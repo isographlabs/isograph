@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "workspaces": [
+    "./libs/*"
+  ],
+  "devDependencies": {
+    "typescript": "^5.0.3"
+  }
+}

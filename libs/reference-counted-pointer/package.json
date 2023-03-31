@@ -1,0 +1,26 @@
+{
+  "name": "@boulton/reference-counted-pointer",
+  "version": "0.0.3",
+  "description": "Reference counted pointers enable sharing of disposable items.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "author": "Boulton Labs",
+  "license": "MIT",
+  "scripts": {
+    "compile": "rm -rf dist/* && tsc -p tsconfig.pkg.json",
+    "compile-watch": "tsc -p tsconfig.pkg.json --watch",
+    "test": "vitest run",
+    "test-watch": "vitest watch",
+    "coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@boulton/disposable-types": "0.0.3",
+    "react": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.31",
+    "react-test-renderer": "^18.2.0",
+    "typescript": "^5.0.3",
+    "vitest": "^0.29.8"
+  }
+}

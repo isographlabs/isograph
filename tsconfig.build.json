@@ -1,0 +1,19 @@
+{
+  "exclude": ["**/*.test.ts", "**/*.stub.ts", "node_modules", "dist"],
+  "compilerOptions": {
+    "target": "ES2015",
+    "module": "commonjs",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "noUnusedLocals": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUnusedParameters": true,
+    "paths": {
+      "@boulton/*": ["./libs/*"]
+    }
+  }
+}
