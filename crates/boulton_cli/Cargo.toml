@@ -1,0 +1,9 @@
+[package]
+name = "boulton_cli"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+structopt = "0.3.26"
+thiserror = "1.0.40"
+graphql_lang_parser = { path = "../graphql_lang_parser" }

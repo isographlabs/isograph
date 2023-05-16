@@ -5,3 +5,4 @@
 **/*.tsbuildinfo
 **/*.tgz
 **/target/**
+yarn.lock
