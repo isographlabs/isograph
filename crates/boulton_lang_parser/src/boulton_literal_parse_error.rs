@@ -1,10 +1,14 @@
 use thiserror::Error;
 
+use crate::BoultonLangTokenKind;
+
 use super::peekable_lexer::LowLevelParseError;
 
-/// Errors tha make semantic sense when referring to parsing a GraphQL schema file
+pub(crate) type ParseResult<T> = Result<T, BoultonLiteralParseError>;
+
+/// Errors tha make semantic sense when referring to parsing a Boulton literal
 #[derive(Error, Debug)]
-pub enum SchemaParseError {
+pub enum BoultonLiteralParseError {
     #[error("{error}")]
     ParseError { error: LowLevelParseError },
 
@@ -22,10 +26,13 @@ pub enum SchemaParseError {
 
     #[error("Expected a type (e.g. String, [String], or String!)")]
     ExpectedTypeAnnotation,
+
+    #[error("Leftover tokens. Next token: {token}")]
+    LeftoverTokens { token: BoultonLangTokenKind },
 }
 
-impl From<LowLevelParseError> for SchemaParseError {
+impl From<LowLevelParseError> for BoultonLiteralParseError {
     fn from(error: LowLevelParseError) -> Self {
-        SchemaParseError::ParseError { error }
+        BoultonLiteralParseError::ParseError { error }
     }
 }

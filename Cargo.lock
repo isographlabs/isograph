@@ -14,6 +14,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "aho-corasick"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "67fc08ce920c31afb70f013dcce1bfc3a3195de6a228474e45e1f145b36f8d04"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "ansi_term"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -70,9 +79,34 @@ dependencies = [
 name = "boulton_cli"
 version = "0.0.1"
 dependencies = [
+ "boulton_lang_parser",
+ "boulton_lang_types",
  "graphql_lang_parser",
+ "graphql_lang_types",
+ "lazy_static",
+ "regex",
  "structopt",
  "thiserror",
+]
+
+[[package]]
+name = "boulton_lang_parser"
+version = "0.0.1"
+dependencies = [
+ "boulton_lang_types",
+ "graphql_lang_types",
+ "intern",
+ "logos",
+ "thiserror",
+]
+
+[[package]]
+name = "boulton_lang_types"
+version = "0.0.1"
+dependencies = [
+ "graphql_lang_types",
+ "intern",
+ "string_key_newtype",
 ]
 
 [[package]]
@@ -266,6 +300,7 @@ name = "graphql_lang_types"
 version = "0.0.1"
 dependencies = [
  "intern",
+ "string_key_newtype",
 ]
 
 [[package]]
@@ -410,7 +445,7 @@ dependencies = [
  "fnv",
  "proc-macro2",
  "quote",
- "regex-syntax",
+ "regex-syntax 0.6.29",
  "syn 1.0.109",
 ]
 
@@ -435,6 +470,12 @@ checksum = "6365506850d44bff6e2fbcb5176cf63650e48bd45ef2fe2665ae1570e0f4b9ca"
 dependencies = [
  "digest",
 ]
+
+[[package]]
+name = "memchr"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
 name = "memoffset"
@@ -566,10 +607,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "regex"
+version = "1.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1a59b5d8e97dee33696bf13c5ba8ab85341c002922fba050069326b9c498974"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-syntax 0.7.2",
+]
+
+[[package]]
 name = "regex-syntax"
 version = "0.6.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f162c6dd7b008981e4d40210aca20b4bd0f9b60ca9271061b07f78537722f2e1"
+
+[[package]]
+name = "regex-syntax"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "436b050e76ed2903236f032a59761c1eb99e1b0aead2c257922771dab1fc8c78"
 
 [[package]]
 name = "ryu"
@@ -641,6 +699,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "string_key_newtype"
+version = "0.1.0"
+dependencies = [
+ "intern",
 ]
 
 [[package]]

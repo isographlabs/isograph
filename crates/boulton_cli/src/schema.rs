@@ -1,0 +1,58 @@
+use std::path::PathBuf;
+
+use boulton_lang_types::ResolverDeclaration;
+use graphql_lang_types::WithSpan;
+
+use crate::batch_compile::BatchCompileError;
+
+/// Read schema file
+pub(crate) fn read_schema_file(path: PathBuf) -> Result<String, BatchCompileError> {
+    let current_dir = std::env::current_dir().expect("current_dir should exist");
+    let joined = current_dir.join(path);
+    let canonicalized_existing_path =
+        joined
+            .canonicalize()
+            .map_err(|message| BatchCompileError::UnableToLoadSchema {
+                path: joined,
+                message,
+            })?;
+
+    if !canonicalized_existing_path.is_file() {
+        return Err(BatchCompileError::SchemaNotAFile {
+            path: canonicalized_existing_path,
+        });
+    }
+
+    let contents = std::fs::read(canonicalized_existing_path.clone()).map_err(|message| {
+        BatchCompileError::UnableToReadFile {
+            path: canonicalized_existing_path,
+            message,
+        }
+    })?;
+
+    let contents = std::str::from_utf8(&contents)
+        .map_err(|message| BatchCompileError::UnableToConvertToString { message })?
+        .to_owned();
+
+    Ok(contents)
+}
+
+pub struct Schema {}
+
+impl Schema {
+    pub fn process_resolver_declaration(
+        &mut self,
+        resolver_declaration: WithSpan<ResolverDeclaration>,
+    ) {
+        eprintln!(
+            "processed resolver declaration: {:#?}",
+            resolver_declaration
+        );
+        // TODO return some wrapper
+    }
+}
+
+// TODO rename
+pub(crate) fn process_schema_def(schema: graphql_lang_types::TypeSystemDocument) -> Schema {
+    Schema {}
+}

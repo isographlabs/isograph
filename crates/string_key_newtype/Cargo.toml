@@ -1,8 +1,7 @@
 [package]
-name = "graphql_lang_types"
-version = "0.0.1"
+name = "string_key_newtype"
+version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 intern = { git = "https://github.com/facebook/relay.git" }
-string_key_newtype = { path = "../string_key_newtype" }

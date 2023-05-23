@@ -1,3 +1,3 @@
 # Boulton
 
-> State management libraries.
+> The best way to build React apps backed by GraphQL data

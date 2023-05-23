@@ -10,20 +10,21 @@ use graphql_lang_types::{
     TypeSystemDocument, TypeTrait, Value, ValueType, WithSpan,
 };
 
+use crate::ParseResult;
+
 use super::{
-    description::parse_optional_description, parse_error::SchemaParseError,
-    peekable_lexer::PeekableLexer,
+    description::parse_optional_description, peekable_lexer::PeekableLexer,
+    schema_parse_error::SchemaParseError,
 };
 
-pub fn parse_schema(source: &str) -> Result<TypeSystemDocument, SchemaParseError> {
+pub fn parse_schema(source: &str) -> ParseResult<TypeSystemDocument> {
     let mut tokens = PeekableLexer::new(source);
 
-    dbg!(parse_type_system_document(&mut tokens))
+    // dbg!(parse_type_system_document(&mut tokens))
+    parse_type_system_document(&mut tokens)
 }
 
-fn parse_type_system_document(
-    tokens: &mut PeekableLexer,
-) -> Result<TypeSystemDocument, SchemaParseError> {
+fn parse_type_system_document(tokens: &mut PeekableLexer) -> ParseResult<TypeSystemDocument> {
     let mut type_system_definitions = vec![];
     while !tokens.reached_eof() {
         let type_system_definition = parse_type_system_definition(tokens)?;
@@ -32,9 +33,7 @@ fn parse_type_system_document(
     Ok(TypeSystemDocument(type_system_definitions))
 }
 
-fn parse_type_system_definition(
-    tokens: &mut PeekableLexer,
-) -> Result<TypeSystemDefinition, SchemaParseError> {
+fn parse_type_system_definition(tokens: &mut PeekableLexer) -> ParseResult<TypeSystemDefinition> {
     let description = parse_optional_description(tokens);
     let identifier = tokens.parse_token_of_kind(TokenKind::Identifier)?;
     let identifier_source = tokens.source(identifier.span);
@@ -51,7 +50,7 @@ fn parse_type_system_definition(
 fn parse_object_type_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
-) -> Result<ObjectTypeDefinition, SchemaParseError> {
+) -> ParseResult<ObjectTypeDefinition> {
     let name = tokens.parse_string_key_type(TokenKind::Identifier)?;
 
     let interfaces = parse_implements_interfaces_if_present(tokens)?;
@@ -70,7 +69,7 @@ fn parse_object_type_definition(
 /// The state of the PeekableLexer is that we have not parsed the "implements" keyword.
 fn parse_implements_interfaces_if_present(
     tokens: &mut PeekableLexer,
-) -> Result<Vec<WithSpan<InterfaceTypeName>>, SchemaParseError> {
+) -> ParseResult<Vec<WithSpan<InterfaceTypeName>>> {
     if tokens.parse_matching_identifier("implements").is_ok() {
         let interfaces = parse_interfaces(tokens)?;
         Ok(interfaces)
@@ -88,9 +87,7 @@ fn parse_implements_interfaces_if_present(
 ///
 /// In the spec, this would error later, e.g. after an ObjectTypeDefinition
 /// with only "Foo", no directives and no fields was successfully parsed.
-fn parse_interfaces(
-    tokens: &mut PeekableLexer,
-) -> Result<Vec<WithSpan<InterfaceTypeName>>, SchemaParseError> {
+fn parse_interfaces(tokens: &mut PeekableLexer) -> ParseResult<Vec<WithSpan<InterfaceTypeName>>> {
     let _optional_ampersand = tokens.parse_token_of_kind(TokenKind::Ampersand);
 
     let first_interface = tokens.parse_string_key_type(TokenKind::Identifier)?;
@@ -106,7 +103,7 @@ fn parse_interfaces(
 
 fn parse_constant_directives(
     tokens: &mut PeekableLexer,
-) -> Result<Vec<Directive<ConstantValue>>, SchemaParseError> {
+) -> ParseResult<Vec<Directive<ConstantValue>>> {
     let mut directives = vec![];
     while tokens.parse_token_of_kind(TokenKind::At).is_ok() {
         directives.push(Directive {
@@ -120,7 +117,7 @@ fn parse_constant_directives(
 // Parse constant arguments passed to a directive used in a schema definition.
 fn parse_optional_constant_arguments<T: From<StringKey>>(
     tokens: &mut PeekableLexer,
-) -> Result<Vec<NameValuePair<T, ConstantValue>>, SchemaParseError> {
+) -> ParseResult<Vec<NameValuePair<T, ConstantValue>>> {
     if tokens.parse_token_of_kind(TokenKind::OpenParen).is_ok() {
         let first_name_value_pair = parse_constant_name_value_pair(tokens, parse_constant_value)?;
 
@@ -142,8 +139,8 @@ fn parse_optional_constant_arguments<T: From<StringKey>>(
 /// The state of the PeekableLexer is that it is about to parse the "foo" in "foo: bar"
 fn parse_constant_name_value_pair<T: From<StringKey>, TValue: ValueType>(
     tokens: &mut PeekableLexer,
-    parse_value: impl Fn(&mut PeekableLexer) -> Result<WithSpan<TValue>, SchemaParseError>,
-) -> Result<NameValuePair<T, TValue>, SchemaParseError> {
+    parse_value: impl Fn(&mut PeekableLexer) -> ParseResult<WithSpan<TValue>>,
+) -> ParseResult<NameValuePair<T, TValue>> {
     let name = tokens.parse_string_key_type(TokenKind::Identifier)?;
     tokens.parse_token_of_kind(TokenKind::Colon)?;
     let value = parse_value(tokens)?;
@@ -151,9 +148,7 @@ fn parse_constant_name_value_pair<T: From<StringKey>, TValue: ValueType>(
     Ok(NameValuePair { name, value })
 }
 
-fn parse_constant_value(
-    tokens: &mut PeekableLexer,
-) -> Result<WithSpan<ConstantValue>, SchemaParseError> {
+fn parse_constant_value(tokens: &mut PeekableLexer) -> ParseResult<WithSpan<ConstantValue>> {
     from_control_flow(|| {
         to_control_flow(|| {
             tokens
@@ -219,7 +214,7 @@ fn parse_constant_value(
         })?;
 
         to_control_flow(|| {
-            let x: Result<_, SchemaParseError> = tokens
+            let x: ParseResult<_> = tokens
                 .with_span(|tokens| {
                     tokens.parse_token_of_kind(TokenKind::OpenBracket)?;
                     let mut values = vec![];
@@ -233,7 +228,7 @@ fn parse_constant_value(
         })?;
 
         to_control_flow(|| {
-            let x: Result<_, SchemaParseError> = tokens
+            let x: ParseResult<_> = tokens
                 .with_span(|tokens| {
                     tokens.parse_token_of_kind(TokenKind::OpenBrace)?;
                     let mut values = vec![];
@@ -254,7 +249,7 @@ fn parse_constant_value(
 }
 
 #[allow(dead_code)]
-fn parse_value(_tokens: &mut PeekableLexer) -> Result<WithSpan<Value>, SchemaParseError> {
+fn parse_value(_tokens: &mut PeekableLexer) -> ParseResult<WithSpan<Value>> {
     todo!("Non-constant values are not yet supported")
 }
 
@@ -274,7 +269,7 @@ fn from_control_flow<T, E>(control_flow: impl FnOnce() -> ControlFlow<T, E>) -> 
 
 fn parse_optional_fields<'a>(
     tokens: &mut PeekableLexer<'a>,
-) -> Result<Vec<WithSpan<OutputFieldDefinition>>, SchemaParseError> {
+) -> ParseResult<Vec<WithSpan<OutputFieldDefinition>>> {
     let brace = tokens.parse_token_of_kind(TokenKind::OpenBrace);
     if brace.is_err() {
         return Ok(vec![]);
@@ -289,9 +284,7 @@ fn parse_optional_fields<'a>(
     Ok(fields)
 }
 
-fn parse_field<'a>(
-    tokens: &mut PeekableLexer<'a>,
-) -> Result<WithSpan<OutputFieldDefinition>, SchemaParseError> {
+fn parse_field<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResult<WithSpan<OutputFieldDefinition>> {
     tokens
         .with_span(|tokens| {
             let description = parse_optional_description(tokens);
@@ -317,7 +310,7 @@ fn parse_field<'a>(
 
 fn parse_type_annotation<'a, T: TypeTrait>(
     tokens: &mut PeekableLexer<'a>,
-) -> Result<TypeAnnotation<T>, SchemaParseError> {
+) -> ParseResult<TypeAnnotation<T>> {
     from_control_flow(|| {
         // Why do we need this annotation?
         to_control_flow::<_, SchemaParseError>(|| {
@@ -365,7 +358,7 @@ fn parse_type_annotation<'a, T: TypeTrait>(
 
 fn parse_optional_argument_definitions<'a>(
     tokens: &mut PeekableLexer<'a>,
-) -> Result<Vec<WithSpan<InputValueDefinition>>, SchemaParseError> {
+) -> ParseResult<Vec<WithSpan<InputValueDefinition>>> {
     let paren = tokens.parse_token_of_kind(TokenKind::OpenParen);
 
     if paren.is_ok() {
@@ -383,7 +376,7 @@ fn parse_optional_argument_definitions<'a>(
 
 fn parse_argument_definition<'a>(
     tokens: &mut PeekableLexer<'a>,
-) -> Result<WithSpan<InputValueDefinition>, SchemaParseError> {
+) -> ParseResult<WithSpan<InputValueDefinition>> {
     tokens
         .with_span(|tokens| {
             let description = parse_optional_description(tokens);
@@ -406,7 +399,7 @@ fn parse_argument_definition<'a>(
 
 fn parse_optional_constant_default_value<'a>(
     tokens: &mut PeekableLexer<'a>,
-) -> Result<Option<WithSpan<ConstantValue>>, SchemaParseError> {
+) -> ParseResult<Option<WithSpan<ConstantValue>>> {
     let equal = tokens.parse_token_of_kind(TokenKind::Equals);
     if equal.is_err() {
         return Ok(None);

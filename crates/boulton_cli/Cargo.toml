@@ -7,3 +7,8 @@ edition = "2021"
 structopt = "0.3.26"
 thiserror = "1.0.40"
 graphql_lang_parser = { path = "../graphql_lang_parser" }
+graphql_lang_types = { path = "../graphql_lang_types" }
+boulton_lang_parser = { path = "../boulton_lang_parser" }
+boulton_lang_types = { path = "../boulton_lang_types" }
+lazy_static = "1.4"
+regex = "1.6.0"
