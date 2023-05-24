@@ -1,9 +1,11 @@
 use std::{fmt, ops::Deref};
 
-use super::{
-    write_arguments, write_directives, ConstantValue, DescriptionValue, Directive,
-    FieldDefinitionName, InputTypeName, InputValueName, InterfaceTypeName, ObjectTypeName,
-    OutputTypeName, TypeAnnotation, WithSpan,
+use crate::{Directive, TypeAnnotation};
+
+use super::{write_arguments, write_directives, ConstantValue};
+use common_lang_types::{
+    DescriptionValue, FieldDefinitionName, InputTypeName, InputValueName, InterfaceTypeName,
+    ObjectTypeName, UnvalidatedTypeName, WithSpan,
 };
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -52,7 +54,7 @@ pub struct ObjectTypeDefinition {
 pub struct OutputFieldDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithSpan<FieldDefinitionName>,
-    pub type_: TypeAnnotation<OutputTypeName>,
+    pub type_: TypeAnnotation<UnvalidatedTypeName>,
     pub arguments: Vec<WithSpan<InputValueDefinition>>,
     pub directives: Vec<Directive<ConstantValue>>,
 }

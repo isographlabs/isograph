@@ -1,9 +1,13 @@
+pub trait StringKeyNewtype {}
+
 #[macro_export]
 macro_rules! string_key_newtype {
     ($named:ident) => {
         // TODO serialize, deserialize
         #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
         pub struct $named(intern::string_key::StringKey);
+
+        impl string_key_newtype::StringKeyNewtype for $named {}
 
         impl intern::Lookup for $named {
             fn lookup(self) -> &'static str {
@@ -21,6 +25,17 @@ macro_rules! string_key_newtype {
         impl From<intern::string_key::StringKey> for $named {
             fn from(other: intern::string_key::StringKey) -> Self {
                 Self(other)
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! string_key_conversion {
+    ($from:ident, $to:ident) => {
+        impl From<$from> for $to {
+            fn from(other: $from) -> Self {
+                Self(other.0)
             }
         }
     };

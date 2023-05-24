@@ -3,7 +3,7 @@ use intern::string_key::{Intern, StringKey};
 use logos::Logos;
 use thiserror::Error;
 
-use graphql_lang_types::{Span, WithSpan};
+use common_lang_types::{Span, WithSpan};
 
 pub(crate) struct PeekableLexer<'source> {
     current: WithSpan<TokenKind>,

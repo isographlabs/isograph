@@ -5,14 +5,18 @@ use regex::Regex;
 
 use crate::batch_compile::BatchCompileError;
 
-pub(crate) fn read_files_in_folder(path: PathBuf) -> Result<Vec<String>, BatchCompileError> {
+pub(crate) fn read_files_in_folder(
+    root_js_path: PathBuf,
+) -> Result<Vec<(PathBuf, String)>, BatchCompileError> {
+    // current_dir is the directory from which boult was run, and we expect paths
+    // to be relative to that.
     let current_dir = std::env::current_dir().expect("current_dir should exist");
-    let joined = current_dir.join(path);
+    let joined = current_dir.join(root_js_path);
     let canonicalized_existing_path =
         joined
             .canonicalize()
             .map_err(|message| BatchCompileError::UnableToLoadSchema {
-                path: joined,
+                path: joined.clone(),
                 message,
             })?;
 
@@ -40,9 +44,9 @@ pub(crate) fn read_files_in_folder(path: PathBuf) -> Result<Vec<String>, BatchCo
                 .map_err(|message| BatchCompileError::UnableToConvertToString { message })?
                 .to_owned();
 
-            Ok(contents)
+            Ok((entry.path().strip_prefix(&joined)?.to_path_buf(), contents))
         })
-        .collect::<Result<_, _>>()
+        .collect()
 }
 
 lazy_static! {

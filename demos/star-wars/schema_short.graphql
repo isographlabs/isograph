@@ -23,7 +23,13 @@
 # "A description"
 # type Bar implements Baz
 
+"""
+Root object
+"""
 type Query {
+  """
+  Probably whoever is logged in.
+  """
   current_user: User!
   current_post: Post!
 }

@@ -5,4 +5,4 @@ edition = "2021"
 
 [dependencies]
 intern = { git = "https://github.com/facebook/relay.git" }
-string_key_newtype = { path = "../string_key_newtype" }
+common_lang_types = { path = "../common_lang_types" }

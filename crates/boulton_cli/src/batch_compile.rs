@@ -1,13 +1,15 @@
 use std::path::PathBuf;
 
 use boulton_lang_parser::parse_bdeclare_literal;
+use boulton_schema::Schema;
 use graphql_lang_parser::parse_schema;
+use intern::string_key::Intern;
 use structopt::StructOpt;
 use thiserror::Error;
 
 use crate::{
     boulton_literals::{extract_b_declare_literal_from_file_content, read_files_in_folder},
-    schema::{process_schema_def, read_schema_file},
+    schema::read_schema_file,
 };
 
 /// Options if we're doing a batch compilation
@@ -25,17 +27,28 @@ pub(crate) struct BatchCompileCliOptions {
 
 pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), BatchCompileError> {
     let content = read_schema_file(opt.schema)?;
-    let schema_def = parse_schema(&content)?;
-    let mut schema = process_schema_def(schema_def);
+    let type_system_document = parse_schema(&content)?;
+    let mut schema = Schema::new();
 
+    schema.process_type_system_document(type_system_document)?;
+
+    // TODO return an iterator
     let project_files = read_files_in_folder(opt.project_root)?;
-    for file_content in project_files {
+    for (file_path, file_content) in project_files {
+        // TODO don't intern unless there's a match
+        let interned_file_path = file_path.to_string_lossy().into_owned().intern().into();
+
         let b_declare_literals = extract_b_declare_literal_from_file_content(&file_content);
         for b_declare_literal in b_declare_literals {
-            let resolver_declaration = parse_bdeclare_literal(&b_declare_literal)?;
-            schema.process_resolver_declaration(resolver_declaration);
+            let resolver_declaration =
+                parse_bdeclare_literal(&b_declare_literal, interned_file_path)?;
+            schema.process_resolver_declaration(resolver_declaration)?;
         }
     }
+
+    let validated_schema = Schema::validate_and_construct(schema)?;
+
+    dbg!(validated_schema);
 
     Ok(())
 }
@@ -75,6 +88,26 @@ pub(crate) enum BatchCompileError {
     UnableToParseBoultonLiteral {
         message: boulton_lang_parser::BoultonLiteralParseError,
     },
+
+    #[error("Unable to create schema.\nMessage: {message:?}")]
+    UnableToCreateSchema {
+        message: boulton_schema::ProcessTypeDefinitionError,
+    },
+
+    #[error("Error when processing resolver declaration.\nMessage: {message:?}")]
+    ErrorWhenProcessingResolverDeclaration {
+        message: boulton_schema::ProcessResolverDeclarationError,
+    },
+
+    #[error("Unable to strip prefix.\nMessage: {message:?}")]
+    UnableToStripPrefix {
+        message: std::path::StripPrefixError,
+    },
+
+    #[error("Unable to validate schema.\nMessage: {message:?}")]
+    UnableToValidateSchema {
+        message: boulton_schema::ValidateSchemaError,
+    },
 }
 
 impl From<graphql_lang_parser::SchemaParseError> for BatchCompileError {
@@ -86,5 +119,29 @@ impl From<graphql_lang_parser::SchemaParseError> for BatchCompileError {
 impl From<boulton_lang_parser::BoultonLiteralParseError> for BatchCompileError {
     fn from(value: boulton_lang_parser::BoultonLiteralParseError) -> Self {
         BatchCompileError::UnableToParseBoultonLiteral { message: value }
+    }
+}
+
+impl From<boulton_schema::ProcessTypeDefinitionError> for BatchCompileError {
+    fn from(value: boulton_schema::ProcessTypeDefinitionError) -> Self {
+        BatchCompileError::UnableToCreateSchema { message: value }
+    }
+}
+
+impl From<boulton_schema::ProcessResolverDeclarationError> for BatchCompileError {
+    fn from(value: boulton_schema::ProcessResolverDeclarationError) -> Self {
+        BatchCompileError::ErrorWhenProcessingResolverDeclaration { message: value }
+    }
+}
+
+impl From<std::path::StripPrefixError> for BatchCompileError {
+    fn from(value: std::path::StripPrefixError) -> Self {
+        BatchCompileError::UnableToStripPrefix { message: value }
+    }
+}
+
+impl From<boulton_schema::ValidateSchemaError> for BatchCompileError {
+    fn from(value: boulton_schema::ValidateSchemaError) -> Self {
+        BatchCompileError::UnableToValidateSchema { message: value }
     }
 }

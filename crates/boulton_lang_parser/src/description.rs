@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use intern::string_key::Intern;
 
-use graphql_lang_types::{DescriptionValue, WithSpan};
+use common_lang_types::{DescriptionValue, WithSpan};
 
 use crate::{BoultonLangTokenKind, PeekableLexer};
 

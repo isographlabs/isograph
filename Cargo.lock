@@ -81,8 +81,10 @@ version = "0.0.1"
 dependencies = [
  "boulton_lang_parser",
  "boulton_lang_types",
+ "boulton_schema",
  "graphql_lang_parser",
  "graphql_lang_types",
+ "intern",
  "lazy_static",
  "regex",
  "structopt",
@@ -90,10 +92,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "boulton_ir"
+version = "0.1.0"
+
+[[package]]
 name = "boulton_lang_parser"
 version = "0.0.1"
 dependencies = [
  "boulton_lang_types",
+ "common_lang_types",
  "graphql_lang_types",
  "intern",
  "logos",
@@ -104,9 +111,20 @@ dependencies = [
 name = "boulton_lang_types"
 version = "0.0.1"
 dependencies = [
+ "common_lang_types",
  "graphql_lang_types",
  "intern",
- "string_key_newtype",
+]
+
+[[package]]
+name = "boulton_schema"
+version = "0.1.0"
+dependencies = [
+ "boulton_lang_types",
+ "common_lang_types",
+ "graphql_lang_types",
+ "intern",
+ "thiserror",
 ]
 
 [[package]]
@@ -155,6 +173,15 @@ dependencies = [
  "rayon",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "common_lang_types"
+version = "0.1.0"
+dependencies = [
+ "intern",
+ "string_key_newtype",
+ "u32_newtypes",
 ]
 
 [[package]]
@@ -288,6 +315,7 @@ dependencies = [
 name = "graphql_lang_parser"
 version = "0.0.1"
 dependencies = [
+ "common_lang_types",
  "graphql-syntax",
  "graphql_lang_types",
  "intern",
@@ -299,8 +327,8 @@ dependencies = [
 name = "graphql_lang_types"
 version = "0.0.1"
 dependencies = [
+ "common_lang_types",
  "intern",
- "string_key_newtype",
 ]
 
 [[package]]
@@ -815,6 +843,10 @@ name = "typenum"
 version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "497961ef93d974e23eb6f433eb5fe1b7930b659f06d12dec6fc44a8f554c0bba"
+
+[[package]]
+name = "u32_newtypes"
+version = "0.1.0"
 
 [[package]]
 name = "unicode-bidi"

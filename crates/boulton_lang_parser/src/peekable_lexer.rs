@@ -1,9 +1,8 @@
 use crate::BoultonLangTokenKind;
+use common_lang_types::{Span, WithSpan};
 use intern::string_key::{Intern, StringKey};
 use logos::Logos;
 use thiserror::Error;
-
-use graphql_lang_types::{Span, WithSpan};
 
 pub(crate) struct PeekableLexer<'source> {
     current: WithSpan<BoultonLangTokenKind>,
@@ -116,6 +115,7 @@ impl<'source> PeekableLexer<'source> {
         Ok(WithSpan::new(source.into(), kind.span))
     }
 
+    #[allow(dead_code)]
     pub fn parse_matching_identifier(
         &mut self,
         identifier: &'static str,

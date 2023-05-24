@@ -6,4 +6,4 @@ edition = "2021"
 [dependencies]
 intern = { git = "https://github.com/facebook/relay.git" }
 graphql_lang_types = { path = "../graphql_lang_types" }
-string_key_newtype = { path = "../string_key_newtype" }
+common_lang_types = { path = "../common_lang_types" }

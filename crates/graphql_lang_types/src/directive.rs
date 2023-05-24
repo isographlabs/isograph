@@ -1,7 +1,9 @@
 use std::fmt;
 
+use common_lang_types::{DirectiveArgumentName, DirectiveName, WithSpan};
+
 use super::write::write_arguments;
-use super::{DirectiveArgumentName, DirectiveName, NameValuePair, ValueType, WithSpan};
+use super::{NameValuePair, ValueType};
 
 // TODO maybe this should be NameAndArguments and a field should be the same thing...?
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]

@@ -1,13 +1,15 @@
 use std::ops::ControlFlow;
 
+use common_lang_types::{
+    DescriptionValue, InterfaceTypeName, ValidTypeAnnotationInnerType, WithSpan,
+};
 use graphql_syntax::TokenKind;
 use intern::string_key::StringKey;
 
 use graphql_lang_types::{
-    ConstantValue, DescriptionValue, Directive, InputValueDefinition, InterfaceTypeName,
-    ListTypeAnnotation, NameValuePair, NamedTypeAnnotation, NonNullTypeAnnotation,
-    ObjectTypeDefinition, OutputFieldDefinition, TypeAnnotation, TypeSystemDefinition,
-    TypeSystemDocument, TypeTrait, Value, ValueType, WithSpan,
+    ConstantValue, Directive, InputValueDefinition, ListTypeAnnotation, NameValuePair,
+    NamedTypeAnnotation, NonNullTypeAnnotation, ObjectTypeDefinition, OutputFieldDefinition,
+    TypeAnnotation, TypeSystemDefinition, TypeSystemDocument, Value, ValueType,
 };
 
 use crate::ParseResult;
@@ -308,7 +310,7 @@ fn parse_field<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResult<WithSpan<Outpu
         .transpose()
 }
 
-fn parse_type_annotation<'a, T: TypeTrait>(
+fn parse_type_annotation<'a, T: ValidTypeAnnotationInnerType + From<StringKey>>(
     tokens: &mut PeekableLexer<'a>,
 ) -> ParseResult<TypeAnnotation<T>> {
     from_control_flow(|| {

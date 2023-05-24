@@ -9,7 +9,7 @@ export const current_post_component = bDeclare`
       content,
       author {
         name,
-        avatar,
+        avatar_component,
       },
     },
   }
@@ -18,7 +18,7 @@ export const current_post_component = bDeclare`
     <div>
       <h1>{data.name}</h1>
       By <b>{data.author.name}</b>
-      <p>{data.author.avatar}</p>
+      <p>{data.author.avatar_component}</p>
       <p>{data.content}</p>
     </div>
   );

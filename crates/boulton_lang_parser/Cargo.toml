@@ -4,6 +4,7 @@ version = "0.0.1"
 edition = "2021"
 
 [dependencies]
+common_lang_types = { path = "../common_lang_types" }
 boulton_lang_types = { path = "../boulton_lang_types" }
 logos = "0.12"
 thiserror = "1.0.40"

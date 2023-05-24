@@ -1,0 +1,13 @@
+[package]
+name = "boulton_schema"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+common_lang_types = { path = "../common_lang_types" }
+boulton_lang_types = { path = "../boulton_lang_types" }
+graphql_lang_types = { path = "../graphql_lang_types" }
+intern = { git = "https://github.com/facebook/relay.git" }
+thiserror = "1.0.40"

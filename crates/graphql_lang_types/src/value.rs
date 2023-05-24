@@ -1,6 +1,8 @@
 use std::fmt;
 
-use super::{EnumLiteralValue, StringLiteralValue, ValueKeyName, VariableName, WithSpan};
+use common_lang_types::{
+    EnumLiteralValue, StringLiteralValue, ValueKeyName, VariableName, WithSpan,
+};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum ConstantValue {

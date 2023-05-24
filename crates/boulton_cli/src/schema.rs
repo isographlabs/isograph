@@ -1,8 +1,5 @@
 use std::path::PathBuf;
 
-use boulton_lang_types::ResolverDeclaration;
-use graphql_lang_types::WithSpan;
-
 use crate::batch_compile::BatchCompileError;
 
 /// Read schema file
@@ -35,24 +32,4 @@ pub(crate) fn read_schema_file(path: PathBuf) -> Result<String, BatchCompileErro
         .to_owned();
 
     Ok(contents)
-}
-
-pub struct Schema {}
-
-impl Schema {
-    pub fn process_resolver_declaration(
-        &mut self,
-        resolver_declaration: WithSpan<ResolverDeclaration>,
-    ) {
-        eprintln!(
-            "processed resolver declaration: {:#?}",
-            resolver_declaration
-        );
-        // TODO return some wrapper
-    }
-}
-
-// TODO rename
-pub(crate) fn process_schema_def(schema: graphql_lang_types::TypeSystemDocument) -> Schema {
-    Schema {}
 }

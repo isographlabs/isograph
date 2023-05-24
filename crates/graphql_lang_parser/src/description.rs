@@ -1,9 +1,8 @@
 use std::collections::VecDeque;
 
+use common_lang_types::{DescriptionValue, WithSpan};
 use graphql_syntax::TokenKind;
 use intern::string_key::Intern;
-
-use graphql_lang_types::{DescriptionValue, WithSpan};
 
 use super::peekable_lexer::PeekableLexer;
 
