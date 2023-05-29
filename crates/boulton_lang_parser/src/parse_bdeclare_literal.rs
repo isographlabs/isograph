@@ -2,7 +2,7 @@ use boulton_lang_types::{
     FieldSelection, LinkedFieldSelection, ResolverDeclaration, ScalarFieldSelection, Selection,
     SelectionSetAndUnwraps, Unwrap,
 };
-use common_lang_types::{LinkedFieldName, ResolverDefinitionPath, ScalarFieldName, WithSpan};
+use common_lang_types::{ResolverDefinitionPath, WithSpan};
 use intern::string_key::StringKey;
 
 use crate::{
@@ -58,7 +58,7 @@ fn parse_resolver_declaration<'a>(
 
 fn parse_optional_selection_set_and_unwraps<'a>(
     tokens: &mut PeekableLexer<'a>,
-) -> ParseResult<Option<SelectionSetAndUnwraps<ScalarFieldName, LinkedFieldName>>> {
+) -> ParseResult<Option<SelectionSetAndUnwraps<(), ()>>> {
     let selection_set = parse_optional_selection_set(tokens)?;
     match selection_set {
         Some(selection_set) => {
@@ -74,7 +74,7 @@ fn parse_optional_selection_set_and_unwraps<'a>(
 
 fn parse_optional_selection_set<'a>(
     tokens: &mut PeekableLexer<'a>,
-) -> ParseResult<Option<Vec<WithSpan<Selection<ScalarFieldName, LinkedFieldName>>>>> {
+) -> ParseResult<Option<Vec<WithSpan<Selection<(), ()>>>>> {
     let open_brace = tokens.parse_token_of_kind(BoultonLangTokenKind::OpenBrace);
     if open_brace.is_err() {
         return Ok(None);
@@ -90,9 +90,7 @@ fn parse_optional_selection_set<'a>(
     Ok(Some(selections))
 }
 
-fn parse_selection<'a>(
-    tokens: &mut PeekableLexer<'a>,
-) -> ParseResult<WithSpan<Selection<ScalarFieldName, LinkedFieldName>>> {
+fn parse_selection<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResult<WithSpan<Selection<(), ()>>> {
     tokens
         .with_span(|tokens| {
             let (field_name, alias) = parse_optional_alias_and_field_name(tokens)?;
@@ -112,7 +110,7 @@ fn parse_selection<'a>(
                     Selection::Field(FieldSelection::LinkedField(LinkedFieldSelection {
                         name: field_name.map(|string_key| string_key.into()),
                         alias: alias.map(|with_span| with_span.map(|string_key| string_key.into())),
-                        field: field_name.map(|string_key| string_key.into()),
+                        field: (),
                         selection_set_and_unwraps: SelectionSetAndUnwraps {
                             unwraps,
                             selection_set,
@@ -122,7 +120,7 @@ fn parse_selection<'a>(
                 None => Selection::Field(FieldSelection::ScalarField(ScalarFieldSelection {
                     name: field_name.map(|string_key| string_key.into()),
                     alias: alias.map(|with_span| with_span.map(|string_key| string_key.into())),
-                    field: field_name.map(|string_key| string_key.into()),
+                    field: (),
                     unwraps,
                 })),
             };

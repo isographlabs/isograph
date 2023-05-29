@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use boulton_lang_types::SelectionSetAndUnwraps;
 use common_lang_types::{
-    DefinedField, DescriptionValue, FieldDefinitionName, FieldId, HasName, LinkedFieldName,
-    ObjectId, ObjectTypeName, OutputTypeId, OutputTypeName, ResolverDefinitionPath,
-    ScalarFieldName, ScalarId, ScalarTypeName, TypeId, TypeWithFieldsId, TypeWithFieldsName,
-    TypeWithoutFieldsId, TypeWithoutFieldsName, UnvalidatedTypeName, ValidLinkedFieldType,
-    ValidScalarFieldType, ValidTypeAnnotationInnerType,
+    DefinedField, DescriptionValue, FieldDefinitionName, FieldId, HasName, ObjectId,
+    ObjectTypeName, OutputTypeId, OutputTypeName, ResolverDefinitionPath, ScalarFieldName,
+    ScalarId, ScalarTypeName, TypeId, TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId,
+    TypeWithoutFieldsName, UnvalidatedTypeName, ValidLinkedFieldType, ValidScalarFieldType,
+    ValidTypeAnnotationInnerType,
 };
 use intern::string_key::Intern;
 
@@ -49,14 +49,10 @@ pub struct Schema<
     // Mutation
 }
 
-pub(crate) type UnvalidatedSchema = Schema<UnvalidatedTypeName, ScalarFieldName, LinkedFieldName>;
+pub(crate) type UnvalidatedSchema = Schema<UnvalidatedTypeName, (), ()>;
 
-pub(crate) type UnvalidatedSchemaField = SchemaField<
-    DefinedField<
-        UnvalidatedTypeName,
-        SchemaResolverDefinitionInfo<ScalarFieldName, LinkedFieldName>,
-    >,
->;
+pub(crate) type UnvalidatedSchemaField =
+    SchemaField<DefinedField<UnvalidatedTypeName, SchemaResolverDefinitionInfo<(), ()>>>;
 
 #[derive(Debug)]
 pub struct SchemaData {

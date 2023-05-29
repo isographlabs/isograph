@@ -9,7 +9,7 @@ pub struct ResolverDeclaration {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub resolver_field_name: WithSpan<ScalarFieldName>,
-    pub selection_set_and_unwraps: Option<SelectionSetAndUnwraps<ScalarFieldName, LinkedFieldName>>,
+    pub selection_set_and_unwraps: Option<SelectionSetAndUnwraps<(), ()>>,
     // TODO intern the path buf instead of the string?
     pub resolver_definition_path: ResolverDefinitionPath,
 }
@@ -144,12 +144,14 @@ impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
     }
 }
 
-impl HasName for FieldSelection<ScalarFieldName, LinkedFieldName> {
+impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType> HasName
+    for FieldSelection<TScalarField, TLinkedField>
+{
     type Name = FieldDefinitionName;
     fn name(&self) -> Self::Name {
         match self {
-            FieldSelection::ScalarField(s) => s.field.item.into(),
-            FieldSelection::LinkedField(l) => l.field.item.into(),
+            FieldSelection::ScalarField(s) => s.name.item.into(),
+            FieldSelection::LinkedField(l) => l.name.item.into(),
         }
     }
 }
@@ -158,7 +160,7 @@ impl HasName for FieldSelection<ScalarFieldName, LinkedFieldName> {
 pub struct ScalarFieldSelection<TScalarField: ValidScalarFieldType> {
     pub name: WithSpan<ScalarFieldName>,
     pub alias: Option<WithSpan<ScalarFieldAlias>>,
-    pub field: WithSpan<TScalarField>,
+    pub field: TScalarField,
     pub unwraps: Vec<WithSpan<Unwrap>>,
 }
 
@@ -170,7 +172,7 @@ impl<TScalarField: ValidScalarFieldType> ScalarFieldSelection<TScalarField> {
         ScalarFieldSelection {
             name: self.name,
             alias: self.alias,
-            field: self.field.map(map),
+            field: map(self.field),
             unwraps: self.unwraps,
         }
     }
@@ -182,7 +184,7 @@ impl<TScalarField: ValidScalarFieldType> ScalarFieldSelection<TScalarField> {
         Ok(ScalarFieldSelection {
             name: self.name,
             alias: self.alias,
-            field: self.field.and_then(map)?,
+            field: map(self.field)?,
             unwraps: self.unwraps,
         })
     }
@@ -195,7 +197,7 @@ pub struct LinkedFieldSelection<
 > {
     pub name: WithSpan<LinkedFieldName>,
     pub alias: Option<WithSpan<LinkedFieldAlias>>,
-    pub field: WithSpan<TLinkedField>,
+    pub field: TLinkedField,
     pub selection_set_and_unwraps: SelectionSetAndUnwraps<TScalarField, TLinkedField>,
 }
 

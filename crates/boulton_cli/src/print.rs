@@ -74,16 +74,12 @@ fn write_selections(
             Selection::Field(field) => {
                 // foo
                 match field {
-                    ScalarField(scalar_field) => match scalar_field.field.item {
+                    ScalarField(scalar_field) => match scalar_field.field {
                         DefinedField::ServerField(_) => {
-                            // let type_without_fields = schema
-                            //     .schema_data
-                            //     .lookup_type_without_fields(server_field_id);
                             if let Some(alias) = scalar_field.alias {
                                 query_text.push_str(&format!("{}: ", alias));
                             }
                             let name = scalar_field.name.item;
-                            // let name = type_without_fields.name();
                             query_text.push_str(&format!("{},\n", name));
                         }
                         DefinedField::ResolverField(_) => {

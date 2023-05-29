@@ -1,4 +1,4 @@
-use crate::{ValidLinkedFieldType, ValidScalarFieldType};
+use crate::ValidScalarFieldType;
 
 use super::ValidTypeAnnotationInnerType;
 use string_key_newtype::{string_key_conversion, string_key_newtype};
@@ -82,7 +82,6 @@ impl ValidScalarFieldType for ScalarFieldName {}
 string_key_conversion!(ScalarFieldName, FieldDefinitionName);
 
 string_key_newtype!(LinkedFieldName);
-impl ValidLinkedFieldType for LinkedFieldName {}
 string_key_conversion!(LinkedFieldName, FieldDefinitionName);
 
 string_key_newtype!(ScalarFieldAlias);

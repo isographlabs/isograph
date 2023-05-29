@@ -44,6 +44,7 @@ impl<TServerType: ValidTypeAnnotationInnerType, TResolverType>
 /// ScalarFieldName (for unvalidated scalar field selections) and DefinedFieldType<TypeWithoutFieldsId>
 /// (for validated scalar field selections).
 pub trait ValidScalarFieldType {}
+impl ValidScalarFieldType for () {}
 
 impl ValidScalarFieldType for DefinedField<TypeWithoutFieldsId, ()> {}
 
@@ -51,3 +52,4 @@ impl ValidScalarFieldType for DefinedField<TypeWithoutFieldsId, ()> {}
 // /// LinkedFieldName (for unvalidated linked field selections) and TypeWithFieldsId
 // /// (for validated linked field selections).
 pub trait ValidLinkedFieldType {}
+impl ValidLinkedFieldType for () {}

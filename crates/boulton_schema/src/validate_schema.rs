@@ -4,15 +4,14 @@ use boulton_lang_types::{
     LinkedFieldSelection, ScalarFieldSelection, Selection, SelectionSetAndUnwraps,
 };
 use common_lang_types::{
-    DefinedField, FieldDefinitionName, HasName, LinkedFieldName, OutputTypeId, ScalarFieldName,
-    TypeId, TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId, UnvalidatedTypeName,
-    WithSpan,
+    DefinedField, FieldDefinitionName, HasName, OutputTypeId, ScalarFieldName, TypeId,
+    TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId, UnvalidatedTypeName, WithSpan,
 };
 use thiserror::Error;
 
 use crate::{
     Schema, SchemaData, SchemaField, SchemaResolverDefinitionInfo, SchemaTypeWithFields,
-    UnvalidatedSchemaField,
+    UnvalidatedSchema, UnvalidatedSchemaField,
 };
 
 pub type ValidatedSchemaField = SchemaField<
@@ -35,7 +34,7 @@ pub type ValidatedSchema =
 
 impl ValidatedSchema {
     pub fn validate_and_construct(
-        unvalidated_schema: Schema<UnvalidatedTypeName, ScalarFieldName, LinkedFieldName>,
+        unvalidated_schema: UnvalidatedSchema,
     ) -> ValidateSchemaResult<Self> {
         let Schema {
             fields,
@@ -121,7 +120,7 @@ fn validate_server_field_type_exists_and_is_output_type(
 
 fn validate_resolver_fragment(
     schema_data: &SchemaData,
-    resolver_field_type: SchemaResolverDefinitionInfo<ScalarFieldName, LinkedFieldName>,
+    resolver_field_type: SchemaResolverDefinitionInfo<(), ()>,
     field: &SchemaField<()>,
 ) -> ValidateSchemaResult<
     SchemaResolverDefinitionInfo<DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>,
@@ -234,7 +233,7 @@ enum ValidateSelectionsError {
 
 fn validate_resolver_definition_selections_exist_and_types_match(
     schema_data: &SchemaData,
-    selection_set: Vec<WithSpan<Selection<ScalarFieldName, LinkedFieldName>>>,
+    selection_set: Vec<WithSpan<Selection<(), ()>>>,
     parent_type: SchemaTypeWithFields,
 ) -> Result<Vec<WithSpan<ValidatedSelection>>, ValidateSelectionsError> {
     // Currently, we only check that each field exists and has an appropriate type, not that
@@ -252,7 +251,7 @@ fn validate_resolver_definition_selections_exist_and_types_match(
 }
 
 fn validate_resolver_definition_selection_exists_and_type_matches(
-    selection: WithSpan<Selection<ScalarFieldName, LinkedFieldName>>,
+    selection: WithSpan<Selection<(), ()>>,
     parent_type: SchemaTypeWithFields,
     schema_data: &SchemaData,
 ) -> Result<WithSpan<ValidatedSelection>, ValidateSelectionsError> {
@@ -289,9 +288,9 @@ fn validate_field_type_exists_and_is_scalar(
     >,
     schema_data: &SchemaData,
     parent_type: SchemaTypeWithFields,
-    scalar_field_selection: ScalarFieldSelection<ScalarFieldName>,
+    scalar_field_selection: ScalarFieldSelection<()>,
 ) -> ValidateSelectionsResult<ScalarFieldSelection<DefinedField<TypeWithoutFieldsId, ()>>> {
-    let scalar_field_name = scalar_field_selection.field.item.into();
+    let scalar_field_name = scalar_field_selection.name.item.into();
     match parent_fields.get(&scalar_field_name) {
         Some(defined_field_type) => match defined_field_type {
             DefinedField::ServerField(server_field_name) => {
@@ -302,9 +301,7 @@ fn validate_field_type_exists_and_is_scalar(
                 match field_type_id {
                     TypeId::Scalar(scalar_id) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
-                        field: scalar_field_selection.field.map(|_| {
-                            DefinedField::ServerField(TypeWithoutFieldsId::Scalar(scalar_id))
-                        }),
+                        field: DefinedField::ServerField(TypeWithoutFieldsId::Scalar(scalar_id)),
                         alias: scalar_field_selection.alias,
                         unwraps: scalar_field_selection.unwraps,
                     }),
@@ -322,9 +319,7 @@ fn validate_field_type_exists_and_is_scalar(
                 name: scalar_field_selection.name,
                 alias: scalar_field_selection.alias,
                 unwraps: scalar_field_selection.unwraps,
-                field: scalar_field_selection
-                    .field
-                    .map(|_| DefinedField::ResolverField(())),
+                field: DefinedField::ResolverField(()),
             }),
         },
         None => {
@@ -346,11 +341,11 @@ fn validate_field_type_exists_and_is_linked(
     >,
     schema_data: &SchemaData,
     parent_type: SchemaTypeWithFields,
-    linked_field_selection: LinkedFieldSelection<ScalarFieldName, LinkedFieldName>,
+    linked_field_selection: LinkedFieldSelection<(), ()>,
 ) -> ValidateSelectionsResult<
     LinkedFieldSelection<DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>,
 > {
-    let linked_field_name = linked_field_selection.field.item.into();
+    let linked_field_name = linked_field_selection.name.item.into();
     match parent_fields.get(&linked_field_name) {
         Some(defined_field_type) => match defined_field_type {
             DefinedField::ServerField(server_field_name) => {
@@ -381,9 +376,7 @@ fn validate_field_type_exists_and_is_linked(
                                         schema_data,
                                     )
                                 })?,
-                            field: linked_field_selection
-                                .field
-                                .map(|_| TypeWithFieldsId::Object(object_id)),
+                            field: TypeWithFieldsId::Object(object_id),
                         })
                     }
                 }
