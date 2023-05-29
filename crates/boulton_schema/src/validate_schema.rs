@@ -17,20 +17,21 @@ use crate::{
 pub type ValidatedSchemaField = SchemaField<
     DefinedField<
         OutputTypeId,
-        SchemaResolverDefinitionInfo<DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>,
+        SchemaResolverDefinitionInfo<ValidatedDefinedField, TypeWithFieldsId>,
     >,
 >;
 
-pub type ValidatedSelectionSetAndUnwraps =
-    SelectionSetAndUnwraps<DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>;
+type ValidatedDefinedField = DefinedField<TypeWithoutFieldsId, ()>;
 
-pub type ValidatedSelection = Selection<DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>;
+pub type ValidatedSelectionSetAndUnwraps =
+    SelectionSetAndUnwraps<ValidatedDefinedField, TypeWithFieldsId>;
+
+pub type ValidatedSelection = Selection<ValidatedDefinedField, TypeWithFieldsId>;
 
 pub type ValidatedSchemaResolverDefinitionInfo =
-    SchemaResolverDefinitionInfo<DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>;
+    SchemaResolverDefinitionInfo<ValidatedDefinedField, TypeWithFieldsId>;
 
-pub type ValidatedSchema =
-    Schema<OutputTypeId, DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>;
+pub type ValidatedSchema = Schema<OutputTypeId, ValidatedDefinedField, TypeWithFieldsId>;
 
 impl ValidatedSchema {
     pub fn validate_and_construct(
@@ -122,9 +123,7 @@ fn validate_resolver_fragment(
     schema_data: &SchemaData,
     resolver_field_type: SchemaResolverDefinitionInfo<(), ()>,
     field: &SchemaField<()>,
-) -> ValidateSchemaResult<
-    SchemaResolverDefinitionInfo<DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>,
-> {
+) -> ValidateSchemaResult<ValidatedSchemaResolverDefinitionInfo> {
     match resolver_field_type.selection_set_and_unwraps {
         Some(selection_set_and_unwraps) => {
             let parent_type = schema_data.lookup_type_with_fields(field.parent_type_id);
@@ -289,7 +288,7 @@ fn validate_field_type_exists_and_is_scalar(
     schema_data: &SchemaData,
     parent_type: SchemaTypeWithFields,
     scalar_field_selection: ScalarFieldSelection<()>,
-) -> ValidateSelectionsResult<ScalarFieldSelection<DefinedField<TypeWithoutFieldsId, ()>>> {
+) -> ValidateSelectionsResult<ScalarFieldSelection<ValidatedDefinedField>> {
     let scalar_field_name = scalar_field_selection.name.item.into();
     match parent_fields.get(&scalar_field_name) {
         Some(defined_field_type) => match defined_field_type {
@@ -322,13 +321,10 @@ fn validate_field_type_exists_and_is_scalar(
                 field: DefinedField::ResolverField(()),
             }),
         },
-        None => {
-            eprintln!(")1 {:#?}", parent_fields);
-            Err(ValidateSelectionsError::FieldDoesNotExist(
-                parent_type.name(),
-                scalar_field_name,
-            ))
-        }
+        None => Err(ValidateSelectionsError::FieldDoesNotExist(
+            parent_type.name(),
+            scalar_field_name,
+        )),
     }
 }
 
@@ -342,9 +338,7 @@ fn validate_field_type_exists_and_is_linked(
     schema_data: &SchemaData,
     parent_type: SchemaTypeWithFields,
     linked_field_selection: LinkedFieldSelection<(), ()>,
-) -> ValidateSelectionsResult<
-    LinkedFieldSelection<DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>,
-> {
+) -> ValidateSelectionsResult<LinkedFieldSelection<ValidatedDefinedField, TypeWithFieldsId>> {
     let linked_field_name = linked_field_selection.name.item.into();
     match parent_fields.get(&linked_field_name) {
         Some(defined_field_type) => match defined_field_type {

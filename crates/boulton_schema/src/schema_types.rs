@@ -177,12 +177,25 @@ fn add_schema_defined_scalar_type(
 pub enum SchemaTypeWithFields<'a> {
     Object(&'a SchemaObject),
 }
+
+impl<'a> From<&'a SchemaObject> for SchemaTypeWithFields<'a> {
+    fn from(object: &'a SchemaObject) -> Self {
+        SchemaTypeWithFields::Object(object)
+    }
+}
+
 impl<'a> SchemaTypeWithFields<'a> {
     pub fn encountered_field_names(
         &self,
     ) -> &HashMap<FieldDefinitionName, DefinedField<UnvalidatedTypeName, ScalarFieldName>> {
         match self {
             SchemaTypeWithFields::Object(object) => &object.encountered_field_names,
+        }
+    }
+
+    pub fn fields(&self) -> &Vec<FieldId> {
+        match self {
+            SchemaTypeWithFields::Object(object) => &object.fields,
         }
     }
 }

@@ -3,6 +3,14 @@ use u32_newtypes::u32_newtype;
 use crate::{ValidLinkedFieldType, ValidScalarFieldType, ValidTypeAnnotationInnerType};
 
 u32_newtype!(FieldId);
+// Is this a smell?
+u32_newtype!(ResolverFieldId);
+impl From<ResolverFieldId> for FieldId {
+    fn from(id: ResolverFieldId) -> Self {
+        FieldId(id.0)
+    }
+}
+
 u32_newtype!(ObjectId);
 impl ValidTypeAnnotationInnerType for ObjectId {}
 

@@ -46,6 +46,7 @@ impl<TServerType: ValidTypeAnnotationInnerType, TResolverType>
 pub trait ValidScalarFieldType {}
 impl ValidScalarFieldType for () {}
 
+// TODO move to another crate
 impl ValidScalarFieldType for DefinedField<TypeWithoutFieldsId, ()> {}
 
 // /// Used to constrain the valid types that a LinkedFieldSelection can have to

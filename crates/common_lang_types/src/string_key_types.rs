@@ -87,6 +87,12 @@ string_key_conversion!(LinkedFieldName, FieldDefinitionName);
 string_key_newtype!(ScalarFieldAlias);
 string_key_newtype!(LinkedFieldAlias);
 
+string_key_newtype!(FieldNameOrAlias);
+string_key_conversion!(ScalarFieldName, FieldNameOrAlias);
+string_key_conversion!(LinkedFieldName, FieldNameOrAlias);
+string_key_conversion!(ScalarFieldAlias, FieldNameOrAlias);
+string_key_conversion!(LinkedFieldAlias, FieldNameOrAlias);
+
 string_key_newtype!(ResolverDefinitionPath);
 
 // Operations
