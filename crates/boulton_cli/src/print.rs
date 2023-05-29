@@ -8,7 +8,7 @@ use boulton_schema::{
     ValidatedSchema, ValidatedSchemaResolverDefinitionInfo, ValidatedSelectionSetAndUnwraps,
 };
 use common_lang_types::{
-    DefinedField, FieldDefinitionName, HasName, QueryOperationName, ResolverDefinitionPath,
+    DefinedField, FieldDefinitionName, QueryOperationName, ResolverDefinitionPath,
 };
 use thiserror::Error;
 
@@ -71,41 +71,42 @@ fn write_selections(
     for item in items.selection_set.iter() {
         query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
         match &item.item {
-            Selection::Field(field) => match field {
-                ScalarField(scalar_field) => match scalar_field.field.item {
-                    DefinedField::ServerField(server_field_id) => {
-                        let type_without_fields = schema
-                            .schema_data
-                            .lookup_type_without_fields(server_field_id);
-                        if let Some(alias) = scalar_field.alias {
+            Selection::Field(field) => {
+                // foo
+                match field {
+                    ScalarField(scalar_field) => match scalar_field.field.item {
+                        DefinedField::ServerField(_) => {
+                            // let type_without_fields = schema
+                            //     .schema_data
+                            //     .lookup_type_without_fields(server_field_id);
+                            if let Some(alias) = scalar_field.alias {
+                                query_text.push_str(&format!("{}: ", alias));
+                            }
+                            let name = scalar_field.name.item;
+                            // let name = type_without_fields.name();
+                            query_text.push_str(&format!("{},\n", name));
+                        }
+                        DefinedField::ResolverField(_) => {
+                            todo!("cant print resolvers, so far {}", query_text)
+                        }
+                    },
+                    LinkedField(linked_field) => {
+                        if let Some(alias) = linked_field.alias {
                             query_text.push_str(&format!("{}: ", alias));
                         }
-                        let name = type_without_fields.name();
-                        query_text.push_str(&format!("{},\n", name));
+                        let name = linked_field.name.item;
+                        query_text.push_str(&format!("{} {{\n", name));
+                        write_selections(
+                            query_text,
+                            schema,
+                            &linked_field.selection_set_and_unwraps,
+                            indentation_level + 1,
+                        )?;
+                        query_text
+                            .push_str(&format!("{}}},\n", "  ".repeat(indentation_level as usize)));
                     }
-                    DefinedField::ResolverField(_) => {
-                        todo!("cant print resolvers, so far {}", query_text)
-                    }
-                },
-                LinkedField(linked_field) => {
-                    if let Some(alias) = linked_field.alias {
-                        query_text.push_str(&format!("{}: ", alias));
-                    }
-                    let type_with_fields = schema
-                        .schema_data
-                        .lookup_type_with_fields(linked_field.field.item);
-                    let name = type_with_fields.name();
-                    query_text.push_str(&format!("{} {{\n", name));
-                    write_selections(
-                        query_text,
-                        schema,
-                        &linked_field.selection_set_and_unwraps,
-                        indentation_level + 1,
-                    )?;
-                    query_text
-                        .push_str(&format!("{}}},\n", "  ".repeat(indentation_level as usize)));
                 }
-            },
+            }
         }
     }
     Ok(())

@@ -156,6 +156,7 @@ impl HasName for FieldSelection<ScalarFieldName, LinkedFieldName> {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct ScalarFieldSelection<TScalarField: ValidScalarFieldType> {
+    pub name: WithSpan<ScalarFieldName>,
     pub alias: Option<WithSpan<ScalarFieldAlias>>,
     pub field: WithSpan<TScalarField>,
     pub unwraps: Vec<WithSpan<Unwrap>>,
@@ -167,6 +168,7 @@ impl<TScalarField: ValidScalarFieldType> ScalarFieldSelection<TScalarField> {
         map: &mut impl FnMut(TScalarField) -> U,
     ) -> ScalarFieldSelection<U> {
         ScalarFieldSelection {
+            name: self.name,
             alias: self.alias,
             field: self.field.map(map),
             unwraps: self.unwraps,
@@ -178,6 +180,7 @@ impl<TScalarField: ValidScalarFieldType> ScalarFieldSelection<TScalarField> {
         map: &mut impl FnMut(TScalarField) -> Result<U, E>,
     ) -> Result<ScalarFieldSelection<U>, E> {
         Ok(ScalarFieldSelection {
+            name: self.name,
             alias: self.alias,
             field: self.field.and_then(map)?,
             unwraps: self.unwraps,
@@ -190,6 +193,7 @@ pub struct LinkedFieldSelection<
     TScalarField: ValidScalarFieldType,
     TLinkedField: ValidLinkedFieldType,
 > {
+    pub name: WithSpan<LinkedFieldName>,
     pub alias: Option<WithSpan<LinkedFieldAlias>>,
     pub field: WithSpan<TLinkedField>,
     pub selection_set_and_unwraps: SelectionSetAndUnwraps<TScalarField, TLinkedField>,

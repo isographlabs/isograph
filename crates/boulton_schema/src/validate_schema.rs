@@ -301,6 +301,7 @@ fn validate_field_type_exists_and_is_scalar(
                     .expect("Expected field type to be defined, which I think was validated earlier, probably indicates a bug in Boulton");
                 match field_type_id {
                     TypeId::Scalar(scalar_id) => Ok(ScalarFieldSelection {
+                        name: scalar_field_selection.name,
                         field: scalar_field_selection.field.map(|_| {
                             DefinedField::ServerField(TypeWithoutFieldsId::Scalar(scalar_id))
                         }),
@@ -318,6 +319,7 @@ fn validate_field_type_exists_and_is_scalar(
                 }
             }
             DefinedField::ResolverField(_) => Ok(ScalarFieldSelection {
+                name: scalar_field_selection.name,
                 alias: scalar_field_selection.alias,
                 unwraps: scalar_field_selection.unwraps,
                 field: scalar_field_selection
@@ -368,6 +370,7 @@ fn validate_field_type_exists_and_is_linked(
                     TypeId::Object(object_id) => {
                         let object = schema_data.objects.get(object_id.as_usize()).unwrap();
                         Ok(LinkedFieldSelection {
+                            name: linked_field_selection.name,
                             alias: linked_field_selection.alias,
                             selection_set_and_unwraps: linked_field_selection
                                 .selection_set_and_unwraps

@@ -110,6 +110,7 @@ fn parse_selection<'a>(
             let selection = match selection_set {
                 Some(selection_set) => {
                     Selection::Field(FieldSelection::LinkedField(LinkedFieldSelection {
+                        name: field_name.map(|string_key| string_key.into()),
                         alias: alias.map(|with_span| with_span.map(|string_key| string_key.into())),
                         field: field_name.map(|string_key| string_key.into()),
                         selection_set_and_unwraps: SelectionSetAndUnwraps {
@@ -119,6 +120,7 @@ fn parse_selection<'a>(
                     }))
                 }
                 None => Selection::Field(FieldSelection::ScalarField(ScalarFieldSelection {
+                    name: field_name.map(|string_key| string_key.into()),
                     alias: alias.map(|with_span| with_span.map(|string_key| string_key.into())),
                     field: field_name.map(|string_key| string_key.into()),
                     unwraps,
