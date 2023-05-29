@@ -39,11 +39,11 @@ pub struct Schema<
     pub schema_data: SchemaData,
 
     // Well known types
-    pub id_type_id: ScalarId,
-    pub string_type_id: ScalarId,
+    pub id_type: ScalarId,
+    pub string_type: ScalarId,
     // float
     // typename
-    // Query
+    pub query_type: Option<ObjectId>,
     // Subscription
     // Mutation
 }
@@ -83,8 +83,9 @@ impl UnvalidatedSchema {
                 scalars,
                 defined_types,
             },
-            id_type_id,
-            string_type_id,
+            id_type: id_type_id,
+            string_type: string_type_id,
+            query_type: None,
         }
     }
 }

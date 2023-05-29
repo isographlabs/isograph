@@ -11,3 +11,4 @@ boulton_lang_types = { path = "../boulton_lang_types" }
 graphql_lang_types = { path = "../graphql_lang_types" }
 intern = { git = "https://github.com/facebook/relay.git" }
 thiserror = "1.0.40"
+lazy_static = "1.4"

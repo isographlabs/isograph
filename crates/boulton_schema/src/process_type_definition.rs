@@ -1,15 +1,21 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    DefinedField, FieldDefinitionName, FieldId, OutputTypeName, ScalarFieldName, TypeId,
-    TypeWithFieldsId, UnvalidatedTypeName, WithSpan,
+    DefinedField, FieldDefinitionName, FieldId, ObjectTypeName, OutputTypeName, ScalarFieldName,
+    TypeId, TypeWithFieldsId, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
     ObjectTypeDefinition, OutputFieldDefinition, TypeSystemDefinition, TypeSystemDocument,
 };
+use intern::string_key::Intern;
+use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{Schema, SchemaField, SchemaObject, UnvalidatedSchema, UnvalidatedSchemaField};
+
+lazy_static! {
+    static ref QUERY_TYPE: ObjectTypeName = "Query".intern().into();
+}
 
 impl UnvalidatedSchema {
     pub fn process_type_system_document(
@@ -35,7 +41,7 @@ impl UnvalidatedSchema {
             ref mut schema_data,
             ..
         } = self;
-        let object_count = schema_data.objects.len();
+        let next_object_id = schema_data.objects.len().into();
         let ref mut type_names = schema_data.defined_types;
         let ref mut objects = schema_data.objects;
         match type_names.entry(object_type_definition.name.item.into()) {
@@ -50,18 +56,26 @@ impl UnvalidatedSchema {
                     get_field_objects_ids_and_names(
                         object_type_definition.fields,
                         existing_fields.len(),
-                        TypeWithFieldsId::Object(object_count.into()),
+                        TypeWithFieldsId::Object(next_object_id),
                         object_type_definition.name.item.into(),
                     )?;
                 objects.push(SchemaObject {
                     description: object_type_definition.description.map(|d| d.item),
                     name: object_type_definition.name.item,
-                    id: object_count.into(),
+                    id: next_object_id,
                     fields: field_ids,
                     encountered_field_names,
                 });
+
+                // ----- HACK -----
+                // Instead of this, we should parse GraphQL schema declarations.
+                if object_type_definition.name.item == *QUERY_TYPE {
+                    self.query_type = Some(next_object_id);
+                }
+                // --- END HACK ---
+
                 existing_fields.extend(new_fields);
-                vacant.insert(TypeId::Object(object_count.into()));
+                vacant.insert(TypeId::Object(next_object_id));
             }
         }
         Ok(())

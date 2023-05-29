@@ -35,8 +35,9 @@ impl ValidatedSchema {
         let Schema {
             fields,
             schema_data,
-            id_type_id: id_type,
-            string_type_id: string_type,
+            id_type,
+            string_type,
+            query_type,
         } = unvalidated_schema;
 
         let updated_fields = validate_and_transform_fields(fields, &schema_data)?;
@@ -44,8 +45,9 @@ impl ValidatedSchema {
         Ok(Self {
             fields: updated_fields,
             schema_data,
-            id_type_id: id_type,
-            string_type_id: string_type,
+            id_type,
+            string_type,
+            query_type,
         })
     }
 }

@@ -124,6 +124,7 @@ dependencies = [
  "common_lang_types",
  "graphql_lang_types",
  "intern",
+ "lazy_static",
  "thiserror",
 ]
 
