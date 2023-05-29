@@ -5,7 +5,8 @@ use common_lang_types::{
     DefinedField, DescriptionValue, FieldDefinitionName, FieldId, HasName, LinkedFieldName,
     ObjectId, ObjectTypeName, OutputTypeId, OutputTypeName, ResolverDefinitionPath,
     ScalarFieldName, ScalarId, ScalarTypeName, TypeId, TypeWithFieldsId, TypeWithFieldsName,
-    UnvalidatedTypeName, ValidLinkedFieldType, ValidScalarFieldType, ValidTypeAnnotationInnerType,
+    TypeWithoutFieldsId, TypeWithoutFieldsName, UnvalidatedTypeName, ValidLinkedFieldType,
+    ValidScalarFieldType, ValidTypeAnnotationInnerType,
 };
 use intern::string_key::Intern;
 
@@ -47,6 +48,9 @@ pub struct Schema<
     // Subscription
     // Mutation
 }
+
+pub(crate) type UnvalidatedSchema = Schema<UnvalidatedTypeName, ScalarFieldName, LinkedFieldName>;
+
 pub(crate) type UnvalidatedSchemaField = SchemaField<
     DefinedField<
         UnvalidatedTypeName,
@@ -62,7 +66,21 @@ pub struct SchemaData {
     pub defined_types: HashMap<UnvalidatedTypeName, TypeId>,
 }
 
-pub(crate) type UnvalidatedSchema = Schema<UnvalidatedTypeName, ScalarFieldName, LinkedFieldName>;
+impl<
+        TServerType: ValidTypeAnnotationInnerType,
+        TScalarField: ValidScalarFieldType,
+        TLinkedField: ValidLinkedFieldType,
+    > Schema<TServerType, TScalarField, TLinkedField>
+{
+    pub fn field(
+        &self,
+        field_id: FieldId,
+    ) -> &SchemaField<
+        DefinedField<TServerType, SchemaResolverDefinitionInfo<TScalarField, TLinkedField>>,
+    > {
+        &self.fields[field_id.as_usize()]
+    }
+}
 
 impl UnvalidatedSchema {
     pub fn new() -> Self {
@@ -100,6 +118,23 @@ impl SchemaData {
         }
     }
 
+    pub fn lookup_type_without_fields(
+        &self,
+        type_id: TypeWithoutFieldsId,
+    ) -> SchemaTypeWithoutFields {
+        match type_id {
+            TypeWithoutFieldsId::Scalar(scalar_id) => {
+                SchemaTypeWithoutFields::Scalar(self.scalar(scalar_id))
+            }
+        }
+    }
+
+    pub fn scalar(&self, scalar_id: ScalarId) -> &SchemaScalar {
+        self.scalars
+            .get(scalar_id.as_usize())
+            .expect("Invalid ScalarId")
+    }
+
     pub fn lookup_unvalidated_type(&self, type_id: TypeId) -> SchemaType {
         match type_id {
             TypeId::Object(id) => SchemaType::Object(self.objects.get(id.as_usize()).unwrap()),
@@ -116,6 +151,12 @@ impl SchemaData {
                 SchemaOutputType::Scalar(self.scalars.get(id.as_usize()).unwrap())
             }
         }
+    }
+
+    pub fn object(&self, object_id: ObjectId) -> &SchemaObject {
+        self.objects
+            .get(object_id.as_usize())
+            .expect("ObjectId should exist, this indicates a bug in Boulton")
     }
 }
 
@@ -185,8 +226,23 @@ impl<'a> HasName for SchemaOutputType<'a> {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub enum SchemaTypeWithoutFields<'a> {
+    Scalar(&'a SchemaScalar),
+    // enum
+}
+
+impl<'a> HasName for SchemaTypeWithoutFields<'a> {
+    type Name = TypeWithoutFieldsName;
+
+    fn name(&self) -> Self::Name {
+        match self {
+            SchemaTypeWithoutFields::Scalar(scalar) => scalar.name.into(),
+        }
+    }
+}
+
 #[derive(Debug)]
-// TODO UnvalidatedTypeName => OutputTypeId via generic, and ScalarFieldName => OutputTypeId?
 pub struct SchemaObject {
     pub description: Option<DescriptionValue>,
     pub name: ObjectTypeName,
@@ -242,6 +298,7 @@ pub struct SchemaResolverDefinitionInfo<
 > {
     pub resolver_definition_path: ResolverDefinitionPath,
     pub selection_set_and_unwraps: Option<SelectionSetAndUnwraps<TScalarField, TLinkedField>>,
+    pub field_id: FieldId,
 }
 
 impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
@@ -258,6 +315,7 @@ impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
             selection_set_and_unwraps: self
                 .selection_set_and_unwraps
                 .map(|selection_set_and_unwraps| map(selection_set_and_unwraps)),
+            field_id: self.field_id,
         }
     }
 }

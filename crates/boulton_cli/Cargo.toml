@@ -12,5 +12,6 @@ graphql_lang_types = { path = "../graphql_lang_types" }
 boulton_schema = { path = "../boulton_schema" }
 boulton_lang_parser = { path = "../boulton_lang_parser" }
 boulton_lang_types = { path = "../boulton_lang_types" }
+common_lang_types = { path = "../common_lang_types" }
 lazy_static = "1.4"
 regex = "1.6.0"

@@ -9,6 +9,7 @@ use thiserror::Error;
 
 use crate::{
     boulton_literals::{extract_b_declare_literal_from_file_content, read_files_in_folder},
+    print::{print_all_query_texts, PrintError},
     schema::read_schema_file,
 };
 
@@ -48,7 +49,8 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
 
     let validated_schema = Schema::validate_and_construct(schema)?;
 
-    dbg!(validated_schema);
+    print_all_query_texts(&validated_schema)?;
+    // dbg!(validated_schema);
 
     Ok(())
 }
@@ -108,6 +110,9 @@ pub(crate) enum BatchCompileError {
     UnableToValidateSchema {
         message: boulton_schema::ValidateSchemaError,
     },
+
+    #[error("Unable to print.\nMessage: {message:?}")]
+    UnableToPrint { message: PrintError },
 }
 
 impl From<graphql_lang_parser::SchemaParseError> for BatchCompileError {
@@ -143,5 +148,11 @@ impl From<std::path::StripPrefixError> for BatchCompileError {
 impl From<boulton_schema::ValidateSchemaError> for BatchCompileError {
     fn from(value: boulton_schema::ValidateSchemaError) -> Self {
         BatchCompileError::UnableToValidateSchema { message: value }
+    }
+}
+
+impl From<PrintError> for BatchCompileError {
+    fn from(value: PrintError) -> Self {
+        BatchCompileError::UnableToPrint { message: value }
     }
 }

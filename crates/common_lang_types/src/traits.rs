@@ -20,6 +20,24 @@ pub enum DefinedField<TServerType: ValidTypeAnnotationInnerType, TResolverType> 
     ServerField(TServerType),
     ResolverField(TResolverType), // Resolvers have an opaque scalar type
 }
+
+impl<TServerType: ValidTypeAnnotationInnerType, TResolverType>
+    DefinedField<TServerType, TResolverType>
+{
+    pub fn as_server_field(&self) -> Option<&TServerType> {
+        match self {
+            DefinedField::ServerField(server_field) => Some(server_field),
+            DefinedField::ResolverField(_) => None,
+        }
+    }
+
+    pub fn as_resolver_field(&self) -> Option<&TResolverType> {
+        match self {
+            DefinedField::ServerField(_) => None,
+            DefinedField::ResolverField(resolver_field) => Some(resolver_field),
+        }
+    }
+}
 // TODO map both types
 
 /// Used to constrain the valid types that a ScalarFieldSelection can have to

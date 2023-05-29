@@ -15,17 +15,22 @@ use crate::{
     UnvalidatedSchemaField,
 };
 
-pub(crate) type ValidatedSchemaField = SchemaField<
+pub type ValidatedSchemaField = SchemaField<
     DefinedField<
         OutputTypeId,
         SchemaResolverDefinitionInfo<DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>,
     >,
 >;
 
-pub(crate) type ValidatedSelection =
-    Selection<DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>;
+pub type ValidatedSelectionSetAndUnwraps =
+    SelectionSetAndUnwraps<DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>;
 
-pub(crate) type ValidatedSchema =
+pub type ValidatedSelection = Selection<DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>;
+
+pub type ValidatedSchemaResolverDefinitionInfo =
+    SchemaResolverDefinitionInfo<DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>;
+
+pub type ValidatedSchema =
     Schema<OutputTypeId, DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>;
 
 impl ValidatedSchema {
@@ -142,11 +147,13 @@ fn validate_resolver_fragment(
                     selection_set,
                     unwraps,
                 }),
+                field_id: resolver_field_type.field_id,
             })
         }
         None => Ok(SchemaResolverDefinitionInfo {
             resolver_definition_path: resolver_field_type.resolver_definition_path,
             selection_set_and_unwraps: None,
+            field_id: resolver_field_type.field_id,
         }),
     }
 }
@@ -237,7 +244,6 @@ fn validate_resolver_definition_selections_exist_and_types_match(
         .map(|selection| {
             validate_resolver_definition_selection_exists_and_type_matches(
                 selection,
-                parent_type.encountered_field_names(),
                 parent_type,
                 schema_data,
             )
@@ -247,10 +253,6 @@ fn validate_resolver_definition_selections_exist_and_types_match(
 
 fn validate_resolver_definition_selection_exists_and_type_matches(
     selection: WithSpan<Selection<ScalarFieldName, LinkedFieldName>>,
-    parent_fields: &HashMap<
-        FieldDefinitionName,
-        DefinedField<UnvalidatedTypeName, ScalarFieldName>,
-    >,
     parent_type: SchemaTypeWithFields,
     schema_data: &SchemaData,
 ) -> Result<WithSpan<ValidatedSelection>, ValidateSelectionsError> {
@@ -258,16 +260,16 @@ fn validate_resolver_definition_selection_exists_and_type_matches(
         selection.and_then(&mut |field_selection| {
             field_selection.and_then(
                 &mut |scalar_field_selection| {
-                    validate_encountered_field_type_exists_and_is_scalar(
-                        parent_fields,
+                    validate_field_type_exists_and_is_scalar(
+                        parent_type.encountered_field_names(),
                         schema_data,
                         parent_type,
                         scalar_field_selection,
                     )
                 },
                 &mut |linked_field_selection| {
-                    validate_encountered_field_type_exists_and_is_linked(
-                        parent_fields,
+                    validate_field_type_exists_and_is_linked(
+                        parent_type.encountered_field_names(),
                         schema_data,
                         parent_type,
                         linked_field_selection,
@@ -280,7 +282,7 @@ fn validate_resolver_definition_selection_exists_and_type_matches(
 
 /// Given that we selected a scalar field, the field should exist on the parent,
 /// and type should be a resolver (which is a scalar) or a server scalar type.
-fn validate_encountered_field_type_exists_and_is_scalar(
+fn validate_field_type_exists_and_is_scalar(
     parent_fields: &HashMap<
         FieldDefinitionName,
         DefinedField<UnvalidatedTypeName, ScalarFieldName>,
@@ -323,16 +325,19 @@ fn validate_encountered_field_type_exists_and_is_scalar(
                     .map(|_| DefinedField::ResolverField(())),
             }),
         },
-        None => Err(ValidateSelectionsError::FieldDoesNotExist(
-            parent_type.name(),
-            scalar_field_name,
-        )),
+        None => {
+            eprintln!(")1 {:#?}", parent_fields);
+            Err(ValidateSelectionsError::FieldDoesNotExist(
+                parent_type.name(),
+                scalar_field_name,
+            ))
+        }
     }
 }
 
 /// Given that we selected a linked field, the field should exist on the parent,
 /// and type should be a server interface, object or union.
-fn validate_encountered_field_type_exists_and_is_linked(
+fn validate_field_type_exists_and_is_linked(
     parent_fields: &HashMap<
         FieldDefinitionName,
         DefinedField<UnvalidatedTypeName, ScalarFieldName>,
@@ -364,13 +369,15 @@ fn validate_encountered_field_type_exists_and_is_linked(
                         let object = schema_data.objects.get(object_id.as_usize()).unwrap();
                         Ok(LinkedFieldSelection {
                             alias: linked_field_selection.alias,
-                            unwraps: linked_field_selection.unwraps,
-                            selection_set:
-                                validate_resolver_definition_selections_exist_and_types_match(
-                                    schema_data,
-                                    linked_field_selection.selection_set,
-                                    SchemaTypeWithFields::Object(object),
-                                )?,
+                            selection_set_and_unwraps: linked_field_selection
+                                .selection_set_and_unwraps
+                                .and_then(&mut |selection| {
+                                    validate_resolver_definition_selection_exists_and_type_matches(
+                                        selection,
+                                        SchemaTypeWithFields::Object(object),
+                                        schema_data,
+                                    )
+                                })?,
                             field: linked_field_selection
                                 .field
                                 .map(|_| TypeWithFieldsId::Object(object_id)),

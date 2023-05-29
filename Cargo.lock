@@ -82,6 +82,7 @@ dependencies = [
  "boulton_lang_parser",
  "boulton_lang_types",
  "boulton_schema",
+ "common_lang_types",
  "graphql_lang_parser",
  "graphql_lang_types",
  "intern",

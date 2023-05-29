@@ -33,6 +33,7 @@ string_key_newtype!(UnvalidatedTypeName);
 impl ValidTypeAnnotationInnerType for UnvalidatedTypeName {}
 
 string_key_newtype!(TypeWithFieldsName);
+string_key_newtype!(TypeWithoutFieldsName);
 
 string_key_newtype!(ObjectTypeName);
 impl ValidTypeAnnotationInnerType for ObjectTypeName {}
@@ -72,6 +73,9 @@ string_key_conversion!(OutputTypeName, UnvalidatedTypeName);
 string_key_conversion!(InputTypeName, UnvalidatedTypeName);
 string_key_conversion!(TypeWithFieldsName, UnvalidatedTypeName);
 
+string_key_conversion!(ScalarTypeName, TypeWithoutFieldsName);
+string_key_conversion!(EnumTypeName, TypeWithoutFieldsName);
+
 // The name in the schema of the field
 string_key_newtype!(ScalarFieldName);
 impl ValidScalarFieldType for ScalarFieldName {}
@@ -85,3 +89,10 @@ string_key_newtype!(ScalarFieldAlias);
 string_key_newtype!(LinkedFieldAlias);
 
 string_key_newtype!(ResolverDefinitionPath);
+
+// Operations
+
+string_key_newtype!(QueryOperationName);
+// Explanation: any resolver field that is on the Query object is eligible
+// to be a query.
+string_key_conversion!(FieldDefinitionName, QueryOperationName);

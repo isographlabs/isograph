@@ -62,16 +62,17 @@ impl UnvalidatedSchema {
             });
         }
 
-        let field_id = self.fields.len();
-        object.fields.push(field_id.into());
+        let next_field_id = self.fields.len().into();
+        object.fields.push(next_field_id);
 
         self.fields.push(SchemaField {
             description: resolver_declaration.item.description.map(|d| d.item),
             name: resolver_declaration.item.resolver_field_name.item.into(),
-            id: field_id.into(),
+            id: next_field_id,
             field_type: DefinedField::ResolverField(SchemaResolverDefinitionInfo {
                 resolver_definition_path: resolver_declaration.item.resolver_definition_path,
                 selection_set_and_unwraps: resolver_declaration.item.selection_set_and_unwraps,
+                field_id: next_field_id,
             }),
             parent_type_id: TypeWithFieldsId::Object(object.id),
         });

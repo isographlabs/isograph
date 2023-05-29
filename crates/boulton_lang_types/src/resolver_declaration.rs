@@ -23,6 +23,43 @@ pub struct SelectionSetAndUnwraps<
     pub unwraps: Vec<WithSpan<Unwrap>>,
 }
 
+impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
+    SelectionSetAndUnwraps<TScalarField, TLinkedField>
+{
+    // pub fn map<TNewScalarField: ValidScalarFieldType, TNewLinkedField: ValidLinkedFieldType>(
+    //     self,
+    //     map: &mut impl FnMut(
+    //         Selection<TScalarField, TLinkedField>,
+    //     ) -> Selection<TNewScalarField, TNewLinkedField>,
+    // ) -> SelectionSetAndUnwraps<TNewScalarField, TNewLinkedField> {
+    //     SelectionSetAndUnwraps {
+    //         selection_set: self.selection_set.into_iter().map(|x| x.map(map)).collect(),
+    //         unwraps: self.unwraps,
+    //     }
+    // }
+
+    pub fn and_then<
+        TNewScalarField: ValidScalarFieldType,
+        TNewLinkedField: ValidLinkedFieldType,
+        E,
+    >(
+        self,
+        map: &mut impl FnMut(
+            WithSpan<Selection<TScalarField, TLinkedField>>,
+        )
+            -> Result<WithSpan<Selection<TNewScalarField, TNewLinkedField>>, E>,
+    ) -> Result<SelectionSetAndUnwraps<TNewScalarField, TNewLinkedField>, E> {
+        Ok(SelectionSetAndUnwraps {
+            selection_set: self
+                .selection_set
+                .into_iter()
+                .map(map)
+                .collect::<Result<_, _>>()?,
+            unwraps: self.unwraps,
+        })
+    }
+}
+
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum Selection<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType> {
     Field(FieldSelection<TScalarField, TLinkedField>),
@@ -155,8 +192,7 @@ pub struct LinkedFieldSelection<
 > {
     pub alias: Option<WithSpan<LinkedFieldAlias>>,
     pub field: WithSpan<TLinkedField>,
-    pub unwraps: Vec<WithSpan<Unwrap>>,
-    pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
+    pub selection_set_and_unwraps: SelectionSetAndUnwraps<TScalarField, TLinkedField>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]

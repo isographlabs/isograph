@@ -5,6 +5,13 @@ use crate::{ValidLinkedFieldType, ValidScalarFieldType, ValidTypeAnnotationInner
 u32_newtype!(FieldId);
 u32_newtype!(ObjectId);
 impl ValidTypeAnnotationInnerType for ObjectId {}
+
+impl From<ObjectId> for TypeWithFieldsId {
+    fn from(id: ObjectId) -> Self {
+        TypeWithFieldsId::Object(id)
+    }
+}
+
 u32_newtype!(ScalarId);
 impl ValidTypeAnnotationInnerType for ScalarId {}
 

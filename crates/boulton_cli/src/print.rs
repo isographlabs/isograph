@@ -1,0 +1,112 @@
+use std::path::PathBuf;
+
+use boulton_lang_types::{
+    FieldSelection::{LinkedField, ScalarField},
+    Selection,
+};
+use boulton_schema::{
+    ValidatedSchema, ValidatedSchemaResolverDefinitionInfo, ValidatedSelectionSetAndUnwraps,
+};
+use common_lang_types::{
+    DefinedField, FieldDefinitionName, HasName, QueryOperationName, ResolverDefinitionPath,
+};
+use thiserror::Error;
+
+pub(crate) fn print_all_query_texts(schema: &ValidatedSchema) -> Result<String, PrintError> {
+    let query_type = schema.query_type.expect("Expect Query to be defined");
+    let query = schema.schema_data.object(query_type);
+
+    // Operations (i.e. what would've been written with the query/subscription/mutation
+    // keywords in GraphQL) are (for now) all resolver fields on Query.
+    for field_id in query.fields.iter() {
+        let field = schema.field(*field_id);
+        if field.parent_type_id == query_type.into() {
+            if let Some(resolver_field) = field.field_type.as_resolver_field() {
+                let _text = generate_query_text(schema, resolver_field)?;
+            }
+            continue;
+        }
+    }
+
+    todo!()
+}
+
+fn generate_query_text(
+    schema: &ValidatedSchema,
+    resolver_definition: &ValidatedSchemaResolverDefinitionInfo,
+) -> Result<String, PrintError> {
+    eprintln!("resolver_field: {:#?}", resolver_definition);
+    if let Some(ref selection_set) = resolver_definition.selection_set_and_unwraps {
+        let mut query_text = String::new();
+        let path = resolver_definition.resolver_definition_path;
+        let field = schema.field(resolver_definition.field_id);
+        let _output_file = generated_file_name(path, field.name);
+        let query_name: QueryOperationName = field.name.into();
+
+        query_text.push_str(&format!("query {} {{\n", query_name));
+
+        write_selections(&mut query_text, schema, selection_set, 0)?;
+
+        eprintln!("query_text: {}", query_text);
+
+        Ok(query_text)
+    } else {
+        todo!("Unsupported: resolvers on query with no selection set")
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum PrintError {}
+
+fn generated_file_name(path: ResolverDefinitionPath, field_name: FieldDefinitionName) -> PathBuf {
+    PathBuf::from(format!("__generated_/{}__{}.boulton.js", path, field_name))
+}
+
+fn write_selections(
+    query_text: &mut String,
+    schema: &ValidatedSchema,
+    items: &ValidatedSelectionSetAndUnwraps,
+    indentation_level: u8,
+) -> Result<(), PrintError> {
+    for item in items.selection_set.iter() {
+        query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+        match &item.item {
+            Selection::Field(field) => match field {
+                ScalarField(scalar_field) => match scalar_field.field.item {
+                    DefinedField::ServerField(server_field_id) => {
+                        let type_without_fields = schema
+                            .schema_data
+                            .lookup_type_without_fields(server_field_id);
+                        if let Some(alias) = scalar_field.alias {
+                            query_text.push_str(&format!("{}: ", alias));
+                        }
+                        let name = type_without_fields.name();
+                        query_text.push_str(&format!("{},\n", name));
+                    }
+                    DefinedField::ResolverField(_) => {
+                        todo!("cant print resolvers, so far {}", query_text)
+                    }
+                },
+                LinkedField(linked_field) => {
+                    if let Some(alias) = linked_field.alias {
+                        query_text.push_str(&format!("{}: ", alias));
+                    }
+                    let type_with_fields = schema
+                        .schema_data
+                        .lookup_type_with_fields(linked_field.field.item);
+                    let name = type_with_fields.name();
+                    query_text.push_str(&format!("{} {{\n", name));
+                    write_selections(
+                        query_text,
+                        schema,
+                        &linked_field.selection_set_and_unwraps,
+                        indentation_level + 1,
+                    )?;
+                    query_text
+                        .push_str(&format!("{}}},\n", "  ".repeat(indentation_level as usize)));
+                }
+            },
+        }
+    }
+    Ok(())
+}
