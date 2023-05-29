@@ -14,6 +14,8 @@ pub struct ResolverDeclaration {
     pub resolver_definition_path: ResolverDefinitionPath,
 }
 
+/// TODO maybe get rid of, or make it generic over a single parameter,
+/// which is T in Vec<WithSpan<T>>
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct SelectionSetAndUnwraps<
     TScalarField: ValidScalarFieldType,

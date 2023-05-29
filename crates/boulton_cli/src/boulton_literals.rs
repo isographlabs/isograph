@@ -6,7 +6,7 @@ use regex::Regex;
 use crate::batch_compile::BatchCompileError;
 
 pub(crate) fn read_files_in_folder(
-    root_js_path: PathBuf,
+    root_js_path: &PathBuf,
 ) -> Result<Vec<(PathBuf, String)>, BatchCompileError> {
     // current_dir is the directory from which boult was run, and we expect paths
     // to be relative to that.

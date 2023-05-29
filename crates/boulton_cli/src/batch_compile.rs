@@ -9,7 +9,7 @@ use thiserror::Error;
 
 use crate::{
     boulton_literals::{extract_b_declare_literal_from_file_content, read_files_in_folder},
-    print::{print_all_query_texts, PrintError},
+    generate_artifacts::{generate_query_artifacts, PrintError},
     schema::read_schema_file,
 };
 
@@ -34,7 +34,7 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
     schema.process_type_system_document(type_system_document)?;
 
     // TODO return an iterator
-    let project_files = read_files_in_folder(opt.project_root)?;
+    let project_files = read_files_in_folder(&opt.project_root)?;
     for (file_path, file_content) in project_files {
         // TODO don't intern unless there's a match
         let interned_file_path = file_path.to_string_lossy().into_owned().intern().into();
@@ -49,7 +49,7 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
 
     let validated_schema = Schema::validate_and_construct(schema)?;
 
-    print_all_query_texts(&validated_schema)?;
+    generate_query_artifacts(&validated_schema, &opt.project_root)?;
     // dbg!(validated_schema);
 
     Ok(())

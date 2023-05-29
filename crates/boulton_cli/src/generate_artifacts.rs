@@ -5,53 +5,89 @@ use boulton_lang_types::{
     Selection,
 };
 use boulton_schema::{
-    merge_selection_set, ValidatedSchema, ValidatedSchemaResolverDefinitionInfo,
-    ValidatedSelectionSetAndUnwraps,
+    merge_selection_set, SchemaObject, SchemaTypeWithFields, ValidatedSchema,
+    ValidatedSchemaResolverDefinitionInfo, ValidatedSelectionSetAndUnwraps,
 };
 use common_lang_types::{
-    FieldDefinitionName, QueryOperationName, ResolverDefinitionPath, TypeWithFieldsId,
+    FieldDefinitionName, ObjectId, QueryOperationName, TypeWithFieldsId, TypeWithFieldsName,
     TypeWithoutFieldsId, WithSpan,
 };
 use thiserror::Error;
 
-pub(crate) fn print_all_query_texts(schema: &ValidatedSchema) -> Result<String, PrintError> {
+pub(crate) fn generate_query_artifacts(
+    schema: &ValidatedSchema,
+    project_root: &PathBuf,
+) -> Result<String, PrintError> {
     let query_type = schema.query_type.expect("Expect Query to be defined");
     let query = schema.schema_data.object(query_type);
 
-    // Operations (i.e. what would've been written with the query/subscription/mutation
-    // keywords in GraphQL) are (for now) all resolver fields on Query.
-    for field_id in query.fields.iter() {
-        let field = schema.field(*field_id);
-        if field.parent_type_id == query_type.into() {
-            if let Some(resolver_field) = field.field_type.as_resolver_field() {
-                let _text = generate_query_text_for_resolver_on_query(schema, resolver_field)?;
-            }
-            continue;
-        }
-    }
+    write_artifacts(query_artifacts(query, schema, query_type), project_root)?;
 
     Ok("".into())
 }
 
-fn generate_query_text_for_resolver_on_query(
-    schema: &ValidatedSchema,
+fn query_artifacts<'schema>(
+    query: &'schema SchemaObject,
+    schema: &'schema ValidatedSchema,
+    query_type: ObjectId,
+) -> impl Iterator<Item = Result<Artifact<'schema>, PrintError>> + 'schema {
+    std::iter::from_fn(move || {
+        for field_id in query.fields.iter() {
+            let field = schema.field(*field_id);
+            if field.parent_type_id == query_type.into() {
+                if let Some(resolver_field) = field.field_type.as_resolver_field() {
+                    Some(generate_query_text_for_resolver_on_query(
+                        schema,
+                        resolver_field,
+                    ));
+                }
+                continue;
+            }
+        }
+        None
+    })
+}
+
+pub struct QueryText(pub String);
+
+fn generate_query_text_for_resolver_on_query<'schema>(
+    schema: &'schema ValidatedSchema,
     resolver_definition: &ValidatedSchemaResolverDefinitionInfo,
-) -> Result<String, PrintError> {
+) -> Result<Artifact<'schema>, PrintError> {
     if let Some(ref selection_set) = resolver_definition.selection_set_and_unwraps {
         let mut query_text = String::new();
-        let path = resolver_definition.resolver_definition_path;
         let field = schema.field(resolver_definition.field_id);
-        let _output_file = generated_file_name(path, field.name);
         let query_name: QueryOperationName = field.name.into();
 
         write_query_text(&mut query_text, query_name, schema, selection_set)?;
 
         eprintln!("query_text: `{}`", query_text);
 
-        Ok(query_text)
+        Ok(Artifact::FetchableResolver(FetchableResolver {
+            query_text: QueryText(query_text),
+            query_name,
+            parent_type: schema.schema_data.lookup_type_with_fields(
+                schema
+                    .query_type
+                    .expect("expected query type to exist")
+                    .into(),
+            ),
+        }))
     } else {
+        // TODO convert to error
         todo!("Unsupported: resolvers on query with no selection set")
     }
+}
+
+pub enum Artifact<'schema> {
+    FetchableResolver(FetchableResolver<'schema>),
+    // Non-fetchable resolver
+}
+
+pub struct FetchableResolver<'schema> {
+    pub query_text: QueryText,
+    pub query_name: QueryOperationName,
+    pub parent_type: SchemaTypeWithFields<'schema>,
 }
 
 fn write_query_text(
@@ -82,8 +118,14 @@ fn write_query_text(
 #[derive(Debug, Error)]
 pub enum PrintError {}
 
-fn generated_file_name(path: ResolverDefinitionPath, field_name: FieldDefinitionName) -> PathBuf {
-    PathBuf::from(format!("__generated_/{}__{}.boulton.js", path, field_name))
+fn generated_file_name(
+    parent_type_name: TypeWithFieldsName,
+    field_name: FieldDefinitionName,
+) -> PathBuf {
+    PathBuf::from(format!(
+        "__generated_/{}__{}.boulton.js",
+        parent_type_name, field_name
+    ))
 }
 
 fn write_selections(
@@ -119,6 +161,29 @@ fn write_selections(
                         .push_str(&format!("{}}},\n", "  ".repeat(indentation_level as usize)));
                 }
             },
+        }
+    }
+    Ok(())
+}
+
+fn write_artifacts<'schema>(
+    artifacts: impl Iterator<Item = Result<Artifact<'schema>, PrintError>> + 'schema,
+    project_root: &PathBuf,
+) -> Result<(), PrintError> {
+    for artifact in artifacts {
+        let artifact = artifact?;
+        match artifact {
+            Artifact::FetchableResolver(fetchable_resolver) => {
+                let FetchableResolver {
+                    query_text,
+                    query_name,
+                    parent_type,
+                } = fetchable_resolver;
+                // let generated_file_name = generated_file_name(parent_type, query_name.into())
+                //     .display()
+                //     .to_string();
+                todo!()
+            }
         }
     }
     Ok(())

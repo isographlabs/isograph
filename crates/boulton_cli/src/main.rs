@@ -1,6 +1,6 @@
 mod batch_compile;
 mod boulton_literals;
-mod print;
+mod generate_artifacts;
 mod schema;
 
 use batch_compile::{handle_compile_command, BatchCompileCliOptions};

@@ -11,6 +11,12 @@ use common_lang_types::{
 
 use crate::{SchemaTypeWithFields, ValidatedSchema, ValidatedSelectionSetAndUnwraps};
 
+/// A merged selection set is an input for generating:
+/// - query texts
+/// - normalization artifacts
+/// - raw response types
+///
+/// TODO: SelectionSetAndUnwraps should be
 pub fn merge_selection_set(
     schema: &ValidatedSchema,
     parent_type: SchemaTypeWithFields,

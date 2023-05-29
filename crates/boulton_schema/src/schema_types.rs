@@ -32,6 +32,8 @@ pub struct Schema<
     TScalarField: ValidScalarFieldType,
     TLinkedField: ValidLinkedFieldType,
 > {
+    // TODO fields should probably be two vectors: server_fields and resolvers, and have
+    // separate ID types.
     pub fields: Vec<
         SchemaField<
             DefinedField<TServerType, SchemaResolverDefinitionInfo<TScalarField, TLinkedField>>,
