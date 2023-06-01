@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use boulton_lang_types::SelectionSetAndUnwraps;
 use common_lang_types::{
-    DefinedField, DescriptionValue, FieldDefinitionName, FieldId, HasName, ObjectId,
-    ObjectTypeName, OutputTypeId, OutputTypeName, ResolverDefinitionPath, ScalarFieldName,
-    ScalarId, ScalarTypeName, TypeId, TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId,
-    TypeWithoutFieldsName, UnvalidatedTypeName, ValidLinkedFieldType, ValidScalarFieldType,
-    ValidTypeAnnotationInnerType,
+    DefinedField, DescriptionValue, FieldDefinitionName, FieldId, HasName, JavascriptName,
+    ObjectId, ObjectTypeName, OutputTypeId, OutputTypeName, ResolverDefinitionPath,
+    ScalarFieldName, ScalarId, ScalarTypeName, TypeId, TypeWithFieldsId, TypeWithFieldsName,
+    TypeWithoutFieldsId, TypeWithoutFieldsName, UnvalidatedTypeName, ValidLinkedFieldType,
+    ValidScalarFieldType, ValidTypeAnnotationInnerType,
 };
 use intern::string_key::Intern;
 
@@ -88,9 +88,19 @@ impl UnvalidatedSchema {
         let mut scalars = vec![];
         let mut defined_types = HashMap::default();
 
-        let id_type_id = add_schema_defined_scalar_type(&mut scalars, &mut defined_types, "ID");
-        let string_type_id =
-            add_schema_defined_scalar_type(&mut scalars, &mut defined_types, "String");
+        let id_type_id = add_schema_defined_scalar_type(
+            &mut scalars,
+            &mut defined_types,
+            "ID",
+            "string".intern().into(),
+        );
+        let string_type_id = add_schema_defined_scalar_type(
+            &mut scalars,
+            &mut defined_types,
+            "String",
+            "string".intern().into(),
+        );
+        // Float, Boolean, etc.
 
         Self {
             fields,
@@ -162,6 +172,7 @@ fn add_schema_defined_scalar_type(
     scalars: &mut Vec<SchemaScalar>,
     defined_types: &mut HashMap<UnvalidatedTypeName, TypeId>,
     field_name: &'static str,
+    javascript_name: JavascriptName,
 ) -> ScalarId {
     let scalar_id = scalars.len().into();
 
@@ -170,6 +181,7 @@ fn add_schema_defined_scalar_type(
         description: None,
         name: typename,
         id: scalar_id,
+        javascript_name,
     });
     defined_types.insert(typename.into(), TypeId::Scalar(scalar_id.into()));
     scalar_id
@@ -253,6 +265,14 @@ impl<'a> HasName for SchemaTypeWithoutFields<'a> {
     }
 }
 
+impl<'schema> SchemaTypeWithoutFields<'schema> {
+    pub fn javascript_name(&self) -> JavascriptName {
+        match self {
+            SchemaTypeWithoutFields::Scalar(scalar) => scalar.javascript_name,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct SchemaObject {
     pub description: Option<DescriptionValue>,
@@ -298,9 +318,6 @@ impl<T> SchemaField<T> {
     }
 }
 
-/// This describes the definition of a resolver, e.g. the path to its definition.
-/// It will be contained in a hashmap, the key in that hash map is the resolver name.
-/// But that's weird, maybe it needs the field.
 #[derive(Debug)]
 // TODO map selection_set
 pub struct SchemaResolverDefinitionInfo<
@@ -336,5 +353,6 @@ pub struct SchemaScalar {
     pub description: Option<DescriptionValue>,
     pub name: ScalarTypeName,
     pub id: ScalarId,
+    pub javascript_name: JavascriptName,
     // pub directives: Vec<Directive<ConstantValue>>,
 }

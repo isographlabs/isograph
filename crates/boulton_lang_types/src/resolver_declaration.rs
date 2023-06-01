@@ -1,7 +1,7 @@
 use common_lang_types::{
-    DescriptionValue, FieldDefinitionName, HasName, LinkedFieldAlias, LinkedFieldName,
-    ResolverDefinitionPath, ScalarFieldAlias, ScalarFieldName, UnvalidatedTypeName,
-    ValidLinkedFieldType, ValidScalarFieldType, WithSpan,
+    DescriptionValue, FieldDefinitionName, FieldNameOrAlias, HasName, LinkedFieldAlias,
+    LinkedFieldName, ResolverDefinitionPath, ScalarFieldAlias, ScalarFieldName,
+    UnvalidatedTypeName, ValidLinkedFieldType, ValidScalarFieldType, WithSpan,
 };
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -190,6 +190,12 @@ impl<TScalarField: ValidScalarFieldType> ScalarFieldSelection<TScalarField> {
             unwraps: self.unwraps,
         })
     }
+
+    pub fn name_or_alias(&self) -> WithSpan<FieldNameOrAlias> {
+        self.alias
+            .map(|item| item.map(FieldNameOrAlias::from))
+            .unwrap_or_else(|| self.name.map(FieldNameOrAlias::from))
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -201,6 +207,16 @@ pub struct LinkedFieldSelection<
     pub alias: Option<WithSpan<LinkedFieldAlias>>,
     pub field: TLinkedField,
     pub selection_set_and_unwraps: SelectionSetAndUnwraps<TScalarField, TLinkedField>,
+}
+
+impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
+    LinkedFieldSelection<TScalarField, TLinkedField>
+{
+    pub fn name_or_alias(&self) -> WithSpan<FieldNameOrAlias> {
+        self.alias
+            .map(|item| item.map(FieldNameOrAlias::from))
+            .unwrap_or_else(|| self.name.map(FieldNameOrAlias::from))
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]

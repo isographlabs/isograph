@@ -1,0 +1,25 @@
+"""
+Root object
+"""
+type Query {
+  """
+  Probably whoever is logged in.
+  """
+  current_user: User!
+  current_post: Post!
+  hello: String!
+}
+
+type User {
+  id: ID!
+  name: String!
+  email: String!
+  avatar_url: String!
+}
+
+type Post {
+  id: ID!
+  name: String!
+  content: String!
+  author: User!
+}

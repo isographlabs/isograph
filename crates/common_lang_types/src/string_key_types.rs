@@ -101,3 +101,8 @@ string_key_newtype!(QueryOperationName);
 // Explanation: any resolver field that is on the Query object is eligible
 // to be a query.
 string_key_conversion!(FieldDefinitionName, QueryOperationName);
+// The reverse is safe as well.
+string_key_conversion!(QueryOperationName, FieldDefinitionName);
+
+// For scalars
+string_key_newtype!(JavascriptName);

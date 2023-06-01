@@ -26,27 +26,40 @@ pub(crate) fn read_files_in_folder(
         });
     }
 
-    fs::read_dir(canonicalized_existing_path)
+    Ok(fs::read_dir(canonicalized_existing_path)
         .map_err(|e| BatchCompileError::UnableToTraverseDirectory { message: e })?
         .into_iter()
-        .map(move |entry| {
-            let entry =
-                entry.map_err(|e| BatchCompileError::UnableToTraverseDirectory { message: e })?;
+        .map(
+            move |entry| -> Result<Option<(PathBuf, String)>, BatchCompileError> {
+                let entry = entry
+                    .map_err(|e| BatchCompileError::UnableToTraverseDirectory { message: e })?;
 
-            let contents = std::fs::read(entry.path()).map_err(|message| {
-                BatchCompileError::UnableToReadFile {
-                    path: entry.path(),
-                    message,
+                let path = entry.path();
+                if path.is_dir() {
+                    // TODO traverse into subdirectories
+                    return Ok(None);
                 }
-            })?;
 
-            let contents = std::str::from_utf8(&contents)
-                .map_err(|message| BatchCompileError::UnableToConvertToString { message })?
-                .to_owned();
+                let contents =
+                    std::fs::read(path).map_err(|message| BatchCompileError::UnableToReadFile {
+                        path: entry.path(),
+                        message,
+                    })?;
 
-            Ok((entry.path().strip_prefix(&joined)?.to_path_buf(), contents))
-        })
-        .collect()
+                let contents = std::str::from_utf8(&contents)
+                    .map_err(|message| BatchCompileError::UnableToConvertToString { message })?
+                    .to_owned();
+
+                Ok(Some((
+                    entry.path().strip_prefix(&joined)?.to_path_buf(),
+                    contents,
+                )))
+            },
+        )
+        .collect::<Result<Vec<Option<_>>, _>>()?
+        .into_iter()
+        .filter_map(|x| x)
+        .collect())
 }
 
 lazy_static! {

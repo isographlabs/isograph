@@ -11,17 +11,19 @@ use common_lang_types::{
 
 use crate::{SchemaTypeWithFields, ValidatedSchema, ValidatedSelectionSetAndUnwraps};
 
+pub type MergedSelectionSet = Vec<WithSpan<Selection<TypeWithoutFieldsId, TypeWithFieldsId>>>;
+
 /// A merged selection set is an input for generating:
 /// - query texts
 /// - normalization artifacts
 /// - raw response types
 ///
-/// TODO: SelectionSetAndUnwraps should be
+/// TODO: SelectionSetAndUnwraps should be generic enough to handle this
 pub fn merge_selection_set(
     schema: &ValidatedSchema,
     parent_type: SchemaTypeWithFields,
     selection_set: &ValidatedSelectionSetAndUnwraps,
-) -> Vec<WithSpan<Selection<TypeWithoutFieldsId, TypeWithFieldsId>>> {
+) -> MergedSelectionSet {
     // TODO restructure types such that
     let mut merged_selection_set: HashMap<
         FieldNameOrAlias,

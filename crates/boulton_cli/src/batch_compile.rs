@@ -9,7 +9,7 @@ use thiserror::Error;
 
 use crate::{
     boulton_literals::{extract_b_declare_literal_from_file_content, read_files_in_folder},
-    generate_artifacts::{generate_query_artifacts, PrintError},
+    generate_artifacts::{generate_query_artifacts, GenerateArtifactsError},
     schema::read_schema_file,
 };
 
@@ -112,7 +112,7 @@ pub(crate) enum BatchCompileError {
     },
 
     #[error("Unable to print.\nMessage: {message:?}")]
-    UnableToPrint { message: PrintError },
+    UnableToPrint { message: GenerateArtifactsError },
 }
 
 impl From<graphql_lang_parser::SchemaParseError> for BatchCompileError {
@@ -151,8 +151,8 @@ impl From<boulton_schema::ValidateSchemaError> for BatchCompileError {
     }
 }
 
-impl From<PrintError> for BatchCompileError {
-    fn from(value: PrintError) -> Self {
+impl From<GenerateArtifactsError> for BatchCompileError {
+    fn from(value: GenerateArtifactsError) -> Self {
         BatchCompileError::UnableToPrint { message: value }
     }
 }

@@ -1,131 +1,238 @@
-use std::path::PathBuf;
+use std::{
+    fs::{self, File},
+    io::{self, Write},
+    path::PathBuf,
+};
 
 use boulton_lang_types::{
     FieldSelection::{LinkedField, ScalarField},
     Selection,
 };
 use boulton_schema::{
-    merge_selection_set, SchemaObject, SchemaTypeWithFields, ValidatedSchema,
+    merge_selection_set, MergedSelectionSet, SchemaObject, SchemaTypeWithFields, ValidatedSchema,
     ValidatedSchemaResolverDefinitionInfo, ValidatedSelectionSetAndUnwraps,
 };
 use common_lang_types::{
-    FieldDefinitionName, ObjectId, QueryOperationName, TypeWithFieldsId, TypeWithFieldsName,
-    TypeWithoutFieldsId, WithSpan,
+    DefinedField, FieldDefinitionName, HasName, ObjectId, QueryOperationName,
+    ResolverDefinitionPath, TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId, WithSpan,
 };
 use thiserror::Error;
 
 pub(crate) fn generate_query_artifacts(
     schema: &ValidatedSchema,
     project_root: &PathBuf,
-) -> Result<String, PrintError> {
+) -> Result<String, GenerateArtifactsError> {
     let query_type = schema.query_type.expect("Expect Query to be defined");
     let query = schema.schema_data.object(query_type);
 
-    write_artifacts(query_artifacts(query, schema, query_type), project_root)?;
+    write_artifacts(get_all_artifacts(query, schema, query_type), project_root)?;
 
     Ok("".into())
 }
 
-fn query_artifacts<'schema>(
+fn get_all_artifacts<'schema>(
     query: &'schema SchemaObject,
     schema: &'schema ValidatedSchema,
     query_type: ObjectId,
-) -> impl Iterator<Item = Result<Artifact<'schema>, PrintError>> + 'schema {
+) -> impl Iterator<Item = Result<Artifact<'schema>, GenerateArtifactsError>> + 'schema {
+    let mut fields = query.fields.iter();
     std::iter::from_fn(move || {
-        for field_id in query.fields.iter() {
+        while let Some(field_id) = fields.next() {
             let field = schema.field(*field_id);
             if field.parent_type_id == query_type.into() {
                 if let Some(resolver_field) = field.field_type.as_resolver_field() {
-                    Some(generate_query_text_for_resolver_on_query(
-                        schema,
-                        resolver_field,
-                    ));
+                    return Some(
+                        generate_fetchable_resolver_artifact(schema, resolver_field)
+                            .map(|x| Artifact::FetchableResolver(x)),
+                    );
                 }
-                continue;
             }
         }
+        // Non query artifacts
         None
     })
 }
 
+#[derive(Debug)]
 pub struct QueryText(pub String);
 
-fn generate_query_text_for_resolver_on_query<'schema>(
+fn generate_fetchable_resolver_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     resolver_definition: &ValidatedSchemaResolverDefinitionInfo,
-) -> Result<Artifact<'schema>, PrintError> {
+) -> Result<FetchableResolver<'schema>, GenerateArtifactsError> {
     if let Some(ref selection_set) = resolver_definition.selection_set_and_unwraps {
-        let mut query_text = String::new();
         let field = schema.field(resolver_definition.field_id);
         let query_name: QueryOperationName = field.name.into();
 
-        write_query_text(&mut query_text, query_name, schema, selection_set)?;
+        let merged_selection_set = merge_selection_set(
+            schema,
+            schema
+                .schema_data
+                .object(schema.query_type.expect("expect query type to exist"))
+                .into(),
+            selection_set,
+        );
 
-        eprintln!("query_text: `{}`", query_text);
+        let query_object_id = schema.query_type.expect("expected query type to exist");
+        let query_type = schema
+            .schema_data
+            .lookup_type_with_fields(query_object_id.into());
+        let query_text = generate_query_text(query_name, schema, &merged_selection_set)?;
+        let query_type_declaration =
+            generate_query_type_declaration(schema, &merged_selection_set, 1)?;
+        let resolver_import_statement = generate_resolver_import_statement(
+            field.name,
+            resolver_definition.resolver_definition_path,
+        );
+        let resolver_response_type_declaration =
+            ResolverResponseTypeDeclaration("foo: string".to_string());
+        let user_response_type_declaration = UserResponseTypeDeclaration("foo: string".to_string());
+        let mut nested_resolver_artifact_imports = Vec::new();
+        let reader_ast = generate_reader_ast(
+            schema,
+            selection_set,
+            query_type,
+            0,
+            &mut nested_resolver_artifact_imports,
+        );
 
-        Ok(Artifact::FetchableResolver(FetchableResolver {
-            query_text: QueryText(query_text),
+        Ok(FetchableResolver {
+            query_text,
             query_name,
-            parent_type: schema.schema_data.lookup_type_with_fields(
-                schema
-                    .query_type
-                    .expect("expected query type to exist")
-                    .into(),
-            ),
-        }))
+            parent_type: query_type,
+            query_type_declaration,
+            resolver_import_statement,
+            resolver_response_type_declaration,
+            user_response_type_declaration,
+            reader_ast,
+            nested_resolver_artifact_imports,
+        })
     } else {
         // TODO convert to error
         todo!("Unsupported: resolvers on query with no selection set")
     }
 }
 
+#[derive(Debug)]
 pub enum Artifact<'schema> {
     FetchableResolver(FetchableResolver<'schema>),
     // Non-fetchable resolver
 }
 
+#[derive(Debug)]
+pub struct QueryTypeDeclaration(pub String);
+
+#[derive(Debug)]
+pub struct ResolverImportStatement(pub String);
+
+#[derive(Debug)]
+pub struct ResolverResponseTypeDeclaration(pub String);
+
+#[derive(Debug)]
+pub struct UserResponseTypeDeclaration(pub String);
+
+#[derive(Debug)]
+pub struct ReaderAst(pub String);
+
+#[derive(Debug)]
+pub struct NestedResolverName(pub String);
+
+#[derive(Debug)]
 pub struct FetchableResolver<'schema> {
     pub query_text: QueryText,
     pub query_name: QueryOperationName,
     pub parent_type: SchemaTypeWithFields<'schema>,
+    pub query_type_declaration: QueryTypeDeclaration,
+    pub resolver_import_statement: ResolverImportStatement,
+    pub resolver_response_type_declaration: ResolverResponseTypeDeclaration,
+    pub user_response_type_declaration: UserResponseTypeDeclaration,
+    pub reader_ast: ReaderAst,
+    pub nested_resolver_artifact_imports: Vec<NestedResolverName>,
 }
 
-fn write_query_text(
-    query_text: &mut String,
+impl<'schema> FetchableResolver<'schema> {
+    fn file_contents(&self) -> String {
+        // TODO don't use merged, use regular selection set when generating fragment type
+        // (i.e. we are not data masking)
+        format!(
+            "import type {{BoultonFetchableResolver, ReaderAst}} from '@boulton/react';\n\
+            {}\n\
+            {}\n\
+            const queryText = '{}';\n\n\
+            const normalizationAst = {{notNeededForDemo: true}};\n\
+            const readerAst: ReaderAst = {};\n\n\
+            // The type, when passed to the resolver (currently this is the raw response type, it should be the response type)\n\
+            type FragmentType = {{\n{}}};\n\n\
+            // The type, when returned from the resolver\n\
+            type ResolverResponse = {{\n  {}\n}};\n\n\
+            // The type, when read out\n\
+            type UserResponse = {{\n  {}\n}};\n\n\
+            const artifact: BoultonFetchableResolver<FragmentType, ResolverResponse, UserResponse> = {{\n\
+            {}kind: 'FetchableResolver',\n\
+            {}queryText,\n\
+            {}normalizationAst,\n\
+            {}readerAst,\n\
+            {}resolver,\n\
+            }};\n\n\
+            export default artifact;\n",
+            self.resolver_import_statement.0,
+            nested_resolver_names_to_import_statement(&self.nested_resolver_artifact_imports),
+            self.query_text.0,
+            self.reader_ast.0,
+            self.query_type_declaration.0,
+            self.resolver_response_type_declaration.0,
+            self.user_response_type_declaration.0,
+            "  ",
+            "  ",
+            "  ",
+            "  ",
+            "  "
+        )
+    }
+}
+
+fn generate_query_text(
     query_name: QueryOperationName,
     schema: &ValidatedSchema,
-    selection_set: &ValidatedSelectionSetAndUnwraps,
-) -> Result<(), PrintError> {
-    query_text.push_str(&format!("query {} {{\n", query_name));
+    merged_selection_set: &MergedSelectionSet,
+) -> Result<QueryText, GenerateArtifactsError> {
+    let mut query_text = String::new();
+    query_text.push_str(&format!("query {} {{\\\n", query_name));
     write_selections(
-        query_text,
+        &mut query_text,
         schema,
         // TODO do not do this here, instead do it during validation, and topologically sort first
-        &merge_selection_set(
-            schema,
-            schema
-                .schema_data
-                .object(schema.query_type.expect("expect query type to exist"))
-                .into(),
-            &selection_set,
-        ),
+        &merged_selection_set,
         1,
     )?;
     query_text.push_str("}");
-    Ok(())
+    Ok(QueryText(query_text))
 }
 
 #[derive(Debug, Error)]
-pub enum PrintError {}
+pub enum GenerateArtifactsError {
+    #[error("Unable to write to artifact file at path {path:?}.\nMessage: {message:?}")]
+    UnableToWriteToArtifactFile { path: PathBuf, message: io::Error },
+
+    #[error("Unable to create directory at path {path:?}.\nMessage: {message:?}")]
+    UnableToCreateDirectory { path: PathBuf, message: io::Error },
+
+    #[error("Unable to delete directory at path {path:?}.\nMessage: {message:?}")]
+    UnableToDeleteDirectory { path: PathBuf, message: io::Error },
+
+    #[error("Unable to canonicalize path: {path:?}.\nMessage: {message:?}")]
+    UnableToCanonicalizePath { path: PathBuf, message: io::Error },
+}
 
 fn generated_file_name(
     parent_type_name: TypeWithFieldsName,
     field_name: FieldDefinitionName,
 ) -> PathBuf {
-    PathBuf::from(format!(
-        "__generated_/{}__{}.boulton.js",
-        parent_type_name, field_name
-    ))
+    PathBuf::from(format!("{}__{}.boulton.ts", parent_type_name, field_name))
+}
+
+fn generated_file_path(project_root: &PathBuf, file_name: &PathBuf) -> PathBuf {
+    project_root.join(file_name)
 }
 
 fn write_selections(
@@ -133,7 +240,7 @@ fn write_selections(
     schema: &ValidatedSchema,
     items: &Vec<WithSpan<Selection<TypeWithoutFieldsId, TypeWithFieldsId>>>,
     indentation_level: u8,
-) -> Result<(), PrintError> {
+) -> Result<(), GenerateArtifactsError> {
     for item in items.iter() {
         query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
         match &item.item {
@@ -143,22 +250,24 @@ fn write_selections(
                         query_text.push_str(&format!("{}: ", alias));
                     }
                     let name = scalar_field.name.item;
-                    query_text.push_str(&format!("{},\n", name));
+                    query_text.push_str(&format!("{},\\\n", name));
                 }
                 LinkedField(linked_field) => {
                     if let Some(alias) = linked_field.alias {
                         query_text.push_str(&format!("{}: ", alias));
                     }
                     let name = linked_field.name.item;
-                    query_text.push_str(&format!("{} {{\n", name));
+                    query_text.push_str(&format!("{} {{\\\n", name));
                     write_selections(
                         query_text,
                         schema,
                         &linked_field.selection_set_and_unwraps.selection_set,
                         indentation_level + 1,
                     )?;
-                    query_text
-                        .push_str(&format!("{}}},\n", "  ".repeat(indentation_level as usize)));
+                    query_text.push_str(&format!(
+                        "{}}},\\\n",
+                        "  ".repeat(indentation_level as usize)
+                    ));
                 }
             },
         }
@@ -167,24 +276,268 @@ fn write_selections(
 }
 
 fn write_artifacts<'schema>(
-    artifacts: impl Iterator<Item = Result<Artifact<'schema>, PrintError>> + 'schema,
+    artifacts: impl Iterator<Item = Result<Artifact<'schema>, GenerateArtifactsError>> + 'schema,
     project_root: &PathBuf,
-) -> Result<(), PrintError> {
+) -> Result<(), GenerateArtifactsError> {
     for artifact in artifacts {
         let artifact = artifact?;
         match artifact {
             Artifact::FetchableResolver(fetchable_resolver) => {
                 let FetchableResolver {
-                    query_text,
                     query_name,
                     parent_type,
-                } = fetchable_resolver;
-                // let generated_file_name = generated_file_name(parent_type, query_name.into())
-                //     .display()
-                //     .to_string();
-                todo!()
+                    ..
+                } = &fetchable_resolver;
+                let current_dir = std::env::current_dir().expect("current_dir should exist");
+                let project_root = current_dir.join(project_root).canonicalize().map_err(|e| {
+                    GenerateArtifactsError::UnableToCanonicalizePath {
+                        path: project_root.clone(),
+                        message: e,
+                    }
+                })?;
+
+                let generated_folder_root = project_root.join("__boulton");
+
+                fs::remove_dir_all(&generated_folder_root).map_err(|e| {
+                    GenerateArtifactsError::UnableToDeleteDirectory {
+                        path: project_root.clone(),
+                        message: e,
+                    }
+                })?;
+                fs::create_dir_all(&generated_folder_root).map_err(|e| {
+                    GenerateArtifactsError::UnableToCreateDirectory {
+                        path: project_root.clone(),
+                        message: e,
+                    }
+                })?;
+
+                let generated_file_name =
+                    generated_file_name(parent_type.name(), (*query_name).into());
+                let generated_file_path =
+                    generated_file_path(&generated_folder_root, &generated_file_name);
+
+                let mut file = File::create(&generated_file_path).map_err(|e| {
+                    GenerateArtifactsError::UnableToWriteToArtifactFile {
+                        path: generated_file_path.clone(),
+                        message: e,
+                    }
+                })?;
+
+                let file_contents = fetchable_resolver.file_contents();
+
+                file.write(file_contents.as_bytes()).map_err(|e| {
+                    GenerateArtifactsError::UnableToWriteToArtifactFile {
+                        path: generated_file_path.clone(),
+                        message: e,
+                    }
+                })?;
             }
         }
     }
     Ok(())
+}
+
+fn generate_query_type_declaration(
+    schema: &ValidatedSchema,
+    selection_set: &MergedSelectionSet,
+    indentation_level: u8,
+) -> Result<QueryTypeDeclaration, GenerateArtifactsError> {
+    // TODO use unwraps
+    let mut query_type_declaration = String::new();
+    for selection in selection_set.iter() {
+        write_query_types_from_selection(
+            schema,
+            &mut query_type_declaration,
+            selection,
+            indentation_level,
+        )?;
+    }
+    Ok(QueryTypeDeclaration(query_type_declaration))
+}
+
+fn write_query_types_from_selection(
+    schema: &ValidatedSchema,
+    query_type_declaration: &mut String,
+    selection: &WithSpan<Selection<TypeWithoutFieldsId, TypeWithFieldsId>>,
+    indentation_level: u8,
+) -> Result<(), GenerateArtifactsError> {
+    query_type_declaration.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+
+    match &selection.item {
+        Selection::Field(field) => match field {
+            ScalarField(scalar_field) => {
+                let name_or_alias = scalar_field.name_or_alias();
+                let type_ = schema
+                    .schema_data
+                    .lookup_type_without_fields(scalar_field.field)
+                    .javascript_name();
+                query_type_declaration.push_str(&format!("{}: {},\n", name_or_alias, type_));
+            }
+            LinkedField(linked_field) => {
+                let name_or_alias = linked_field.name_or_alias();
+                let inner = generate_query_type_declaration(
+                    schema,
+                    &linked_field.selection_set_and_unwraps.selection_set,
+                    indentation_level + 1,
+                )?;
+                query_type_declaration.push_str(&format!(
+                    "{}: {{\n{}{}}},\n",
+                    name_or_alias,
+                    inner.0,
+                    "  ".repeat(indentation_level as usize)
+                ));
+            }
+        },
+    }
+    Ok(())
+}
+
+fn generate_resolver_import_statement(
+    resolver_name: FieldDefinitionName,
+    resolver_path: ResolverDefinitionPath,
+) -> ResolverImportStatement {
+    // ../ gets us to the project root from the __boulton folder
+    ResolverImportStatement(format!(
+        "import {{ {} as resolver }} from '../{}';",
+        resolver_name, resolver_path
+    ))
+}
+
+fn generate_reader_ast<'schema>(
+    schema: &'schema ValidatedSchema,
+    selection_set: &'schema ValidatedSelectionSetAndUnwraps,
+    parent_type: SchemaTypeWithFields<'schema>,
+    indentation_level: u8,
+    nested_resolver_imports: &mut Vec<NestedResolverName>,
+) -> ReaderAst {
+    let mut reader_ast = "[\n".to_string();
+    for item in &selection_set.selection_set {
+        let s = generate_reader_ast_node(
+            item,
+            parent_type,
+            schema,
+            indentation_level + 1,
+            nested_resolver_imports,
+        );
+        reader_ast.push_str(&s);
+    }
+    reader_ast.push_str(&format!("{}]", "  ".repeat(indentation_level as usize)));
+    ReaderAst(reader_ast)
+}
+
+fn generate_reader_ast_node(
+    item: &WithSpan<Selection<DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>>,
+    parent_type: SchemaTypeWithFields,
+    schema: &boulton_schema::Schema<
+        common_lang_types::OutputTypeId,
+        DefinedField<TypeWithoutFieldsId, ()>,
+        TypeWithFieldsId,
+    >,
+    indentation_level: u8,
+    nested_resolver_imports: &mut Vec<NestedResolverName>,
+) -> String {
+    match &item.item {
+        Selection::Field(field) => match field {
+            ScalarField(scalar_field) => {
+                let field_name = scalar_field.name.item;
+
+                match scalar_field.field {
+                    DefinedField::ServerField(_server_field) => {
+                        let alias = scalar_field
+                            .alias
+                            .map(|x| format!("\"{}\"", x.item))
+                            .unwrap_or("null".to_string());
+                        format!(
+                            "{}{{\n{}kind: \"Scalar\",\n{}response_name: \"{}\",\n{}alias: {},\n{}}},\n",
+                            "  ".repeat(indentation_level as usize),
+                            "  ".repeat((indentation_level + 1) as usize),
+                            "  ".repeat((indentation_level + 1) as usize),
+                            field_name,
+                            "  ".repeat((indentation_level + 1) as usize),
+                            alias,
+                            "  ".repeat((indentation_level) as usize),
+                        )
+                    }
+                    DefinedField::ResolverField(_) => {
+                        let alias = scalar_field.name_or_alias().item;
+                        // This field is a resolver, so we need to look up the field in the
+                        // schema.
+                        let resolver_field_name = scalar_field.name.item;
+                        let parent_field_id = parent_type
+                            .fields()
+                            .iter()
+                            .find(|parent_field_id| {
+                                let field = schema.field(**parent_field_id);
+                                field.name == resolver_field_name.into()
+                            })
+                            .expect("expect field to exist");
+                        let resolver_field = schema.field(*parent_field_id);
+                        match &resolver_field.field_type {
+                            DefinedField::ServerField(_) => panic!("Expected resolver"),
+                            DefinedField::ResolverField(resolver_field) => {
+                                let resolver_import_name = NestedResolverName(format!(
+                                    "{}__{}",
+                                    parent_type.name(),
+                                    field_name
+                                ));
+                                let res = format!(
+                                    "{}{{\n{}kind: \"Resolver\",\n{}alias: \"{}\",\n{}resolver: {},\n{}}},\n",
+                                    "  ".repeat(indentation_level as usize),
+                                    "  ".repeat((indentation_level + 1) as usize),
+                                    "  ".repeat((indentation_level + 1) as usize),
+                                    alias,
+                                    "  ".repeat((indentation_level + 1) as usize),
+                                    resolver_import_name.0,
+                                    "  ".repeat(indentation_level as usize),
+                                );
+                                nested_resolver_imports.push(resolver_import_name);
+                                res
+                            }
+                        }
+                    }
+                }
+            }
+            LinkedField(linked_field) => {
+                let name = linked_field.name.item;
+                let alias = linked_field
+                    .alias
+                    .map(|x| format!("\"{}\"", x.item))
+                    .unwrap_or("null".to_string());
+                let linked_field_type = schema
+                    .schema_data
+                    .lookup_type_with_fields(linked_field.field);
+                let inner_reader_ast = generate_reader_ast(
+                    schema,
+                    &linked_field.selection_set_and_unwraps,
+                    linked_field_type,
+                    indentation_level + 1,
+                    nested_resolver_imports,
+                );
+                format!(
+                    "{}{{\n{}kind: \"Linked\",\n{}response_name: \"{}\",\n{}alias: {},\n{}selections: {},\n{}}},\n",
+                    "  ".repeat(indentation_level as usize),
+                    "  ".repeat((indentation_level + 1) as usize),
+                    "  ".repeat((indentation_level + 1) as usize),
+                    name,
+                    "  ".repeat((indentation_level + 1) as usize),
+                    alias,
+                    "  ".repeat((indentation_level + 1) as usize),
+                    inner_reader_ast.0, "  ".repeat(indentation_level as usize),
+                )
+            }
+        },
+    }
+}
+
+fn nested_resolver_names_to_import_statement(
+    nested_resolver_imports: &Vec<NestedResolverName>,
+) -> String {
+    let mut s = String::new();
+    for import in nested_resolver_imports {
+        s.push_str(&format!(
+            "import {{ {} }} from './{}';\n",
+            import.0, import.0
+        ));
+    }
+    s
 }

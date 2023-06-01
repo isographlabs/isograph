@@ -1,5 +1,5 @@
 {
-  "name": "disposable-state-ajax-demo",
+  "name": "boulton-demo",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -9,12 +9,17 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@boulton/react": "../../libs/boulton-react/",
     "@boulton/react-disposable-state": "../../libs/boulton-react-disposable-state/",
     "@types/node": "18.16.3",
     "@types/react": "18.2.0",
     "@types/react-dom": "18.2.1",
+    "cors": "^2.8.5",
     "eslint": "8.39.0",
     "eslint-config-next": "13.3.2",
+    "express": "^4.18.2",
+    "express-graphql": "^0.12.0",
+    "graphql": "^16.6.0",
     "next": "13.3.2",
     "react": "18.2.0",
     "react-dom": "18.2.0",
