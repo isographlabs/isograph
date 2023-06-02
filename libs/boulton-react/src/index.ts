@@ -1,5 +1,6 @@
 import {
   DataId,
+  DataTypeValue,
   Link,
   ROOT_ID,
   getOrCreateCacheForUrl,
@@ -48,9 +49,12 @@ export type BoultonResolver<
       TUnwrappedResolverResult
     >;
 
-export type ReaderAst = [
-  ReaderScalarField | ReaderLinkedField | ReaderResolverField
-];
+export type ReaderAstNode =
+  | ReaderScalarField
+  | ReaderLinkedField
+  | ReaderResolverField;
+export type ReaderAst = ReaderAstNode[];
+
 export type ReaderScalarField = {
   kind: "Scalar";
   response_name: string;
@@ -82,10 +86,10 @@ export type FragmentReference<
   kind: "FragmentReference";
   readerAst: ReaderAst;
   root: DataId;
-  resolver?: (networkResponse: TReadFromStore) => TResolverResult;
+  resolver: (networkResponse: TReadFromStore) => TResolverResult;
 };
 
-export function bDeclare(queryText: string) {
+export function bDeclare(queryText: TemplateStringsArray) {
   return (x: any) => x;
 }
 
@@ -118,6 +122,7 @@ export function useLazyReference<
       kind: "FragmentReference",
       readerAst: artifact.readerAst,
       root: ROOT_ID,
+      resolver: artifact.resolver ?? ((x) => x),
     },
   };
 }
@@ -137,14 +142,11 @@ export function read<
     reference.readerAst,
     reference.root
   );
+  console.log("just read out", reference, response);
   if (response.kind === "MissingData") {
     throw onNextChange();
   } else {
-    if (reference.resolver != null) {
-      return reference.resolver(response.data) as any;
-    } else {
-      return response.data as any;
-    }
+    return reference.resolver(response.data) as any;
   }
 }
 
@@ -161,6 +163,7 @@ function readData<TReadFromStore>(
   ast: ReaderAst,
   root: DataId
 ): ReadDataResult<TReadFromStore> {
+  console.log("reading", root, ast);
   let existingRecord = store[root];
   if (existingRecord == null) {
     return { kind: "MissingData" };
@@ -170,15 +173,34 @@ function readData<TReadFromStore>(
 
   for (const field of ast) {
     switch (field.kind) {
-      case "Scalar":
+      case "Scalar": {
         const value = existingRecord[field.response_name];
         if (value == null) {
           return { kind: "MissingData" };
         }
         target[field.alias ?? field.response_name] = value;
         break;
-      case "Linked":
-        const link = assertLink(existingRecord[field.response_name]);
+      }
+      case "Linked": {
+        const value = existingRecord[field.response_name];
+        console.log("testing", value);
+        if (Array.isArray(value)) {
+          const results = [];
+          for (const item of value) {
+            const link = assertLink(item);
+            if (link == null) {
+              return { kind: "MissingData" };
+            }
+            const result = readData(field.selections, link?.__link);
+            if (result.kind === "MissingData") {
+              return { kind: "MissingData" };
+            }
+            results.push(result.data);
+          }
+          target[field.alias ?? field.response_name] = results;
+          break;
+        }
+        const link = assertLink(value);
         if (link == null) {
           return { kind: "MissingData" };
         }
@@ -189,20 +211,28 @@ function readData<TReadFromStore>(
         }
         target[field.alias ?? field.response_name] = data.data;
         break;
-      case "Resolver":
+      }
+      case "Resolver": {
         target[field.alias] = {
           kind: "FragmentReference",
           readerAst: field.resolver.readerAst,
           root,
-          resolver: field.resolver.resolver,
+          // This is a footgun, I should really figure out a better way to handle this.
+          // If you misspell a resolver export (it should be the field name), then this
+          // will fall back to x => x, when the app developer intended something else.
+          resolver: field.resolver.resolver ?? ((x) => x),
         };
         break;
+      }
     }
   }
   return { kind: "Success", data: target as any };
 }
 
-function assertLink(link: Link | string | undefined): Link | undefined {
+function assertLink(link: DataTypeValue): Link | undefined {
+  if (Array.isArray(link)) {
+    throw new Error("Unexpected array");
+  }
   if (typeof link === "object") {
     return link;
   }

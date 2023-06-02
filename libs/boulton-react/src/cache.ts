@@ -59,8 +59,15 @@ export function makeNetworkRequest<T extends object>(
 export type Link = {
   __link: DataId;
 };
+export type DataTypeValue =
+  | string
+  | undefined
+  | DataId
+  | Link
+  | DataTypeValue[];
+
 export type DataType = {
-  [index: DataId | string]: string | undefined | DataId | Link;
+  [index: DataId | string]: DataTypeValue;
   id?: DataId;
 };
 export type DataId = string;
@@ -105,12 +112,14 @@ function normalizeDataWithPath(data: DataType, path: string): DataId {
   return id;
 }
 
-function getFieldOrNormalize(
-  data: DataType | string | undefined,
-  path: string
-): string | Link | undefined {
+function getFieldOrNormalize(data: DataTypeValue, path: string): DataTypeValue {
   if (typeof data === "string" || data == null) {
     return data;
+  }
+  if (Array.isArray(data)) {
+    return data.map((item, index) =>
+      getFieldOrNormalize(item, `${path}[${index}]`)
+    );
   }
 
   const dataId = normalizeDataWithPath(data, path);

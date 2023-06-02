@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     fs::{self, File},
     io::{self, Write},
     path::PathBuf,
@@ -18,7 +19,7 @@ use common_lang_types::{
 };
 use thiserror::Error;
 
-pub(crate) fn generate_query_artifacts(
+pub(crate) fn generate_artifacts(
     schema: &ValidatedSchema,
     project_root: &PathBuf,
 ) -> Result<String, GenerateArtifactsError> {
@@ -35,15 +36,20 @@ fn get_all_artifacts<'schema>(
     schema: &'schema ValidatedSchema,
     query_type: ObjectId,
 ) -> impl Iterator<Item = Result<Artifact<'schema>, GenerateArtifactsError>> + 'schema {
-    let mut fields = query.fields.iter();
+    let mut fields = schema.fields.iter();
     std::iter::from_fn(move || {
-        while let Some(field_id) = fields.next() {
-            let field = schema.field(*field_id);
-            if field.parent_type_id == query_type.into() {
-                if let Some(resolver_field) = field.field_type.as_resolver_field() {
+        while let Some(field) = fields.next() {
+            // let field = schema.field(*field_id);
+            if let Some(resolver_field) = field.field_type.as_resolver_field() {
+                if field.parent_type_id == query_type.into() {
                     return Some(
                         generate_fetchable_resolver_artifact(schema, resolver_field)
                             .map(|x| Artifact::FetchableResolver(x)),
+                    );
+                } else {
+                    return Some(
+                        generate_non_fetchable_resolver_artifact(schema, resolver_field)
+                            .map(|x| Artifact::NonFetchableResolver(x)),
                     );
                 }
             }
@@ -60,7 +66,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     resolver_definition: &ValidatedSchemaResolverDefinitionInfo,
 ) -> Result<FetchableResolver<'schema>, GenerateArtifactsError> {
-    if let Some(ref selection_set) = resolver_definition.selection_set_and_unwraps {
+    if let Some(ref selection_set_and_unwraps) = resolver_definition.selection_set_and_unwraps {
         let field = schema.field(resolver_definition.field_id);
         let query_name: QueryOperationName = field.name.into();
 
@@ -70,7 +76,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
                 .schema_data
                 .object(schema.query_type.expect("expect query type to exist"))
                 .into(),
-            selection_set,
+            selection_set_and_unwraps,
         );
 
         let query_object_id = schema.query_type.expect("expected query type to exist");
@@ -87,10 +93,10 @@ fn generate_fetchable_resolver_artifact<'schema>(
         let resolver_response_type_declaration =
             ResolverResponseTypeDeclaration("foo: string".to_string());
         let user_response_type_declaration = UserResponseTypeDeclaration("foo: string".to_string());
-        let mut nested_resolver_artifact_imports = Vec::new();
+        let mut nested_resolver_artifact_imports = HashSet::new();
         let reader_ast = generate_reader_ast(
             schema,
-            selection_set,
+            selection_set_and_unwraps,
             query_type,
             0,
             &mut nested_resolver_artifact_imports,
@@ -113,10 +119,45 @@ fn generate_fetchable_resolver_artifact<'schema>(
     }
 }
 
+fn generate_non_fetchable_resolver_artifact<'schema>(
+    schema: &'schema ValidatedSchema,
+    resolver_definition: &ValidatedSchemaResolverDefinitionInfo,
+) -> Result<NonFetchableResolver<'schema>, GenerateArtifactsError> {
+    if let Some(selection_set_and_unwraps) = &resolver_definition.selection_set_and_unwraps {
+        let field = schema.field(resolver_definition.field_id);
+        let parent_type = schema
+            .schema_data
+            .lookup_type_with_fields(field.parent_type_id);
+        let mut nested_resolver_artifact_imports = HashSet::new();
+        let reader_ast = generate_reader_ast(
+            schema,
+            selection_set_and_unwraps,
+            parent_type,
+            0,
+            &mut nested_resolver_artifact_imports,
+        );
+        let resolver_import_statement = generate_resolver_import_statement(
+            field.name,
+            resolver_definition.resolver_definition_path,
+        );
+        Ok(NonFetchableResolver {
+            parent_type: schema
+                .schema_data
+                .lookup_type_with_fields(field.parent_type_id),
+            resolver_field_name: field.name,
+            reader_ast,
+            nested_resolver_artifact_imports,
+            resolver_import_statement,
+        })
+    } else {
+        panic!("Unsupported: resolvers not on query with no selection set")
+    }
+}
+
 #[derive(Debug)]
 pub enum Artifact<'schema> {
     FetchableResolver(FetchableResolver<'schema>),
-    // Non-fetchable resolver
+    NonFetchableResolver(NonFetchableResolver<'schema>),
 }
 
 #[derive(Debug)]
@@ -134,7 +175,7 @@ pub struct UserResponseTypeDeclaration(pub String);
 #[derive(Debug)]
 pub struct ReaderAst(pub String);
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Hash)]
 pub struct NestedResolverName(pub String);
 
 #[derive(Debug)]
@@ -147,7 +188,7 @@ pub struct FetchableResolver<'schema> {
     pub resolver_response_type_declaration: ResolverResponseTypeDeclaration,
     pub user_response_type_declaration: UserResponseTypeDeclaration,
     pub reader_ast: ReaderAst,
-    pub nested_resolver_artifact_imports: Vec<NestedResolverName>,
+    pub nested_resolver_artifact_imports: HashSet<NestedResolverName>,
 }
 
 impl<'schema> FetchableResolver<'schema> {
@@ -187,6 +228,38 @@ impl<'schema> FetchableResolver<'schema> {
             "  ",
             "  ",
             "  "
+        )
+    }
+}
+
+#[derive(Debug)]
+pub struct NonFetchableResolver<'schema> {
+    pub parent_type: SchemaTypeWithFields<'schema>,
+    pub resolver_field_name: FieldDefinitionName,
+    pub nested_resolver_artifact_imports: HashSet<NestedResolverName>,
+    pub reader_ast: ReaderAst,
+    pub resolver_import_statement: ResolverImportStatement,
+}
+
+impl<'schema> NonFetchableResolver<'schema> {
+    pub fn file_contents(&self) -> String {
+        format!(
+            "import type {{BoultonNonFetchableResolver, ReaderAst}} from '@boulton/react';\n\
+            {}\n\
+            {}\n\
+            const readerAst: ReaderAst = {};\n\n\
+            const artifact: BoultonNonFetchableResolver = {{\n\
+            {}kind: 'NonFetchableResolver',\n\
+            {}resolver,\n\
+            {}readerAst,\n\
+            }};\n\n\
+            export default artifact;\n",
+            self.resolver_import_statement.0,
+            nested_resolver_names_to_import_statement(&self.nested_resolver_artifact_imports),
+            self.reader_ast.0,
+            "  ",
+            "  ",
+            "  ",
         )
     }
 }
@@ -279,6 +352,28 @@ fn write_artifacts<'schema>(
     artifacts: impl Iterator<Item = Result<Artifact<'schema>, GenerateArtifactsError>> + 'schema,
     project_root: &PathBuf,
 ) -> Result<(), GenerateArtifactsError> {
+    let current_dir = std::env::current_dir().expect("current_dir should exist");
+    let project_root = current_dir.join(project_root).canonicalize().map_err(|e| {
+        GenerateArtifactsError::UnableToCanonicalizePath {
+            path: project_root.clone(),
+            message: e,
+        }
+    })?;
+
+    let generated_folder_root = project_root.join("__boulton");
+
+    fs::remove_dir_all(&generated_folder_root).map_err(|e| {
+        GenerateArtifactsError::UnableToDeleteDirectory {
+            path: project_root.clone(),
+            message: e,
+        }
+    })?;
+    fs::create_dir_all(&generated_folder_root).map_err(|e| {
+        GenerateArtifactsError::UnableToCreateDirectory {
+            path: project_root.clone(),
+            message: e,
+        }
+    })?;
     for artifact in artifacts {
         let artifact = artifact?;
         match artifact {
@@ -288,28 +383,6 @@ fn write_artifacts<'schema>(
                     parent_type,
                     ..
                 } = &fetchable_resolver;
-                let current_dir = std::env::current_dir().expect("current_dir should exist");
-                let project_root = current_dir.join(project_root).canonicalize().map_err(|e| {
-                    GenerateArtifactsError::UnableToCanonicalizePath {
-                        path: project_root.clone(),
-                        message: e,
-                    }
-                })?;
-
-                let generated_folder_root = project_root.join("__boulton");
-
-                fs::remove_dir_all(&generated_folder_root).map_err(|e| {
-                    GenerateArtifactsError::UnableToDeleteDirectory {
-                        path: project_root.clone(),
-                        message: e,
-                    }
-                })?;
-                fs::create_dir_all(&generated_folder_root).map_err(|e| {
-                    GenerateArtifactsError::UnableToCreateDirectory {
-                        path: project_root.clone(),
-                        message: e,
-                    }
-                })?;
 
                 let generated_file_name =
                     generated_file_name(parent_type.name(), (*query_name).into());
@@ -324,6 +397,34 @@ fn write_artifacts<'schema>(
                 })?;
 
                 let file_contents = fetchable_resolver.file_contents();
+
+                file.write(file_contents.as_bytes()).map_err(|e| {
+                    GenerateArtifactsError::UnableToWriteToArtifactFile {
+                        path: generated_file_path.clone(),
+                        message: e,
+                    }
+                })?;
+            }
+            Artifact::NonFetchableResolver(non_fetchable_resolver) => {
+                let NonFetchableResolver {
+                    parent_type,
+                    resolver_field_name,
+                    ..
+                } = &non_fetchable_resolver;
+
+                let generated_file_name =
+                    generated_file_name(parent_type.name(), *resolver_field_name);
+                let generated_file_path =
+                    generated_file_path(&generated_folder_root, &generated_file_name);
+
+                let mut file = File::create(&generated_file_path).map_err(|e| {
+                    GenerateArtifactsError::UnableToWriteToArtifactFile {
+                        path: generated_file_path.clone(),
+                        message: e,
+                    }
+                })?;
+
+                let file_contents = non_fetchable_resolver.file_contents();
 
                 file.write(file_contents.as_bytes()).map_err(|e| {
                     GenerateArtifactsError::UnableToWriteToArtifactFile {
@@ -405,13 +506,13 @@ fn generate_resolver_import_statement(
 
 fn generate_reader_ast<'schema>(
     schema: &'schema ValidatedSchema,
-    selection_set: &'schema ValidatedSelectionSetAndUnwraps,
+    selection_set_and_unwraps: &'schema ValidatedSelectionSetAndUnwraps,
     parent_type: SchemaTypeWithFields<'schema>,
     indentation_level: u8,
-    nested_resolver_imports: &mut Vec<NestedResolverName>,
+    nested_resolver_imports: &mut HashSet<NestedResolverName>,
 ) -> ReaderAst {
     let mut reader_ast = "[\n".to_string();
-    for item in &selection_set.selection_set {
+    for item in &selection_set_and_unwraps.selection_set {
         let s = generate_reader_ast_node(
             item,
             parent_type,
@@ -434,7 +535,7 @@ fn generate_reader_ast_node(
         TypeWithFieldsId,
     >,
     indentation_level: u8,
-    nested_resolver_imports: &mut Vec<NestedResolverName>,
+    nested_resolver_imports: &mut HashSet<NestedResolverName>,
 ) -> String {
     match &item.item {
         Selection::Field(field) => match field {
@@ -490,7 +591,7 @@ fn generate_reader_ast_node(
                                     resolver_import_name.0,
                                     "  ".repeat(indentation_level as usize),
                                 );
-                                nested_resolver_imports.push(resolver_import_name);
+                                nested_resolver_imports.insert(resolver_import_name);
                                 res
                             }
                         }
@@ -530,12 +631,12 @@ fn generate_reader_ast_node(
 }
 
 fn nested_resolver_names_to_import_statement(
-    nested_resolver_imports: &Vec<NestedResolverName>,
+    nested_resolver_imports: &HashSet<NestedResolverName>,
 ) -> String {
     let mut s = String::new();
     for import in nested_resolver_imports {
         s.push_str(&format!(
-            "import {{ {} }} from './{}';\n",
+            "import {} from './{}.boulton';\n",
             import.0, import.0
         ));
     }

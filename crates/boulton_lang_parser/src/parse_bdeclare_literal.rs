@@ -167,7 +167,6 @@ mod test {
 
         loop {
             let token = lexer.parse_token();
-            eprintln!("found token {}", token);
             if token.item == BoultonLangTokenKind::EndOfFile {
                 break;
             }

@@ -1,24 +1,25 @@
 import type {BoultonFetchableResolver, ReaderAst} from '@boulton/react';
-import { hello_component as resolver } from '../hello.tsx';
-import { User__avatar_component } from './User__avatar_component';
+import { user_detail_page as resolver } from '../detail_page.tsx';
+import User__user_profile_with_details from './User__user_profile_with_details.boulton';
 
-const queryText = 'query hello_component {\
-  hello,\
+const queryText = 'query user_detail_page {\
   current_user {\
     avatar_url,\
     email,\
     id,\
     name,\
+    billing_details {\
+      address,\
+      card_brand,\
+      credit_card_number,\
+      expiration_date,\
+      id,\
+    },\
   },\
 }';
 
 const normalizationAst = {notNeededForDemo: true};
 const readerAst: ReaderAst = [
-  {
-    kind: "Scalar",
-    response_name: "hello",
-    alias: null,
-  },
   {
     kind: "Linked",
     response_name: "current_user",
@@ -31,8 +32,8 @@ const readerAst: ReaderAst = [
       },
       {
         kind: "Resolver",
-        alias: "avatar_component",
-        resolver: User__avatar_component,
+        alias: "user_profile_with_details",
+        resolver: User__user_profile_with_details,
       },
     ],
   },
@@ -40,12 +41,18 @@ const readerAst: ReaderAst = [
 
 // The type, when passed to the resolver (currently this is the raw response type, it should be the response type)
 type FragmentType = {
-  hello: string,
   current_user: {
     avatar_url: string,
     email: string,
     id: string,
     name: string,
+    billing_details: {
+      address: string,
+      card_brand: string,
+      credit_card_number: string,
+      expiration_date: string,
+      id: string,
+    },
   },
 };
 

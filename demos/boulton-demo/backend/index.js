@@ -11,25 +11,25 @@ var schema = buildSchema(readFileSync('./schema.graphql').toString())
 
 // The root provides a resolver function for each API endpoint
 var root = {
-  hello: () => {
-    return "Hello world!"
-  },
-  current_user: () => userResolver,
+  current_user: () => userResolver(1),
   current_post: () => postResolver, 
+  users: () => [userResolver(1), userResolver(2), userResolver(3)],
 };
 
-const userResolver = {
-  id: () => 1,
-  name: () => "John Doe",
+const userResolver = (id) => ({
+  id: () => id,
+  name: () => ("John Doe " + id),
   avatar_url: () => 'https://sm.ign.com/ign_ap/cover/a/avatar-gen/avatar-generations_hugw.jpg',
-  email: () => 'foo@bar.com',
-}
+  email: () => 'foo' + id + '@bar.com',
+  billing_details: () => billingDetailsResolver
+})
 
-const postResolver = {
-  id: () => 2,
-  name: () => "My first post",
-  content: () => "This is my first post",
-  author: () => userResolver,
+const billingDetailsResolver = {
+  id: () => 102,
+  card_brand: () => 'Visa',
+  credit_card_number: () => '1234 5678 9012 3456',
+  expiration_date: () => '12/24',
+  address: () => '1234 Main St, Anytown, USA',
 }
 
 var app = express()

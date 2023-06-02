@@ -9,7 +9,7 @@ use thiserror::Error;
 
 use crate::{
     boulton_literals::{extract_b_declare_literal_from_file_content, read_files_in_folder},
-    generate_artifacts::{generate_query_artifacts, GenerateArtifactsError},
+    generate_artifacts::{generate_artifacts, GenerateArtifactsError},
     schema::read_schema_file,
 };
 
@@ -49,7 +49,7 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
 
     let validated_schema = Schema::validate_and_construct(schema)?;
 
-    generate_query_artifacts(&validated_schema, &opt.project_root)?;
+    generate_artifacts(&validated_schema, &opt.project_root)?;
     // dbg!(validated_schema);
 
     Ok(())

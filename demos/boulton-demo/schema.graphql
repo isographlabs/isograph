@@ -6,8 +6,7 @@ type Query {
   Probably whoever is logged in.
   """
   current_user: User!
-  current_post: Post!
-  hello: String!
+  users: [User!]!
 }
 
 type User {
@@ -15,11 +14,13 @@ type User {
   name: String!
   email: String!
   avatar_url: String!
+  billing_details: BillingDetails!
 }
 
-type Post {
+type BillingDetails {
   id: ID!
-  name: String!
-  content: String!
-  author: User!
+  card_brand: String!
+  credit_card_number: String!
+  expiration_date: String!
+  address: String!
 }
