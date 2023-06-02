@@ -14,8 +14,8 @@ pub enum BoultonLangTokenKind {
     ErrorUnterminatedBlockString,
 
     // Valid tokens
-    // #[token("@")]
-    // At,
+    #[token("@")]
+    At,
     #[token("}")]
     CloseBrace,
 
@@ -153,7 +153,7 @@ impl fmt::Display for BoultonLangTokenKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
             // BoultonLangTokenKind::Ampersand => "ampersand ('&')",
-            // BoultonLangTokenKind::At => "at ('@')",
+            BoultonLangTokenKind::At => "at ('@')",
             BoultonLangTokenKind::CloseBrace => "closing brace ('}')",
             // BoultonLangTokenKind::CloseBracket => "closing bracket (']')",
             // BoultonLangTokenKind::CloseParen => "closing paren (')')",

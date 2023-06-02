@@ -106,3 +106,5 @@ string_key_conversion!(QueryOperationName, FieldDefinitionName);
 
 // For scalars
 string_key_newtype!(JavascriptName);
+
+string_key_newtype!(BoultonDirectiveName);

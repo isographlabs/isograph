@@ -1,8 +1,11 @@
-use boulton_lang_types::ResolverDeclaration;
+use std::fmt;
+
+use boulton_lang_types::{FragmentDirectiveUsage, ResolverDeclaration};
 use common_lang_types::{
     DefinedField, FieldDefinitionName, ObjectId, TypeId, TypeWithFieldsId, TypeWithFieldsName,
     UnvalidatedTypeName, WithSpan,
 };
+use intern::string_key::Intern;
 use thiserror::Error;
 
 use crate::{SchemaField, SchemaResolverDefinitionInfo, UnvalidatedSchema};
@@ -73,6 +76,7 @@ impl UnvalidatedSchema {
                 resolver_definition_path: resolver_declaration.item.resolver_definition_path,
                 selection_set_and_unwraps: resolver_declaration.item.selection_set_and_unwraps,
                 field_id: next_field_id,
+                variant: get_resolver_variant(&resolver_declaration.item.directives),
             }),
             parent_type_id: TypeWithFieldsId::Object(object.id),
         });
@@ -103,4 +107,34 @@ pub enum ProcessResolverDeclarationError {
         parent_type_name: TypeWithFieldsName,
         resolver_field_name: FieldDefinitionName,
     },
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ResolverVariant {
+    Component,
+    Eager,
+}
+
+impl fmt::Display for ResolverVariant {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ResolverVariant::Component => write!(f, "Component"),
+            ResolverVariant::Eager => write!(f, "Eager"),
+        }
+    }
+}
+
+fn get_resolver_variant(
+    directives: &Vec<WithSpan<FragmentDirectiveUsage>>,
+) -> Option<WithSpan<ResolverVariant>> {
+    for directive in directives {
+        let span = directive.span;
+        if directive.item.name.item == "eager".intern().into() {
+            return Some(WithSpan::new(ResolverVariant::Eager, span));
+        }
+        if directive.item.name.item == "component".intern().into() {
+            return Some(WithSpan::new(ResolverVariant::Component, span));
+        }
+    }
+    return None;
 }

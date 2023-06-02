@@ -146,12 +146,14 @@ fn validate_resolver_fragment(
                     unwraps,
                 }),
                 field_id: resolver_field_type.field_id,
+                variant: resolver_field_type.variant,
             })
         }
         None => Ok(SchemaResolverDefinitionInfo {
             resolver_definition_path: resolver_field_type.resolver_definition_path,
             selection_set_and_unwraps: None,
             field_id: resolver_field_type.field_id,
+            variant: resolver_field_type.variant,
         }),
     }
 }

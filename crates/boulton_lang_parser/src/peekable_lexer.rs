@@ -91,6 +91,7 @@ impl<'source> PeekableLexer<'source> {
             Err(LowLevelParseError::ParseTokenKindError {
                 expected_kind,
                 found_kind,
+                rest: self.source[(self.lexer_span().end as usize)..].to_string(),
             })
         }
     }
@@ -135,6 +136,7 @@ impl<'source> PeekableLexer<'source> {
             Err(LowLevelParseError::ParseTokenKindError {
                 expected_kind: BoultonLangTokenKind::Identifier,
                 found_kind: peeked.item,
+                rest: self.source[(self.lexer_span().end as usize)..].to_string(),
             })
         }
     }
@@ -151,10 +153,11 @@ impl<'source> PeekableLexer<'source> {
 /// about EOF), these would belong in a different crate than the parser itself.
 #[derive(Error, Debug)]
 pub enum LowLevelParseError {
-    #[error("Expected {expected_kind}, found {found_kind}")]
+    #[error("Expected {expected_kind}, found {found_kind}. Rest {rest}")]
     ParseTokenKindError {
         expected_kind: BoultonLangTokenKind,
         found_kind: BoultonLangTokenKind,
+        rest: String,
     },
 
     #[error("Expected {expected_identifier}, found \"{found_text}\"")]

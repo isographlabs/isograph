@@ -6,9 +6,11 @@ use common_lang_types::{
     ObjectId, ObjectTypeName, OutputTypeId, OutputTypeName, ResolverDefinitionPath,
     ScalarFieldName, ScalarId, ScalarTypeName, TypeId, TypeWithFieldsId, TypeWithFieldsName,
     TypeWithoutFieldsId, TypeWithoutFieldsName, UnvalidatedTypeName, ValidLinkedFieldType,
-    ValidScalarFieldType, ValidTypeAnnotationInnerType,
+    ValidScalarFieldType, ValidTypeAnnotationInnerType, WithSpan,
 };
 use intern::string_key::Intern;
+
+use crate::ResolverVariant;
 
 /// The first, unvalidated in-memory representation of a schema.
 ///
@@ -281,6 +283,8 @@ pub struct SchemaObject {
     // pub interfaces: Vec<InterfaceTypeName>,
     // pub directives: Vec<Directive<ConstantValue>>,
     pub fields: Vec<FieldId>,
+    // TODO: the ScalarFieldName in DefinedField is pretty useless. Consider
+    // storing more useful information there, like the field index or something.
     pub encountered_field_names:
         HashMap<FieldDefinitionName, DefinedField<UnvalidatedTypeName, ScalarFieldName>>,
 }
@@ -327,6 +331,7 @@ pub struct SchemaResolverDefinitionInfo<
     pub resolver_definition_path: ResolverDefinitionPath,
     pub selection_set_and_unwraps: Option<SelectionSetAndUnwraps<TScalarField, TLinkedField>>,
     pub field_id: FieldId,
+    pub variant: Option<WithSpan<ResolverVariant>>,
 }
 
 impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
@@ -344,6 +349,7 @@ impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
                 .selection_set_and_unwraps
                 .map(|selection_set_and_unwraps| map(selection_set_and_unwraps)),
             field_id: self.field_id,
+            variant: self.variant,
         }
     }
 }

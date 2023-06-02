@@ -11,18 +11,19 @@ export const user_list_page = bDeclare`
 `;
 
 export const user_list_component = bDeclare`
-  User.user_list_component {
+  User.user_list_component @component {
     id,
     name,
     avatar_component,
   }
-`((data) => {
-  const avatar = read(data.avatar_component);
-  return (selectUser: (id: string) => void /* these are runtime props */) => (
+`(UserListComponent);
+
+function UserListComponent({ data, onSelectId }) {
+  return (
     <>
-      <h1>{data.name}</h1>
-      {avatar}
-      <button onClick={() => selectUser(data.id)}>User details</button>
+      <h2>{data.name}</h2>
+      {data.avatar_component()}
+      <button onClick={() => onSelectId(data.id)}>User details</button>
     </>
   );
-});
+}

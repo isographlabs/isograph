@@ -3,5 +3,5 @@
   "compilerOptions": {
     "baseUrl": "./"
   },
-  "include": ["./libs/**/*.ts"]
+  "include": ["./libs/**/*.ts", "libs/boulton-react/src/index.tsx"]
 }

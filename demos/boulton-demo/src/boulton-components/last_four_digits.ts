@@ -1,7 +1,7 @@
 import { bDeclare } from "@boulton/react";
 
 export const last_four_digits = bDeclare`
-  BillingDetails.last_four_digits {
+  BillingDetails.last_four_digits @eager {
     credit_card_number,
   }
 `((data) => {

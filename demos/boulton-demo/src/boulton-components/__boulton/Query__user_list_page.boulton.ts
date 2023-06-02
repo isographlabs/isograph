@@ -27,6 +27,7 @@ const readerAst: ReaderAst = [
         kind: "Resolver",
         alias: "user_list_component",
         resolver: User__user_list_component,
+        variant: "Component",
       },
     ],
   },

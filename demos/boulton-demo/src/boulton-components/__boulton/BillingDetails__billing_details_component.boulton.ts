@@ -1,5 +1,6 @@
 import type {BoultonNonFetchableResolver, ReaderAst} from '@boulton/react';
 import { billing_details_component as resolver } from '../billing_details_component.tsx';
+import BillingDetails__last_four_digits from './BillingDetails__last_four_digits.boulton';
 
 const readerAst: ReaderAst = [
   {
@@ -26,6 +27,12 @@ const readerAst: ReaderAst = [
     kind: "Scalar",
     response_name: "address",
     alias: null,
+  },
+  {
+    kind: "Resolver",
+    alias: "last_four_digits",
+    resolver: BillingDetails__last_four_digits,
+    variant: "Eager",
   },
 ];
 

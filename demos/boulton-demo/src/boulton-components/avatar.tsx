@@ -3,12 +3,12 @@ import * as React from "react";
 
 export const avatar_component = bDeclare`
   "An avatar"
-  User.avatar_component {
+  User.avatar_component @component {
     name,
     email,
     avatar_url,
   }
-`((data) => {
+`(({ data }) => {
   return (
     <div>
       <a href={`mailto:${data.email}`}>

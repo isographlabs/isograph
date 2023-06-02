@@ -23,6 +23,7 @@ const readerAst: ReaderAst = [
     kind: "Resolver",
     alias: "avatar_component",
     resolver: User__avatar_component,
+    variant: "Component",
   },
   {
     kind: "Linked",
@@ -38,6 +39,7 @@ const readerAst: ReaderAst = [
         kind: "Resolver",
         alias: "billing_details_component",
         resolver: BillingDetails__billing_details_component,
+        variant: "Component",
       },
     ],
   },

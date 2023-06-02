@@ -1,8 +1,8 @@
 use boulton_lang_types::{
-    FieldSelection, LinkedFieldSelection, ResolverDeclaration, ScalarFieldSelection, Selection,
-    SelectionSetAndUnwraps, Unwrap,
+    FieldSelection, FragmentDirectiveUsage, LinkedFieldSelection, ResolverDeclaration,
+    ScalarFieldSelection, Selection, SelectionSetAndUnwraps, Unwrap,
 };
-use common_lang_types::{ResolverDefinitionPath, WithSpan};
+use common_lang_types::{ResolverDefinitionPath, Span, WithSpan};
 use intern::string_key::StringKey;
 
 use crate::{
@@ -42,7 +42,16 @@ fn parse_resolver_declaration<'a>(
             let resolver_field_name = tokens
                 .parse_string_key_type(BoultonLangTokenKind::Identifier)
                 .map_err(|x| BoultonLiteralParseError::from(x))?;
+
+            let directives = parse_directives(tokens)?;
+
             let selection_set_and_unwraps = parse_optional_selection_set_and_unwraps(tokens)?;
+
+            // --------------------
+            // TODO: use directives to:
+            // - ensure only component exists
+            // - it ends up in the reader AST
+            // --------------------
 
             Ok(ResolverDeclaration {
                 description,
@@ -50,6 +59,7 @@ fn parse_resolver_declaration<'a>(
                 resolver_field_name,
                 selection_set_and_unwraps,
                 resolver_definition_path: definition_file_path,
+                directives,
             })
         })
         .transpose();
@@ -154,6 +164,21 @@ fn parse_unwraps(tokens: &mut PeekableLexer) -> Vec<WithSpan<Unwrap>> {
         unwraps.push(token.map(|_| Unwrap::ActualUnwrap))
     }
     unwraps
+}
+
+fn parse_directives(
+    tokens: &mut PeekableLexer,
+) -> ParseResult<Vec<WithSpan<FragmentDirectiveUsage>>> {
+    let mut directives = vec![];
+    while let Ok(token) = tokens.parse_token_of_kind(BoultonLangTokenKind::At) {
+        let name = tokens.parse_string_key_type(BoultonLangTokenKind::Identifier)?;
+        let directive_span = Span::join(token.span, name.span);
+        directives.push(WithSpan::new(
+            FragmentDirectiveUsage { name },
+            directive_span,
+        ));
+    }
+    Ok(directives)
 }
 
 #[cfg(test)]

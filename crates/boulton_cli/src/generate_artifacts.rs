@@ -1,5 +1,6 @@
 use std::{
     collections::HashSet,
+    fmt::Debug,
     fs::{self, File},
     io::{self, Write},
     path::PathBuf,
@@ -582,13 +583,15 @@ fn generate_reader_ast_node(
                                     field_name
                                 ));
                                 let res = format!(
-                                    "{}{{\n{}kind: \"Resolver\",\n{}alias: \"{}\",\n{}resolver: {},\n{}}},\n",
+                                    "{}{{\n{}kind: \"Resolver\",\n{}alias: \"{}\",\n{}resolver: {},\n{}variant: {},\n{}}},\n",
                                     "  ".repeat(indentation_level as usize),
                                     "  ".repeat((indentation_level + 1) as usize),
                                     "  ".repeat((indentation_level + 1) as usize),
                                     alias,
                                     "  ".repeat((indentation_level + 1) as usize),
                                     resolver_import_name.0,
+                                    "  ".repeat((indentation_level + 1) as usize),
+                                    resolver_field.variant.map(|x| format!("\"{}\"", x)).unwrap_or_else(|| "null".to_string()),
                                     "  ".repeat(indentation_level as usize),
                                 );
                                 nested_resolver_imports.insert(resolver_import_name);

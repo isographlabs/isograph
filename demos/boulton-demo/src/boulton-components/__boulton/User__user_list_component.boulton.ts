@@ -17,6 +17,7 @@ const readerAst: ReaderAst = [
     kind: "Resolver",
     alias: "avatar_component",
     resolver: User__avatar_component,
+    variant: "Component",
   },
 ];
 

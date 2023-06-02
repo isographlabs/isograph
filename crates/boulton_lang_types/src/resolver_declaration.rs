@@ -1,6 +1,6 @@
 use common_lang_types::{
-    DescriptionValue, FieldDefinitionName, FieldNameOrAlias, HasName, LinkedFieldAlias,
-    LinkedFieldName, ResolverDefinitionPath, ScalarFieldAlias, ScalarFieldName,
+    BoultonDirectiveName, DescriptionValue, FieldDefinitionName, FieldNameOrAlias, HasName,
+    LinkedFieldAlias, LinkedFieldName, ResolverDefinitionPath, ScalarFieldAlias, ScalarFieldName,
     UnvalidatedTypeName, ValidLinkedFieldType, ValidScalarFieldType, WithSpan,
 };
 
@@ -12,6 +12,14 @@ pub struct ResolverDeclaration {
     pub selection_set_and_unwraps: Option<SelectionSetAndUnwraps<(), ()>>,
     // TODO intern the path buf instead of the string?
     pub resolver_definition_path: ResolverDefinitionPath,
+    pub directives: Vec<WithSpan<FragmentDirectiveUsage>>,
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+/// Ugly name, but at least it makes clear this isn't a schema directive.
+pub struct FragmentDirectiveUsage {
+    pub name: WithSpan<BoultonDirectiveName>,
+    // TODO arguments and such
 }
 
 /// TODO maybe get rid of, or make it generic over a single parameter,

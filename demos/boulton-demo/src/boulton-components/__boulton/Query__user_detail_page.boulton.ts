@@ -34,6 +34,7 @@ const readerAst: ReaderAst = [
         kind: "Resolver",
         alias: "user_profile_with_details",
         resolver: User__user_profile_with_details,
+        variant: "Component",
       },
     ],
   },

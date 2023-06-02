@@ -29,6 +29,10 @@ impl Span {
     pub fn as_usize(self) -> (usize, usize) {
         (self.start as usize, self.end as usize)
     }
+
+    pub fn join(left: Span, right: Span) -> Self {
+        Span::new(left.start, right.end)
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
