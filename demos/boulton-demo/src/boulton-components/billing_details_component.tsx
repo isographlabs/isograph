@@ -1,5 +1,15 @@
 import * as React from "react";
-import { bDeclare, read } from "@boulton/react";
+import { bDeclare, type BoultonComponentProps } from "@boulton/react";
+
+// TODO the compiler will generate this type
+type GeneratedDataType = {
+  id: string;
+  card_brand: string;
+  credit_card_number: string;
+  expiration_date: string;
+  address: string;
+  last_four_digits: string;
+};
 
 export const billing_details_component = bDeclare`
   BillingDetails.billing_details_component @component {
@@ -13,8 +23,7 @@ export const billing_details_component = bDeclare`
 `(function BillingDetailsComponent({
   data,
   setStateToFalse,
-  ...additionalRuntimeProps /* unused here */
-}) {
+}: BoultonComponentProps<GeneratedDataType, { setStateToFalse: () => void }>) {
   const [showFullCardNumber, setShowFullCardNumber] = React.useState(false);
 
   return (

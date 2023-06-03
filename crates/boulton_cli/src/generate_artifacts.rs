@@ -204,12 +204,12 @@ impl<'schema> FetchableResolver<'schema> {
             const normalizationAst = {{notNeededForDemo: true}};\n\
             const readerAst: ReaderAst = {};\n\n\
             // The type, when passed to the resolver (currently this is the raw response type, it should be the response type)\n\
-            type FragmentType = {{\n{}}};\n\n\
+            export type ResolverParameterType = {{\n{}}};\n\n\
             // The type, when returned from the resolver\n\
             type ResolverResponse = {{\n  {}\n}};\n\n\
             // The type, when read out\n\
             type UserResponse = {{\n  {}\n}};\n\n\
-            const artifact: BoultonFetchableResolver<FragmentType, ResolverResponse, UserResponse> = {{\n\
+            const artifact: BoultonFetchableResolver<ResolverParamaterType, ResolverResponse, UserResponse> = {{\n\
             {}kind: 'FetchableResolver',\n\
             {}queryText,\n\
             {}normalizationAst,\n\

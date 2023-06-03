@@ -34,7 +34,7 @@ const readerAst: ReaderAst = [
 ];
 
 // The type, when passed to the resolver (currently this is the raw response type, it should be the response type)
-type FragmentType = {
+export type ResolverParameterType = {
   users: {
     avatar_url: string,
     email: string,
@@ -53,7 +53,7 @@ type UserResponse = {
   foo: string
 };
 
-const artifact: BoultonFetchableResolver<FragmentType, ResolverResponse, UserResponse> = {
+const artifact: BoultonFetchableResolver<ResolverParamaterType, ResolverResponse, UserResponse> = {
   kind: 'FetchableResolver',
   queryText,
   normalizationAst,

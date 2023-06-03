@@ -311,3 +311,7 @@ function getRefReaderForName(name: string) {
   }
   return refReaders[name];
 }
+
+export type BoultonComponentProps<TDataType, TOtherProps = Object> = {
+  data: TDataType;
+} & TOtherProps;

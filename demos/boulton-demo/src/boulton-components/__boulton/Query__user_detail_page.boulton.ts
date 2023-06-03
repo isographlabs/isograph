@@ -1,5 +1,5 @@
 import type {BoultonFetchableResolver, ReaderAst} from '@boulton/react';
-import { user_detail_page as resolver } from '../detail_page.tsx';
+import { user_detail_page as resolver } from '../user_detail_page.tsx';
 import User__user_profile_with_details from './User__user_profile_with_details.boulton';
 
 const queryText = 'query user_detail_page {\
@@ -41,7 +41,7 @@ const readerAst: ReaderAst = [
 ];
 
 // The type, when passed to the resolver (currently this is the raw response type, it should be the response type)
-type FragmentType = {
+export type ResolverParameterType = {
   current_user: {
     avatar_url: string,
     email: string,
@@ -67,7 +67,7 @@ type UserResponse = {
   foo: string
 };
 
-const artifact: BoultonFetchableResolver<FragmentType, ResolverResponse, UserResponse> = {
+const artifact: BoultonFetchableResolver<ResolverParamaterType, ResolverResponse, UserResponse> = {
   kind: 'FetchableResolver',
   queryText,
   normalizationAst,
