@@ -29,14 +29,14 @@ export function getOrCreateCacheForUrl<T extends object>(
 
 export function makeNetworkRequest<T extends object>(
   query_text: string,
-  params: object
+  variables: object
 ): ItemCleanupPair<PromiseWrapper<T>> {
   let promise: Promise<T> = fetch("http://localhost:4000/graphql", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ query: query_text }),
+    body: JSON.stringify({ query: query_text, variables }),
   })
     .then((response) => response.json())
     .then((networkResponse) => {

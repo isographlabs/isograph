@@ -8,8 +8,12 @@ import {
   store,
 } from "./cache";
 import { useLazyDisposableState } from "@boulton/react-disposable-state";
-import { type PromiseWrapper, useReadPromise } from "./PromiseWrapper";
+import { type PromiseWrapper } from "./PromiseWrapper";
 import React from "react";
+
+// TODO there should be separate types for @component and not, since they
+// accept different props. Or make the PropType (TReadFromStore) reflect
+// the differences.
 
 // This type should be treated as an opaque type.
 export type BoultonFetchableResolver<
@@ -103,7 +107,8 @@ export function useLazyReference<
     TReadFromStore,
     TResolverResult,
     TUnwrappedResolverResult
-  >
+  >,
+  variables: object
 ): {
   queryReference: FragmentReference<
     TReadFromStore,
@@ -112,7 +117,7 @@ export function useLazyReference<
   >;
 } {
   // Typechecking fails here... TODO investigate
-  const cache = getOrCreateCacheForUrl<{}>(artifact.queryText, {});
+  const cache = getOrCreateCacheForUrl<{}>(artifact.queryText, variables);
   const data =
     useLazyDisposableState<PromiseWrapper<TUnwrappedResolverResult>>(
       cache
