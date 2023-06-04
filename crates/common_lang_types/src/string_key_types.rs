@@ -108,3 +108,5 @@ string_key_conversion!(QueryOperationName, FieldDefinitionName);
 string_key_newtype!(JavascriptName);
 
 string_key_newtype!(BoultonDirectiveName);
+
+string_key_newtype!(FieldArgumentName);

@@ -11,8 +11,6 @@ use thiserror::Error;
 use crate::{SchemaField, SchemaResolverDefinitionInfo, UnvalidatedSchema};
 
 impl UnvalidatedSchema {
-    /// We don't currently support creating new types in resolvers,
-    /// so we can assume parent_type exists
     pub fn process_resolver_declaration(
         &mut self,
         resolver_declaration: WithSpan<ResolverDeclaration>,
@@ -77,6 +75,7 @@ impl UnvalidatedSchema {
                 selection_set_and_unwraps: resolver_declaration.item.selection_set_and_unwraps,
                 field_id: next_field_id,
                 variant: get_resolver_variant(&resolver_declaration.item.directives),
+                variable_definitions: resolver_declaration.item.variable_definitions,
             }),
             parent_type_id: TypeWithFieldsId::Object(object.id),
         });
@@ -125,7 +124,7 @@ impl fmt::Display for ResolverVariant {
 }
 
 fn get_resolver_variant(
-    directives: &Vec<WithSpan<FragmentDirectiveUsage>>,
+    directives: &[WithSpan<FragmentDirectiveUsage>],
 ) -> Option<WithSpan<ResolverVariant>> {
     for directive in directives {
         let span = directive.span;

@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use boulton_lang_types::SelectionSetAndUnwraps;
+use boulton_lang_types::{SelectionSetAndUnwraps, VariableDefinition};
 use common_lang_types::{
-    DefinedField, DescriptionValue, FieldDefinitionName, FieldId, HasName, JavascriptName,
-    ObjectId, ObjectTypeName, OutputTypeId, OutputTypeName, ResolverDefinitionPath,
-    ScalarFieldName, ScalarId, ScalarTypeName, TypeId, TypeWithFieldsId, TypeWithFieldsName,
-    TypeWithoutFieldsId, TypeWithoutFieldsName, UnvalidatedTypeName, ValidLinkedFieldType,
-    ValidScalarFieldType, ValidTypeAnnotationInnerType, WithSpan,
+    DefinedField, DescriptionValue, FieldDefinitionName, FieldId, HasName, InputTypeId,
+    InputTypeName, JavascriptName, ObjectId, ObjectTypeName, OutputTypeId, OutputTypeName,
+    ResolverDefinitionPath, ScalarFieldName, ScalarId, ScalarTypeName, TypeId, TypeWithFieldsId,
+    TypeWithFieldsName, TypeWithoutFieldsId, TypeWithoutFieldsName, UnvalidatedTypeName,
+    ValidLinkedFieldType, ValidScalarFieldType, ValidTypeAnnotationInnerType, WithSpan,
 };
 use intern::string_key::Intern;
 
@@ -33,12 +33,16 @@ pub struct Schema<
     TServerType: ValidTypeAnnotationInnerType,
     TScalarField: ValidScalarFieldType,
     TLinkedField: ValidLinkedFieldType,
+    TVariableType: ValidTypeAnnotationInnerType,
 > {
     // TODO fields should probably be two vectors: server_fields and resolvers, and have
     // separate ID types.
     pub fields: Vec<
         SchemaField<
-            DefinedField<TServerType, SchemaResolverDefinitionInfo<TScalarField, TLinkedField>>,
+            DefinedField<
+                TServerType,
+                SchemaResolverDefinitionInfo<TScalarField, TLinkedField, TVariableType>,
+            >,
         >,
     >,
     pub schema_data: SchemaData,
@@ -53,10 +57,11 @@ pub struct Schema<
     // Mutation
 }
 
-pub(crate) type UnvalidatedSchema = Schema<UnvalidatedTypeName, (), ()>;
+pub(crate) type UnvalidatedSchema = Schema<UnvalidatedTypeName, (), (), UnvalidatedTypeName>;
 
-pub(crate) type UnvalidatedSchemaField =
-    SchemaField<DefinedField<UnvalidatedTypeName, SchemaResolverDefinitionInfo<(), ()>>>;
+pub(crate) type UnvalidatedSchemaField = SchemaField<
+    DefinedField<UnvalidatedTypeName, SchemaResolverDefinitionInfo<(), (), UnvalidatedTypeName>>,
+>;
 
 #[derive(Debug)]
 pub struct SchemaData {
@@ -70,13 +75,17 @@ impl<
         TServerType: ValidTypeAnnotationInnerType,
         TScalarField: ValidScalarFieldType,
         TLinkedField: ValidLinkedFieldType,
-    > Schema<TServerType, TScalarField, TLinkedField>
+        TVariableType: ValidTypeAnnotationInnerType,
+    > Schema<TServerType, TScalarField, TLinkedField, TVariableType>
 {
     pub fn field(
         &self,
         field_id: FieldId,
     ) -> &SchemaField<
-        DefinedField<TServerType, SchemaResolverDefinitionInfo<TScalarField, TLinkedField>>,
+        DefinedField<
+            TServerType,
+            SchemaResolverDefinitionInfo<TScalarField, TLinkedField, TVariableType>,
+        >,
     > {
         &self.fields[field_id.as_usize()]
     }
@@ -163,6 +172,14 @@ impl SchemaData {
         }
     }
 
+    pub fn lookup_input_type(&self, input_type_id: InputTypeId) -> SchemaInputType {
+        match input_type_id {
+            InputTypeId::Scalar(id) => {
+                SchemaInputType::Scalar(self.scalars.get(id.as_usize()).unwrap())
+            }
+        }
+    }
+
     pub fn object(&self, object_id: ObjectId) -> &SchemaObject {
         self.objects
             .get(object_id.as_usize())
@@ -209,7 +226,7 @@ impl<'a> SchemaTypeWithFields<'a> {
         }
     }
 
-    pub fn fields(&self) -> &Vec<FieldId> {
+    pub fn fields(&self) -> &[FieldId] {
         match self {
             SchemaTypeWithFields::Object(object) => &object.fields,
         }
@@ -247,6 +264,23 @@ impl<'a> HasName for SchemaOutputType<'a> {
         match self {
             SchemaOutputType::Object(object) => object.name.into(),
             SchemaOutputType::Scalar(scalar) => scalar.name.into(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum SchemaInputType<'a> {
+    Scalar(&'a SchemaScalar),
+    // input object
+    // enum
+}
+
+impl<'a> HasName for SchemaInputType<'a> {
+    type Name = InputTypeName;
+
+    fn name(&self) -> Self::Name {
+        match self {
+            SchemaInputType::Scalar(x) => (x.name).into(),
         }
     }
 }
@@ -327,22 +361,29 @@ impl<T> SchemaField<T> {
 pub struct SchemaResolverDefinitionInfo<
     TScalarField: ValidScalarFieldType,
     TLinkedField: ValidLinkedFieldType,
+    // TODO this should be restricted to ValidTypeAnnotationInnerInputType
+    TVariableDefinitionType: ValidTypeAnnotationInnerType,
 > {
     pub resolver_definition_path: ResolverDefinitionPath,
     pub selection_set_and_unwraps: Option<SelectionSetAndUnwraps<TScalarField, TLinkedField>>,
     pub field_id: FieldId,
     pub variant: Option<WithSpan<ResolverVariant>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<TVariableDefinitionType>>>,
 }
 
-impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
-    SchemaResolverDefinitionInfo<TScalarField, TLinkedField>
+impl<
+        TScalarField: ValidScalarFieldType,
+        TLinkedField: ValidLinkedFieldType,
+        TVariableDefinitionType: ValidTypeAnnotationInnerType,
+    > SchemaResolverDefinitionInfo<TScalarField, TLinkedField, TVariableDefinitionType>
 {
     pub fn map<TNewScalarField: ValidScalarFieldType, TNewLinkedField: ValidLinkedFieldType>(
         self,
         map: impl FnOnce(
             SelectionSetAndUnwraps<TScalarField, TLinkedField>,
         ) -> SelectionSetAndUnwraps<TNewScalarField, TNewLinkedField>,
-    ) -> SchemaResolverDefinitionInfo<TNewScalarField, TNewLinkedField> {
+    ) -> SchemaResolverDefinitionInfo<TNewScalarField, TNewLinkedField, TVariableDefinitionType>
+    {
         SchemaResolverDefinitionInfo {
             resolver_definition_path: self.resolver_definition_path,
             selection_set_and_unwraps: self
@@ -350,6 +391,7 @@ impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
                 .map(|selection_set_and_unwraps| map(selection_set_and_unwraps)),
             field_id: self.field_id,
             variant: self.variant,
+            variable_definitions: self.variable_definitions,
         }
     }
 }

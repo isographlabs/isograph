@@ -24,7 +24,9 @@ export function BoultonDemo() {
 }
 
 function TopLevelListView({ onSelectId }) {
-  const { queryReference } = useLazyReference(userListPageQuery);
+  const { queryReference } = useLazyReference(userListPageQuery, {
+    bar: "yayayaya",
+  });
   // TODO get this to work:
   // const {queryReference} = useLazyReference(b Declare ` ... `);
 
@@ -33,6 +35,7 @@ function TopLevelListView({ onSelectId }) {
   return (
     <>
       <h1>Users</h1>
+      {listPageData.byah}
       {listPageData.users.map((user) => {
         const user_component = user.user_list_component({ onSelectId });
         return <div key={user.id}>{user_component}</div>;

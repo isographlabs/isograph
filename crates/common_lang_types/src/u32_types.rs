@@ -34,6 +34,14 @@ pub enum OutputTypeId {
 impl ValidTypeAnnotationInnerType for OutputTypeId {}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+pub enum InputTypeId {
+    Scalar(ScalarId),
+    // Enum
+    // InputObject
+}
+impl ValidTypeAnnotationInnerType for InputTypeId {}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 pub enum TypeWithoutFieldsId {
     Scalar(ScalarId),
     // Enum
@@ -57,6 +65,13 @@ impl TypeId {
         match self {
             TypeId::Object(id) => Some(OutputTypeId::Object(id)),
             TypeId::Scalar(id) => Some(OutputTypeId::Scalar(id)),
+        }
+    }
+
+    pub fn as_input_type_id(self) -> Option<InputTypeId> {
+        match self {
+            TypeId::Scalar(id) => Some(InputTypeId::Scalar(id)),
+            _ => None,
         }
     }
 

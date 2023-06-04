@@ -1,8 +1,14 @@
+use std::ops::ControlFlow;
+
 use boulton_lang_types::{
-    FieldSelection, FragmentDirectiveUsage, LinkedFieldSelection, ResolverDeclaration,
-    ScalarFieldSelection, Selection, SelectionSetAndUnwraps, Unwrap,
+    FieldSelection, FragmentDirectiveUsage, LinkedFieldSelection, NonConstantValue,
+    ResolverDeclaration, ScalarFieldSelection, Selection, SelectionFieldArgument,
+    SelectionSetAndUnwraps, Unwrap, VariableDefinition,
 };
-use common_lang_types::{ResolverDefinitionPath, Span, WithSpan};
+use common_lang_types::{ResolverDefinitionPath, Span, UnvalidatedTypeName, WithSpan};
+use graphql_lang_types::{
+    ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation,
+};
 use intern::string_key::StringKey;
 
 use crate::{
@@ -43,6 +49,8 @@ fn parse_resolver_declaration<'a>(
                 .parse_string_key_type(BoultonLangTokenKind::Identifier)
                 .map_err(|x| BoultonLiteralParseError::from(x))?;
 
+            let variable_definitions = parse_variable_definitions(tokens)?;
+
             let directives = parse_directives(tokens)?;
 
             let selection_set_and_unwraps = parse_optional_selection_set_and_unwraps(tokens)?;
@@ -60,6 +68,7 @@ fn parse_resolver_declaration<'a>(
                 selection_set_and_unwraps,
                 resolver_definition_path: definition_file_path,
                 directives,
+                variable_definitions,
             })
         })
         .transpose();
@@ -106,6 +115,7 @@ fn parse_selection<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResult<WithSpan<S
             let (field_name, alias) = parse_optional_alias_and_field_name(tokens)?;
 
             // TODO distinguish field groups
+            let arguments = parse_optional_arguments(tokens)?;
 
             // If we encounter a selection set, we are parsing a linked field. Otherwise, a scalar field.
             let selection_set = parse_optional_selection_set(tokens)?;
@@ -125,6 +135,7 @@ fn parse_selection<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResult<WithSpan<S
                             unwraps,
                             selection_set,
                         },
+                        arguments,
                     }))
                 }
                 None => Selection::Field(FieldSelection::ScalarField(ScalarFieldSelection {
@@ -132,6 +143,7 @@ fn parse_selection<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResult<WithSpan<S
                     alias: alias.map(|with_span| with_span.map(|string_key| string_key.into())),
                     field: (),
                     unwraps,
+                    arguments,
                 })),
             };
             Ok(selection)
@@ -179,6 +191,137 @@ fn parse_directives(
         ));
     }
     Ok(directives)
+}
+
+fn parse_optional_arguments(
+    tokens: &mut PeekableLexer,
+) -> ParseResult<Vec<WithSpan<SelectionFieldArgument>>> {
+    if tokens
+        .parse_token_of_kind(BoultonLangTokenKind::OpenParen)
+        .is_ok()
+    {
+        let mut arguments = vec![];
+        while tokens
+            .parse_token_of_kind(BoultonLangTokenKind::CloseParen)
+            .is_err()
+        {
+            let argument = tokens
+                .with_span(|tokens| {
+                    let name = tokens.parse_string_key_type(BoultonLangTokenKind::Identifier)?;
+                    tokens.parse_token_of_kind(BoultonLangTokenKind::Colon)?;
+                    let value = parse_non_constant_value(tokens)?;
+                    let _comma = tokens.parse_token_of_kind(BoultonLangTokenKind::Comma)?;
+                    Ok::<_, BoultonLiteralParseError>(SelectionFieldArgument { name, value })
+                })
+                .transpose()?;
+            arguments.push(argument);
+        }
+        Ok(arguments)
+    } else {
+        Ok(vec![])
+    }
+}
+
+fn parse_non_constant_value(tokens: &mut PeekableLexer) -> ParseResult<WithSpan<NonConstantValue>> {
+    // For now, we only support variables!
+    let _dollar_sign = tokens.parse_token_of_kind(BoultonLangTokenKind::Dollar)?;
+    let name = tokens.parse_string_key_type(BoultonLangTokenKind::Identifier)?;
+    Ok(name.map(NonConstantValue::Variable))
+}
+
+fn parse_variable_definitions(
+    tokens: &mut PeekableLexer,
+) -> ParseResult<Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>> {
+    if tokens
+        .parse_token_of_kind(BoultonLangTokenKind::OpenParen)
+        .is_ok()
+    {
+        let mut variable_definitions = vec![];
+        while tokens
+            .parse_token_of_kind(BoultonLangTokenKind::CloseParen)
+            .is_err()
+        {
+            let variable_definition = tokens
+                .with_span(|tokens| {
+                    let _dollar = tokens.parse_token_of_kind(BoultonLangTokenKind::Dollar)?;
+                    let name = tokens.parse_string_key_type(BoultonLangTokenKind::Identifier)?;
+                    tokens.parse_token_of_kind(BoultonLangTokenKind::Colon)?;
+                    let type_ = parse_type_annotation(tokens)?;
+                    let _comma = tokens.parse_token_of_kind(BoultonLangTokenKind::Comma)?;
+                    Ok::<_, BoultonLiteralParseError>(VariableDefinition { name, type_ })
+                })
+                .transpose()?;
+            variable_definitions.push(variable_definition);
+        }
+        Ok(variable_definitions)
+    } else {
+        Ok(vec![])
+    }
+}
+
+fn parse_type_annotation(
+    tokens: &mut PeekableLexer,
+) -> ParseResult<TypeAnnotation<UnvalidatedTypeName>> {
+    from_control_flow(|| {
+        to_control_flow::<_, BoultonLiteralParseError>(|| {
+            let type_ = tokens.parse_string_key_type(BoultonLangTokenKind::Identifier)?;
+
+            let is_non_null = tokens
+                .parse_token_of_kind(BoultonLangTokenKind::Exclamation)
+                .is_ok();
+            if is_non_null {
+                Ok(TypeAnnotation::NonNull(Box::new(
+                    NonNullTypeAnnotation::Named(NamedTypeAnnotation(type_)),
+                )))
+            } else {
+                Ok(TypeAnnotation::Named(NamedTypeAnnotation(type_)))
+            }
+        })?;
+
+        to_control_flow::<_, BoultonLiteralParseError>(|| {
+            // TODO: atomically parse everything here:
+            tokens.parse_token_of_kind(BoultonLangTokenKind::OpenBracket)?;
+
+            let inner_type_annotation = parse_type_annotation(tokens)?;
+            tokens.parse_token_of_kind(BoultonLangTokenKind::CloseBracket)?;
+            let is_non_null = tokens
+                .parse_token_of_kind(BoultonLangTokenKind::Exclamation)
+                .is_ok();
+
+            if is_non_null {
+                Ok(TypeAnnotation::NonNull(Box::new(
+                    NonNullTypeAnnotation::List(ListTypeAnnotation(inner_type_annotation)),
+                )))
+            } else {
+                Ok(TypeAnnotation::List(Box::new(ListTypeAnnotation(
+                    inner_type_annotation,
+                ))))
+            }
+        })?;
+
+        // One **cannot** add additional cases here (though of course none exist in the spec.)
+        // Because, if we successfully parse the OpenBracket for a list type, we must parse the
+        // entirety of the list type. Otherwise, we will have eaten the OpenBracket and will
+        // leave the parser in an inconsistent state.
+        //
+        // We don't get a great error message with this current approach.
+
+        ControlFlow::Continue(BoultonLiteralParseError::ExpectedTypeAnnotation)
+    })
+}
+
+fn to_control_flow<T, E>(result: impl FnOnce() -> Result<T, E>) -> ControlFlow<T, E> {
+    match result() {
+        Ok(t) => ControlFlow::Break(t),
+        Err(e) => ControlFlow::Continue(e),
+    }
+}
+
+fn from_control_flow<T, E>(control_flow: impl FnOnce() -> ControlFlow<T, E>) -> Result<T, E> {
+    match control_flow() {
+        ControlFlow::Break(t) => Ok(t),
+        ControlFlow::Continue(e) => Err(e),
+    }
 }
 
 #[cfg(test)]

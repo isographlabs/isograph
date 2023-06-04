@@ -2,10 +2,12 @@ use std::collections::HashMap;
 
 use boulton_lang_types::{
     LinkedFieldSelection, ScalarFieldSelection, Selection, SelectionSetAndUnwraps,
+    VariableDefinition,
 };
 use common_lang_types::{
-    DefinedField, FieldDefinitionName, HasName, OutputTypeId, ScalarFieldName, TypeId,
-    TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId, UnvalidatedTypeName, WithSpan,
+    DefinedField, FieldDefinitionName, HasName, InputTypeId, OutputTypeId, ScalarFieldName, TypeId,
+    TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId, UnvalidatedTypeName, VariableName,
+    WithSpan,
 };
 use thiserror::Error;
 
@@ -14,12 +16,8 @@ use crate::{
     UnvalidatedSchema, UnvalidatedSchemaField,
 };
 
-pub type ValidatedSchemaField = SchemaField<
-    DefinedField<
-        OutputTypeId,
-        SchemaResolverDefinitionInfo<ValidatedDefinedField, TypeWithFieldsId>,
-    >,
->;
+pub type ValidatedSchemaField =
+    SchemaField<DefinedField<OutputTypeId, ValidatedSchemaResolverDefinitionInfo>>;
 
 type ValidatedDefinedField = DefinedField<TypeWithoutFieldsId, ()>;
 
@@ -29,9 +27,12 @@ pub type ValidatedSelectionSetAndUnwraps =
 pub type ValidatedSelection = Selection<ValidatedDefinedField, TypeWithFieldsId>;
 
 pub type ValidatedSchemaResolverDefinitionInfo =
-    SchemaResolverDefinitionInfo<ValidatedDefinedField, TypeWithFieldsId>;
+    SchemaResolverDefinitionInfo<ValidatedDefinedField, TypeWithFieldsId, InputTypeId>;
 
-pub type ValidatedSchema = Schema<OutputTypeId, ValidatedDefinedField, TypeWithFieldsId>;
+pub type ValidatedVariableDefinition = VariableDefinition<InputTypeId>;
+
+pub type ValidatedSchema =
+    Schema<OutputTypeId, ValidatedDefinedField, TypeWithFieldsId, InputTypeId>;
 
 impl ValidatedSchema {
     pub fn validate_and_construct(
@@ -47,13 +48,13 @@ impl ValidatedSchema {
 
         let updated_fields = validate_and_transform_fields(fields, &schema_data)?;
 
-        Ok(Self {
+        Ok(dbg!(Self {
             fields: updated_fields,
             schema_data,
             id_type,
             string_type,
             query_type,
-        })
+        }))
     }
 }
 
@@ -121,9 +122,12 @@ fn validate_server_field_type_exists_and_is_output_type(
 
 fn validate_resolver_fragment(
     schema_data: &SchemaData,
-    resolver_field_type: SchemaResolverDefinitionInfo<(), ()>,
+    resolver_field_type: SchemaResolverDefinitionInfo<(), (), UnvalidatedTypeName>,
     field: &SchemaField<()>,
 ) -> ValidateSchemaResult<ValidatedSchemaResolverDefinitionInfo> {
+    let variable_definitions =
+        validate_variable_definitions(schema_data, resolver_field_type.variable_definitions)?;
+
     match resolver_field_type.selection_set_and_unwraps {
         Some(selection_set_and_unwraps) => {
             let parent_type = schema_data.lookup_type_with_fields(field.parent_type_id);
@@ -147,6 +151,7 @@ fn validate_resolver_fragment(
                 }),
                 field_id: resolver_field_type.field_id,
                 variant: resolver_field_type.variant,
+                variable_definitions,
             })
         }
         None => Ok(SchemaResolverDefinitionInfo {
@@ -154,8 +159,45 @@ fn validate_resolver_fragment(
             selection_set_and_unwraps: None,
             field_id: resolver_field_type.field_id,
             variant: resolver_field_type.variant,
+            variable_definitions,
         }),
     }
+}
+
+fn validate_variable_definitions(
+    schema_data: &SchemaData,
+    variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
+) -> ValidateSchemaResult<Vec<WithSpan<ValidatedVariableDefinition>>> {
+    variable_definitions
+        .into_iter()
+        .map(|x| {
+            x.and_then(|vd| {
+                // TODO this should be doable in the error branch
+                let type_string = vd.type_.to_string();
+                let inner_type = *vd.type_.inner();
+                Ok(VariableDefinition {
+                    name: vd.name,
+                    type_: vd.type_.and_then(|type_name| {
+                        match schema_data.defined_types.get(&type_name) {
+                            Some(type_id) => type_id.as_input_type_id().ok_or_else(|| {
+                                ValidateSchemaError::VariableDefinitionInnerTypeIsOutputType {
+                                    variable_name: vd.name.item,
+                                    type_: type_string,
+                                }
+                            }),
+                            None => Err(
+                                ValidateSchemaError::VariableDefinitionInnerTypeDoesNotExist {
+                                    variable_name: vd.name.item,
+                                    type_: type_string,
+                                    inner_type,
+                                },
+                            ),
+                        }
+                    })?,
+                })
+            })
+        })
+        .collect()
 }
 
 fn validate_selections_error_to_validate_schema_error(
@@ -305,6 +347,7 @@ fn validate_field_type_exists_and_is_scalar(
                         field: DefinedField::ServerField(TypeWithoutFieldsId::Scalar(scalar_id)),
                         alias: scalar_field_selection.alias,
                         unwraps: scalar_field_selection.unwraps,
+                        arguments: scalar_field_selection.arguments,
                     }),
                     TypeId::Object(_) => Err(
                         ValidateSelectionsError::FieldSelectedAsScalarButTypeIsNotScalar {
@@ -321,6 +364,7 @@ fn validate_field_type_exists_and_is_scalar(
                 alias: scalar_field_selection.alias,
                 unwraps: scalar_field_selection.unwraps,
                 field: DefinedField::ResolverField(()),
+                arguments: scalar_field_selection.arguments,
             }),
         },
         None => Err(ValidateSelectionsError::FieldDoesNotExist(
@@ -373,6 +417,7 @@ fn validate_field_type_exists_and_is_linked(
                                     )
                                 })?,
                             field: TypeWithFieldsId::Object(object_id),
+                            arguments: linked_field_selection.arguments,
                         })
                     }
                 }
@@ -455,5 +500,22 @@ pub enum ValidateSchemaError {
         parent_type_name: TypeWithFieldsName,
         field_name: FieldDefinitionName,
         field_type: UnvalidatedTypeName,
+    },
+
+    #[error(
+        "The variable `{variable_name}` has type `{type_}`, which is an output type. It should be an input type."
+    )]
+    VariableDefinitionInnerTypeIsOutputType {
+        variable_name: VariableName,
+        type_: String,
+    },
+
+    #[error(
+        "The variable `{variable_name}` has type `{type_}`, but the inner type `{inner_type}` does not exist."
+    )]
+    VariableDefinitionInnerTypeDoesNotExist {
+        variable_name: VariableName,
+        type_: String,
+        inner_type: UnvalidatedTypeName,
     },
 }

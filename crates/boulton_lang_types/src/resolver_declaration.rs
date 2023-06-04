@@ -1,8 +1,10 @@
 use common_lang_types::{
-    BoultonDirectiveName, DescriptionValue, FieldDefinitionName, FieldNameOrAlias, HasName,
-    LinkedFieldAlias, LinkedFieldName, ResolverDefinitionPath, ScalarFieldAlias, ScalarFieldName,
-    UnvalidatedTypeName, ValidLinkedFieldType, ValidScalarFieldType, WithSpan,
+    BoultonDirectiveName, DescriptionValue, FieldArgumentName, FieldDefinitionName,
+    FieldNameOrAlias, HasName, LinkedFieldAlias, LinkedFieldName, ResolverDefinitionPath,
+    ScalarFieldAlias, ScalarFieldName, UnvalidatedTypeName, ValidLinkedFieldType,
+    ValidScalarFieldType, ValidTypeAnnotationInnerType, VariableName, WithSpan,
 };
+use graphql_lang_types::TypeAnnotation;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct ResolverDeclaration {
@@ -13,6 +15,7 @@ pub struct ResolverDeclaration {
     // TODO intern the path buf instead of the string?
     pub resolver_definition_path: ResolverDefinitionPath,
     pub directives: Vec<WithSpan<FragmentDirectiveUsage>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -172,6 +175,7 @@ pub struct ScalarFieldSelection<TScalarField: ValidScalarFieldType> {
     pub alias: Option<WithSpan<ScalarFieldAlias>>,
     pub field: TScalarField,
     pub unwraps: Vec<WithSpan<Unwrap>>,
+    pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
 }
 
 impl<TScalarField: ValidScalarFieldType> ScalarFieldSelection<TScalarField> {
@@ -184,6 +188,7 @@ impl<TScalarField: ValidScalarFieldType> ScalarFieldSelection<TScalarField> {
             alias: self.alias,
             field: map(self.field),
             unwraps: self.unwraps,
+            arguments: self.arguments,
         }
     }
 
@@ -196,6 +201,7 @@ impl<TScalarField: ValidScalarFieldType> ScalarFieldSelection<TScalarField> {
             alias: self.alias,
             field: map(self.field)?,
             unwraps: self.unwraps,
+            arguments: self.arguments,
         })
     }
 
@@ -215,6 +221,7 @@ pub struct LinkedFieldSelection<
     pub alias: Option<WithSpan<LinkedFieldAlias>>,
     pub field: TLinkedField,
     pub selection_set_and_unwraps: SelectionSetAndUnwraps<TScalarField, TLinkedField>,
+    pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
 }
 
 impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
@@ -232,4 +239,44 @@ pub enum Unwrap {
     ActualUnwrap,
     SkippedUnwrap,
     // FakeUnwrap?
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub struct SelectionFieldArgument {
+    pub name: WithSpan<FieldArgumentName>,
+    pub value: WithSpan<NonConstantValue>,
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub enum NonConstantValue {
+    Variable(VariableName),
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub struct VariableDefinition<TValue: ValidTypeAnnotationInnerType> {
+    pub name: WithSpan<VariableName>,
+    pub type_: TypeAnnotation<TValue>,
+    // pub default_value: Option<WithSpan<ConstantValue>>,
+}
+
+impl<TValue: ValidTypeAnnotationInnerType> VariableDefinition<TValue> {
+    pub fn map<TNewValue: ValidTypeAnnotationInnerType>(
+        self,
+        map: &mut impl FnMut(TValue) -> TNewValue,
+    ) -> VariableDefinition<TNewValue> {
+        VariableDefinition {
+            name: self.name,
+            type_: self.type_.map(map),
+        }
+    }
+
+    pub fn and_then<TNewValue: ValidTypeAnnotationInnerType, E>(
+        self,
+        map: &mut impl FnMut(TValue) -> Result<TNewValue, E>,
+    ) -> Result<VariableDefinition<TNewValue>, E> {
+        Ok(VariableDefinition {
+            name: self.name,
+            type_: self.type_.and_then(map)?,
+        })
+    }
 }

@@ -2,7 +2,8 @@ import type {BoultonFetchableResolver, ReaderAst} from '@boulton/react';
 import { user_list_page as resolver } from '../user_list.tsx';
 import User__user_list_component from './User__user_list_component.boulton';
 
-const queryText = 'query user_list_page {\
+const queryText = 'query user_list_page ($bar: String!) {\
+  byah(foo: $bar),\
   users {\
     avatar_url,\
     email,\
@@ -13,6 +14,11 @@ const queryText = 'query user_list_page {\
 
 const normalizationAst = {notNeededForDemo: true};
 const readerAst: ReaderAst = [
+  {
+    kind: "Scalar",
+    response_name: "byah",
+    alias: null,
+  },
   {
     kind: "Linked",
     response_name: "users",
@@ -35,6 +41,7 @@ const readerAst: ReaderAst = [
 
 // The type, when passed to the resolver (currently this is the raw response type, it should be the response type)
 export type ResolverParameterType = {
+  byah: string,
   users: {
     avatar_url: string,
     email: string,

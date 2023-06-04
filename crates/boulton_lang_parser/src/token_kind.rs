@@ -19,14 +19,14 @@ pub enum BoultonLangTokenKind {
     #[token("}")]
     CloseBrace,
 
-    // #[token("]")]
-    // CloseBracket,
-    // #[token(")")]
-    // CloseParen,
+    #[token("]")]
+    CloseBracket,
+    #[token(")")]
+    CloseParen,
     #[token(":")]
     Colon,
-    // #[token("$")]
-    // Dollar,
+    #[token("$")]
+    Dollar,
     EndOfFile,
 
     // #[token("=")]
@@ -56,11 +56,10 @@ pub enum BoultonLangTokenKind {
     #[token("{")]
     OpenBrace,
 
-    // #[token("[")]
-    // OpenBracket,
-
-    // #[token("(")]
-    // OpenParen,
+    #[token("[")]
+    OpenBracket,
+    #[token("(")]
+    OpenParen,
     #[token(".")]
     Period,
     // #[token("..")]
@@ -155,10 +154,10 @@ impl fmt::Display for BoultonLangTokenKind {
             // BoultonLangTokenKind::Ampersand => "ampersand ('&')",
             BoultonLangTokenKind::At => "at ('@')",
             BoultonLangTokenKind::CloseBrace => "closing brace ('}')",
-            // BoultonLangTokenKind::CloseBracket => "closing bracket (']')",
-            // BoultonLangTokenKind::CloseParen => "closing paren (')')",
+            BoultonLangTokenKind::CloseBracket => "closing bracket (']')",
+            BoultonLangTokenKind::CloseParen => "closing paren (')')",
             // BoultonLangTokenKind::Colon => "colon (':')",
-            // BoultonLangTokenKind::Dollar => "dollar ('$')",
+            BoultonLangTokenKind::Dollar => "dollar ('$')",
             BoultonLangTokenKind::EndOfFile => "end of file",
             // BoultonLangTokenKind::Equals => "equals ('=')",
             BoultonLangTokenKind::Exclamation => "exclamation mark ('!')",
@@ -166,8 +165,8 @@ impl fmt::Display for BoultonLangTokenKind {
             BoultonLangTokenKind::Identifier => "non-variable identifier (e.g. 'x' or 'Foo')",
             // BoultonLangTokenKind::IntegerLiteral => "integer value (e.g. '0' or '42')",
             BoultonLangTokenKind::OpenBrace => "open brace ('{')",
-            // BoultonLangTokenKind::OpenBracket => "open bracket ('[')",
-            // BoultonLangTokenKind::OpenParen => "open parenthesis ('(')",
+            BoultonLangTokenKind::OpenBracket => "open bracket ('[')",
+            BoultonLangTokenKind::OpenParen => "open parenthesis ('(')",
             BoultonLangTokenKind::Period => "period ('.')",
             // BoultonLangTokenKind::PeriodPeriod => "double period ('..')",
             // BoultonLangTokenKind::Pipe => "pipe ('|')",

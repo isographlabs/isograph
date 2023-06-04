@@ -2,7 +2,7 @@ import type {BoultonFetchableResolver, ReaderAst} from '@boulton/react';
 import { user_detail_page as resolver } from '../user_detail_page.tsx';
 import User__user_profile_with_details from './User__user_profile_with_details.boulton';
 
-const queryText = 'query user_detail_page {\
+const queryText = 'query user_detail_page  {\
   current_user {\
     avatar_url,\
     email,\

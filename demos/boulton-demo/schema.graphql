@@ -7,6 +7,7 @@ type Query {
   """
   current_user: User!
   users: [User!]!
+  byah(foo: String!): String!
 }
 
 type User {

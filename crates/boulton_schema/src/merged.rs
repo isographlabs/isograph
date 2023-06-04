@@ -74,6 +74,7 @@ fn merge_selections_into_set(
                                                 alias: scalar_field.alias,
                                                 unwraps: scalar_field.unwraps.clone(),
                                                 field: *server_field_id,
+                                                arguments: scalar_field.arguments.clone(),
                                             },
                                         )),
                                         span,
@@ -140,6 +141,7 @@ fn merge_selections_into_set(
                                                     .clone(),
                                             }
                                         },
+                                        arguments: linked_field.arguments.clone(),
                                     },
                                 )),
                                 span,

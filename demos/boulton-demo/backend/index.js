@@ -14,6 +14,7 @@ var root = {
   current_user: () => userResolver(1),
   current_post: () => postResolver, 
   users: () => [userResolver(1), userResolver(2), userResolver(3)],
+  byah: ({foo}) => `byah ${foo}`,
 };
 
 const userResolver = (id) => ({

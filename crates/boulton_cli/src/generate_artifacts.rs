@@ -8,16 +8,19 @@ use std::{
 
 use boulton_lang_types::{
     FieldSelection::{LinkedField, ScalarField},
-    Selection,
+    NonConstantValue, Selection, SelectionFieldArgument,
 };
 use boulton_schema::{
     merge_selection_set, MergedSelectionSet, SchemaObject, SchemaTypeWithFields, ValidatedSchema,
     ValidatedSchemaResolverDefinitionInfo, ValidatedSelectionSetAndUnwraps,
+    ValidatedVariableDefinition,
 };
 use common_lang_types::{
     DefinedField, FieldDefinitionName, HasName, ObjectId, QueryOperationName,
-    ResolverDefinitionPath, TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId, WithSpan,
+    ResolverDefinitionPath, TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId,
+    UnvalidatedTypeName, WithSpan,
 };
+use graphql_lang_types::TypeAnnotation;
 use thiserror::Error;
 
 pub(crate) fn generate_artifacts(
@@ -84,7 +87,12 @@ fn generate_fetchable_resolver_artifact<'schema>(
         let query_type = schema
             .schema_data
             .lookup_type_with_fields(query_object_id.into());
-        let query_text = generate_query_text(query_name, schema, &merged_selection_set)?;
+        let query_text = generate_query_text(
+            query_name,
+            schema,
+            &merged_selection_set,
+            &resolver_definition.variable_definitions,
+        );
         let query_type_declaration =
             generate_query_type_declaration(schema, &merged_selection_set, 1)?;
         let resolver_import_statement = generate_resolver_import_statement(
@@ -269,18 +277,49 @@ fn generate_query_text(
     query_name: QueryOperationName,
     schema: &ValidatedSchema,
     merged_selection_set: &MergedSelectionSet,
-) -> Result<QueryText, GenerateArtifactsError> {
+    query_variables: &[WithSpan<ValidatedVariableDefinition>],
+) -> QueryText {
     let mut query_text = String::new();
-    query_text.push_str(&format!("query {} {{\\\n", query_name));
+
+    let variable_text = write_variables_to_string(schema, query_variables);
+
+    query_text.push_str(&format!("query {} {} {{\\\n", query_name, variable_text));
     write_selections(
         &mut query_text,
         schema,
         // TODO do not do this here, instead do it during validation, and topologically sort first
         &merged_selection_set,
         1,
-    )?;
+    );
     query_text.push_str("}");
-    Ok(QueryText(query_text))
+    QueryText(query_text)
+}
+
+fn write_variables_to_string(
+    schema: &ValidatedSchema,
+    variables: &[WithSpan<ValidatedVariableDefinition>],
+) -> String {
+    if variables.is_empty() {
+        String::new()
+    } else {
+        let mut variable_text = String::new();
+        variable_text.push('(');
+        for (i, variable) in variables.iter().enumerate() {
+            if i != 0 {
+                variable_text.push_str(", ");
+            }
+            // TODO can we consume the variables here?
+            let x: TypeAnnotation<UnvalidatedTypeName> =
+                variable.item.type_.clone().map(|input_type_id| {
+                    // schema.
+                    let schema_input_type = schema.schema_data.lookup_input_type(input_type_id);
+                    schema_input_type.name().into()
+                });
+            variable_text.push_str(&format!("${}: {}", variable.item.name, x));
+        }
+        variable_text.push(')');
+        variable_text
+    }
 }
 
 #[derive(Debug, Error)]
@@ -312,9 +351,9 @@ fn generated_file_path(project_root: &PathBuf, file_name: &PathBuf) -> PathBuf {
 fn write_selections(
     query_text: &mut String,
     schema: &ValidatedSchema,
-    items: &Vec<WithSpan<Selection<TypeWithoutFieldsId, TypeWithFieldsId>>>,
+    items: &[WithSpan<Selection<TypeWithoutFieldsId, TypeWithFieldsId>>],
     indentation_level: u8,
-) -> Result<(), GenerateArtifactsError> {
+) {
     for item in items.iter() {
         query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
         match &item.item {
@@ -324,20 +363,22 @@ fn write_selections(
                         query_text.push_str(&format!("{}: ", alias));
                     }
                     let name = scalar_field.name.item;
-                    query_text.push_str(&format!("{},\\\n", name));
+                    let arguments = get_serialized_arguments(&scalar_field.arguments);
+                    query_text.push_str(&format!("{}{},\\\n", name, arguments));
                 }
                 LinkedField(linked_field) => {
                     if let Some(alias) = linked_field.alias {
                         query_text.push_str(&format!("{}: ", alias));
                     }
                     let name = linked_field.name.item;
-                    query_text.push_str(&format!("{} {{\\\n", name));
+                    let arguments = get_serialized_arguments(&linked_field.arguments);
+                    query_text.push_str(&format!("{}{} {{\\\n", name, arguments));
                     write_selections(
                         query_text,
                         schema,
                         &linked_field.selection_set_and_unwraps.selection_set,
                         indentation_level + 1,
-                    )?;
+                    );
                     query_text.push_str(&format!(
                         "{}}},\\\n",
                         "  ".repeat(indentation_level as usize)
@@ -346,7 +387,6 @@ fn write_selections(
             },
         }
     }
-    Ok(())
 }
 
 fn write_artifacts<'schema>(
@@ -530,11 +570,7 @@ fn generate_reader_ast<'schema>(
 fn generate_reader_ast_node(
     item: &WithSpan<Selection<DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>>,
     parent_type: SchemaTypeWithFields,
-    schema: &boulton_schema::Schema<
-        common_lang_types::OutputTypeId,
-        DefinedField<TypeWithoutFieldsId, ()>,
-        TypeWithFieldsId,
-    >,
+    schema: &ValidatedSchema,
     indentation_level: u8,
     nested_resolver_imports: &mut HashSet<NestedResolverName>,
 ) -> String {
@@ -644,4 +680,33 @@ fn nested_resolver_names_to_import_statement(
         ));
     }
     s
+}
+
+fn get_serialized_arguments(arguments: &[WithSpan<SelectionFieldArgument>]) -> String {
+    if arguments.is_empty() {
+        return "".to_string();
+    } else {
+        let mut arguments = arguments.iter();
+        let first = arguments.next().unwrap();
+        let mut s = format!(
+            "({}: {}",
+            first.item.name.item,
+            serialize_non_constant_value(&first.item.value.item)
+        );
+        for argument in arguments {
+            s.push_str(&format!(
+                ", {}: {}",
+                argument.item.name.item,
+                serialize_non_constant_value(&argument.item.value.item)
+            ));
+        }
+        s.push_str(")");
+        s
+    }
+}
+
+fn serialize_non_constant_value(value: &NonConstantValue) -> String {
+    match value {
+        NonConstantValue::Variable(variable_name) => format!("${}", variable_name),
+    }
 }

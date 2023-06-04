@@ -2,7 +2,10 @@ import * as React from "react";
 import { bDeclare, read } from "@boulton/react";
 
 export const user_list_page = bDeclare`
-  Query.user_list_page @fetchable {
+  Query.user_list_page(
+    $bar: String!,
+  ) @fetchable {
+    byah(foo: $bar,),
     users {
       id,
       user_list_component,

@@ -9,7 +9,7 @@ use intern::string_key::StringKey;
 use graphql_lang_types::{
     ConstantValue, Directive, InputValueDefinition, ListTypeAnnotation, NameValuePair,
     NamedTypeAnnotation, NonNullTypeAnnotation, ObjectTypeDefinition, OutputFieldDefinition,
-    TypeAnnotation, TypeSystemDefinition, TypeSystemDocument, Value, ValueType,
+    TypeAnnotation, TypeSystemDefinition, TypeSystemDocument, ValueType,
 };
 
 use crate::ParseResult;
@@ -250,11 +250,6 @@ fn parse_constant_value(tokens: &mut PeekableLexer) -> ParseResult<WithSpan<Cons
     })
 }
 
-#[allow(dead_code)]
-fn parse_value(_tokens: &mut PeekableLexer) -> ParseResult<WithSpan<Value>> {
-    todo!("Non-constant values are not yet supported")
-}
-
 fn to_control_flow<T, E>(result: impl FnOnce() -> Result<T, E>) -> ControlFlow<T, E> {
     match result() {
         Ok(t) => ControlFlow::Break(t),
@@ -310,11 +305,10 @@ fn parse_field<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResult<WithSpan<Outpu
         .transpose()
 }
 
-fn parse_type_annotation<'a, T: ValidTypeAnnotationInnerType + From<StringKey>>(
-    tokens: &mut PeekableLexer<'a>,
+fn parse_type_annotation<T: ValidTypeAnnotationInnerType + From<StringKey>>(
+    tokens: &mut PeekableLexer,
 ) -> ParseResult<TypeAnnotation<T>> {
     from_control_flow(|| {
-        // Why do we need this annotation?
         to_control_flow::<_, SchemaParseError>(|| {
             let type_ = tokens.parse_string_key_type(TokenKind::Identifier)?;
 
