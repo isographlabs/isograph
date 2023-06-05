@@ -1,4 +1,5 @@
 use crate::ValidScalarFieldType;
+pub use string_key_newtype::StringKeyNewtype;
 
 use super::ValidTypeAnnotationInnerType;
 use string_key_newtype::{string_key_conversion, string_key_newtype};

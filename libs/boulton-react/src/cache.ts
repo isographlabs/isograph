@@ -40,8 +40,8 @@ export function makeNetworkRequest<T extends object>(
   })
     .then((response) => response.json())
     .then((networkResponse) => {
-      normalizeData(networkResponse.data);
-      console.log("after normalizing", store);
+      normalizeData(networkResponse.data, variables);
+      console.log("after normalizing", JSON.stringify(store, null, 4));
       return networkResponse.data;
     });
 
@@ -76,8 +76,8 @@ export const store: { [index: DataId]: DataType } = {};
 
 export const ROOT_ID = "ROOT";
 
-function normalizeData(data: DataType) {
-  normalizeDataWithPath(data, ROOT_ID);
+function normalizeData(data: DataType, variables: Object) {
+  normalizeDataWithPath(data, ROOT_ID, variables);
   callSubscriptions();
 }
 
@@ -101,27 +101,81 @@ function callSubscriptions() {
   subscriptions.forEach((callback) => callback());
 }
 
-function normalizeDataWithPath(data: DataType, path: string): DataId {
+function normalizeDataWithPath(
+  data: DataType,
+  path: string,
+  variables: { [index: string]: string }
+): DataId {
   const id = data["id"] ?? path;
   const targetRecord: DataType = store[id] ?? {};
   store[id] = targetRecord;
 
-  Object.keys(data).forEach((key) => {
-    targetRecord[key] = getFieldOrNormalize(data[key], `${path}.${key}`);
+  Object.keys(data).forEach((networkResponseKey) => {
+    const actualKey = HACK_map_key(networkResponseKey, variables);
+    targetRecord[actualKey] = getFieldOrNormalize(
+      data[networkResponseKey],
+      `${path}.${networkResponseKey}`,
+      variables
+    );
   });
   return id;
 }
 
-function getFieldOrNormalize(data: DataTypeValue, path: string): DataTypeValue {
+function getFieldOrNormalize(
+  data: DataTypeValue,
+  path: string,
+  variables: { [index: string]: string }
+): DataTypeValue {
   if (typeof data === "string" || data == null) {
     return data;
   }
   if (Array.isArray(data)) {
     return data.map((item, index) =>
-      getFieldOrNormalize(item, `${path}[${index}]`)
+      getFieldOrNormalize(item, `${path}[${index}]`, variables)
     );
   }
 
-  const dataId = normalizeDataWithPath(data, path);
+  const dataId = normalizeDataWithPath(data, path, variables);
   return { __link: dataId };
+}
+
+/// Fields that use variables have aliases like nameOfField__fieldName1_variableName2__...
+/// so e.g. node(id: $ID) becomes node__id_ID. Here, we map that back to node__id_4
+/// for writing to the store.
+function HACK_map_key(
+  networkResponseKey: string,
+  // {ID: "4"} and the like
+  variablesToValues: { [index: string]: string }
+): string {
+  const parts = networkResponseKey.split("__");
+  let fieldName = parts[0];
+
+  // {id: "ID"} and the like
+  const fieldArgToUsedVariable: { [index: string]: string } = {};
+  for (const variable_key_val of parts.slice(1)) {
+    const [fieldArgName, usedVariable] = variable_key_val.split("_");
+    fieldArgToUsedVariable[fieldArgName] = usedVariable;
+  }
+
+  // {id: 4} and the like
+  const fieldArgToValue: { [index: string]: string } = {};
+  for (const fieldArgName in fieldArgToUsedVariable) {
+    const usedVariable = fieldArgToUsedVariable[fieldArgName];
+    if (variablesToValues[usedVariable] == null) {
+      throw new Error(
+        `Variable ${fieldArgName} used in ${networkResponseKey} but not provided in variables`
+      );
+    }
+    fieldArgToValue[fieldArgName] = variablesToValues[usedVariable];
+  }
+
+  const sortedFields = Object.entries(fieldArgToValue).sort((a, b) =>
+    a[0].localeCompare(b[0])
+  );
+
+  for (const [fieldArgName, value] of sortedFields) {
+    fieldName += `__${fieldArgName}_${value}`;
+  }
+
+  return fieldName;
 }

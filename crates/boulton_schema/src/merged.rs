@@ -71,10 +71,12 @@ fn merge_selections_into_set(
                                         Selection::Field(FieldSelection::ScalarField(
                                             ScalarFieldSelection {
                                                 name: scalar_field.name,
-                                                alias: scalar_field.alias,
+                                                reader_alias: scalar_field.reader_alias,
                                                 unwraps: scalar_field.unwraps.clone(),
                                                 field: *server_field_id,
                                                 arguments: scalar_field.arguments.clone(),
+                                                normalization_alias: scalar_field
+                                                    .normalization_alias,
                                             },
                                         )),
                                         span,
@@ -122,7 +124,7 @@ fn merge_selections_into_set(
                                 Selection::Field(FieldSelection::LinkedField(
                                     LinkedFieldSelection {
                                         name: linked_field.name,
-                                        alias: linked_field.alias,
+                                        reader_alias: linked_field.reader_alias,
                                         field: linked_field.field,
                                         selection_set_and_unwraps: {
                                             let type_id = linked_field.field;
@@ -142,6 +144,7 @@ fn merge_selections_into_set(
                                             }
                                         },
                                         arguments: linked_field.arguments.clone(),
+                                        normalization_alias: linked_field.normalization_alias,
                                     },
                                 )),
                                 span,

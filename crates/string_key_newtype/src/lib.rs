@@ -1,4 +1,7 @@
-pub trait StringKeyNewtype {}
+pub trait StringKeyNewtype:
+    From<intern::string_key::StringKey> + std::fmt::Display + Clone
+{
+}
 
 #[macro_export]
 macro_rules! string_key_newtype {

@@ -1,3 +1,5 @@
+use std::fmt;
+
 use common_lang_types::{
     BoultonDirectiveName, DescriptionValue, FieldArgumentName, FieldDefinitionName,
     FieldNameOrAlias, HasName, LinkedFieldAlias, LinkedFieldName, ResolverDefinitionPath,
@@ -172,7 +174,8 @@ impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType> Has
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct ScalarFieldSelection<TScalarField: ValidScalarFieldType> {
     pub name: WithSpan<ScalarFieldName>,
-    pub alias: Option<WithSpan<ScalarFieldAlias>>,
+    pub reader_alias: Option<WithSpan<ScalarFieldAlias>>,
+    pub normalization_alias: Option<WithSpan<ScalarFieldAlias>>,
     pub field: TScalarField,
     pub unwraps: Vec<WithSpan<Unwrap>>,
     pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
@@ -185,10 +188,11 @@ impl<TScalarField: ValidScalarFieldType> ScalarFieldSelection<TScalarField> {
     ) -> ScalarFieldSelection<U> {
         ScalarFieldSelection {
             name: self.name,
-            alias: self.alias,
+            reader_alias: self.reader_alias,
             field: map(self.field),
             unwraps: self.unwraps,
             arguments: self.arguments,
+            normalization_alias: self.normalization_alias,
         }
     }
 
@@ -198,15 +202,16 @@ impl<TScalarField: ValidScalarFieldType> ScalarFieldSelection<TScalarField> {
     ) -> Result<ScalarFieldSelection<U>, E> {
         Ok(ScalarFieldSelection {
             name: self.name,
-            alias: self.alias,
+            reader_alias: self.reader_alias,
             field: map(self.field)?,
             unwraps: self.unwraps,
             arguments: self.arguments,
+            normalization_alias: self.normalization_alias,
         })
     }
 
     pub fn name_or_alias(&self) -> WithSpan<FieldNameOrAlias> {
-        self.alias
+        self.reader_alias
             .map(|item| item.map(FieldNameOrAlias::from))
             .unwrap_or_else(|| self.name.map(FieldNameOrAlias::from))
     }
@@ -218,7 +223,8 @@ pub struct LinkedFieldSelection<
     TLinkedField: ValidLinkedFieldType,
 > {
     pub name: WithSpan<LinkedFieldName>,
-    pub alias: Option<WithSpan<LinkedFieldAlias>>,
+    pub reader_alias: Option<WithSpan<LinkedFieldAlias>>,
+    pub normalization_alias: Option<WithSpan<LinkedFieldAlias>>,
     pub field: TLinkedField,
     pub selection_set_and_unwraps: SelectionSetAndUnwraps<TScalarField, TLinkedField>,
     pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
@@ -228,7 +234,7 @@ impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
     LinkedFieldSelection<TScalarField, TLinkedField>
 {
     pub fn name_or_alias(&self) -> WithSpan<FieldNameOrAlias> {
-        self.alias
+        self.reader_alias
             .map(|item| item.map(FieldNameOrAlias::from))
             .unwrap_or_else(|| self.name.map(FieldNameOrAlias::from))
     }
@@ -250,6 +256,14 @@ pub struct SelectionFieldArgument {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum NonConstantValue {
     Variable(VariableName),
+}
+
+impl fmt::Display for NonConstantValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NonConstantValue::Variable(name) => write!(f, "${}", name),
+        }
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]

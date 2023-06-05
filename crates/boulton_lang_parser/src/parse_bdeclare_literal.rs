@@ -5,11 +5,14 @@ use boulton_lang_types::{
     ResolverDeclaration, ScalarFieldSelection, Selection, SelectionFieldArgument,
     SelectionSetAndUnwraps, Unwrap, VariableDefinition,
 };
-use common_lang_types::{ResolverDefinitionPath, Span, UnvalidatedTypeName, WithSpan};
+use common_lang_types::{
+    FieldDefinitionName, ResolverDefinitionPath, Span, StringKeyNewtype, UnvalidatedTypeName,
+    WithSpan,
+};
 use graphql_lang_types::{
     ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation,
 };
-use intern::string_key::StringKey;
+use intern::string_key::{Intern, StringKey};
 
 use crate::{
     parse_optional_description, BoultonLangTokenKind, BoultonLiteralParseError, ParseResult,
@@ -129,20 +132,31 @@ fn parse_selection<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResult<WithSpan<S
                 Some(selection_set) => {
                     Selection::Field(FieldSelection::LinkedField(LinkedFieldSelection {
                         name: field_name.map(|string_key| string_key.into()),
-                        alias: alias.map(|with_span| with_span.map(|string_key| string_key.into())),
+                        reader_alias: alias
+                            .map(|with_span| with_span.map(|string_key| string_key.into())),
                         field: (),
                         selection_set_and_unwraps: SelectionSetAndUnwraps {
                             unwraps,
                             selection_set,
                         },
+                        normalization_alias:
+                            HACK_combine_name_and_variables_into_normalization_alias(
+                                field_name.map(|x| x.into()),
+                                &arguments,
+                            ),
                         arguments,
                     }))
                 }
                 None => Selection::Field(FieldSelection::ScalarField(ScalarFieldSelection {
                     name: field_name.map(|string_key| string_key.into()),
-                    alias: alias.map(|with_span| with_span.map(|string_key| string_key.into())),
+                    reader_alias: alias
+                        .map(|with_span| with_span.map(|string_key| string_key.into())),
                     field: (),
                     unwraps,
+                    normalization_alias: HACK_combine_name_and_variables_into_normalization_alias(
+                        field_name.map(|x| x.into()),
+                        &arguments,
+                    ),
                     arguments,
                 })),
             };
@@ -321,6 +335,28 @@ fn from_control_flow<T, E>(control_flow: impl FnOnce() -> ControlFlow<T, E>) -> 
     match control_flow() {
         ControlFlow::Break(t) => Ok(t),
         ControlFlow::Continue(e) => Err(e),
+    }
+}
+
+/// In order to avoid requiring a normalization AST, we write the variables
+/// used in the alias. Once we have a normalization AST, we can remove this.
+fn HACK_combine_name_and_variables_into_normalization_alias<T: StringKeyNewtype>(
+    name: WithSpan<FieldDefinitionName>,
+    arguments: &[WithSpan<SelectionFieldArgument>],
+) -> Option<WithSpan<T>> {
+    if arguments.is_empty() {
+        None
+    } else {
+        let mut alias_str = name.item.to_string();
+
+        for argument in arguments {
+            alias_str.push_str(&format!(
+                "__{}_{}",
+                argument.item.name.item,
+                &argument.item.value.item.to_string()[1..]
+            ));
+        }
+        Some(name.map(|_| T::from(alias_str.intern())))
     }
 }
 

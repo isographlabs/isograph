@@ -48,13 +48,13 @@ impl ValidatedSchema {
 
         let updated_fields = validate_and_transform_fields(fields, &schema_data)?;
 
-        Ok(dbg!(Self {
+        Ok(Self {
             fields: updated_fields,
             schema_data,
             id_type,
             string_type,
             query_type,
-        }))
+        })
     }
 }
 
@@ -345,7 +345,8 @@ fn validate_field_type_exists_and_is_scalar(
                     TypeId::Scalar(scalar_id) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
                         field: DefinedField::ServerField(TypeWithoutFieldsId::Scalar(scalar_id)),
-                        alias: scalar_field_selection.alias,
+                        reader_alias: scalar_field_selection.reader_alias,
+                        normalization_alias: scalar_field_selection.normalization_alias,
                         unwraps: scalar_field_selection.unwraps,
                         arguments: scalar_field_selection.arguments,
                     }),
@@ -361,10 +362,11 @@ fn validate_field_type_exists_and_is_scalar(
             }
             DefinedField::ResolverField(_) => Ok(ScalarFieldSelection {
                 name: scalar_field_selection.name,
-                alias: scalar_field_selection.alias,
+                reader_alias: scalar_field_selection.reader_alias,
                 unwraps: scalar_field_selection.unwraps,
                 field: DefinedField::ResolverField(()),
                 arguments: scalar_field_selection.arguments,
+                normalization_alias: scalar_field_selection.normalization_alias,
             }),
         },
         None => Err(ValidateSelectionsError::FieldDoesNotExist(
@@ -406,7 +408,8 @@ fn validate_field_type_exists_and_is_linked(
                         let object = schema_data.objects.get(object_id.as_usize()).unwrap();
                         Ok(LinkedFieldSelection {
                             name: linked_field_selection.name,
-                            alias: linked_field_selection.alias,
+                            reader_alias: linked_field_selection.reader_alias,
+                            normalization_alias: linked_field_selection.normalization_alias,
                             selection_set_and_unwraps: linked_field_selection
                                 .selection_set_and_unwraps
                                 .and_then(&mut |selection| {

@@ -3,7 +3,7 @@ import { user_list_page as resolver } from '../user_list.tsx';
 import User__user_list_component from './User__user_list_component.boulton';
 
 const queryText = 'query user_list_page ($bar: String!) {\
-  byah(foo: $bar),\
+  byah__foo_bar: byah(foo: $bar),\
   users {\
     avatar_url,\
     email,\

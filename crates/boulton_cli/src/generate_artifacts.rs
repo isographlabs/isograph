@@ -359,7 +359,7 @@ fn write_selections(
         match &item.item {
             Selection::Field(field) => match field {
                 ScalarField(scalar_field) => {
-                    if let Some(alias) = scalar_field.alias {
+                    if let Some(alias) = scalar_field.normalization_alias {
                         query_text.push_str(&format!("{}: ", alias));
                     }
                     let name = scalar_field.name.item;
@@ -367,7 +367,7 @@ fn write_selections(
                     query_text.push_str(&format!("{}{},\\\n", name, arguments));
                 }
                 LinkedField(linked_field) => {
-                    if let Some(alias) = linked_field.alias {
+                    if let Some(alias) = linked_field.normalization_alias {
                         query_text.push_str(&format!("{}: ", alias));
                     }
                     let name = linked_field.name.item;
@@ -582,7 +582,7 @@ fn generate_reader_ast_node(
                 match scalar_field.field {
                     DefinedField::ServerField(_server_field) => {
                         let alias = scalar_field
-                            .alias
+                            .reader_alias
                             .map(|x| format!("\"{}\"", x.item))
                             .unwrap_or("null".to_string());
                         format!(
@@ -640,7 +640,7 @@ fn generate_reader_ast_node(
             LinkedField(linked_field) => {
                 let name = linked_field.name.item;
                 let alias = linked_field
-                    .alias
+                    .reader_alias
                     .map(|x| format!("\"{}\"", x.item))
                     .unwrap_or("null".to_string());
                 let linked_field_type = schema
