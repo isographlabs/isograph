@@ -4,12 +4,20 @@ import { bDeclare, read } from "@boulton/react";
 export const user_list_page = bDeclare`
   Query.user_list_page(
     $bar: String!,
+    $bar2: String!,
   ) @fetchable {
     byah(foo: $bar,),
     users {
       id,
       user_list_component,
     },
+    some_resolver,
+  }
+`;
+
+export const some_resolver = bDeclare`
+  Query.some_resolver @eager {
+    byah(foo: $bar2,),
   }
 `;
 

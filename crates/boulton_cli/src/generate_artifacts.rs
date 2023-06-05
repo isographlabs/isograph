@@ -217,7 +217,7 @@ impl<'schema> FetchableResolver<'schema> {
             type ResolverResponse = {{\n  {}\n}};\n\n\
             // The type, when read out\n\
             type UserResponse = {{\n  {}\n}};\n\n\
-            const artifact: BoultonFetchableResolver<ResolverParamaterType, ResolverResponse, UserResponse> = {{\n\
+            const artifact: BoultonFetchableResolver<ResolverParameterType, ResolverResponse, UserResponse> = {{\n\
             {}kind: 'FetchableResolver',\n\
             {}queryText,\n\
             {}normalizationAst,\n\
@@ -585,14 +585,18 @@ fn generate_reader_ast_node(
                             .reader_alias
                             .map(|x| format!("\"{}\"", x.item))
                             .unwrap_or("null".to_string());
+                        let arguments =
+                            format_arguments(&scalar_field.arguments, indentation_level + 1);
                         format!(
-                            "{}{{\n{}kind: \"Scalar\",\n{}response_name: \"{}\",\n{}alias: {},\n{}}},\n",
+                            "{}{{\n{}kind: \"Scalar\",\n{}response_name: \"{}\",\n{}alias: {},\n{}arguments: {},\n{}}},\n",
                             "  ".repeat(indentation_level as usize),
                             "  ".repeat((indentation_level + 1) as usize),
                             "  ".repeat((indentation_level + 1) as usize),
                             field_name,
                             "  ".repeat((indentation_level + 1) as usize),
                             alias,
+                            "  ".repeat((indentation_level + 1) as usize),
+                            arguments,
                             "  ".repeat((indentation_level) as usize),
                         )
                     }
@@ -618,12 +622,18 @@ fn generate_reader_ast_node(
                                     parent_type.name(),
                                     field_name
                                 ));
+                                let arguments = format_arguments(
+                                    &scalar_field.arguments,
+                                    indentation_level + 1,
+                                );
                                 let res = format!(
-                                    "{}{{\n{}kind: \"Resolver\",\n{}alias: \"{}\",\n{}resolver: {},\n{}variant: {},\n{}}},\n",
+                                    "{}{{\n{}kind: \"Resolver\",\n{}alias: \"{}\",\n{}arguments: {},\n{}resolver: {},\n{}variant: {},\n{}}},\n",
                                     "  ".repeat(indentation_level as usize),
                                     "  ".repeat((indentation_level + 1) as usize),
                                     "  ".repeat((indentation_level + 1) as usize),
                                     alias,
+                                    "  ".repeat((indentation_level + 1) as usize),
+                                    arguments,
                                     "  ".repeat((indentation_level + 1) as usize),
                                     resolver_import_name.0,
                                     "  ".repeat((indentation_level + 1) as usize),
@@ -653,14 +663,17 @@ fn generate_reader_ast_node(
                     indentation_level + 1,
                     nested_resolver_imports,
                 );
+                let arguments = format_arguments(&linked_field.arguments, indentation_level + 1);
                 format!(
-                    "{}{{\n{}kind: \"Linked\",\n{}response_name: \"{}\",\n{}alias: {},\n{}selections: {},\n{}}},\n",
+                    "{}{{\n{}kind: \"Linked\",\n{}response_name: \"{}\",\n{}alias: {},\n{}arguments: {},\n{}selections: {},\n{}}},\n",
                     "  ".repeat(indentation_level as usize),
                     "  ".repeat((indentation_level + 1) as usize),
                     "  ".repeat((indentation_level + 1) as usize),
                     name,
                     "  ".repeat((indentation_level + 1) as usize),
                     alias,
+                    "  ".repeat((indentation_level + 1) as usize),
+                    arguments,
                     "  ".repeat((indentation_level + 1) as usize),
                     inner_reader_ast.0, "  ".repeat(indentation_level as usize),
                 )
@@ -691,13 +704,13 @@ fn get_serialized_arguments(arguments: &[WithSpan<SelectionFieldArgument>]) -> S
         let mut s = format!(
             "({}: {}",
             first.item.name.item,
-            serialize_non_constant_value(&first.item.value.item)
+            serialize_non_constant_value_for_graphql(&first.item.value.item)
         );
         for argument in arguments {
             s.push_str(&format!(
                 ", {}: {}",
                 argument.item.name.item,
-                serialize_non_constant_value(&argument.item.value.item)
+                serialize_non_constant_value_for_graphql(&argument.item.value.item)
             ));
         }
         s.push_str(")");
@@ -705,8 +718,36 @@ fn get_serialized_arguments(arguments: &[WithSpan<SelectionFieldArgument>]) -> S
     }
 }
 
-fn serialize_non_constant_value(value: &NonConstantValue) -> String {
+fn serialize_non_constant_value_for_graphql(value: &NonConstantValue) -> String {
     match value {
         NonConstantValue::Variable(variable_name) => format!("${}", variable_name),
+    }
+}
+
+// TODO strings and variables are indistinguishable
+fn serialize_non_constant_value_for_js(value: &NonConstantValue) -> String {
+    match value {
+        NonConstantValue::Variable(variable_name) => format!("\"{}\"", variable_name),
+    }
+}
+
+fn format_arguments(
+    arguments: &[WithSpan<SelectionFieldArgument>],
+    indentation_level: u8,
+) -> String {
+    if arguments.is_empty() {
+        return "null".to_string();
+    } else {
+        let mut out_str = "{".to_string();
+        for argument in arguments {
+            out_str.push_str(&format!(
+                "\n{}\"{}\": {},",
+                "  ".repeat((indentation_level + 1) as usize),
+                argument.item.name.item,
+                serialize_non_constant_value_for_js(&argument.item.value.item)
+            ));
+        }
+        out_str.push_str(&format!("\n{}}}", "  ".repeat(indentation_level as usize)));
+        out_str
     }
 }

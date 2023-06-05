@@ -6,6 +6,7 @@ const readerAst: ReaderAst = [
     kind: "Scalar",
     response_name: "credit_card_number",
     alias: null,
+    arguments: null,
   },
 ];
 

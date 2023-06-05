@@ -64,12 +64,14 @@ export type ReaderScalarField = {
   kind: "Scalar";
   response_name: string;
   alias: string | null;
+  arguments: Object | null;
 };
 export type ReaderLinkedField = {
   kind: "Linked";
   response_name: string;
   alias: string | null;
   selections: ReaderAst;
+  arguments: Object | null;
 };
 
 export type ReaderResolverVariant = "Eager" | "Component";
@@ -78,6 +80,7 @@ export type ReaderResolverField = {
   alias: string;
   resolver: BoultonResolver<any, any, any>;
   variant: ReaderResolverVariant | null;
+  arguments: Object | null;
 };
 
 export type FragmentReference<
@@ -92,6 +95,7 @@ export type FragmentReference<
     data: TReadFromStore;
     [index: string]: any;
   }) => TResolverResult;
+  variables: Object | null;
 };
 
 export function bDeclare(queryText: TemplateStringsArray) {
@@ -129,6 +133,7 @@ export function useLazyReference<
       readerAst: artifact.readerAst,
       root: ROOT_ID,
       resolver: artifact.resolver ?? ((x) => x),
+      variables,
     },
   };
 }
@@ -146,7 +151,8 @@ export function read<
 ): TUnwrappedResolverResult {
   const response = readData<TReadFromStore>(
     reference.readerAst,
-    reference.root
+    reference.root,
+    reference.variables
   );
   console.log("result of calling read", { response, reference });
   if (response.kind === "MissingData") {
@@ -169,7 +175,8 @@ export function readButDoNotEvaluate<
 ): TUnwrappedResolverResult {
   const response = readData<TReadFromStore>(
     reference.readerAst,
-    reference.root
+    reference.root,
+    reference.variables
   );
   console.log("result of read but do not evaluate", { response, reference });
   if (response.kind === "MissingData") {
@@ -190,10 +197,11 @@ type ReadDataResult<TReadFromStore> =
 
 function readData<TReadFromStore>(
   ast: ReaderAst,
-  root: DataId
+  root: DataId,
+  variables: Object | null
 ): ReadDataResult<TReadFromStore> {
-  let existingRecord = store[root];
-  if (existingRecord == null) {
+  let storeRecord = store[root];
+  if (storeRecord == null) {
     return { kind: "MissingData" };
   }
 
@@ -202,7 +210,12 @@ function readData<TReadFromStore>(
   for (const field of ast) {
     switch (field.kind) {
       case "Scalar": {
-        const value = existingRecord[field.response_name];
+        const storeRecordName = formatNameAndArgs(
+          field.response_name,
+          field.arguments,
+          variables
+        );
+        const value = storeRecord[storeRecordName];
         if (value == null) {
           return { kind: "MissingData" };
         }
@@ -210,7 +223,12 @@ function readData<TReadFromStore>(
         break;
       }
       case "Linked": {
-        const value = existingRecord[field.response_name];
+        const storeRecordName = formatNameAndArgs(
+          field.response_name,
+          field.arguments,
+          variables
+        );
+        const value = storeRecord[storeRecordName];
         if (Array.isArray(value)) {
           const results = [];
           for (const item of value) {
@@ -218,7 +236,7 @@ function readData<TReadFromStore>(
             if (link == null) {
               return { kind: "MissingData" };
             }
-            const result = readData(field.selections, link?.__link);
+            const result = readData(field.selections, link?.__link, variables);
             if (result.kind === "MissingData") {
               return { kind: "MissingData" };
             }
@@ -232,7 +250,7 @@ function readData<TReadFromStore>(
           return { kind: "MissingData" };
         }
         const targetId = link.__link;
-        const data = readData(field.selections, targetId);
+        const data = readData(field.selections, targetId, variables);
         if (data.kind === "MissingData") {
           return { kind: "MissingData" };
         }
@@ -241,7 +259,7 @@ function readData<TReadFromStore>(
       }
       case "Resolver": {
         if (field.variant === "Eager") {
-          const data = readData(field.resolver.readerAst, root);
+          const data = readData(field.resolver.readerAst, root, variables);
           if (data.kind === "MissingData") {
             return { kind: "MissingData" };
           } else {
@@ -260,6 +278,7 @@ function readData<TReadFromStore>(
                   readerAst: field.resolver.readerAst,
                   root,
                   resolver: resolver_function,
+                  variables,
                 }}
                 additionalRuntimeProps={additionalRuntimeProps}
               />
@@ -320,3 +339,33 @@ function getRefReaderForName(name: string) {
 export type BoultonComponentProps<TDataType, TOtherProps = Object> = {
   data: TDataType;
 } & TOtherProps;
+
+function formatNameAndArgs(
+  name: string,
+  args: { [index: string]: any } | null,
+  variables: { [index: string]: any } | null
+): string {
+  if (args === null) {
+    return name;
+  }
+  if (variables == null) {
+    throw new Error("Missing variables when args are present");
+  }
+
+  let keys = Object.keys(args ?? {});
+  keys.sort();
+
+  if (keys.length === 0) {
+    return name;
+  } else {
+    let out = name;
+    for (const key of keys) {
+      if (variables[args[key]] == null) {
+        throw new Error("Undefined variable " + args[key]);
+      }
+      out = out + "__" + key + "_" + variables[args[key]];
+    }
+    console.log("out", { out });
+    return out;
+  }
+}

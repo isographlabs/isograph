@@ -6,16 +6,19 @@ const readerAst: ReaderAst = [
     kind: "Scalar",
     response_name: "name",
     alias: null,
+    arguments: null,
   },
   {
     kind: "Scalar",
     response_name: "email",
     alias: null,
+    arguments: null,
   },
   {
     kind: "Scalar",
     response_name: "avatar_url",
     alias: null,
+    arguments: null,
   },
 ];
 

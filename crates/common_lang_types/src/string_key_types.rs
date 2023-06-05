@@ -1,4 +1,5 @@
 use crate::ValidScalarFieldType;
+use intern::string;
 pub use string_key_newtype::StringKeyNewtype;
 
 use super::ValidTypeAnnotationInnerType;
@@ -93,6 +94,7 @@ string_key_conversion!(ScalarFieldName, FieldNameOrAlias);
 string_key_conversion!(LinkedFieldName, FieldNameOrAlias);
 string_key_conversion!(ScalarFieldAlias, FieldNameOrAlias);
 string_key_conversion!(LinkedFieldAlias, FieldNameOrAlias);
+string_key_conversion!(FieldDefinitionName, FieldNameOrAlias);
 
 string_key_newtype!(ResolverDefinitionPath);
 

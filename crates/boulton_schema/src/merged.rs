@@ -3,11 +3,13 @@ use std::collections::{hash_map::Entry, HashMap};
 use boulton_lang_types::{
     FieldSelection, LinkedFieldSelection, ScalarFieldSelection,
     Selection::{self, Field},
-    SelectionSetAndUnwraps,
+    SelectionFieldArgument, SelectionSetAndUnwraps,
 };
 use common_lang_types::{
-    DefinedField, FieldNameOrAlias, TypeWithFieldsId, TypeWithoutFieldsId, WithSpan,
+    DefinedField, FieldDefinitionName, FieldNameOrAlias, StringKeyNewtype, TypeWithFieldsId,
+    TypeWithoutFieldsId, WithSpan,
 };
+use intern::string_key::{Intern, StringKey};
 
 use crate::{SchemaTypeWithFields, ValidatedSchema, ValidatedSelectionSetAndUnwraps};
 
@@ -61,7 +63,12 @@ fn merge_selections_into_set(
                 FieldSelection::ScalarField(scalar_field) => {
                     match &scalar_field.field {
                         DefinedField::ServerField(server_field_id) => {
-                            match merged_selection_set.entry(scalar_field.name.item.into()) {
+                            let normalization_key =
+                                HACK_combine_name_and_variables_into_normalization_alias(
+                                    scalar_field.name.map(|x| x.into()),
+                                    &scalar_field.arguments,
+                                );
+                            match merged_selection_set.entry(normalization_key.item) {
                                 Entry::Occupied(_) => {
                                     // TODO check for merge conflicts, or transform them to not be merge
                                     // conflicts by auto-aliasing and the like.
@@ -114,7 +121,12 @@ fn merge_selections_into_set(
                     };
                 }
                 FieldSelection::LinkedField(linked_field) => {
-                    match merged_selection_set.entry(linked_field.name.item.into()) {
+                    let normalization_key =
+                        HACK_combine_name_and_variables_into_normalization_alias(
+                            linked_field.name.map(|x| x.into()),
+                            &linked_field.arguments,
+                        );
+                    match merged_selection_set.entry(normalization_key.item) {
                         Entry::Occupied(_) => {
                             // TODO check for merge conflicts, or transform them to not be merge
                             // conflicts by auto-aliasing and the like.
@@ -154,5 +166,27 @@ fn merge_selections_into_set(
                 }
             },
         }
+    }
+}
+
+/// In order to avoid requiring a normalization AST, we write the variables
+/// used in the alias. Once we have a normalization AST, we can remove this.
+fn HACK_combine_name_and_variables_into_normalization_alias(
+    name: WithSpan<FieldDefinitionName>,
+    arguments: &[WithSpan<SelectionFieldArgument>],
+) -> WithSpan<FieldNameOrAlias> {
+    if arguments.is_empty() {
+        name.map(|x| x.into())
+    } else {
+        let mut alias_str = name.item.to_string();
+
+        for argument in arguments {
+            alias_str.push_str(&format!(
+                "__{}_{}",
+                argument.item.name.item,
+                &argument.item.value.item.to_string()[1..]
+            ));
+        }
+        name.map(|_| alias_str.intern().into())
     }
 }

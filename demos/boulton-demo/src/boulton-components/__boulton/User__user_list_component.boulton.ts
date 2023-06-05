@@ -7,15 +7,18 @@ const readerAst: ReaderAst = [
     kind: "Scalar",
     response_name: "id",
     alias: null,
+    arguments: null,
   },
   {
     kind: "Scalar",
     response_name: "name",
     alias: null,
+    arguments: null,
   },
   {
     kind: "Resolver",
     alias: "avatar_component",
+    arguments: null,
     resolver: User__avatar_component,
     variant: "Component",
   },

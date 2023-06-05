@@ -24,15 +24,18 @@ const readerAst: ReaderAst = [
     kind: "Linked",
     response_name: "current_user",
     alias: null,
+    arguments: null,
     selections: [
       {
         kind: "Scalar",
         response_name: "id",
         alias: null,
+        arguments: null,
       },
       {
         kind: "Resolver",
         alias: "user_profile_with_details",
+        arguments: null,
         resolver: User__user_profile_with_details,
         variant: "Component",
       },
@@ -67,7 +70,7 @@ type UserResponse = {
   foo: string
 };
 
-const artifact: BoultonFetchableResolver<ResolverParamaterType, ResolverResponse, UserResponse> = {
+const artifact: BoultonFetchableResolver<ResolverParameterType, ResolverResponse, UserResponse> = {
   kind: 'FetchableResolver',
   queryText,
   normalizationAst,
