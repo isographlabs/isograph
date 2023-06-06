@@ -12,7 +12,7 @@ use boulton_lang_types::{
 };
 use boulton_schema::{
     merge_selection_set, MergedSelectionSet, SchemaObject, SchemaTypeWithFields, ValidatedSchema,
-    ValidatedSchemaResolverDefinitionInfo, ValidatedSelectionSetAndUnwraps,
+    ValidatedSchemaResolverDefinitionInfo, ValidatedSelection, ValidatedSelectionSetAndUnwraps,
     ValidatedVariableDefinition,
 };
 use common_lang_types::{
@@ -93,8 +93,8 @@ fn generate_fetchable_resolver_artifact<'schema>(
             &merged_selection_set,
             &resolver_definition.variable_definitions,
         );
-        let query_type_declaration =
-            generate_query_type_declaration(schema, &merged_selection_set, 1)?;
+        let resolver_parameter_type =
+            generate_resolver_parameter_type(schema, &selection_set_and_unwraps.selection_set, 1)?;
         let resolver_import_statement = generate_resolver_import_statement(
             field.name,
             resolver_definition.resolver_definition_path,
@@ -115,7 +115,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
             query_text,
             query_name,
             parent_type: query_type,
-            query_type_declaration,
+            resolver_parameter_type,
             resolver_import_statement,
             resolver_response_type_declaration,
             user_response_type_declaration,
@@ -170,7 +170,7 @@ pub enum Artifact<'schema> {
 }
 
 #[derive(Debug)]
-pub struct QueryTypeDeclaration(pub String);
+pub struct ResolverParameterType(pub String);
 
 #[derive(Debug)]
 pub struct ResolverImportStatement(pub String);
@@ -192,7 +192,7 @@ pub struct FetchableResolver<'schema> {
     pub query_text: QueryText,
     pub query_name: QueryOperationName,
     pub parent_type: SchemaTypeWithFields<'schema>,
-    pub query_type_declaration: QueryTypeDeclaration,
+    pub resolver_parameter_type: ResolverParameterType,
     pub resolver_import_statement: ResolverImportStatement,
     pub resolver_response_type_declaration: ResolverResponseTypeDeclaration,
     pub user_response_type_declaration: UserResponseTypeDeclaration,
@@ -211,7 +211,6 @@ impl<'schema> FetchableResolver<'schema> {
             const queryText = '{}';\n\n\
             const normalizationAst = {{notNeededForDemo: true}};\n\
             const readerAst: ReaderAst = {};\n\n\
-            // The type, when passed to the resolver (currently this is the raw response type, it should be the response type)\n\
             export type ResolverParameterType = {{\n{}}};\n\n\
             // The type, when returned from the resolver\n\
             type ResolverResponse = {{\n  {}\n}};\n\n\
@@ -229,7 +228,7 @@ impl<'schema> FetchableResolver<'schema> {
             nested_resolver_names_to_import_statement(&self.nested_resolver_artifact_imports),
             self.query_text.0,
             self.reader_ast.0,
-            self.query_type_declaration.0,
+            self.resolver_parameter_type.0,
             self.resolver_response_type_declaration.0,
             self.user_response_type_declaration.0,
             "  ",
@@ -479,28 +478,29 @@ fn write_artifacts<'schema>(
     Ok(())
 }
 
-fn generate_query_type_declaration(
+fn generate_resolver_parameter_type(
     schema: &ValidatedSchema,
-    selection_set: &MergedSelectionSet,
+    selection_set: &Vec<WithSpan<ValidatedSelection>>,
     indentation_level: u8,
-) -> Result<QueryTypeDeclaration, GenerateArtifactsError> {
+) -> Result<ResolverParameterType, GenerateArtifactsError> {
     // TODO use unwraps
-    let mut query_type_declaration = String::new();
+    let mut resolver_parameter_type = String::new();
     for selection in selection_set.iter() {
         write_query_types_from_selection(
             schema,
-            &mut query_type_declaration,
+            &mut resolver_parameter_type,
             selection,
             indentation_level,
         )?;
     }
-    Ok(QueryTypeDeclaration(query_type_declaration))
+
+    Ok(ResolverParameterType(resolver_parameter_type))
 }
 
 fn write_query_types_from_selection(
     schema: &ValidatedSchema,
     query_type_declaration: &mut String,
-    selection: &WithSpan<Selection<TypeWithoutFieldsId, TypeWithFieldsId>>,
+    selection: &WithSpan<ValidatedSelection>,
     indentation_level: u8,
 ) -> Result<(), GenerateArtifactsError> {
     query_type_declaration.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
@@ -517,7 +517,7 @@ fn write_query_types_from_selection(
             }
             LinkedField(linked_field) => {
                 let name_or_alias = linked_field.name_or_alias();
-                let inner = generate_query_type_declaration(
+                let inner = generate_resolver_parameter_type(
                     schema,
                     &linked_field.selection_set_and_unwraps.selection_set,
                     indentation_level + 1,

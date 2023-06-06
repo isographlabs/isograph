@@ -1,7 +1,7 @@
 import type {BoultonFetchableResolver, ReaderAst} from '@boulton/react';
 import { user_list_page as resolver } from '../user_list.tsx';
-import User__user_list_component from './User__user_list_component.boulton';
 import Query__some_resolver from './Query__some_resolver.boulton';
+import User__user_list_component from './User__user_list_component.boulton';
 
 const queryText = 'query user_list_page ($bar: String!, $bar2: String!) {\
   byah__foo_bar2: byah(foo: $bar2),\
@@ -54,7 +54,6 @@ const readerAst: ReaderAst = [
   },
 ];
 
-// The type, when passed to the resolver (currently this is the raw response type, it should be the response type)
 export type ResolverParameterType = {
   byah: string,
   byah: string,

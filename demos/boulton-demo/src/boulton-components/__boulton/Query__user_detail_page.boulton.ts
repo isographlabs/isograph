@@ -43,7 +43,6 @@ const readerAst: ReaderAst = [
   },
 ];
 
-// The type, when passed to the resolver (currently this is the raw response type, it should be the response type)
 export type ResolverParameterType = {
   current_user: {
     avatar_url: string,
