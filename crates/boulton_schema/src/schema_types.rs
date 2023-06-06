@@ -52,7 +52,7 @@ pub struct Schema<
     pub string_type: ScalarId,
     // float
     // typename
-    pub query_type: Option<ObjectId>,
+    pub query_type_id: Option<ObjectId>,
     // Subscription
     // Mutation
 }
@@ -89,6 +89,12 @@ impl<
     > {
         &self.fields[field_id.as_usize()]
     }
+
+    pub fn query_object(&self) -> Option<&SchemaObject> {
+        self.query_type_id
+            .as_ref()
+            .map(|id| self.schema_data.object(*id))
+    }
 }
 
 impl UnvalidatedSchema {
@@ -122,7 +128,7 @@ impl UnvalidatedSchema {
             },
             id_type: id_type_id,
             string_type: string_type_id,
-            query_type: None,
+            query_type_id: None,
         }
     }
 }

@@ -70,7 +70,7 @@ impl UnvalidatedSchema {
                 // ----- HACK -----
                 // Instead of this, we should parse GraphQL schema declarations.
                 if object_type_definition.name.item == *QUERY_TYPE {
-                    self.query_type = Some(next_object_id);
+                    self.query_type_id = Some(next_object_id);
                 }
                 // --- END HACK ---
 

@@ -45,17 +45,8 @@ const readerAst: ReaderAst = [
 
 export type ResolverParameterType = {
   current_user: {
-    avatar_url: string,
-    email: string,
     id: string,
-    name: string,
-    billing_details: {
-      address: string,
-      card_brand: string,
-      credit_card_number: string,
-      expiration_date: string,
-      id: string,
-    },
+    user_profile_with_details: string, /* resolver */
   },
 };
 

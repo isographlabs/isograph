@@ -27,7 +27,7 @@ pub(crate) fn generate_artifacts(
     schema: &ValidatedSchema,
     project_root: &PathBuf,
 ) -> Result<String, GenerateArtifactsError> {
-    let query_type = schema.query_type.expect("Expect Query to be defined");
+    let query_type = schema.query_type_id.expect("Expect Query to be defined");
     let query = schema.schema_data.object(query_type);
 
     write_artifacts(get_all_artifacts(query, schema, query_type), project_root)?;
@@ -78,23 +78,26 @@ fn generate_fetchable_resolver_artifact<'schema>(
             schema,
             schema
                 .schema_data
-                .object(schema.query_type.expect("expect query type to exist"))
+                .object(schema.query_type_id.expect("expect query type to exist"))
                 .into(),
             selection_set_and_unwraps,
         );
 
-        let query_object_id = schema.query_type.expect("expected query type to exist");
-        let query_type = schema
-            .schema_data
-            .lookup_type_with_fields(query_object_id.into());
+        let query_object = schema
+            .query_object()
+            .expect("Expected query object to exist");
         let query_text = generate_query_text(
             query_name,
             schema,
             &merged_selection_set,
             &resolver_definition.variable_definitions,
         );
-        let resolver_parameter_type =
-            generate_resolver_parameter_type(schema, &selection_set_and_unwraps.selection_set, 1)?;
+        let resolver_parameter_type = generate_resolver_parameter_type(
+            schema,
+            &selection_set_and_unwraps.selection_set,
+            query_object.into(),
+            1,
+        )?;
         let resolver_import_statement = generate_resolver_import_statement(
             field.name,
             resolver_definition.resolver_definition_path,
@@ -106,7 +109,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
         let reader_ast = generate_reader_ast(
             schema,
             selection_set_and_unwraps,
-            query_type,
+            query_object.into(),
             0,
             &mut nested_resolver_artifact_imports,
         );
@@ -114,7 +117,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
         Ok(FetchableResolver {
             query_text,
             query_name,
-            parent_type: query_type,
+            parent_type: query_object.into(),
             resolver_parameter_type,
             resolver_import_statement,
             resolver_response_type_declaration,
@@ -481,6 +484,7 @@ fn write_artifacts<'schema>(
 fn generate_resolver_parameter_type(
     schema: &ValidatedSchema,
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
+    parent_type: SchemaTypeWithFields,
     indentation_level: u8,
 ) -> Result<ResolverParameterType, GenerateArtifactsError> {
     // TODO use unwraps
@@ -490,6 +494,7 @@ fn generate_resolver_parameter_type(
             schema,
             &mut resolver_parameter_type,
             selection,
+            parent_type,
             indentation_level,
         )?;
     }
@@ -501,6 +506,7 @@ fn write_query_types_from_selection(
     schema: &ValidatedSchema,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
+    parent_type: SchemaTypeWithFields,
     indentation_level: u8,
 ) -> Result<(), GenerateArtifactsError> {
     query_type_declaration.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
@@ -508,18 +514,49 @@ fn write_query_types_from_selection(
     match &selection.item {
         Selection::Field(field) => match field {
             ScalarField(scalar_field) => {
-                let name_or_alias = scalar_field.name_or_alias();
-                let type_ = schema
-                    .schema_data
-                    .lookup_type_without_fields(scalar_field.field)
-                    .javascript_name();
-                query_type_declaration.push_str(&format!("{}: {},\n", name_or_alias, type_));
+                match scalar_field.field {
+                    DefinedField::ServerField(field_id) => {
+                        let name_or_alias = scalar_field.name_or_alias();
+                        let type_ = schema
+                            .schema_data
+                            .lookup_type_without_fields(field_id)
+                            .javascript_name();
+                        query_type_declaration
+                            .push_str(&format!("{}: {},\n", name_or_alias, type_));
+                    }
+                    DefinedField::ResolverField(_) => {
+                        let alias = scalar_field.name_or_alias().item;
+                        // This field is a resolver, so we need to look up the field in the
+                        // schema.
+                        let resolver_field_name = scalar_field.name.item;
+                        let parent_field_id = parent_type
+                            .fields()
+                            .iter()
+                            .find(|parent_field_id| {
+                                let field = schema.field(**parent_field_id);
+                                field.name == resolver_field_name.into()
+                            })
+                            .expect("expect field to exist");
+                        let resolver_field = schema.field(*parent_field_id);
+                        match &resolver_field.field_type {
+                            DefinedField::ServerField(_) => panic!("Expected resolver"),
+                            DefinedField::ResolverField(resolver_field) => {
+                                query_type_declaration
+                                    .push_str(&format!("{}: string, /* resolver */\n", alias,));
+                            }
+                        }
+                    }
+                }
             }
             LinkedField(linked_field) => {
+                let linked_field_type = schema
+                    .schema_data
+                    .lookup_type_with_fields(linked_field.field);
                 let name_or_alias = linked_field.name_or_alias();
                 let inner = generate_resolver_parameter_type(
                     schema,
                     &linked_field.selection_set_and_unwraps.selection_set,
+                    linked_field_type,
                     indentation_level + 1,
                 )?;
                 query_type_declaration.push_str(&format!(
