@@ -6,10 +6,10 @@ use boulton_lang_types::{
     SelectionFieldArgument, SelectionSetAndUnwraps,
 };
 use common_lang_types::{
-    DefinedField, FieldDefinitionName, FieldNameOrAlias, StringKeyNewtype, TypeWithFieldsId,
-    TypeWithoutFieldsId, WithSpan,
+    DefinedField, FieldDefinitionName, FieldNameOrAlias, TypeWithFieldsId, TypeWithoutFieldsId,
+    WithSpan,
 };
-use intern::string_key::{Intern, StringKey};
+use intern::string_key::Intern;
 
 use crate::{SchemaTypeWithFields, ValidatedSchema, ValidatedSelectionSetAndUnwraps};
 

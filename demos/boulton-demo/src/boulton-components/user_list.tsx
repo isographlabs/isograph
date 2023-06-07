@@ -1,7 +1,9 @@
 import * as React from "react";
 import { bDeclare, read } from "@boulton/react";
+import type { ResolverType as QueryUserListPage } from "./__boulton/Query__user_list_page.boulton";
+import type { ResolverType as FooQueryType } from "./__boulton/Query__foo_query.boulton";
 
-export const user_list_page = bDeclare`
+export const user_list_page = bDeclare<QueryUserListPage>`
   Query.user_list_page(
     $bar: String!,
     $bar2: String!,
@@ -13,6 +15,15 @@ export const user_list_page = bDeclare`
     },
   }
 `;
+
+export const foo_query = bDeclare<FooQueryType>`
+  Query.foo_query @fetchable {
+    users {
+      id,
+      name,
+    },
+  }
+`(function FooQuery(param) {});
 
 export const user_list_component = bDeclare`
   User.user_list_component @component {

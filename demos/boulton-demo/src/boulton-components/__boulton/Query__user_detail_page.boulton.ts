@@ -51,7 +51,7 @@ export type ResolverParameterType = {
 };
 
 // The type, when returned from the resolver
-type ResolverResponse = {
+type ResolverReturnType = {
   foo: string
 };
 
@@ -60,7 +60,12 @@ export type ReadOutType = {
   foo: string
 };
 
-const artifact: BoultonFetchableResolver<ResolverParameterType, ResolverResponse, UserResponse> = {
+export type ResolverType = {
+  readOut: ReadOutType,
+  resolverReturn: ResolverReturnType,
+  resolverParameter: ResolverParameterType,
+}
+const artifact: BoultonFetchableResolver<ResolverParameterType, ResolverReturnType, ReadOutType> = {
   kind: 'FetchableResolver',
   queryText,
   normalizationAst,

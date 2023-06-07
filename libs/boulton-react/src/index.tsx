@@ -98,8 +98,28 @@ export type FragmentReference<
   variables: Object | null;
 };
 
-export function bDeclare(queryText: TemplateStringsArray) {
-  return (x: any) => x;
+interface Resolver<TReadOut, TResolverReturn, TResolverParameter> {
+  readOut: TReadOut;
+  resolverReturn: TResolverReturn;
+  resolverParameter: TResolverParameter;
+}
+
+export function bDeclare<T extends Resolver<any, any, any>>(
+  queryText: TemplateStringsArray
+) {
+  // The name `identity` here is a bit of a double entendre.
+  // First, it is the identity function, constrained to operate
+  // on a very specific type. Thus, the value of b Declare`...`(
+  // someFunction) is someFunction. But furthermore, if one
+  // write b Declare`...` and passes no function, the resolver itself
+  // is the identity function. At that point, the types
+  // T['resolverParameter'] and T['resolverReturn'] must be identical.
+
+  return function identity(
+    x: (param: T["resolverParameter"]) => T["resolverReturn"]
+  ): (param: T["resolverParameter"]) => T["resolverReturn"] {
+    return x;
+  };
 }
 
 export function useLazyReference<

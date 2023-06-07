@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
+    collections::{hash_map::Entry, HashMap},
     fmt::Debug,
     fs::{self, File},
     io::{self, Write},
@@ -11,7 +11,7 @@ use boulton_lang_types::{
     NonConstantValue, Selection, SelectionFieldArgument,
 };
 use boulton_schema::{
-    merge_selection_set, MergedSelectionSet, SchemaObject, SchemaTypeWithFields, ValidatedSchema,
+    merge_selection_set, MergedSelectionSet, SchemaTypeWithFields, ValidatedSchema,
     ValidatedSchemaResolverDefinitionInfo, ValidatedSelection, ValidatedSelectionSetAndUnwraps,
     ValidatedVariableDefinition,
 };
@@ -28,15 +28,13 @@ pub(crate) fn generate_artifacts(
     project_root: &PathBuf,
 ) -> Result<String, GenerateArtifactsError> {
     let query_type = schema.query_type_id.expect("Expect Query to be defined");
-    let query = schema.schema_data.object(query_type);
 
-    write_artifacts(get_all_artifacts(query, schema, query_type), project_root)?;
+    write_artifacts(get_all_artifacts(schema, query_type), project_root)?;
 
     Ok("".into())
 }
 
 fn get_all_artifacts<'schema>(
-    query: &'schema SchemaObject,
     schema: &'schema ValidatedSchema,
     query_type: ObjectId,
 ) -> impl Iterator<Item = Result<Artifact<'schema>, GenerateArtifactsError>> + 'schema {
@@ -105,8 +103,9 @@ fn generate_fetchable_resolver_artifact<'schema>(
             resolver_definition.resolver_definition_path,
         );
         let resolver_response_type_declaration =
-            ResolverResponseTypeDeclaration("foo: string".to_string());
-        let user_response_type_declaration = UserResponseTypeDeclaration("foo: string".to_string());
+            ResolverReturnTypeTypeDeclaration("foo: string".to_string());
+        let user_response_type_declaration =
+            ResolverReadOutTypeDeclaration("foo: string".to_string());
         let reader_ast = generate_reader_ast(
             schema,
             selection_set_and_unwraps,
@@ -122,7 +121,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
             resolver_parameter_type,
             resolver_import_statement,
             resolver_response_type_declaration,
-            user_response_type_declaration,
+            resolver_read_out_type_declaration: user_response_type_declaration,
             reader_ast,
             nested_resolver_artifact_imports,
         })
@@ -180,10 +179,10 @@ pub struct ResolverParameterType(pub String);
 pub struct ResolverImportStatement(pub String);
 
 #[derive(Debug)]
-pub struct ResolverResponseTypeDeclaration(pub String);
+pub struct ResolverReturnTypeTypeDeclaration(pub String);
 
 #[derive(Debug)]
-pub struct UserResponseTypeDeclaration(pub String);
+pub struct ResolverReadOutTypeDeclaration(pub String);
 
 #[derive(Debug)]
 pub struct ReaderAst(pub String);
@@ -198,8 +197,8 @@ pub struct FetchableResolver<'schema> {
     pub parent_type: SchemaTypeWithFields<'schema>,
     pub resolver_parameter_type: ResolverParameterType,
     pub resolver_import_statement: ResolverImportStatement,
-    pub resolver_response_type_declaration: ResolverResponseTypeDeclaration,
-    pub user_response_type_declaration: UserResponseTypeDeclaration,
+    pub resolver_response_type_declaration: ResolverReturnTypeTypeDeclaration,
+    pub resolver_read_out_type_declaration: ResolverReadOutTypeDeclaration,
     pub reader_ast: ReaderAst,
     pub nested_resolver_artifact_imports: HashMap<NestedResolverName, ResolverImport>,
 }
@@ -217,10 +216,15 @@ impl<'schema> FetchableResolver<'schema> {
             const readerAst: ReaderAst = {};\n\n\
             export type ResolverParameterType = {{\n{}}};\n\n\
             // The type, when returned from the resolver\n\
-            type ResolverResponse = {{\n  {}\n}};\n\n\
+            type ResolverReturnType = {{\n  {}\n}};\n\n\
             // The type, when read out\n\
             export type ReadOutType = {{\n  {}\n}};\n\n\
-            const artifact: BoultonFetchableResolver<ResolverParameterType, ResolverResponse, UserResponse> = {{\n\
+            export type ResolverType = {{\n\
+            {}readOut: ReadOutType,\n\
+            {}resolverReturn: ResolverReturnType,\n\
+            {}resolverParameter: ResolverParameterType,\n\
+            }}\n\
+            const artifact: BoultonFetchableResolver<ResolverParameterType, ResolverReturnType, ReadOutType> = {{\n\
             {}kind: 'FetchableResolver',\n\
             {}queryText,\n\
             {}normalizationAst,\n\
@@ -234,7 +238,10 @@ impl<'schema> FetchableResolver<'schema> {
             self.reader_ast.0,
             self.resolver_parameter_type.0,
             self.resolver_response_type_declaration.0,
-            self.user_response_type_declaration.0,
+            self.resolver_read_out_type_declaration.0,
+            "  ",
+            "  ",
+            "  ",
             "  ",
             "  ",
             "  ",
