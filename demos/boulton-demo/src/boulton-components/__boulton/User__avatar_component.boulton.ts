@@ -1,6 +1,9 @@
 import type {BoultonNonFetchableResolver, ReaderAst} from '@boulton/react';
 import { avatar_component as resolver } from '../avatar.tsx';
 
+// TODO generate actual types
+export type ReadOutType = string;
+
 const readerAst: ReaderAst = [
   {
     kind: "Scalar",

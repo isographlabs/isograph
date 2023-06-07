@@ -1,6 +1,6 @@
 import type {BoultonFetchableResolver, ReaderAst} from '@boulton/react';
 import { user_detail_page as resolver } from '../user_detail_page.tsx';
-import User__user_profile_with_details, { ResolverOutputType as User__user_profile_with_details__outputType } from './User__user_profile_with_details.boulton';
+import User__user_profile_with_details, { ReadOutType as User__user_profile_with_details__outputType } from './User__user_profile_with_details.boulton';
 
 const queryText = 'query user_detail_page  {\
   current_user {\
@@ -56,7 +56,7 @@ type ResolverResponse = {
 };
 
 // The type, when read out
-type UserResponse = {
+export type ReadOutType = {
   foo: string
 };
 

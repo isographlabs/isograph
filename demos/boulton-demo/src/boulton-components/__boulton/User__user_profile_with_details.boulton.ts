@@ -3,6 +3,9 @@ import { user_profile_with_details as resolver } from '../user_detail_page.tsx';
 import User__avatar_component from './User__avatar_component.boulton';
 import BillingDetails__billing_details_component from './BillingDetails__billing_details_component.boulton';
 
+// TODO generate actual types
+export type ReadOutType = string;
+
 const readerAst: ReaderAst = [
   {
     kind: "Scalar",

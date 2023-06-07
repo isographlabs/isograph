@@ -1,6 +1,6 @@
 import type {BoultonFetchableResolver, ReaderAst} from '@boulton/react';
 import { user_list_page as resolver } from '../user_list.tsx';
-import User__user_list_component, { ResolverOutputType as User__user_list_component__outputType } from './User__user_list_component.boulton';
+import User__user_list_component, { ReadOutType as User__user_list_component__outputType } from './User__user_list_component.boulton';
 
 const queryText = 'query user_list_page ($bar: String!, $bar2: String!) {\
   byah__foo_bar: byah(foo: $bar),\
@@ -59,7 +59,7 @@ type ResolverResponse = {
 };
 
 // The type, when read out
-type UserResponse = {
+export type ReadOutType = {
   foo: string
 };
 

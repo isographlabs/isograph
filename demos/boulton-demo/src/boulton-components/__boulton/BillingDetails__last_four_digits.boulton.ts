@@ -1,6 +1,9 @@
 import type {BoultonNonFetchableResolver, ReaderAst} from '@boulton/react';
 import { last_four_digits as resolver } from '../last_four_digits.ts';
 
+// TODO generate actual types
+export type ReadOutType = string;
+
 const readerAst: ReaderAst = [
   {
     kind: "Scalar",

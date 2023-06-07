@@ -2,6 +2,9 @@ import type {BoultonNonFetchableResolver, ReaderAst} from '@boulton/react';
 import { billing_details_component as resolver } from '../billing_details_component.tsx';
 import BillingDetails__last_four_digits from './BillingDetails__last_four_digits.boulton';
 
+// TODO generate actual types
+export type ReadOutType = string;
+
 const readerAst: ReaderAst = [
   {
     kind: "Scalar",

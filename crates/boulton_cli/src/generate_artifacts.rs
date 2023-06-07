@@ -219,7 +219,7 @@ impl<'schema> FetchableResolver<'schema> {
             // The type, when returned from the resolver\n\
             type ResolverResponse = {{\n  {}\n}};\n\n\
             // The type, when read out\n\
-            type UserResponse = {{\n  {}\n}};\n\n\
+            export type ReadOutType = {{\n  {}\n}};\n\n\
             const artifact: BoultonFetchableResolver<ResolverParameterType, ResolverResponse, UserResponse> = {{\n\
             {}kind: 'FetchableResolver',\n\
             {}queryText,\n\
@@ -259,6 +259,8 @@ impl<'schema> NonFetchableResolver<'schema> {
             "import type {{BoultonNonFetchableResolver, ReaderAst}} from '@boulton/react';\n\
             {}\n\
             {}\n\
+            // TODO generate actual types\n\
+            export type ReadOutType = string;\n\n\
             const readerAst: ReaderAst = {};\n\n\
             const artifact: BoultonNonFetchableResolver = {{\n\
             {}kind: 'NonFetchableResolver',\n\
@@ -555,9 +557,7 @@ fn write_query_types_from_selection(
                                 match nested_resolver_imports.entry(resolver_import_name.clone()) {
                                     Entry::Occupied(mut occupied) => {
                                         occupied.get_mut().types.push(ResolverImportType {
-                                            original: ResolverImportName(
-                                                "ResolverOutputType".to_string(),
-                                            ),
+                                            original: ResolverImportName("ReadOutType".to_string()),
                                             alias: ResolverImportAlias(format!(
                                                 "{}__outputType",
                                                 resolver_import_name.0
@@ -569,7 +569,7 @@ fn write_query_types_from_selection(
                                             default_import: false,
                                             types: vec![ResolverImportType {
                                                 original: ResolverImportName(
-                                                    "ResolverOutputType".to_string(),
+                                                    "ReadOutType".to_string(),
                                                 ),
                                                 alias: ResolverImportAlias(format!(
                                                     "{}__outputType",

@@ -2,7 +2,7 @@ import * as React from "react";
 import { bDeclare, read } from "@boulton/react";
 
 // TODO @component seems to have no effect?
-export const user_page_with_details = bDeclare`
+export const user_detail_page = bDeclare`
   Query.user_detail_page @component @fetchable {
     current_user {
       id,
