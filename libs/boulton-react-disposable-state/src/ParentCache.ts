@@ -63,6 +63,9 @@ export class ParentCache<T> {
         // - then, the temporary retain of CacheItem A is disposed or expires.
         //
         // At this point, we don't want to delete CacheItem B from the cache.
+        //
+        // TODO consider what happens if items are === comparable to each other,
+        // e.g. the item is a number!
         if (this.__cacheItem === pair[0]) {
           this.empty();
         }

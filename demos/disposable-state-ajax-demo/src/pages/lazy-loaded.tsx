@@ -1,6 +1,5 @@
 import Head from "next/head";
 
-import "bootstrap/dist/css/bootstrap.css";
 import { LazyLoadPostsWrapper } from "@/components/LazyLoadPostsPage";
 
 export default function Home() {

@@ -1,6 +1,6 @@
 import type {BoultonFetchableResolver, ReaderAst} from '@boulton/react';
 import { user_detail_page as resolver } from '../user_detail_page.tsx';
-import User__user_profile_with_details from './User__user_profile_with_details.boulton';
+import User__user_profile_with_details, { ResolverOutputType as User__user_profile_with_details__outputType } from './User__user_profile_with_details.boulton';
 
 const queryText = 'query user_detail_page  {\
   current_user {\
@@ -46,7 +46,7 @@ const readerAst: ReaderAst = [
 export type ResolverParameterType = {
   current_user: {
     id: string,
-    user_profile_with_details: string, /* resolver */
+    user_profile_with_details: User__user_profile_with_details__outputType,
   },
 };
 

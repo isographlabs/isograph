@@ -1,9 +1,9 @@
 "use strict";
 
 import { useEffect, useState } from "react";
-import type { CleanupFn } from "@boulton/disposable-types";
 import { ParentCache } from "./ParentCache";
 import { useHasCommittedRef } from "./useHasCommittedRef";
+import { ItemCleanupPair } from "@boulton/boulton-disposable-types/dist";
 
 /**
  * usePrecommitValue<T>
@@ -38,14 +38,14 @@ import { useHasCommittedRef } from "./useHasCommittedRef";
  */
 export function useCachedPrecommitValue<T>(
   parentCache: ParentCache<T>,
-  onCommit: (pair: [T, CleanupFn]) => void
+  onCommit: (pair: ItemCleanupPair<T>) => void
 ): { state: T } | null {
-  const hasCommittedRef = useHasCommittedRef();
-
-  // TODO: Consider whether we always want to rerender if the committed item
-  // was not returned during the last render, or whether some callers will
-  // prefer opting out of this behavior (e.g. if every disposable item behaves
-  // identically, but must be loaded.)
+  // TODO: there should be two APIs. One in which we always re-render if the
+  // committed item was not returned during the last render, and one in which
+  // we do not. The latter is useful for cases where every disposable item
+  // behaves identically, but must be loaded.
+  //
+  // This hook is the former, i.e. re-renders if the committed item has changed.
   const [, rerender] = useState<{} | null>(null);
 
   useEffect(() => {
@@ -90,6 +90,7 @@ export function useCachedPrecommitValue<T>(
     }
   }, []);
 
+  const hasCommittedRef = useHasCommittedRef();
   if (hasCommittedRef.current) {
     return null;
   }

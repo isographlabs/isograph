@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{hash_map::Entry, HashMap, HashSet},
     fmt::Debug,
     fs::{self, File},
     io::{self, Write},
@@ -92,10 +92,12 @@ fn generate_fetchable_resolver_artifact<'schema>(
             &merged_selection_set,
             &resolver_definition.variable_definitions,
         );
+        let mut nested_resolver_artifact_imports = HashMap::new();
         let resolver_parameter_type = generate_resolver_parameter_type(
             schema,
             &selection_set_and_unwraps.selection_set,
             query_object.into(),
+            &mut nested_resolver_artifact_imports,
             1,
         )?;
         let resolver_import_statement = generate_resolver_import_statement(
@@ -105,7 +107,6 @@ fn generate_fetchable_resolver_artifact<'schema>(
         let resolver_response_type_declaration =
             ResolverResponseTypeDeclaration("foo: string".to_string());
         let user_response_type_declaration = UserResponseTypeDeclaration("foo: string".to_string());
-        let mut nested_resolver_artifact_imports = HashSet::new();
         let reader_ast = generate_reader_ast(
             schema,
             selection_set_and_unwraps,
@@ -140,7 +141,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
         let parent_type = schema
             .schema_data
             .lookup_type_with_fields(field.parent_type_id);
-        let mut nested_resolver_artifact_imports = HashSet::new();
+        let mut nested_resolver_artifact_imports = HashMap::new();
         let reader_ast = generate_reader_ast(
             schema,
             selection_set_and_unwraps,
@@ -187,7 +188,7 @@ pub struct UserResponseTypeDeclaration(pub String);
 #[derive(Debug)]
 pub struct ReaderAst(pub String);
 
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct NestedResolverName(pub String);
 
 #[derive(Debug)]
@@ -200,7 +201,7 @@ pub struct FetchableResolver<'schema> {
     pub resolver_response_type_declaration: ResolverResponseTypeDeclaration,
     pub user_response_type_declaration: UserResponseTypeDeclaration,
     pub reader_ast: ReaderAst,
-    pub nested_resolver_artifact_imports: HashSet<NestedResolverName>,
+    pub nested_resolver_artifact_imports: HashMap<NestedResolverName, ResolverImport>,
 }
 
 impl<'schema> FetchableResolver<'schema> {
@@ -247,7 +248,7 @@ impl<'schema> FetchableResolver<'schema> {
 pub struct NonFetchableResolver<'schema> {
     pub parent_type: SchemaTypeWithFields<'schema>,
     pub resolver_field_name: FieldDefinitionName,
-    pub nested_resolver_artifact_imports: HashSet<NestedResolverName>,
+    pub nested_resolver_artifact_imports: HashMap<NestedResolverName, ResolverImport>,
     pub reader_ast: ReaderAst,
     pub resolver_import_statement: ResolverImportStatement,
 }
@@ -485,6 +486,7 @@ fn generate_resolver_parameter_type(
     schema: &ValidatedSchema,
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
     parent_type: SchemaTypeWithFields,
+    nested_resolver_imports: &mut HashMap<NestedResolverName, ResolverImport>,
     indentation_level: u8,
 ) -> Result<ResolverParameterType, GenerateArtifactsError> {
     // TODO use unwraps
@@ -495,6 +497,7 @@ fn generate_resolver_parameter_type(
             &mut resolver_parameter_type,
             selection,
             parent_type,
+            nested_resolver_imports,
             indentation_level,
         )?;
     }
@@ -507,6 +510,7 @@ fn write_query_types_from_selection(
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
     parent_type: SchemaTypeWithFields,
+    nested_resolver_imports: &mut HashMap<NestedResolverName, ResolverImport>,
     indentation_level: u8,
 ) -> Result<(), GenerateArtifactsError> {
     query_type_declaration.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
@@ -540,9 +544,46 @@ fn write_query_types_from_selection(
                         let resolver_field = schema.field(*parent_field_id);
                         match &resolver_field.field_type {
                             DefinedField::ServerField(_) => panic!("Expected resolver"),
-                            DefinedField::ResolverField(resolver_field) => {
-                                query_type_declaration
-                                    .push_str(&format!("{}: string, /* resolver */\n", alias,));
+                            DefinedField::ResolverField(_) => {
+                                // TODO make this part of the ResolverField payload
+                                let resolver_import_name = NestedResolverName(format!(
+                                    "{}__{}",
+                                    parent_type.name(),
+                                    resolver_field_name
+                                ));
+                                // Why does entry consume its argument?
+                                match nested_resolver_imports.entry(resolver_import_name.clone()) {
+                                    Entry::Occupied(mut occupied) => {
+                                        occupied.get_mut().types.push(ResolverImportType {
+                                            original: ResolverImportName(
+                                                "ResolverOutputType".to_string(),
+                                            ),
+                                            alias: ResolverImportAlias(format!(
+                                                "{}__outputType",
+                                                resolver_import_name.0
+                                            )),
+                                        });
+                                    }
+                                    Entry::Vacant(vacant) => {
+                                        vacant.insert(ResolverImport {
+                                            default_import: false,
+                                            types: vec![ResolverImportType {
+                                                original: ResolverImportName(
+                                                    "ResolverOutputType".to_string(),
+                                                ),
+                                                alias: ResolverImportAlias(format!(
+                                                    "{}__outputType",
+                                                    resolver_import_name.0
+                                                )),
+                                            }],
+                                        });
+                                    }
+                                }
+
+                                query_type_declaration.push_str(&format!(
+                                    "{}: {}__outputType,\n",
+                                    alias, resolver_import_name.0
+                                ));
                             }
                         }
                     }
@@ -557,6 +598,7 @@ fn write_query_types_from_selection(
                     schema,
                     &linked_field.selection_set_and_unwraps.selection_set,
                     linked_field_type,
+                    nested_resolver_imports,
                     indentation_level + 1,
                 )?;
                 query_type_declaration.push_str(&format!(
@@ -582,12 +624,28 @@ fn generate_resolver_import_statement(
     ))
 }
 
+#[derive(Debug)]
+struct ResolverImportName(pub String);
+#[derive(Debug)]
+struct ResolverImportAlias(pub String);
+
+#[derive(Debug)]
+pub struct ResolverImportType {
+    original: ResolverImportName,
+    alias: ResolverImportAlias,
+}
+#[derive(Debug)]
+pub struct ResolverImport {
+    default_import: bool,
+    types: Vec<ResolverImportType>,
+}
+
 fn generate_reader_ast<'schema>(
     schema: &'schema ValidatedSchema,
     selection_set_and_unwraps: &'schema ValidatedSelectionSetAndUnwraps,
     parent_type: SchemaTypeWithFields<'schema>,
     indentation_level: u8,
-    nested_resolver_imports: &mut HashSet<NestedResolverName>,
+    nested_resolver_imports: &mut HashMap<NestedResolverName, ResolverImport>,
 ) -> ReaderAst {
     let mut reader_ast = "[\n".to_string();
     for item in &selection_set_and_unwraps.selection_set {
@@ -609,7 +667,7 @@ fn generate_reader_ast_node(
     parent_type: SchemaTypeWithFields,
     schema: &ValidatedSchema,
     indentation_level: u8,
-    nested_resolver_imports: &mut HashSet<NestedResolverName>,
+    nested_resolver_imports: &mut HashMap<NestedResolverName, ResolverImport>,
 ) -> String {
     match &item.item {
         Selection::Field(field) => match field {
@@ -654,6 +712,7 @@ fn generate_reader_ast_node(
                         match &resolver_field.field_type {
                             DefinedField::ServerField(_) => panic!("Expected resolver"),
                             DefinedField::ResolverField(resolver_field) => {
+                                // TODO move me to the SchemaResolverDefinitionInfo
                                 let resolver_import_name = NestedResolverName(format!(
                                     "{}__{}",
                                     parent_type.name(),
@@ -677,7 +736,17 @@ fn generate_reader_ast_node(
                                     resolver_field.variant.map(|x| format!("\"{}\"", x)).unwrap_or_else(|| "null".to_string()),
                                     "  ".repeat(indentation_level as usize),
                                 );
-                                nested_resolver_imports.insert(resolver_import_name);
+                                match nested_resolver_imports.entry(resolver_import_name) {
+                                    Entry::Occupied(mut occupied) => {
+                                        occupied.get_mut().default_import = true;
+                                    }
+                                    Entry::Vacant(vacant) => {
+                                        vacant.insert(ResolverImport {
+                                            default_import: true,
+                                            types: vec![],
+                                        });
+                                    }
+                                }
                                 res
                             }
                         }
@@ -720,16 +789,34 @@ fn generate_reader_ast_node(
 }
 
 fn nested_resolver_names_to_import_statement(
-    nested_resolver_imports: &HashSet<NestedResolverName>,
+    nested_resolver_imports: &HashMap<NestedResolverName, ResolverImport>,
 ) -> String {
-    let mut s = String::new();
-    for import in nested_resolver_imports {
-        s.push_str(&format!(
-            "import {} from './{}.boulton';\n",
-            import.0, import.0
-        ));
+    let mut overall = String::new();
+    for (nested_resolver_name, resolver_import) in nested_resolver_imports {
+        if !resolver_import.default_import && resolver_import.types.is_empty() {
+            continue;
+        }
+
+        let mut s = "import ".to_string();
+        if resolver_import.default_import {
+            s.push_str(&format!("{}", nested_resolver_name.0));
+        }
+        let mut types = resolver_import.types.iter();
+        if let Some(first) = types.next() {
+            if resolver_import.default_import {
+                s.push_str(",");
+            }
+            s.push_str(" { ");
+            s.push_str(&format!("{} as {} ", first.original.0, first.alias.0));
+            for value in types {
+                s.push_str(&format!(", {} as {} ", value.original.0, value.alias.0));
+            }
+            s.push_str("}");
+        }
+        s.push_str(&format!(" from './{}.boulton';\n", nested_resolver_name.0));
+        overall.push_str(&s);
     }
-    s
+    overall
 }
 
 fn get_serialized_arguments(arguments: &[WithSpan<SelectionFieldArgument>]) -> String {
