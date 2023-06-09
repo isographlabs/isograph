@@ -3,10 +3,10 @@ import { user_profile_with_details as resolver } from '../user_detail_page.tsx';
 import BillingDetails__billing_details_component from './BillingDetails__billing_details_component.boulton';
 import User__avatar_component from './User__avatar_component.boulton';
 
-// TODO generate actual types
-export type ReadOutType = string;
+// the type, when read out (either via useLazyReference or via graph)
+export type ReadOutType = React.FC<{ data: ResolverParameterType } & Object>;
 
-const readerAst: ReaderAst<ResolverParameterType> = [
+const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Scalar",
     response_name: "id",
@@ -59,6 +59,7 @@ const artifact: BoultonNonFetchableResolver = {
   kind: 'NonFetchableResolver',
   resolver,
   readerAst,
-};
+  convert: (x) => x,
+            };
 
 export default artifact;

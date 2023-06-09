@@ -117,12 +117,21 @@ export function bDeclare<
 
 export function useLazyReference<
   TReadFromStore extends Object,
+  TResolverProps,
   TResolverResult
 >(
-  artifact: BoultonFetchableResolver<TReadFromStore, unknown, TResolverResult>,
+  artifact: BoultonFetchableResolver<
+    TReadFromStore,
+    TResolverProps,
+    FragmentReference<TReadFromStore, TResolverProps, TResolverResult>
+  >,
   variables: object
 ): {
-  queryReference: FragmentReference<TReadFromStore, unknown, TResolverResult>;
+  queryReference: FragmentReference<
+    TReadFromStore,
+    TResolverProps,
+    TResolverResult
+  >;
 } {
   // Typechecking fails here... TODO investigate
   const cache = getOrCreateCacheForUrl<TResolverResult>(

@@ -12,8 +12,11 @@ const queryText = 'query user_list_page ($bar: String!) {\
   },\
 }';
 
+// TODO support changing this,
+export type ReadFromStoreType = ResolverParameterType;
+
 const normalizationAst = {notNeededForDemo: true};
-const readerAst: ReaderAst<ResolverParameterType> = [
+const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Scalar",
     response_name: "byah",
@@ -57,15 +60,15 @@ export type ResolverParameterType = {
 export type ResolverReturnType = ResolverParameterType;
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = FragmentReference<ResolverParameterType, ResolverReturnType, TReadOutType>;
+export type ReadOutType = FragmentReference<ReadFromStoreType, ResolverParameterType, ResolverReturnType>;
 
-const artifact: BoultonFetchableResolver<ResolverParameterType, ResolverReturnType, ReadOutType> = {
+const artifact: BoultonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
   kind: 'FetchableResolver',
   queryText,
   normalizationAst,
   readerAst,
   resolver: resolver as any,
-convert: (x) => { return x; },
+  convert: (x) => { return x; },
 };
 
 export default artifact;

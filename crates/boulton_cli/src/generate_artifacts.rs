@@ -144,6 +144,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
             0,
             &mut nested_resolver_artifact_imports,
         );
+        let resolver_read_out_type = generate_read_out_type(resolver_definition);
         let resolver_import_statement = generate_resolver_import_statement(
             field.name,
             resolver_definition.resolver_definition_path,
@@ -156,6 +157,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
             reader_ast,
             nested_resolver_artifact_imports,
             resolver_import_statement,
+            resolver_read_out_type,
         })
     } else {
         panic!("Unsupported: resolvers not on query with no selection set")
@@ -205,19 +207,21 @@ impl<'schema> FetchableResolver<'schema> {
             {}\n\
             {}\n\
             const queryText = '{}';\n\n\
+            // TODO support changing this,\n\
+            export type ReadFromStoreType = ResolverParameterType;\n\n\
             const normalizationAst = {{notNeededForDemo: true}};\n\
-            const readerAst: ReaderAst<ResolverParameterType> = {};\n\n\
+            const readerAst: ReaderAst<ReadFromStoreType> = {};\n\n\
             export type ResolverParameterType = {{\n{}}};\n\n\
             // The type, when returned from the resolver\n\
             export type ResolverReturnType = {};\n\n\
             {}\n\n\
-            const artifact: BoultonFetchableResolver<ResolverParameterType, ResolverReturnType, ReadOutType> = {{\n\
+            const artifact: BoultonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {{\n\
             {}kind: 'FetchableResolver',\n\
             {}queryText,\n\
             {}normalizationAst,\n\
             {}readerAst,\n\
             {}resolver: resolver as any,\n\
-              convert: (x) => {{ return x; }},\n\
+            {}convert: (x) => {{ return x; }},\n\
             }};\n\n\
             export default artifact;\n",
             self.resolver_import_statement.0,
@@ -227,6 +231,7 @@ impl<'schema> FetchableResolver<'schema> {
             self.resolver_parameter_type.0,
             self.resolver_return_type.0,
             get_read_out_type_text(self.resolver_read_out_type),
+            "  ",
             "  ",
             "  ",
             "  ",
@@ -245,6 +250,7 @@ pub struct NonFetchableResolver<'schema> {
     pub parent_type: SchemaTypeWithFields<'schema>,
     pub resolver_field_name: FieldDefinitionName,
     pub nested_resolver_artifact_imports: HashMap<TypeAndField, ResolverImport>,
+    pub resolver_read_out_type: ResolverReadOutType,
     pub reader_ast: ReaderAst,
     pub resolver_import_statement: ResolverImportStatement,
 }
@@ -255,21 +261,23 @@ impl<'schema> NonFetchableResolver<'schema> {
             "import type {{BoultonNonFetchableResolver, ReaderAst}} from '@boulton/react';\n\
             {}\n\
             {}\n\
-            // TODO generate actual types\n\
-            export type ReadOutType = string;\n\n\
-            const readerAst: ReaderAst<ResolverParameterType> = {};\n\n\
+            {}\n\n\
+            const readerAst: ReaderAst<ReadFromStoreType> = {};\n\n\
             const artifact: BoultonNonFetchableResolver = {{\n\
             {}kind: 'NonFetchableResolver',\n\
             {}resolver,\n\
             {}readerAst,\n\
+            {}convert: (x) => x,
             }};\n\n\
             export default artifact;\n",
             self.resolver_import_statement.0,
             nested_resolver_names_to_import_statement(self.nested_resolver_artifact_imports),
+            get_read_out_type_text(self.resolver_read_out_type),
             self.reader_ast.0,
             "  ",
             "  ",
             "  ",
+            "  "
         )
     }
 }
@@ -879,7 +887,7 @@ fn generate_read_out_type(
             ResolverVariant::Eager => ResolverReadOutType("ResolverReturnType".to_string()),
         },
         None => ResolverReadOutType(
-            "FragmentReference<ResolverParameterType, ResolverReturnType, TReadOutType>"
+            "FragmentReference<ReadFromStoreType, ResolverParameterType, ResolverReturnType>"
                 .to_string(),
         ),
     }

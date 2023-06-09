@@ -8,8 +8,11 @@ const queryText = 'query foo_query  {\
   },\
 }';
 
+// TODO support changing this,
+export type ReadFromStoreType = ResolverParameterType;
+
 const normalizationAst = {notNeededForDemo: true};
-const readerAst: ReaderAst<ResolverParameterType> = [
+const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Linked",
     response_name: "users",
@@ -43,15 +46,15 @@ export type ResolverParameterType = {
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = FragmentReference<ResolverParameterType, ResolverReturnType, TReadOutType>;
+export type ReadOutType = FragmentReference<ReadFromStoreType, ResolverParameterType, ResolverReturnType>;
 
-const artifact: BoultonFetchableResolver<ResolverParameterType, ResolverReturnType, ReadOutType> = {
+const artifact: BoultonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
   kind: 'FetchableResolver',
   queryText,
   normalizationAst,
   readerAst,
   resolver: resolver as any,
-convert: (x) => { return x; },
+  convert: (x) => { return x; },
 };
 
 export default artifact;

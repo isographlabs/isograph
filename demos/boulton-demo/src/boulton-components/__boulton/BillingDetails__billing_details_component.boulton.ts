@@ -2,10 +2,10 @@ import type {BoultonNonFetchableResolver, ReaderAst} from '@boulton/react';
 import { billing_details_component as resolver } from '../billing_details_component.tsx';
 import BillingDetails__last_four_digits from './BillingDetails__last_four_digits.boulton';
 
-// TODO generate actual types
-export type ReadOutType = string;
+// the type, when read out (either via useLazyReference or via graph)
+export type ReadOutType = React.FC<{ data: ResolverParameterType } & Object>;
 
-const readerAst: ReaderAst<ResolverParameterType> = [
+const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Scalar",
     response_name: "id",
@@ -49,6 +49,7 @@ const artifact: BoultonNonFetchableResolver = {
   kind: 'NonFetchableResolver',
   resolver,
   readerAst,
-};
+  convert: (x) => x,
+            };
 
 export default artifact;
