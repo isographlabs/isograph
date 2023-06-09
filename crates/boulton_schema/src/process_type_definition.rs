@@ -5,7 +5,8 @@ use common_lang_types::{
     TypeId, TypeWithFieldsId, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
-    ObjectTypeDefinition, OutputFieldDefinition, TypeSystemDefinition, TypeSystemDocument,
+    ObjectTypeDefinition, OutputFieldDefinition, TypeAnnotation, TypeSystemDefinition,
+    TypeSystemDocument,
 };
 use intern::string_key::Intern;
 use lazy_static::lazy_static;
@@ -92,24 +93,27 @@ fn get_field_objects_ids_and_names(
 ) -> ProcessTypeDefinitionResult<(
     Vec<UnvalidatedSchemaField>,
     Vec<FieldId>,
-    HashMap<FieldDefinitionName, DefinedField<UnvalidatedTypeName, ScalarFieldName>>,
+    HashMap<
+        FieldDefinitionName,
+        DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>,
+    >,
 )> {
     let new_field_count = new_fields.len();
     let mut field_names_to_type_name = HashMap::with_capacity(new_field_count);
     let mut unvalidated_fields = Vec::with_capacity(new_field_count);
     let mut field_ids = Vec::with_capacity(new_field_count);
-    for (current_field_index, field) in new_fields.iter().enumerate() {
+    for (current_field_index, field) in new_fields.into_iter().enumerate() {
         // TODO use entry
         match field_names_to_type_name.insert(
             field.item.name.item,
-            DefinedField::ServerField(*field.item.type_.inner()),
+            DefinedField::ServerField(field.item.type_.clone()),
         ) {
             None => {
                 unvalidated_fields.push(SchemaField {
                     description: field.item.description.map(|d| d.item),
                     name: field.item.name.item,
                     id: (next_field_id + current_field_index).into(),
-                    field_type: DefinedField::ServerField(*field.item.type_.inner()),
+                    field_type: DefinedField::ServerField(field.item.type_),
                     parent_type_id: parent_type,
                 });
                 field_ids.push((next_field_id + current_field_index).into());

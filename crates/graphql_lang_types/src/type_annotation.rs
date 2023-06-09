@@ -9,6 +9,8 @@ pub enum TypeAnnotation<TValue: ValidTypeAnnotationInnerType> {
     NonNull(Box<NonNullTypeAnnotation<TValue>>),
 }
 
+impl<T: ValidTypeAnnotationInnerType> ValidTypeAnnotationInnerType for TypeAnnotation<T> {}
+
 impl<TValue: ValidTypeAnnotationInnerType> TypeAnnotation<TValue> {
     pub fn inner(&self) -> &TValue {
         match self {

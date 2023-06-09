@@ -9,6 +9,7 @@ use common_lang_types::{
     UnvalidatedTypeName, ValidLinkedFieldType, ValidScalarFieldType, ValidTypeAnnotationInnerType,
     WithSpan,
 };
+use graphql_lang_types::TypeAnnotation;
 use intern::string_key::Intern;
 
 use crate::ResolverVariant;
@@ -41,7 +42,7 @@ pub struct Schema<
     pub fields: Vec<
         SchemaField<
             DefinedField<
-                TServerType,
+                TypeAnnotation<TServerType>,
                 SchemaResolverDefinitionInfo<TScalarField, TLinkedField, TVariableType>,
             >,
         >,
@@ -61,7 +62,10 @@ pub struct Schema<
 pub(crate) type UnvalidatedSchema = Schema<UnvalidatedTypeName, (), (), UnvalidatedTypeName>;
 
 pub(crate) type UnvalidatedSchemaField = SchemaField<
-    DefinedField<UnvalidatedTypeName, SchemaResolverDefinitionInfo<(), (), UnvalidatedTypeName>>,
+    DefinedField<
+        TypeAnnotation<UnvalidatedTypeName>,
+        SchemaResolverDefinitionInfo<(), (), UnvalidatedTypeName>,
+    >,
 >;
 
 #[derive(Debug)]
@@ -84,7 +88,7 @@ impl<
         field_id: FieldId,
     ) -> &SchemaField<
         DefinedField<
-            TServerType,
+            TypeAnnotation<TServerType>,
             SchemaResolverDefinitionInfo<TScalarField, TLinkedField, TVariableType>,
         >,
     > {
@@ -227,7 +231,10 @@ impl<'a> From<&'a SchemaObject> for SchemaTypeWithFields<'a> {
 impl<'a> SchemaTypeWithFields<'a> {
     pub fn encountered_field_names(
         &self,
-    ) -> &HashMap<FieldDefinitionName, DefinedField<UnvalidatedTypeName, ScalarFieldName>> {
+    ) -> &HashMap<
+        FieldDefinitionName,
+        DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>,
+    > {
         match self {
             SchemaTypeWithFields::Object(object) => &object.encountered_field_names,
         }
@@ -326,8 +333,10 @@ pub struct SchemaObject {
     pub fields: Vec<FieldId>,
     // TODO: the ScalarFieldName in DefinedField is pretty useless. Consider
     // storing more useful information there, like the field index or something.
-    pub encountered_field_names:
-        HashMap<FieldDefinitionName, DefinedField<UnvalidatedTypeName, ScalarFieldName>>,
+    pub encountered_field_names: HashMap<
+        FieldDefinitionName,
+        DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>,
+    >,
 }
 
 #[derive(Debug)]

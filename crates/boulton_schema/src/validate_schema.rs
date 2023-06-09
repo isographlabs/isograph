@@ -9,6 +9,7 @@ use common_lang_types::{
     TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId, UnvalidatedTypeName, VariableName,
     WithSpan,
 };
+use graphql_lang_types::TypeAnnotation;
 use thiserror::Error;
 
 use crate::{
@@ -17,7 +18,7 @@ use crate::{
 };
 
 pub type ValidatedSchemaField =
-    SchemaField<DefinedField<OutputTypeId, ValidatedSchemaResolverDefinitionInfo>>;
+    SchemaField<DefinedField<TypeAnnotation<OutputTypeId>, ValidatedSchemaResolverDefinitionInfo>>;
 
 type ValidatedDefinedField = DefinedField<TypeWithoutFieldsId, ()>;
 
@@ -97,25 +98,28 @@ fn validate_and_transform_field(
 
 fn validate_server_field_type_exists_and_is_output_type(
     schema_data: &SchemaData,
-    server_field_type: &UnvalidatedTypeName,
+    server_field_type: &TypeAnnotation<UnvalidatedTypeName>,
     field: &SchemaField<()>,
-) -> ValidateSchemaResult<OutputTypeId> {
+) -> ValidateSchemaResult<TypeAnnotation<OutputTypeId>> {
     // look up the item in defined_types. If it's not there, error.
-    match schema_data.defined_types.get(&server_field_type) {
-        Some(type_id) => type_id.as_output_type_id().ok_or_else(|| {
-            let parent_type = schema_data.lookup_type_with_fields(field.parent_type_id);
-            ValidateSchemaError::FieldTypenameIsInputObject {
-                parent_type_name: parent_type.name(),
-                field_name: field.name,
-                field_type: *server_field_type,
-            }
+    match schema_data.defined_types.get(server_field_type.inner()) {
+        // Why do we need to clone here? Can we avoid this?
+        Some(type_id) => server_field_type.clone().and_then(|_| {
+            type_id.as_output_type_id().ok_or_else(|| {
+                let parent_type = schema_data.lookup_type_with_fields(field.parent_type_id);
+                ValidateSchemaError::FieldTypenameIsInputObject {
+                    parent_type_name: parent_type.name(),
+                    field_name: field.name,
+                    field_type: *server_field_type.inner(),
+                }
+            })
         }),
         None => Err(ValidateSchemaError::FieldTypenameDoesNotExist {
             parent_type_name: schema_data
                 .lookup_type_with_fields(field.parent_type_id)
                 .name(),
             field_name: field.name,
-            field_type: *server_field_type,
+            field_type: *server_field_type.inner(),
         }),
     }
 }
@@ -334,7 +338,7 @@ fn validate_resolver_definition_selection_exists_and_type_matches(
 fn validate_field_type_exists_and_is_scalar(
     parent_fields: &HashMap<
         FieldDefinitionName,
-        DefinedField<UnvalidatedTypeName, ScalarFieldName>,
+        DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>,
     >,
     schema_data: &SchemaData,
     parent_type: SchemaTypeWithFields,
@@ -346,7 +350,7 @@ fn validate_field_type_exists_and_is_scalar(
             DefinedField::ServerField(server_field_name) => {
                 let field_type_id = *schema_data
                     .defined_types
-                    .get(server_field_name)
+                    .get(server_field_name.inner())
                     .expect("Expected field type to be defined, which I think was validated earlier, probably indicates a bug in Boulton");
                 match field_type_id {
                     TypeId::Scalar(scalar_id) => Ok(ScalarFieldSelection {
@@ -362,7 +366,7 @@ fn validate_field_type_exists_and_is_scalar(
                             field_parent_type_name: parent_type.name(),
                             field_name: scalar_field_name,
                             target_type: "an object",
-                            target_type_name: *server_field_name,
+                            target_type_name: *server_field_name.inner(),
                         },
                     ),
                 }
@@ -388,7 +392,7 @@ fn validate_field_type_exists_and_is_scalar(
 fn validate_field_type_exists_and_is_linked(
     parent_fields: &HashMap<
         FieldDefinitionName,
-        DefinedField<UnvalidatedTypeName, ScalarFieldName>,
+        DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>,
     >,
     schema_data: &SchemaData,
     parent_type: SchemaTypeWithFields,
@@ -400,7 +404,7 @@ fn validate_field_type_exists_and_is_linked(
             DefinedField::ServerField(server_field_name) => {
                 let field_type_id = *schema_data
                     .defined_types
-                    .get(server_field_name)
+                    .get(server_field_name.inner())
                     .expect("Expected field type to be defined, which I think was validated earlier, probably indicates a bug in Boulton");
                 match field_type_id {
                     TypeId::Scalar(_) => Err(
@@ -408,7 +412,7 @@ fn validate_field_type_exists_and_is_linked(
                             field_parent_type_name: parent_type.name(),
                             field_name: linked_field_name,
                             target_type: "a scalar",
-                            target_type_name: *server_field_name,
+                            target_type_name: *server_field_name.inner(),
                         },
                     ),
                     TypeId::Object(object_id) => {
