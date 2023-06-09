@@ -150,9 +150,9 @@ impl SchemaData {
 
     pub fn lookup_type_without_fields(
         &self,
-        type_id: TypeWithoutFieldsId,
+        type_without_fields_id: TypeWithoutFieldsId,
     ) -> SchemaTypeWithoutFields {
-        match type_id {
+        match type_without_fields_id {
             TypeWithoutFieldsId::Scalar(scalar_id) => {
                 SchemaTypeWithoutFields::Scalar(self.scalar(scalar_id))
             }

@@ -52,7 +52,6 @@ fn get_all_artifacts<'schema>(
                 }
             }
         }
-        // Non query artifacts
         None
     })
 }
@@ -525,11 +524,11 @@ fn write_query_types_from_selection(
         Selection::Field(field) => match field {
             ScalarField(scalar_field) => {
                 match scalar_field.field {
-                    DefinedField::ServerField(field_id) => {
+                    DefinedField::ServerField(type_without_fields_id) => {
                         let name_or_alias = scalar_field.name_or_alias();
                         let type_ = schema
                             .schema_data
-                            .lookup_type_without_fields(field_id)
+                            .lookup_type_without_fields(type_without_fields_id)
                             .javascript_name();
                         query_type_declaration
                             .push_str(&format!("{}: {},\n", name_or_alias, type_));
