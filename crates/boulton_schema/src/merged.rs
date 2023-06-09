@@ -11,7 +11,10 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 
-use crate::{SchemaTypeWithFields, ValidatedSchema, ValidatedSelectionSetAndUnwraps};
+use crate::{
+    SchemaTypeWithFields, UnvalidatedObjectFieldInfo, ValidatedSchema,
+    ValidatedSelectionSetAndUnwraps,
+};
 
 pub type MergedSelectionSet = Vec<WithSpan<Selection<TypeWithoutFieldsId, TypeWithFieldsId>>>;
 
@@ -23,7 +26,7 @@ pub type MergedSelectionSet = Vec<WithSpan<Selection<TypeWithoutFieldsId, TypeWi
 /// TODO: SelectionSetAndUnwraps should be generic enough to handle this
 pub fn merge_selection_set(
     schema: &ValidatedSchema,
-    parent_type: SchemaTypeWithFields,
+    parent_type: SchemaTypeWithFields<UnvalidatedObjectFieldInfo>,
     selection_set: &ValidatedSelectionSetAndUnwraps,
 ) -> MergedSelectionSet {
     // TODO restructure types such that
@@ -53,7 +56,7 @@ fn merge_selections_into_set(
         FieldNameOrAlias,
         WithSpan<Selection<TypeWithoutFieldsId, TypeWithFieldsId>>,
     >,
-    parent_type: SchemaTypeWithFields,
+    parent_type: SchemaTypeWithFields<UnvalidatedObjectFieldInfo>,
     value: &ValidatedSelectionSetAndUnwraps,
 ) {
     for item in value.selection_set.iter() {

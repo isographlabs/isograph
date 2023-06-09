@@ -47,7 +47,7 @@ pub struct Schema<
             >,
         >,
     >,
-    pub schema_data: SchemaData,
+    pub schema_data: UnvalidatedSchemaData,
 
     // Well known types
     pub id_type: ScalarId,
@@ -60,6 +60,9 @@ pub struct Schema<
 }
 
 pub(crate) type UnvalidatedSchema = Schema<UnvalidatedTypeName, (), (), UnvalidatedTypeName>;
+pub type UnvalidatedObjectFieldInfo =
+    DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>;
+pub(crate) type UnvalidatedSchemaData = SchemaData<UnvalidatedObjectFieldInfo>;
 
 pub(crate) type UnvalidatedSchemaField = SchemaField<
     DefinedField<
@@ -69,8 +72,8 @@ pub(crate) type UnvalidatedSchemaField = SchemaField<
 >;
 
 #[derive(Debug)]
-pub struct SchemaData {
-    pub objects: Vec<SchemaObject>,
+pub struct SchemaData<TEncounteredField> {
+    pub objects: Vec<SchemaObject<TEncounteredField>>,
     pub scalars: Vec<SchemaScalar>,
     // enums, unions, interfaces, input objects
     pub defined_types: HashMap<UnvalidatedTypeName, TypeId>,
@@ -95,7 +98,7 @@ impl<
         &self.fields[field_id.as_usize()]
     }
 
-    pub fn query_object(&self) -> Option<&SchemaObject> {
+    pub fn query_object(&self) -> Option<&UnvalidatedSchemaObject> {
         self.query_type_id
             .as_ref()
             .map(|id| self.schema_data.object(*id))
@@ -138,8 +141,11 @@ impl UnvalidatedSchema {
     }
 }
 
-impl SchemaData {
-    pub fn lookup_type_with_fields(&self, type_id: TypeWithFieldsId) -> SchemaTypeWithFields {
+impl<TEncounteredField> SchemaData<TEncounteredField> {
+    pub fn lookup_type_with_fields(
+        &self,
+        type_id: TypeWithFieldsId,
+    ) -> SchemaTypeWithFields<TEncounteredField> {
         match type_id {
             TypeWithFieldsId::Object(object_id) => {
                 // TODO replace with an unchecked lookup?
@@ -165,14 +171,17 @@ impl SchemaData {
             .expect("Invalid ScalarId")
     }
 
-    pub fn lookup_unvalidated_type(&self, type_id: TypeId) -> SchemaType {
+    pub fn lookup_unvalidated_type(&self, type_id: TypeId) -> SchemaType<TEncounteredField> {
         match type_id {
             TypeId::Object(id) => SchemaType::Object(self.objects.get(id.as_usize()).unwrap()),
             TypeId::Scalar(id) => SchemaType::Scalar(self.scalars.get(id.as_usize()).unwrap()),
         }
     }
 
-    pub fn lookup_output_type(&self, output_type_id: OutputTypeId) -> SchemaOutputType {
+    pub fn lookup_output_type(
+        &self,
+        output_type_id: OutputTypeId,
+    ) -> SchemaOutputType<TEncounteredField> {
         match output_type_id {
             OutputTypeId::Object(id) => {
                 SchemaOutputType::Object(self.objects.get(id.as_usize()).unwrap())
@@ -191,7 +200,7 @@ impl SchemaData {
         }
     }
 
-    pub fn object(&self, object_id: ObjectId) -> &SchemaObject {
+    pub fn object(&self, object_id: ObjectId) -> &SchemaObject<TEncounteredField> {
         self.objects
             .get(object_id.as_usize())
             .expect("ObjectId should exist, this indicates a bug in Boulton")
@@ -217,24 +226,32 @@ fn add_schema_defined_scalar_type(
     scalar_id
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum SchemaTypeWithFields<'a> {
-    Object(&'a SchemaObject),
+#[derive(Debug)]
+pub enum SchemaTypeWithFields<'a, TEncounteredField> {
+    Object(&'a SchemaObject<TEncounteredField>),
 }
 
-impl<'a> From<&'a SchemaObject> for SchemaTypeWithFields<'a> {
-    fn from(object: &'a SchemaObject) -> Self {
+impl<'a, TEncounteredField> Copy for SchemaTypeWithFields<'a, TEncounteredField> {}
+impl<'a, TEncounteredField> Clone for SchemaTypeWithFields<'a, TEncounteredField> {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Object(arg0) => Self::Object(arg0),
+        }
+    }
+}
+
+pub type UnvalidatedSchemaTypeWithFields<'a> = SchemaTypeWithFields<'a, UnvalidatedObjectFieldInfo>;
+
+impl<'a, TEncounteredField> From<&'a SchemaObject<TEncounteredField>>
+    for SchemaTypeWithFields<'a, TEncounteredField>
+{
+    fn from(object: &'a SchemaObject<TEncounteredField>) -> Self {
         SchemaTypeWithFields::Object(object)
     }
 }
 
-impl<'a> SchemaTypeWithFields<'a> {
-    pub fn encountered_field_names(
-        &self,
-    ) -> &HashMap<
-        FieldDefinitionName,
-        DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>,
-    > {
+impl<'a, TEncounteredField> SchemaTypeWithFields<'a, TEncounteredField> {
+    pub fn encountered_field_names(&self) -> &HashMap<FieldDefinitionName, TEncounteredField> {
         match self {
             SchemaTypeWithFields::Object(object) => &object.encountered_field_names,
         }
@@ -248,13 +265,13 @@ impl<'a> SchemaTypeWithFields<'a> {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum SchemaType<'a> {
-    Object(&'a SchemaObject),
+pub enum SchemaType<'a, TEncounteredField> {
+    Object(&'a SchemaObject<TEncounteredField>),
     Scalar(&'a SchemaScalar),
     // Includes input object
 }
 
-impl<'a> HasName for SchemaTypeWithFields<'a> {
+impl<'a, TEncounteredField> HasName for SchemaTypeWithFields<'a, TEncounteredField> {
     type Name = TypeWithFieldsName;
 
     fn name(&self) -> Self::Name {
@@ -265,13 +282,13 @@ impl<'a> HasName for SchemaTypeWithFields<'a> {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum SchemaOutputType<'a> {
-    Object(&'a SchemaObject),
+pub enum SchemaOutputType<'a, TEncounteredField> {
+    Object(&'a SchemaObject<TEncounteredField>),
     Scalar(&'a SchemaScalar),
     // excludes input object
 }
 
-impl<'a> HasName for SchemaOutputType<'a> {
+impl<'a, TEncounteredField> HasName for SchemaOutputType<'a, TEncounteredField> {
     type Name = OutputTypeName;
 
     fn name(&self) -> Self::Name {
@@ -323,8 +340,10 @@ impl<'schema> SchemaTypeWithoutFields<'schema> {
     }
 }
 
+pub(crate) type UnvalidatedSchemaObject = SchemaObject<UnvalidatedObjectFieldInfo>;
+
 #[derive(Debug)]
-pub struct SchemaObject {
+pub struct SchemaObject<TEncounteredField> {
     pub description: Option<DescriptionValue>,
     pub name: ObjectTypeName,
     pub id: ObjectId,
@@ -333,11 +352,10 @@ pub struct SchemaObject {
     pub fields: Vec<FieldId>,
     // TODO: the ScalarFieldName in DefinedField is pretty useless. Consider
     // storing more useful information there, like the field index or something.
-    pub encountered_field_names: HashMap<
-        FieldDefinitionName,
-        DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>,
-    >,
+    pub encountered_field_names: HashMap<FieldDefinitionName, TEncounteredField>,
 }
+// Unvalidated => TScalarField: TypeAnnotation<UnvalidatedTypeName>,
+// Validated => FieldId
 
 #[derive(Debug)]
 pub struct SchemaField<T> {

@@ -5,7 +5,7 @@ use boulton_lang_types::{
     VariableDefinition,
 };
 use common_lang_types::{
-    DefinedField, FieldDefinitionName, HasName, InputTypeId, OutputTypeId, ScalarFieldName, TypeId,
+    DefinedField, FieldDefinitionName, HasName, InputTypeId, OutputTypeId, TypeId,
     TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId, UnvalidatedTypeName, VariableName,
     WithSpan,
 };
@@ -13,8 +13,9 @@ use graphql_lang_types::TypeAnnotation;
 use thiserror::Error;
 
 use crate::{
-    Schema, SchemaData, SchemaField, SchemaResolverDefinitionInfo, SchemaTypeWithFields,
-    UnvalidatedSchema, UnvalidatedSchemaField,
+    Schema, SchemaField, SchemaResolverDefinitionInfo, SchemaTypeWithFields,
+    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData, UnvalidatedSchemaField,
+    UnvalidatedSchemaTypeWithFields,
 };
 
 pub type ValidatedSchemaField =
@@ -61,7 +62,7 @@ impl ValidatedSchema {
 
 fn validate_and_transform_fields(
     fields: Vec<UnvalidatedSchemaField>,
-    schema_data: &SchemaData,
+    schema_data: &UnvalidatedSchemaData,
 ) -> ValidateSchemaResult<Vec<ValidatedSchemaField>> {
     fields
         .into_iter()
@@ -71,7 +72,7 @@ fn validate_and_transform_fields(
 
 fn validate_and_transform_field(
     field: UnvalidatedSchemaField,
-    schema_data: &SchemaData,
+    schema_data: &UnvalidatedSchemaData,
 ) -> ValidateSchemaResult<ValidatedSchemaField> {
     let (empty_field, field_type) = field.split();
     let field_type = match field_type {
@@ -97,7 +98,7 @@ fn validate_and_transform_field(
 }
 
 fn validate_server_field_type_exists_and_is_output_type(
-    schema_data: &SchemaData,
+    schema_data: &UnvalidatedSchemaData,
     server_field_type: &TypeAnnotation<UnvalidatedTypeName>,
     field: &SchemaField<()>,
 ) -> ValidateSchemaResult<TypeAnnotation<OutputTypeId>> {
@@ -125,7 +126,7 @@ fn validate_server_field_type_exists_and_is_output_type(
 }
 
 fn validate_resolver_fragment(
-    schema_data: &SchemaData,
+    schema_data: &UnvalidatedSchemaData,
     resolver_field_type: SchemaResolverDefinitionInfo<(), (), UnvalidatedTypeName>,
     field: &SchemaField<()>,
 ) -> ValidateSchemaResult<ValidatedSchemaResolverDefinitionInfo> {
@@ -175,7 +176,7 @@ fn validate_resolver_fragment(
 }
 
 fn validate_variable_definitions(
-    schema_data: &SchemaData,
+    schema_data: &UnvalidatedSchemaData,
     variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
 ) -> ValidateSchemaResult<Vec<WithSpan<ValidatedVariableDefinition>>> {
     variable_definitions
@@ -212,7 +213,7 @@ fn validate_variable_definitions(
 
 fn validate_selections_error_to_validate_schema_error(
     err: ValidateSelectionsError,
-    parent_type: SchemaTypeWithFields,
+    parent_type: UnvalidatedSchemaTypeWithFields,
     field: &SchemaField<()>,
 ) -> ValidateSchemaError {
     match err {
@@ -285,9 +286,9 @@ enum ValidateSelectionsError {
 }
 
 fn validate_resolver_definition_selections_exist_and_types_match(
-    schema_data: &SchemaData,
+    schema_data: &UnvalidatedSchemaData,
     selection_set: Vec<WithSpan<Selection<(), ()>>>,
-    parent_type: SchemaTypeWithFields,
+    parent_type: UnvalidatedSchemaTypeWithFields,
 ) -> Result<Vec<WithSpan<ValidatedSelection>>, ValidateSelectionsError> {
     // Currently, we only check that each field exists and has an appropriate type, not that
     // there are no selection conflicts due to aliases or parameters.
@@ -306,8 +307,8 @@ fn validate_resolver_definition_selections_exist_and_types_match(
 
 fn validate_resolver_definition_selection_exists_and_type_matches(
     selection: WithSpan<Selection<(), ()>>,
-    parent_type: SchemaTypeWithFields,
-    schema_data: &SchemaData,
+    parent_type: UnvalidatedSchemaTypeWithFields,
+    schema_data: &UnvalidatedSchemaData,
 ) -> Result<WithSpan<ValidatedSelection>, ValidateSelectionsError> {
     selection.and_then(|selection| {
         selection.and_then(&mut |field_selection| {
@@ -336,12 +337,9 @@ fn validate_resolver_definition_selection_exists_and_type_matches(
 /// Given that we selected a scalar field, the field should exist on the parent,
 /// and type should be a resolver (which is a scalar) or a server scalar type.
 fn validate_field_type_exists_and_is_scalar(
-    parent_fields: &HashMap<
-        FieldDefinitionName,
-        DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>,
-    >,
-    schema_data: &SchemaData,
-    parent_type: SchemaTypeWithFields,
+    parent_fields: &HashMap<FieldDefinitionName, UnvalidatedObjectFieldInfo>,
+    schema_data: &UnvalidatedSchemaData,
+    parent_type: UnvalidatedSchemaTypeWithFields,
     scalar_field_selection: ScalarFieldSelection<()>,
 ) -> ValidateSelectionsResult<ScalarFieldSelection<ValidatedDefinedField>> {
     let scalar_field_name = scalar_field_selection.name.item.into();
@@ -390,12 +388,9 @@ fn validate_field_type_exists_and_is_scalar(
 /// Given that we selected a linked field, the field should exist on the parent,
 /// and type should be a server interface, object or union.
 fn validate_field_type_exists_and_is_linked(
-    parent_fields: &HashMap<
-        FieldDefinitionName,
-        DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>,
-    >,
-    schema_data: &SchemaData,
-    parent_type: SchemaTypeWithFields,
+    parent_fields: &HashMap<FieldDefinitionName, UnvalidatedObjectFieldInfo>,
+    schema_data: &UnvalidatedSchemaData,
+    parent_type: UnvalidatedSchemaTypeWithFields,
     linked_field_selection: LinkedFieldSelection<(), ()>,
 ) -> ValidateSelectionsResult<LinkedFieldSelection<ValidatedDefinedField, TypeWithFieldsId>> {
     let linked_field_name = linked_field_selection.name.item.into();
