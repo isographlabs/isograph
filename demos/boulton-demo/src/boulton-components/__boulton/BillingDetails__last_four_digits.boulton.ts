@@ -23,11 +23,11 @@ export type ResolverParameterType = {
 // The type, when returned from the resolver
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
-const artifact: BoultonNonFetchableResolver = {
+const artifact: BoultonNonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
   kind: 'NonFetchableResolver',
-  resolver,
+  resolver: resolver as any,
   readerAst,
   convert: (x) => x,
-            };
+};
 
 export default artifact;

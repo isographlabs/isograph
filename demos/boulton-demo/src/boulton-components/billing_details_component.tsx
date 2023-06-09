@@ -1,6 +1,8 @@
 import * as React from "react";
 import { bDeclare, type BoultonComponentProps } from "@boulton/react";
 
+import type { ResolverParameterType } from "./__boulton/BillingDetails__billing_details_component.boulton";
+
 // TODO the compiler will generate this type
 type GeneratedDataType = {
   id: string;
@@ -11,7 +13,10 @@ type GeneratedDataType = {
   last_four_digits: string;
 };
 
-export const billing_details_component = bDeclare`
+export const billing_details_component = bDeclare<
+  ResolverParameterType,
+  ReturnType<typeof BillingDetailsComponent>
+>`
   BillingDetails.billing_details_component @component {
     id,
     card_brand,
@@ -20,10 +25,12 @@ export const billing_details_component = bDeclare`
     address,
     last_four_digits,
   }
-`(function BillingDetailsComponent({
+`(BillingDetailsComponent);
+
+function BillingDetailsComponent({
   data,
   setStateToFalse,
-}: BoultonComponentProps<GeneratedDataType, { setStateToFalse: () => void }>) {
+}: ResolverParameterType) {
   const [showFullCardNumber, setShowFullCardNumber] = React.useState(false);
 
   return (
@@ -41,4 +48,4 @@ export const billing_details_component = bDeclare`
       <p>Address: {data.address}</p>
     </>
   );
-});
+}

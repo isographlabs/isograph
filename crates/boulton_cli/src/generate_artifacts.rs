@@ -291,11 +291,11 @@ impl<'schema> NonFetchableResolver<'schema> {
             export type ResolverParameterType = {};\n\n\
             // The type, when returned from the resolver\n\
             export type ResolverReturnType = {};\n\n\
-            const artifact: BoultonNonFetchableResolver = {{\n\
+            const artifact: BoultonNonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {{\n\
             {}kind: 'NonFetchableResolver',\n\
-            {}resolver,\n\
+            {}resolver: resolver as any,\n\
             {}readerAst,\n\
-            {}convert: (x) => x,
+            {}convert: (x) => x,\n\
             }};\n\n\
             export default artifact;\n",
             self.resolver_import_statement.0,
@@ -544,7 +544,12 @@ fn generate_resolver_parameter_type(
     resolver_parameter_type.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
 
     if let Some(ResolverVariant::Component) = variant.map(|v| v.item) {
-        resolver_parameter_type = format!("{{ data: {} }}", resolver_parameter_type);
+        resolver_parameter_type = format!(
+            "{{ data:\n{}{},\n{}[index: string]: any }}",
+            "  ".repeat(indentation_level as usize),
+            resolver_parameter_type,
+            "  ".repeat(indentation_level as usize)
+        );
     }
 
     ResolverParameterType(resolver_parameter_type)

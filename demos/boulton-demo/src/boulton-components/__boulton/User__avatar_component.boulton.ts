@@ -28,20 +28,22 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
 ];
 
-export type ResolverParameterType = { data: {
+export type ResolverParameterType = { data:
+{
   name: string,
   email: string,
   avatar_url: string,
-} };
+},
+[index: string]: any };
 
 // The type, when returned from the resolver
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
-const artifact: BoultonNonFetchableResolver = {
+const artifact: BoultonNonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
   kind: 'NonFetchableResolver',
-  resolver,
+  resolver: resolver as any,
   readerAst,
   convert: (x) => x,
-            };
+};
 
 export default artifact;

@@ -48,23 +48,25 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
 ];
 
-export type ResolverParameterType = { data: {
+export type ResolverParameterType = { data:
+{
   id: string,
   card_brand: string,
   credit_card_number: string,
   expiration_date: string,
   address: string,
   last_four_digits: BillingDetails__last_four_digits__outputType,
-} };
+},
+[index: string]: any };
 
 // The type, when returned from the resolver
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
-const artifact: BoultonNonFetchableResolver = {
+const artifact: BoultonNonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
   kind: 'NonFetchableResolver',
-  resolver,
+  resolver: resolver as any,
   readerAst,
   convert: (x) => x,
-            };
+};
 
 export default artifact;
