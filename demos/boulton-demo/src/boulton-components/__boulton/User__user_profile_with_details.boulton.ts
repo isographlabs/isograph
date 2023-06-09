@@ -1,12 +1,12 @@
 import type {BoultonNonFetchableResolver, ReaderAst} from '@boulton/react';
 import { user_profile_with_details as resolver } from '../user_detail_page.tsx';
-import User__avatar_component from './User__avatar_component.boulton';
 import BillingDetails__billing_details_component from './BillingDetails__billing_details_component.boulton';
+import User__avatar_component from './User__avatar_component.boulton';
 
 // TODO generate actual types
 export type ReadOutType = string;
 
-const readerAst: ReaderAst = [
+const readerAst: ReaderAst<ResolverParameterType> = [
   {
     kind: "Scalar",
     response_name: "id",

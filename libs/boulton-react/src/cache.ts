@@ -18,17 +18,17 @@ function getOrCreateCache<T>(
   return cache[index];
 }
 
-export function getOrCreateCacheForUrl<T extends object>(
-  query_text: string,
+export function getOrCreateCacheForUrl<T>(
+  queryText: string,
   variables: object
 ): ParentCache<PromiseWrapper<T>> {
   const factory: Factory<PromiseWrapper<T>> = () =>
-    makeNetworkRequest<T>(query_text, variables);
-  return getOrCreateCache<PromiseWrapper<T>>(query_text, factory);
+    makeNetworkRequest<T>(queryText, variables);
+  return getOrCreateCache<PromiseWrapper<T>>(queryText, factory);
 }
 
-export function makeNetworkRequest<T extends object>(
-  query_text: string,
+export function makeNetworkRequest<T>(
+  queryText: string,
   variables: object
 ): ItemCleanupPair<PromiseWrapper<T>> {
   let promise: Promise<T> = fetch("http://localhost:4000/graphql", {
@@ -36,7 +36,7 @@ export function makeNetworkRequest<T extends object>(
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ query: query_text, variables }),
+    body: JSON.stringify({ query: queryText, variables }),
   })
     .then((response) => response.json())
     .then((networkResponse) => {
@@ -111,8 +111,8 @@ function normalizeDataWithPath(
   store[id] = targetRecord;
 
   Object.keys(data).forEach((networkResponseKey) => {
-    const actualKey = HACK_map_key(networkResponseKey, variables);
-    targetRecord[actualKey] = getFieldOrNormalize(
+    const storeKey = HACK_get_store_key(networkResponseKey, variables);
+    targetRecord[storeKey] = getFieldOrNormalize(
       data[networkResponseKey],
       `${path}.${networkResponseKey}`,
       variables
@@ -142,7 +142,7 @@ function getFieldOrNormalize(
 /// Fields that use variables have aliases like nameOfField__fieldName1_variableName2__...
 /// so e.g. node(id: $ID) becomes node__id_ID. Here, we map that back to node__id_4
 /// for writing to the store.
-function HACK_map_key(
+function HACK_get_store_key(
   networkResponseKey: string,
   // {ID: "4"} and the like
   variablesToValues: { [index: string]: string }

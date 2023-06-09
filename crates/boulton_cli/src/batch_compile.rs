@@ -40,9 +40,12 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
         let interned_file_path = file_path.to_string_lossy().into_owned().intern().into();
 
         let b_declare_literals = extract_b_declare_literal_from_file_content(&file_content);
-        for b_declare_literal in b_declare_literals {
-            let resolver_declaration =
-                parse_bdeclare_literal(&b_declare_literal, interned_file_path)?;
+        for (b_declare_literal_text, has_associated_js_function) in b_declare_literals {
+            let resolver_declaration = parse_bdeclare_literal(
+                &b_declare_literal_text,
+                interned_file_path,
+                has_associated_js_function,
+            )?;
             schema.process_resolver_declaration(resolver_declaration)?;
         }
     }

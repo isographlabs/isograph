@@ -5,7 +5,7 @@ import BillingDetails__last_four_digits from './BillingDetails__last_four_digits
 // TODO generate actual types
 export type ReadOutType = string;
 
-const readerAst: ReaderAst = [
+const readerAst: ReaderAst<ResolverParameterType> = [
   {
     kind: "Scalar",
     response_name: "id",

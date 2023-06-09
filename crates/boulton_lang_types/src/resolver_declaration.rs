@@ -18,6 +18,8 @@ pub struct ResolverDeclaration {
     pub resolver_definition_path: ResolverDefinitionPath,
     pub directives: Vec<WithSpan<FragmentDirectiveUsage>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
+
+    pub has_associated_js_function: bool,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]

@@ -4,9 +4,10 @@ use boulton_lang_types::{SelectionSetAndUnwraps, VariableDefinition};
 use common_lang_types::{
     DefinedField, DescriptionValue, FieldDefinitionName, FieldId, HasName, InputTypeId,
     InputTypeName, JavascriptName, ObjectId, ObjectTypeName, OutputTypeId, OutputTypeName,
-    ResolverDefinitionPath, ScalarFieldName, ScalarId, ScalarTypeName, TypeId, TypeWithFieldsId,
-    TypeWithFieldsName, TypeWithoutFieldsId, TypeWithoutFieldsName, UnvalidatedTypeName,
-    ValidLinkedFieldType, ValidScalarFieldType, ValidTypeAnnotationInnerType, WithSpan,
+    ResolverDefinitionPath, ScalarFieldName, ScalarId, ScalarTypeName, TypeAndField, TypeId,
+    TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId, TypeWithoutFieldsName,
+    UnvalidatedTypeName, ValidLinkedFieldType, ValidScalarFieldType, ValidTypeAnnotationInnerType,
+    WithSpan,
 };
 use intern::string_key::Intern;
 
@@ -374,7 +375,10 @@ pub struct SchemaResolverDefinitionInfo<
     pub selection_set_and_unwraps: Option<SelectionSetAndUnwraps<TScalarField, TLinkedField>>,
     pub field_id: FieldId,
     pub variant: Option<WithSpan<ResolverVariant>>,
+    pub is_fetchable: bool,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<TVariableDefinitionType>>>,
+    pub type_and_field: TypeAndField,
+    pub has_associated_js_function: bool,
 }
 
 impl<
@@ -397,7 +401,10 @@ impl<
                 .map(|selection_set_and_unwraps| map(selection_set_and_unwraps)),
             field_id: self.field_id,
             variant: self.variant,
+            is_fetchable: self.is_fetchable,
             variable_definitions: self.variable_definitions,
+            type_and_field: self.type_and_field,
+            has_associated_js_function: self.has_associated_js_function,
         }
     }
 }

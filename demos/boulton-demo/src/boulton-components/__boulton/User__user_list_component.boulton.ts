@@ -5,7 +5,7 @@ import User__avatar_component from './User__avatar_component.boulton';
 // TODO generate actual types
 export type ReadOutType = string;
 
-const readerAst: ReaderAst = [
+const readerAst: ReaderAst<ResolverParameterType> = [
   {
     kind: "Scalar",
     response_name: "id",

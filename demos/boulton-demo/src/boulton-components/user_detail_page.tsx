@@ -1,9 +1,9 @@
 import * as React from "react";
-import { bDeclare, read } from "@boulton/react";
+import { bDeclare } from "@boulton/react";
 
 // TODO @component seems to have no effect?
 export const user_detail_page = bDeclare`
-  Query.user_detail_page @component @fetchable {
+  Query.user_detail_page @fetchable {
     current_user {
       id,
       user_profile_with_details,

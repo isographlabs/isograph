@@ -63,14 +63,16 @@ pub(crate) fn read_files_in_folder(
 }
 
 lazy_static! {
-    static ref EXTRACT_BDECLARE: Regex = Regex::new(r"bDeclare`([^`]+)`").unwrap();
+    // This is regex is inadequate, as bDeclare<typeof foo`...`>, and it's certainly possible
+    // to want that.
+    static ref EXTRACT_BDECLARE: Regex = Regex::new(r"bDeclare(<[^`]+>)?`([^`]+)`(\()?").unwrap();
 }
 
 pub(crate) fn extract_b_declare_literal_from_file_content(
     content: &str,
-) -> impl Iterator<Item = &str> {
+) -> impl Iterator<Item = (&str, bool)> {
     EXTRACT_BDECLARE
         .captures_iter(content)
         .into_iter()
-        .map(|x| x.get(1).unwrap().as_str())
+        .map(|x| (x.get(2).unwrap().as_str(), x.get(3).is_some()))
 }

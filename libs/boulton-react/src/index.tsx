@@ -11,54 +11,49 @@ import { useLazyDisposableState } from "@boulton/react-disposable-state";
 import { type PromiseWrapper } from "./PromiseWrapper";
 import React from "react";
 
-// TODO there should be separate types for @component and not, since they
-// accept different props. Or make the PropType (TReadFromStore) reflect
-// the differences.
-
 // This type should be treated as an opaque type.
 export type BoultonFetchableResolver<
   TReadFromStore extends Object,
-  TResolverResult extends Object,
-  TUnwrappedResolverResult extends Object
+  TResolverProps,
+  TResolverResult
 > = {
   kind: "FetchableResolver";
   queryText: string;
   normalizationAst: any;
-  readerAst: ReaderAst;
-  resolver: (data: TReadFromStore) => TResolverResult;
+  readerAst: ReaderAst<TReadFromStore>;
+  resolver: (data: TResolverProps) => TResolverResult;
+  // TODO ReaderAst<TResolverProps> should contain the convert function
+  convert: (data: TReadFromStore) => TResolverProps;
 };
 
 export type BoultonNonFetchableResolver<
   TReadFromStore extends Object,
-  TResolverResult extends Object,
-  TUnwrappedResolverResult extends Object
+  TResolverProps,
+  TResolverResult
 > = {
   kind: "NonFetchableResolver";
-  readerAst: ReaderAst;
-  resolver: (data: TReadFromStore) => TResolverResult;
+  readerAst: ReaderAst<TReadFromStore>;
+  convert: (data: TReadFromStore) => TResolverProps;
+  resolver: (data: TResolverProps) => TResolverResult;
 };
 
 export type BoultonResolver<
   TReadFromStore extends Object,
-  TResolverResult extends Object,
-  TUnwrappedResolverResult extends Object
+  TResolverProps,
+  TResolverResult
 > =
-  | BoultonFetchableResolver<
-      TReadFromStore,
-      TResolverResult,
-      TUnwrappedResolverResult
-    >
+  | BoultonFetchableResolver<TReadFromStore, TResolverProps, TResolverResult>
   | BoultonNonFetchableResolver<
       TReadFromStore,
-      TResolverResult,
-      TUnwrappedResolverResult
+      TResolverProps,
+      TResolverResult
     >;
 
 export type ReaderAstNode =
   | ReaderScalarField
   | ReaderLinkedField
   | ReaderResolverField;
-export type ReaderAst = ReaderAstNode[];
+export type ReaderAst<TReadFromStore> = ReaderAstNode[];
 
 export type ReaderScalarField = {
   kind: "Scalar";
@@ -70,7 +65,7 @@ export type ReaderLinkedField = {
   kind: "Linked";
   response_name: string;
   alias: string | null;
-  selections: ReaderAst;
+  selections: ReaderAst<unknown>;
   arguments: Object | null;
 };
 
@@ -85,74 +80,65 @@ export type ReaderResolverField = {
 
 export type FragmentReference<
   TReadFromStore extends Object,
-  TResolverResult extends Object,
-  TUnwrappedResolverResult extends Object
+  TResolverProps,
+  TResolverResult
 > = {
   kind: "FragmentReference";
-  readerAst: ReaderAst;
+  readerAst: ReaderAst<TReadFromStore>;
   root: DataId;
-  resolver: (props: {
-    data: TReadFromStore;
-    [index: string]: any;
-  }) => TResolverResult;
+  resolver: (props: TResolverProps) => TResolverResult;
   variables: Object | null;
+  // TODO: We should instead have ReaderAst<TResolverProps>
+  convert: (data: TReadFromStore) => TResolverProps;
 };
 
-interface Resolver<TReadOut, TResolverReturn, TResolverParameter> {
-  readOut: TReadOut;
-  resolverReturn: TResolverReturn;
-  resolverParameter: TResolverParameter;
-}
-
-export function bDeclare<T extends Resolver<any, any, any>>(
+export function bDeclare<
+  TResolverParameter,
+  TResolverReturn = TResolverParameter
+>(
   queryText: TemplateStringsArray
-) {
+): (
+  x: (param: TResolverParameter) => TResolverReturn
+) => (param: TResolverParameter) => TResolverReturn {
   // The name `identity` here is a bit of a double entendre.
   // First, it is the identity function, constrained to operate
   // on a very specific type. Thus, the value of b Declare`...`(
   // someFunction) is someFunction. But furthermore, if one
   // write b Declare`...` and passes no function, the resolver itself
   // is the identity function. At that point, the types
-  // T['resolverParameter'] and T['resolverReturn'] must be identical.
+  // TResolverParameter and TResolverReturn must be identical.
 
   return function identity(
-    x: (param: T["resolverParameter"]) => T["resolverReturn"]
-  ): (param: T["resolverParameter"]) => T["resolverReturn"] {
+    x: (param: TResolverParameter) => TResolverReturn
+  ): (param: TResolverParameter) => TResolverReturn {
     return x;
   };
 }
 
 export function useLazyReference<
   TReadFromStore extends Object,
-  TResolverResult extends Object,
-  TUnwrappedResolverResult extends Object
+  TResolverResult
 >(
-  artifact: BoultonFetchableResolver<
-    TReadFromStore,
-    TResolverResult,
-    TUnwrappedResolverResult
-  >,
+  artifact: BoultonFetchableResolver<TReadFromStore, unknown, TResolverResult>,
   variables: object
 ): {
-  queryReference: FragmentReference<
-    TReadFromStore,
-    TResolverResult,
-    TUnwrappedResolverResult
-  >;
+  queryReference: FragmentReference<TReadFromStore, unknown, TResolverResult>;
 } {
   // Typechecking fails here... TODO investigate
-  const cache = getOrCreateCacheForUrl<{}>(artifact.queryText, variables);
+  const cache = getOrCreateCacheForUrl<TResolverResult>(
+    artifact.queryText,
+    variables
+  );
   const data =
-    useLazyDisposableState<PromiseWrapper<TUnwrappedResolverResult>>(
-      cache
-    ).state;
+    useLazyDisposableState<PromiseWrapper<TResolverResult>>(cache).state;
 
   return {
     queryReference: {
       kind: "FragmentReference",
       readerAst: artifact.readerAst,
       root: ROOT_ID,
-      resolver: artifact.resolver ?? ((x) => x),
+      convert: artifact.convert,
+      resolver: artifact.resolver,
       variables,
     },
   };
@@ -160,16 +146,12 @@ export function useLazyReference<
 
 export function read<
   TReadFromStore extends Object,
-  TResolverResult extends Object,
-  TUnwrappedResolverResult extends Object
+  TResolverProps,
+  TResolverResult
 >(
-  reference: FragmentReference<
-    TReadFromStore,
-    TResolverResult,
-    TUnwrappedResolverResult
-  >
-): TUnwrappedResolverResult {
-  const response = readData<TReadFromStore>(
+  reference: FragmentReference<TReadFromStore, TResolverProps, TResolverResult>
+): TResolverResult {
+  const response = readData(
     reference.readerAst,
     reference.root,
     reference.variables
@@ -178,22 +160,20 @@ export function read<
   if (response.kind === "MissingData") {
     throw onNextChange();
   } else {
-    return reference.resolver(response.data) as any;
+    console.log(
+      "calling resolver",
+      reference.resolver,
+      reference.convert,
+      new Error().stack
+    );
+    return reference.resolver(reference.convert(response.data));
   }
 }
 
-export function readButDoNotEvaluate<
-  TReadFromStore extends Object,
-  TResolverResult extends Object,
-  TUnwrappedResolverResult extends Object
->(
-  reference: FragmentReference<
-    TReadFromStore,
-    TResolverResult,
-    TUnwrappedResolverResult
-  >
-): TUnwrappedResolverResult {
-  const response = readData<TReadFromStore>(
+export function readButDoNotEvaluate<TReadFromStore extends Object>(
+  reference: FragmentReference<TReadFromStore, unknown, unknown>
+): TReadFromStore {
+  const response = readData(
     reference.readerAst,
     reference.root,
     reference.variables
@@ -202,7 +182,7 @@ export function readButDoNotEvaluate<
   if (response.kind === "MissingData") {
     throw onNextChange();
   } else {
-    return response.data as any;
+    return response.data;
   }
 }
 
@@ -216,7 +196,7 @@ type ReadDataResult<TReadFromStore> =
     };
 
 function readData<TReadFromStore>(
-  ast: ReaderAst,
+  ast: ReaderAst<TReadFromStore>,
   root: DataId,
   variables: Object | null
 ): ReadDataResult<TReadFromStore> {
@@ -230,7 +210,7 @@ function readData<TReadFromStore>(
   for (const field of ast) {
     switch (field.kind) {
       case "Scalar": {
-        const storeRecordName = formatNameAndArgs(
+        const storeRecordName = getStoreFieldName(
           field.response_name,
           field.arguments,
           variables
@@ -243,7 +223,7 @@ function readData<TReadFromStore>(
         break;
       }
       case "Linked": {
-        const storeRecordName = formatNameAndArgs(
+        const storeRecordName = getStoreFieldName(
           field.response_name,
           field.arguments,
           variables
@@ -299,6 +279,10 @@ function readData<TReadFromStore>(
                   root,
                   resolver: resolver_function,
                   variables,
+                  convert: () => {
+                    console.log(new Error().stack);
+                    throw new Error("where did I convert");
+                  },
                 }}
                 additionalRuntimeProps={additionalRuntimeProps}
               />
@@ -313,6 +297,10 @@ function readData<TReadFromStore>(
             // If you misspell a resolver export (it should be the field name), then this
             // will fall back to x => x, when the app developer intended something else.
             resolver: field.resolver.resolver ?? ((x) => x),
+            convert: () => {
+              console.log(new Error().stack);
+              throw new Error("where did I convert");
+            },
           };
           target[field.alias] = fragmentReference;
         }
@@ -350,7 +338,7 @@ function getRefReaderForName(name: string) {
       const data = readButDoNotEvaluate(reference);
       return reference.resolver({ data, ...additionalRuntimeProps });
     }
-    Component.displayName = `RefReader<${name}>`;
+    Component.displayName = `${name} @component`;
     refReaders[name] = Component;
   }
   return refReaders[name];
@@ -360,7 +348,7 @@ export type BoultonComponentProps<TDataType, TOtherProps = Object> = {
   data: TDataType;
 } & TOtherProps;
 
-function formatNameAndArgs(
+function getStoreFieldName(
   name: string,
   args: { [index: string]: any } | null,
   variables: { [index: string]: any } | null

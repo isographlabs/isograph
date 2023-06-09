@@ -1,20 +1,10 @@
 import type {BoultonFetchableResolver, ReaderAst, FragmentReference} from '@boulton/react';
-import { user_detail_page as resolver } from '../user_detail_page.tsx';
-import User__user_profile_with_details, { ReadOutType as User__user_profile_with_details__outputType } from './User__user_profile_with_details.boulton';
+import { foo_query as resolver } from '../user_list.tsx';
 
-const queryText = 'query user_detail_page  {\
-  current_user {\
-    avatar_url,\
-    email,\
+const queryText = 'query foo_query  {\
+  users {\
     id,\
     name,\
-    billing_details {\
-      address,\
-      card_brand,\
-      credit_card_number,\
-      expiration_date,\
-      id,\
-    },\
   },\
 }';
 
@@ -22,7 +12,7 @@ const normalizationAst = {notNeededForDemo: true};
 const readerAst: ReaderAst<ResolverParameterType> = [
   {
     kind: "Linked",
-    response_name: "current_user",
+    response_name: "users",
     alias: null,
     arguments: null,
     selections: [
@@ -33,25 +23,24 @@ const readerAst: ReaderAst<ResolverParameterType> = [
         arguments: null,
       },
       {
-        kind: "Resolver",
-        alias: "user_profile_with_details",
+        kind: "Scalar",
+        response_name: "name",
+        alias: null,
         arguments: null,
-        resolver: User__user_profile_with_details,
-        variant: "Component",
       },
     ],
   },
 ];
 
 export type ResolverParameterType = {
-  current_user: {
+  users: {
     id: string,
-    user_profile_with_details: User__user_profile_with_details__outputType,
+    name: string,
   },
 };
 
 // The type, when returned from the resolver
-export type ResolverReturnType = ResolverParameterType;
+export type ResolverReturnType = ReturnType<typeof resolver>;
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = FragmentReference<ResolverParameterType, ResolverReturnType, TReadOutType>;

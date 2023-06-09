@@ -2,10 +2,11 @@ use std::fmt;
 
 use boulton_lang_types::{FragmentDirectiveUsage, ResolverDeclaration};
 use common_lang_types::{
-    DefinedField, FieldDefinitionName, ObjectId, TypeId, TypeWithFieldsId, TypeWithFieldsName,
-    UnvalidatedTypeName, WithSpan,
+    BoultonDirectiveName, DefinedField, FieldDefinitionName, ObjectId, TypeId, TypeWithFieldsId,
+    TypeWithFieldsName, UnvalidatedTypeName, WithSpan,
 };
 use intern::string_key::Intern;
+use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{SchemaField, SchemaResolverDefinitionInfo, UnvalidatedSchema};
@@ -66,16 +67,20 @@ impl UnvalidatedSchema {
         let next_field_id = self.fields.len().into();
         object.fields.push(next_field_id);
 
+        let name = resolver_declaration.item.resolver_field_name.item.into();
         self.fields.push(SchemaField {
             description: resolver_declaration.item.description.map(|d| d.item),
-            name: resolver_declaration.item.resolver_field_name.item.into(),
+            name,
             id: next_field_id,
             field_type: DefinedField::ResolverField(SchemaResolverDefinitionInfo {
                 resolver_definition_path: resolver_declaration.item.resolver_definition_path,
                 selection_set_and_unwraps: resolver_declaration.item.selection_set_and_unwraps,
                 field_id: next_field_id,
                 variant: get_resolver_variant(&resolver_declaration.item.directives),
+                is_fetchable: is_fetchable(&resolver_declaration.item.directives),
                 variable_definitions: resolver_declaration.item.variable_definitions,
+                type_and_field: format!("{}__{}", object.name, name).intern().into(),
+                has_associated_js_function: resolver_declaration.item.has_associated_js_function,
             }),
             parent_type_id: TypeWithFieldsId::Object(object.id),
         });
@@ -108,7 +113,7 @@ pub enum ProcessResolverDeclarationError {
     },
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ResolverVariant {
     Component,
     Eager,
@@ -123,17 +128,34 @@ impl fmt::Display for ResolverVariant {
     }
 }
 
+lazy_static! {
+    // This is regex is inadequate, as bDeclare<typeof foo`...`>, and it's certainly possible
+    // to want that.
+    static ref EAGER: BoultonDirectiveName = "eager".intern().into();
+    static ref COMPONENT: BoultonDirectiveName = "component".intern().into();
+    static ref FETCHABLE: BoultonDirectiveName = "fetchable".intern().into();
+}
+
+// TODO validate that the type is actually fetchable, and that we don't have both
 fn get_resolver_variant(
     directives: &[WithSpan<FragmentDirectiveUsage>],
 ) -> Option<WithSpan<ResolverVariant>> {
-    for directive in directives {
+    for directive in directives.iter() {
         let span = directive.span;
-        if directive.item.name.item == "eager".intern().into() {
+        if directive.item.name.item == *EAGER {
             return Some(WithSpan::new(ResolverVariant::Eager, span));
-        }
-        if directive.item.name.item == "component".intern().into() {
+        } else if directive.item.name.item == *COMPONENT {
             return Some(WithSpan::new(ResolverVariant::Component, span));
         }
     }
-    return None;
+    None
+}
+
+fn is_fetchable(directives: &[WithSpan<FragmentDirectiveUsage>]) -> bool {
+    for directive in directives.iter() {
+        if directive.item.name.item == *FETCHABLE {
+            return true;
+        }
+    }
+    false
 }

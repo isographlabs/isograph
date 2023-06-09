@@ -1,12 +1,11 @@
 import * as React from "react";
-import { bDeclare, read } from "@boulton/react";
-import type { ResolverType as QueryUserListPage } from "./__boulton/Query__user_list_page.boulton";
-import type { ResolverType as FooQueryType } from "./__boulton/Query__foo_query.boulton";
+import { bDeclare } from "@boulton/react";
+import type { ResolverParameterType as QueryUserListPage } from "./__boulton/Query__user_list_page.boulton";
+import type { ResolverParameterType as FooQueryType } from "./__boulton/Query__foo_query.boulton";
 
 export const user_list_page = bDeclare<QueryUserListPage>`
   Query.user_list_page(
     $bar: String!,
-    $bar2: String!,
   ) @fetchable {
     byah(foo: $bar,),
     users {
@@ -16,14 +15,17 @@ export const user_list_page = bDeclare<QueryUserListPage>`
   }
 `;
 
-export const foo_query = bDeclare<FooQueryType>`
+export const foo_query = bDeclare<FooQueryType, ReturnType<typeof FooQuery>>`
   Query.foo_query @fetchable {
     users {
       id,
       name,
     },
   }
-`(function FooQuery(param) {});
+`(FooQuery);
+function FooQuery(param: FooQueryType) {
+  return "poop";
+}
 
 export const user_list_component = bDeclare`
   User.user_list_component @component {
@@ -37,7 +39,7 @@ function UserListComponent({ data, onSelectId }) {
   return (
     <>
       <h2>{data.name}</h2>
-      {data.avatar_component()}
+      {data.avatar_component({ foo: "bar" })}
       <button onClick={() => onSelectId(data.id)}>User details</button>
     </>
   );

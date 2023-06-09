@@ -4,7 +4,7 @@ import { avatar_component as resolver } from '../avatar.tsx';
 // TODO generate actual types
 export type ReadOutType = string;
 
-const readerAst: ReaderAst = [
+const readerAst: ReaderAst<ResolverParameterType> = [
   {
     kind: "Scalar",
     response_name: "name",

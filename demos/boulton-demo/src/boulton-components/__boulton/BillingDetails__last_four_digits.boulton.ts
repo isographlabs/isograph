@@ -4,7 +4,7 @@ import { last_four_digits as resolver } from '../last_four_digits.ts';
 // TODO generate actual types
 export type ReadOutType = string;
 
-const readerAst: ReaderAst = [
+const readerAst: ReaderAst<ResolverParameterType> = [
   {
     kind: "Scalar",
     response_name: "credit_card_number",

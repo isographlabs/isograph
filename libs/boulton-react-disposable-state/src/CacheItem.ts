@@ -27,9 +27,9 @@ export type InParentCacheAndNotDisposed<T> = {
 };
 
 export type CacheItemState<T> =
-  | NotInParentCacheAndDisposed
+  | InParentCacheAndNotDisposed<T>
   | NotInParentCacheAndNotDisposed<T>
-  | InParentCacheAndNotDisposed<T>;
+  | NotInParentCacheAndDisposed;
 
 export type CacheItemOptions = {
   temporaryRetainTime: number;

@@ -151,7 +151,10 @@ fn validate_resolver_fragment(
                 }),
                 field_id: resolver_field_type.field_id,
                 variant: resolver_field_type.variant,
+                is_fetchable: resolver_field_type.is_fetchable,
                 variable_definitions,
+                type_and_field: resolver_field_type.type_and_field,
+                has_associated_js_function: resolver_field_type.has_associated_js_function,
             })
         }
         None => Ok(SchemaResolverDefinitionInfo {
@@ -159,7 +162,10 @@ fn validate_resolver_fragment(
             selection_set_and_unwraps: None,
             field_id: resolver_field_type.field_id,
             variant: resolver_field_type.variant,
+            is_fetchable: resolver_field_type.is_fetchable,
             variable_definitions,
+            type_and_field: resolver_field_type.type_and_field,
+            has_associated_js_function: resolver_field_type.has_associated_js_function,
         }),
     }
 }
@@ -281,6 +287,7 @@ fn validate_resolver_definition_selections_exist_and_types_match(
 ) -> Result<Vec<WithSpan<ValidatedSelection>>, ValidateSelectionsError> {
     // Currently, we only check that each field exists and has an appropriate type, not that
     // there are no selection conflicts due to aliases or parameters.
+
     Ok(selection_set
         .into_iter()
         .map(|selection| {

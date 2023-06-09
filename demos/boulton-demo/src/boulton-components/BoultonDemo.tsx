@@ -26,7 +26,7 @@ export function BoultonDemo() {
 function TopLevelListView({ onSelectId }) {
   const { queryReference } = useLazyReference(userListPageQuery, {
     bar: "yayayaya",
-    bar2: "bar2",
+    // bar2: "bar2",
   });
   // TODO get this to work:
   // const {queryReference} = useLazyReference(b Declare ` ... `);
@@ -48,7 +48,7 @@ function TopLevelListView({ onSelectId }) {
 
 function TopLevelUserProfileWithDetails({ onGoBack }) {
   // TODO replace this with the trick that causes graphql`...` literals to work
-  const { queryReference } = useLazyReference(userDetailPageQuery);
+  const { queryReference } = useLazyReference(userDetailPageQuery, {});
   const data = read(queryReference);
   return data.current_user.user_profile_with_details({ onGoBack });
 }

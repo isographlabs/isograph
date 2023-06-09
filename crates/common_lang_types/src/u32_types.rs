@@ -83,6 +83,7 @@ impl TypeId {
 pub enum TypeWithFieldsId {
     Object(ObjectId),
     // Interface
+    // Union
 }
 impl ValidLinkedFieldType for TypeWithFieldsId {}
 impl ValidTypeAnnotationInnerType for TypeWithFieldsId {}

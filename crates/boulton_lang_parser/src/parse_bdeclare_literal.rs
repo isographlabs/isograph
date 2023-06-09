@@ -20,12 +20,17 @@ use crate::{
 };
 
 pub fn parse_bdeclare_literal(
-    b_declare_contents: &str,
+    b_declare_literal_text: &str,
     definition_file_path: ResolverDefinitionPath,
+    has_associated_js_function: bool,
 ) -> ParseResult<WithSpan<ResolverDeclaration>> {
-    let mut tokens = PeekableLexer::new(b_declare_contents);
+    let mut tokens = PeekableLexer::new(b_declare_literal_text);
 
-    let resolver_declaration = parse_resolver_declaration(&mut tokens, definition_file_path)?;
+    let resolver_declaration = parse_resolver_declaration(
+        &mut tokens,
+        definition_file_path,
+        has_associated_js_function,
+    )?;
 
     if !tokens.reached_eof() {
         return Err(BoultonLiteralParseError::LeftoverTokens {
@@ -40,6 +45,7 @@ pub fn parse_bdeclare_literal(
 fn parse_resolver_declaration<'a>(
     tokens: &mut PeekableLexer<'a>,
     definition_file_path: ResolverDefinitionPath,
+    has_associated_js_function: bool,
 ) -> ParseResult<WithSpan<ResolverDeclaration>> {
     let resolver_declaration = tokens
         .with_span(|tokens| {
@@ -72,6 +78,7 @@ fn parse_resolver_declaration<'a>(
                 resolver_definition_path: definition_file_path,
                 directives,
                 variable_definitions,
+                has_associated_js_function,
             })
         })
         .transpose();

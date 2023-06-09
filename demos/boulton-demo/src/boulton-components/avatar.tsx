@@ -8,7 +8,9 @@ export const avatar_component = bDeclare`
     email,
     avatar_url,
   }
-`(({ data }) => {
+`(Avatar);
+
+function Avatar({ data, foo }) {
   return (
     <div>
       <a href={`mailto:${data.email}`}>
@@ -21,4 +23,4 @@ export const avatar_component = bDeclare`
       </a>
     </div>
   );
-});
+}

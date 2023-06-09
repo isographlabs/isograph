@@ -11,14 +11,14 @@ use boulton_lang_types::{
     NonConstantValue, Selection, SelectionFieldArgument,
 };
 use boulton_schema::{
-    merge_selection_set, MergedSelectionSet, SchemaTypeWithFields, ValidatedSchema,
-    ValidatedSchemaResolverDefinitionInfo, ValidatedSelection, ValidatedSelectionSetAndUnwraps,
-    ValidatedVariableDefinition,
+    merge_selection_set, MergedSelectionSet, ResolverVariant, SchemaTypeWithFields,
+    ValidatedSchema, ValidatedSchemaResolverDefinitionInfo, ValidatedSelection,
+    ValidatedSelectionSetAndUnwraps, ValidatedVariableDefinition,
 };
 use common_lang_types::{
-    DefinedField, FieldDefinitionName, HasName, ObjectId, QueryOperationName,
-    ResolverDefinitionPath, TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId,
-    UnvalidatedTypeName, WithSpan,
+    DefinedField, FieldDefinitionName, HasName, QueryOperationName, ResolverDefinitionPath,
+    TypeAndField, TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId, UnvalidatedTypeName,
+    WithSpan,
 };
 use graphql_lang_types::TypeAnnotation;
 use thiserror::Error;
@@ -26,24 +26,20 @@ use thiserror::Error;
 pub(crate) fn generate_artifacts(
     schema: &ValidatedSchema,
     project_root: &PathBuf,
-) -> Result<String, GenerateArtifactsError> {
-    let query_type = schema.query_type_id.expect("Expect Query to be defined");
+) -> Result<(), GenerateArtifactsError> {
+    write_artifacts(get_all_artifacts(schema), project_root)?;
 
-    write_artifacts(get_all_artifacts(schema, query_type), project_root)?;
-
-    Ok("".into())
+    Ok(())
 }
 
 fn get_all_artifacts<'schema>(
     schema: &'schema ValidatedSchema,
-    query_type: ObjectId,
 ) -> impl Iterator<Item = Result<Artifact<'schema>, GenerateArtifactsError>> + 'schema {
     let mut fields = schema.fields.iter();
     std::iter::from_fn(move || {
         while let Some(field) = fields.next() {
-            // let field = schema.field(*field_id);
             if let Some(resolver_field) = field.field_type.as_resolver_field() {
-                if field.parent_type_id == query_type.into() {
+                if resolver_field.is_fetchable {
                     return Some(
                         generate_fetchable_resolver_artifact(schema, resolver_field)
                             .map(|x| Artifact::FetchableResolver(x)),
@@ -102,10 +98,10 @@ fn generate_fetchable_resolver_artifact<'schema>(
             field.name,
             resolver_definition.resolver_definition_path,
         );
-        let resolver_response_type_declaration =
-            ResolverReturnTypeTypeDeclaration("foo: string".to_string());
-        let user_response_type_declaration =
-            ResolverReadOutTypeDeclaration("foo: string".to_string());
+        let resolver_response_type_declaration = generate_resolver_return_type_declaration(
+            resolver_definition.has_associated_js_function,
+        );
+        let resolver_read_out_type = generate_read_out_type(resolver_definition);
         let reader_ast = generate_reader_ast(
             schema,
             selection_set_and_unwraps,
@@ -120,8 +116,8 @@ fn generate_fetchable_resolver_artifact<'schema>(
             parent_type: query_object.into(),
             resolver_parameter_type,
             resolver_import_statement,
-            resolver_response_type_declaration,
-            resolver_read_out_type_declaration: user_response_type_declaration,
+            resolver_return_type: resolver_response_type_declaration,
+            resolver_read_out_type,
             reader_ast,
             nested_resolver_artifact_imports,
         })
@@ -179,96 +175,89 @@ pub struct ResolverParameterType(pub String);
 pub struct ResolverImportStatement(pub String);
 
 #[derive(Debug)]
-pub struct ResolverReturnTypeTypeDeclaration(pub String);
+pub struct ResolverReturnType(pub String);
 
 #[derive(Debug)]
-pub struct ResolverReadOutTypeDeclaration(pub String);
+pub struct ResolverReadOutType(pub String);
 
 #[derive(Debug)]
 pub struct ReaderAst(pub String);
-
-#[derive(Debug, Eq, PartialEq, Hash, Clone)]
-pub struct NestedResolverName(pub String);
 
 #[derive(Debug)]
 pub struct FetchableResolver<'schema> {
     pub query_text: QueryText,
     pub query_name: QueryOperationName,
     pub parent_type: SchemaTypeWithFields<'schema>,
-    pub resolver_parameter_type: ResolverParameterType,
     pub resolver_import_statement: ResolverImportStatement,
-    pub resolver_response_type_declaration: ResolverReturnTypeTypeDeclaration,
-    pub resolver_read_out_type_declaration: ResolverReadOutTypeDeclaration,
+    pub resolver_parameter_type: ResolverParameterType,
+    pub resolver_return_type: ResolverReturnType,
+    pub resolver_read_out_type: ResolverReadOutType,
     pub reader_ast: ReaderAst,
-    pub nested_resolver_artifact_imports: HashMap<NestedResolverName, ResolverImport>,
+    pub nested_resolver_artifact_imports: HashMap<TypeAndField, ResolverImport>,
 }
 
 impl<'schema> FetchableResolver<'schema> {
-    fn file_contents(&self) -> String {
+    fn file_contents(self) -> String {
         // TODO don't use merged, use regular selection set when generating fragment type
         // (i.e. we are not data masking)
         format!(
-            "import type {{BoultonFetchableResolver, ReaderAst}} from '@boulton/react';\n\
+            "import type {{BoultonFetchableResolver, ReaderAst, FragmentReference}} from '@boulton/react';\n\
             {}\n\
             {}\n\
             const queryText = '{}';\n\n\
             const normalizationAst = {{notNeededForDemo: true}};\n\
-            const readerAst: ReaderAst = {};\n\n\
+            const readerAst: ReaderAst<ResolverParameterType> = {};\n\n\
             export type ResolverParameterType = {{\n{}}};\n\n\
             // The type, when returned from the resolver\n\
-            type ResolverReturnType = {{\n  {}\n}};\n\n\
-            // The type, when read out\n\
-            export type ReadOutType = {{\n  {}\n}};\n\n\
-            export type ResolverType = {{\n\
-            {}readOut: ReadOutType,\n\
-            {}resolverReturn: ResolverReturnType,\n\
-            {}resolverParameter: ResolverParameterType,\n\
-            }}\n\
+            export type ResolverReturnType = {};\n\n\
+            {}\n\n\
             const artifact: BoultonFetchableResolver<ResolverParameterType, ResolverReturnType, ReadOutType> = {{\n\
             {}kind: 'FetchableResolver',\n\
             {}queryText,\n\
             {}normalizationAst,\n\
             {}readerAst,\n\
-            {}resolver,\n\
+            {}resolver: resolver as any,\n\
+              convert: (x) => {{ return x; }},\n\
             }};\n\n\
             export default artifact;\n",
             self.resolver_import_statement.0,
-            nested_resolver_names_to_import_statement(&self.nested_resolver_artifact_imports),
+            nested_resolver_names_to_import_statement(self.nested_resolver_artifact_imports),
             self.query_text.0,
             self.reader_ast.0,
             self.resolver_parameter_type.0,
-            self.resolver_response_type_declaration.0,
-            self.resolver_read_out_type_declaration.0,
+            self.resolver_return_type.0,
+            get_read_out_type_text(self.resolver_read_out_type),
             "  ",
             "  ",
             "  ",
             "  ",
             "  ",
-            "  ",
-            "  ",
-            "  "
         )
     }
+}
+
+fn get_read_out_type_text(read_out_type: ResolverReadOutType) -> String {
+    format!("// the type, when read out (either via useLazyReference or via graph)\nexport type ReadOutType = {};", read_out_type.0)
 }
 
 #[derive(Debug)]
 pub struct NonFetchableResolver<'schema> {
     pub parent_type: SchemaTypeWithFields<'schema>,
     pub resolver_field_name: FieldDefinitionName,
-    pub nested_resolver_artifact_imports: HashMap<NestedResolverName, ResolverImport>,
+    pub nested_resolver_artifact_imports: HashMap<TypeAndField, ResolverImport>,
     pub reader_ast: ReaderAst,
     pub resolver_import_statement: ResolverImportStatement,
 }
 
 impl<'schema> NonFetchableResolver<'schema> {
-    pub fn file_contents(&self) -> String {
+    pub fn file_contents(self) -> String {
         format!(
             "import type {{BoultonNonFetchableResolver, ReaderAst}} from '@boulton/react';\n\
             {}\n\
             {}\n\
             // TODO generate actual types\n\
             export type ReadOutType = string;\n\n\
-            const readerAst: ReaderAst = {};\n\n\
+            const readerAst: ReaderAst<ResolverParameterType> = {};\n\n\
             const artifact: BoultonNonFetchableResolver = {{\n\
             {}kind: 'NonFetchableResolver',\n\
             {}resolver,\n\
@@ -276,7 +265,7 @@ impl<'schema> NonFetchableResolver<'schema> {
             }};\n\n\
             export default artifact;\n",
             self.resolver_import_statement.0,
-            nested_resolver_names_to_import_statement(&self.nested_resolver_artifact_imports),
+            nested_resolver_names_to_import_statement(self.nested_resolver_artifact_imports),
             self.reader_ast.0,
             "  ",
             "  ",
@@ -495,7 +484,7 @@ fn generate_resolver_parameter_type(
     schema: &ValidatedSchema,
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
     parent_type: SchemaTypeWithFields,
-    nested_resolver_imports: &mut HashMap<NestedResolverName, ResolverImport>,
+    nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
     indentation_level: u8,
 ) -> Result<ResolverParameterType, GenerateArtifactsError> {
     // TODO use unwraps
@@ -519,7 +508,7 @@ fn write_query_types_from_selection(
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
     parent_type: SchemaTypeWithFields,
-    nested_resolver_imports: &mut HashMap<NestedResolverName, ResolverImport>,
+    nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
     indentation_level: u8,
 ) -> Result<(), GenerateArtifactsError> {
     query_type_declaration.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
@@ -553,21 +542,15 @@ fn write_query_types_from_selection(
                         let resolver_field = schema.field(*parent_field_id);
                         match &resolver_field.field_type {
                             DefinedField::ServerField(_) => panic!("Expected resolver"),
-                            DefinedField::ResolverField(_) => {
+                            DefinedField::ResolverField(resolver_field) => {
                                 // TODO make this part of the ResolverField payload
-                                let resolver_import_name = NestedResolverName(format!(
-                                    "{}__{}",
-                                    parent_type.name(),
-                                    resolver_field_name
-                                ));
-                                // Why does entry consume its argument?
-                                match nested_resolver_imports.entry(resolver_import_name.clone()) {
+                                match nested_resolver_imports.entry(resolver_field.type_and_field) {
                                     Entry::Occupied(mut occupied) => {
                                         occupied.get_mut().types.push(ResolverImportType {
                                             original: ResolverImportName("ReadOutType".to_string()),
                                             alias: ResolverImportAlias(format!(
                                                 "{}__outputType",
-                                                resolver_import_name.0
+                                                resolver_field.type_and_field
                                             )),
                                         });
                                     }
@@ -580,7 +563,7 @@ fn write_query_types_from_selection(
                                                 ),
                                                 alias: ResolverImportAlias(format!(
                                                     "{}__outputType",
-                                                    resolver_import_name.0
+                                                    resolver_field.type_and_field
                                                 )),
                                             }],
                                         });
@@ -589,7 +572,7 @@ fn write_query_types_from_selection(
 
                                 query_type_declaration.push_str(&format!(
                                     "{}: {}__outputType,\n",
-                                    alias, resolver_import_name.0
+                                    alias, resolver_field.type_and_field
                                 ));
                             }
                         }
@@ -652,7 +635,7 @@ fn generate_reader_ast<'schema>(
     selection_set_and_unwraps: &'schema ValidatedSelectionSetAndUnwraps,
     parent_type: SchemaTypeWithFields<'schema>,
     indentation_level: u8,
-    nested_resolver_imports: &mut HashMap<NestedResolverName, ResolverImport>,
+    nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
 ) -> ReaderAst {
     let mut reader_ast = "[\n".to_string();
     for item in &selection_set_and_unwraps.selection_set {
@@ -674,7 +657,7 @@ fn generate_reader_ast_node(
     parent_type: SchemaTypeWithFields,
     schema: &ValidatedSchema,
     indentation_level: u8,
-    nested_resolver_imports: &mut HashMap<NestedResolverName, ResolverImport>,
+    nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
 ) -> String {
     match &item.item {
         Selection::Field(field) => match field {
@@ -719,12 +702,6 @@ fn generate_reader_ast_node(
                         match &resolver_field.field_type {
                             DefinedField::ServerField(_) => panic!("Expected resolver"),
                             DefinedField::ResolverField(resolver_field) => {
-                                // TODO move me to the SchemaResolverDefinitionInfo
-                                let resolver_import_name = NestedResolverName(format!(
-                                    "{}__{}",
-                                    parent_type.name(),
-                                    field_name
-                                ));
                                 let arguments = format_arguments(
                                     &scalar_field.arguments,
                                     indentation_level + 1,
@@ -738,12 +715,12 @@ fn generate_reader_ast_node(
                                     "  ".repeat((indentation_level + 1) as usize),
                                     arguments,
                                     "  ".repeat((indentation_level + 1) as usize),
-                                    resolver_import_name.0,
+                                    resolver_field.type_and_field,
                                     "  ".repeat((indentation_level + 1) as usize),
                                     resolver_field.variant.map(|x| format!("\"{}\"", x)).unwrap_or_else(|| "null".to_string()),
                                     "  ".repeat(indentation_level as usize),
                                 );
-                                match nested_resolver_imports.entry(resolver_import_name) {
+                                match nested_resolver_imports.entry(resolver_field.type_and_field) {
                                     Entry::Occupied(mut occupied) => {
                                         occupied.get_mut().default_import = true;
                                     }
@@ -796,9 +773,14 @@ fn generate_reader_ast_node(
 }
 
 fn nested_resolver_names_to_import_statement(
-    nested_resolver_imports: &HashMap<NestedResolverName, ResolverImport>,
+    nested_resolver_imports: HashMap<TypeAndField, ResolverImport>,
 ) -> String {
     let mut overall = String::new();
+
+    // TODO we should always sort outputs. We should find a nice generic way to ensure that.
+    let mut nested_resolver_imports: Vec<_> = nested_resolver_imports.into_iter().collect();
+    nested_resolver_imports.sort_by(|(a, _), (b, _)| a.cmp(b));
+
     for (nested_resolver_name, resolver_import) in nested_resolver_imports {
         if !resolver_import.default_import && resolver_import.types.is_empty() {
             continue;
@@ -806,7 +788,7 @@ fn nested_resolver_names_to_import_statement(
 
         let mut s = "import ".to_string();
         if resolver_import.default_import {
-            s.push_str(&format!("{}", nested_resolver_name.0));
+            s.push_str(&format!("{}", nested_resolver_name));
         }
         let mut types = resolver_import.types.iter();
         if let Some(first) = types.next() {
@@ -820,7 +802,7 @@ fn nested_resolver_names_to_import_statement(
             }
             s.push_str("}");
         }
-        s.push_str(&format!(" from './{}.boulton';\n", nested_resolver_name.0));
+        s.push_str(&format!(" from './{}.boulton';\n", nested_resolver_name));
         overall.push_str(&s);
     }
     overall
@@ -880,5 +862,35 @@ fn format_arguments(
         }
         out_str.push_str(&format!("\n{}}}", "  ".repeat(indentation_level as usize)));
         out_str
+    }
+}
+
+fn generate_read_out_type(
+    resolver_definition: &ValidatedSchemaResolverDefinitionInfo,
+) -> ResolverReadOutType {
+    match resolver_definition.variant {
+        Some(variant) => match variant.item {
+            ResolverVariant::Component => {
+                // Close enough
+                ResolverReadOutType(
+                    "React.FC<{ data: ResolverParameterType } & Object>".to_string(),
+                )
+            }
+            ResolverVariant::Eager => ResolverReadOutType("ResolverReturnType".to_string()),
+        },
+        None => ResolverReadOutType(
+            "FragmentReference<ResolverParameterType, ResolverReturnType, TReadOutType>"
+                .to_string(),
+        ),
+    }
+}
+
+fn generate_resolver_return_type_declaration(
+    has_associated_js_function: bool,
+) -> ResolverReturnType {
+    if has_associated_js_function {
+        ResolverReturnType("ReturnType<typeof resolver>".to_string())
+    } else {
+        ResolverReturnType("ResolverParameterType".to_string())
     }
 }

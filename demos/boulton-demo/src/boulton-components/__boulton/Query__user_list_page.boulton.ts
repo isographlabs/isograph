@@ -1,28 +1,30 @@
 import type {BoultonFetchableResolver, ReaderAst, FragmentReference} from '@boulton/react';
-import { user_detail_page as resolver } from '../user_detail_page.tsx';
-import User__user_profile_with_details, { ReadOutType as User__user_profile_with_details__outputType } from './User__user_profile_with_details.boulton';
+import { user_list_page as resolver } from '../user_list.tsx';
+import User__user_list_component, { ReadOutType as User__user_list_component__outputType } from './User__user_list_component.boulton';
 
-const queryText = 'query user_detail_page  {\
-  current_user {\
+const queryText = 'query user_list_page ($bar: String!) {\
+  byah__foo_bar: byah(foo: $bar),\
+  users {\
     avatar_url,\
     email,\
     id,\
     name,\
-    billing_details {\
-      address,\
-      card_brand,\
-      credit_card_number,\
-      expiration_date,\
-      id,\
-    },\
   },\
 }';
 
 const normalizationAst = {notNeededForDemo: true};
 const readerAst: ReaderAst<ResolverParameterType> = [
   {
+    kind: "Scalar",
+    response_name: "byah",
+    alias: null,
+    arguments: {
+      "foo": "bar",
+    },
+  },
+  {
     kind: "Linked",
-    response_name: "current_user",
+    response_name: "users",
     alias: null,
     arguments: null,
     selections: [
@@ -34,9 +36,9 @@ const readerAst: ReaderAst<ResolverParameterType> = [
       },
       {
         kind: "Resolver",
-        alias: "user_profile_with_details",
+        alias: "user_list_component",
         arguments: null,
-        resolver: User__user_profile_with_details,
+        resolver: User__user_list_component,
         variant: "Component",
       },
     ],
@@ -44,9 +46,10 @@ const readerAst: ReaderAst<ResolverParameterType> = [
 ];
 
 export type ResolverParameterType = {
-  current_user: {
+  byah: string,
+  users: {
     id: string,
-    user_profile_with_details: User__user_profile_with_details__outputType,
+    user_list_component: User__user_list_component__outputType,
   },
 };
 

@@ -1,5 +1,4 @@
 use crate::ValidScalarFieldType;
-use intern::string;
 pub use string_key_newtype::StringKeyNewtype;
 
 use super::ValidTypeAnnotationInnerType;
@@ -113,3 +112,6 @@ string_key_newtype!(JavascriptName);
 string_key_newtype!(BoultonDirectiveName);
 
 string_key_newtype!(FieldArgumentName);
+
+// e.g. Query__foo
+string_key_newtype!(TypeAndField);
