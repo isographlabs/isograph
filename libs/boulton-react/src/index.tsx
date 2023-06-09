@@ -140,7 +140,6 @@ export function useLazyReference<
   );
   const data =
     useLazyDisposableState<PromiseWrapper<TResolverResult>>(cache).state;
-
   return {
     queryReference: {
       kind: "FragmentReference",
@@ -169,13 +168,7 @@ export function read<
   if (response.kind === "MissingData") {
     throw onNextChange();
   } else {
-    console.log(
-      "calling resolver",
-      reference.resolver,
-      reference.convert,
-      new Error().stack
-    );
-    return reference.resolver(reference.convert(response.data));
+    return reference.convert(reference.resolver, response.data);
   }
 }
 
@@ -272,6 +265,7 @@ function readData<TReadFromStore>(
           if (data.kind === "MissingData") {
             return { kind: "MissingData" };
           } else {
+            // TODO do we also need to call convert?
             target[field.alias] = field.resolver.resolver(data.data);
           }
         } else if (field.variant === "Component") {

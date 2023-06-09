@@ -108,6 +108,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
             0,
             &mut nested_resolver_artifact_imports,
         );
+        let convert_function = generate_convert_function(&resolver_definition.variant);
 
         FetchableResolver {
             query_text,
@@ -119,6 +120,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
             resolver_read_out_type,
             reader_ast,
             nested_resolver_artifact_imports,
+            convert_function,
         }
     } else {
         // TODO convert to error
@@ -207,6 +209,9 @@ pub struct ResolverReadOutType(pub String);
 pub struct ReaderAst(pub String);
 
 #[derive(Debug)]
+pub struct ConvertFunction(pub String);
+
+#[derive(Debug)]
 pub struct FetchableResolver<'schema> {
     pub query_text: QueryText,
     pub query_name: QueryOperationName,
@@ -217,6 +222,7 @@ pub struct FetchableResolver<'schema> {
     pub resolver_read_out_type: ResolverReadOutType,
     pub reader_ast: ReaderAst,
     pub nested_resolver_artifact_imports: HashMap<TypeAndField, ResolverImport>,
+    pub convert_function: ConvertFunction,
 }
 
 impl<'schema> FetchableResolver<'schema> {
@@ -242,7 +248,7 @@ impl<'schema> FetchableResolver<'schema> {
             {}normalizationAst,\n\
             {}readerAst,\n\
             {}resolver: resolver as any,\n\
-            {}convert: (x) => {{ return x; }},\n\
+            {}convert: {},\n\
             }};\n\n\
             export default artifact;\n",
             self.resolver_import_statement.0,
@@ -258,6 +264,7 @@ impl<'schema> FetchableResolver<'schema> {
             "  ",
             "  ",
             "  ",
+            self.convert_function.0,
         )
     }
 }
@@ -295,7 +302,8 @@ impl<'schema> NonFetchableResolver<'schema> {
             {}kind: 'NonFetchableResolver',\n\
             {}resolver: resolver as any,\n\
             {}readerAst,\n\
-            {}convert: (x) => x,\n\
+            // is this needed?
+            {}convert: (x) => {{throw new Error('convert non fetchable')}},\n\
             }};\n\n\
             export default artifact;\n",
             self.resolver_import_statement.0,
@@ -1004,4 +1012,16 @@ fn generate_resolver_return_type_declaration(
     } else {
         ResolverReturnType("ResolverParameterType".to_string())
     }
+}
+
+fn generate_convert_function(variant: &Option<WithSpan<ResolverVariant>>) -> ConvertFunction {
+    match variant {
+        Some(variant) => {
+            if let ResolverVariant::Component = variant.item {
+                return ConvertFunction("((resolver, data) => additionalParams => resolver({ data, ...additionalParams }))".to_string());
+            }
+        }
+        None => {}
+    }
+    ConvertFunction("((resolver, data) => resolver(data))".to_string())
 }

@@ -1,6 +1,6 @@
 import type {BoultonFetchableResolver, ReaderAst, FragmentReference} from '@boulton/react';
 import { user_list_page as resolver } from '../user_list_page.tsx';
-import User__user_list_component, { ReadOutType as User__user_list_component__outputType } from './User__user_list_component.boulton';
+import User__user_detail, { ReadOutType as User__user_detail__outputType } from './User__user_detail.boulton';
 
 const queryText = 'query user_list_page ($bar: String!) {\
   byah__foo_bar: byah(foo: $bar),\
@@ -39,30 +39,28 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
       },
       {
         kind: "Resolver",
-        alias: "user_list_component",
+        alias: "user_detail",
         arguments: null,
-        resolver: User__user_list_component,
+        resolver: User__user_detail,
         variant: "Component",
       },
     ],
   },
 ];
 
-export type ResolverParameterType = { data:
-{
+export type ResolverParameterType = {
   byah: string,
   users: ({
     id: string,
-    user_list_component: User__user_list_component__outputType,
+    user_detail: User__user_detail__outputType,
   })[],
-},
-[index: string]: any };
+};
 
 // The type, when returned from the resolver
-export type ResolverReturnType = ReturnType<typeof resolver>;
+export type ResolverReturnType = ResolverParameterType;
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = React.FC<{ } & Object>;
+export type ReadOutType = FragmentReference<ReadFromStoreType, ResolverParameterType, ResolverReturnType>;
 
 const artifact: BoultonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
   kind: 'FetchableResolver',
@@ -70,7 +68,7 @@ const artifact: BoultonFetchableResolver<ReadFromStoreType, ResolverParameterTyp
   normalizationAst,
   readerAst,
   resolver: resolver as any,
-  convert: (x) => { return x; },
+  convert: ((resolver, data) => resolver(data)),
 };
 
 export default artifact;

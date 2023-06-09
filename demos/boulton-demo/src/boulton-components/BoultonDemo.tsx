@@ -33,15 +33,13 @@ function TopLevelListView({ onSelectId }) {
   console.log("queryReference", queryReference);
 
   const listPageData = read(queryReference);
-  console.log("listPageData", listPageData);
-  return listPageData;
 
   return (
     <>
       <h1>Users</h1>
       {listPageData.byah}
       {listPageData.users.map((user) => {
-        const user_component = user.user_list_component({ onSelectId });
+        const user_component = user.user_detail({ onSelectId });
         return <div key={user.id}>{user_component}</div>;
       })}
     </>
@@ -50,9 +48,12 @@ function TopLevelListView({ onSelectId }) {
 
 function TopLevelUserProfileWithDetails({ onGoBack }) {
   // TODO replace this with the trick that causes graphql`...` literals to work
-  const { queryReference } = useLazyReference(userDetailPageQuery, {});
-  const data = read(queryReference);
-  return data.current_user.user_profile_with_details({ onGoBack });
+  const { queryReference } = useLazyReference(userDetailPageQuery, {
+    onGoBack,
+  });
+  const x = read(queryReference);
+  console.log("x", x);
+  return x({ onGoBack });
 }
 
 function FullPageLoading() {

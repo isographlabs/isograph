@@ -46,18 +46,20 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
 ];
 
-export type ResolverParameterType = {
+export type ResolverParameterType = { data:
+{
   current_user: {
     id: string,
     user_profile_with_details: User__user_profile_with_details__outputType,
   },
-};
+},
+[index: string]: any };
 
 // The type, when returned from the resolver
-export type ResolverReturnType = ResolverParameterType;
+export type ResolverReturnType = ReturnType<typeof resolver>;
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = FragmentReference<ReadFromStoreType, ResolverParameterType, ResolverReturnType>;
+export type ReadOutType = React.FC<{ } & Object>;
 
 const artifact: BoultonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
   kind: 'FetchableResolver',
@@ -65,7 +67,7 @@ const artifact: BoultonFetchableResolver<ReadFromStoreType, ResolverParameterTyp
   normalizationAst,
   readerAst,
   resolver: resolver as any,
-  convert: (x) => { return x; },
+  convert: ((resolver, data) => additionalParams => resolver({ data, ...additionalParams })),
 };
 
 export default artifact;

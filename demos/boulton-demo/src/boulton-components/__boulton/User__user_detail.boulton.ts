@@ -1,5 +1,5 @@
 import type {BoultonNonFetchableResolver, ReaderAst} from '@boulton/react';
-import { user_list_component as resolver } from '../user_list_page.tsx';
+import { user_detail as resolver } from '../user_list_page.tsx';
 import User__avatar_component, { ReadOutType as User__avatar_component__outputType } from './User__avatar_component.boulton';
 
 // the type, when read out (either via useLazyReference or via graph)
@@ -45,7 +45,8 @@ const artifact: BoultonNonFetchableResolver<ReadFromStoreType, ResolverParameter
   kind: 'NonFetchableResolver',
   resolver: resolver as any,
   readerAst,
-  convert: (x) => x,
+// is this needed?
+              convert: (x) => {throw new Error('convert non fetchable')},
 };
 
 export default artifact;

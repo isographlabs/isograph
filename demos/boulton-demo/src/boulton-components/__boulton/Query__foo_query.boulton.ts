@@ -54,7 +54,7 @@ const artifact: BoultonFetchableResolver<ReadFromStoreType, ResolverParameterTyp
   normalizationAst,
   readerAst,
   resolver: resolver as any,
-  convert: (x) => { return x; },
+  convert: ((resolver, data) => resolver(data)),
 };
 
 export default artifact;
