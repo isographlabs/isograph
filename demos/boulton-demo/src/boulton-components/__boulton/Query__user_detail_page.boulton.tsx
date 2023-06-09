@@ -1,16 +1,9 @@
-import type {
-  BoultonFetchableResolver,
-  ReaderAst,
-  FragmentReference,
-} from "@boulton/react";
-import { getRefRendererForName } from "@boulton/react";
-import { user_detail_page as resolver } from "../user_detail_page.tsx";
-import User__user_profile_with_details, {
-  ReadOutType as User__user_profile_with_details__outputType,
-} from "./User__user_profile_with_details.boulton";
+import type {BoultonFetchableResolver, ReaderAst, FragmentReference} from '@boulton/react';
+import { getRefRendererForName } from '@boulton/react';
+import { user_detail_page as resolver } from '../user_detail_page.tsx';
+import User__user_profile_with_details, { ReadOutType as User__user_profile_with_details__outputType } from './User__user_profile_with_details.boulton';
 
-const queryText =
-  "query user_detail_page  {\
+const queryText = 'query user_detail_page  {\
   current_user {\
     avatar_url,\
     email,\
@@ -24,12 +17,12 @@ const queryText =
       id,\
     },\
   },\
-}";
+}';
 
 // TODO support changing this,
 export type ReadFromStoreType = ResolverParameterType;
 
-const normalizationAst = { notNeededForDemo: true };
+const normalizationAst = {notNeededForDemo: true};
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Linked",
@@ -54,44 +47,38 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
 ];
 
-export type ResolverParameterType = {
-  data: {
-    current_user: {
-      id: string;
-      user_profile_with_details: User__user_profile_with_details__outputType;
-    };
-  };
-  [index: string]: any;
-};
+export type ResolverParameterType = { data:
+{
+  current_user: {
+    id: string,
+    user_profile_with_details: User__user_profile_with_details__outputType,
+  },
+},
+[index: string]: any };
 
 // The type, when returned from the resolver
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = React.FC<{} & Object>;
+export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
 
-const artifact: BoultonFetchableResolver<
-  ReadFromStoreType,
-  ResolverParameterType,
-  ReadOutType
-> = {
-  kind: "FetchableResolver",
+const artifact: BoultonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
+  kind: 'FetchableResolver',
   queryText,
   normalizationAst,
   readerAst,
   resolver: resolver as any,
   convert: (() => {
-    const RefRendererForName = getRefRendererForName("user_detail_page");
-    return (resolver, data) => (additionalRuntimeProps) => {
-      return (
-        <RefRendererForName
+    const RefRendererForName = getRefRendererForName('user_detail_page');
+    return ((resolver, data) => additionalRuntimeProps => 
+      {
+        return <RefRendererForName 
           resolver={resolver}
           data={data}
           additionalRuntimeProps={additionalRuntimeProps}
-        />
-      );
-    };
-  })(),
+        />;
+      })
+    })(),
 };
 
 export default artifact;

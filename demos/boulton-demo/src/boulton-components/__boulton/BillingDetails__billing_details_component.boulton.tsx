@@ -3,7 +3,7 @@ import { billing_details_component as resolver } from '../billing_details_compon
 import BillingDetails__last_four_digits, { ReadOutType as BillingDetails__last_four_digits__outputType } from './BillingDetails__last_four_digits.boulton';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = React.FC<{ } & Object>;
+export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
 
 // TODO support changing this
 export type ReadFromStoreType = ResolverParameterType;

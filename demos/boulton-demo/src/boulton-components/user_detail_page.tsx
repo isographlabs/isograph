@@ -4,7 +4,6 @@ import { bDeclare } from "@boulton/react";
 import { ResolverParameterType as UserDetailPageProps } from "./__boulton/Query__user_detail_page.boulton";
 import { ResolverParameterType as UserProfileWithDetails } from "./__boulton/User__user_profile_with_details.boulton";
 
-// TODO @component seems to have no effect?
 export const user_detail_page = bDeclare<
   UserDetailPageProps,
   ReturnType<typeof UserDetailPage>
@@ -55,7 +54,6 @@ export const user_profile_with_details = bDeclare<
         {state ? "true" : "false"}
       </p>
       {data.billing_details.billing_details_component({
-        additionalRuntimePropsGoHere: "unused",
         setStateToFalse: () => setState(false),
       })}
     </>

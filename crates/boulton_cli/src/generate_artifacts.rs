@@ -990,8 +990,12 @@ fn generate_read_out_type(
     match resolver_definition.variant {
         Some(variant) => match variant.item {
             ResolverVariant::Component => {
-                // Does **not** include data, because that's provided by Boulton
-                ResolverReadOutType("React.FC<{ } & Object>".to_string())
+                // The read out type of a component is a function that accepts additional
+                // (currently untyped) runtime props, and returns a component.
+                ResolverReadOutType(
+                    "(additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null)"
+                        .to_string(),
+                )
             }
             ResolverVariant::Eager => ResolverReadOutType("ResolverReturnType".to_string()),
         },

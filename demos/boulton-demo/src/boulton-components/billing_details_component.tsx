@@ -3,16 +3,6 @@ import { bDeclare, type BoultonComponentProps } from "@boulton/react";
 
 import type { ResolverParameterType } from "./__boulton/BillingDetails__billing_details_component.boulton";
 
-// TODO the compiler will generate this type
-type GeneratedDataType = {
-  id: string;
-  card_brand: string;
-  credit_card_number: string;
-  expiration_date: string;
-  address: string;
-  last_four_digits: string;
-};
-
 export const billing_details_component = bDeclare<
   ResolverParameterType,
   ReturnType<typeof BillingDetailsComponent>

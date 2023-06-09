@@ -2,7 +2,7 @@ import type {BoultonNonFetchableResolver, ReaderAst} from '@boulton/react';
 import { avatar_component as resolver } from '../avatar.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = React.FC<{ } & Object>;
+export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
 
 // TODO support changing this
 export type ReadFromStoreType = ResolverParameterType;
