@@ -6,15 +6,12 @@ use boulton_lang_types::{
     SelectionFieldArgument, SelectionSetAndUnwraps,
 };
 use common_lang_types::{
-    DefinedField, FieldDefinitionName, FieldNameOrAlias, TypeWithFieldsId, TypeWithoutFieldsId,
-    WithSpan,
+    DefinedField, FieldDefinitionName, FieldId, FieldNameOrAlias, TypeWithFieldsId,
+    TypeWithoutFieldsId, WithSpan,
 };
 use intern::string_key::Intern;
 
-use crate::{
-    SchemaTypeWithFields, UnvalidatedObjectFieldInfo, ValidatedSchema,
-    ValidatedSelectionSetAndUnwraps,
-};
+use crate::{SchemaTypeWithFields, ValidatedSchema, ValidatedSelectionSetAndUnwraps};
 
 pub type MergedSelectionSet = Vec<WithSpan<Selection<TypeWithoutFieldsId, TypeWithFieldsId>>>;
 
@@ -26,7 +23,7 @@ pub type MergedSelectionSet = Vec<WithSpan<Selection<TypeWithoutFieldsId, TypeWi
 /// TODO: SelectionSetAndUnwraps should be generic enough to handle this
 pub fn merge_selection_set(
     schema: &ValidatedSchema,
-    parent_type: SchemaTypeWithFields<UnvalidatedObjectFieldInfo>,
+    parent_type: SchemaTypeWithFields<FieldId>,
     selection_set: &ValidatedSelectionSetAndUnwraps,
 ) -> MergedSelectionSet {
     // TODO restructure types such that
@@ -56,7 +53,7 @@ fn merge_selections_into_set(
         FieldNameOrAlias,
         WithSpan<Selection<TypeWithoutFieldsId, TypeWithFieldsId>>,
     >,
-    parent_type: SchemaTypeWithFields<UnvalidatedObjectFieldInfo>,
+    parent_type: SchemaTypeWithFields<FieldId>,
     value: &ValidatedSelectionSetAndUnwraps,
 ) {
     for item in value.selection_set.iter() {

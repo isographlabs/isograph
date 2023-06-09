@@ -12,14 +12,13 @@ use boulton_lang_types::{
 };
 use boulton_schema::{
     merge_selection_set, MergedSelectionSet, ResolverVariant, SchemaTypeWithFields,
-    UnvalidatedObjectFieldInfo, UnvalidatedSchemaTypeWithFields, ValidatedSchema,
-    ValidatedSchemaResolverDefinitionInfo, ValidatedSelection, ValidatedSelectionSetAndUnwraps,
-    ValidatedVariableDefinition,
+    ValidatedSchema, ValidatedSchemaResolverDefinitionInfo, ValidatedSelection,
+    ValidatedSelectionSetAndUnwraps, ValidatedVariableDefinition,
 };
 use common_lang_types::{
-    DefinedField, FieldDefinitionName, HasName, QueryOperationName, ResolverDefinitionPath,
-    TypeAndField, TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId, UnvalidatedTypeName,
-    WithSpan,
+    DefinedField, FieldDefinitionName, FieldId, HasName, QueryOperationName,
+    ResolverDefinitionPath, TypeAndField, TypeWithFieldsId, TypeWithFieldsName,
+    TypeWithoutFieldsId, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::TypeAnnotation;
 use thiserror::Error;
@@ -189,7 +188,7 @@ pub struct ReaderAst(pub String);
 pub struct FetchableResolver<'schema> {
     pub query_text: QueryText,
     pub query_name: QueryOperationName,
-    pub parent_type: SchemaTypeWithFields<'schema, UnvalidatedObjectFieldInfo>,
+    pub parent_type: SchemaTypeWithFields<'schema, FieldId>,
     pub resolver_import_statement: ResolverImportStatement,
     pub resolver_parameter_type: ResolverParameterType,
     pub resolver_return_type: ResolverReturnType,
@@ -247,7 +246,7 @@ fn get_read_out_type_text(read_out_type: ResolverReadOutType) -> String {
 
 #[derive(Debug)]
 pub struct NonFetchableResolver<'schema> {
-    pub parent_type: SchemaTypeWithFields<'schema, UnvalidatedObjectFieldInfo>,
+    pub parent_type: SchemaTypeWithFields<'schema, FieldId>,
     pub resolver_field_name: FieldDefinitionName,
     pub nested_resolver_artifact_imports: HashMap<TypeAndField, ResolverImport>,
     pub resolver_read_out_type: ResolverReadOutType,
@@ -491,7 +490,7 @@ fn write_artifacts<'schema>(
 fn generate_resolver_parameter_type(
     schema: &ValidatedSchema,
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
-    parent_type: UnvalidatedSchemaTypeWithFields,
+    parent_type: SchemaTypeWithFields<'_, FieldId>,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
     indentation_level: u8,
 ) -> Result<ResolverParameterType, GenerateArtifactsError> {
@@ -515,7 +514,7 @@ fn write_query_types_from_selection(
     schema: &ValidatedSchema,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
-    parent_type: UnvalidatedSchemaTypeWithFields,
+    parent_type: SchemaTypeWithFields<'_, FieldId>,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
     indentation_level: u8,
 ) -> Result<(), GenerateArtifactsError> {
@@ -641,7 +640,7 @@ pub struct ResolverImport {
 fn generate_reader_ast<'schema>(
     schema: &'schema ValidatedSchema,
     selection_set_and_unwraps: &'schema ValidatedSelectionSetAndUnwraps,
-    parent_type: SchemaTypeWithFields<'schema, UnvalidatedObjectFieldInfo>,
+    parent_type: SchemaTypeWithFields<'schema, FieldId>,
     indentation_level: u8,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
 ) -> ReaderAst {
@@ -662,7 +661,7 @@ fn generate_reader_ast<'schema>(
 
 fn generate_reader_ast_node(
     item: &WithSpan<Selection<DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>>,
-    parent_type: UnvalidatedSchemaTypeWithFields,
+    parent_type: SchemaTypeWithFields<'_, FieldId>,
     schema: &ValidatedSchema,
     indentation_level: u8,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,

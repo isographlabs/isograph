@@ -5,7 +5,7 @@ use boulton_lang_types::{
     VariableDefinition,
 };
 use common_lang_types::{
-    DefinedField, FieldDefinitionName, HasName, InputTypeId, OutputTypeId, TypeId,
+    DefinedField, FieldDefinitionName, FieldId, HasName, InputTypeId, OutputTypeId, TypeId,
     TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId, UnvalidatedTypeName, VariableName,
     WithSpan,
 };
@@ -13,9 +13,9 @@ use graphql_lang_types::TypeAnnotation;
 use thiserror::Error;
 
 use crate::{
-    Schema, SchemaField, SchemaResolverDefinitionInfo, SchemaTypeWithFields,
-    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData, UnvalidatedSchemaField,
-    UnvalidatedSchemaTypeWithFields,
+    Schema, SchemaData, SchemaField, SchemaObject, SchemaResolverDefinitionInfo,
+    SchemaTypeWithFields, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData,
+    UnvalidatedSchemaField, UnvalidatedSchemaTypeWithFields,
 };
 
 pub type ValidatedSchemaField =
@@ -33,13 +33,8 @@ pub type ValidatedSchemaResolverDefinitionInfo =
 
 pub type ValidatedVariableDefinition = VariableDefinition<InputTypeId>;
 
-pub type ValidatedSchema = Schema<
-    OutputTypeId,
-    ValidatedDefinedField,
-    TypeWithFieldsId,
-    InputTypeId,
-    UnvalidatedObjectFieldInfo,
->;
+pub type ValidatedSchema =
+    Schema<OutputTypeId, ValidatedDefinedField, TypeWithFieldsId, InputTypeId, FieldId>;
 
 impl ValidatedSchema {
     pub fn validate_and_construct(
@@ -50,18 +45,69 @@ impl ValidatedSchema {
             schema_data,
             id_type,
             string_type,
-            query_type_id: query_type,
+            query_type_id,
         } = unvalidated_schema;
 
         let updated_fields = validate_and_transform_fields(fields, &schema_data)?;
 
+        let SchemaData {
+            objects,
+            scalars,
+            defined_types,
+        } = schema_data;
+
+        let objects = objects
+            .into_iter()
+            .map(|object| transform_object_field_ids(&updated_fields, object))
+            .collect();
+
         Ok(Self {
             fields: updated_fields,
-            schema_data,
+            schema_data: SchemaData {
+                objects,
+                scalars,
+                defined_types,
+            },
             id_type,
             string_type,
-            query_type_id: query_type,
+            query_type_id,
         })
+    }
+}
+
+fn transform_object_field_ids(
+    schema_fields: &[ValidatedSchemaField],
+    object: SchemaObject<UnvalidatedObjectFieldInfo>,
+) -> SchemaObject<FieldId> {
+    let SchemaObject {
+        name,
+        fields,
+        description,
+        id,
+        encountered_field_names,
+    } = object;
+
+    let encountered_field_names = encountered_field_names
+        .into_iter()
+        .map(|(encountered_field_name, _)| {
+            for field in fields.iter() {
+                let field = &schema_fields[field.as_usize()];
+                if field.name == encountered_field_name {
+                    return (encountered_field_name, field.id);
+                }
+            }
+            panic!("field not found, probably a boulton bug but we should confirm");
+            // schema_fields[]
+            // schema_fields.
+        })
+        .collect();
+
+    SchemaObject {
+        description,
+        name,
+        id,
+        fields,
+        encountered_field_names,
     }
 }
 
