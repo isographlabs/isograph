@@ -34,21 +34,19 @@ pub(crate) fn generate_artifacts(
 
 fn get_all_artifacts<'schema>(
     schema: &'schema ValidatedSchema,
-) -> impl Iterator<Item = Result<Artifact<'schema>, GenerateArtifactsError>> + 'schema {
+) -> impl Iterator<Item = Artifact<'schema>> + 'schema {
     let mut fields = schema.fields.iter();
     std::iter::from_fn(move || {
         while let Some(field) = fields.next() {
             if let Some(resolver_field) = field.field_type.as_resolver_field() {
                 if resolver_field.is_fetchable {
-                    return Some(
-                        generate_fetchable_resolver_artifact(schema, resolver_field)
-                            .map(|x| Artifact::FetchableResolver(x)),
-                    );
+                    return Some(Artifact::FetchableResolver(
+                        generate_fetchable_resolver_artifact(schema, resolver_field),
+                    ));
                 } else {
-                    return Some(
-                        generate_non_fetchable_resolver_artifact(schema, resolver_field)
-                            .map(|x| Artifact::NonFetchableResolver(x)),
-                    );
+                    return Some(Artifact::NonFetchableResolver(
+                        generate_non_fetchable_resolver_artifact(schema, resolver_field),
+                    ));
                 }
             }
         }
@@ -62,7 +60,7 @@ pub struct QueryText(pub String);
 fn generate_fetchable_resolver_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     resolver_definition: &ValidatedSchemaResolverDefinitionInfo,
-) -> Result<FetchableResolver<'schema>, GenerateArtifactsError> {
+) -> FetchableResolver<'schema> {
     if let Some(ref selection_set_and_unwraps) = resolver_definition.selection_set_and_unwraps {
         let field = schema.field(resolver_definition.field_id);
         let query_name: QueryOperationName = field.name.into();
@@ -111,7 +109,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
             &mut nested_resolver_artifact_imports,
         );
 
-        Ok(FetchableResolver {
+        FetchableResolver {
             query_text,
             query_name,
             parent_type: query_object.into(),
@@ -121,7 +119,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
             resolver_read_out_type,
             reader_ast,
             nested_resolver_artifact_imports,
-        })
+        }
     } else {
         // TODO convert to error
         todo!("Unsupported: resolvers on query with no selection set")
@@ -131,7 +129,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
 fn generate_non_fetchable_resolver_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     resolver_definition: &ValidatedSchemaResolverDefinitionInfo,
-) -> Result<NonFetchableResolver<'schema>, GenerateArtifactsError> {
+) -> NonFetchableResolver<'schema> {
     if let Some(selection_set_and_unwraps) = &resolver_definition.selection_set_and_unwraps {
         let field = schema.field(resolver_definition.field_id);
         let parent_type = schema
@@ -162,7 +160,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
             field.name,
             resolver_definition.resolver_definition_path,
         );
-        Ok(NonFetchableResolver {
+        NonFetchableResolver {
             parent_type: schema
                 .schema_data
                 .lookup_type_with_fields(field.parent_type_id),
@@ -173,7 +171,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
             resolver_read_out_type,
             resolver_parameter_type,
             resolver_return_type,
-        })
+        }
     } else {
         panic!("Unsupported: resolvers not on query with no selection set")
     }
@@ -431,7 +429,7 @@ fn write_selections(
 }
 
 fn write_artifacts<'schema>(
-    artifacts: impl Iterator<Item = Result<Artifact<'schema>, GenerateArtifactsError>> + 'schema,
+    artifacts: impl Iterator<Item = Artifact<'schema>> + 'schema,
     project_root: &PathBuf,
 ) -> Result<(), GenerateArtifactsError> {
     let current_dir = std::env::current_dir().expect("current_dir should exist");
@@ -457,7 +455,6 @@ fn write_artifacts<'schema>(
         }
     })?;
     for artifact in artifacts {
-        let artifact = artifact?;
         match artifact {
             Artifact::FetchableResolver(fetchable_resolver) => {
                 let FetchableResolver {
