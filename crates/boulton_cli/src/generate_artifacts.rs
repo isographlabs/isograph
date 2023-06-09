@@ -87,7 +87,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
         );
         let mut nested_resolver_artifact_imports: HashMap<TypeAndField, ResolverImport> =
             HashMap::new();
-        let resolver_parameter_type = generate_read_from_store_type(
+        let resolver_parameter_type = generate_resolver_parameter_type(
             schema,
             &selection_set_and_unwraps.selection_set,
             query_object.into(),
@@ -144,6 +144,14 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
             0,
             &mut nested_resolver_artifact_imports,
         );
+
+        let resolver_parameter_type = generate_resolver_parameter_type(
+            schema,
+            &selection_set_and_unwraps.selection_set,
+            parent_type,
+            &mut nested_resolver_artifact_imports,
+            0,
+        );
         let resolver_read_out_type = generate_read_out_type(resolver_definition);
         let resolver_import_statement = generate_resolver_import_statement(
             field.name,
@@ -158,6 +166,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
             nested_resolver_artifact_imports,
             resolver_import_statement,
             resolver_read_out_type,
+            resolver_parameter_type,
         })
     } else {
         panic!("Unsupported: resolvers not on query with no selection set")
@@ -260,6 +269,7 @@ pub struct NonFetchableResolver<'schema> {
     pub nested_resolver_artifact_imports: HashMap<TypeAndField, ResolverImport>,
     pub resolver_read_out_type: ResolverReadOutType,
     pub reader_ast: ReaderAst,
+    pub resolver_parameter_type: ResolverParameterType,
     pub resolver_import_statement: ResolverImportStatement,
 }
 
@@ -270,7 +280,10 @@ impl<'schema> NonFetchableResolver<'schema> {
             {}\n\
             {}\n\
             {}\n\n\
+            // TODO support changing this\n\
+            export type ReadFromStoreType = ResolverParameterType;\n\n\
             const readerAst: ReaderAst<ReadFromStoreType> = {};\n\n\
+            export type ResolverParameterType = {};\n\n\
             const artifact: BoultonNonFetchableResolver = {{\n\
             {}kind: 'NonFetchableResolver',\n\
             {}resolver,\n\
@@ -282,6 +295,7 @@ impl<'schema> NonFetchableResolver<'schema> {
             nested_resolver_names_to_import_statement(self.nested_resolver_artifact_imports),
             get_read_out_type_text(self.resolver_read_out_type),
             self.reader_ast.0,
+            self.resolver_parameter_type.0,
             "  ",
             "  ",
             "  ",
@@ -496,7 +510,7 @@ fn write_artifacts<'schema>(
     Ok(())
 }
 
-fn generate_read_from_store_type(
+fn generate_resolver_parameter_type(
     schema: &ValidatedSchema,
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
     parent_type: SchemaTypeWithFields<'_, FieldId>,
@@ -536,7 +550,7 @@ fn write_query_types_from_selection(
                 let parent_field = parent_type
                     .encountered_field_names()
                     .get(&scalar_field.name.item.into())
-                    .expect("parent_field should exist");
+                    .expect("parent_field should exist 1");
                 let field = schema.field(*parent_field);
                 let name_or_alias = scalar_field.name_or_alias().item;
 
@@ -594,7 +608,7 @@ fn write_query_types_from_selection(
                 let parent_field = parent_type
                     .encountered_field_names()
                     .get(&linked_field.name.item.into())
-                    .expect("parent_field should exist");
+                    .expect("parent_field should exist 2");
                 let field = schema.field(*parent_field);
                 let name_or_alias = linked_field.name_or_alias().item;
                 match &field.field_type {
@@ -607,7 +621,7 @@ fn write_query_types_from_selection(
                                 panic!("output_type_id should be a object");
                             };
                             let object = schema.schema_data.object(object_id);
-                            let inner = generate_read_from_store_type(
+                            let inner = generate_resolver_parameter_type(
                                 schema,
                                 &linked_field.selection_set_and_unwraps.selection_set,
                                 object.into(),

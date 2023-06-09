@@ -1,9 +1,12 @@
 import type {BoultonNonFetchableResolver, ReaderAst} from '@boulton/react';
 import { billing_details_component as resolver } from '../billing_details_component.tsx';
-import BillingDetails__last_four_digits from './BillingDetails__last_four_digits.boulton';
+import BillingDetails__last_four_digits, { ReadOutType as BillingDetails__last_four_digits__outputType } from './BillingDetails__last_four_digits.boulton';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = React.FC<{ data: ResolverParameterType } & Object>;
+
+// TODO support changing this
+export type ReadFromStoreType = ResolverParameterType;
 
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
@@ -44,6 +47,15 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     variant: "Eager",
   },
 ];
+
+export type ResolverParameterType = {
+  id: string,
+  card_brand: string,
+  credit_card_number: string,
+  expiration_date: string,
+  address: string,
+  last_four_digits: BillingDetails__last_four_digits__outputType,
+};
 
 const artifact: BoultonNonFetchableResolver = {
   kind: 'NonFetchableResolver',

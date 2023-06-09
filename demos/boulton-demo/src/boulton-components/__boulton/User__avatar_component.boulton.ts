@@ -4,6 +4,9 @@ import { avatar_component as resolver } from '../avatar.tsx';
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = React.FC<{ data: ResolverParameterType } & Object>;
 
+// TODO support changing this
+export type ReadFromStoreType = ResolverParameterType;
+
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Scalar",
@@ -24,6 +27,12 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     arguments: null,
   },
 ];
+
+export type ResolverParameterType = {
+  name: string,
+  email: string,
+  avatar_url: string,
+};
 
 const artifact: BoultonNonFetchableResolver = {
   kind: 'NonFetchableResolver',
