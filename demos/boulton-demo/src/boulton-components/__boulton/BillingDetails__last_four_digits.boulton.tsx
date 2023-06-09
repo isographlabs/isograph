@@ -27,8 +27,6 @@ const artifact: BoultonNonFetchableResolver<ReadFromStoreType, ResolverParameter
   kind: 'NonFetchableResolver',
   resolver: resolver as any,
   readerAst,
-// is this needed?
-              convert: (x) => {throw new Error('convert non fetchable')},
 };
 
 export default artifact;

@@ -108,7 +108,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
             0,
             &mut nested_resolver_artifact_imports,
         );
-        let convert_function = generate_convert_function(&resolver_definition.variant);
+        let convert_function = generate_convert_function(&resolver_definition.variant, field.name);
 
         FetchableResolver {
             query_text,
@@ -231,6 +231,7 @@ impl<'schema> FetchableResolver<'schema> {
         // (i.e. we are not data masking)
         format!(
             "import type {{BoultonFetchableResolver, ReaderAst, FragmentReference}} from '@boulton/react';\n\
+            import {{ getRefRendererForName }} from '@boulton/react';\n\
             {}\n\
             {}\n\
             const queryText = '{}';\n\n\
@@ -302,8 +303,6 @@ impl<'schema> NonFetchableResolver<'schema> {
             {}kind: 'NonFetchableResolver',\n\
             {}resolver: resolver as any,\n\
             {}readerAst,\n\
-            // is this needed?
-            {}convert: (x) => {{throw new Error('convert non fetchable')}},\n\
             }};\n\n\
             export default artifact;\n",
             self.resolver_import_statement.0,
@@ -315,7 +314,6 @@ impl<'schema> NonFetchableResolver<'schema> {
             "  ",
             "  ",
             "  ",
-            "  "
         )
     }
 }
@@ -388,7 +386,7 @@ fn generated_file_name(
     parent_type_name: TypeWithFieldsName,
     field_name: FieldDefinitionName,
 ) -> PathBuf {
-    PathBuf::from(format!("{}__{}.boulton.ts", parent_type_name, field_name))
+    PathBuf::from(format!("{}__{}.boulton.tsx", parent_type_name, field_name))
 }
 
 fn generated_file_path(project_root: &PathBuf, file_name: &PathBuf) -> PathBuf {
@@ -1014,11 +1012,37 @@ fn generate_resolver_return_type_declaration(
     }
 }
 
-fn generate_convert_function(variant: &Option<WithSpan<ResolverVariant>>) -> ConvertFunction {
+fn generate_convert_function(
+    variant: &Option<WithSpan<ResolverVariant>>,
+    field_name: FieldDefinitionName,
+) -> ConvertFunction {
     match variant {
         Some(variant) => {
             if let ResolverVariant::Component = variant.item {
-                return ConvertFunction("((resolver, data) => additionalParams => resolver({ data, ...additionalParams }))".to_string());
+                return ConvertFunction(format!(
+                    "(() => {{\n\
+                {}const RefRendererForName = getRefRendererForName('{}');\n\
+                {}return ((resolver, data) => additionalRuntimeProps => \n\
+                {}{{\n\
+                {}return <RefRendererForName \n\
+                {}resolver={{resolver}}\n\
+                {}data={{data}}\n\
+                {}additionalRuntimeProps={{additionalRuntimeProps}}\n\
+                {}/>;\n\
+                {}}})\n\
+                {}}})()",
+                    "  ".repeat(2),
+                    field_name,
+                    "  ".repeat(2),
+                    "  ".repeat(3),
+                    "  ".repeat(4),
+                    "  ".repeat(5),
+                    "  ".repeat(5),
+                    "  ".repeat(5),
+                    "  ".repeat(4),
+                    "  ".repeat(3),
+                    "  ".repeat(2),
+                ));
             }
         }
         None => {}

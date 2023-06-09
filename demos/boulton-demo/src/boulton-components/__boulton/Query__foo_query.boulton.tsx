@@ -1,4 +1,5 @@
 import type {BoultonFetchableResolver, ReaderAst, FragmentReference} from '@boulton/react';
+import { getRefRendererForName } from '@boulton/react';
 import { foo_query as resolver } from '../user_list_page.tsx';
 
 const queryText = 'query foo_query  {\

@@ -26,11 +26,7 @@ export function BoultonDemo() {
 function TopLevelListView({ onSelectId }) {
   const { queryReference } = useLazyReference(userListPageQuery, {
     bar: "yayayaya",
-    // bar2: "bar2",
   });
-  // TODO get this to work:
-  // const {queryReference} = useLazyReference(b Declare ` ... `);
-  console.log("queryReference", queryReference);
 
   const listPageData = read(queryReference);
 

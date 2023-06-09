@@ -23,7 +23,10 @@ export type BoultonFetchableResolver<
   readerAst: ReaderAst<TReadFromStore>;
   resolver: (data: TResolverProps) => TResolverResult;
   // TODO ReaderAst<TResolverProps> should contain the convert function
-  convert: (data: TReadFromStore) => TResolverProps;
+  convert: (
+    resolver: (data: TResolverProps) => TResolverResult,
+    data: TReadFromStore
+  ) => TResolverResult; // TODO this should be a different return type
 };
 
 export type BoultonNonFetchableResolver<
@@ -33,7 +36,6 @@ export type BoultonNonFetchableResolver<
 > = {
   kind: "NonFetchableResolver";
   readerAst: ReaderAst<TReadFromStore>;
-  convert: (data: TReadFromStore) => TResolverProps;
   resolver: (data: TResolverProps) => TResolverResult;
 };
 
@@ -89,7 +91,10 @@ export type FragmentReference<
   resolver: (props: TResolverProps) => TResolverResult;
   variables: Object | null;
   // TODO: We should instead have ReaderAst<TResolverProps>
-  convert: (data: TReadFromStore) => TResolverProps;
+  convert: (
+    resolver: (data: TResolverProps) => TResolverResult,
+    data: TReadFromStore
+  ) => TResolverResult;
 };
 
 export function bDeclare<
@@ -328,7 +333,7 @@ function assertLink(link: DataTypeValue): Link | undefined {
 }
 
 const refReaders: { [index: string]: any } = {};
-function getRefReaderForName(name: string) {
+export function getRefReaderForName(name: string) {
   if (refReaders[name] == null) {
     function Component({
       reference,
@@ -340,6 +345,25 @@ function getRefReaderForName(name: string) {
       console.log("Rendering RefReader:", name);
       const data = readButDoNotEvaluate(reference);
       return reference.resolver({ data, ...additionalRuntimeProps });
+    }
+    Component.displayName = `${name} @component`;
+    refReaders[name] = Component;
+  }
+  return refReaders[name];
+}
+
+export function getRefRendererForName(name: string) {
+  if (refReaders[name] == null) {
+    function Component({
+      resolver,
+      data,
+      additionalRuntimeProps,
+    }: {
+      resolver: any;
+      additionalRuntimeProps: any;
+      data: any;
+    }) {
+      return resolver({ data, ...additionalRuntimeProps });
     }
     Component.displayName = `${name} @component`;
     refReaders[name] = Component;

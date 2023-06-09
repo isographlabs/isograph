@@ -1,6 +1,5 @@
 import type {BoultonNonFetchableResolver, ReaderAst} from '@boulton/react';
-import { user_detail as resolver } from '../user_list_page.tsx';
-import User__avatar_component, { ReadOutType as User__avatar_component__outputType } from './User__avatar_component.boulton';
+import { avatar_component as resolver } from '../avatar.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = React.FC<{ } & Object>;
@@ -11,30 +10,29 @@ export type ReadFromStoreType = ResolverParameterType;
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Scalar",
-    response_name: "id",
-    alias: null,
-    arguments: null,
-  },
-  {
-    kind: "Scalar",
     response_name: "name",
     alias: null,
     arguments: null,
   },
   {
-    kind: "Resolver",
-    alias: "avatar_component",
+    kind: "Scalar",
+    response_name: "email",
+    alias: null,
     arguments: null,
-    resolver: User__avatar_component,
-    variant: "Component",
+  },
+  {
+    kind: "Scalar",
+    response_name: "avatar_url",
+    alias: null,
+    arguments: null,
   },
 ];
 
 export type ResolverParameterType = { data:
 {
-  id: string,
   name: string,
-  avatar_component: User__avatar_component__outputType,
+  email: string,
+  avatar_url: string,
 },
 [index: string]: any };
 
@@ -45,8 +43,6 @@ const artifact: BoultonNonFetchableResolver<ReadFromStoreType, ResolverParameter
   kind: 'NonFetchableResolver',
   resolver: resolver as any,
   readerAst,
-// is this needed?
-              convert: (x) => {throw new Error('convert non fetchable')},
 };
 
 export default artifact;

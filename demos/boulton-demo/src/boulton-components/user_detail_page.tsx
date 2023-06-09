@@ -16,8 +16,11 @@ export const user_detail_page = bDeclare<
     },
   }
 `(UserDetailPage);
+
+// It's not very useful to make user_detail_page a component, since
+// it basically calls user_profile_with_details /shrug
 function UserDetailPage(props: UserDetailPageProps) {
-  console.log("user detail props", props);
+  // This guy is a ref reader, but user_detail_page is not?
   return props.data.current_user.user_profile_with_details({
     onGoBack: props.onGoBack,
   });
@@ -38,7 +41,6 @@ export const user_profile_with_details = bDeclare<
     },
   }
 `(function UserProfileWithDetails({ data, onGoBack }) {
-  console.log("user profile with details", data, onGoBack);
   const [state, setState] = React.useState(true);
   return (
     <>
