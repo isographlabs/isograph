@@ -33,8 +33,13 @@ pub type ValidatedSchemaResolverDefinitionInfo =
 
 pub type ValidatedVariableDefinition = VariableDefinition<InputTypeId>;
 
-pub type ValidatedSchema =
-    Schema<OutputTypeId, ValidatedDefinedField, TypeWithFieldsId, InputTypeId>;
+pub type ValidatedSchema = Schema<
+    OutputTypeId,
+    ValidatedDefinedField,
+    TypeWithFieldsId,
+    InputTypeId,
+    UnvalidatedObjectFieldInfo,
+>;
 
 impl ValidatedSchema {
     pub fn validate_and_construct(

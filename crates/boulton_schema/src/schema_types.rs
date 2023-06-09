@@ -36,6 +36,7 @@ pub struct Schema<
     TScalarField: ValidScalarFieldType,
     TLinkedField: ValidLinkedFieldType,
     TVariableType: ValidTypeAnnotationInnerType,
+    TEncounteredField,
 > {
     // TODO fields should probably be two vectors: server_fields and resolvers, and have
     // separate ID types.
@@ -47,7 +48,7 @@ pub struct Schema<
             >,
         >,
     >,
-    pub schema_data: UnvalidatedSchemaData,
+    pub schema_data: SchemaData<TEncounteredField>,
 
     // Well known types
     pub id_type: ScalarId,
@@ -59,7 +60,8 @@ pub struct Schema<
     // Mutation
 }
 
-pub(crate) type UnvalidatedSchema = Schema<UnvalidatedTypeName, (), (), UnvalidatedTypeName>;
+pub(crate) type UnvalidatedSchema =
+    Schema<UnvalidatedTypeName, (), (), UnvalidatedTypeName, UnvalidatedObjectFieldInfo>;
 pub type UnvalidatedObjectFieldInfo =
     DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>;
 pub(crate) type UnvalidatedSchemaData = SchemaData<UnvalidatedObjectFieldInfo>;
@@ -84,7 +86,8 @@ impl<
         TScalarField: ValidScalarFieldType,
         TLinkedField: ValidLinkedFieldType,
         TVariableType: ValidTypeAnnotationInnerType,
-    > Schema<TServerType, TScalarField, TLinkedField, TVariableType>
+        TEncounteredField,
+    > Schema<TServerType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
 {
     pub fn field(
         &self,
@@ -98,7 +101,7 @@ impl<
         &self.fields[field_id.as_usize()]
     }
 
-    pub fn query_object(&self) -> Option<&UnvalidatedSchemaObject> {
+    pub fn query_object(&self) -> Option<&SchemaObject<TEncounteredField>> {
         self.query_type_id
             .as_ref()
             .map(|id| self.schema_data.object(*id))
@@ -339,8 +342,6 @@ impl<'schema> SchemaTypeWithoutFields<'schema> {
         }
     }
 }
-
-pub(crate) type UnvalidatedSchemaObject = SchemaObject<UnvalidatedObjectFieldInfo>;
 
 #[derive(Debug)]
 pub struct SchemaObject<TEncounteredField> {
