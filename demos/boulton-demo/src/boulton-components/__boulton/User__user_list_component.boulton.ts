@@ -1,5 +1,5 @@
 import type {BoultonNonFetchableResolver, ReaderAst} from '@boulton/react';
-import { user_list_component as resolver } from '../user_list.tsx';
+import { user_list_component as resolver } from '../user_list_page.tsx';
 import User__avatar_component, { ReadOutType as User__avatar_component__outputType } from './User__avatar_component.boulton';
 
 // the type, when read out (either via useLazyReference or via graph)

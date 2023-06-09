@@ -68,6 +68,16 @@ impl UnvalidatedSchema {
         object.fields.push(next_field_id);
 
         let name = resolver_declaration.item.resolver_field_name.item.into();
+        let variant = get_resolver_variant(&resolver_declaration.item.directives);
+        let has_associated_js_function = resolver_declaration.item.has_associated_js_function;
+
+        // TODO variant should carry payloads, instead of this check
+        if variant.as_ref().map(|span| span.item) == Some(ResolverVariant::Component) {
+            if !has_associated_js_function {
+                return Err(ProcessResolverDeclarationError::ComponentResolverMissingJsFunction {});
+            }
+        }
+
         self.fields.push(SchemaField {
             description: resolver_declaration.item.description.map(|d| d.item),
             name,
@@ -76,11 +86,11 @@ impl UnvalidatedSchema {
                 resolver_definition_path: resolver_declaration.item.resolver_definition_path,
                 selection_set_and_unwraps: resolver_declaration.item.selection_set_and_unwraps,
                 field_id: next_field_id,
-                variant: get_resolver_variant(&resolver_declaration.item.directives),
+                variant,
                 is_fetchable: is_fetchable(&resolver_declaration.item.directives),
                 variable_definitions: resolver_declaration.item.variable_definitions,
                 type_and_field: format!("{}__{}", object.name, name).intern().into(),
-                has_associated_js_function: resolver_declaration.item.has_associated_js_function,
+                has_associated_js_function,
             }),
             parent_type_id: TypeWithFieldsId::Object(object.id),
         });
@@ -110,6 +120,13 @@ pub enum ProcessResolverDeclarationError {
         parent_type: &'static str,
         parent_type_name: TypeWithFieldsName,
         resolver_field_name: FieldDefinitionName,
+    },
+
+    #[error(
+        "Resolvers with @component must have associated javascript (i.e. bDeclare`...` must be called as a function, as in bDeclare`...`(MyComponent))"
+    )]
+    ComponentResolverMissingJsFunction {
+        // TODO add parent type and resolver field name
     },
 }
 

@@ -30,9 +30,11 @@ function TopLevelListView({ onSelectId }) {
   });
   // TODO get this to work:
   // const {queryReference} = useLazyReference(b Declare ` ... `);
+  console.log("queryReference", queryReference);
 
   const listPageData = read(queryReference);
   console.log("listPageData", listPageData);
+  return listPageData;
 
   return (
     <>

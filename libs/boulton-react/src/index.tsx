@@ -123,7 +123,7 @@ export function useLazyReference<
   artifact: BoultonFetchableResolver<
     TReadFromStore,
     TResolverProps,
-    FragmentReference<TReadFromStore, TResolverProps, TResolverResult>
+    TResolverResult
   >,
   variables: object
 ): {
