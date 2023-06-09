@@ -1,7 +1,9 @@
 import { bDeclare } from "@boulton/react";
 import * as React from "react";
 
-export const avatar_component = bDeclare`
+import type { ResolverParameterType } from "./__boulton/User__avatar_component.boulton";
+
+export const avatar_component = bDeclare<ResolverParameterType, unknown>`
   "An avatar"
   User.avatar_component @component {
     name,
@@ -10,7 +12,7 @@ export const avatar_component = bDeclare`
   }
 `(Avatar);
 
-function Avatar({ data, foo }) {
+function Avatar({ data }: ResolverParameterType) {
   return (
     <div>
       <a href={`mailto:${data.email}`}>

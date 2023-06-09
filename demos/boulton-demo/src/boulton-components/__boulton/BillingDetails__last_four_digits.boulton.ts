@@ -20,6 +20,9 @@ export type ResolverParameterType = {
   credit_card_number: string,
 };
 
+// The type, when returned from the resolver
+export type ResolverReturnType = ReturnType<typeof resolver>;
+
 const artifact: BoultonNonFetchableResolver = {
   kind: 'NonFetchableResolver',
   resolver,

@@ -90,6 +90,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
         let resolver_parameter_type = generate_resolver_parameter_type(
             schema,
             &selection_set_and_unwraps.selection_set,
+            resolver_definition.variant,
             query_object.into(),
             &mut nested_resolver_artifact_imports,
             0,
@@ -98,7 +99,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
             field.name,
             resolver_definition.resolver_definition_path,
         );
-        let resolver_response_type_declaration = generate_resolver_return_type_declaration(
+        let resolver_return_type = generate_resolver_return_type_declaration(
             resolver_definition.has_associated_js_function,
         );
         let resolver_read_out_type = generate_read_out_type(resolver_definition);
@@ -116,7 +117,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
             parent_type: query_object.into(),
             resolver_parameter_type,
             resolver_import_statement,
-            resolver_return_type: resolver_response_type_declaration,
+            resolver_return_type,
             resolver_read_out_type,
             reader_ast,
             nested_resolver_artifact_imports,
@@ -148,9 +149,13 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
         let resolver_parameter_type = generate_resolver_parameter_type(
             schema,
             &selection_set_and_unwraps.selection_set,
+            resolver_definition.variant,
             parent_type,
             &mut nested_resolver_artifact_imports,
             0,
+        );
+        let resolver_return_type = generate_resolver_return_type_declaration(
+            resolver_definition.has_associated_js_function,
         );
         let resolver_read_out_type = generate_read_out_type(resolver_definition);
         let resolver_import_statement = generate_resolver_import_statement(
@@ -167,6 +172,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
             resolver_import_statement,
             resolver_read_out_type,
             resolver_parameter_type,
+            resolver_return_type,
         })
     } else {
         panic!("Unsupported: resolvers not on query with no selection set")
@@ -270,6 +276,7 @@ pub struct NonFetchableResolver<'schema> {
     pub resolver_read_out_type: ResolverReadOutType,
     pub reader_ast: ReaderAst,
     pub resolver_parameter_type: ResolverParameterType,
+    pub resolver_return_type: ResolverReturnType,
     pub resolver_import_statement: ResolverImportStatement,
 }
 
@@ -284,6 +291,8 @@ impl<'schema> NonFetchableResolver<'schema> {
             export type ReadFromStoreType = ResolverParameterType;\n\n\
             const readerAst: ReaderAst<ReadFromStoreType> = {};\n\n\
             export type ResolverParameterType = {};\n\n\
+            // The type, when returned from the resolver\n\
+            export type ResolverReturnType = {};\n\n\
             const artifact: BoultonNonFetchableResolver = {{\n\
             {}kind: 'NonFetchableResolver',\n\
             {}resolver,\n\
@@ -296,6 +305,7 @@ impl<'schema> NonFetchableResolver<'schema> {
             get_read_out_type_text(self.resolver_read_out_type),
             self.reader_ast.0,
             self.resolver_parameter_type.0,
+            self.resolver_return_type.0,
             "  ",
             "  ",
             "  ",
@@ -513,6 +523,7 @@ fn write_artifacts<'schema>(
 fn generate_resolver_parameter_type(
     schema: &ValidatedSchema,
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
+    variant: Option<WithSpan<ResolverVariant>>,
     parent_type: SchemaTypeWithFields<'_, FieldId>,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
     indentation_level: u8,
@@ -524,12 +535,20 @@ fn generate_resolver_parameter_type(
             schema,
             &mut resolver_parameter_type,
             selection,
+            // Variant "unwrapping" only matters for the top-level parameter type,
+            // doing it for nested selections is leads to situations where linked fields
+            // show up as linkedField: { data: /* actualLinkedFields */ }
+            None,
             parent_type,
             nested_resolver_imports,
             indentation_level + 1,
         );
     }
     resolver_parameter_type.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
+
+    if let Some(ResolverVariant::Component) = variant.map(|v| v.item) {
+        resolver_parameter_type = format!("{{ data: {} }}", resolver_parameter_type);
+    }
 
     ResolverParameterType(resolver_parameter_type)
 }
@@ -538,6 +557,7 @@ fn write_query_types_from_selection(
     schema: &ValidatedSchema,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
+    variant: Option<WithSpan<ResolverVariant>>,
     parent_type: SchemaTypeWithFields<'_, FieldId>,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
     indentation_level: u8,
@@ -624,6 +644,7 @@ fn write_query_types_from_selection(
                             let inner = generate_resolver_parameter_type(
                                 schema,
                                 &linked_field.selection_set_and_unwraps.selection_set,
+                                variant,
                                 object.into(),
                                 nested_resolver_imports,
                                 indentation_level,
@@ -961,10 +982,8 @@ fn generate_read_out_type(
     match resolver_definition.variant {
         Some(variant) => match variant.item {
             ResolverVariant::Component => {
-                // Close enough
-                ResolverReadOutType(
-                    "React.FC<{ data: ResolverParameterType } & Object>".to_string(),
-                )
+                // Does **not** include data, because that's provided by Boulton
+                ResolverReadOutType("React.FC<{ } & Object>".to_string())
             }
             ResolverVariant::Eager => ResolverReadOutType("ResolverReturnType".to_string()),
         },

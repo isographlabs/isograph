@@ -3,7 +3,7 @@ import { user_list_component as resolver } from '../user_list.tsx';
 import User__avatar_component, { ReadOutType as User__avatar_component__outputType } from './User__avatar_component.boulton';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = React.FC<{ data: ResolverParameterType } & Object>;
+export type ReadOutType = React.FC<{ } & Object>;
 
 // TODO support changing this
 export type ReadFromStoreType = ResolverParameterType;
@@ -30,11 +30,14 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
 ];
 
-export type ResolverParameterType = {
+export type ResolverParameterType = { data: {
   id: string,
   name: string,
   avatar_component: User__avatar_component__outputType,
-};
+} };
+
+// The type, when returned from the resolver
+export type ResolverReturnType = ReturnType<typeof resolver>;
 
 const artifact: BoultonNonFetchableResolver = {
   kind: 'NonFetchableResolver',

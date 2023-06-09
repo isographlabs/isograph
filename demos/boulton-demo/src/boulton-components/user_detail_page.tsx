@@ -1,8 +1,11 @@
 import * as React from "react";
 import { bDeclare } from "@boulton/react";
 
+import { ResolverParameterType as UserDetailPage } from "./__boulton/Query__user_detail_page.boulton";
+import { ResolverParameterType as UserProfileWithDetails } from "./__boulton/User__user_profile_with_details.boulton";
+
 // TODO @component seems to have no effect?
-export const user_detail_page = bDeclare`
+export const user_detail_page = bDeclare<UserDetailPage>`
   Query.user_detail_page @fetchable {
     current_user {
       id,
@@ -11,7 +14,10 @@ export const user_detail_page = bDeclare`
   }
 `;
 
-export const user_profile_with_details = bDeclare`
+export const user_profile_with_details = bDeclare<
+  UserProfileWithDetails,
+  unknown
+>`
   User.user_profile_with_details @component {
     id,
     name,
