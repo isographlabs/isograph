@@ -36,10 +36,10 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 ];
 
 export type ResolverParameterType = {
-  users: {
+  users: ({
     id: string,
     name: string,
-  },
+  })[],
 };
 
 // The type, when returned from the resolver

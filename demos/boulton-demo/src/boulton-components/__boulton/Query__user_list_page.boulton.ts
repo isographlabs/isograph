@@ -50,10 +50,10 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 
 export type ResolverParameterType = {
   byah: string,
-  users: {
+  users: ({
     id: string,
     user_list_component: User__user_list_component__outputType,
-  },
+  })[],
 };
 
 // The type, when returned from the resolver

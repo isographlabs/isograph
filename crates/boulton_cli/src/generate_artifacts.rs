@@ -1,6 +1,6 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
-    fmt::Debug,
+    fmt::{self, Debug, Display},
     fs::{self, File},
     io::{self, Write},
     path::PathBuf,
@@ -16,11 +16,11 @@ use boulton_schema::{
     ValidatedSelectionSetAndUnwraps, ValidatedVariableDefinition,
 };
 use common_lang_types::{
-    DefinedField, FieldDefinitionName, FieldId, HasName, QueryOperationName,
+    DefinedField, FieldDefinitionName, FieldId, HasName, OutputTypeId, QueryOperationName,
     ResolverDefinitionPath, TypeAndField, TypeWithFieldsId, TypeWithFieldsName,
-    TypeWithoutFieldsId, UnvalidatedTypeName, WithSpan,
+    TypeWithoutFieldsId, UnvalidatedTypeName, ValidTypeAnnotationInnerType, WithSpan,
 };
-use graphql_lang_types::TypeAnnotation;
+use graphql_lang_types::{ListTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation};
 use thiserror::Error;
 
 pub(crate) fn generate_artifacts(
@@ -85,14 +85,15 @@ fn generate_fetchable_resolver_artifact<'schema>(
             &merged_selection_set,
             &resolver_definition.variable_definitions,
         );
-        let mut nested_resolver_artifact_imports = HashMap::new();
-        let resolver_parameter_type = generate_resolver_parameter_type(
+        let mut nested_resolver_artifact_imports: HashMap<TypeAndField, ResolverImport> =
+            HashMap::new();
+        let resolver_parameter_type = generate_read_from_store_type(
             schema,
             &selection_set_and_unwraps.selection_set,
             query_object.into(),
             &mut nested_resolver_artifact_imports,
-            1,
-        )?;
+            0,
+        );
         let resolver_import_statement = generate_resolver_import_statement(
             field.name,
             resolver_definition.resolver_definition_path,
@@ -172,6 +173,14 @@ pub enum Artifact<'schema> {
 #[derive(Debug)]
 pub struct ResolverParameterType(pub String);
 
+impl ValidTypeAnnotationInnerType for ResolverParameterType {}
+
+impl fmt::Display for ResolverParameterType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
+
 #[derive(Debug)]
 pub struct ResolverImportStatement(pub String);
 
@@ -210,7 +219,7 @@ impl<'schema> FetchableResolver<'schema> {
             export type ReadFromStoreType = ResolverParameterType;\n\n\
             const normalizationAst = {{notNeededForDemo: true}};\n\
             const readerAst: ReaderAst<ReadFromStoreType> = {};\n\n\
-            export type ResolverParameterType = {{\n{}}};\n\n\
+            export type ResolverParameterType = {};\n\n\
             // The type, when returned from the resolver\n\
             export type ResolverReturnType = {};\n\n\
             {}\n\n\
@@ -487,15 +496,15 @@ fn write_artifacts<'schema>(
     Ok(())
 }
 
-fn generate_resolver_parameter_type(
+fn generate_read_from_store_type(
     schema: &ValidatedSchema,
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
     parent_type: SchemaTypeWithFields<'_, FieldId>,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
     indentation_level: u8,
-) -> Result<ResolverParameterType, GenerateArtifactsError> {
+) -> ResolverParameterType {
     // TODO use unwraps
-    let mut resolver_parameter_type = String::new();
+    let mut resolver_parameter_type = "{\n".to_string();
     for selection in selection_set.iter() {
         write_query_types_from_selection(
             schema,
@@ -503,11 +512,12 @@ fn generate_resolver_parameter_type(
             selection,
             parent_type,
             nested_resolver_imports,
-            indentation_level,
-        )?;
+            indentation_level + 1,
+        );
     }
+    resolver_parameter_type.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
 
-    Ok(ResolverParameterType(resolver_parameter_type))
+    ResolverParameterType(resolver_parameter_type)
 }
 
 fn write_query_types_from_selection(
@@ -517,97 +527,156 @@ fn write_query_types_from_selection(
     parent_type: SchemaTypeWithFields<'_, FieldId>,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
     indentation_level: u8,
-) -> Result<(), GenerateArtifactsError> {
+) {
     query_type_declaration.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
 
     match &selection.item {
         Selection::Field(field) => match field {
             ScalarField(scalar_field) => {
-                match scalar_field.field {
-                    DefinedField::ServerField(type_without_fields_id) => {
-                        let name_or_alias = scalar_field.name_or_alias();
-                        let type_ = schema
-                            .schema_data
-                            .lookup_type_without_fields(type_without_fields_id)
-                            .javascript_name();
-                        query_type_declaration
-                            .push_str(&format!("{}: {},\n", name_or_alias, type_));
-                    }
-                    DefinedField::ResolverField(_) => {
-                        let alias = scalar_field.name_or_alias().item;
-                        // This field is a resolver, so we need to look up the field in the
-                        // schema.
-                        let resolver_field_name = scalar_field.name.item;
-                        let parent_field_id = parent_type
-                            .fields()
-                            .iter()
-                            .find(|parent_field_id| {
-                                let field = schema.field(**parent_field_id);
-                                field.name == resolver_field_name.into()
-                            })
-                            .expect("expect field to exist");
-                        let resolver_field = schema.field(*parent_field_id);
-                        match &resolver_field.field_type {
-                            DefinedField::ServerField(_) => panic!("Expected resolver"),
-                            DefinedField::ResolverField(resolver_field) => {
-                                // TODO make this part of the ResolverField payload
-                                match nested_resolver_imports.entry(resolver_field.type_and_field) {
-                                    Entry::Occupied(mut occupied) => {
-                                        occupied.get_mut().types.push(ResolverImportType {
-                                            original: ResolverImportName("ReadOutType".to_string()),
-                                            alias: ResolverImportAlias(format!(
-                                                "{}__outputType",
-                                                resolver_field.type_and_field
-                                            )),
-                                        });
-                                    }
-                                    Entry::Vacant(vacant) => {
-                                        vacant.insert(ResolverImport {
-                                            default_import: false,
-                                            types: vec![ResolverImportType {
-                                                original: ResolverImportName(
-                                                    "ReadOutType".to_string(),
-                                                ),
-                                                alias: ResolverImportAlias(format!(
-                                                    "{}__outputType",
-                                                    resolver_field.type_and_field
-                                                )),
-                                            }],
-                                        });
-                                    }
-                                }
+                let parent_field = parent_type
+                    .encountered_field_names()
+                    .get(&scalar_field.name.item.into())
+                    .expect("parent_field should exist");
+                let field = schema.field(*parent_field);
+                let name_or_alias = scalar_field.name_or_alias().item;
 
-                                query_type_declaration.push_str(&format!(
-                                    "{}: {}__outputType,\n",
-                                    alias, resolver_field.type_and_field
-                                ));
+                match &field.field_type {
+                    DefinedField::ServerField(server_field) => {
+                        // TODO there should be a clever way to print without cloning
+                        let output_type = server_field.clone().map(|output_type_id| {
+                            // TODO not just scalars, enums as well. Both should have a javascript name
+                            let scalar_id = if let OutputTypeId::Scalar(scalar) = output_type_id {
+                                scalar
+                            } else {
+                                panic!("output_type_id should be a scalar");
+                            };
+                            schema.schema_data.scalar(scalar_id).javascript_name
+                        });
+                        query_type_declaration.push_str(&format!(
+                            "{}: {},\n",
+                            name_or_alias,
+                            print_type_annotation(&output_type)
+                        ));
+                    }
+                    DefinedField::ResolverField(resolver) => {
+                        match nested_resolver_imports.entry(resolver.type_and_field) {
+                            Entry::Occupied(mut occupied) => {
+                                occupied.get_mut().types.push(ResolverImportType {
+                                    original: ResolverImportName("ReadOutType".to_string()),
+                                    alias: ResolverImportAlias(format!(
+                                        "{}__outputType",
+                                        resolver.type_and_field
+                                    )),
+                                });
+                            }
+                            Entry::Vacant(vacant) => {
+                                vacant.insert(ResolverImport {
+                                    default_import: false,
+                                    types: vec![ResolverImportType {
+                                        original: ResolverImportName("ReadOutType".to_string()),
+                                        alias: ResolverImportAlias(format!(
+                                            "{}__outputType",
+                                            resolver.type_and_field
+                                        )),
+                                    }],
+                                });
                             }
                         }
+
+                        query_type_declaration.push_str(&format!(
+                            "{}: {}__outputType,\n",
+                            name_or_alias, resolver.type_and_field
+                        ));
                     }
                 }
             }
             LinkedField(linked_field) => {
-                let linked_field_type = schema
-                    .schema_data
-                    .lookup_type_with_fields(linked_field.field);
-                let name_or_alias = linked_field.name_or_alias();
-                let inner = generate_resolver_parameter_type(
-                    schema,
-                    &linked_field.selection_set_and_unwraps.selection_set,
-                    linked_field_type,
-                    nested_resolver_imports,
-                    indentation_level + 1,
-                )?;
-                query_type_declaration.push_str(&format!(
-                    "{}: {{\n{}{}}},\n",
-                    name_or_alias,
-                    inner.0,
-                    "  ".repeat(indentation_level as usize)
-                ));
+                let parent_field = parent_type
+                    .encountered_field_names()
+                    .get(&linked_field.name.item.into())
+                    .expect("parent_field should exist");
+                let field = schema.field(*parent_field);
+                let name_or_alias = linked_field.name_or_alias().item;
+                match &field.field_type {
+                    DefinedField::ServerField(server_field) => {
+                        let type_annotation = server_field.clone().map(|output_type_id| {
+                            // TODO Or interface or union type
+                            let object_id = if let OutputTypeId::Object(object) = output_type_id {
+                                object
+                            } else {
+                                panic!("output_type_id should be a object");
+                            };
+                            let object = schema.schema_data.object(object_id);
+                            let inner = generate_read_from_store_type(
+                                schema,
+                                &linked_field.selection_set_and_unwraps.selection_set,
+                                object.into(),
+                                nested_resolver_imports,
+                                indentation_level,
+                            );
+                            inner
+                        });
+                        query_type_declaration.push_str(&format!(
+                            "{}: {},\n",
+                            name_or_alias,
+                            print_type_annotation(&type_annotation),
+                        ));
+                    }
+                    DefinedField::ResolverField(_) => panic!("should not be a resolver field"),
+                }
             }
         },
     }
-    Ok(())
+}
+
+fn print_type_annotation<T: Display + ValidTypeAnnotationInnerType>(
+    type_annotation: &TypeAnnotation<T>,
+) -> String {
+    let mut s = String::new();
+    print_type_annotation_impl(type_annotation, &mut s);
+    s
+}
+
+fn print_type_annotation_impl<T: Display + ValidTypeAnnotationInnerType>(
+    type_annotation: &TypeAnnotation<T>,
+    s: &mut String,
+) {
+    match &type_annotation {
+        TypeAnnotation::Named(named) => {
+            s.push_str("(");
+            s.push_str(&named.item.to_string());
+            s.push_str(" | null)");
+        }
+        TypeAnnotation::List(list) => {
+            print_list_type_annotation(list, s);
+        }
+        TypeAnnotation::NonNull(non_null) => {
+            print_non_null_type_annotation(non_null, s);
+        }
+    }
+}
+
+fn print_list_type_annotation<T: Display + ValidTypeAnnotationInnerType>(
+    list: &ListTypeAnnotation<T>,
+    s: &mut String,
+) {
+    s.push_str("(");
+    print_type_annotation_impl(&list.0, s);
+    s.push_str(")[]");
+}
+
+fn print_non_null_type_annotation<T: Display + ValidTypeAnnotationInnerType>(
+    non_null: &NonNullTypeAnnotation<T>,
+    s: &mut String,
+) {
+    match non_null {
+        NonNullTypeAnnotation::Named(named) => {
+            s.push_str(&named.item.to_string());
+        }
+        NonNullTypeAnnotation::List(list) => {
+            print_list_type_annotation(list, s);
+        }
+    }
 }
 
 fn generate_resolver_import_statement(

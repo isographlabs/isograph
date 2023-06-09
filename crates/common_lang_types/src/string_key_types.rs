@@ -108,6 +108,8 @@ string_key_conversion!(QueryOperationName, FieldDefinitionName);
 
 // For scalars
 string_key_newtype!(JavascriptName);
+// This is getting ridiculous...
+impl ValidTypeAnnotationInnerType for JavascriptName {}
 
 string_key_newtype!(BoultonDirectiveName);
 
