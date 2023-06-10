@@ -18,12 +18,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
   {
     kind: "Scalar",
-    response_name: "name",
-    alias: null,
-    arguments: null,
-  },
-  {
-    kind: "Scalar",
     response_name: "email",
     alias: null,
     arguments: null,
@@ -61,7 +55,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 export type ResolverParameterType = { data:
 {
   id: string,
-  name: string,
   email: string,
   avatar_component: User__avatar_component__outputType,
   billing_details: {

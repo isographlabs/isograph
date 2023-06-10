@@ -8,9 +8,10 @@ export const user_detail_page = bDeclare<
   UserDetailPageProps,
   ReturnType<typeof UserDetailPage>
 >`
-  Query.user_detail_page @fetchable @component {
-    current_user {
+  Query.user_detail_page($id: ID!,) @fetchable @component {
+    user(id: $id,) {
       id,
+      user_profile_header,
       user_profile_with_details,
     },
   }
@@ -20,9 +21,16 @@ export const user_detail_page = bDeclare<
 // it basically calls user_profile_with_details /shrug
 function UserDetailPage(props: UserDetailPageProps) {
   // This guy is a ref reader, but user_detail_page is not?
-  return props.data.current_user.user_profile_with_details({
-    onGoBack: props.onGoBack,
-  });
+  return (
+    <>
+      {props.data.user.user_profile_header({})}
+      <React.Suspense fallback="Loading...">
+        {props.data.user.user_profile_with_details({
+          onGoBack: props.onGoBack,
+        })}
+      </React.Suspense>
+    </>
+  );
 }
 
 export const user_profile_with_details = bDeclare<
@@ -31,7 +39,6 @@ export const user_profile_with_details = bDeclare<
 >`
   User.user_profile_with_details @component {
     id,
-    name,
     email,
     avatar_component,
     billing_details {
@@ -43,7 +50,6 @@ export const user_profile_with_details = bDeclare<
   const [state, setState] = React.useState(true);
   return (
     <>
-      <h1>User detail page for {data.name}</h1>
       <p>email: {data.email}</p>
       {data.avatar_component()}
       <p>
@@ -58,4 +64,13 @@ export const user_profile_with_details = bDeclare<
       })}
     </>
   );
+});
+
+export const user_profile_header = bDeclare`
+  User.user_profile_header @component {
+    id,
+    name,
+  }
+`(({ data }) => {
+  return <h1>Detail page for: {data.name}</h1>;
 });

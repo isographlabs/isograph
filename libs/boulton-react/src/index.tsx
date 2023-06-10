@@ -1,5 +1,6 @@
 import {
   DataId,
+  DataType,
   DataTypeValue,
   Link,
   ROOT_ID,
@@ -243,7 +244,7 @@ function readData<TReadFromStore>(
             if (link == null) {
               return { kind: "MissingData" };
             }
-            const result = readData(field.selections, link?.__link, variables);
+            const result = readData(field.selections, link.__link, variables);
             if (result.kind === "MissingData") {
               return { kind: "MissingData" };
             }
@@ -252,9 +253,21 @@ function readData<TReadFromStore>(
           target[field.alias ?? field.response_name] = results;
           break;
         }
-        const link = assertLink(value);
+        let link = assertLink(value);
         if (link == null) {
-          return { kind: "MissingData" };
+          // TODO make this configurable, and also generated and derived from the schema
+          const altLink = HACK_missingFieldHandler(
+            storeRecord,
+            root,
+            field.response_name,
+            field.arguments,
+            variables
+          );
+          if (altLink == null) {
+            return { kind: "MissingData" };
+          } else {
+            link = altLink;
+          }
         }
         const targetId = link.__link;
         const data = readData(field.selections, targetId, variables);
@@ -317,6 +330,32 @@ function readData<TReadFromStore>(
     }
   }
   return { kind: "Success", data: target as any };
+}
+
+function HACK_missingFieldHandler(
+  storeRecord: DataType,
+  root: DataId,
+  fieldName: string,
+  arguments_: { [index: string]: any } | null,
+  variables: { [index: string]: any } | null
+): Link | null {
+  console.log("missing field handler", {
+    storeRecord,
+    root,
+    fieldName,
+    arguments_,
+    variables,
+  });
+  if (fieldName === "node" || fieldName === "user") {
+    const variable = arguments_?.["id"];
+    const value = variables?.[variable];
+
+    if (value != null) {
+      console.log("found node", value);
+      return { __link: value };
+    }
+  }
+  return null;
 }
 
 function assertLink(link: DataTypeValue): Link | undefined {

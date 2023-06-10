@@ -15,13 +15,18 @@ var root = {
   current_post: () => postResolver, 
   users: () => [userResolver(1), userResolver(2), userResolver(3)],
   byah: ({foo}) => `byah ${foo}`,
+  user: ({id}) => userResolver(id),
 };
+
+const names = ["Moe", "Larry", "Curly"];
+const avatars = ["https://flxt.tmsimg.com/assets/121814_v9_ba.jpg", "https://flxt.tmsimg.com/assets/189023_v9_ba.jpg", "https://flxt.tmsimg.com/assets/189024_v9_ba.jpg"];
+const emails = names.map(name => `${name}@stooges.com`);
 
 const userResolver = (id) => ({
   id: () => id,
-  name: () => ("John Doe " + id),
-  avatar_url: () => 'https://sm.ign.com/ign_ap/cover/a/avatar-gen/avatar-generations_hugw.jpg',
-  email: () => 'foo' + id + '@bar.com',
+  name: () => names[id - 1],
+  avatar_url: () => avatars[id - 1],
+  email: () => emails[id - 1],
   billing_details: () => billingDetailsResolver
 })
 

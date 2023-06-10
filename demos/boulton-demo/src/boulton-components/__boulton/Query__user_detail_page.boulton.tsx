@@ -1,10 +1,11 @@
 import type {BoultonFetchableResolver, ReaderAst, FragmentReference} from '@boulton/react';
 import { getRefRendererForName } from '@boulton/react';
 import { user_detail_page as resolver } from '../user_detail_page.tsx';
+import User__user_profile_header, { ReadOutType as User__user_profile_header__outputType } from './User__user_profile_header.boulton';
 import User__user_profile_with_details, { ReadOutType as User__user_profile_with_details__outputType } from './User__user_profile_with_details.boulton';
 
-const queryText = 'query user_detail_page  {\
-  current_user {\
+const queryText = 'query user_detail_page ($id: ID!) {\
+  user__id_id: user(id: $id) {\
     avatar_url,\
     email,\
     id,\
@@ -26,15 +27,24 @@ const normalizationAst = {notNeededForDemo: true};
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Linked",
-    response_name: "current_user",
+    response_name: "user",
     alias: null,
-    arguments: null,
+    arguments: {
+      "id": "id",
+    },
     selections: [
       {
         kind: "Scalar",
         response_name: "id",
         alias: null,
         arguments: null,
+      },
+      {
+        kind: "Resolver",
+        alias: "user_profile_header",
+        arguments: null,
+        resolver: User__user_profile_header,
+        variant: "Component",
       },
       {
         kind: "Resolver",
@@ -49,8 +59,9 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 
 export type ResolverParameterType = { data:
 {
-  current_user: {
+  user: {
     id: string,
+    user_profile_header: User__user_profile_header__outputType,
     user_profile_with_details: User__user_profile_with_details__outputType,
   },
 },

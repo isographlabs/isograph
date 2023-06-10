@@ -13,6 +13,7 @@ export function BoultonDemo() {
       <React.Suspense fallback={<FullPageLoading />}>
         {selectedId ? (
           <TopLevelUserProfileWithDetails
+            selectedId={selectedId}
             onGoBack={() => setSelectedId(null)}
           />
         ) : (
@@ -41,9 +42,12 @@ function TopLevelListView({ onSelectId }) {
   );
 }
 
-function TopLevelUserProfileWithDetails({ onGoBack }) {
+function TopLevelUserProfileWithDetails({ onGoBack, selectedId }) {
   // TODO replace this with the trick that causes graphql`...` literals to work
-  const { queryReference } = useLazyReference(userDetailPageQuery, {});
+  console.log("selected id");
+  const { queryReference } = useLazyReference(userDetailPageQuery, {
+    id: selectedId,
+  });
   const userProfileWithDetails = read(queryReference);
   return userProfileWithDetails({ onGoBack });
 }
