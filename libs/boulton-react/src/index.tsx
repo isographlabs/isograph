@@ -400,7 +400,6 @@ function getStoreFieldName(
       }
       out = out + "__" + key + "_" + variables[args[key]];
     }
-    console.log("out", { out });
     return out;
   }
 }
