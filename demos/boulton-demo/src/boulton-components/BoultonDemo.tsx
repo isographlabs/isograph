@@ -44,7 +44,6 @@ function TopLevelListView({ onSelectId }) {
 
 function TopLevelUserProfileWithDetails({ onGoBack, selectedId }) {
   // TODO replace this with the trick that causes graphql`...` literals to work
-  console.log("selected id");
   const { queryReference } = useLazyReference(userDetailPageQuery, {
     id: selectedId,
   });

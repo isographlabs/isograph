@@ -18,13 +18,36 @@ function getOrCreateCache<T>(
   return cache[index];
 }
 
+/**
+ * Creates a copy of the provided value, ensuring any nested objects have their
+ * keys sorted such that equivalent values would have identical JSON.stringify
+ * results.
+ */
+function stableCopy<T>(value: T): T {
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(stableCopy);
+  }
+  const keys = Object.keys(value).sort();
+  const stable: { [index: string]: any } = {};
+  for (let i = 0; i < keys.length; i++) {
+    stable[keys[i]] = stableCopy(value[keys[i]]);
+  }
+  return stable as any;
+}
+
 export function getOrCreateCacheForUrl<T>(
   queryText: string,
   variables: object
 ): ParentCache<PromiseWrapper<T>> {
   const factory: Factory<PromiseWrapper<T>> = () =>
     makeNetworkRequest<T>(queryText, variables);
-  return getOrCreateCache<PromiseWrapper<T>>(queryText, factory);
+  return getOrCreateCache<PromiseWrapper<T>>(
+    queryText + JSON.stringify(stableCopy(variables)),
+    factory
+  );
 }
 
 export function makeNetworkRequest<T>(
