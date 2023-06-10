@@ -47,7 +47,7 @@ export type ResolverParameterType = {
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = FragmentReference<ReadFromStoreType, ResolverParameterType, ResolverReturnType>;
+export type ReadOutType = ResolverReturnType;
 
 const artifact: BoultonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
   kind: 'FetchableResolver',

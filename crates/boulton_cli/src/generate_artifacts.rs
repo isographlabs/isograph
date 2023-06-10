@@ -1000,8 +1000,11 @@ fn generate_read_out_type(
             ResolverVariant::Eager => ResolverReadOutType("ResolverReturnType".to_string()),
         },
         None => ResolverReadOutType(
-            "FragmentReference<ReadFromStoreType, ResolverParameterType, ResolverReturnType>"
-                .to_string(),
+            // This is correct:
+            // "FragmentReference<ReadFromStoreType, ResolverParameterType, ResolverReturnType>"
+            //     .to_string(),
+            // This is not correct, but has the correct behavior for now:
+            "ResolverReturnType".to_string(),
         ),
     }
 }
