@@ -448,12 +448,14 @@ fn write_artifacts<'schema>(
 
     let generated_folder_root = project_root.join("__boulton");
 
-    fs::remove_dir_all(&generated_folder_root).map_err(|e| {
-        GenerateArtifactsError::UnableToDeleteDirectory {
-            path: project_root.clone(),
-            message: e,
-        }
-    })?;
+    if generated_folder_root.exists() {
+        fs::remove_dir_all(&generated_folder_root).map_err(|e| {
+            GenerateArtifactsError::UnableToDeleteDirectory {
+                path: project_root.clone(),
+                message: e,
+            }
+        })?;
+    }
     fs::create_dir_all(&generated_folder_root).map_err(|e| {
         GenerateArtifactsError::UnableToCreateDirectory {
             path: project_root.clone(),
