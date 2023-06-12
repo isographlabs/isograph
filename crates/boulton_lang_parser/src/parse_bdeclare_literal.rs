@@ -347,6 +347,7 @@ fn from_control_flow<T, E>(control_flow: impl FnOnce() -> ControlFlow<T, E>) -> 
 
 /// In order to avoid requiring a normalization AST, we write the variables
 /// used in the alias. Once we have a normalization AST, we can remove this.
+#[allow(non_snake_case)]
 fn HACK_combine_name_and_variables_into_normalization_alias<T: StringKeyNewtype>(
     name: WithSpan<FieldDefinitionName>,
     arguments: &[WithSpan<SelectionFieldArgument>],
