@@ -106,7 +106,7 @@ export function bDeclare<
 >(
   queryText: TemplateStringsArray
 ): (
-  x: (param: TResolverParameter) => TResolverReturn
+  x: ((param: TResolverParameter) => TResolverReturn) | void
 ) => (param: TResolverParameter) => TResolverReturn {
   // The name `identity` here is a bit of a double entendre.
   // First, it is the identity function, constrained to operate

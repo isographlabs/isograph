@@ -96,6 +96,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
         let resolver_import_statement = generate_resolver_import_statement(
             field.name,
             resolver_definition.resolver_definition_path,
+            resolver_definition.has_associated_js_function,
         );
         let resolver_return_type = generate_resolver_return_type_declaration(
             resolver_definition.has_associated_js_function,
@@ -161,6 +162,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
         let resolver_import_statement = generate_resolver_import_statement(
             field.name,
             resolver_definition.resolver_definition_path,
+            resolver_definition.has_associated_js_function,
         );
         NonFetchableResolver {
             parent_type: schema
@@ -727,12 +729,18 @@ fn print_non_null_type_annotation<T: Display + ValidTypeAnnotationInnerType>(
 fn generate_resolver_import_statement(
     resolver_name: FieldDefinitionName,
     resolver_path: ResolverDefinitionPath,
+    has_associated_js_function: bool,
 ) -> ResolverImportStatement {
-    // ../ gets us to the project root from the __boulton folder
-    ResolverImportStatement(format!(
-        "import {{ {} as resolver }} from '../{}';",
-        resolver_name, resolver_path
-    ))
+    // TODO make this an enum/option instead of three variables
+    if has_associated_js_function {
+        // ../ gets us to the project root from the __boulton folder
+        ResolverImportStatement(format!(
+            "import {{ {} as resolver }} from '../{}';",
+            resolver_name, resolver_path
+        ))
+    } else {
+        ResolverImportStatement("const resolver = x => x;".to_string())
+    }
 }
 
 #[derive(Debug)]

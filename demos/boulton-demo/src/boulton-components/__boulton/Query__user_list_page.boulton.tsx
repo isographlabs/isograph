@@ -1,6 +1,6 @@
 import type {BoultonFetchableResolver, ReaderAst, FragmentReference} from '@boulton/react';
 import { getRefRendererForName } from '@boulton/react';
-import { user_list_page as resolver } from '../user_list_page.tsx';
+const resolver = x => x;
 import User__user_detail, { ReadOutType as User__user_detail__outputType } from './User__user_detail.boulton';
 
 const queryText = 'query user_list_page ($bar: String!) {\
