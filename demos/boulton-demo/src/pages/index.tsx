@@ -2,6 +2,12 @@ import Head from "next/head";
 
 import { BoultonDemo } from "@/boulton-components/BoultonDemo";
 
+// Initial Boulton setup. This will eventually happen when constructing an EnvironmentProvider
+// or the like.
+import { setNetwork } from "@boulton/react";
+import { network } from "../network";
+setNetwork(network);
+
 export default function Home() {
   return (
     <>

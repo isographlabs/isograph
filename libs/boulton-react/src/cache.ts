@@ -50,23 +50,26 @@ export function getOrCreateCacheForUrl<T>(
   );
 }
 
-export function makeNetworkRequest<T>(
+let network: ((queryText: string, variables: object) => Promise<any>) | null;
+
+// This is a hack until we store this in context somehow
+export function setNetwork(newNetwork: typeof network) {
+  network = newNetwork;
+}
+
+function makeNetworkRequest<T>(
   queryText: string,
   variables: object
 ): ItemCleanupPair<PromiseWrapper<T>> {
-  let promise: Promise<T> = fetch("http://localhost:4000/graphql", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ query: queryText, variables }),
-  })
-    .then((response) => response.json())
-    .then((networkResponse) => {
-      normalizeData(networkResponse.data, variables);
-      console.log("after normalizing", JSON.stringify(store, null, 4));
-      return networkResponse.data;
-    });
+  if (network == null) {
+    throw new Error("Network must be set before makeNetworkRequest is called");
+  }
+
+  const promise = network(queryText, variables).then((networkResponse) => {
+    normalizeData(networkResponse.data, variables);
+    console.log("after normalizing", JSON.stringify(store, null, 4));
+    return networkResponse.data;
+  });
 
   const wrapper = wrapPromise(promise);
 

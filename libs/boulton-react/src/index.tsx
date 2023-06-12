@@ -12,6 +12,8 @@ import { useLazyDisposableState } from "@boulton/react-disposable-state";
 import { type PromiseWrapper } from "./PromiseWrapper";
 import React from "react";
 
+export { setNetwork } from "./cache";
+
 // This type should be treated as an opaque type.
 export type BoultonFetchableResolver<
   TReadFromStore extends Object,
@@ -140,10 +142,7 @@ export function useLazyReference<
   >;
 } {
   // Typechecking fails here... TODO investigate
-  const cache = getOrCreateCacheForUrl<TResolverResult>(
-    artifact.queryText,
-    variables
-  );
+  const cache = getOrCreateCacheForUrl(artifact.queryText, variables);
   const data =
     useLazyDisposableState<PromiseWrapper<TResolverResult>>(cache).state;
   return {
