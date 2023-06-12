@@ -43,9 +43,12 @@ impl ValidatedSchema {
         let Schema {
             fields,
             schema_data,
-            id_type,
-            string_type,
+            id_type_id: id_type,
+            string_type_id: string_type,
             query_type_id,
+            float_type_id,
+            boolean_type_id,
+            int_type_id,
         } = unvalidated_schema;
 
         let updated_fields = validate_and_transform_fields(fields, &schema_data)?;
@@ -68,9 +71,12 @@ impl ValidatedSchema {
                 scalars,
                 defined_types,
             },
-            id_type,
-            string_type,
+            id_type_id: id_type,
+            string_type_id: string_type,
             query_type_id,
+            float_type_id,
+            boolean_type_id,
+            int_type_id,
         })
     }
 }

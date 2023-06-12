@@ -26,3 +26,8 @@ type BillingDetails {
   expiration_date: String!
   address: String!
 }
+
+"""
+Some scalar
+"""
+scalar Foo

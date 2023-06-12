@@ -9,7 +9,7 @@ use intern::string_key::StringKey;
 use graphql_lang_types::{
     ConstantValue, Directive, InputValueDefinition, ListTypeAnnotation, NameValuePair,
     NamedTypeAnnotation, NonNullTypeAnnotation, ObjectTypeDefinition, OutputFieldDefinition,
-    TypeAnnotation, TypeSystemDefinition, TypeSystemDocument, ValueType,
+    ScalarTypeDefinition, TypeAnnotation, TypeSystemDefinition, TypeSystemDocument, ValueType,
 };
 
 use crate::ParseResult;
@@ -42,6 +42,7 @@ fn parse_type_system_definition(tokens: &mut PeekableLexer) -> ParseResult<TypeS
 
     match identifier_source {
         "type" => parse_object_type_definition(tokens, description).map(|x| x.into()),
+        "scalar" => parse_scalar_type_definition(tokens, description).map(|x| x.into()),
         _ => Err(SchemaParseError::TopLevelSchemaDeclarationExpected {
             found_text: identifier_source.to_string(),
         }),
@@ -65,6 +66,22 @@ fn parse_object_type_definition(
         interfaces,
         directives,
         fields,
+    })
+}
+
+/// The state of the PeekableLexer is that it has processed the "scalar" keyword
+fn parse_scalar_type_definition(
+    tokens: &mut PeekableLexer,
+    description: Option<WithSpan<DescriptionValue>>,
+) -> ParseResult<ScalarTypeDefinition> {
+    let name = tokens.parse_string_key_type(TokenKind::Identifier)?;
+
+    let directives = parse_constant_directives(tokens)?;
+
+    Ok(ScalarTypeDefinition {
+        description,
+        name,
+        directives,
     })
 }
 

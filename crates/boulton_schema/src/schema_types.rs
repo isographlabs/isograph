@@ -14,6 +14,10 @@ use intern::string_key::Intern;
 
 use crate::ResolverVariant;
 
+lazy_static::lazy_static!(
+    pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
+);
+
 /// The first, unvalidated in-memory representation of a schema.
 ///
 /// The things that are unvalidated include:
@@ -51,9 +55,12 @@ pub struct Schema<
     pub schema_data: SchemaData<TEncounteredField>,
 
     // Well known types
-    pub id_type: ScalarId,
-    pub string_type: ScalarId,
-    // float
+    pub id_type_id: ScalarId,
+    pub string_type_id: ScalarId,
+    pub float_type_id: ScalarId,
+    pub boolean_type_id: ScalarId,
+    pub int_type_id: ScalarId,
+
     // typename
     pub query_type_id: Option<ObjectId>,
     // Subscription
@@ -120,15 +127,32 @@ impl UnvalidatedSchema {
             &mut scalars,
             &mut defined_types,
             "ID",
-            "string".intern().into(),
+            *STRING_JAVASCRIPT_TYPE,
         );
         let string_type_id = add_schema_defined_scalar_type(
             &mut scalars,
             &mut defined_types,
             "String",
-            "string".intern().into(),
+            *STRING_JAVASCRIPT_TYPE,
         );
-        // Float, Boolean, etc.
+        let boolean_type_id = add_schema_defined_scalar_type(
+            &mut scalars,
+            &mut defined_types,
+            "Boolean",
+            "boolean".intern().into(),
+        );
+        let float_type_id = add_schema_defined_scalar_type(
+            &mut scalars,
+            &mut defined_types,
+            "Float",
+            "number".intern().into(),
+        );
+        let int_type_id = add_schema_defined_scalar_type(
+            &mut scalars,
+            &mut defined_types,
+            "Int",
+            "number".intern().into(),
+        );
 
         Self {
             fields,
@@ -137,9 +161,12 @@ impl UnvalidatedSchema {
                 scalars,
                 defined_types,
             },
-            id_type: id_type_id,
-            string_type: string_type_id,
+            id_type_id,
+            string_type_id,
             query_type_id: None,
+            int_type_id,
+            float_type_id,
+            boolean_type_id,
         }
     }
 }

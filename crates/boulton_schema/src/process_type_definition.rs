@@ -5,14 +5,17 @@ use common_lang_types::{
     TypeId, TypeWithFieldsId, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
-    ObjectTypeDefinition, OutputFieldDefinition, TypeAnnotation, TypeSystemDefinition,
-    TypeSystemDocument,
+    ObjectTypeDefinition, OutputFieldDefinition, ScalarTypeDefinition, TypeAnnotation,
+    TypeSystemDefinition, TypeSystemDocument,
 };
 use intern::string_key::Intern;
 use lazy_static::lazy_static;
 use thiserror::Error;
 
-use crate::{Schema, SchemaField, SchemaObject, UnvalidatedSchema, UnvalidatedSchemaField};
+use crate::{
+    Schema, SchemaField, SchemaObject, SchemaScalar, UnvalidatedSchema, UnvalidatedSchemaField,
+    STRING_JAVASCRIPT_TYPE,
+};
 
 lazy_static! {
     static ref QUERY_TYPE: ObjectTypeName = "Query".intern().into();
@@ -27,6 +30,9 @@ impl UnvalidatedSchema {
             match type_system_definition {
                 TypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
                     self.process_object_type_definition(object_type_definition)?;
+                }
+                TypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
+                    self.process_scalar_definition(scalar_type_definition)?;
                 }
             }
         }
@@ -77,6 +83,38 @@ impl UnvalidatedSchema {
 
                 existing_fields.extend(new_fields);
                 vacant.insert(TypeId::Object(next_object_id));
+            }
+        }
+        Ok(())
+    }
+
+    fn process_scalar_definition(
+        &mut self,
+        scalar_type_definition: ScalarTypeDefinition,
+    ) -> ProcessTypeDefinitionResult<()> {
+        let &mut Schema {
+            ref mut schema_data,
+            ..
+        } = self;
+        let next_scalar_id = schema_data.scalars.len().into();
+        let ref mut type_names = schema_data.defined_types;
+        let ref mut scalars = schema_data.scalars;
+        match type_names.entry(scalar_type_definition.name.item.into()) {
+            Entry::Occupied(_) => {
+                return Err(ProcessTypeDefinitionError::DuplicateTypeDefinition {
+                    type_definition_type: "object",
+                    type_name: scalar_type_definition.name.item.into(),
+                });
+            }
+            Entry::Vacant(vacant) => {
+                scalars.push(SchemaScalar {
+                    description: scalar_type_definition.description.map(|d| d.item),
+                    name: scalar_type_definition.name.item,
+                    id: next_scalar_id,
+                    javascript_name: *STRING_JAVASCRIPT_TYPE,
+                });
+
+                vacant.insert(TypeId::Scalar(next_scalar_id));
             }
         }
         Ok(())

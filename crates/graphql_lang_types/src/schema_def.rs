@@ -5,13 +5,13 @@ use crate::{Directive, TypeAnnotation};
 use super::{write_arguments, write_directives, ConstantValue};
 use common_lang_types::{
     DescriptionValue, FieldDefinitionName, InputTypeName, InputValueName, InterfaceTypeName,
-    ObjectTypeName, UnvalidatedTypeName, WithSpan,
+    ObjectTypeName, ScalarTypeName, UnvalidatedTypeName, WithSpan,
 };
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum TypeSystemDefinition {
     ObjectTypeDefinition(ObjectTypeDefinition),
-    // Scalar
+    ScalarTypeDefinition(ScalarTypeDefinition),
     // Interface
     // Union
     // Enum
@@ -24,6 +24,12 @@ pub enum TypeSystemDefinition {
 impl From<ObjectTypeDefinition> for TypeSystemDefinition {
     fn from(type_definition: ObjectTypeDefinition) -> Self {
         Self::ObjectTypeDefinition(type_definition)
+    }
+}
+
+impl From<ScalarTypeDefinition> for TypeSystemDefinition {
+    fn from(type_definition: ScalarTypeDefinition) -> Self {
+        Self::ScalarTypeDefinition(type_definition)
     }
 }
 
@@ -47,6 +53,13 @@ pub struct ObjectTypeDefinition {
     pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
     pub directives: Vec<Directive<ConstantValue>>,
     pub fields: Vec<WithSpan<OutputFieldDefinition>>,
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub struct ScalarTypeDefinition {
+    pub description: Option<WithSpan<DescriptionValue>>,
+    pub name: WithSpan<ScalarTypeName>,
+    pub directives: Vec<Directive<ConstantValue>>,
 }
 
 // TODO maybe parametrize with T: TypeTrait
