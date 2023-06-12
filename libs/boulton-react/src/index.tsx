@@ -169,7 +169,7 @@ export function read<
     reference.root,
     reference.variables
   );
-  console.log("result of calling read", { response, reference });
+  console.log("done reading", { response });
   if (response.kind === "MissingData") {
     throw onNextChange();
   } else {
@@ -185,7 +185,7 @@ export function readButDoNotEvaluate<TReadFromStore extends Object>(
     reference.root,
     reference.variables
   );
-  console.log("result of read but do not evaluate", { response, reference });
+  console.log("done reading but not evaluating", { response });
   if (response.kind === "MissingData") {
     throw onNextChange();
   } else {
@@ -208,8 +208,8 @@ function readData<TReadFromStore>(
   variables: Object | null
 ): ReadDataResult<TReadFromStore> {
   let storeRecord = store[root];
-  if (storeRecord == null) {
-    return { kind: "MissingData" };
+  if (storeRecord === undefined) {
+    return { kind: "MissingData", reason: "No record for root " + root };
   }
 
   let target: { [index: string]: any } = {};
@@ -226,7 +226,10 @@ function readData<TReadFromStore>(
         // TODO consider making scalars into discriminated unions. This probably has
         // to happen for when we handle errors.
         if (value === undefined) {
-          return { kind: "MissingData" };
+          return {
+            kind: "MissingData",
+            reason: "No value for " + storeRecordName + " on root " + root,
+          };
         }
         target[field.alias ?? field.response_name] = value;
         break;
@@ -242,12 +245,34 @@ function readData<TReadFromStore>(
           const results = [];
           for (const item of value) {
             const link = assertLink(item);
-            if (link == null) {
-              return { kind: "MissingData" };
+            if (link === undefined) {
+              return {
+                kind: "MissingData",
+                reason:
+                  "No link for " +
+                  storeRecordName +
+                  " on root " +
+                  root +
+                  ". Link is " +
+                  JSON.stringify(item),
+              };
+            } else if (link === null) {
+              results.push(null);
+              continue;
             }
             const result = readData(field.selections, link.__link, variables);
             if (result.kind === "MissingData") {
-              return { kind: "MissingData" };
+              return {
+                kind: "MissingData",
+                reason:
+                  "Missing data for " +
+                  storeRecordName +
+                  " on root " +
+                  root +
+                  ". Link is " +
+                  JSON.stringify(item),
+                nestedReason: result,
+              };
             }
             results.push(result.data);
           }
@@ -255,7 +280,7 @@ function readData<TReadFromStore>(
           break;
         }
         let link = assertLink(value);
-        if (link == null) {
+        if (link === undefined) {
           // TODO make this configurable, and also generated and derived from the schema
           const altLink = HACK_missingFieldHandler(
             storeRecord,
@@ -264,16 +289,32 @@ function readData<TReadFromStore>(
             field.arguments,
             variables
           );
-          if (altLink == null) {
-            return { kind: "MissingData" };
+          if (altLink === undefined) {
+            return {
+              kind: "MissingData",
+              reason:
+                "No link for " +
+                storeRecordName +
+                " on root " +
+                root +
+                ". Link is " +
+                JSON.stringify(value),
+            };
           } else {
             link = altLink;
           }
+        } else if (link === null) {
+          target[field.alias ?? field.response_name] = null;
+          break;
         }
         const targetId = link.__link;
         const data = readData(field.selections, targetId, variables);
         if (data.kind === "MissingData") {
-          return { kind: "MissingData" };
+          return {
+            kind: "MissingData",
+            reason: "Missing data for " + storeRecordName + " on root " + root,
+            nestedReason: data,
+          };
         }
         target[field.alias ?? field.response_name] = data.data;
         break;
@@ -282,7 +323,11 @@ function readData<TReadFromStore>(
         if (field.variant === "Eager") {
           const data = readData(field.resolver.readerAst, root, variables);
           if (data.kind === "MissingData") {
-            return { kind: "MissingData" };
+            return {
+              kind: "MissingData",
+              reason: "Missing data for " + field.alias + " on root " + root,
+              nestedReason: data,
+            };
           } else {
             // TODO do we also need to call convert?
             target[field.alias] = field.resolver.resolver(data.data);
@@ -302,8 +347,9 @@ function readData<TReadFromStore>(
                   resolver: resolver_function,
                   variables,
                   convert: () => {
+                    // Change refReader props to not accept this
                     console.log(new Error().stack);
-                    throw new Error("where did I convert");
+                    throw new Error("where did I convert 1 ");
                   },
                 }}
                 additionalRuntimeProps={additionalRuntimeProps}
@@ -318,11 +364,10 @@ function readData<TReadFromStore>(
             // This is a footgun, I should really figure out a better way to handle this.
             // If you misspell a resolver export (it should be the field name), then this
             // will fall back to x => x, when the app developer intended something else.
+            //
+            // lint rules will ameliorate this
             resolver: field.resolver.resolver ?? ((x) => x),
-            convert: () => {
-              console.log(new Error().stack);
-              throw new Error("where did I convert");
-            },
+            convert: (resolver, data) => resolver(data),
           };
           target[field.alias] = fragmentReference;
         }
@@ -339,7 +384,7 @@ function HACK_missingFieldHandler(
   fieldName: string,
   arguments_: { [index: string]: any } | null,
   variables: { [index: string]: any } | null
-): Link | null {
+): Link | undefined {
   console.log("missing field handler", {
     storeRecord,
     root,
@@ -351,22 +396,22 @@ function HACK_missingFieldHandler(
     const variable = arguments_?.["id"];
     const value = variables?.[variable];
 
+    // TODO can we handle explicit nulls here too? Probably, after wrapping in objects
     if (value != null) {
       console.log("found node", value);
       return { __link: value };
     }
   }
-  return null;
 }
 
-function assertLink(link: DataTypeValue): Link | undefined {
+function assertLink(link: DataTypeValue): Link | undefined | null {
   if (Array.isArray(link)) {
     throw new Error("Unexpected array");
   }
   if (typeof link === "object") {
     return link;
   }
-  if (link == null) {
+  if (link === undefined) {
     return undefined;
   }
   throw new Error("Invalid link");
@@ -382,7 +427,7 @@ export function getRefReaderForName(name: string) {
       reference: FragmentReference<any, any, any>;
       additionalRuntimeProps: any;
     }) {
-      console.log("Rendering RefReader:", name);
+      console.log("Rendering RefReader:", { name, reference });
       const data = readButDoNotEvaluate(reference);
       return reference.resolver({ data, ...additionalRuntimeProps });
     }

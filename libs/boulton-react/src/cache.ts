@@ -11,6 +11,11 @@ function getOrCreateCache<T>(
   index: string,
   factory: Factory<T>
 ): ParentCache<T> {
+  console.log("getting cache for", {
+    index,
+    cache: Object.keys(cache),
+    found: !!cache[index],
+  });
   if (cache[index] == null) {
     cache[index] = new ParentCache(factory);
   }
@@ -42,12 +47,10 @@ export function getOrCreateCacheForUrl<T>(
   queryText: string,
   variables: object
 ): ParentCache<PromiseWrapper<T>> {
+  const cacheKey = queryText + JSON.stringify(stableCopy(variables));
   const factory: Factory<PromiseWrapper<T>> = () =>
     makeNetworkRequest<T>(queryText, variables);
-  return getOrCreateCache<PromiseWrapper<T>>(
-    queryText + JSON.stringify(stableCopy(variables)),
-    factory
-  );
+  return getOrCreateCache<PromiseWrapper<T>>(cacheKey, factory);
 }
 
 let network: ((queryText: string, variables: object) => Promise<any>) | null;
@@ -65,9 +68,9 @@ function makeNetworkRequest<T>(
     throw new Error("Network must be set before makeNetworkRequest is called");
   }
 
+  console.log("making network request", variables);
   const promise = network(queryText, variables).then((networkResponse) => {
     normalizeData(networkResponse.data, variables);
-    console.log("after normalizing", JSON.stringify(store, null, 4));
     return networkResponse.data;
   });
 
@@ -104,6 +107,7 @@ export const ROOT_ID = "ROOT";
 
 function normalizeData(data: DataType, variables: Object) {
   normalizeDataWithPath(data, ROOT_ID, variables);
+  console.log("after normalization", { store });
   callSubscriptions();
 }
 
@@ -128,40 +132,51 @@ function callSubscriptions() {
 }
 
 function normalizeDataWithPath(
-  data: DataType,
-  path: string,
+  dataToNormalize: DataType,
+  parentId: string,
   variables: { [index: string]: string }
 ): DataId {
-  const id = data["id"] ?? path;
-  const targetRecord: DataType = store[id] ?? {};
-  store[id] = targetRecord;
+  const dataId = dataToNormalize["id"] ?? parentId;
+  const targetRecord: DataType = store[dataId] ?? {};
+  store[dataId] = targetRecord;
 
-  Object.keys(data).forEach((networkResponseKey) => {
+  Object.keys(dataToNormalize).forEach((networkResponseKey) => {
     const storeKey = HACK_get_store_key(networkResponseKey, variables);
     targetRecord[storeKey] = getFieldOrNormalize(
-      data[networkResponseKey],
-      `${path}.${networkResponseKey}`,
+      dataToNormalize[networkResponseKey],
+      `${dataId ?? parentId}.${storeKey}`,
       variables
     );
   });
-  return id;
+
+  return dataId;
 }
 
+// Normalizes + returns the value that we want to store in the record
 function getFieldOrNormalize(
-  data: DataTypeValue,
-  path: string,
+  dataToNormalize: DataTypeValue,
+  idOrPathToRecord: string,
   variables: { [index: string]: string }
 ): DataTypeValue {
-  if (typeof data === "string" || data == null) {
-    return data;
+  if (
+    typeof dataToNormalize === "string" ||
+    typeof dataToNormalize === "number" ||
+    typeof dataToNormalize === "boolean" ||
+    dataToNormalize == null
+  ) {
+    return dataToNormalize;
   }
-  if (Array.isArray(data)) {
-    return data.map((item, index) =>
-      getFieldOrNormalize(item, `${path}[${index}]`, variables)
+  if (Array.isArray(dataToNormalize)) {
+    return dataToNormalize.map((item, index) =>
+      getFieldOrNormalize(item, `${idOrPathToRecord}.${index}`, variables)
     );
   }
 
-  const dataId = normalizeDataWithPath(data, path, variables);
+  const dataId = normalizeDataWithPath(
+    dataToNormalize,
+    idOrPathToRecord,
+    variables
+  );
   return { __link: dataId };
 }
 
