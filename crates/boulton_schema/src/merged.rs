@@ -171,6 +171,7 @@ fn merge_selections_into_set(
 
 /// In order to avoid requiring a normalization AST, we write the variables
 /// used in the alias. Once we have a normalization AST, we can remove this.
+#[allow(non_snake_case)]
 fn HACK_combine_name_and_variables_into_normalization_alias(
     name: WithSpan<FieldDefinitionName>,
     arguments: &[WithSpan<SelectionFieldArgument>],

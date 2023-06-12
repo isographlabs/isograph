@@ -11,12 +11,13 @@ use common_lang_types::{
 };
 use graphql_lang_types::TypeAnnotation;
 use intern::string_key::Intern;
+use lazy_static::lazy_static;
 
 use crate::ResolverVariant;
 
-lazy_static::lazy_static!(
+lazy_static! {
     pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
-);
+}
 
 /// The first, unvalidated in-memory representation of a schema.
 ///
