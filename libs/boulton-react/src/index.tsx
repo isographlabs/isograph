@@ -223,7 +223,9 @@ function readData<TReadFromStore>(
           variables
         );
         const value = storeRecord[storeRecordName];
-        if (value == null) {
+        // TODO consider making scalars into discriminated unions. This probably has
+        // to happen for when we handle errors.
+        if (value === undefined) {
           return { kind: "MissingData" };
         }
         target[field.alias ?? field.response_name] = value;
