@@ -6,3 +6,6 @@
 **/*.tgz
 **/target/**
 yarn.lock
+**/.env.local
+**/.next/**
+**/next-env.d.ts
