@@ -117,3 +117,6 @@ string_key_newtype!(FieldArgumentName);
 
 // e.g. Query__foo
 string_key_newtype!(TypeAndField);
+
+string_key_newtype!(NormalizationKey);
+string_key_conversion!(FieldDefinitionName, NormalizationKey);
