@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use boulton_lang_types::{SelectionSetAndUnwraps, VariableDefinition};
+use boulton_lang_types::{Selection, Unwrap, VariableDefinition};
 use common_lang_types::{
     DefinedField, DescriptionValue, FieldDefinitionName, FieldId, HasName, InputTypeId,
     InputTypeName, JavascriptName, ObjectId, ObjectTypeName, OutputTypeId, OutputTypeName,
@@ -428,7 +428,10 @@ pub struct SchemaResolverDefinitionInfo<
     TVariableDefinitionType: ValidTypeAnnotationInnerType,
 > {
     pub resolver_definition_path: ResolverDefinitionPath,
-    pub selection_set_and_unwraps: Option<SelectionSetAndUnwraps<TScalarField, TLinkedField>>,
+    pub selection_set_and_unwraps: Option<(
+        Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
+        Vec<WithSpan<Unwrap>>,
+    )>,
     pub field_id: FieldId,
     pub variant: Option<WithSpan<ResolverVariant>>,
     pub is_fetchable: bool,
@@ -446,8 +449,14 @@ impl<
     pub fn map<TNewScalarField: ValidScalarFieldType, TNewLinkedField: ValidLinkedFieldType>(
         self,
         map: impl FnOnce(
-            SelectionSetAndUnwraps<TScalarField, TLinkedField>,
-        ) -> SelectionSetAndUnwraps<TNewScalarField, TNewLinkedField>,
+            (
+                Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
+                Vec<WithSpan<Unwrap>>,
+            ),
+        ) -> (
+            Vec<WithSpan<Selection<TNewScalarField, TNewLinkedField>>>,
+            Vec<WithSpan<Unwrap>>,
+        ),
     ) -> SchemaResolverDefinitionInfo<TNewScalarField, TNewLinkedField, TVariableDefinitionType>
     {
         SchemaResolverDefinitionInfo {

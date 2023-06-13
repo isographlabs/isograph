@@ -3,7 +3,7 @@ use std::collections::{hash_map::Entry, HashMap};
 use boulton_lang_types::{
     FieldSelection, LinkedFieldSelection, ScalarFieldSelection,
     Selection::{self, Field},
-    SelectionFieldArgument, SelectionSetAndUnwraps,
+    SelectionFieldArgument,
 };
 use common_lang_types::{
     DefinedField, FieldDefinitionName, FieldId, FieldNameOrAlias, TypeWithFieldsId,
@@ -11,7 +11,7 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 
-use crate::{SchemaTypeWithFields, ValidatedSchema, ValidatedSelectionSetAndUnwraps};
+use crate::{SchemaTypeWithFields, ValidatedSchema, ValidatedSelection};
 
 pub type MergedSelectionSet = Vec<WithSpan<Selection<TypeWithoutFieldsId, TypeWithFieldsId>>>;
 
@@ -24,7 +24,7 @@ pub type MergedSelectionSet = Vec<WithSpan<Selection<TypeWithoutFieldsId, TypeWi
 pub fn merge_selection_set(
     schema: &ValidatedSchema,
     parent_type: SchemaTypeWithFields<FieldId>,
-    selection_set: &ValidatedSelectionSetAndUnwraps,
+    selection_set: &Vec<WithSpan<ValidatedSelection>>,
 ) -> MergedSelectionSet {
     let mut merged_selection_set = HashMap::new();
 
@@ -50,9 +50,9 @@ fn merge_selections_into_set(
         WithSpan<Selection<TypeWithoutFieldsId, TypeWithFieldsId>>,
     >,
     parent_type: SchemaTypeWithFields<FieldId>,
-    value: &ValidatedSelectionSetAndUnwraps,
+    value: &Vec<WithSpan<ValidatedSelection>>,
 ) {
-    for item in value.selection_set.iter() {
+    for item in value.iter() {
         let span = item.span;
         match &item.item {
             Field(field) => match field {
@@ -101,14 +101,14 @@ fn merge_selections_into_set(
                             match &field.field_type {
                                 DefinedField::ServerField(_) => panic!("Expected resolver"),
                                 DefinedField::ResolverField(r) => {
-                                    if let Some(ref selection_set_and_unwraps) =
+                                    if let Some((ref selection_set, _)) =
                                         r.selection_set_and_unwraps
                                     {
                                         merge_selections_into_set(
                                             schema,
                                             merged_selection_set,
                                             parent_type,
-                                            selection_set_and_unwraps,
+                                            selection_set,
                                         )
                                     }
                                 }
@@ -131,26 +131,23 @@ fn merge_selections_into_set(
                                         name: linked_field.name,
                                         reader_alias: linked_field.reader_alias,
                                         field: linked_field.field,
-                                        selection_set_and_unwraps: {
+                                        selection_set: {
                                             let type_id = linked_field.field;
                                             let linked_field_parent_type =
                                                 schema.schema_data.lookup_type_with_fields(type_id);
-                                            SelectionSetAndUnwraps {
-                                                selection_set: merge_selection_set(
-                                                    schema,
-                                                    linked_field_parent_type,
-                                                    &linked_field.selection_set_and_unwraps,
-                                                ),
-                                                // Unwraps **aren't necessary** in the merged data structure. The merged fields
-                                                // should either be generic over the type of unwraps or it should be a different
-                                                // data structure.
-                                                unwraps: linked_field
-                                                    .selection_set_and_unwraps
-                                                    .unwraps
-                                                    // TODO this sucks
-                                                    .clone(),
-                                            }
+                                            merge_selection_set(
+                                                schema,
+                                                linked_field_parent_type,
+                                                &linked_field.selection_set,
+                                            )
                                         },
+                                        // Unwraps **aren't necessary** in the merged data structure. The merged fields
+                                        // should either be generic over the type of unwraps or it should be a different
+                                        // data structure.
+                                        unwraps: linked_field
+                                            .unwraps
+                                            // TODO this sucks
+                                            .clone(),
                                         arguments: linked_field.arguments.clone(),
                                         normalization_alias: linked_field.normalization_alias,
                                     },

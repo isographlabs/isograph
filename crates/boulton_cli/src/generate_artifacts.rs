@@ -13,7 +13,7 @@ use boulton_lang_types::{
 use boulton_schema::{
     merge_selection_set, MergedSelectionSet, ResolverVariant, SchemaTypeWithFields,
     ValidatedSchema, ValidatedSchemaResolverDefinitionInfo, ValidatedSelection,
-    ValidatedSelectionSetAndUnwraps, ValidatedVariableDefinition,
+    ValidatedVariableDefinition,
 };
 use common_lang_types::{
     DefinedField, FieldDefinitionName, FieldId, HasName, OutputTypeId, QueryOperationName,
@@ -61,7 +61,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     resolver_definition: &ValidatedSchemaResolverDefinitionInfo,
 ) -> FetchableResolver<'schema> {
-    if let Some(ref selection_set_and_unwraps) = resolver_definition.selection_set_and_unwraps {
+    if let Some((ref selection_set, _)) = resolver_definition.selection_set_and_unwraps {
         let field = schema.field(resolver_definition.field_id);
         let query_name: QueryOperationName = field.name.into();
 
@@ -71,7 +71,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
                 .schema_data
                 .object(schema.query_type_id.expect("expect query type to exist"))
                 .into(),
-            selection_set_and_unwraps,
+            selection_set,
         );
 
         let query_object = schema
@@ -87,7 +87,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
             HashMap::new();
         let resolver_parameter_type = generate_resolver_parameter_type(
             schema,
-            &selection_set_and_unwraps.selection_set,
+            &selection_set,
             resolver_definition.variant,
             query_object.into(),
             &mut nested_resolver_artifact_imports,
@@ -104,7 +104,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
         let resolver_read_out_type = generate_read_out_type(resolver_definition);
         let reader_ast = generate_reader_ast(
             schema,
-            selection_set_and_unwraps,
+            selection_set,
             query_object.into(),
             0,
             &mut nested_resolver_artifact_imports,
@@ -133,7 +133,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     resolver_definition: &ValidatedSchemaResolverDefinitionInfo,
 ) -> NonFetchableResolver<'schema> {
-    if let Some(selection_set_and_unwraps) = &resolver_definition.selection_set_and_unwraps {
+    if let Some((selection_set, _)) = &resolver_definition.selection_set_and_unwraps {
         let field = schema.field(resolver_definition.field_id);
         let parent_type = schema
             .schema_data
@@ -141,7 +141,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
         let mut nested_resolver_artifact_imports = HashMap::new();
         let reader_ast = generate_reader_ast(
             schema,
-            selection_set_and_unwraps,
+            selection_set,
             parent_type,
             0,
             &mut nested_resolver_artifact_imports,
@@ -149,7 +149,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
 
         let resolver_parameter_type = generate_resolver_parameter_type(
             schema,
-            &selection_set_and_unwraps.selection_set,
+            &selection_set,
             resolver_definition.variant,
             parent_type,
             &mut nested_resolver_artifact_imports,
@@ -423,7 +423,7 @@ fn write_selections(
                     write_selections(
                         query_text,
                         schema,
-                        &linked_field.selection_set_and_unwraps.selection_set,
+                        &linked_field.selection_set,
                         indentation_level + 1,
                     );
                     query_text.push_str(&format!(
@@ -655,7 +655,7 @@ fn write_query_types_from_selection(
                             let object = schema.schema_data.object(object_id);
                             let inner = generate_resolver_parameter_type(
                                 schema,
-                                &linked_field.selection_set_and_unwraps.selection_set,
+                                &linked_field.selection_set,
                                 variant,
                                 object.into(),
                                 nested_resolver_imports,
@@ -761,13 +761,13 @@ pub struct ResolverImport {
 
 fn generate_reader_ast<'schema>(
     schema: &'schema ValidatedSchema,
-    selection_set_and_unwraps: &'schema ValidatedSelectionSetAndUnwraps,
+    selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
     parent_type: SchemaTypeWithFields<'schema, FieldId>,
     indentation_level: u8,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
 ) -> ReaderAst {
     let mut reader_ast = "[\n".to_string();
-    for item in &selection_set_and_unwraps.selection_set {
+    for item in selection_set {
         let s = generate_reader_ast_node(
             item,
             parent_type,
@@ -877,7 +877,7 @@ fn generate_reader_ast_node(
                     .lookup_type_with_fields(linked_field.field);
                 let inner_reader_ast = generate_reader_ast(
                     schema,
-                    &linked_field.selection_set_and_unwraps,
+                    &linked_field.selection_set,
                     linked_field_type,
                     indentation_level + 1,
                     nested_resolver_imports,

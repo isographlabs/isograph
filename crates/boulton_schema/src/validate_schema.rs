@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
 use boulton_lang_types::{
-    LinkedFieldSelection, ScalarFieldSelection, Selection, SelectionSetAndUnwraps,
-    VariableDefinition,
+    LinkedFieldSelection, ScalarFieldSelection, Selection, VariableDefinition,
 };
 use common_lang_types::{
     DefinedField, FieldDefinitionName, FieldId, HasName, InputTypeId, OutputTypeId, TypeId,
@@ -22,9 +21,6 @@ pub type ValidatedSchemaField =
     SchemaField<DefinedField<TypeAnnotation<OutputTypeId>, ValidatedSchemaResolverDefinitionInfo>>;
 
 type ValidatedDefinedField = DefinedField<TypeWithoutFieldsId, ()>;
-
-pub type ValidatedSelectionSetAndUnwraps =
-    SelectionSetAndUnwraps<ValidatedDefinedField, TypeWithFieldsId>;
 
 pub type ValidatedSelection = Selection<ValidatedDefinedField, TypeWithFieldsId>;
 
@@ -191,12 +187,8 @@ fn validate_resolver_fragment(
         validate_variable_definitions(schema_data, resolver_field_type.variable_definitions)?;
 
     match resolver_field_type.selection_set_and_unwraps {
-        Some(selection_set_and_unwraps) => {
+        Some((selection_set, unwraps)) => {
             let parent_type = schema_data.lookup_type_with_fields(field.parent_type_id);
-            let SelectionSetAndUnwraps {
-                selection_set,
-                unwraps,
-            } = selection_set_and_unwraps;
             let selection_set = validate_resolver_definition_selections_exist_and_types_match(
                 schema_data,
                 selection_set,
@@ -207,10 +199,7 @@ fn validate_resolver_fragment(
             })?;
             Ok(SchemaResolverDefinitionInfo {
                 resolver_definition_path: resolver_field_type.resolver_definition_path,
-                selection_set_and_unwraps: Some(SelectionSetAndUnwraps {
-                    selection_set,
-                    unwraps,
-                }),
+                selection_set_and_unwraps: Some((selection_set, unwraps)),
                 field_id: resolver_field_type.field_id,
                 variant: resolver_field_type.variant,
                 is_fetchable: resolver_field_type.is_fetchable,
@@ -452,49 +441,52 @@ fn validate_field_type_exists_and_is_linked(
 ) -> ValidateSelectionsResult<LinkedFieldSelection<ValidatedDefinedField, TypeWithFieldsId>> {
     let linked_field_name = linked_field_selection.name.item.into();
     match parent_fields.get(&linked_field_name) {
-        Some(defined_field_type) => match defined_field_type {
-            DefinedField::ServerField(server_field_name) => {
-                let field_type_id = *schema_data
+        Some(defined_field_type) => {
+            match defined_field_type {
+                DefinedField::ServerField(server_field_name) => {
+                    let field_type_id = *schema_data
                     .defined_types
                     .get(server_field_name.inner())
                     .expect("Expected field type to be defined, which I think was validated earlier, probably indicates a bug in Boulton");
-                match field_type_id {
-                    TypeId::Scalar(_) => Err(
-                        ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsScalar {
-                            field_parent_type_name: parent_type.name(),
-                            field_name: linked_field_name,
-                            target_type: "a scalar",
-                            target_type_name: *server_field_name.inner(),
-                        },
-                    ),
-                    TypeId::Object(object_id) => {
-                        let object = schema_data.objects.get(object_id.as_usize()).unwrap();
-                        Ok(LinkedFieldSelection {
+                    match field_type_id {
+                        TypeId::Scalar(_) => Err(
+                            ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsScalar {
+                                field_parent_type_name: parent_type.name(),
+                                field_name: linked_field_name,
+                                target_type: "a scalar",
+                                target_type_name: *server_field_name.inner(),
+                            },
+                        ),
+                        TypeId::Object(object_id) => {
+                            let object = schema_data.objects.get(object_id.as_usize()).unwrap();
+                            Ok(LinkedFieldSelection {
                             name: linked_field_selection.name,
                             reader_alias: linked_field_selection.reader_alias,
                             normalization_alias: linked_field_selection.normalization_alias,
-                            selection_set_and_unwraps: linked_field_selection
-                                .selection_set_and_unwraps
-                                .and_then(&mut |selection| {
+                            selection_set: linked_field_selection.selection_set.into_iter().map(
+                                |selection| {
                                     validate_resolver_definition_selection_exists_and_type_matches(
                                         selection,
                                         SchemaTypeWithFields::Object(object),
                                         schema_data,
                                     )
-                                })?,
+                                },
+                            ).collect::<Result<Vec<_>, _>>()?,
+                            unwraps: linked_field_selection.unwraps,
                             field: TypeWithFieldsId::Object(object_id),
                             arguments: linked_field_selection.arguments,
                         })
+                        }
                     }
                 }
+                DefinedField::ResolverField(_) => Err(
+                    ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsResolver {
+                        field_parent_type_name: parent_type.name(),
+                        field_name: linked_field_name,
+                    },
+                ),
             }
-            DefinedField::ResolverField(_) => Err(
-                ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsResolver {
-                    field_parent_type_name: parent_type.name(),
-                    field_name: linked_field_name,
-                },
-            ),
-        },
+        }
         None => Err(ValidateSelectionsError::FieldDoesNotExist(
             parent_type.name(),
             linked_field_name,

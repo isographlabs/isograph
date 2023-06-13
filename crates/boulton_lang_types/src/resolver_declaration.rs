@@ -13,7 +13,8 @@ pub struct ResolverDeclaration {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub resolver_field_name: WithSpan<ScalarFieldName>,
-    pub selection_set_and_unwraps: Option<SelectionSetAndUnwraps<(), ()>>,
+    pub selection_set_and_unwraps:
+        Option<(Vec<WithSpan<Selection<(), ()>>>, Vec<WithSpan<Unwrap>>)>,
     // TODO intern the path buf instead of the string?
     pub resolver_definition_path: ResolverDefinitionPath,
     pub directives: Vec<WithSpan<FragmentDirectiveUsage>>,
@@ -27,53 +28,6 @@ pub struct ResolverDeclaration {
 pub struct FragmentDirectiveUsage {
     pub name: WithSpan<BoultonDirectiveName>,
     // TODO arguments and such
-}
-
-/// TODO maybe get rid of
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct SelectionSetAndUnwraps<
-    TScalarField: ValidScalarFieldType,
-    TLinkedField: ValidLinkedFieldType,
-> {
-    pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
-    pub unwraps: Vec<WithSpan<Unwrap>>,
-}
-
-impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
-    SelectionSetAndUnwraps<TScalarField, TLinkedField>
-{
-    // pub fn map<TNewScalarField: ValidScalarFieldType, TNewLinkedField: ValidLinkedFieldType>(
-    //     self,
-    //     map: &mut impl FnMut(
-    //         Selection<TScalarField, TLinkedField>,
-    //     ) -> Selection<TNewScalarField, TNewLinkedField>,
-    // ) -> SelectionSetAndUnwraps<TNewScalarField, TNewLinkedField> {
-    //     SelectionSetAndUnwraps {
-    //         selection_set: self.selection_set.into_iter().map(|x| x.map(map)).collect(),
-    //         unwraps: self.unwraps,
-    //     }
-    // }
-
-    pub fn and_then<
-        TNewScalarField: ValidScalarFieldType,
-        TNewLinkedField: ValidLinkedFieldType,
-        E,
-    >(
-        self,
-        map: &mut impl FnMut(
-            WithSpan<Selection<TScalarField, TLinkedField>>,
-        )
-            -> Result<WithSpan<Selection<TNewScalarField, TNewLinkedField>>, E>,
-    ) -> Result<SelectionSetAndUnwraps<TNewScalarField, TNewLinkedField>, E> {
-        Ok(SelectionSetAndUnwraps {
-            selection_set: self
-                .selection_set
-                .into_iter()
-                .map(map)
-                .collect::<Result<_, _>>()?,
-            unwraps: self.unwraps,
-        })
-    }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -227,7 +181,8 @@ pub struct LinkedFieldSelection<
     pub reader_alias: Option<WithSpan<LinkedFieldAlias>>,
     pub normalization_alias: Option<WithSpan<LinkedFieldAlias>>,
     pub field: TLinkedField,
-    pub selection_set_and_unwraps: SelectionSetAndUnwraps<TScalarField, TLinkedField>,
+    pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
+    pub unwraps: Vec<WithSpan<Unwrap>>,
     pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
 }
 

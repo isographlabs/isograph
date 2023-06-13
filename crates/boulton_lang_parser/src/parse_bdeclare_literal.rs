@@ -2,8 +2,8 @@ use std::ops::ControlFlow;
 
 use boulton_lang_types::{
     FieldSelection, FragmentDirectiveUsage, LinkedFieldSelection, NonConstantValue,
-    ResolverDeclaration, ScalarFieldSelection, Selection, SelectionFieldArgument,
-    SelectionSetAndUnwraps, Unwrap, VariableDefinition,
+    ResolverDeclaration, ScalarFieldSelection, Selection, SelectionFieldArgument, Unwrap,
+    VariableDefinition,
 };
 use common_lang_types::{
     FieldDefinitionName, ResolverDefinitionPath, Span, StringKeyNewtype, UnvalidatedTypeName,
@@ -87,15 +87,12 @@ fn parse_resolver_declaration<'a>(
 
 fn parse_optional_selection_set_and_unwraps<'a>(
     tokens: &mut PeekableLexer<'a>,
-) -> ParseResult<Option<SelectionSetAndUnwraps<(), ()>>> {
+) -> ParseResult<Option<(Vec<WithSpan<Selection<(), ()>>>, Vec<WithSpan<Unwrap>>)>> {
     let selection_set = parse_optional_selection_set(tokens)?;
     match selection_set {
         Some(selection_set) => {
             let unwraps = parse_unwraps(tokens);
-            Ok(Some(SelectionSetAndUnwraps {
-                selection_set,
-                unwraps,
-            }))
+            Ok(Some((selection_set, unwraps)))
         }
         None => Ok(None),
     }
@@ -142,10 +139,8 @@ fn parse_selection<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResult<WithSpan<S
                         reader_alias: alias
                             .map(|with_span| with_span.map(|string_key| string_key.into())),
                         field: (),
-                        selection_set_and_unwraps: SelectionSetAndUnwraps {
-                            unwraps,
-                            selection_set,
-                        },
+                        selection_set,
+                        unwraps,
                         normalization_alias:
                             HACK_combine_name_and_variables_into_normalization_alias(
                                 field_name.map(|x| x.into()),
