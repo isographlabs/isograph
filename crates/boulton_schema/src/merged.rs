@@ -26,11 +26,7 @@ pub fn merge_selection_set(
     parent_type: SchemaTypeWithFields<FieldId>,
     selection_set: &ValidatedSelectionSetAndUnwraps,
 ) -> MergedSelectionSet {
-    // TODO restructure types such that
-    let mut merged_selection_set: HashMap<
-        FieldNameOrAlias,
-        WithSpan<Selection<TypeWithoutFieldsId, TypeWithFieldsId>>,
-    > = HashMap::new();
+    let mut merged_selection_set = HashMap::new();
 
     merge_selections_into_set(
         schema,
@@ -127,10 +123,7 @@ fn merge_selections_into_set(
                             &linked_field.arguments,
                         );
                     match merged_selection_set.entry(normalization_key.item) {
-                        Entry::Occupied(_) => {
-                            // TODO check for merge conflicts, or transform them to not be merge
-                            // conflicts by auto-aliasing and the like.
-                        }
+                        Entry::Occupied(_) => {}
                         Entry::Vacant(vacant_entry) => {
                             vacant_entry.insert(WithSpan::new(
                                 Selection::Field(FieldSelection::LinkedField(
@@ -148,6 +141,9 @@ fn merge_selections_into_set(
                                                     linked_field_parent_type,
                                                     &linked_field.selection_set_and_unwraps,
                                                 ),
+                                                // Unwraps **aren't necessary** in the merged data structure. The merged fields
+                                                // should either be generic over the type of unwraps or it should be a different
+                                                // data structure.
                                                 unwraps: linked_field
                                                     .selection_set_and_unwraps
                                                     .unwraps

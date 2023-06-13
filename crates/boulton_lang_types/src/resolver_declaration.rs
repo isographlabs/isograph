@@ -29,8 +29,7 @@ pub struct FragmentDirectiveUsage {
     // TODO arguments and such
 }
 
-/// TODO maybe get rid of, or make it generic over a single parameter,
-/// which is T in Vec<WithSpan<T>>
+/// TODO maybe get rid of
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct SelectionSetAndUnwraps<
     TScalarField: ValidScalarFieldType,
