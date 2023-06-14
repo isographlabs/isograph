@@ -1,6 +1,6 @@
 [package]
 name = "graphql_lang_types"
-version = "0.0.1"
+version = "0.0.4"
 edition = "2021"
 
 [dependencies]

@@ -125,7 +125,7 @@ dependencies = [
 
 [[package]]
 name = "common_lang_types"
-version = "0.1.0"
+version = "0.0.4"
 dependencies = [
  "intern",
  "string_key_newtype",
@@ -261,7 +261,7 @@ dependencies = [
 
 [[package]]
 name = "graphql_lang_parser"
-version = "0.0.1"
+version = "0.0.4"
 dependencies = [
  "common_lang_types",
  "graphql-syntax",
@@ -273,7 +273,7 @@ dependencies = [
 
 [[package]]
 name = "graphql_lang_types"
-version = "0.0.1"
+version = "0.0.4"
 dependencies = [
  "common_lang_types",
  "intern",
@@ -366,7 +366,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_cli"
-version = "0.0.1"
+version = "0.0.4"
 dependencies = [
  "common_lang_types",
  "graphql_lang_parser",
@@ -383,11 +383,11 @@ dependencies = [
 
 [[package]]
 name = "isograph_ir"
-version = "0.1.0"
+version = "0.0.4"
 
 [[package]]
 name = "isograph_lang_parser"
-version = "0.0.1"
+version = "0.0.4"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -399,7 +399,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_lang_types"
-version = "0.0.1"
+version = "0.0.4"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -408,7 +408,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_schema"
-version = "0.1.0"
+version = "0.0.4"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -733,7 +733,7 @@ dependencies = [
 
 [[package]]
 name = "string_key_newtype"
-version = "0.1.0"
+version = "0.0.4"
 dependencies = [
  "intern",
 ]
@@ -848,7 +848,7 @@ checksum = "497961ef93d974e23eb6f433eb5fe1b7930b659f06d12dec6fc44a8f554c0bba"
 
 [[package]]
 name = "u32_newtypes"
-version = "0.1.0"
+version = "0.0.4"
 
 [[package]]
 name = "unicode-bidi"

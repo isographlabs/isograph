@@ -1,6 +1,6 @@
 [package]
 name = "string_key_newtype"
-version = "0.1.0"
+version = "0.0.4"
 edition = "2021"
 
 [dependencies]
