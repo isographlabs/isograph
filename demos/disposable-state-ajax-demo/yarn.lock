@@ -9,17 +9,6 @@
   dependencies:
     regenerator-runtime "^0.13.11"
 
-"@boulton/disposable-types@0.0.3":
-  version "0.0.3"
-  resolved "https://registry.yarnpkg.com/@boulton/disposable-types/-/disposable-types-0.0.3.tgz#2ceb1f91a6234bc12daff672598efbbe3fd33d44"
-  integrity sha512-WPzCoaHLAMbSWlN43yd7saFymUquXiBrT5MCuXGbCQlK1Irn1eiP1XDtv7jJVz/QgedHHnpC1lON+oLuj/NzkQ==
-
-"@boulton/react-disposable-state@../../libs/boulton-react-disposable-state/":
-  version "0.0.3"
-  dependencies:
-    "@boulton/disposable-types" "0.0.3"
-    react "^18.2.0"
-
 "@eslint-community/eslint-utils@^4.2.0":
   version "4.4.0"
   resolved "https://registry.yarnpkg.com/@eslint-community/eslint-utils/-/eslint-utils-4.4.0.tgz#a23514e8fb9af1269d5f7788aa556798d61c6b59"
@@ -70,6 +59,17 @@
   version "1.2.1"
   resolved "https://registry.yarnpkg.com/@humanwhocodes/object-schema/-/object-schema-1.2.1.tgz#b520529ec21d8e5945a1851dfd1c32e94e39ff45"
   integrity sha512-ZnQMnLV4e7hDlUvw8H+U8ASL02SS2Gn6+9Ac3wGGLIe7+je2AeAOxPY+izIPJDfFDb7eDjev0Us8MO1iFRN8hA==
+
+"@isograph/disposable-types@0.0.4":
+  version "0.0.4"
+  resolved "https://registry.yarnpkg.com/@isograph/disposable-types/-/disposable-types-0.0.4.tgz#5fd21d3a6848ec7e9dc13443cb014f25682fd6dc"
+  integrity sha512-FH1r0e/u0oo4Eqal0oYYtYM9Y50d+Rs9J2JzdskQPAhBtNmLMHOfJJIPgvLXpeGSCv739YUpD5VWpJDKqdd51Q==
+
+"@isograph/react-disposable-state@file:../../libs/isograph-react-disposable-state":
+  version "0.0.4"
+  dependencies:
+    "@isograph/disposable-types" "0.0.4"
+    react "^18.2.0"
 
 "@next/env@13.3.2":
   version "13.3.2"
