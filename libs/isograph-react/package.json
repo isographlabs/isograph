@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@isograph/disposable-types": "0.0.4",
-    "@isograph/react-disposable-state": "file:../../libs/isograph-react-disposable-state/",
+    "@isograph/react-disposable-state": "*",
     "react": "^18.2.0"
   },
   "devDependencies": {

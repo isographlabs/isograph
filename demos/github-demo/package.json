@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@isograph/react": "../../libs/isograph-react/",
-    "@isograph/react-disposable-state": "file:../../libs/isograph-react-disposable-state/",
+    "@isograph/react-disposable-state": "*",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "@fontsource/roboto": "^5.0.3",
