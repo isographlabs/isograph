@@ -1,8 +1,8 @@
-import { bDeclare } from "@isograph/react";
+import { iso } from "@isograph/react";
 import { ResolverParameterType as AvatarProps } from "./__isograph/User__avatar.isograph";
 import { Avatar, Box } from "@mui/material";
 
-export const avatar = bDeclare<AvatarProps, ReturnType<typeof Avatar>>`
+export const avatar = iso<AvatarProps, ReturnType<typeof Avatar>>`
   User.avatar @component {
     id,
     name,

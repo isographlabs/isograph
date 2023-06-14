@@ -1,9 +1,9 @@
-import { bDeclare } from "@isograph/react";
+import { iso } from "@isograph/react";
 import * as React from "react";
 
 import type { ResolverParameterType } from "./__isograph/User__avatar_component.isograph";
 
-export const avatar_component = bDeclare<ResolverParameterType, unknown>`
+export const avatar_component = iso<ResolverParameterType, unknown>`
   "An avatar"
   User.avatar_component @component {
     name,

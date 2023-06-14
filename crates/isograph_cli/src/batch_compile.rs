@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use graphql_lang_parser::parse_schema;
 use intern::string_key::Intern;
-use isograph_lang_parser::parse_bdeclare_literal;
+use isograph_lang_parser::parse_iso_literal;
 use isograph_schema::Schema;
 use structopt::StructOpt;
 use thiserror::Error;
@@ -41,7 +41,7 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
 
         let b_declare_literals = extract_b_declare_literal_from_file_content(&file_content);
         for (b_declare_literal_text, has_associated_js_function) in b_declare_literals {
-            let resolver_declaration = parse_bdeclare_literal(
+            let resolver_declaration = parse_iso_literal(
                 &b_declare_literal_text,
                 interned_file_path,
                 has_associated_js_function,

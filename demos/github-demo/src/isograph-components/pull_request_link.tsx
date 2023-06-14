@@ -1,11 +1,11 @@
 import React from "react";
-import { bDeclare } from "@isograph/react";
+import { iso } from "@isograph/react";
 
 import { ResolverParameterType as PullRequestProps } from "./__isograph/PullRequest__pull_request_link.isograph";
 
 import { Link } from "@mui/material";
 
-export const pull_request_link = bDeclare<
+export const pull_request_link = iso<
   PullRequestProps,
   ReturnType<typeof PullRequestLink>
 >`

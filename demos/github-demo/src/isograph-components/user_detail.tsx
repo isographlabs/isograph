@@ -1,10 +1,7 @@
-import { bDeclare } from "@isograph/react";
+import { iso } from "@isograph/react";
 import type { ResolverParameterType as UserDetailParams } from "./__isograph/Query__user_detail.isograph";
 
-export const user_detail = bDeclare<
-  UserDetailParams,
-  ReturnType<typeof UserDetail>
->`
+export const user_detail = iso<UserDetailParams, ReturnType<typeof UserDetail>>`
   Query.user_detail @component {
     user(login: $userLogin,) {
       id,

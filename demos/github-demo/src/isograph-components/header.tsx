@@ -1,11 +1,11 @@
-import { bDeclare } from "@isograph/react";
+import { iso } from "@isograph/react";
 import { ResolverParameterType as HeaderProps } from "./__isograph/Query__header.isograph";
 
 import { AppBar, Button, Grid, Container } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { Route } from "./github_demo";
 
-export const header = bDeclare<HeaderProps, ReturnType<typeof Header>>`
+export const header = iso<HeaderProps, ReturnType<typeof Header>>`
   Query.header @component {
     viewer {
       id,

@@ -1,10 +1,10 @@
-import { bDeclare } from "@isograph/react";
+import { iso } from "@isograph/react";
 
 import type { ResolverParameterType as RepositoryLinkParams } from "./__isograph/Repository__repository_link.isograph";
 
 import { Link } from "@mui/material";
 
-export const repository_link = bDeclare<
+export const repository_link = iso<
   RepositoryLinkParams,
   ReturnType<typeof RepositoryLink>
 >`

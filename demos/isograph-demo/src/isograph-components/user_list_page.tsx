@@ -1,9 +1,9 @@
 import * as React from "react";
-import { bDeclare } from "@isograph/react";
+import { iso } from "@isograph/react";
 import type { ResolverParameterType as FooQueryType } from "./__isograph/Query__foo_query.isograph";
 import type { ResolverParameterType as UserDetailType } from "./__isograph/User__user_detail.isograph";
 
-export const foo_query = bDeclare<FooQueryType, ReturnType<typeof FooQuery>>`
+export const foo_query = iso<FooQueryType, ReturnType<typeof FooQuery>>`
   Query.foo_query @fetchable {
     users {
       id,
@@ -15,7 +15,7 @@ function FooQuery(param: FooQueryType) {
   return "stuff";
 }
 
-export const user_detail = bDeclare<
+export const user_detail = iso<
   UserDetailType,
   ReturnType<typeof UserListComponent>
 >`

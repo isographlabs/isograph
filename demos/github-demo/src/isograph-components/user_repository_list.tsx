@@ -1,4 +1,4 @@
-import { bDeclare } from "@isograph/react";
+import { iso } from "@isograph/react";
 import type { ResolverParameterType as UserRepositoryListParams } from "./__isograph/User__repository_list.isograph";
 
 import {
@@ -9,7 +9,7 @@ import {
   TableRow,
 } from "@mui/material";
 
-export const repository_list = bDeclare<
+export const repository_list = iso<
   UserRepositoryListParams,
   ReturnType<typeof UserRepositoryList>
 >`

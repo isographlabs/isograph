@@ -1,4 +1,4 @@
-import { bDeclare } from "@isograph/react";
+import { iso } from "@isograph/react";
 import type { ResolverParameterType as PullRequestTableParams } from "./__isograph/PullRequestConnection__pull_request_table.isograph";
 import type { ResolverParameterType as CreatedAtFormattedType } from "./__isograph/PullRequest__created_at_formatted.isograph";
 
@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@mui/material";
 
-export const created_at_formatted = bDeclare<CreatedAtFormattedType, string>`
+export const created_at_formatted = iso<CreatedAtFormattedType, string>`
   PullRequest.created_at_formatted @eager {
     createdAt,
   }
@@ -23,7 +23,7 @@ export const created_at_formatted = bDeclare<CreatedAtFormattedType, string>`
   });
 });
 
-export const pull_request_table = bDeclare<
+export const pull_request_table = iso<
   PullRequestTableParams,
   ReturnType<typeof PullRequestTable>
 >`

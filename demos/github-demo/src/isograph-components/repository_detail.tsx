@@ -1,7 +1,7 @@
-import { bDeclare } from "@isograph/react";
+import { iso } from "@isograph/react";
 import type { ResolverParameterType as RepositoryDetailParams } from "./__isograph/Query__repository_detail.isograph";
 
-export const repository_detail = bDeclare<
+export const repository_detail = iso<
   RepositoryDetailParams,
   ReturnType<typeof RepositoryDetail>
 >`

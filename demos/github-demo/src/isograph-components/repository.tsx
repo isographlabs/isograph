@@ -1,11 +1,11 @@
 import React from "react";
-import { bDeclare, read, useLazyReference } from "@isograph/react";
+import { iso, read, useLazyReference } from "@isograph/react";
 import { Container } from "@mui/material";
 
 import repositoryPageQuery from "./__isograph/Query__repository_page.isograph";
 import { FullPageLoading, Route, RepositoryRoute } from "./github_demo";
 
-bDeclare`
+iso`
   Query.repository_page($repositoryName: String!, $repositoryOwner: String!, $first: Int!,) @fetchable {
     header,
     repository_detail,

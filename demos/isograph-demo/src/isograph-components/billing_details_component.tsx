@@ -1,9 +1,9 @@
 import * as React from "react";
-import { bDeclare, type IsographComponentProps } from "@isograph/react";
+import { iso, type IsographComponentProps } from "@isograph/react";
 
 import type { ResolverParameterType } from "./__isograph/BillingDetails__billing_details_component.isograph";
 
-export const billing_details_component = bDeclare<
+export const billing_details_component = iso<
   ResolverParameterType,
   ReturnType<typeof BillingDetailsComponent>
 >`

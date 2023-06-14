@@ -19,7 +19,7 @@ use crate::{
     PeekableLexer,
 };
 
-pub fn parse_bdeclare_literal(
+pub fn parse_iso_literal(
     b_declare_literal_text: &str,
     definition_file_path: ResolverDefinitionPath,
     has_associated_js_function: bool,

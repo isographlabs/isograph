@@ -1,10 +1,10 @@
-import { bDeclare } from "@isograph/react";
+import { iso } from "@isograph/react";
 
 import type { ResolverParameterType as UserLinkParams } from "./__isograph/Actor__user_link.isograph";
 
 import { Link } from "@mui/material";
 
-export const user_link = bDeclare<UserLinkParams, ReturnType<typeof UserLink>>`
+export const user_link = iso<UserLinkParams, ReturnType<typeof UserLink>>`
   Actor.user_link @component {
     login,
   }

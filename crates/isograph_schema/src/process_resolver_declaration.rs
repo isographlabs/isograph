@@ -123,7 +123,7 @@ pub enum ProcessResolverDeclarationError {
     },
 
     #[error(
-        "Resolvers with @component must have associated javascript (i.e. bDeclare`...` must be called as a function, as in bDeclare`...`(MyComponent))"
+        "Resolvers with @component must have associated javascript (i.e. iso`...` must be called as a function, as in iso`...`(MyComponent))"
     )]
     ComponentResolverMissingJsFunction {
         // TODO add parent type and resolver field name
@@ -146,7 +146,7 @@ impl fmt::Display for ResolverVariant {
 }
 
 lazy_static! {
-    // This is regex is inadequate, as bDeclare<typeof foo`...`>, and it's certainly possible
+    // This is regex is inadequate, as iso<typeof foo`...`>, and it's certainly possible
     // to want that.
     static ref EAGER: IsographDirectiveName = "eager".intern().into();
     static ref COMPONENT: IsographDirectiveName = "component".intern().into();

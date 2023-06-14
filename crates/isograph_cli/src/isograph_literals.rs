@@ -63,15 +63,15 @@ pub(crate) fn read_files_in_folder(
 }
 
 lazy_static! {
-    // This is regex is inadequate, as bDeclare<typeof foo`...`>, and it's certainly possible
+    // This is regex is inadequate, as iso<typeof foo`...`>, and it's certainly possible
     // to want that.
-    static ref EXTRACT_BDECLARE: Regex = Regex::new(r"bDeclare(<[^`]+>)?`([^`]+)`(\()?").unwrap();
+    static ref EXTRACT_ISO: Regex = Regex::new(r"iso(<[^`]+>)?`([^`]+)`(\()?").unwrap();
 }
 
 pub(crate) fn extract_b_declare_literal_from_file_content(
     content: &str,
 ) -> impl Iterator<Item = (&str, bool)> {
-    EXTRACT_BDECLARE
+    EXTRACT_ISO
         .captures_iter(content)
         .into_iter()
         .map(|x| (x.get(2).unwrap().as_str(), x.get(3).is_some()))

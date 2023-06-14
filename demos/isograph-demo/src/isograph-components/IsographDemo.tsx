@@ -5,9 +5,9 @@ import userListPageQuery from "./__isograph/Query__user_list_page.isograph";
 import userDetailPageQuery from "./__isograph/Query__user_detail_page.isograph";
 import type { ResolverParameterType as QueryUserListPage } from "./__isograph/Query__user_list_page.isograph";
 
-import { useLazyReference, read, bDeclare } from "@isograph/react";
+import { useLazyReference, read, iso } from "@isograph/react";
 
-bDeclare<QueryUserListPage>`
+iso<QueryUserListPage>`
   Query.user_list_page(
     $bar: String!,
   ) @fetchable {

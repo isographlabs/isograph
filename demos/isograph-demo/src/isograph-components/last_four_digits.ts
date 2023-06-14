@@ -1,7 +1,7 @@
-import { bDeclare } from "@isograph/react";
+import { iso } from "@isograph/react";
 import type { ResolverParameterType } from "./__isograph/BillingDetails__last_four_digits.isograph";
 
-export const last_four_digits = bDeclare<
+export const last_four_digits = iso<
   ResolverParameterType,
   ReturnType<typeof LastFour>
 >`

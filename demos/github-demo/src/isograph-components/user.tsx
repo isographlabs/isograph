@@ -1,11 +1,11 @@
 import React from "react";
-import { bDeclare, read, useLazyReference } from "@isograph/react";
+import { iso, read, useLazyReference } from "@isograph/react";
 import { Container } from "@mui/material";
 
 import userPageQuery from "./__isograph/Query__user_page.isograph";
 import { FullPageLoading, Route, UserRoute } from "./github_demo";
 
-bDeclare`
+iso`
   Query.user_page($first: Int!, $userLogin: String!,) @fetchable {
     header,
     user_detail,

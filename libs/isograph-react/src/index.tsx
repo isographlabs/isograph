@@ -100,10 +100,7 @@ export type FragmentReference<
   ) => TResolverResult;
 };
 
-export function bDeclare<
-  TResolverParameter,
-  TResolverReturn = TResolverParameter
->(
+export function iso<TResolverParameter, TResolverReturn = TResolverParameter>(
   queryText: TemplateStringsArray
 ): (
   x: ((param: TResolverParameter) => TResolverReturn) | void

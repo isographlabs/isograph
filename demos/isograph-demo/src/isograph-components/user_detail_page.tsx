@@ -1,10 +1,10 @@
 import * as React from "react";
-import { bDeclare } from "@isograph/react";
+import { iso } from "@isograph/react";
 
 import { ResolverParameterType as UserDetailPageProps } from "./__isograph/Query__user_detail_page.isograph";
 import { ResolverParameterType as UserProfileWithDetails } from "./__isograph/User__user_profile_with_details.isograph";
 
-export const user_detail_page = bDeclare<
+export const user_detail_page = iso<
   UserDetailPageProps,
   ReturnType<typeof UserDetailPage>
 >`
@@ -33,10 +33,7 @@ function UserDetailPage(props: UserDetailPageProps) {
   );
 }
 
-export const user_profile_with_details = bDeclare<
-  UserProfileWithDetails,
-  unknown
->`
+export const user_profile_with_details = iso<UserProfileWithDetails, unknown>`
   User.user_profile_with_details @component {
     id,
     email,
@@ -66,7 +63,7 @@ export const user_profile_with_details = bDeclare<
   );
 });
 
-export const user_profile_header = bDeclare`
+export const user_profile_header = iso`
   User.user_profile_header @component {
     id,
     name,

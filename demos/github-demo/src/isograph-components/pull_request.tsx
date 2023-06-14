@@ -1,12 +1,12 @@
 import React from "react";
-import { bDeclare, useLazyReference, read } from "@isograph/react";
+import { iso, useLazyReference, read } from "@isograph/react";
 import { FullPageLoading, PullRequestRoute, Route } from "./github_demo";
 
 import PullRequestQuery from "./__isograph/Query__pull_request.isograph";
 
 import { Container } from "@mui/material";
 
-bDeclare`
+iso`
   Query.pull_request($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!,) @fetchable {
     header,
     pull_request_detail,

@@ -1,16 +1,13 @@
 import React from "react";
 
-import { bDeclare } from "@isograph/react";
+import { iso } from "@isograph/react";
 
 import { ResolverParameterType as CommentListProps } from "./__isograph/PullRequest__comment_list.isograph";
 import { ResolverParameterType as IssueCommentProps } from "./__isograph/IssueComment__formatted_comment_creation_date.isograph";
 
 import { Card, CardContent } from "@mui/material";
 
-export const formatted_comment_creation_date = bDeclare<
-  IssueCommentProps,
-  string
->`
+export const formatted_comment_creation_date = iso<IssueCommentProps, string>`
   IssueComment.formatted_comment_creation_date @eager {
     createdAt,
   }
@@ -23,7 +20,7 @@ export const formatted_comment_creation_date = bDeclare<
   });
 });
 
-export const comment_list = bDeclare<
+export const comment_list = iso<
   CommentListProps,
   ReturnType<typeof CommentList>
 >`
