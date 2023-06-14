@@ -1,0 +1,28 @@
+{
+  "name": "@isograph/react-disposable-state",
+  "version": "0.0.4",
+  "description": "Primitives for managing disposable state in React",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "author": "Isograph Labs",
+  "license": "MIT",
+  "scripts": {
+    "compile": "rm -rf dist/* && tsc -p tsconfig.pkg.json",
+    "compile-watch": "tsc -p tsconfig.pkg.json --watch",
+    "test": "vitest run",
+    "test-watch": "vitest watch",
+    "coverage": "vitest run --coverage",
+    "note": "WE SHOULD ALSO TEST HERE",
+    "prepack": "yarn run compile"
+  },
+  "dependencies": {
+    "@isograph/disposable-types": "0.0.4",
+    "react": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.31",
+    "react-test-renderer": "^18.2.0",
+    "vitest": "^0.29.8",
+    "typescript": "^5.0.3"
+  }
+}

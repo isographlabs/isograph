@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@boulton/react-disposable-state": "../../libs/boulton-react-disposable-state/",
+    "@isograph/react-disposable-state": "file:../../libs/isograph-react-disposable-state/",
     "@types/node": "18.16.3",
     "@types/react": "18.2.0",
     "@types/react-dom": "18.2.1",

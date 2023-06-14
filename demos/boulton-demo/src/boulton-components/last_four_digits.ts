@@ -1,5 +1,5 @@
-import { bDeclare } from "@boulton/react";
-import type { ResolverParameterType } from "./__boulton/BillingDetails__last_four_digits.boulton";
+import { bDeclare } from "@isograph/react";
+import type { ResolverParameterType } from "./__isograph/BillingDetails__last_four_digits.isograph";
 
 export const last_four_digits = bDeclare<
   ResolverParameterType,

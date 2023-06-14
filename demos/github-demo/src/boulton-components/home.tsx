@@ -1,8 +1,8 @@
 import React from "react";
-import { bDeclare, read, useLazyReference } from "@boulton/react";
+import { bDeclare, read, useLazyReference } from "@isograph/react";
 import { Container } from "@mui/material";
 
-import homePageQuery from "./__boulton/Query__home_page.boulton";
+import homePageQuery from "./__isograph/Query__home_page.isograph";
 import { FullPageLoading, Route } from "./github_demo";
 
 bDeclare`

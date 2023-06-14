@@ -1,9 +1,13 @@
-import type {BoultonNonFetchableResolver, ReaderAst} from '@boulton/react';
-import { billing_details_component as resolver } from '../billing_details_component.tsx';
-import BillingDetails__last_four_digits, { ReadOutType as BillingDetails__last_four_digits__outputType } from './BillingDetails__last_four_digits.boulton';
+import type { IsographNonFetchableResolver, ReaderAst } from "@isograph/react";
+import { billing_details_component as resolver } from "../billing_details_component.tsx";
+import BillingDetails__last_four_digits, {
+  ReadOutType as BillingDetails__last_four_digits__outputType,
+} from "./BillingDetails__last_four_digits.isograph";
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
+export type ReadOutType = (
+  additionalRuntimeProps: Object | void
+) => React.ReactElement<any, any> | null;
 
 // TODO support changing this
 export type ReadFromStoreType = ResolverParameterType;
@@ -48,22 +52,27 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
 ];
 
-export type ResolverParameterType = { data:
-{
-  id: string,
-  card_brand: string,
-  credit_card_number: string,
-  expiration_date: string,
-  address: string,
-  last_four_digits: BillingDetails__last_four_digits__outputType,
-},
-[index: string]: any };
+export type ResolverParameterType = {
+  data: {
+    id: string;
+    card_brand: string;
+    credit_card_number: string;
+    expiration_date: string;
+    address: string;
+    last_four_digits: BillingDetails__last_four_digits__outputType;
+  };
+  [index: string]: any;
+};
 
 // The type, when returned from the resolver
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
-const artifact: BoultonNonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
-  kind: 'NonFetchableResolver',
+const artifact: IsographNonFetchableResolver<
+  ReadFromStoreType,
+  ResolverParameterType,
+  ReadOutType
+> = {
+  kind: "NonFetchableResolver",
   resolver: resolver as any,
   readerAst,
 };

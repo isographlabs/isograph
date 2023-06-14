@@ -1,5 +1,5 @@
-import { bDeclare } from "@boulton/react";
-import type { ResolverParameterType as UserDetailParams } from "./__boulton/Query__user_detail.boulton";
+import { bDeclare } from "@isograph/react";
+import type { ResolverParameterType as UserDetailParams } from "./__isograph/Query__user_detail.isograph";
 
 export const user_detail = bDeclare<
   UserDetailParams,

@@ -1,6 +1,6 @@
-import { bDeclare } from "@boulton/react";
+import { bDeclare } from "@isograph/react";
 
-import type { ResolverParameterType as UserLinkParams } from "./__boulton/Actor__user_link.boulton";
+import type { ResolverParameterType as UserLinkParams } from "./__isograph/Actor__user_link.isograph";
 
 import { Link } from "@mui/material";
 

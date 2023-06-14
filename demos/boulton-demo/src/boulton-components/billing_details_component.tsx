@@ -1,7 +1,7 @@
 import * as React from "react";
-import { bDeclare, type BoultonComponentProps } from "@boulton/react";
+import { bDeclare, type IsographComponentProps } from "@isograph/react";
 
-import type { ResolverParameterType } from "./__boulton/BillingDetails__billing_details_component.boulton";
+import type { ResolverParameterType } from "./__isograph/BillingDetails__billing_details_component.isograph";
 
 export const billing_details_component = bDeclare<
   ResolverParameterType,

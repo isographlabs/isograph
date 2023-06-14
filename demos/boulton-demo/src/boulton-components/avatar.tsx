@@ -1,7 +1,7 @@
-import { bDeclare } from "@boulton/react";
+import { bDeclare } from "@isograph/react";
 import * as React from "react";
 
-import type { ResolverParameterType } from "./__boulton/User__avatar_component.boulton";
+import type { ResolverParameterType } from "./__isograph/User__avatar_component.isograph";
 
 export const avatar_component = bDeclare<ResolverParameterType, unknown>`
   "An avatar"

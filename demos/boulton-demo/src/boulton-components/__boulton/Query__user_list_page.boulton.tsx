@@ -1,9 +1,16 @@
-import type {BoultonFetchableResolver, ReaderAst, FragmentReference} from '@boulton/react';
-import { getRefRendererForName } from '@boulton/react';
-const resolver = x => x;
-import User__user_detail, { ReadOutType as User__user_detail__outputType } from './User__user_detail.boulton';
+import type {
+  IsographFetchableResolver,
+  ReaderAst,
+  FragmentReference,
+} from "@isograph/react";
+import { getRefRendererForName } from "@isograph/react";
+const resolver = (x) => x;
+import User__user_detail, {
+  ReadOutType as User__user_detail__outputType,
+} from "./User__user_detail.isograph";
 
-const queryText = 'query user_list_page ($bar: String!) {\
+const queryText =
+  "query user_list_page ($bar: String!) {\
   byah__foo_bar: byah(foo: $bar),\
   users {\
     avatar_url,\
@@ -11,19 +18,19 @@ const queryText = 'query user_list_page ($bar: String!) {\
     id,\
     name,\
   },\
-}';
+}";
 
 // TODO support changing this,
 export type ReadFromStoreType = ResolverParameterType;
 
-const normalizationAst = {notNeededForDemo: true};
+const normalizationAst = { notNeededForDemo: true };
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Scalar",
     response_name: "byah",
     alias: null,
     arguments: {
-      "foo": "bar",
+      foo: "bar",
     },
   },
   {
@@ -50,11 +57,11 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 ];
 
 export type ResolverParameterType = {
-  byah: string,
-  users: ({
-    id: string,
-    user_detail: User__user_detail__outputType,
-  })[],
+  byah: string;
+  users: {
+    id: string;
+    user_detail: User__user_detail__outputType;
+  }[];
 };
 
 // The type, when returned from the resolver
@@ -63,13 +70,17 @@ export type ResolverReturnType = ResolverParameterType;
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = ResolverReturnType;
 
-const artifact: BoultonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
-  kind: 'FetchableResolver',
+const artifact: IsographFetchableResolver<
+  ReadFromStoreType,
+  ResolverParameterType,
+  ReadOutType
+> = {
+  kind: "FetchableResolver",
   queryText,
   normalizationAst,
   readerAst,
   resolver: resolver as any,
-  convert: ((resolver, data) => resolver(data)),
+  convert: (resolver, data) => resolver(data),
 };
 
 export default artifact;

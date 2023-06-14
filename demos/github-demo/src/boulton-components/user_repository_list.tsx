@@ -1,5 +1,5 @@
-import { bDeclare } from "@boulton/react";
-import type { ResolverParameterType as UserRepositoryListParams } from "./__boulton/User__repository_list.boulton";
+import { bDeclare } from "@isograph/react";
+import type { ResolverParameterType as UserRepositoryListParams } from "./__isograph/User__repository_list.isograph";
 
 import {
   Table,

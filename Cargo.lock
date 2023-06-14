@@ -76,60 +76,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "boulton_cli"
-version = "0.0.1"
-dependencies = [
- "boulton_lang_parser",
- "boulton_lang_types",
- "boulton_schema",
- "common_lang_types",
- "graphql_lang_parser",
- "graphql_lang_types",
- "intern",
- "lazy_static",
- "regex",
- "structopt",
- "thiserror",
-]
-
-[[package]]
-name = "boulton_ir"
-version = "0.1.0"
-
-[[package]]
-name = "boulton_lang_parser"
-version = "0.0.1"
-dependencies = [
- "boulton_lang_types",
- "common_lang_types",
- "graphql_lang_types",
- "intern",
- "logos",
- "thiserror",
-]
-
-[[package]]
-name = "boulton_lang_types"
-version = "0.0.1"
-dependencies = [
- "common_lang_types",
- "graphql_lang_types",
- "intern",
-]
-
-[[package]]
-name = "boulton_schema"
-version = "0.1.0"
-dependencies = [
- "boulton_lang_types",
- "common_lang_types",
- "graphql_lang_types",
- "intern",
- "lazy_static",
- "thiserror",
-]
-
-[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -416,6 +362,60 @@ dependencies = [
  "serde_bytes",
  "serde_derive",
  "smallvec",
+]
+
+[[package]]
+name = "isograph_cli"
+version = "0.0.1"
+dependencies = [
+ "common_lang_types",
+ "graphql_lang_parser",
+ "graphql_lang_types",
+ "intern",
+ "isograph_lang_parser",
+ "isograph_lang_types",
+ "isograph_schema",
+ "lazy_static",
+ "regex",
+ "structopt",
+ "thiserror",
+]
+
+[[package]]
+name = "isograph_ir"
+version = "0.1.0"
+
+[[package]]
+name = "isograph_lang_parser"
+version = "0.0.1"
+dependencies = [
+ "common_lang_types",
+ "graphql_lang_types",
+ "intern",
+ "isograph_lang_types",
+ "logos",
+ "thiserror",
+]
+
+[[package]]
+name = "isograph_lang_types"
+version = "0.0.1"
+dependencies = [
+ "common_lang_types",
+ "graphql_lang_types",
+ "intern",
+]
+
+[[package]]
+name = "isograph_schema"
+version = "0.1.0"
+dependencies = [
+ "common_lang_types",
+ "graphql_lang_types",
+ "intern",
+ "isograph_lang_types",
+ "lazy_static",
+ "thiserror",
 ]
 
 [[package]]

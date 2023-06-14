@@ -1,8 +1,8 @@
 import * as React from "react";
-import { bDeclare } from "@boulton/react";
+import { bDeclare } from "@isograph/react";
 
-import { ResolverParameterType as UserDetailPageProps } from "./__boulton/Query__user_detail_page.boulton";
-import { ResolverParameterType as UserProfileWithDetails } from "./__boulton/User__user_profile_with_details.boulton";
+import { ResolverParameterType as UserDetailPageProps } from "./__isograph/Query__user_detail_page.isograph";
+import { ResolverParameterType as UserProfileWithDetails } from "./__isograph/User__user_profile_with_details.isograph";
 
 export const user_detail_page = bDeclare<
   UserDetailPageProps,

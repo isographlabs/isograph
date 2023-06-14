@@ -1,0 +1,9 @@
+[package]
+name = "isograph_lang_types"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+intern = { git = "https://github.com/facebook/relay.git" }
+graphql_lang_types = { path = "../graphql_lang_types" }
+common_lang_types = { path = "../common_lang_types" }

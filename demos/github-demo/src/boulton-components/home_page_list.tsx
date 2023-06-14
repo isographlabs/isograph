@@ -1,5 +1,5 @@
-import { bDeclare } from "@boulton/react";
-import type { ResolverParameterType as HomePageListParams } from "./__boulton/Query__home_page_list.boulton";
+import { bDeclare } from "@isograph/react";
+import type { ResolverParameterType as HomePageListParams } from "./__isograph/Query__home_page_list.isograph";
 
 export const home_page_list = bDeclare<
   HomePageListParams,

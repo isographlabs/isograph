@@ -1,7 +1,7 @@
 import * as React from "react";
-import { bDeclare } from "@boulton/react";
-import type { ResolverParameterType as FooQueryType } from "./__boulton/Query__foo_query.boulton";
-import type { ResolverParameterType as UserDetailType } from "./__boulton/User__user_detail.boulton";
+import { bDeclare } from "@isograph/react";
+import type { ResolverParameterType as FooQueryType } from "./__isograph/Query__foo_query.isograph";
+import type { ResolverParameterType as UserDetailType } from "./__isograph/User__user_detail.isograph";
 
 export const foo_query = bDeclare<FooQueryType, ReturnType<typeof FooQuery>>`
   Query.foo_query @fetchable {

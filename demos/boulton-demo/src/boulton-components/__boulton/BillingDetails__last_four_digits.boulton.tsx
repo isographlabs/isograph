@@ -1,5 +1,5 @@
-import type {BoultonNonFetchableResolver, ReaderAst} from '@boulton/react';
-import { last_four_digits as resolver } from '../last_four_digits.ts';
+import type { IsographNonFetchableResolver, ReaderAst } from "@isograph/react";
+import { last_four_digits as resolver } from "../last_four_digits.ts";
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = ResolverReturnType;
@@ -17,14 +17,18 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 ];
 
 export type ResolverParameterType = {
-  credit_card_number: string,
+  credit_card_number: string;
 };
 
 // The type, when returned from the resolver
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
-const artifact: BoultonNonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
-  kind: 'NonFetchableResolver',
+const artifact: IsographNonFetchableResolver<
+  ReadFromStoreType,
+  ResolverParameterType,
+  ReadOutType
+> = {
+  kind: "NonFetchableResolver",
   resolver: resolver as any,
   readerAst,
 };

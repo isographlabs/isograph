@@ -1,8 +1,10 @@
-import type {BoultonNonFetchableResolver, ReaderAst} from '@boulton/react';
-import { avatar_component as resolver } from '../avatar.tsx';
+import type { IsographnNonFetchableResolver, ReaderAst } from "@isograph/react";
+import { avatar_component as resolver } from "../avatar.tsx";
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
+export type ReadOutType = (
+  additionalRuntimeProps: Object | void
+) => React.ReactElement<any, any> | null;
 
 // TODO support changing this
 export type ReadFromStoreType = ResolverParameterType;
@@ -28,19 +30,24 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
 ];
 
-export type ResolverParameterType = { data:
-{
-  name: string,
-  email: string,
-  avatar_url: string,
-},
-[index: string]: any };
+export type ResolverParameterType = {
+  data: {
+    name: string;
+    email: string;
+    avatar_url: string;
+  };
+  [index: string]: any;
+};
 
-// The type, when returned from the resolver
+// The type, wheIsographned from the resolver
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
-const artifact: BoultonNonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
-  kind: 'NonFetchableResolver',
+const artifact: BoultonNonFetchableResolver<
+  ReadFromStoreType,
+  ResolverParameterType,
+  ReadOutType
+> = {
+  kind: "NonFetchableResolver",
   resolver: resolver as any,
   readerAst,
 };

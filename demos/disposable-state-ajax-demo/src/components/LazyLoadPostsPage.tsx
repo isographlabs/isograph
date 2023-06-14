@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import NoSSR from "react-no-ssr";
 
-import { useLazyDisposableState } from "@boulton/react-disposable-state";
+import { useLazyDisposableState } from "@isograph/react-disposable-state";
 import { getOrCreateCacheForUrl } from "./api";
 import { Comment, Post, User } from "./networkTypes";
 import { useReadPromise } from "./PromiseWrapper";

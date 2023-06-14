@@ -1,5 +1,5 @@
 {
-  "name": "github-boulton-demo",
+  "name": "github-isograph-demo",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -9,8 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@boulton/react": "../../libs/boulton-react/",
-    "@boulton/react-disposable-state": "../../libs/boulton-react-disposable-state/",
+    "@isograph/react": "../../libs/isograph-react/",
+    "@isograph/react-disposable-state": "file:../../libs/isograph-react-disposable-state/",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "@fontsource/roboto": "^5.0.3",

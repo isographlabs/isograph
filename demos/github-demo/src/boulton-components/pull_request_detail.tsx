@@ -1,7 +1,7 @@
 import React from "react";
 
-import { bDeclare } from "@boulton/react";
-import { ResolverParameterType as PullRequestDetailsProps } from "./__boulton/Query__pull_request_detail.boulton";
+import { bDeclare } from "@isograph/react";
+import { ResolverParameterType as PullRequestDetailsProps } from "./__isograph/Query__pull_request_detail.isograph";
 
 import { Card, CardContent } from "@mui/material";
 

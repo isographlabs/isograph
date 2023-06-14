@@ -1,5 +1,5 @@
-import { bDeclare } from "@boulton/react";
-import { ResolverParameterType as HeaderProps } from "./__boulton/Query__header.boulton";
+import { bDeclare } from "@isograph/react";
+import { ResolverParameterType as HeaderProps } from "./__isograph/Query__header.isograph";
 
 import { AppBar, Button, Grid, Container } from "@mui/material";
 import { useTheme } from "@mui/material/styles";

@@ -1,3 +1,3 @@
 # libs folder
 
-This contains everything that goes into the Boulton front-end.
+This contains everything that goes into the Isograph front-end.

@@ -1,6 +1,6 @@
-import { bDeclare } from "@boulton/react";
-import type { ResolverParameterType as PullRequestTableParams } from "./__boulton/PullRequestConnection__pull_request_table.boulton";
-import type { ResolverParameterType as CreatedAtFormattedType } from "./__boulton/PullRequest__created_at_formatted.boulton";
+import { bDeclare } from "@isograph/react";
+import type { ResolverParameterType as PullRequestTableParams } from "./__isograph/PullRequestConnection__pull_request_table.isograph";
+import type { ResolverParameterType as CreatedAtFormattedType } from "./__isograph/PullRequest__created_at_formatted.isograph";
 
 import {
   Table,

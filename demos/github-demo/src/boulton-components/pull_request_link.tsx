@@ -1,7 +1,7 @@
 import React from "react";
-import { bDeclare } from "@boulton/react";
+import { bDeclare } from "@isograph/react";
 
-import { ResolverParameterType as PullRequestProps } from "./__boulton/PullRequest__pull_request_link.boulton";
+import { ResolverParameterType as PullRequestProps } from "./__isograph/PullRequest__pull_request_link.isograph";
 
 import { Link } from "@mui/material";
 

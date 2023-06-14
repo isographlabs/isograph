@@ -1,11 +1,11 @@
 import React from "react";
 import NoSSR from "react-no-ssr";
 
-import userListPageQuery from "./__boulton/Query__user_list_page.boulton";
-import userDetailPageQuery from "./__boulton/Query__user_detail_page.boulton";
-import type { ResolverParameterType as QueryUserListPage } from "./__boulton/Query__user_list_page.boulton";
+import userListPageQuery from "./__isograph/Query__user_list_page.isograph";
+import userDetailPageQuery from "./__isograph/Query__user_detail_page.isograph";
+import type { ResolverParameterType as QueryUserListPage } from "./__isograph/Query__user_list_page.isograph";
 
-import { useLazyReference, read, bDeclare } from "@boulton/react";
+import { useLazyReference, read, bDeclare } from "@isograph/react";
 
 bDeclare<QueryUserListPage>`
   Query.user_list_page(
@@ -19,7 +19,7 @@ bDeclare<QueryUserListPage>`
   }
 `;
 
-export function BoultonDemo() {
+export function IsographDemo() {
   const [selectedId, setSelectedId] = React.useState<null | string>(null);
   return (
     <NoSSR>

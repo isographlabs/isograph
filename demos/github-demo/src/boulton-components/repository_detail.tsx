@@ -1,5 +1,5 @@
-import { bDeclare } from "@boulton/react";
-import type { ResolverParameterType as RepositoryDetailParams } from "./__boulton/Query__repository_detail.boulton";
+import { bDeclare } from "@isograph/react";
+import type { ResolverParameterType as RepositoryDetailParams } from "./__isograph/Query__repository_detail.isograph";
 
 export const repository_detail = bDeclare<
   RepositoryDetailParams,

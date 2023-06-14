@@ -1,9 +1,9 @@
 import React from "react";
 
-import { bDeclare } from "@boulton/react";
+import { bDeclare } from "@isograph/react";
 
-import { ResolverParameterType as CommentListProps } from "./__boulton/PullRequest__comment_list.boulton";
-import { ResolverParameterType as IssueCommentProps } from "./__boulton/IssueComment__formatted_comment_creation_date.boulton";
+import { ResolverParameterType as CommentListProps } from "./__isograph/PullRequest__comment_list.isograph";
+import { ResolverParameterType as IssueCommentProps } from "./__isograph/IssueComment__formatted_comment_creation_date.isograph";
 
 import { Card, CardContent } from "@mui/material";
 

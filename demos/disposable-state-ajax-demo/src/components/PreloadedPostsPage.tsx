@@ -4,7 +4,7 @@ import NoSSR from "react-no-ssr";
 import {
   UNASSIGNED_STATE,
   useUpdatableDisposableState,
-} from "@boulton/react-disposable-state";
+} from "@isograph/react-disposable-state";
 import { makeNetworkRequest } from "./api";
 import { Comment, Post, User } from "./networkTypes";
 import { PromiseWrapper, useReadPromise } from "./PromiseWrapper";

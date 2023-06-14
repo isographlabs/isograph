@@ -2,7 +2,7 @@ import {
   Factory,
   ItemCleanupPair,
   ParentCache,
-} from "@boulton/react-disposable-state";
+} from "@isograph/react-disposable-state";
 import { PromiseWrapper, wrapPromise } from "./PromiseWrapper";
 
 const cache: { [index: string]: ParentCache<any> } = {};

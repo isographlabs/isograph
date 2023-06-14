@@ -6,7 +6,7 @@ var { buildSchema } = require("graphql")
 const { readFileSync } = require("fs")
 
 // Construct a schema, using GraphQL schema language
-// You must execute this from the boulton-demo folder...
+// You must execute this from the isograph-demo folder...
 var schema = buildSchema(readFileSync('./schema.graphql').toString())
 
 // The root provides a resolver function for each API endpoint

@@ -1,18 +1,23 @@
-import type {BoultonFetchableResolver, ReaderAst, FragmentReference} from '@boulton/react';
-import { getRefRendererForName } from '@boulton/react';
-import { foo_query as resolver } from '../user_list_page.tsx';
+import type {
+  IsographFetchableResolver,
+  ReaderAst,
+  FragmentReference,
+} from "@isograph/react";
+import { getRefRendererForName } from "@isograph/react";
+import { foo_query as resolver } from "../user_list_page.tsx";
 
-const queryText = 'query foo_query  {\
+const queryText =
+  "query foo_query  {\
   users {\
     id,\
     name,\
   },\
-}';
+}";
 
 // TODO support changing this,
 export type ReadFromStoreType = ResolverParameterType;
 
-const normalizationAst = {notNeededForDemo: true};
+const normalizationAst = { notNeededForDemo: true };
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Linked",
@@ -37,10 +42,10 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 ];
 
 export type ResolverParameterType = {
-  users: ({
-    id: string,
-    name: string,
-  })[],
+  users: {
+    id: string;
+    name: string;
+  }[];
 };
 
 // The type, when returned from the resolver
@@ -49,13 +54,17 @@ export type ResolverReturnType = ReturnType<typeof resolver>;
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = ResolverReturnType;
 
-const artifact: BoultonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
-  kind: 'FetchableResolver',
+const artifact: IsographFetchableResolver<
+  ReadFromStoreType,
+  ResolverParameterType,
+  ReadOutType
+> = {
+  kind: "FetchableResolver",
   queryText,
   normalizationAst,
   readerAst,
   resolver: resolver as any,
-  convert: ((resolver, data) => resolver(data)),
+  convert: (resolver, data) => resolver(data),
 };
 
 export default artifact;

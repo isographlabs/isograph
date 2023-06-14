@@ -111,7 +111,7 @@ string_key_newtype!(JavascriptName);
 // This is getting ridiculous...
 impl ValidTypeAnnotationInnerType for JavascriptName {}
 
-string_key_newtype!(BoultonDirectiveName);
+string_key_newtype!(IsographDirectiveName);
 
 string_key_newtype!(FieldArgumentName);
 
