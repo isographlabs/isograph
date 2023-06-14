@@ -4,13 +4,15 @@ import { HomeRoute } from "./home";
 import { RepositoryRoute } from "./repository";
 import { Container } from "@mui/material";
 import { UserRoute } from "./user";
+import { PullRequestRoute } from "./pull_request";
 
 export type Route =
   | {
       kind: "Home";
     }
   | RepositoryRoute
-  | UserRoute;
+  | UserRoute
+  | PullRequestRoute;
 
 export type UserRoute = {
   kind: "User";
@@ -25,13 +27,21 @@ export type RepositoryRoute = {
   repositoryId: string;
 };
 
+export type PullRequestRoute = {
+  kind: "PullRequest";
+  pullRequestNumber: number;
+  repositoryName: string;
+  // this is owner login:
+  repositoryOwner: string;
+};
+
 export function GithubDemo() {
   const [currentRoute, setCurrentRoute] = React.useState<Route>({
-    kind: "Home",
-    // kind: "Repository",
-    // repositoryName: "react",
-    // repositoryOwner: "facebook",
-    // repositoryId: "123",
+    // kind: "Home",
+    kind: "Repository",
+    repositoryName: "relay",
+    repositoryOwner: "facebook",
+    repositoryId: "123",
   });
   return (
     <NoSSR>
@@ -73,6 +83,8 @@ function Router({
       );
     case "User":
       return <UserRoute route={route} setRoute={setRoute} />;
+    case "PullRequest":
+      return <PullRequestRoute route={route} setRoute={setRoute} />;
     default:
       const exhaustiveCheck: never = route;
   }

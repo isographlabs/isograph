@@ -30,6 +30,7 @@ export const pull_request_table = bDeclare<
   PullRequestConnection.pull_request_table @component {
     edges {
       node {
+        pull_request_link,
         number,
         id,
         title,
@@ -46,7 +47,6 @@ export const pull_request_table = bDeclare<
 `(PullRequestTable);
 
 function PullRequestTable(props: PullRequestTableParams) {
-  console.log("pull request table", { props });
   const reversedPullRequests = [...props.data.edges].reverse();
   return (
     <>
@@ -69,7 +69,12 @@ function PullRequestTable(props: PullRequestTableParams) {
             return (
               <TableRow key={node.id}>
                 <TableCell>
-                  <small>{node.number}</small>
+                  <small>
+                    {node.pull_request_link({
+                      children: node.number,
+                      setRoute: props.setRoute,
+                    })}
+                  </small>
                 </TableCell>
                 <TableCell>{node.title}</TableCell>
                 <TableCell>

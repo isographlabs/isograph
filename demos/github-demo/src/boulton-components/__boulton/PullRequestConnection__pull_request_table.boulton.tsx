@@ -2,6 +2,7 @@ import type {BoultonNonFetchableResolver, ReaderAst} from '@boulton/react';
 import { pull_request_table as resolver } from '../pull_request_table.tsx';
 import Actor__user_link, { ReadOutType as Actor__user_link__outputType } from './Actor__user_link.boulton';
 import PullRequest__created_at_formatted, { ReadOutType as PullRequest__created_at_formatted__outputType } from './PullRequest__created_at_formatted.boulton';
+import PullRequest__pull_request_link, { ReadOutType as PullRequest__pull_request_link__outputType } from './PullRequest__pull_request_link.boulton';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
@@ -22,6 +23,13 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
         alias: null,
         arguments: null,
         selections: [
+          {
+            kind: "Resolver",
+            alias: "pull_request_link",
+            arguments: null,
+            resolver: PullRequest__pull_request_link,
+            variant: "Component",
+          },
           {
             kind: "Scalar",
             response_name: "number",
@@ -90,6 +98,7 @@ export type ResolverParameterType = { data:
 {
   edges: (({
     node: ({
+      pull_request_link: PullRequest__pull_request_link__outputType,
       number: number,
       id: string,
       title: string,

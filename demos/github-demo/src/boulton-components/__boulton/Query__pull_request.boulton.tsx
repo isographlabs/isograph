@@ -2,36 +2,22 @@ import type {BoultonFetchableResolver, ReaderAst, FragmentReference} from '@boul
 import { getRefRendererForName } from '@boulton/react';
 const resolver = x => x;
 import Query__header, { ReadOutType as Query__header__outputType } from './Query__header.boulton';
-import Query__repository_detail, { ReadOutType as Query__repository_detail__outputType } from './Query__repository_detail.boulton';
+import Query__pull_request_detail, { ReadOutType as Query__pull_request_detail__outputType } from './Query__pull_request_detail.boulton';
 
-const queryText = 'query repository_page ($repositoryName: String!, $repositoryOwner: String!, $first: Int!) {\
-  repository__name_repositoryName__owner_repositoryOwner: repository(name: $repositoryName, owner: $repositoryOwner) {\
+const queryText = 'query pull_request ($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!) {\
+  repository__owner_repositoryOwner__name_repositoryName: repository(owner: $repositoryOwner, name: $repositoryName) {\
     id,\
-    nameWithOwner,\
-    parent {\
+    pullRequest__number_pullRequestNumber: pullRequest(number: $pullRequestNumber) {\
+      bodyHTML,\
       id,\
-      name,\
-      nameWithOwner,\
-      owner {\
-        id,\
-        login,\
-      },\
-    },\
-    pullRequests__last_first: pullRequests(last: $first) {\
-      edges {\
-        node {\
-          closed,\
-          createdAt,\
-          id,\
-          number,\
-          title,\
-          totalCommentsCount,\
-          author {\
-            login,\
-          },\
-          repository {\
-            name,\
-            owner {\
+      title,\
+      comments__last_last: comments(last: $last) {\
+        edges {\
+          node {\
+            bodyText,\
+            createdAt,\
+            id,\
+            author {\
               login,\
             },\
           },\
@@ -60,16 +46,16 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
   {
     kind: "Resolver",
-    alias: "repository_detail",
+    alias: "pull_request_detail",
     arguments: null,
-    resolver: Query__repository_detail,
+    resolver: Query__pull_request_detail,
     variant: "Component",
   },
 ];
 
 export type ResolverParameterType = {
   header: Query__header__outputType,
-  repository_detail: Query__repository_detail__outputType,
+  pull_request_detail: Query__pull_request_detail__outputType,
 };
 
 // The type, when returned from the resolver
