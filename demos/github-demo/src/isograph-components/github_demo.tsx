@@ -37,11 +37,7 @@ export type PullRequestRoute = {
 
 export function GithubDemo() {
   const [currentRoute, setCurrentRoute] = React.useState<Route>({
-    // kind: "Home",
-    kind: "Repository",
-    repositoryName: "relay",
-    repositoryOwner: "facebook",
-    repositoryId: "123",
+    kind: "Home",
   });
   return (
     <NoSSR>
