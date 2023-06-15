@@ -3,35 +3,28 @@
   "version": "0.0.4",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@isograph/react": "*",
-    "@isograph/react-disposable-state": "*",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "@fontsource/roboto": "^5.0.3",
+    "@isograph/react": "*",
+    "@isograph/react-disposable-state": "*",
     "@mui/icons-material": "^5.11.16",
     "@mui/material": "^5.13.5",
     "@types/node": "18.16.3",
     "@types/react": "18.2.0",
     "@types/react-dom": "18.2.1",
-    "cors": "^2.8.5",
-    "eslint": "8.39.0",
-    "eslint-config-next": "13.3.2",
-    "express": "^4.18.2",
-    "express-graphql": "^0.12.0",
-    "graphql": "^16.6.0",
-    "next": "13.3.2",
+    "@vitejs/plugin-react": "^4.0.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "react-no-ssr": "^1.1.0",
-    "typescript": "5.0.4"
+    "typescript": "5.0.4",
+    "vite": "^4.3.9"
   },
   "devDependencies": {
-    "@types/react-no-ssr": "^1.1.3"
+    "vite-tsconfig-paths": "^4.2.0"
   }
 }

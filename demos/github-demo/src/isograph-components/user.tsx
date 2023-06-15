@@ -3,7 +3,7 @@ import { iso, read, useLazyReference } from "@isograph/react";
 import { Container } from "@mui/material";
 
 import userPageQuery from "./__isograph/Query__user_page.isograph";
-import { FullPageLoading, Route, UserRoute } from "./github_demo";
+import { FullPageLoading, Route, type UserRoute } from "./github_demo";
 
 iso`
   Query.user_page($first: Int!, $userLogin: String!,) @fetchable {

@@ -1,4 +1,6 @@
-import Head from "next/head";
+import { render } from 'react-dom';
+import { createTheme, ThemeProvider } from "@mui/material/styles";
+import { CssBaseline } from '@mui/material';
 
 import { GithubDemo } from "@/isograph-components/github_demo";
 import { setNetwork } from "@isograph/react";
@@ -16,7 +18,6 @@ function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
 }
 setNetwork(makeNetworkRequest);
 
-import { createTheme, ThemeProvider } from "@mui/material/styles";
 
 const theme = createTheme({
   palette: {
@@ -35,19 +36,12 @@ const theme = createTheme({
   },
 });
 
-export default function Home() {
-  return (
-    <>
-      <Head>
-        <title>Github Demo</title>
-        <meta
-          name="description"
-          content="Demonstration of Isograph, used with Github's GraphQL API."
-        />
-      </Head>
-      <ThemeProvider theme={theme}>
-        <GithubDemo />
-      </ThemeProvider>
-    </>
-  );
-}
+render(
+	<>
+		<CssBaseline />
+		<ThemeProvider theme={theme}>
+			<GithubDemo />
+		</ThemeProvider>
+	</>,
+	document.getElementById("root")!
+)

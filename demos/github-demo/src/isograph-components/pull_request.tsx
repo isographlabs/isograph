@@ -1,6 +1,6 @@
 import React from "react";
 import { iso, useLazyReference, read } from "@isograph/react";
-import { FullPageLoading, PullRequestRoute, Route } from "./github_demo";
+import { FullPageLoading, type PullRequestRoute, Route } from "./github_demo";
 
 import PullRequestQuery from "./__isograph/Query__pull_request.isograph";
 
