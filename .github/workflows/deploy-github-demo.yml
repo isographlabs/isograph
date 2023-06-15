@@ -1,0 +1,86 @@
+name: Deploy GitHub Demo
+
+on:
+  push:
+    branches: ["master"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: (env) setup pnpm
+        uses: pnpm/action-setup@v2.2.4
+        with:
+          version: 8.5.1
+
+      - name: (env) setup node
+        uses: actions/setup-node@main
+        with:
+          node-version: 18
+          cache: pnpm
+          check-latest: true
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+
+      - name: (env) cargo cache
+        uses: actions/cache@v3
+        continue-on-error: false
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: (env) setup pages
+        uses: actions/configure-pages@v3
+
+      - name: (js) install
+        run: pnpm install
+
+      - name: (js) compile
+        run: pnpm -r compile || 0
+
+      - name: (rs) build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+
+      - name: iso demo
+        run: |-
+          ./target/release/isograph_cli
+          --project-root demos/github-demo/
+          --schema demos/github-demo/schema.graphql
+
+      - name: iso build
+        run: pnpm --filter github-isograph-demo build
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: "."
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
