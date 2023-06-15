@@ -435,6 +435,8 @@ export function getRefReaderForName(name: string) {
 }
 
 export function getRefRendererForName(name: string) {
+  // TODO name should be Type__fieldName, right now it's just fieldName.
+  // Collisions on the fieldName will cause problems.
   if (refReaders[name] == null) {
     function Component({
       resolver,
