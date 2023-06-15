@@ -83,7 +83,7 @@ function UserListPageRoute() {
 }
 ```
 
-> Note that the call to `read(queryReference)` will suspend if the required data is not present in the store, so make sure that `UserListPageRoute` is wrapped in a `React.Suspense` boundary, or read the `queryReference` in a child component that is wrapped by `React.Suspense`!
+> Note that the call to `read(queryReference)` will suspend if the required data is not present in the store, so make sure that either `UserListPageRoute` is wrapped in a `React.Suspense` boundary, or that the `queryReference` is passed to `read` in a child component that is wrapped by `React.Suspense`!
 
 Now, when `UserListPageRoute` is initially rendered, Isograph will make an API call.
 
