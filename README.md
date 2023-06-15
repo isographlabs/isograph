@@ -50,7 +50,7 @@ These calls to `iso` define resolvers, which are functions from graph data (such
 
 At the root of each page, every app will have an `iso` literal with an `@fetchable` directive. Isograph's compiler finds and processes all the `iso` literals in your codebase, and will take any fetchable literals and generate GraphQL queries from them.
 
-So, if the compiler encountered the following fetcable literal:
+So, if the compiler encountered the following fetchable literal:
 
 ```js
 iso`
