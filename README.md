@@ -92,7 +92,7 @@ Now, when `UserListPageRoute` is initially rendered, Isograph will make an API c
 You may have noticed that when we called `data.avatar({})`, we did not pass the data that the avatar needs! Instead, when the component is rendered, Isograph will `read` the data that the avatar component needs, and pass it to `Avatar`. The calling component:
 
 - only passes additional props that don't affect the query data, like `onClick`, and
-- does **not** know what data `Avatar` expects, and never sees the data that `Avatar` expects. This is called **data masking**, and it's a crucial reason that teams of multiple developers can move quickly when building apps with Isograph: because no component sees the data that another component selected, changing one component cannot affect another!
+- does **not** know what data `Avatar` expects, and never sees the data that `Avatar` reads out. This is called **data masking**, and it's a crucial reason that teams of multiple developers can move quickly when building apps with Isograph: because no component sees the data that another component selected, changing one component cannot affect another!
 
 ### Big picture
 
