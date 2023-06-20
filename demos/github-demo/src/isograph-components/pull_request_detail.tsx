@@ -4,6 +4,7 @@ import { iso } from "@isograph/react";
 import { ResolverParameterType as PullRequestDetailsProps } from "./__isograph/Query__pull_request_detail.isograph";
 
 import { Card, CardContent } from "@mui/material";
+import { RepoLink } from "./RepoLink";
 
 export const pull_request_detail = iso<
   PullRequestDetailsProps,
@@ -35,6 +36,10 @@ function PullRequestDetail(props: PullRequestDetailsProps) {
 
   return (
     <>
+      <RepoLink filePath="demos/github-demo/src/isograph-components/pull_request_detail.tsx">
+        Pull Request Detail Component
+      </RepoLink>
+
       <h1>{pullRequest.title}</h1>
 
       <Card variant="outlined">

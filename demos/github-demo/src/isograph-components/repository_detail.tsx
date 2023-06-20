@@ -1,5 +1,6 @@
 import { iso } from "@isograph/react";
 import type { ResolverParameterType as RepositoryDetailParams } from "./__isograph/Query__repository_detail.isograph";
+import { RepoLink } from "./RepoLink";
 
 export const repository_detail = iso<
   RepositoryDetailParams,
@@ -23,10 +24,12 @@ export const repository_detail = iso<
 `(RepositoryDetail);
 
 function RepositoryDetail(props: RepositoryDetailParams) {
-  console.log("repo detail", props.data);
   const parent = props.data.repository?.parent;
   return (
     <>
+      <RepoLink filePath="demos/github-demo/src/isograph-components/repository_detail.tsx">
+        Repository Detail Component
+      </RepoLink>
       <h1>{props.data.repository?.nameWithOwner}</h1>
       {parent != null ? (
         <h3>
