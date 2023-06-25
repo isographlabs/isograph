@@ -273,27 +273,31 @@ fn parse_variable_definitions(
         .parse_token_of_kind(IsographLangTokenKind::OpenParen)
         .is_ok()
     {
-        let mut variable_definitions = vec![];
-        while tokens
-            .parse_token_of_kind(IsographLangTokenKind::CloseParen)
-            .is_err()
-        {
-            let variable_definition = tokens
-                .with_span(|tokens| {
-                    let _dollar = tokens.parse_token_of_kind(IsographLangTokenKind::Dollar)?;
-                    let name = tokens.parse_string_key_type(IsographLangTokenKind::Identifier)?;
-                    tokens.parse_token_of_kind(IsographLangTokenKind::Colon)?;
-                    let type_ = parse_type_annotation(tokens)?;
-                    let _comma = tokens.parse_token_of_kind(IsographLangTokenKind::Comma)?;
-                    Ok::<_, IsographLiteralParseError>(VariableDefinition { name, type_ })
-                })
-                .transpose()?;
-            variable_definitions.push(variable_definition);
-        }
+        let variable_definitions = parse_delimited_list(
+            tokens,
+            parse_variable_definition,
+            IsographLangTokenKind::Comma,
+        )?;
+        tokens.parse_token_of_kind(IsographLangTokenKind::CloseParen)?;
         Ok(variable_definitions)
     } else {
         Ok(vec![])
     }
+}
+
+fn parse_variable_definition(
+    tokens: &mut PeekableLexer<'_>,
+) -> ParseResult<WithSpan<VariableDefinition<UnvalidatedTypeName>>> {
+    let variable_definition = tokens
+        .with_span(|tokens| {
+            let _dollar = tokens.parse_token_of_kind(IsographLangTokenKind::Dollar)?;
+            let name = tokens.parse_string_key_type(IsographLangTokenKind::Identifier)?;
+            tokens.parse_token_of_kind(IsographLangTokenKind::Colon)?;
+            let type_ = parse_type_annotation(tokens)?;
+            Ok::<_, IsographLiteralParseError>(VariableDefinition { name, type_ })
+        })
+        .transpose()?;
+    Ok(variable_definition)
 }
 
 fn parse_type_annotation(

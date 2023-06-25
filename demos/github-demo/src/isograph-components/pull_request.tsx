@@ -7,7 +7,7 @@ import PullRequestQuery from "./__isograph/Query__pull_request.isograph";
 import { Container } from "@mui/material";
 
 iso`
-  Query.pull_request($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!,) @fetchable {
+  Query.pull_request($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!) @fetchable {
     header,
     pull_request_detail,
   }

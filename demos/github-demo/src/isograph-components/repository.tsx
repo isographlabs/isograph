@@ -6,7 +6,7 @@ import repositoryPageQuery from "./__isograph/Query__repository_page.isograph";
 import { FullPageLoading, Route, RepositoryRoute } from "./github_demo";
 
 iso`
-  Query.repository_page($repositoryName: String!, $repositoryOwner: String!, $first: Int!,) @fetchable {
+  Query.repository_page($repositoryName: String!, $repositoryOwner: String!, $first: Int!) @fetchable {
     header,
     repository_detail,
   }

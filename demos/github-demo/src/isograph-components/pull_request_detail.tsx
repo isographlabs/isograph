@@ -11,7 +11,7 @@ export const pull_request_detail = iso<
   ReturnType<typeof PullRequestDetail>
 >`
   Query.pull_request_detail @component {
-    repository(owner: $repositoryOwner, name: $repositoryName,) {
+    repository(owner: $repositoryOwner, name: $repositoryName) {
       id,
       pullRequest(number: $pullRequestNumber) {
         id,
