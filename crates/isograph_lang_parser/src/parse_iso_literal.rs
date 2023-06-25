@@ -116,6 +116,29 @@ fn parse_optional_selection_set<'a>(
     Ok(Some(selections))
 }
 
+/// Parse a list with a delimiter. Expect an optional final delimiter.
+fn parse_delimited_list<'a, TResult>(
+    tokens: &mut PeekableLexer<'a>,
+    parse_item: impl Fn(&mut PeekableLexer<'a>) -> ParseResult<TResult> + 'a,
+    delimiter: IsographLangTokenKind,
+) -> ParseResult<Vec<TResult>> {
+    let mut items = vec![];
+    items.push(parse_item(tokens)?);
+    while tokens.parse_token_of_kind(delimiter).is_ok() {
+        // Note: this is not ideal. parse_item can consume items off of the token stream, so
+        // if it (for example) parsed a closing parentheses *then* errored, we would be in
+        // an invalid state. In practice, this isn't an issue, but we should clean up the
+        // code to not do this.
+        let result = parse_item(tokens);
+        if let Ok(result) = result {
+            items.push(result);
+        } else {
+            break;
+        }
+    }
+    Ok(items)
+}
+
 fn parse_selection<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResult<WithSpan<Selection<(), ()>>> {
     tokens
         .with_span(|tokens| {
@@ -216,26 +239,24 @@ fn parse_optional_arguments(
         .parse_token_of_kind(IsographLangTokenKind::OpenParen)
         .is_ok()
     {
-        let mut arguments = vec![];
-        while tokens
-            .parse_token_of_kind(IsographLangTokenKind::CloseParen)
-            .is_err()
-        {
-            let argument = tokens
-                .with_span(|tokens| {
-                    let name = tokens.parse_string_key_type(IsographLangTokenKind::Identifier)?;
-                    tokens.parse_token_of_kind(IsographLangTokenKind::Colon)?;
-                    let value = parse_non_constant_value(tokens)?;
-                    let _comma = tokens.parse_token_of_kind(IsographLangTokenKind::Comma)?;
-                    Ok::<_, IsographLiteralParseError>(SelectionFieldArgument { name, value })
-                })
-                .transpose()?;
-            arguments.push(argument);
-        }
+        let arguments = parse_delimited_list(tokens, parse_argument, IsographLangTokenKind::Comma)?;
+        tokens.parse_token_of_kind(IsographLangTokenKind::CloseParen)?;
         Ok(arguments)
     } else {
         Ok(vec![])
     }
+}
+
+fn parse_argument(tokens: &mut PeekableLexer<'_>) -> ParseResult<WithSpan<SelectionFieldArgument>> {
+    let argument = tokens
+        .with_span(|tokens| {
+            let name = tokens.parse_string_key_type(IsographLangTokenKind::Identifier)?;
+            tokens.parse_token_of_kind(IsographLangTokenKind::Colon)?;
+            let value = parse_non_constant_value(tokens)?;
+            Ok::<_, IsographLiteralParseError>(SelectionFieldArgument { name, value })
+        })
+        .transpose()?;
+    Ok(argument)
 }
 
 fn parse_non_constant_value(tokens: &mut PeekableLexer) -> ParseResult<WithSpan<NonConstantValue>> {

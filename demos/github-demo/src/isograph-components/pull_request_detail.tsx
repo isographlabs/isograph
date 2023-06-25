@@ -13,7 +13,7 @@ export const pull_request_detail = iso<
   Query.pull_request_detail @component {
     repository(owner: $repositoryOwner, name: $repositoryName,) {
       id,
-      pullRequest(number: $pullRequestNumber,) {
+      pullRequest(number: $pullRequestNumber) {
         id,
         title,
         bodyHTML,

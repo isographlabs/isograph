@@ -7,7 +7,7 @@ export const repository_detail = iso<
   ReturnType<typeof RepositoryDetail>
 >`
   Query.repository_detail @component {
-    repository(name: $repositoryName, owner: $repositoryOwner,) {
+    repository(name: $repositoryName, owner: $repositoryOwner) {
       id,
       nameWithOwner,
       parent {
@@ -16,7 +16,7 @@ export const repository_detail = iso<
         nameWithOwner,
       },
 
-      pullRequests(last: $first,) {
+      pullRequests(last: $first) {
         pull_request_table,
       },
     },

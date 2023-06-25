@@ -14,7 +14,7 @@ export const repository_list = iso<
   ReturnType<typeof UserRepositoryList>
 >`
   User.repository_list @component {
-    repositories(last: $first,) {
+    repositories(last: $first) {
       edges {
         node {
           id,
@@ -23,11 +23,11 @@ export const repository_list = iso<
           nameWithOwner,
           description,
           forkCount,
-          pullRequests(first: $first,) {
+          pullRequests(first: $first) {
             totalCount,
           },
           stargazerCount,
-          watchers(first: $first,) {
+          watchers(first: $first) {
             totalCount,
           },
         },
