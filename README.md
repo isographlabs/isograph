@@ -34,7 +34,6 @@ export const user_profile_button = iso`
     name,
   }
 `(function UserProfileButton({ data }) {
-  return foo;
   return (
     <Button onClick={() => navigateToUserProfile(data.id)}>
       {data.name}
