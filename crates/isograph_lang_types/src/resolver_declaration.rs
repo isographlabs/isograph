@@ -1,10 +1,10 @@
 use std::fmt;
 
 use common_lang_types::{
-    DescriptionValue, FieldArgumentName, FieldDefinitionName, FieldNameOrAlias, HasName,
-    IsographDirectiveName, LinkedFieldAlias, LinkedFieldName, ResolverDefinitionPath,
-    ScalarFieldAlias, ScalarFieldName, UnvalidatedTypeName, ValidLinkedFieldType,
-    ValidScalarFieldType, ValidTypeAnnotationInnerType, VariableName, WithSpan,
+    DescriptionValue, FieldArgumentName, FieldNameOrAlias, HasName, IsographDirectiveName,
+    LinkedFieldAlias, LinkedFieldName, ResolverDefinitionPath, ScalarFieldAlias, ScalarFieldName,
+    ServerFieldDefinitionName, UnvalidatedTypeName, ValidLinkedFieldType, ValidScalarFieldType,
+    ValidTypeAnnotationInnerType, VariableName, WithSpan,
 };
 use graphql_lang_types::TypeAnnotation;
 
@@ -32,7 +32,7 @@ pub struct FragmentDirectiveUsage {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum Selection<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType> {
-    Field(FieldSelection<TScalarField, TLinkedField>),
+    ServerField(ServerFieldSelection<TScalarField, TLinkedField>),
     // FieldGroup(FieldGroupSelection),
 }
 
@@ -42,11 +42,11 @@ impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
     pub fn map<TNewScalarField: ValidScalarFieldType, TNewLinkedField: ValidLinkedFieldType>(
         self,
         map: &mut impl FnMut(
-            FieldSelection<TScalarField, TLinkedField>,
-        ) -> FieldSelection<TNewScalarField, TNewLinkedField>,
+            ServerFieldSelection<TScalarField, TLinkedField>,
+        ) -> ServerFieldSelection<TNewScalarField, TNewLinkedField>,
     ) -> Selection<TNewScalarField, TNewLinkedField> {
         match self {
-            Selection::Field(field_selection) => Selection::Field(map(field_selection)),
+            Selection::ServerField(field_selection) => Selection::ServerField(map(field_selection)),
         }
     }
 
@@ -57,23 +57,29 @@ impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
     >(
         self,
         map: &mut impl FnMut(
-            FieldSelection<TScalarField, TLinkedField>,
-        ) -> Result<FieldSelection<TNewScalarField, TNewLinkedField>, E>,
+            ServerFieldSelection<TScalarField, TLinkedField>,
+        )
+            -> Result<ServerFieldSelection<TNewScalarField, TNewLinkedField>, E>,
     ) -> Result<Selection<TNewScalarField, TNewLinkedField>, E> {
         match self {
-            Selection::Field(field_selection) => Ok(Selection::Field(map(field_selection)?)),
+            Selection::ServerField(field_selection) => {
+                Ok(Selection::ServerField(map(field_selection)?))
+            }
         }
     }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub enum FieldSelection<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType> {
+pub enum ServerFieldSelection<
+    TScalarField: ValidScalarFieldType,
+    TLinkedField: ValidLinkedFieldType,
+> {
     ScalarField(ScalarFieldSelection<TScalarField>),
     LinkedField(LinkedFieldSelection<TScalarField, TLinkedField>),
 }
 
 impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
-    FieldSelection<TScalarField, TLinkedField>
+    ServerFieldSelection<TScalarField, TLinkedField>
 {
     pub fn map<TNewScalarField: ValidScalarFieldType, TNewLinkedField: ValidLinkedFieldType>(
         self,
@@ -84,10 +90,14 @@ impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
             LinkedFieldSelection<TScalarField, TLinkedField>,
         )
             -> LinkedFieldSelection<TNewScalarField, TNewLinkedField>,
-    ) -> FieldSelection<TNewScalarField, TNewLinkedField> {
+    ) -> ServerFieldSelection<TNewScalarField, TNewLinkedField> {
         match self {
-            FieldSelection::ScalarField(s) => FieldSelection::ScalarField(map_scalar_field(s)),
-            FieldSelection::LinkedField(l) => FieldSelection::LinkedField(map_linked_field(l)),
+            ServerFieldSelection::ScalarField(s) => {
+                ServerFieldSelection::ScalarField(map_scalar_field(s))
+            }
+            ServerFieldSelection::LinkedField(l) => {
+                ServerFieldSelection::LinkedField(map_linked_field(l))
+            }
         }
     }
 
@@ -106,22 +116,26 @@ impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
             LinkedFieldSelection<TNewScalarField, TNewLinkedField>,
             E,
         >,
-    ) -> Result<FieldSelection<TNewScalarField, TNewLinkedField>, E> {
+    ) -> Result<ServerFieldSelection<TNewScalarField, TNewLinkedField>, E> {
         match self {
-            FieldSelection::ScalarField(s) => Ok(FieldSelection::ScalarField(map_scalar_field(s)?)),
-            FieldSelection::LinkedField(l) => Ok(FieldSelection::LinkedField(map_linked_field(l)?)),
+            ServerFieldSelection::ScalarField(s) => {
+                Ok(ServerFieldSelection::ScalarField(map_scalar_field(s)?))
+            }
+            ServerFieldSelection::LinkedField(l) => {
+                Ok(ServerFieldSelection::LinkedField(map_linked_field(l)?))
+            }
         }
     }
 }
 
 impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType> HasName
-    for FieldSelection<TScalarField, TLinkedField>
+    for ServerFieldSelection<TScalarField, TLinkedField>
 {
-    type Name = FieldDefinitionName;
+    type Name = ServerFieldDefinitionName;
     fn name(&self) -> Self::Name {
         match self {
-            FieldSelection::ScalarField(s) => s.name.item.into(),
-            FieldSelection::LinkedField(l) => l.name.item.into(),
+            ServerFieldSelection::ScalarField(s) => s.name.item.into(),
+            ServerFieldSelection::LinkedField(l) => l.name.item.into(),
         }
     }
 }

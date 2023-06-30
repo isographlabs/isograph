@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    DefinedField, DescriptionValue, FieldDefinitionName, FieldId, HasName, InputTypeId,
-    InputTypeName, JavascriptName, ObjectId, ObjectTypeName, OutputTypeId, OutputTypeName,
-    ResolverDefinitionPath, ScalarFieldName, ScalarId, ScalarTypeName, TypeAndField, TypeId,
+    DefinedField, DescriptionValue, HasName, InputTypeId, InputTypeName, JavascriptName, ObjectId,
+    ObjectTypeName, OutputTypeId, OutputTypeName, ResolverDefinitionPath, ScalarFieldName,
+    ScalarId, ScalarTypeName, ServerFieldDefinitionName, ServerFieldId, TypeAndField, TypeId,
     TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId, TypeWithoutFieldsName,
     UnvalidatedTypeName, ValidLinkedFieldType, ValidScalarFieldType, ValidTypeAnnotationInnerType,
     WithSpan,
@@ -46,7 +46,7 @@ pub struct Schema<
     // TODO fields should probably be two vectors: server_fields and resolvers, and have
     // separate ID types.
     pub fields: Vec<
-        SchemaField<
+        SchemaServerField<
             DefinedField<
                 TypeAnnotation<TServerType>,
                 SchemaResolverDefinitionInfo<TScalarField, TLinkedField, TVariableType>,
@@ -74,7 +74,7 @@ pub type UnvalidatedObjectFieldInfo =
     DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>;
 pub(crate) type UnvalidatedSchemaData = SchemaData<UnvalidatedObjectFieldInfo>;
 
-pub(crate) type UnvalidatedSchemaField = SchemaField<
+pub(crate) type UnvalidatedSchemaField = SchemaServerField<
     DefinedField<
         TypeAnnotation<UnvalidatedTypeName>,
         SchemaResolverDefinitionInfo<(), (), UnvalidatedTypeName>,
@@ -99,8 +99,8 @@ impl<
 {
     pub fn field(
         &self,
-        field_id: FieldId,
-    ) -> &SchemaField<
+        field_id: ServerFieldId,
+    ) -> &SchemaServerField<
         DefinedField<
             TypeAnnotation<TServerType>,
             SchemaResolverDefinitionInfo<TScalarField, TLinkedField, TVariableType>,
@@ -282,13 +282,15 @@ impl<'a, TEncounteredField> From<&'a SchemaObject<TEncounteredField>>
 }
 
 impl<'a, TEncounteredField> SchemaTypeWithFields<'a, TEncounteredField> {
-    pub fn encountered_field_names(&self) -> &HashMap<FieldDefinitionName, TEncounteredField> {
+    pub fn encountered_field_names(
+        &self,
+    ) -> &HashMap<ServerFieldDefinitionName, TEncounteredField> {
         match self {
             SchemaTypeWithFields::Object(object) => &object.encountered_field_names,
         }
     }
 
-    pub fn fields(&self) -> &[FieldId] {
+    pub fn fields(&self) -> &[ServerFieldId] {
         match self {
             SchemaTypeWithFields::Object(object) => &object.fields,
         }
@@ -378,27 +380,28 @@ pub struct SchemaObject<TEncounteredField> {
     pub id: ObjectId,
     // pub interfaces: Vec<InterfaceTypeName>,
     // pub directives: Vec<Directive<ConstantValue>>,
-    pub fields: Vec<FieldId>,
+    // TODO Vec of enums? Two vecs?
+    pub fields: Vec<ServerFieldId>,
     // TODO: the ScalarFieldName in DefinedField is pretty useless. Consider
     // storing more useful information there, like the field index or something.
-    pub encountered_field_names: HashMap<FieldDefinitionName, TEncounteredField>,
+    pub encountered_field_names: HashMap<ServerFieldDefinitionName, TEncounteredField>,
 }
 // Unvalidated => TScalarField: TypeAnnotation<UnvalidatedTypeName>,
 // Validated => FieldId
 
 #[derive(Debug)]
-pub struct SchemaField<T> {
+pub struct SchemaServerField<T> {
     pub description: Option<DescriptionValue>,
-    pub name: FieldDefinitionName,
-    pub id: FieldId,
+    pub name: ServerFieldDefinitionName,
+    pub id: ServerFieldId,
     pub field_type: T,
     pub parent_type_id: TypeWithFieldsId,
     // pub arguments: Vec<InputValue<ConstantValue>>,
     // pub directives: Vec<Directive<ConstantValue>>,
 }
 
-impl<T> SchemaField<T> {
-    pub fn split(self) -> (SchemaField<()>, T) {
+impl<T> SchemaServerField<T> {
+    pub fn split(self) -> (SchemaServerField<()>, T) {
         let Self {
             description,
             name,
@@ -407,7 +410,7 @@ impl<T> SchemaField<T> {
             parent_type_id,
         } = self;
         (
-            SchemaField {
+            SchemaServerField {
                 description,
                 name,
                 id,
@@ -432,7 +435,7 @@ pub struct SchemaResolverDefinitionInfo<
         Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
         Vec<WithSpan<Unwrap>>,
     )>,
-    pub field_id: FieldId,
+    pub field_id: ServerFieldId,
     pub variant: Option<WithSpan<ResolverVariant>>,
     pub is_fetchable: bool,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<TVariableDefinitionType>>>,

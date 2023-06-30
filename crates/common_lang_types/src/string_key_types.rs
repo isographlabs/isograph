@@ -7,7 +7,7 @@ use string_key_newtype::{string_key_conversion, string_key_newtype};
 string_key_newtype!(DirectiveName);
 string_key_newtype!(DirectiveArgumentName);
 
-string_key_newtype!(FieldDefinitionName);
+string_key_newtype!(ServerFieldDefinitionName);
 
 string_key_newtype!(InputValueName);
 string_key_newtype!(EnumLiteralValue);
@@ -80,10 +80,10 @@ string_key_conversion!(EnumTypeName, TypeWithoutFieldsName);
 // The name in the schema of the field
 string_key_newtype!(ScalarFieldName);
 impl ValidScalarFieldType for ScalarFieldName {}
-string_key_conversion!(ScalarFieldName, FieldDefinitionName);
+string_key_conversion!(ScalarFieldName, ServerFieldDefinitionName);
 
 string_key_newtype!(LinkedFieldName);
-string_key_conversion!(LinkedFieldName, FieldDefinitionName);
+string_key_conversion!(LinkedFieldName, ServerFieldDefinitionName);
 
 string_key_newtype!(ScalarFieldAlias);
 string_key_newtype!(LinkedFieldAlias);
@@ -93,7 +93,7 @@ string_key_conversion!(ScalarFieldName, FieldNameOrAlias);
 string_key_conversion!(LinkedFieldName, FieldNameOrAlias);
 string_key_conversion!(ScalarFieldAlias, FieldNameOrAlias);
 string_key_conversion!(LinkedFieldAlias, FieldNameOrAlias);
-string_key_conversion!(FieldDefinitionName, FieldNameOrAlias);
+string_key_conversion!(ServerFieldDefinitionName, FieldNameOrAlias);
 
 string_key_newtype!(ResolverDefinitionPath);
 
@@ -102,9 +102,9 @@ string_key_newtype!(ResolverDefinitionPath);
 string_key_newtype!(QueryOperationName);
 // Explanation: any resolver field that is on the Query object is eligible
 // to be a query.
-string_key_conversion!(FieldDefinitionName, QueryOperationName);
+string_key_conversion!(ServerFieldDefinitionName, QueryOperationName);
 // The reverse is safe as well.
-string_key_conversion!(QueryOperationName, FieldDefinitionName);
+string_key_conversion!(QueryOperationName, ServerFieldDefinitionName);
 
 // For scalars
 string_key_newtype!(JavascriptName);
@@ -119,4 +119,4 @@ string_key_newtype!(FieldArgumentName);
 string_key_newtype!(TypeAndField);
 
 string_key_newtype!(NormalizationKey);
-string_key_conversion!(FieldDefinitionName, NormalizationKey);
+string_key_conversion!(ServerFieldDefinitionName, NormalizationKey);

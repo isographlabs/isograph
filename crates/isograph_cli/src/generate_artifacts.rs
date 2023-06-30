@@ -7,14 +7,14 @@ use std::{
 };
 
 use common_lang_types::{
-    DefinedField, FieldDefinitionName, FieldId, HasName, OutputTypeId, QueryOperationName,
-    ResolverDefinitionPath, TypeAndField, TypeWithFieldsId, TypeWithFieldsName,
+    DefinedField, HasName, OutputTypeId, QueryOperationName, ResolverDefinitionPath,
+    ServerFieldDefinitionName, ServerFieldId, TypeAndField, TypeWithFieldsId, TypeWithFieldsName,
     TypeWithoutFieldsId, UnvalidatedTypeName, ValidTypeAnnotationInnerType, WithSpan,
 };
 use graphql_lang_types::{ListTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
-    FieldSelection::{LinkedField, ScalarField},
     NonConstantValue, Selection, SelectionFieldArgument,
+    ServerFieldSelection::{LinkedField, ScalarField},
 };
 use isograph_schema::{
     merge_selection_set, MergedSelectionSet, ResolverVariant, SchemaTypeWithFields,
@@ -217,7 +217,7 @@ pub struct ConvertFunction(pub String);
 pub struct FetchableResolver<'schema> {
     pub query_text: QueryText,
     pub query_name: QueryOperationName,
-    pub parent_type: SchemaTypeWithFields<'schema, FieldId>,
+    pub parent_type: SchemaTypeWithFields<'schema, ServerFieldId>,
     pub resolver_import_statement: ResolverImportStatement,
     pub resolver_parameter_type: ResolverParameterType,
     pub resolver_return_type: ResolverReturnType,
@@ -278,8 +278,8 @@ fn get_read_out_type_text(read_out_type: ResolverReadOutType) -> String {
 
 #[derive(Debug)]
 pub struct NonFetchableResolver<'schema> {
-    pub parent_type: SchemaTypeWithFields<'schema, FieldId>,
-    pub resolver_field_name: FieldDefinitionName,
+    pub parent_type: SchemaTypeWithFields<'schema, ServerFieldId>,
+    pub resolver_field_name: ServerFieldDefinitionName,
     pub nested_resolver_artifact_imports: HashMap<TypeAndField, ResolverImport>,
     pub resolver_read_out_type: ResolverReadOutType,
     pub reader_ast: ReaderAst,
@@ -386,7 +386,7 @@ pub enum GenerateArtifactsError {
 
 fn generated_file_name(
     parent_type_name: TypeWithFieldsName,
-    field_name: FieldDefinitionName,
+    field_name: ServerFieldDefinitionName,
 ) -> PathBuf {
     PathBuf::from(format!("{}__{}.isograph.tsx", parent_type_name, field_name))
 }
@@ -404,7 +404,7 @@ fn write_selections(
     for item in items.iter() {
         query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
         match &item.item {
-            Selection::Field(field) => match field {
+            Selection::ServerField(field) => match field {
                 ScalarField(scalar_field) => {
                     if let Some(alias) = scalar_field.normalization_alias {
                         query_text.push_str(&format!("{}: ", alias));
@@ -531,7 +531,7 @@ fn generate_resolver_parameter_type(
     schema: &ValidatedSchema,
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
     variant: Option<WithSpan<ResolverVariant>>,
-    parent_type: SchemaTypeWithFields<'_, FieldId>,
+    parent_type: SchemaTypeWithFields<'_, ServerFieldId>,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
     indentation_level: u8,
 ) -> ResolverParameterType {
@@ -570,14 +570,14 @@ fn write_query_types_from_selection(
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
     variant: Option<WithSpan<ResolverVariant>>,
-    parent_type: SchemaTypeWithFields<'_, FieldId>,
+    parent_type: SchemaTypeWithFields<'_, ServerFieldId>,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
     indentation_level: u8,
 ) {
     query_type_declaration.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
 
     match &selection.item {
-        Selection::Field(field) => match field {
+        Selection::ServerField(field) => match field {
             ScalarField(scalar_field) => {
                 let parent_field = parent_type
                     .encountered_field_names()
@@ -727,7 +727,7 @@ fn print_non_null_type_annotation<T: Display + ValidTypeAnnotationInnerType>(
 }
 
 fn generate_resolver_import_statement(
-    resolver_name: FieldDefinitionName,
+    resolver_name: ServerFieldDefinitionName,
     resolver_path: ResolverDefinitionPath,
     has_associated_js_function: bool,
 ) -> ResolverImportStatement {
@@ -762,7 +762,7 @@ pub struct ResolverImport {
 fn generate_reader_ast<'schema>(
     schema: &'schema ValidatedSchema,
     selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
-    parent_type: SchemaTypeWithFields<'schema, FieldId>,
+    parent_type: SchemaTypeWithFields<'schema, ServerFieldId>,
     indentation_level: u8,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
 ) -> ReaderAst {
@@ -783,13 +783,13 @@ fn generate_reader_ast<'schema>(
 
 fn generate_reader_ast_node(
     item: &WithSpan<Selection<DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>>,
-    parent_type: SchemaTypeWithFields<'_, FieldId>,
+    parent_type: SchemaTypeWithFields<'_, ServerFieldId>,
     schema: &ValidatedSchema,
     indentation_level: u8,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
 ) -> String {
     match &item.item {
-        Selection::Field(field) => match field {
+        Selection::ServerField(field) => match field {
             ScalarField(scalar_field) => {
                 let field_name = scalar_field.name.item;
 
@@ -1031,7 +1031,7 @@ fn generate_resolver_return_type_declaration(
 
 fn generate_convert_function(
     variant: &Option<WithSpan<ResolverVariant>>,
-    field_name: FieldDefinitionName,
+    field_name: ServerFieldDefinitionName,
 ) -> ConvertFunction {
     match variant {
         Some(variant) => {

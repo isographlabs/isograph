@@ -4,8 +4,8 @@ use crate::{Directive, TypeAnnotation};
 
 use super::{write_arguments, write_directives, ConstantValue};
 use common_lang_types::{
-    DescriptionValue, FieldDefinitionName, InputTypeName, InputValueName, InterfaceTypeName,
-    ObjectTypeName, ScalarTypeName, UnvalidatedTypeName, WithSpan,
+    DescriptionValue, InputTypeName, InputValueName, InterfaceTypeName, ObjectTypeName,
+    ScalarTypeName, ServerFieldDefinitionName, UnvalidatedTypeName, WithSpan,
 };
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -66,7 +66,7 @@ pub struct ScalarTypeDefinition {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct OutputFieldDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithSpan<FieldDefinitionName>,
+    pub name: WithSpan<ServerFieldDefinitionName>,
     pub type_: TypeAnnotation<UnvalidatedTypeName>,
     pub arguments: Vec<WithSpan<InputValueDefinition>>,
     pub directives: Vec<Directive<ConstantValue>>,

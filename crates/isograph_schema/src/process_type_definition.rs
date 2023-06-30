@@ -1,8 +1,8 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    DefinedField, FieldDefinitionName, FieldId, ObjectTypeName, OutputTypeName, ScalarFieldName,
-    TypeId, TypeWithFieldsId, UnvalidatedTypeName, WithSpan,
+    DefinedField, ObjectTypeName, OutputTypeName, ScalarFieldName, ServerFieldDefinitionName,
+    ServerFieldId, TypeId, TypeWithFieldsId, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
     ObjectTypeDefinition, OutputFieldDefinition, ScalarTypeDefinition, TypeAnnotation,
@@ -13,8 +13,8 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    Schema, SchemaField, SchemaObject, SchemaScalar, UnvalidatedSchema, UnvalidatedSchemaField,
-    STRING_JAVASCRIPT_TYPE,
+    Schema, SchemaObject, SchemaScalar, SchemaServerField, UnvalidatedSchema,
+    UnvalidatedSchemaField, STRING_JAVASCRIPT_TYPE,
 };
 
 lazy_static! {
@@ -130,9 +130,9 @@ fn get_field_objects_ids_and_names(
     parent_type_name: OutputTypeName,
 ) -> ProcessTypeDefinitionResult<(
     Vec<UnvalidatedSchemaField>,
-    Vec<FieldId>,
+    Vec<ServerFieldId>,
     HashMap<
-        FieldDefinitionName,
+        ServerFieldDefinitionName,
         DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>,
     >,
 )> {
@@ -147,7 +147,7 @@ fn get_field_objects_ids_and_names(
             DefinedField::ServerField(field.item.type_.clone()),
         ) {
             None => {
-                unvalidated_fields.push(SchemaField {
+                unvalidated_fields.push(SchemaServerField {
                     description: field.item.description.map(|d| d.item),
                     name: field.item.name.item,
                     id: (next_field_id + current_field_index).into(),
@@ -180,7 +180,7 @@ pub enum ProcessTypeDefinitionError {
 
     #[error("Duplicate field named \"{field_name}\" on type \"{parent_type}\"")]
     DuplicateField {
-        field_name: FieldDefinitionName,
+        field_name: ServerFieldDefinitionName,
         parent_type: OutputTypeName,
     },
 }

@@ -1,7 +1,7 @@
 use std::ops::ControlFlow;
 
 use common_lang_types::{
-    FieldDefinitionName, ResolverDefinitionPath, Span, StringKeyNewtype, UnvalidatedTypeName,
+    ResolverDefinitionPath, ServerFieldDefinitionName, Span, StringKeyNewtype, UnvalidatedTypeName,
     WithSpan,
 };
 use graphql_lang_types::{
@@ -9,8 +9,8 @@ use graphql_lang_types::{
 };
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
-    FieldSelection, FragmentDirectiveUsage, LinkedFieldSelection, NonConstantValue,
-    ResolverDeclaration, ScalarFieldSelection, Selection, SelectionFieldArgument, Unwrap,
+    FragmentDirectiveUsage, LinkedFieldSelection, NonConstantValue, ResolverDeclaration,
+    ScalarFieldSelection, Selection, SelectionFieldArgument, ServerFieldSelection, Unwrap,
     VariableDefinition,
 };
 
@@ -156,8 +156,8 @@ fn parse_selection<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResult<WithSpan<S
             tokens.parse_token_of_kind(IsographLangTokenKind::Comma)?;
 
             let selection = match selection_set {
-                Some(selection_set) => {
-                    Selection::Field(FieldSelection::LinkedField(LinkedFieldSelection {
+                Some(selection_set) => Selection::ServerField(ServerFieldSelection::LinkedField(
+                    LinkedFieldSelection {
                         name: field_name.map(|string_key| string_key.into()),
                         reader_alias: alias
                             .map(|with_span| with_span.map(|string_key| string_key.into())),
@@ -170,20 +170,23 @@ fn parse_selection<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResult<WithSpan<S
                                 &arguments,
                             ),
                         arguments,
-                    }))
-                }
-                None => Selection::Field(FieldSelection::ScalarField(ScalarFieldSelection {
-                    name: field_name.map(|string_key| string_key.into()),
-                    reader_alias: alias
-                        .map(|with_span| with_span.map(|string_key| string_key.into())),
-                    field: (),
-                    unwraps,
-                    normalization_alias: HACK_combine_name_and_variables_into_normalization_alias(
-                        field_name.map(|x| x.into()),
-                        &arguments,
-                    ),
-                    arguments,
-                })),
+                    },
+                )),
+                None => Selection::ServerField(ServerFieldSelection::ScalarField(
+                    ScalarFieldSelection {
+                        name: field_name.map(|string_key| string_key.into()),
+                        reader_alias: alias
+                            .map(|with_span| with_span.map(|string_key| string_key.into())),
+                        field: (),
+                        unwraps,
+                        normalization_alias:
+                            HACK_combine_name_and_variables_into_normalization_alias(
+                                field_name.map(|x| x.into()),
+                                &arguments,
+                            ),
+                        arguments,
+                    },
+                )),
             };
             Ok(selection)
         })
@@ -369,7 +372,7 @@ fn from_control_flow<T, E>(control_flow: impl FnOnce() -> ControlFlow<T, E>) -> 
 /// used in the alias. Once we have a normalization AST, we can remove this.
 #[allow(non_snake_case)]
 fn HACK_combine_name_and_variables_into_normalization_alias<T: StringKeyNewtype>(
-    name: WithSpan<FieldDefinitionName>,
+    name: WithSpan<ServerFieldDefinitionName>,
     arguments: &[WithSpan<SelectionFieldArgument>],
 ) -> Option<WithSpan<T>> {
     if arguments.is_empty() {

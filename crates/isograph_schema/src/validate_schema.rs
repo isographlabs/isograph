@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    DefinedField, FieldDefinitionName, FieldId, HasName, InputTypeId, OutputTypeId, TypeId,
-    TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId, UnvalidatedTypeName, VariableName,
-    WithSpan,
+    DefinedField, HasName, InputTypeId, OutputTypeId, ServerFieldDefinitionName, ServerFieldId,
+    TypeId, TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId, UnvalidatedTypeName,
+    VariableName, WithSpan,
 };
 use graphql_lang_types::TypeAnnotation;
 use isograph_lang_types::{
@@ -12,13 +12,14 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    Schema, SchemaData, SchemaField, SchemaObject, SchemaResolverDefinitionInfo,
+    Schema, SchemaData, SchemaObject, SchemaResolverDefinitionInfo, SchemaServerField,
     SchemaTypeWithFields, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData,
     UnvalidatedSchemaField, UnvalidatedSchemaTypeWithFields,
 };
 
-pub type ValidatedSchemaField =
-    SchemaField<DefinedField<TypeAnnotation<OutputTypeId>, ValidatedSchemaResolverDefinitionInfo>>;
+pub type ValidatedSchemaField = SchemaServerField<
+    DefinedField<TypeAnnotation<OutputTypeId>, ValidatedSchemaResolverDefinitionInfo>,
+>;
 
 type ValidatedDefinedField = DefinedField<TypeWithoutFieldsId, ()>;
 
@@ -30,7 +31,7 @@ pub type ValidatedSchemaResolverDefinitionInfo =
 pub type ValidatedVariableDefinition = VariableDefinition<InputTypeId>;
 
 pub type ValidatedSchema =
-    Schema<OutputTypeId, ValidatedDefinedField, TypeWithFieldsId, InputTypeId, FieldId>;
+    Schema<OutputTypeId, ValidatedDefinedField, TypeWithFieldsId, InputTypeId, ServerFieldId>;
 
 impl ValidatedSchema {
     pub fn validate_and_construct(
@@ -80,7 +81,7 @@ impl ValidatedSchema {
 fn transform_object_field_ids(
     schema_fields: &[ValidatedSchemaField],
     object: SchemaObject<UnvalidatedObjectFieldInfo>,
-) -> SchemaObject<FieldId> {
+) -> SchemaObject<ServerFieldId> {
     let SchemaObject {
         name,
         fields,
@@ -141,7 +142,7 @@ fn validate_and_transform_field(
             validate_resolver_fragment(schema_data, resolver_field_type, &empty_field)?,
         ),
     };
-    Ok(SchemaField {
+    Ok(SchemaServerField {
         description: empty_field.description,
         name: empty_field.name,
         id: empty_field.id,
@@ -153,7 +154,7 @@ fn validate_and_transform_field(
 fn validate_server_field_type_exists_and_is_output_type(
     schema_data: &UnvalidatedSchemaData,
     server_field_type: &TypeAnnotation<UnvalidatedTypeName>,
-    field: &SchemaField<()>,
+    field: &SchemaServerField<()>,
 ) -> ValidateSchemaResult<TypeAnnotation<OutputTypeId>> {
     // look up the item in defined_types. If it's not there, error.
     match schema_data.defined_types.get(server_field_type.inner()) {
@@ -181,7 +182,7 @@ fn validate_server_field_type_exists_and_is_output_type(
 fn validate_resolver_fragment(
     schema_data: &UnvalidatedSchemaData,
     resolver_field_type: SchemaResolverDefinitionInfo<(), (), UnvalidatedTypeName>,
-    field: &SchemaField<()>,
+    field: &SchemaServerField<()>,
 ) -> ValidateSchemaResult<ValidatedSchemaResolverDefinitionInfo> {
     let variable_definitions =
         validate_variable_definitions(schema_data, resolver_field_type.variable_definitions)?;
@@ -260,7 +261,7 @@ fn validate_variable_definitions(
 fn validate_selections_error_to_validate_schema_error(
     err: ValidateSelectionsError,
     parent_type: UnvalidatedSchemaTypeWithFields,
-    field: &SchemaField<()>,
+    field: &SchemaServerField<()>,
 ) -> ValidateSchemaError {
     match err {
         ValidateSelectionsError::FieldDoesNotExist(field_parent_type_name, field_name) => {
@@ -312,22 +313,22 @@ fn validate_selections_error_to_validate_schema_error(
 type ValidateSelectionsResult<T> = Result<T, ValidateSelectionsError>;
 
 enum ValidateSelectionsError {
-    FieldDoesNotExist(TypeWithFieldsName, FieldDefinitionName),
+    FieldDoesNotExist(TypeWithFieldsName, ServerFieldDefinitionName),
     FieldSelectedAsScalarButTypeIsNotScalar {
         field_parent_type_name: TypeWithFieldsName,
-        field_name: FieldDefinitionName,
+        field_name: ServerFieldDefinitionName,
         target_type: &'static str,
         target_type_name: UnvalidatedTypeName,
     },
     FieldSelectedAsLinkedButTypeIsScalar {
         field_parent_type_name: TypeWithFieldsName,
-        field_name: FieldDefinitionName,
+        field_name: ServerFieldDefinitionName,
         target_type: &'static str,
         target_type_name: UnvalidatedTypeName,
     },
     FieldSelectedAsLinkedButTypeIsResolver {
         field_parent_type_name: TypeWithFieldsName,
-        field_name: FieldDefinitionName,
+        field_name: ServerFieldDefinitionName,
     },
 }
 
@@ -383,7 +384,7 @@ fn validate_resolver_definition_selection_exists_and_type_matches(
 /// Given that we selected a scalar field, the field should exist on the parent,
 /// and type should be a resolver (which is a scalar) or a server scalar type.
 fn validate_field_type_exists_and_is_scalar(
-    parent_fields: &HashMap<FieldDefinitionName, UnvalidatedObjectFieldInfo>,
+    parent_fields: &HashMap<ServerFieldDefinitionName, UnvalidatedObjectFieldInfo>,
     schema_data: &UnvalidatedSchemaData,
     parent_type: UnvalidatedSchemaTypeWithFields,
     scalar_field_selection: ScalarFieldSelection<()>,
@@ -434,7 +435,7 @@ fn validate_field_type_exists_and_is_scalar(
 /// Given that we selected a linked field, the field should exist on the parent,
 /// and type should be a server interface, object or union.
 fn validate_field_type_exists_and_is_linked(
-    parent_fields: &HashMap<FieldDefinitionName, UnvalidatedObjectFieldInfo>,
+    parent_fields: &HashMap<ServerFieldDefinitionName, UnvalidatedObjectFieldInfo>,
     schema_data: &UnvalidatedSchemaData,
     parent_type: UnvalidatedSchemaTypeWithFields,
     linked_field_selection: LinkedFieldSelection<(), ()>,
@@ -503,7 +504,7 @@ pub enum ValidateSchemaError {
     )]
     FieldTypenameDoesNotExist {
         parent_type_name: TypeWithFieldsName,
-        field_name: FieldDefinitionName,
+        field_name: ServerFieldDefinitionName,
         field_type: UnvalidatedTypeName,
     },
 
@@ -512,9 +513,9 @@ pub enum ValidateSchemaError {
     )]
     ResolverSelectionFieldDoesNotExist {
         resolver_parent_type_name: TypeWithFieldsName,
-        resolver_field_name: FieldDefinitionName,
+        resolver_field_name: ServerFieldDefinitionName,
         field_parent_type_name: TypeWithFieldsName,
-        field_name: FieldDefinitionName,
+        field_name: ServerFieldDefinitionName,
     },
 
     #[error(
@@ -522,9 +523,9 @@ pub enum ValidateSchemaError {
     )]
     ResolverSelectionFieldIsNotScalar {
         resolver_parent_type_name: TypeWithFieldsName,
-        resolver_field_name: FieldDefinitionName,
+        resolver_field_name: ServerFieldDefinitionName,
         field_parent_type_name: TypeWithFieldsName,
-        field_name: FieldDefinitionName,
+        field_name: ServerFieldDefinitionName,
         field_type: &'static str,
         target_type_name: UnvalidatedTypeName,
     },
@@ -534,9 +535,9 @@ pub enum ValidateSchemaError {
     )]
     ResolverSelectionFieldIsScalar {
         resolver_parent_type_name: TypeWithFieldsName,
-        resolver_field_name: FieldDefinitionName,
+        resolver_field_name: ServerFieldDefinitionName,
         field_parent_type_name: TypeWithFieldsName,
-        field_name: FieldDefinitionName,
+        field_name: ServerFieldDefinitionName,
         field_type: &'static str,
         target_type_name: UnvalidatedTypeName,
     },
@@ -546,9 +547,9 @@ pub enum ValidateSchemaError {
     )]
     ResolverSelectionFieldIsResolver {
         resolver_parent_type_name: TypeWithFieldsName,
-        resolver_field_name: FieldDefinitionName,
+        resolver_field_name: ServerFieldDefinitionName,
         field_parent_type_name: TypeWithFieldsName,
-        field_name: FieldDefinitionName,
+        field_name: ServerFieldDefinitionName,
     },
 
     #[error(
@@ -556,7 +557,7 @@ pub enum ValidateSchemaError {
     )]
     FieldTypenameIsInputObject {
         parent_type_name: TypeWithFieldsName,
-        field_name: FieldDefinitionName,
+        field_name: ServerFieldDefinitionName,
         field_type: UnvalidatedTypeName,
     },
 

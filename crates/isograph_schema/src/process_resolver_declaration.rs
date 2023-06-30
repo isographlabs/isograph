@@ -1,15 +1,15 @@
 use std::fmt;
 
 use common_lang_types::{
-    DefinedField, FieldDefinitionName, IsographDirectiveName, ObjectId, TypeId, TypeWithFieldsId,
-    TypeWithFieldsName, UnvalidatedTypeName, WithSpan,
+    DefinedField, IsographDirectiveName, ObjectId, ServerFieldDefinitionName, TypeId,
+    TypeWithFieldsId, TypeWithFieldsName, UnvalidatedTypeName, WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{FragmentDirectiveUsage, ResolverDeclaration};
 use lazy_static::lazy_static;
 use thiserror::Error;
 
-use crate::{SchemaField, SchemaResolverDefinitionInfo, UnvalidatedSchema};
+use crate::{SchemaResolverDefinitionInfo, SchemaServerField, UnvalidatedSchema};
 
 impl UnvalidatedSchema {
     pub fn process_resolver_declaration(
@@ -78,7 +78,7 @@ impl UnvalidatedSchema {
             }
         }
 
-        self.fields.push(SchemaField {
+        self.fields.push(SchemaServerField {
             description: resolver_declaration.item.description.map(|d| d.item),
             name,
             id: next_field_id,
@@ -119,7 +119,7 @@ pub enum ProcessResolverDeclarationError {
     ParentAlreadyHasField {
         parent_type: &'static str,
         parent_type_name: TypeWithFieldsName,
-        resolver_field_name: FieldDefinitionName,
+        resolver_field_name: ServerFieldDefinitionName,
     },
 
     #[error(
