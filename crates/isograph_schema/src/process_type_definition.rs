@@ -59,7 +59,7 @@ impl UnvalidatedSchema {
                 });
             }
             Entry::Vacant(vacant) => {
-                let (new_fields, field_ids, encountered_field_names) =
+                let (new_fields, server_field_ids, encountered_field_names) =
                     get_field_objects_ids_and_names(
                         object_type_definition.fields,
                         existing_fields.len(),
@@ -70,12 +70,15 @@ impl UnvalidatedSchema {
                     description: object_type_definition.description.map(|d| d.item),
                     name: object_type_definition.name.item,
                     id: next_object_id,
-                    fields: field_ids,
+                    fields: server_field_ids,
+                    // Resolvers are not defined until we process iso literals. They're not contained in
+                    // the schema definition.
+                    resolvers: vec![],
                     encountered_field_names,
                 });
 
                 // ----- HACK -----
-                // Instead of this, we should parse GraphQL schema declarations.
+                // Instead of this, we possibly should parse GraphQL schema declarations.
                 if object_type_definition.name.item == *QUERY_TYPE {
                     self.query_type_id = Some(next_object_id);
                 }

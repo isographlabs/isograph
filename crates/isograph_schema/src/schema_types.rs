@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use common_lang_types::{
     DefinedField, DescriptionValue, HasName, InputTypeId, InputTypeName, JavascriptName, ObjectId,
-    ObjectTypeName, OutputTypeId, OutputTypeName, ResolverDefinitionPath, ScalarFieldName,
-    ScalarId, ScalarTypeName, ServerFieldDefinitionName, ServerFieldId, TypeAndField, TypeId,
-    TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId, TypeWithoutFieldsName,
-    UnvalidatedTypeName, ValidLinkedFieldType, ValidScalarFieldType, ValidTypeAnnotationInnerType,
-    WithSpan,
+    ObjectTypeName, OutputTypeId, OutputTypeName, ResolverDefinitionPath, ResolverFieldId,
+    ScalarFieldName, ScalarId, ScalarTypeName, ServerFieldDefinitionName, ServerFieldId,
+    TypeAndField, TypeId, TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId,
+    TypeWithoutFieldsName, UnvalidatedTypeName, ValidLinkedFieldType, ValidScalarFieldType,
+    ValidTypeAnnotationInnerType, WithSpan,
 };
 use graphql_lang_types::TypeAnnotation;
 use intern::string_key::Intern;
@@ -53,6 +53,7 @@ pub struct Schema<
             >,
         >,
     >,
+    pub resolvers: Vec<SchemaResolver>,
     pub schema_data: SchemaData<TEncounteredField>,
 
     // Well known types
@@ -120,6 +121,7 @@ impl UnvalidatedSchema {
     pub fn new() -> Self {
         // TODO add __typename
         let fields = vec![];
+        let resolvers = vec![];
         let objects = vec![];
         let mut scalars = vec![];
         let mut defined_types = HashMap::default();
@@ -157,17 +159,20 @@ impl UnvalidatedSchema {
 
         Self {
             fields,
+            resolvers,
             schema_data: SchemaData {
                 objects,
                 scalars,
                 defined_types,
             },
+
             id_type_id,
             string_type_id,
-            query_type_id: None,
             int_type_id,
             float_type_id,
             boolean_type_id,
+
+            query_type_id: None,
         }
     }
 }
@@ -380,8 +385,8 @@ pub struct SchemaObject<TEncounteredField> {
     pub id: ObjectId,
     // pub interfaces: Vec<InterfaceTypeName>,
     // pub directives: Vec<Directive<ConstantValue>>,
-    // TODO Vec of enums? Two vecs?
     pub fields: Vec<ServerFieldId>,
+    pub resolvers: Vec<ResolverFieldId>,
     // TODO: the ScalarFieldName in DefinedField is pretty useless. Consider
     // storing more useful information there, like the field index or something.
     pub encountered_field_names: HashMap<ServerFieldDefinitionName, TEncounteredField>,
@@ -398,6 +403,12 @@ pub struct SchemaServerField<T> {
     pub parent_type_id: TypeWithFieldsId,
     // pub arguments: Vec<InputValue<ConstantValue>>,
     // pub directives: Vec<Directive<ConstantValue>>,
+}
+
+#[derive(Debug)]
+pub struct SchemaResolver {
+    pub description: Option<DescriptionValue>,
+    pub name: ServerFieldDefinitionName,
 }
 
 impl<T> SchemaServerField<T> {

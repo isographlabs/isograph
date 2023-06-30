@@ -39,6 +39,7 @@ impl ValidatedSchema {
     ) -> ValidateSchemaResult<Self> {
         let Schema {
             fields,
+            resolvers,
             schema_data,
             id_type_id: id_type,
             string_type_id: string_type,
@@ -63,6 +64,7 @@ impl ValidatedSchema {
 
         Ok(Self {
             fields: updated_fields,
+            resolvers,
             schema_data: SchemaData {
                 objects,
                 scalars,
@@ -88,6 +90,7 @@ fn transform_object_field_ids(
         description,
         id,
         encountered_field_names,
+        resolvers,
     } = object;
 
     let encountered_field_names = encountered_field_names
@@ -100,8 +103,6 @@ fn transform_object_field_ids(
                 }
             }
             panic!("field not found, probably a isograph bug but we should confirm");
-            // schema_fields[]
-            // schema_fields.
         })
         .collect();
 
@@ -111,6 +112,7 @@ fn transform_object_field_ids(
         id,
         fields,
         encountered_field_names,
+        resolvers,
     }
 }
 
