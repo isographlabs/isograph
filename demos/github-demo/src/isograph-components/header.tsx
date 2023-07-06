@@ -1,9 +1,12 @@
+import Image from "next/image";
 import { iso } from "@isograph/react";
 import { ResolverParameterType as HeaderProps } from "./__isograph/Query__header.isograph";
 
 import { AppBar, Button, Grid, Container } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { Route } from "./github_demo";
+
+import logo from "./svgs/dark-logo.svg";
 
 export const header = iso<HeaderProps, ReturnType<typeof Header>>`
   Query.header @component {
@@ -52,16 +55,21 @@ function Buttons({
   const theme = useTheme();
   return (
     <>
-      <Button
-        variant="text"
-        style={{
-          color: theme.palette.primary.contrastText,
-          textDecoration: route.kind === "Home" ? "underline" : "none",
-        }}
-        onClick={() => setRoute({ kind: "Home" })}
-      >
-        Home
-      </Button>
+      <div style={{ display: "flex" }}>
+        <a href="https://github.com/isographlabs/isograph">
+          <Image src={logo} alt="Isograph Logo" height={40} width={40} />
+        </a>
+        <Button
+          variant="text"
+          style={{
+            color: theme.palette.primary.contrastText,
+            textDecoration: route.kind === "Home" ? "underline" : "none",
+          }}
+          onClick={() => setRoute({ kind: "Home" })}
+        >
+          Home
+        </Button>
+      </div>
     </>
   );
 }
