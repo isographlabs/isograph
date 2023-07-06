@@ -41,19 +41,11 @@ pub struct Schema<
     TScalarField: ValidScalarFieldType,
     TLinkedField: ValidLinkedFieldType,
     TVariableType: ValidTypeAnnotationInnerType,
+    // On objects, what does the HashMap of encountered types contain
     TEncounteredField,
 > {
-    // TODO fields should probably be two vectors: server_fields and resolvers, and have
-    // separate ID types.
-    pub fields: Vec<
-        SchemaServerField<
-            DefinedField<
-                TypeAnnotation<TServerType>,
-                SchemaResolverDefinitionInfo<TScalarField, TLinkedField, TVariableType>,
-            >,
-        >,
-    >,
-    pub resolvers: Vec<SchemaResolver>,
+    pub fields: Vec<SchemaServerField<TypeAnnotation<TServerType>>>,
+    pub resolvers: Vec<SchemaResolver<TScalarField, TLinkedField, TVariableType>>,
     pub schema_data: SchemaData<TEncounteredField>,
 
     // Well known types
@@ -71,16 +63,18 @@ pub struct Schema<
 
 pub(crate) type UnvalidatedSchema =
     Schema<UnvalidatedTypeName, (), (), UnvalidatedTypeName, UnvalidatedObjectFieldInfo>;
+
+/// On unvalidated schema objects, the encountered types are either a type annotation
+/// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
+/// resolver.)
 pub type UnvalidatedObjectFieldInfo =
     DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>;
+
 pub(crate) type UnvalidatedSchemaData = SchemaData<UnvalidatedObjectFieldInfo>;
 
-pub(crate) type UnvalidatedSchemaField = SchemaServerField<
-    DefinedField<
-        TypeAnnotation<UnvalidatedTypeName>,
-        SchemaResolverDefinitionInfo<(), (), UnvalidatedTypeName>,
-    >,
->;
+pub(crate) type UnvalidatedSchemaField = SchemaServerField<TypeAnnotation<UnvalidatedTypeName>>;
+
+pub(crate) type UnvalidatedSchemaResolver = SchemaResolver<(), (), UnvalidatedTypeName>;
 
 #[derive(Debug)]
 pub struct SchemaData<TEncounteredField> {
@@ -101,13 +95,15 @@ impl<
     pub fn field(
         &self,
         field_id: ServerFieldId,
-    ) -> &SchemaServerField<
-        DefinedField<
-            TypeAnnotation<TServerType>,
-            SchemaResolverDefinitionInfo<TScalarField, TLinkedField, TVariableType>,
-        >,
-    > {
+    ) -> &SchemaServerField<TypeAnnotation<TServerType>> {
         &self.fields[field_id.as_usize()]
+    }
+
+    pub fn resolver(
+        &self,
+        resolver_field_id: ResolverFieldId,
+    ) -> &SchemaResolver<TScalarField, TLinkedField, TVariableType> {
+        &self.resolvers[resolver_field_id.as_usize()]
     }
 
     pub fn query_object(&self) -> Option<&SchemaObject<TEncounteredField>> {
@@ -300,6 +296,12 @@ impl<'a, TEncounteredField> SchemaTypeWithFields<'a, TEncounteredField> {
             SchemaTypeWithFields::Object(object) => &object.fields,
         }
     }
+
+    pub fn resolvers(&self) -> &[ResolverFieldId] {
+        match self {
+            SchemaTypeWithFields::Object(object) => &object.resolvers,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -387,8 +389,6 @@ pub struct SchemaObject<TEncounteredField> {
     // pub directives: Vec<Directive<ConstantValue>>,
     pub fields: Vec<ServerFieldId>,
     pub resolvers: Vec<ResolverFieldId>,
-    // TODO: the ScalarFieldName in DefinedField is pretty useless. Consider
-    // storing more useful information there, like the field index or something.
     pub encountered_field_names: HashMap<ServerFieldDefinitionName, TEncounteredField>,
 }
 // Unvalidated => TScalarField: TypeAnnotation<UnvalidatedTypeName>,
@@ -406,12 +406,37 @@ pub struct SchemaServerField<T> {
 }
 
 #[derive(Debug)]
-pub struct SchemaResolver {
+pub struct SchemaResolver<
+    TScalarField: ValidScalarFieldType,
+    TLinkedField: ValidLinkedFieldType,
+    TVariableDefinitionType: ValidTypeAnnotationInnerType,
+> {
     pub description: Option<DescriptionValue>,
     pub name: ServerFieldDefinitionName,
+    pub id: ResolverFieldId,
+    pub resolver_definition_path: ResolverDefinitionPath,
+    // TODO it makes no sense for a resolver to not select fields!
+    // Why not just make it a global function at that point? Who knows.
+    // Unless you'll eventually select fields?
+    pub selection_set_and_unwraps: Option<(
+        Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
+        Vec<WithSpan<Unwrap>>,
+    )>,
+    pub variant: Option<WithSpan<ResolverVariant>>,
+    // This should not be a bool; this should be an enum?
+    pub is_fetchable: bool,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<TVariableDefinitionType>>>,
+
+    // Why is this not calculated when needed?
+    pub type_and_field: TypeAndField,
+    pub has_associated_js_function: bool,
+
+    // TODO should this be TypeWithFieldsId???
+    pub parent_object_id: ObjectId,
 }
 
 impl<T> SchemaServerField<T> {
+    // TODO probably unnecessary, and can be replaced with .map and .transpose
     pub fn split(self) -> (SchemaServerField<()>, T) {
         let Self {
             description,
@@ -430,61 +455,6 @@ impl<T> SchemaServerField<T> {
             },
             field_type,
         )
-    }
-}
-
-#[derive(Debug)]
-// TODO map selection_set
-pub struct SchemaResolverDefinitionInfo<
-    TScalarField: ValidScalarFieldType,
-    TLinkedField: ValidLinkedFieldType,
-    // TODO this should be restricted to ValidTypeAnnotationInnerInputType
-    TVariableDefinitionType: ValidTypeAnnotationInnerType,
-> {
-    pub resolver_definition_path: ResolverDefinitionPath,
-    pub selection_set_and_unwraps: Option<(
-        Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
-        Vec<WithSpan<Unwrap>>,
-    )>,
-    pub field_id: ServerFieldId,
-    pub variant: Option<WithSpan<ResolverVariant>>,
-    pub is_fetchable: bool,
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<TVariableDefinitionType>>>,
-    pub type_and_field: TypeAndField,
-    pub has_associated_js_function: bool,
-}
-
-impl<
-        TScalarField: ValidScalarFieldType,
-        TLinkedField: ValidLinkedFieldType,
-        TVariableDefinitionType: ValidTypeAnnotationInnerType,
-    > SchemaResolverDefinitionInfo<TScalarField, TLinkedField, TVariableDefinitionType>
-{
-    pub fn map<TNewScalarField: ValidScalarFieldType, TNewLinkedField: ValidLinkedFieldType>(
-        self,
-        map: impl FnOnce(
-            (
-                Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
-                Vec<WithSpan<Unwrap>>,
-            ),
-        ) -> (
-            Vec<WithSpan<Selection<TNewScalarField, TNewLinkedField>>>,
-            Vec<WithSpan<Unwrap>>,
-        ),
-    ) -> SchemaResolverDefinitionInfo<TNewScalarField, TNewLinkedField, TVariableDefinitionType>
-    {
-        SchemaResolverDefinitionInfo {
-            resolver_definition_path: self.resolver_definition_path,
-            selection_set_and_unwraps: self
-                .selection_set_and_unwraps
-                .map(|selection_set_and_unwraps| map(selection_set_and_unwraps)),
-            field_id: self.field_id,
-            variant: self.variant,
-            is_fetchable: self.is_fetchable,
-            variable_definitions: self.variable_definitions,
-            type_and_field: self.type_and_field,
-            has_associated_js_function: self.has_associated_js_function,
-        }
     }
 }
 

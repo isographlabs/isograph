@@ -1,7 +1,7 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    DefinedField, NormalizationKey, ServerFieldDefinitionName, ServerFieldId, TypeWithFieldsId,
+    DefinedField, NormalizationKey, ServerFieldDefinitionName, TypeWithFieldsId,
     TypeWithoutFieldsId, WithSpan,
 };
 use intern::string_key::Intern;
@@ -11,9 +11,10 @@ use isograph_lang_types::{
     SelectionFieldArgument, ServerFieldSelection,
 };
 
-use crate::{SchemaTypeWithFields, ValidatedSchema, ValidatedSelection};
+use crate::{SchemaTypeWithFields, ValidatedDefinedField, ValidatedSchema, ValidatedSelection};
 
-pub type MergedSelectionSet = Vec<WithSpan<Selection<TypeWithoutFieldsId, TypeWithFieldsId>>>;
+pub type MergedSelection = Selection<TypeWithoutFieldsId, TypeWithFieldsId>;
+pub type MergedSelectionSet = Vec<WithSpan<MergedSelection>>;
 
 /// A merged selection set is an input for generating:
 /// - query texts
@@ -23,7 +24,7 @@ pub type MergedSelectionSet = Vec<WithSpan<Selection<TypeWithoutFieldsId, TypeWi
 /// TODO: SelectionSetAndUnwraps should be generic enough to handle this
 pub fn merge_selection_set(
     schema: &ValidatedSchema,
-    parent_type: SchemaTypeWithFields<ServerFieldId>,
+    parent_type: SchemaTypeWithFields<ValidatedDefinedField>,
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
 ) -> MergedSelectionSet {
     let mut merged_selection_set = HashMap::new();
@@ -45,11 +46,8 @@ pub fn merge_selection_set(
 
 fn merge_selections_into_set(
     schema: &ValidatedSchema,
-    merged_selection_set: &mut HashMap<
-        NormalizationKey,
-        WithSpan<Selection<TypeWithoutFieldsId, TypeWithFieldsId>>,
-    >,
-    parent_type: SchemaTypeWithFields<ServerFieldId>,
+    merged_selection_set: &mut HashMap<NormalizationKey, WithSpan<MergedSelection>>,
+    parent_type: SchemaTypeWithFields<ValidatedDefinedField>,
     validated_selections: &Vec<WithSpan<ValidatedSelection>>,
 ) {
     for validated_selection in validated_selections.iter() {
@@ -90,28 +88,23 @@ fn merge_selections_into_set(
                         DefinedField::ResolverField(_) => {
                             let resolver_field_name = scalar_field.name.item;
                             let parent_field_id = parent_type
-                                .fields()
+                                .resolvers()
                                 .iter()
                                 .find(|parent_field_id| {
-                                    let field = schema.field(**parent_field_id);
+                                    let field = schema.resolver(**parent_field_id);
                                     field.name == resolver_field_name.into()
                                 })
                                 .expect("expect field to exist");
-                            let field = schema.field(*parent_field_id);
-                            match &field.field_type {
-                                DefinedField::ServerField(_) => panic!("Expected resolver"),
-                                DefinedField::ResolverField(r) => {
-                                    if let Some((ref selection_set, _)) =
-                                        r.selection_set_and_unwraps
-                                    {
-                                        merge_selections_into_set(
-                                            schema,
-                                            merged_selection_set,
-                                            parent_type,
-                                            selection_set,
-                                        )
-                                    }
-                                }
+                            let resolver_field = schema.resolver(*parent_field_id);
+                            if let Some((ref selection_set, _)) =
+                                resolver_field.selection_set_and_unwraps
+                            {
+                                merge_selections_into_set(
+                                    schema,
+                                    merged_selection_set,
+                                    parent_type,
+                                    selection_set,
+                                )
                             }
                         }
                     };
@@ -218,9 +211,9 @@ fn HACK_combine_name_and_variables_into_normalization_alias(
 /// convert back. Blah!
 fn HACK__merge_linked_fields(
     schema: &ValidatedSchema,
-    existing_selection_set: &mut Vec<WithSpan<Selection<TypeWithoutFieldsId, TypeWithFieldsId>>>,
+    existing_selection_set: &mut Vec<WithSpan<MergedSelection>>,
     new_selection_set: &Vec<WithSpan<ValidatedSelection>>,
-    linked_field_parent_type: SchemaTypeWithFields<'_, ServerFieldId>,
+    linked_field_parent_type: SchemaTypeWithFields<'_, ValidatedDefinedField>,
 ) {
     let mut merged_selection_set = HashMap::new();
     for item in existing_selection_set.iter() {

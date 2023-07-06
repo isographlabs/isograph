@@ -7,6 +7,8 @@ use string_key_newtype::{string_key_conversion, string_key_newtype};
 string_key_newtype!(DirectiveName);
 string_key_newtype!(DirectiveArgumentName);
 
+// TODO this should be "SelectionName" or something because it's not just server fields,
+// it's also resolver fields.
 string_key_newtype!(ServerFieldDefinitionName);
 
 string_key_newtype!(InputValueName);

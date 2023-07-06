@@ -3,14 +3,9 @@ use u32_newtypes::u32_newtype;
 use crate::{ValidLinkedFieldType, ValidScalarFieldType, ValidTypeAnnotationInnerType};
 
 u32_newtype!(ServerFieldId);
-u32_newtype!(ResolverFieldId);
+impl ValidTypeAnnotationInnerType for ServerFieldId {}
 
-// TODO remove
-impl From<ResolverFieldId> for ServerFieldId {
-    fn from(id: ResolverFieldId) -> Self {
-        ServerFieldId(id.0)
-    }
-}
+u32_newtype!(ResolverFieldId);
 
 u32_newtype!(ObjectId);
 impl ValidTypeAnnotationInnerType for ObjectId {}

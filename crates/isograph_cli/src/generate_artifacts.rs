@@ -7,9 +7,10 @@ use std::{
 };
 
 use common_lang_types::{
-    DefinedField, HasName, OutputTypeId, QueryOperationName, ResolverDefinitionPath,
-    ServerFieldDefinitionName, ServerFieldId, TypeAndField, TypeWithFieldsId, TypeWithFieldsName,
-    TypeWithoutFieldsId, UnvalidatedTypeName, ValidTypeAnnotationInnerType, WithSpan,
+    DefinedField, FieldNameOrAlias, HasName, OutputTypeId, QueryOperationName,
+    ResolverDefinitionPath, ResolverFieldId, ServerFieldDefinitionName, ServerFieldId,
+    TypeAndField, TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId, UnvalidatedTypeName,
+    ValidTypeAnnotationInnerType, WithSpan,
 };
 use graphql_lang_types::{ListTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
@@ -17,9 +18,9 @@ use isograph_lang_types::{
     ServerFieldSelection::{LinkedField, ScalarField},
 };
 use isograph_schema::{
-    merge_selection_set, MergedSelectionSet, ResolverVariant, SchemaTypeWithFields,
-    ValidatedSchema, ValidatedSchemaResolverDefinitionInfo, ValidatedSelection,
-    ValidatedVariableDefinition,
+    merge_selection_set, MergedSelection, MergedSelectionSet, ResolverVariant,
+    SchemaTypeWithFields, ValidatedDefinedField, ValidatedSchema, ValidatedSchemaResolver,
+    ValidatedSelection, ValidatedVariableDefinition,
 };
 use thiserror::Error;
 
@@ -35,22 +36,14 @@ pub(crate) fn generate_artifacts(
 fn get_all_artifacts<'schema>(
     schema: &'schema ValidatedSchema,
 ) -> impl Iterator<Item = Artifact<'schema>> + 'schema {
-    let mut fields = schema.fields.iter();
-    std::iter::from_fn(move || {
-        while let Some(field) = fields.next() {
-            if let Some(resolver_field) = field.field_type.as_resolver_field() {
-                if resolver_field.is_fetchable {
-                    return Some(Artifact::FetchableResolver(
-                        generate_fetchable_resolver_artifact(schema, resolver_field),
-                    ));
-                } else {
-                    return Some(Artifact::NonFetchableResolver(
-                        generate_non_fetchable_resolver_artifact(schema, resolver_field),
-                    ));
-                }
-            }
+    schema.resolvers.iter().map(|resolver| {
+        if resolver.is_fetchable {
+            Artifact::FetchableResolver(generate_fetchable_resolver_artifact(schema, resolver))
+        } else {
+            Artifact::NonFetchableResolver(generate_non_fetchable_resolver_artifact(
+                schema, resolver,
+            ))
         }
-        None
     })
 }
 
@@ -59,14 +52,15 @@ pub struct QueryText(pub String);
 
 fn generate_fetchable_resolver_artifact<'schema>(
     schema: &'schema ValidatedSchema,
-    resolver_definition: &ValidatedSchemaResolverDefinitionInfo,
+    fetchable_resolver: &ValidatedSchemaResolver,
 ) -> FetchableResolver<'schema> {
-    if let Some((ref selection_set, _)) = resolver_definition.selection_set_and_unwraps {
-        let field = schema.field(resolver_definition.field_id);
-        let query_name: QueryOperationName = field.name.into();
+    if let Some((ref selection_set, _)) = fetchable_resolver.selection_set_and_unwraps {
+        let query_name: QueryOperationName = fetchable_resolver.name.into();
 
         let merged_selection_set = merge_selection_set(
             schema,
+            // TODO here we are assuming that the resolver is only on the Query type.
+            // That restriction should be loosened.
             schema
                 .schema_data
                 .object(schema.query_type_id.expect("expect query type to exist"))
@@ -81,27 +75,27 @@ fn generate_fetchable_resolver_artifact<'schema>(
             query_name,
             schema,
             &merged_selection_set,
-            &resolver_definition.variable_definitions,
+            &fetchable_resolver.variable_definitions,
         );
         let mut nested_resolver_artifact_imports: HashMap<TypeAndField, ResolverImport> =
             HashMap::new();
         let resolver_parameter_type = generate_resolver_parameter_type(
             schema,
             &selection_set,
-            resolver_definition.variant,
+            fetchable_resolver.variant,
             query_object.into(),
             &mut nested_resolver_artifact_imports,
             0,
         );
         let resolver_import_statement = generate_resolver_import_statement(
-            field.name,
-            resolver_definition.resolver_definition_path,
-            resolver_definition.has_associated_js_function,
+            fetchable_resolver.name,
+            fetchable_resolver.resolver_definition_path,
+            fetchable_resolver.has_associated_js_function,
         );
         let resolver_return_type = generate_resolver_return_type_declaration(
-            resolver_definition.has_associated_js_function,
+            fetchable_resolver.has_associated_js_function,
         );
-        let resolver_read_out_type = generate_read_out_type(resolver_definition);
+        let resolver_read_out_type = generate_read_out_type(fetchable_resolver);
         let reader_ast = generate_reader_ast(
             schema,
             selection_set,
@@ -109,7 +103,8 @@ fn generate_fetchable_resolver_artifact<'schema>(
             0,
             &mut nested_resolver_artifact_imports,
         );
-        let convert_function = generate_convert_function(&resolver_definition.variant, field.name);
+        let convert_function =
+            generate_convert_function(&fetchable_resolver.variant, fetchable_resolver.name);
 
         FetchableResolver {
             query_text,
@@ -131,18 +126,17 @@ fn generate_fetchable_resolver_artifact<'schema>(
 
 fn generate_non_fetchable_resolver_artifact<'schema>(
     schema: &'schema ValidatedSchema,
-    resolver_definition: &ValidatedSchemaResolverDefinitionInfo,
+    non_fetchable_resolver: &ValidatedSchemaResolver,
 ) -> NonFetchableResolver<'schema> {
-    if let Some((selection_set, _)) = &resolver_definition.selection_set_and_unwraps {
-        let field = schema.field(resolver_definition.field_id);
+    if let Some((selection_set, _)) = &non_fetchable_resolver.selection_set_and_unwraps {
         let parent_type = schema
             .schema_data
-            .lookup_type_with_fields(field.parent_type_id);
+            .object(non_fetchable_resolver.parent_object_id);
         let mut nested_resolver_artifact_imports = HashMap::new();
         let reader_ast = generate_reader_ast(
             schema,
             selection_set,
-            parent_type,
+            parent_type.into(),
             0,
             &mut nested_resolver_artifact_imports,
         );
@@ -150,25 +144,23 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
         let resolver_parameter_type = generate_resolver_parameter_type(
             schema,
             &selection_set,
-            resolver_definition.variant,
-            parent_type,
+            non_fetchable_resolver.variant,
+            parent_type.into(),
             &mut nested_resolver_artifact_imports,
             0,
         );
         let resolver_return_type = generate_resolver_return_type_declaration(
-            resolver_definition.has_associated_js_function,
+            non_fetchable_resolver.has_associated_js_function,
         );
-        let resolver_read_out_type = generate_read_out_type(resolver_definition);
+        let resolver_read_out_type = generate_read_out_type(non_fetchable_resolver);
         let resolver_import_statement = generate_resolver_import_statement(
-            field.name,
-            resolver_definition.resolver_definition_path,
-            resolver_definition.has_associated_js_function,
+            non_fetchable_resolver.name,
+            non_fetchable_resolver.resolver_definition_path,
+            non_fetchable_resolver.has_associated_js_function,
         );
         NonFetchableResolver {
-            parent_type: schema
-                .schema_data
-                .lookup_type_with_fields(field.parent_type_id),
-            resolver_field_name: field.name,
+            parent_type: parent_type.into(),
+            resolver_field_name: non_fetchable_resolver.name,
             reader_ast,
             nested_resolver_artifact_imports,
             resolver_import_statement,
@@ -217,7 +209,7 @@ pub struct ConvertFunction(pub String);
 pub struct FetchableResolver<'schema> {
     pub query_text: QueryText,
     pub query_name: QueryOperationName,
-    pub parent_type: SchemaTypeWithFields<'schema, ServerFieldId>,
+    pub parent_type: SchemaTypeWithFields<'schema, ValidatedDefinedField>,
     pub resolver_import_statement: ResolverImportStatement,
     pub resolver_parameter_type: ResolverParameterType,
     pub resolver_return_type: ResolverReturnType,
@@ -278,7 +270,7 @@ fn get_read_out_type_text(read_out_type: ResolverReadOutType) -> String {
 
 #[derive(Debug)]
 pub struct NonFetchableResolver<'schema> {
-    pub parent_type: SchemaTypeWithFields<'schema, ServerFieldId>,
+    pub parent_type: SchemaTypeWithFields<'schema, ValidatedDefinedField>,
     pub resolver_field_name: ServerFieldDefinitionName,
     pub nested_resolver_artifact_imports: HashMap<TypeAndField, ResolverImport>,
     pub resolver_read_out_type: ResolverReadOutType,
@@ -398,7 +390,7 @@ fn generated_file_path(project_root: &PathBuf, file_name: &PathBuf) -> PathBuf {
 fn write_selections(
     query_text: &mut String,
     schema: &ValidatedSchema,
-    items: &[WithSpan<Selection<TypeWithoutFieldsId, TypeWithFieldsId>>],
+    items: &[WithSpan<MergedSelection>],
     indentation_level: u8,
 ) {
     for item in items.iter() {
@@ -531,7 +523,7 @@ fn generate_resolver_parameter_type(
     schema: &ValidatedSchema,
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
     variant: Option<WithSpan<ResolverVariant>>,
-    parent_type: SchemaTypeWithFields<'_, ServerFieldId>,
+    parent_type: SchemaTypeWithFields<'_, ValidatedDefinedField>,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
     indentation_level: u8,
 ) -> ResolverParameterType {
@@ -570,7 +562,7 @@ fn write_query_types_from_selection(
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
     variant: Option<WithSpan<ResolverVariant>>,
-    parent_type: SchemaTypeWithFields<'_, ServerFieldId>,
+    parent_type: SchemaTypeWithFields<'_, ValidatedDefinedField>,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
     indentation_level: u8,
 ) {
@@ -579,17 +571,19 @@ fn write_query_types_from_selection(
     match &selection.item {
         Selection::ServerField(field) => match field {
             ScalarField(scalar_field) => {
-                let parent_field = parent_type
-                    .encountered_field_names()
-                    .get(&scalar_field.name.item.into())
-                    .expect("parent_field should exist 1");
-                let field = schema.field(*parent_field);
-                let name_or_alias = scalar_field.name_or_alias().item;
-
-                match &field.field_type {
+                match scalar_field.field {
                     DefinedField::ServerField(server_field) => {
+                        let parent_field = parent_type
+                            .encountered_field_names()
+                            .get(&scalar_field.name.item.into())
+                            .expect("parent_field should exist 1")
+                            .as_server_field()
+                            .expect("parent_field should exist and be server field");
+                        let field = schema.field(*parent_field);
+                        let name_or_alias = scalar_field.name_or_alias().item;
+
                         // TODO there should be a clever way to print without cloning
-                        let output_type = server_field.clone().map(|output_type_id| {
+                        let output_type = field.field_type.clone().map(|output_type_id| {
                             // TODO not just scalars, enums as well. Both should have a javascript name
                             let scalar_id = if let OutputTypeId::Scalar(scalar) = output_type_id {
                                 scalar
@@ -604,7 +598,13 @@ fn write_query_types_from_selection(
                             print_type_annotation(&output_type)
                         ));
                     }
-                    DefinedField::ResolverField(resolver) => {
+                    DefinedField::ResolverField((name_or_alias, type_and_field)) => {
+                        let resolver = schema
+                            .resolvers
+                            .iter()
+                            .find(|x| x.type_and_field == type_and_field)
+                            .expect("Expected resolver to exist. Probably indicates a bug in Isograph at this point.");
+
                         match nested_resolver_imports.entry(resolver.type_and_field) {
                             Entry::Occupied(mut occupied) => {
                                 occupied.get_mut().types.push(ResolverImportType {
@@ -640,37 +640,34 @@ fn write_query_types_from_selection(
                 let parent_field = parent_type
                     .encountered_field_names()
                     .get(&linked_field.name.item.into())
-                    .expect("parent_field should exist 2");
+                    .expect("parent_field should exist 2")
+                    .as_server_field()
+                    .expect("Parent field should exist and be server field");
                 let field = schema.field(*parent_field);
                 let name_or_alias = linked_field.name_or_alias().item;
-                match &field.field_type {
-                    DefinedField::ServerField(server_field) => {
-                        let type_annotation = server_field.clone().map(|output_type_id| {
-                            // TODO Or interface or union type
-                            let object_id = if let OutputTypeId::Object(object) = output_type_id {
-                                object
-                            } else {
-                                panic!("output_type_id should be a object");
-                            };
-                            let object = schema.schema_data.object(object_id);
-                            let inner = generate_resolver_parameter_type(
-                                schema,
-                                &linked_field.selection_set,
-                                variant,
-                                object.into(),
-                                nested_resolver_imports,
-                                indentation_level,
-                            );
-                            inner
-                        });
-                        query_type_declaration.push_str(&format!(
-                            "{}: {},\n",
-                            name_or_alias,
-                            print_type_annotation(&type_annotation),
-                        ));
-                    }
-                    DefinedField::ResolverField(_) => panic!("should not be a resolver field"),
-                }
+                let type_annotation = field.field_type.clone().map(|output_type_id| {
+                    // TODO Or interface or union type
+                    let object_id = if let OutputTypeId::Object(object) = output_type_id {
+                        object
+                    } else {
+                        panic!("output_type_id should be a object");
+                    };
+                    let object = schema.schema_data.object(object_id);
+                    let inner = generate_resolver_parameter_type(
+                        schema,
+                        &linked_field.selection_set,
+                        variant,
+                        object.into(),
+                        nested_resolver_imports,
+                        indentation_level,
+                    );
+                    inner
+                });
+                query_type_declaration.push_str(&format!(
+                    "{}: {},\n",
+                    name_or_alias,
+                    print_type_annotation(&type_annotation),
+                ));
             }
         },
     }
@@ -762,7 +759,7 @@ pub struct ResolverImport {
 fn generate_reader_ast<'schema>(
     schema: &'schema ValidatedSchema,
     selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
-    parent_type: SchemaTypeWithFields<'schema, ServerFieldId>,
+    parent_type: SchemaTypeWithFields<'schema, ValidatedDefinedField>,
     indentation_level: u8,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
 ) -> ReaderAst {
@@ -782,8 +779,13 @@ fn generate_reader_ast<'schema>(
 }
 
 fn generate_reader_ast_node(
-    item: &WithSpan<Selection<DefinedField<TypeWithoutFieldsId, ()>, TypeWithFieldsId>>,
-    parent_type: SchemaTypeWithFields<'_, ServerFieldId>,
+    item: &WithSpan<
+        Selection<
+            DefinedField<TypeWithoutFieldsId, (FieldNameOrAlias, TypeAndField)>,
+            TypeWithFieldsId,
+        >,
+    >,
+    parent_type: SchemaTypeWithFields<'_, ValidatedDefinedField>,
     schema: &ValidatedSchema,
     indentation_level: u8,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
@@ -819,23 +821,18 @@ fn generate_reader_ast_node(
                         // This field is a resolver, so we need to look up the field in the
                         // schema.
                         let resolver_field_name = scalar_field.name.item;
-                        let parent_field_id = parent_type
-                            .fields()
+                        let resolver_field_id = parent_type
+                            .resolvers()
                             .iter()
                             .find(|parent_field_id| {
-                                let field = schema.field(**parent_field_id);
+                                let field = schema.resolver(**parent_field_id);
                                 field.name == resolver_field_name.into()
                             })
                             .expect("expect field to exist");
-                        let resolver_field = schema.field(*parent_field_id);
-                        match &resolver_field.field_type {
-                            DefinedField::ServerField(_) => panic!("Expected resolver"),
-                            DefinedField::ResolverField(resolver_field) => {
-                                let arguments = format_arguments(
-                                    &scalar_field.arguments,
-                                    indentation_level + 1,
-                                );
-                                let res = format!(
+                        let resolver_field = schema.resolver(*resolver_field_id);
+                        let arguments =
+                            format_arguments(&scalar_field.arguments, indentation_level + 1);
+                        let res = format!(
                                     "{}{{\n{}kind: \"Resolver\",\n{}alias: \"{}\",\n{}arguments: {},\n{}resolver: {},\n{}variant: {},\n{}}},\n",
                                     "  ".repeat(indentation_level as usize),
                                     "  ".repeat((indentation_level + 1) as usize),
@@ -849,20 +846,18 @@ fn generate_reader_ast_node(
                                     resolver_field.variant.map(|x| format!("\"{}\"", x)).unwrap_or_else(|| "null".to_string()),
                                     "  ".repeat(indentation_level as usize),
                                 );
-                                match nested_resolver_imports.entry(resolver_field.type_and_field) {
-                                    Entry::Occupied(mut occupied) => {
-                                        occupied.get_mut().default_import = true;
-                                    }
-                                    Entry::Vacant(vacant) => {
-                                        vacant.insert(ResolverImport {
-                                            default_import: true,
-                                            types: vec![],
-                                        });
-                                    }
-                                }
-                                res
+                        match nested_resolver_imports.entry(resolver_field.type_and_field) {
+                            Entry::Occupied(mut occupied) => {
+                                occupied.get_mut().default_import = true;
+                            }
+                            Entry::Vacant(vacant) => {
+                                vacant.insert(ResolverImport {
+                                    default_import: true,
+                                    types: vec![],
+                                });
                             }
                         }
+                        res
                     }
                 }
             }
@@ -994,9 +989,7 @@ fn format_arguments(
     }
 }
 
-fn generate_read_out_type(
-    resolver_definition: &ValidatedSchemaResolverDefinitionInfo,
-) -> ResolverReadOutType {
+fn generate_read_out_type(resolver_definition: &ValidatedSchemaResolver) -> ResolverReadOutType {
     match resolver_definition.variant {
         Some(variant) => match variant.item {
             ResolverVariant::Component => {

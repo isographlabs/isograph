@@ -154,7 +154,7 @@ fn get_field_objects_ids_and_names(
                     description: field.item.description.map(|d| d.item),
                     name: field.item.name.item,
                     id: (next_field_id + current_field_index).into(),
-                    field_type: DefinedField::ServerField(field.item.type_),
+                    field_type: field.item.type_,
                     parent_type_id: parent_type,
                 });
                 field_ids.push((next_field_id + current_field_index).into());

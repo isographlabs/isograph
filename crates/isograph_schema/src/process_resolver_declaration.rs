@@ -2,14 +2,14 @@ use std::fmt;
 
 use common_lang_types::{
     DefinedField, IsographDirectiveName, ObjectId, ServerFieldDefinitionName, TypeId,
-    TypeWithFieldsId, TypeWithFieldsName, UnvalidatedTypeName, WithSpan,
+    TypeWithFieldsName, UnvalidatedTypeName, WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{FragmentDirectiveUsage, ResolverDeclaration};
 use lazy_static::lazy_static;
 use thiserror::Error;
 
-use crate::{SchemaResolverDefinitionInfo, SchemaServerField, UnvalidatedSchema};
+use crate::{SchemaResolver, UnvalidatedSchema};
 
 impl UnvalidatedSchema {
     pub fn process_resolver_declaration(
@@ -42,10 +42,10 @@ impl UnvalidatedSchema {
 
     fn add_resolver_field_to_object(
         &mut self,
-        object: ObjectId,
+        parent_object_id: ObjectId,
         resolver_declaration: WithSpan<ResolverDeclaration>,
     ) -> ProcessResolverDeclarationResult<()> {
-        let object = &mut self.schema_data.objects[object.as_usize()];
+        let object = &mut self.schema_data.objects[parent_object_id.as_usize()];
         let resolver_field_name = resolver_declaration.item.resolver_field_name.item;
 
         if object
@@ -64,8 +64,8 @@ impl UnvalidatedSchema {
             });
         }
 
-        let next_field_id = self.fields.len().into();
-        object.fields.push(next_field_id);
+        let next_resolver_id = self.resolvers.len().into();
+        object.resolvers.push(next_resolver_id);
 
         let name = resolver_declaration.item.resolver_field_name.item.into();
         let variant = get_resolver_variant(&resolver_declaration.item.directives);
@@ -78,21 +78,18 @@ impl UnvalidatedSchema {
             }
         }
 
-        self.fields.push(SchemaServerField {
+        self.resolvers.push(SchemaResolver {
             description: resolver_declaration.item.description.map(|d| d.item),
             name,
-            id: next_field_id,
-            field_type: DefinedField::ResolverField(SchemaResolverDefinitionInfo {
-                resolver_definition_path: resolver_declaration.item.resolver_definition_path,
-                selection_set_and_unwraps: resolver_declaration.item.selection_set_and_unwraps,
-                field_id: next_field_id,
-                variant,
-                is_fetchable: is_fetchable(&resolver_declaration.item.directives),
-                variable_definitions: resolver_declaration.item.variable_definitions,
-                type_and_field: format!("{}__{}", object.name, name).intern().into(),
-                has_associated_js_function,
-            }),
-            parent_type_id: TypeWithFieldsId::Object(object.id),
+            id: next_resolver_id,
+            resolver_definition_path: resolver_declaration.item.resolver_definition_path,
+            selection_set_and_unwraps: resolver_declaration.item.selection_set_and_unwraps,
+            variant,
+            is_fetchable: is_fetchable(&resolver_declaration.item.directives),
+            variable_definitions: resolver_declaration.item.variable_definitions,
+            type_and_field: format!("{}__{}", object.name, name).intern().into(),
+            has_associated_js_function,
+            parent_object_id,
         });
         Ok(())
     }

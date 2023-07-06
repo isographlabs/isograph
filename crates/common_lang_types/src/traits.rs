@@ -1,4 +1,7 @@
-use crate::TypeWithoutFieldsId;
+use crate::{
+    FieldNameOrAlias, ServerFieldDefinitionName, TypeAndField, TypeWithFieldsName,
+    TypeWithoutFieldsId,
+};
 
 pub trait HasName {
     type Name;
@@ -7,6 +10,7 @@ pub trait HasName {
 
 /// A trait that constrains the types that are valid in a TypeAnnotation.
 /// TypeNames and TypeIds are valid types for a TypeAnnotation.
+/// TODO this trait should be removed
 pub trait ValidTypeAnnotationInnerType {}
 
 /// Distinguishes between server fields and locally-defined resolver fields.
@@ -47,7 +51,7 @@ pub trait ValidScalarFieldType {}
 impl ValidScalarFieldType for () {}
 
 // TODO move to another crate
-impl ValidScalarFieldType for DefinedField<TypeWithoutFieldsId, ()> {}
+impl ValidScalarFieldType for DefinedField<TypeWithoutFieldsId, (FieldNameOrAlias, TypeAndField)> {}
 
 // /// Used to constrain the valid types that a LinkedFieldSelection can have to
 // /// LinkedFieldName (for unvalidated linked field selections) and TypeWithFieldsId

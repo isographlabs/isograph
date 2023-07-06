@@ -1,10 +1,11 @@
 use std::fmt;
 
 use common_lang_types::{
-    DescriptionValue, FieldArgumentName, FieldNameOrAlias, HasName, IsographDirectiveName,
-    LinkedFieldAlias, LinkedFieldName, ResolverDefinitionPath, ScalarFieldAlias, ScalarFieldName,
-    ServerFieldDefinitionName, UnvalidatedTypeName, ValidLinkedFieldType, ValidScalarFieldType,
-    ValidTypeAnnotationInnerType, VariableName, WithSpan,
+    DefinedField, DescriptionValue, FieldArgumentName, FieldNameOrAlias, HasName,
+    IsographDirectiveName, LinkedFieldAlias, LinkedFieldName, ResolverDefinitionPath,
+    ScalarFieldAlias, ScalarFieldName, ServerFieldDefinitionName, TypeAndField, TypeWithFieldsId,
+    TypeWithFieldsName, TypeWithoutFieldsId, UnvalidatedTypeName, ValidLinkedFieldType,
+    ValidScalarFieldType, ValidTypeAnnotationInnerType, VariableName, WithSpan,
 };
 use graphql_lang_types::TypeAnnotation;
 
@@ -34,6 +35,13 @@ pub struct FragmentDirectiveUsage {
 pub enum Selection<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType> {
     ServerField(ServerFieldSelection<TScalarField, TLinkedField>),
     // FieldGroup(FieldGroupSelection),
+}
+impl ValidScalarFieldType
+    for Selection<
+        DefinedField<TypeWithoutFieldsId, (FieldNameOrAlias, TypeAndField)>,
+        TypeWithFieldsId,
+    >
+{
 }
 
 impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
