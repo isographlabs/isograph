@@ -11,7 +11,7 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    EncounteredTypeId, InputTypeId, ObjectId, OutputTypeId, ResolverFieldId, ScalarId, Selection,
+    DefinedTypeId, InputTypeId, ObjectId, OutputTypeId, ResolverFieldId, ScalarId, Selection,
     ServerFieldId, TypeWithFieldsId, Unwrap, VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -85,7 +85,7 @@ pub struct SchemaData<TEncounteredField> {
     pub objects: Vec<SchemaObject<TEncounteredField>>,
     pub scalars: Vec<SchemaScalar>,
     // enums, unions, interfaces, input objects
-    pub defined_types: HashMap<UnvalidatedTypeName, EncounteredTypeId>,
+    pub defined_types: HashMap<UnvalidatedTypeName, DefinedTypeId>,
 }
 
 impl<TServerType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
@@ -195,15 +195,12 @@ impl<TEncounteredField> SchemaData<TEncounteredField> {
             .expect("Invalid ScalarId")
     }
 
-    pub fn lookup_unvalidated_type(
-        &self,
-        type_id: EncounteredTypeId,
-    ) -> SchemaType<TEncounteredField> {
+    pub fn lookup_unvalidated_type(&self, type_id: DefinedTypeId) -> SchemaType<TEncounteredField> {
         match type_id {
-            EncounteredTypeId::Object(id) => {
+            DefinedTypeId::Object(id) => {
                 SchemaType::Object(self.objects.get(id.as_usize()).unwrap())
             }
-            EncounteredTypeId::Scalar(id) => {
+            DefinedTypeId::Scalar(id) => {
                 SchemaType::Scalar(self.scalars.get(id.as_usize()).unwrap())
             }
         }
@@ -240,7 +237,7 @@ impl<TEncounteredField> SchemaData<TEncounteredField> {
 
 fn add_schema_defined_scalar_type(
     scalars: &mut Vec<SchemaScalar>,
-    defined_types: &mut HashMap<UnvalidatedTypeName, EncounteredTypeId>,
+    defined_types: &mut HashMap<UnvalidatedTypeName, DefinedTypeId>,
     field_name: &'static str,
     javascript_name: JavascriptName,
 ) -> ScalarId {
@@ -253,7 +250,7 @@ fn add_schema_defined_scalar_type(
         id: scalar_id,
         javascript_name,
     });
-    defined_types.insert(typename.into(), EncounteredTypeId::Scalar(scalar_id.into()));
+    defined_types.insert(typename.into(), DefinedTypeId::Scalar(scalar_id.into()));
     scalar_id
 }
 

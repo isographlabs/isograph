@@ -31,22 +31,22 @@ pub enum InputTypeId {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
-pub enum EncounteredTypeId {
+pub enum DefinedTypeId {
     Object(ObjectId),
     Scalar(ScalarId),
 }
 
-impl EncounteredTypeId {
+impl DefinedTypeId {
     pub fn as_output_type_id(self) -> Option<OutputTypeId> {
         match self {
-            EncounteredTypeId::Object(id) => Some(OutputTypeId::Object(id)),
-            EncounteredTypeId::Scalar(id) => Some(OutputTypeId::Scalar(id)),
+            DefinedTypeId::Object(id) => Some(OutputTypeId::Object(id)),
+            DefinedTypeId::Scalar(id) => Some(OutputTypeId::Scalar(id)),
         }
     }
 
     pub fn as_input_type_id(self) -> Option<InputTypeId> {
         match self {
-            EncounteredTypeId::Scalar(id) => Some(InputTypeId::Scalar(id)),
+            DefinedTypeId::Scalar(id) => Some(InputTypeId::Scalar(id)),
             _ => None,
         }
     }

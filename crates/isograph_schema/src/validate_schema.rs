@@ -7,7 +7,7 @@ use common_lang_types::{
 use graphql_lang_types::TypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    EncounteredTypeId, InputTypeId, LinkedFieldSelection, OutputTypeId, ResolverFieldId,
+    DefinedTypeId, InputTypeId, LinkedFieldSelection, OutputTypeId, ResolverFieldId,
     ScalarFieldSelection, ScalarId, Selection, ServerFieldId, TypeWithFieldsId, VariableDefinition,
 };
 use thiserror::Error;
@@ -437,7 +437,7 @@ fn validate_field_type_exists_and_is_scalar(
                     .get(server_field_name.inner())
                     .expect("Expected field type to be defined, which I think was validated earlier, probably indicates a bug in Isograph");
                 match field_type_id {
-                    EncounteredTypeId::Scalar(scalar_id) => Ok(ScalarFieldSelection {
+                    DefinedTypeId::Scalar(scalar_id) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
                         field: DefinedField::ServerField(scalar_id),
                         reader_alias: scalar_field_selection.reader_alias,
@@ -445,7 +445,7 @@ fn validate_field_type_exists_and_is_scalar(
                         unwraps: scalar_field_selection.unwraps,
                         arguments: scalar_field_selection.arguments,
                     }),
-                    EncounteredTypeId::Object(_) => Err(
+                    DefinedTypeId::Object(_) => Err(
                         ValidateSelectionsError::FieldSelectedAsScalarButTypeIsNotScalar {
                             field_parent_type_name: parent_type.name(),
                             field_name: scalar_field_name,
@@ -502,7 +502,7 @@ fn validate_field_type_exists_and_is_linked(
                     .get(server_field_name.inner())
                     .expect("Expected field type to be defined, which I think was validated earlier, probably indicates a bug in Isograph");
                     match field_type_id {
-                        EncounteredTypeId::Scalar(_) => Err(
+                        DefinedTypeId::Scalar(_) => Err(
                             ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsScalar {
                                 field_parent_type_name: parent_type.name(),
                                 field_name: linked_field_name,
@@ -510,7 +510,7 @@ fn validate_field_type_exists_and_is_linked(
                                 target_type_name: *server_field_name.inner(),
                             },
                         ),
-                        EncounteredTypeId::Object(object_id) => {
+                        DefinedTypeId::Object(object_id) => {
                             let object = schema_data.objects.get(object_id.as_usize()).unwrap();
                             Ok(LinkedFieldSelection {
                             name: linked_field_selection.name,
