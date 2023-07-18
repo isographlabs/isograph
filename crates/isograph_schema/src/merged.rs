@@ -8,7 +8,7 @@ use isograph_lang_types::{
     SelectionFieldArgument, ServerFieldSelection,
 };
 
-use crate::{SchemaTypeWithFields, ValidatedDefinedField, ValidatedSchema, ValidatedSelection};
+use crate::{SchemaObject, ValidatedDefinedField, ValidatedSchema, ValidatedSelection};
 
 pub type MergedSelection = Selection<ScalarId, ObjectId>;
 pub type MergedSelectionSet = Vec<WithSpan<MergedSelection>>;
@@ -21,7 +21,7 @@ pub type MergedSelectionSet = Vec<WithSpan<MergedSelection>>;
 /// TODO: SelectionSetAndUnwraps should be generic enough to handle this
 pub fn merge_selection_set(
     schema: &ValidatedSchema,
-    parent_type: SchemaTypeWithFields<ValidatedDefinedField>,
+    parent_type: &SchemaObject<ValidatedDefinedField>,
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
 ) -> MergedSelectionSet {
     let mut merged_selection_set = HashMap::new();
@@ -44,7 +44,7 @@ pub fn merge_selection_set(
 fn merge_selections_into_set(
     schema: &ValidatedSchema,
     merged_selection_set: &mut HashMap<NormalizationKey, WithSpan<MergedSelection>>,
-    parent_type: SchemaTypeWithFields<ValidatedDefinedField>,
+    parent_type: &SchemaObject<ValidatedDefinedField>,
     validated_selections: &Vec<WithSpan<ValidatedSelection>>,
 ) {
     for validated_selection in validated_selections.iter() {
@@ -85,7 +85,7 @@ fn merge_selections_into_set(
                         DefinedField::ResolverField(_) => {
                             let resolver_field_name = scalar_field.name.item;
                             let parent_field_id = parent_type
-                                .resolvers()
+                                .resolvers
                                 .iter()
                                 .find(|parent_field_id| {
                                     let field = schema.resolver(**parent_field_id);
@@ -210,7 +210,7 @@ fn HACK__merge_linked_fields(
     schema: &ValidatedSchema,
     existing_selection_set: &mut Vec<WithSpan<MergedSelection>>,
     new_selection_set: &Vec<WithSpan<ValidatedSelection>>,
-    linked_field_parent_type: SchemaTypeWithFields<'_, ValidatedDefinedField>,
+    linked_field_parent_type: &SchemaObject<ValidatedDefinedField>,
 ) {
     let mut merged_selection_set = HashMap::new();
     for item in existing_selection_set.iter() {

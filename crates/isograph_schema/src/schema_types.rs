@@ -173,11 +173,8 @@ impl UnvalidatedSchema {
 }
 
 impl<TEncounteredField> SchemaData<TEncounteredField> {
-    pub fn lookup_type_with_fields(
-        &self,
-        object_id: ObjectId,
-    ) -> SchemaTypeWithFields<TEncounteredField> {
-        SchemaTypeWithFields::Object(&self.objects[object_id.as_usize()])
+    pub fn lookup_type_with_fields(&self, object_id: ObjectId) -> &SchemaObject<TEncounteredField> {
+        &self.objects[object_id.as_usize()]
     }
 
     pub fn lookup_type_without_fields(&self, scalar_id: ScalarId) -> &SchemaScalar {
@@ -249,68 +246,11 @@ fn add_schema_defined_scalar_type(
     scalar_id
 }
 
-// TODO this type should not exist, it is simply a SchemaObject
-#[derive(Debug)]
-pub enum SchemaTypeWithFields<'a, TEncounteredField> {
-    Object(&'a SchemaObject<TEncounteredField>),
-}
-
-impl<'a, TEncounteredField> Copy for SchemaTypeWithFields<'a, TEncounteredField> {}
-impl<'a, TEncounteredField> Clone for SchemaTypeWithFields<'a, TEncounteredField> {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Object(arg0) => Self::Object(arg0),
-        }
-    }
-}
-
-pub type UnvalidatedSchemaTypeWithFields<'a> = SchemaTypeWithFields<'a, UnvalidatedObjectFieldInfo>;
-
-impl<'a, TEncounteredField> From<&'a SchemaObject<TEncounteredField>>
-    for SchemaTypeWithFields<'a, TEncounteredField>
-{
-    fn from(object: &'a SchemaObject<TEncounteredField>) -> Self {
-        SchemaTypeWithFields::Object(object)
-    }
-}
-
-impl<'a, TEncounteredField> SchemaTypeWithFields<'a, TEncounteredField> {
-    pub fn encountered_field_names(
-        &self,
-    ) -> &HashMap<ServerFieldDefinitionName, TEncounteredField> {
-        match self {
-            SchemaTypeWithFields::Object(object) => &object.encountered_field_names,
-        }
-    }
-
-    pub fn fields(&self) -> &[ServerFieldId] {
-        match self {
-            SchemaTypeWithFields::Object(object) => &object.fields,
-        }
-    }
-
-    pub fn resolvers(&self) -> &[ResolverFieldId] {
-        match self {
-            SchemaTypeWithFields::Object(object) => &object.resolvers,
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 pub enum SchemaType<'a, TEncounteredField> {
     Object(&'a SchemaObject<TEncounteredField>),
     Scalar(&'a SchemaScalar),
     // Includes input object
-}
-
-impl<'a, TEncounteredField> HasName for SchemaTypeWithFields<'a, TEncounteredField> {
-    type Name = IsographObjectTypeName;
-
-    fn name(&self) -> Self::Name {
-        match self {
-            SchemaTypeWithFields::Object(object) => object.name.into(),
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug)]

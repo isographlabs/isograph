@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    DefinedField, FieldNameOrAlias, HasName, IsographObjectTypeName, ServerFieldDefinitionName,
+    DefinedField, FieldNameOrAlias, IsographObjectTypeName, ServerFieldDefinitionName,
     TypeAndField, UnvalidatedTypeName, VariableName, WithSpan,
 };
 use graphql_lang_types::TypeAnnotation;
@@ -13,9 +13,9 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    Schema, SchemaData, SchemaObject, SchemaResolver, SchemaServerField, SchemaTypeWithFields,
+    Schema, SchemaData, SchemaObject, SchemaResolver, SchemaServerField,
     UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData, UnvalidatedSchemaField,
-    UnvalidatedSchemaResolver, UnvalidatedSchemaTypeWithFields,
+    UnvalidatedSchemaResolver,
 };
 
 pub type ValidatedSchemaField = SchemaServerField<TypeAnnotation<OutputTypeId>>;
@@ -178,7 +178,7 @@ fn validate_server_field_type_exists_and_is_output_type(
             type_id.as_output_type_id().ok_or_else(|| {
                 let parent_type = schema_data.lookup_type_with_fields(field.parent_type_id);
                 ValidateSchemaError::FieldTypenameIsInputObject {
-                    parent_type_name: parent_type.name(),
+                    parent_type_name: parent_type.name,
                     field_name: field.name,
                     field_type: *server_field_type.inner(),
                 }
@@ -187,7 +187,7 @@ fn validate_server_field_type_exists_and_is_output_type(
         None => Err(ValidateSchemaError::FieldTypenameDoesNotExist {
             parent_type_name: schema_data
                 .lookup_type_with_fields(field.parent_type_id)
-                .name(),
+                .name,
             field_name: field.name,
             field_type: *server_field_type.inner(),
         }),
@@ -292,13 +292,13 @@ fn validate_variable_definitions(
 
 fn validate_selections_error_to_validate_schema_error(
     err: ValidateSelectionsError,
-    parent_type: UnvalidatedSchemaTypeWithFields,
+    parent_type: &SchemaObject<UnvalidatedObjectFieldInfo>,
     field: &SchemaServerField<()>,
 ) -> ValidateSchemaError {
     match err {
         ValidateSelectionsError::FieldDoesNotExist(field_parent_type_name, field_name) => {
             ValidateSchemaError::ResolverSelectionFieldDoesNotExist {
-                resolver_parent_type_name: parent_type.name(),
+                resolver_parent_type_name: parent_type.name,
                 resolver_field_name: field.name,
                 field_parent_type_name,
                 field_name,
@@ -310,7 +310,7 @@ fn validate_selections_error_to_validate_schema_error(
             target_type,
             target_type_name,
         } => ValidateSchemaError::ResolverSelectionFieldIsNotScalar {
-            resolver_parent_type_name: parent_type.name(),
+            resolver_parent_type_name: parent_type.name,
             resolver_field_name: field.name,
             field_parent_type_name: parent_type_name,
             field_name,
@@ -323,7 +323,7 @@ fn validate_selections_error_to_validate_schema_error(
             target_type,
             target_type_name,
         } => ValidateSchemaError::ResolverSelectionFieldIsScalar {
-            resolver_parent_type_name: parent_type.name(),
+            resolver_parent_type_name: parent_type.name,
             resolver_field_name: field.name,
             field_parent_type_name,
             field_name,
@@ -334,7 +334,7 @@ fn validate_selections_error_to_validate_schema_error(
             field_parent_type_name,
             field_name,
         } => ValidateSchemaError::ResolverSelectionFieldIsResolver {
-            resolver_parent_type_name: parent_type.name(),
+            resolver_parent_type_name: parent_type.name,
             resolver_field_name: field.name,
             field_parent_type_name,
             field_name,
@@ -368,7 +368,7 @@ enum ValidateSelectionsError {
 fn validate_resolver_definition_selections_exist_and_types_match(
     schema_data: &UnvalidatedSchemaData,
     selection_set: Vec<WithSpan<Selection<(), ()>>>,
-    parent_type: UnvalidatedSchemaTypeWithFields,
+    parent_type: &SchemaObject<UnvalidatedObjectFieldInfo>,
 ) -> ValidateSelectionsResult<Vec<WithSpan<ValidatedSelection>>> {
     // Currently, we only check that each field exists and has an appropriate type, not that
     // there are no selection conflicts due to aliases or parameters.
@@ -387,7 +387,7 @@ fn validate_resolver_definition_selections_exist_and_types_match(
 
 fn validate_resolver_definition_selection_exists_and_type_matches(
     selection: WithSpan<Selection<(), ()>>,
-    parent_type: UnvalidatedSchemaTypeWithFields,
+    parent_type: &SchemaObject<UnvalidatedObjectFieldInfo>,
     schema_data: &UnvalidatedSchemaData,
 ) -> ValidateSelectionsResult<WithSpan<ValidatedSelection>> {
     selection.and_then(|selection| {
@@ -395,7 +395,7 @@ fn validate_resolver_definition_selection_exists_and_type_matches(
             field_selection.and_then(
                 &mut |scalar_field_selection| {
                     validate_field_type_exists_and_is_scalar(
-                        parent_type.encountered_field_names(),
+                        &parent_type.encountered_field_names,
                         schema_data,
                         parent_type,
                         scalar_field_selection,
@@ -403,7 +403,7 @@ fn validate_resolver_definition_selection_exists_and_type_matches(
                 },
                 &mut |linked_field_selection| {
                     validate_field_type_exists_and_is_linked(
-                        parent_type.encountered_field_names(),
+                        &parent_type.encountered_field_names,
                         schema_data,
                         parent_type,
                         linked_field_selection,
@@ -419,7 +419,7 @@ fn validate_resolver_definition_selection_exists_and_type_matches(
 fn validate_field_type_exists_and_is_scalar(
     parent_encountered_fields: &HashMap<ServerFieldDefinitionName, UnvalidatedObjectFieldInfo>,
     schema_data: &UnvalidatedSchemaData,
-    parent_type: UnvalidatedSchemaTypeWithFields,
+    parent_type: &SchemaObject<UnvalidatedObjectFieldInfo>,
     scalar_field_selection: ScalarFieldSelection<()>,
 ) -> ValidateSelectionsResult<
     ScalarFieldSelection<DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>>,
@@ -443,7 +443,7 @@ fn validate_field_type_exists_and_is_scalar(
                     }),
                     DefinedTypeId::Object(_) => Err(
                         ValidateSelectionsError::FieldSelectedAsScalarButTypeIsNotScalar {
-                            field_parent_type_name: parent_type.name(),
+                            field_parent_type_name: parent_type.name,
                             field_name: scalar_field_name,
                             target_type: "an object",
                             target_type_name: *server_field_name.inner(),
@@ -459,7 +459,7 @@ fn validate_field_type_exists_and_is_scalar(
                     unwraps: scalar_field_selection.unwraps,
                     field: DefinedField::ResolverField((
                         (*resolver_name).into(),
-                        format!("{}__{}", parent_type.name(), resolver_name)
+                        format!("{}__{}", parent_type.name, resolver_name)
                             .intern()
                             .into(),
                     )),
@@ -469,7 +469,7 @@ fn validate_field_type_exists_and_is_scalar(
             }
         },
         None => Err(ValidateSelectionsError::FieldDoesNotExist(
-            parent_type.name(),
+            parent_type.name,
             scalar_field_name,
         )),
     }
@@ -480,7 +480,7 @@ fn validate_field_type_exists_and_is_scalar(
 fn validate_field_type_exists_and_is_linked(
     parent_fields: &HashMap<ServerFieldDefinitionName, UnvalidatedObjectFieldInfo>,
     schema_data: &UnvalidatedSchemaData,
-    parent_type: UnvalidatedSchemaTypeWithFields,
+    parent_type: &SchemaObject<UnvalidatedObjectFieldInfo>,
     linked_field_selection: LinkedFieldSelection<(), ()>,
 ) -> ValidateSelectionsResult<
     LinkedFieldSelection<DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>, ObjectId>,
@@ -497,7 +497,7 @@ fn validate_field_type_exists_and_is_linked(
                     match field_type_id {
                         DefinedTypeId::Scalar(_) => Err(
                             ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsScalar {
-                                field_parent_type_name: parent_type.name(),
+                                field_parent_type_name: parent_type.name,
                                 field_name: linked_field_name,
                                 target_type: "a scalar",
                                 target_type_name: *server_field_name.inner(),
@@ -513,7 +513,7 @@ fn validate_field_type_exists_and_is_linked(
                                     |selection| {
                                         validate_resolver_definition_selection_exists_and_type_matches(
                                             selection,
-                                            SchemaTypeWithFields::Object(object),
+                                            object,
                                             schema_data,
                                         )
                                     },
@@ -527,14 +527,14 @@ fn validate_field_type_exists_and_is_linked(
                 }
                 DefinedField::ResolverField(_) => Err(
                     ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsResolver {
-                        field_parent_type_name: parent_type.name(),
+                        field_parent_type_name: parent_type.name,
                         field_name: linked_field_name,
                     },
                 ),
             }
         }
         None => Err(ValidateSelectionsError::FieldDoesNotExist(
-            parent_type.name(),
+            parent_type.name,
             linked_field_name,
         )),
     }
