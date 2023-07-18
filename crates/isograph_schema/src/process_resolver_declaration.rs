@@ -1,8 +1,8 @@
 use std::fmt;
 
 use common_lang_types::{
-    DefinedField, IsographDirectiveName, ObjectId, ServerFieldDefinitionName, TypeId,
-    TypeWithFieldsName, UnvalidatedTypeName, WithSpan,
+    DefinedField, IsographDirectiveName, IsographObjectTypeName, ObjectId,
+    ServerFieldDefinitionName, TypeId, UnvalidatedTypeName, WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{FragmentDirectiveUsage, ResolverDeclaration};
@@ -115,7 +115,7 @@ pub enum ProcessResolverDeclarationError {
     )]
     ParentAlreadyHasField {
         parent_type: &'static str,
-        parent_type_name: TypeWithFieldsName,
+        parent_type_name: IsographObjectTypeName,
         resolver_field_name: ServerFieldDefinitionName,
     },
 

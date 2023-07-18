@@ -1,14 +1,17 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    DefinedField, DescriptionValue, HasName, InputTypeId, InputTypeName, JavascriptName, ObjectId,
-    ObjectTypeName, OutputTypeId, OutputTypeName, ResolverDefinitionPath, ResolverFieldId,
-    ScalarFieldName, ScalarId, ScalarTypeName, ServerFieldDefinitionName, ServerFieldId,
-    TypeAndField, TypeId, TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId,
+    DefinedField, DescriptionValue, HasName, InputTypeId, InputTypeName, InterfaceTypeName,
+    IsographObjectTypeName, JavascriptName, ObjectId, OutputTypeId, ResolverDefinitionPath,
+    ResolverFieldId, ScalarFieldName, ScalarId, ScalarTypeName, ServerFieldDefinitionName,
+    ServerFieldId, TypeAndField, TypeId, TypeWithFieldsId, TypeWithoutFieldsId,
     TypeWithoutFieldsName, UnvalidatedTypeName, ValidLinkedFieldType, ValidScalarFieldType,
     ValidTypeAnnotationInnerType, WithSpan,
 };
-use graphql_lang_types::TypeAnnotation;
+use graphql_lang_types::{
+    ConstantValue, Directive, InterfaceTypeDefinition, ObjectTypeDefinition, OutputFieldDefinition,
+    TypeAnnotation,
+};
 use intern::string_key::Intern;
 use isograph_lang_types::{Selection, Unwrap, VariableDefinition};
 use lazy_static::lazy_static;
@@ -258,6 +261,7 @@ fn add_schema_defined_scalar_type(
     scalar_id
 }
 
+// TODO this type should not exist, it is simply a SchemaObject
 #[derive(Debug)]
 pub enum SchemaTypeWithFields<'a, TEncounteredField> {
     Object(&'a SchemaObject<TEncounteredField>),
@@ -312,7 +316,7 @@ pub enum SchemaType<'a, TEncounteredField> {
 }
 
 impl<'a, TEncounteredField> HasName for SchemaTypeWithFields<'a, TEncounteredField> {
-    type Name = TypeWithFieldsName;
+    type Name = IsographObjectTypeName;
 
     fn name(&self) -> Self::Name {
         match self {
@@ -326,17 +330,6 @@ pub enum SchemaOutputType<'a, TEncounteredField> {
     Object(&'a SchemaObject<TEncounteredField>),
     Scalar(&'a SchemaScalar),
     // excludes input object
-}
-
-impl<'a, TEncounteredField> HasName for SchemaOutputType<'a, TEncounteredField> {
-    type Name = OutputTypeName;
-
-    fn name(&self) -> Self::Name {
-        match self {
-            SchemaOutputType::Object(object) => object.name.into(),
-            SchemaOutputType::Scalar(scalar) => scalar.name.into(),
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -380,19 +373,61 @@ impl<'schema> SchemaTypeWithoutFields<'schema> {
     }
 }
 
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub struct IsographObjectTypeDefinition {
+    pub description: Option<WithSpan<DescriptionValue>>,
+    pub name: WithSpan<IsographObjectTypeName>,
+    // maybe this should be Vec<WithSpan<IsographObjectTypeName>>>
+    pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
+    pub directives: Vec<Directive<ConstantValue>>,
+    pub fields: Vec<WithSpan<OutputFieldDefinition>>,
+}
+
+impl From<ObjectTypeDefinition> for IsographObjectTypeDefinition {
+    fn from(value: ObjectTypeDefinition) -> Self {
+        Self {
+            description: value.description,
+            name: value.name.map(|x| x.into()),
+            interfaces: value.interfaces,
+            directives: value.directives,
+            fields: value.fields,
+        }
+    }
+}
+
+impl From<InterfaceTypeDefinition> for IsographObjectTypeDefinition {
+    fn from(value: InterfaceTypeDefinition) -> Self {
+        Self {
+            description: value.description,
+            name: value.name.map(|x| x.into()),
+            interfaces: value.interfaces,
+            directives: value.directives,
+            fields: value.fields,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct SchemaObject<TEncounteredField> {
     pub description: Option<DescriptionValue>,
-    pub name: ObjectTypeName,
+    pub name: IsographObjectTypeName,
     pub id: ObjectId,
     // pub interfaces: Vec<InterfaceTypeName>,
     // pub directives: Vec<Directive<ConstantValue>>,
     pub fields: Vec<ServerFieldId>,
     pub resolvers: Vec<ResolverFieldId>,
     pub encountered_field_names: HashMap<ServerFieldDefinitionName, TEncounteredField>,
+    pub valid_refinements: Vec<ValidRefinement>,
 }
 // Unvalidated => TScalarField: TypeAnnotation<UnvalidatedTypeName>,
 // Validated => FieldId
+
+/// In GraphQL, ValidRefinement's are essentially the concrete types that an interface or
+/// union can be narrowed to. valid_refinements should be empty for concrete types.
+#[derive(Debug)]
+pub struct ValidRefinement {
+    concrete_type: ObjectId,
+}
 
 #[derive(Debug)]
 pub struct SchemaServerField<T> {

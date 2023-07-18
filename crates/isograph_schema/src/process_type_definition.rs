@@ -1,24 +1,24 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    DefinedField, ObjectTypeName, OutputTypeName, ScalarFieldName, ServerFieldDefinitionName,
+    DefinedField, IsographObjectTypeName, ScalarFieldName, ServerFieldDefinitionName,
     ServerFieldId, TypeId, TypeWithFieldsId, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
-    InterfaceTypeDefinition, ObjectTypeDefinition, OutputFieldDefinition, ScalarTypeDefinition,
-    TypeAnnotation, TypeSystemDefinition, TypeSystemDocument,
+    OutputFieldDefinition, ScalarTypeDefinition, TypeAnnotation, TypeSystemDefinition,
+    TypeSystemDocument,
 };
 use intern::string_key::Intern;
 use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    Schema, SchemaObject, SchemaScalar, SchemaServerField, UnvalidatedSchema,
-    UnvalidatedSchemaField, STRING_JAVASCRIPT_TYPE,
+    IsographObjectTypeDefinition, Schema, SchemaObject, SchemaScalar, SchemaServerField,
+    UnvalidatedSchema, UnvalidatedSchemaField, STRING_JAVASCRIPT_TYPE,
 };
 
 lazy_static! {
-    static ref QUERY_TYPE: ObjectTypeName = "Query".intern().into();
+    static ref QUERY_TYPE: IsographObjectTypeName = "Query".intern().into();
 }
 
 impl UnvalidatedSchema {
@@ -26,25 +26,62 @@ impl UnvalidatedSchema {
         &mut self,
         type_system_document: TypeSystemDocument,
     ) -> ProcessTypeDefinitionResult<()> {
+        // In the schema, interfaces, unions and objects are the same type of object (SchemaType),
+        // with e.g. interfaces "simply" being objects that can be refined to other
+        // concrete objects.
+        //
+        // Processing type system documents is done in two passes:
+        // - First, create types for interfaces, objects, scalars, etc.
+        // - Then, validate that all implemented interfaces exist, and add refinements
+        //   to the found interface.
+        //
+        let mut valid_type_refinement_map = HashMap::new();
+
         for type_system_definition in type_system_document.0 {
             match type_system_definition {
                 TypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
-                    self.process_object_type_definition(object_type_definition)?;
+                    self.process_object_type_definition(
+                        object_type_definition.into(),
+                        &mut valid_type_refinement_map,
+                    )?;
                 }
                 TypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
                     self.process_scalar_definition(scalar_type_definition)?;
                 }
                 TypeSystemDefinition::InterfaceTypeDefinition(interface_type_definition) => {
-                    self.process_interface_type_definition(interface_type_definition)?;
+                    self.process_object_type_definition(
+                        interface_type_definition.into(),
+                        &mut valid_type_refinement_map,
+                    )?;
                 }
             }
         }
+
+        for (supertype_id, subtypes) in valid_type_refinement_map {
+            // supertype, if it exists, can be refined to each subtype
+            let supertype_id = self
+                .schema_data
+                .defined_types
+                .get(&supertype_id.into())
+                .ok_or(
+                    ProcessTypeDefinitionError::IsographObjectTypeNameNotDefined {
+                        type_name: supertype_id,
+                    },
+                )?;
+
+            // TODO modify supertype
+        }
+
         Ok(())
     }
 
     fn process_object_type_definition(
         &mut self,
-        object_type_definition: ObjectTypeDefinition,
+        type_definition: IsographObjectTypeDefinition,
+        valid_type_refinement_map: &mut HashMap<
+            IsographObjectTypeName,
+            Vec<WithSpan<IsographObjectTypeName>>,
+        >,
     ) -> ProcessTypeDefinitionResult<()> {
         let &mut Schema {
             fields: ref mut existing_fields,
@@ -54,36 +91,39 @@ impl UnvalidatedSchema {
         let next_object_id = schema_data.objects.len().into();
         let ref mut type_names = schema_data.defined_types;
         let ref mut objects = schema_data.objects;
-        match type_names.entry(object_type_definition.name.item.into()) {
+        match type_names.entry(type_definition.name.item.into()) {
             Entry::Occupied(_) => {
                 return Err(ProcessTypeDefinitionError::DuplicateTypeDefinition {
                     type_definition_type: "object",
-                    type_name: object_type_definition.name.item.into(),
+                    type_name: type_definition.name.item.into(),
                 });
             }
             Entry::Vacant(vacant) => {
                 let (new_fields, server_field_ids, encountered_field_names) =
                     get_field_objects_ids_and_names(
-                        object_type_definition.fields,
+                        type_definition.fields,
                         existing_fields.len(),
                         TypeWithFieldsId::Object(next_object_id),
-                        object_type_definition.name.item.into(),
+                        type_definition.name.item.into(),
                     )?;
                 objects.push(SchemaObject {
-                    description: object_type_definition.description.map(|d| d.item),
-                    name: object_type_definition.name.item,
+                    description: type_definition.description.map(|d| d.item),
+                    name: type_definition.name.item,
                     id: next_object_id,
                     fields: server_field_ids,
                     // Resolvers are not defined until we process iso literals. They're not contained in
                     // the schema definition.
                     resolvers: vec![],
                     encountered_field_names,
+                    valid_refinements: vec![],
                 });
 
                 // ----- HACK -----
                 // This should mutate a default query object; only if no schema declaration is ultimately
                 // encountered should we use the default query object.
-                if object_type_definition.name.item == *QUERY_TYPE {
+                //
+                // Also, this is a GraphQL concept, but it's leaking into Isograph land :/
+                if type_definition.name.item == *QUERY_TYPE {
                     self.query_type_id = Some(next_object_id);
                 }
                 // --- END HACK ---
@@ -92,13 +132,15 @@ impl UnvalidatedSchema {
                 vacant.insert(TypeId::Object(next_object_id));
             }
         }
-        Ok(())
-    }
 
-    fn process_interface_type_definition(
-        &mut self,
-        interface_type_definition: InterfaceTypeDefinition,
-    ) -> ProcessTypeDefinitionResult<()> {
+        for interface in type_definition.interfaces {
+            // type_definition implements interface
+            let definitions = valid_type_refinement_map
+                .entry(interface.item.into())
+                .or_default();
+            definitions.push(type_definition.name);
+        }
+
         Ok(())
     }
 
@@ -141,7 +183,7 @@ fn get_field_objects_ids_and_names(
     new_fields: Vec<WithSpan<OutputFieldDefinition>>,
     next_field_id: usize,
     parent_type: TypeWithFieldsId,
-    parent_type_name: OutputTypeName,
+    parent_type_name: IsographObjectTypeName,
 ) -> ProcessTypeDefinitionResult<(
     Vec<UnvalidatedSchemaField>,
     Vec<ServerFieldId>,
@@ -195,6 +237,10 @@ pub enum ProcessTypeDefinitionError {
     #[error("Duplicate field named \"{field_name}\" on type \"{parent_type}\"")]
     DuplicateField {
         field_name: ServerFieldDefinitionName,
-        parent_type: OutputTypeName,
+        parent_type: IsographObjectTypeName,
     },
+
+    // When type Foo implements Bar and Bar is not defined:
+    #[error("Type \"{type_name}\" is never defined.")]
+    IsographObjectTypeNameNotDefined { type_name: IsographObjectTypeName },
 }

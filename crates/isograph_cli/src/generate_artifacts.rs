@@ -7,9 +7,9 @@ use std::{
 };
 
 use common_lang_types::{
-    DefinedField, FieldNameOrAlias, HasName, OutputTypeId, QueryOperationName,
-    ResolverDefinitionPath, ServerFieldDefinitionName, TypeAndField, TypeWithFieldsId,
-    TypeWithFieldsName, TypeWithoutFieldsId, UnvalidatedTypeName, ValidTypeAnnotationInnerType,
+    DefinedField, FieldNameOrAlias, HasName, IsographObjectTypeName, OutputTypeId,
+    QueryOperationName, ResolverDefinitionPath, ServerFieldDefinitionName, TypeAndField,
+    TypeWithFieldsId, TypeWithoutFieldsId, UnvalidatedTypeName, ValidTypeAnnotationInnerType,
     WithSpan,
 };
 use graphql_lang_types::{ListTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation};
@@ -377,7 +377,7 @@ pub enum GenerateArtifactsError {
 }
 
 fn generated_file_name(
-    parent_type_name: TypeWithFieldsName,
+    parent_type_name: IsographObjectTypeName,
     field_name: ServerFieldDefinitionName,
 ) -> PathBuf {
     PathBuf::from(format!("{}__{}.isograph.tsx", parent_type_name, field_name))

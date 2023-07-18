@@ -42,9 +42,13 @@ fn parse_type_system_definition(tokens: &mut PeekableLexer) -> ParseResult<TypeS
     let identifier_source = tokens.source(identifier.span);
 
     match identifier_source {
-        "type" => parse_object_type_definition(tokens, description).map(|x| x.into()),
-        "scalar" => parse_scalar_type_definition(tokens, description).map(|x| x.into()),
-        "interface" => parse_interface_type_definition(tokens, description).map(|x| x.into()),
+        "type" => parse_object_type_definition(tokens, description).map(TypeSystemDefinition::from),
+        "scalar" => {
+            parse_scalar_type_definition(tokens, description).map(TypeSystemDefinition::from)
+        }
+        "interface" => {
+            parse_interface_type_definition(tokens, description).map(TypeSystemDefinition::from)
+        }
         _ => Err(SchemaParseError::TopLevelSchemaDeclarationExpected {
             found_text: identifier_source.to_string(),
         }),

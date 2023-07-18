@@ -32,10 +32,13 @@ impl ValidTypeAnnotationInnerType for InputTypeName {}
 //
 // Resolver parent types and field types are the only places where this should
 // be used.
+//
+// It can also be used in error messages a sort of top type name type, i.e. any type name
+// can be converted into this type name.
 string_key_newtype!(UnvalidatedTypeName);
 impl ValidTypeAnnotationInnerType for UnvalidatedTypeName {}
+string_key_conversion!(IsographObjectTypeName, UnvalidatedTypeName);
 
-string_key_newtype!(TypeWithFieldsName);
 string_key_newtype!(TypeWithoutFieldsName);
 
 string_key_newtype!(ObjectTypeName);
@@ -51,20 +54,23 @@ impl ValidTypeAnnotationInnerType for UnionTypeName {}
 string_key_newtype!(InputObjectTypeName);
 impl ValidTypeAnnotationInnerType for InputObjectTypeName {}
 
+// TODO this doesn't belong in common
+// This type represents any type with fields *in the Isograph world*.
+// TypeWithFields is a GraphQL concept, this is an Isograph concept.
+string_key_newtype!(IsographObjectTypeName);
+string_key_conversion!(ObjectTypeName, IsographObjectTypeName);
+string_key_conversion!(InterfaceTypeName, IsographObjectTypeName);
+string_key_conversion!(UnionTypeName, IsographObjectTypeName);
+
 string_key_conversion!(ObjectTypeName, OutputTypeName);
 string_key_conversion!(ScalarTypeName, OutputTypeName);
 string_key_conversion!(InterfaceTypeName, OutputTypeName);
 string_key_conversion!(EnumTypeName, OutputTypeName);
 string_key_conversion!(UnionTypeName, OutputTypeName);
-string_key_conversion!(TypeWithFieldsName, OutputTypeName);
-impl ValidTypeAnnotationInnerType for TypeWithFieldsName {}
 
 string_key_conversion!(ScalarTypeName, InputTypeName);
 string_key_conversion!(EnumTypeName, InputTypeName);
 string_key_conversion!(InputObjectTypeName, InputTypeName);
-
-string_key_conversion!(ObjectTypeName, TypeWithFieldsName);
-string_key_conversion!(InterfaceTypeName, TypeWithFieldsName);
 
 string_key_conversion!(ObjectTypeName, UnvalidatedTypeName);
 string_key_conversion!(ScalarTypeName, UnvalidatedTypeName);
@@ -74,7 +80,6 @@ string_key_conversion!(UnionTypeName, UnvalidatedTypeName);
 string_key_conversion!(InputObjectTypeName, UnvalidatedTypeName);
 string_key_conversion!(OutputTypeName, UnvalidatedTypeName);
 string_key_conversion!(InputTypeName, UnvalidatedTypeName);
-string_key_conversion!(TypeWithFieldsName, UnvalidatedTypeName);
 
 string_key_conversion!(ScalarTypeName, TypeWithoutFieldsName);
 string_key_conversion!(EnumTypeName, TypeWithoutFieldsName);

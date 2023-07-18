@@ -71,7 +71,6 @@ impl TypeId {
         }
     }
 
-    // as_type_with_fields
     // as_scalar_id
 }
 
