@@ -191,8 +191,8 @@ impl<TEncounteredField> SchemaData<TEncounteredField> {
         }
     }
 
-    pub fn lookup_type_without_fields(&self, scalar_id: ScalarId) -> SchemaTypeWithoutFields {
-        SchemaTypeWithoutFields::Scalar(self.scalar(scalar_id))
+    pub fn lookup_type_without_fields(&self, scalar_id: ScalarId) -> &SchemaScalar {
+        self.scalar(scalar_id)
     }
 
     pub fn scalar(&self, scalar_id: ScalarId) -> &SchemaScalar {
@@ -347,20 +347,6 @@ impl<'a> HasName for SchemaInputType<'a> {
     fn name(&self) -> Self::Name {
         match self {
             SchemaInputType::Scalar(x) => (x.name).into(),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum SchemaTypeWithoutFields<'a> {
-    Scalar(&'a SchemaScalar),
-    // enum
-}
-
-impl<'schema> SchemaTypeWithoutFields<'schema> {
-    pub fn javascript_name(&self) -> JavascriptName {
-        match self {
-            SchemaTypeWithoutFields::Scalar(scalar) => scalar.javascript_name,
         }
     }
 }
