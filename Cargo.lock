@@ -129,7 +129,6 @@ version = "0.0.4"
 dependencies = [
  "intern",
  "string_key_newtype",
- "u32_newtypes",
 ]
 
 [[package]]
@@ -408,6 +407,7 @@ dependencies = [
  "common_lang_types",
  "graphql_lang_types",
  "intern",
+ "u32_newtypes",
 ]
 
 [[package]]

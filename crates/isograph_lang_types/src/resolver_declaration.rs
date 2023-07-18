@@ -1,10 +1,9 @@
 use std::fmt;
 
 use common_lang_types::{
-    DefinedField, DescriptionValue, FieldArgumentName, FieldNameOrAlias, HasName,
-    IsographDirectiveName, LinkedFieldAlias, LinkedFieldName, ResolverDefinitionPath,
-    ScalarFieldAlias, ScalarFieldName, ServerFieldDefinitionName, TypeAndField, TypeWithFieldsId,
-    TypeWithoutFieldsId, UnvalidatedTypeName, ValidLinkedFieldType, ValidScalarFieldType,
+    DescriptionValue, FieldArgumentName, FieldNameOrAlias, HasName, IsographDirectiveName,
+    LinkedFieldAlias, LinkedFieldName, ResolverDefinitionPath, ScalarFieldAlias, ScalarFieldName,
+    ServerFieldDefinitionName, UnvalidatedTypeName, ValidLinkedFieldType,
     ValidTypeAnnotationInnerType, VariableName, WithSpan,
 };
 use graphql_lang_types::TypeAnnotation;
@@ -32,22 +31,13 @@ pub struct FragmentDirectiveUsage {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub enum Selection<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType> {
+pub enum Selection<TScalarField, TLinkedField: ValidLinkedFieldType> {
     ServerField(ServerFieldSelection<TScalarField, TLinkedField>),
     // FieldGroup(FieldGroupSelection),
 }
-impl ValidScalarFieldType
-    for Selection<
-        DefinedField<TypeWithoutFieldsId, (FieldNameOrAlias, TypeAndField)>,
-        TypeWithFieldsId,
-    >
-{
-}
 
-impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
-    Selection<TScalarField, TLinkedField>
-{
-    pub fn map<TNewScalarField: ValidScalarFieldType, TNewLinkedField: ValidLinkedFieldType>(
+impl<TScalarField, TLinkedField: ValidLinkedFieldType> Selection<TScalarField, TLinkedField> {
+    pub fn map<TNewScalarField, TNewLinkedField: ValidLinkedFieldType>(
         self,
         map: &mut impl FnMut(
             ServerFieldSelection<TScalarField, TLinkedField>,
@@ -58,11 +48,7 @@ impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
         }
     }
 
-    pub fn and_then<
-        TNewScalarField: ValidScalarFieldType,
-        TNewLinkedField: ValidLinkedFieldType,
-        E,
-    >(
+    pub fn and_then<TNewScalarField, TNewLinkedField: ValidLinkedFieldType, E>(
         self,
         map: &mut impl FnMut(
             ServerFieldSelection<TScalarField, TLinkedField>,
@@ -78,18 +64,15 @@ impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub enum ServerFieldSelection<
-    TScalarField: ValidScalarFieldType,
-    TLinkedField: ValidLinkedFieldType,
-> {
+pub enum ServerFieldSelection<TScalarField, TLinkedField: ValidLinkedFieldType> {
     ScalarField(ScalarFieldSelection<TScalarField>),
     LinkedField(LinkedFieldSelection<TScalarField, TLinkedField>),
 }
 
-impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
+impl<TScalarField, TLinkedField: ValidLinkedFieldType>
     ServerFieldSelection<TScalarField, TLinkedField>
 {
-    pub fn map<TNewScalarField: ValidScalarFieldType, TNewLinkedField: ValidLinkedFieldType>(
+    pub fn map<TNewScalarField, TNewLinkedField: ValidLinkedFieldType>(
         self,
         map_scalar_field: &mut impl FnMut(
             ScalarFieldSelection<TScalarField>,
@@ -109,11 +92,7 @@ impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
         }
     }
 
-    pub fn and_then<
-        TNewScalarField: ValidScalarFieldType,
-        TNewLinkedField: ValidLinkedFieldType,
-        E,
-    >(
+    pub fn and_then<TNewScalarField, TNewLinkedField: ValidLinkedFieldType, E>(
         self,
         map_scalar_field: &mut impl FnMut(
             ScalarFieldSelection<TScalarField>,
@@ -136,7 +115,7 @@ impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
     }
 }
 
-impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType> HasName
+impl<TScalarField, TLinkedField: ValidLinkedFieldType> HasName
     for ServerFieldSelection<TScalarField, TLinkedField>
 {
     type Name = ServerFieldDefinitionName;
@@ -149,7 +128,7 @@ impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType> Has
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct ScalarFieldSelection<TScalarField: ValidScalarFieldType> {
+pub struct ScalarFieldSelection<TScalarField> {
     pub name: WithSpan<ScalarFieldName>,
     pub reader_alias: Option<WithSpan<ScalarFieldAlias>>,
     pub normalization_alias: Option<WithSpan<ScalarFieldAlias>>,
@@ -158,11 +137,8 @@ pub struct ScalarFieldSelection<TScalarField: ValidScalarFieldType> {
     pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
 }
 
-impl<TScalarField: ValidScalarFieldType> ScalarFieldSelection<TScalarField> {
-    pub fn map<U: ValidScalarFieldType>(
-        self,
-        map: &mut impl FnMut(TScalarField) -> U,
-    ) -> ScalarFieldSelection<U> {
+impl<TScalarField> ScalarFieldSelection<TScalarField> {
+    pub fn map<U>(self, map: &mut impl FnMut(TScalarField) -> U) -> ScalarFieldSelection<U> {
         ScalarFieldSelection {
             name: self.name,
             reader_alias: self.reader_alias,
@@ -173,7 +149,7 @@ impl<TScalarField: ValidScalarFieldType> ScalarFieldSelection<TScalarField> {
         }
     }
 
-    pub fn and_then<U: ValidScalarFieldType, E>(
+    pub fn and_then<U, E>(
         self,
         map: &mut impl FnMut(TScalarField) -> Result<U, E>,
     ) -> Result<ScalarFieldSelection<U>, E> {
@@ -195,10 +171,7 @@ impl<TScalarField: ValidScalarFieldType> ScalarFieldSelection<TScalarField> {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct LinkedFieldSelection<
-    TScalarField: ValidScalarFieldType,
-    TLinkedField: ValidLinkedFieldType,
-> {
+pub struct LinkedFieldSelection<TScalarField, TLinkedField: ValidLinkedFieldType> {
     pub name: WithSpan<LinkedFieldName>,
     pub reader_alias: Option<WithSpan<LinkedFieldAlias>>,
     pub normalization_alias: Option<WithSpan<LinkedFieldAlias>>,
@@ -208,7 +181,7 @@ pub struct LinkedFieldSelection<
     pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
 }
 
-impl<TScalarField: ValidScalarFieldType, TLinkedField: ValidLinkedFieldType>
+impl<TScalarField, TLinkedField: ValidLinkedFieldType>
     LinkedFieldSelection<TScalarField, TLinkedField>
 {
     pub fn name_or_alias(&self) -> WithSpan<FieldNameOrAlias> {

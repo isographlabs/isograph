@@ -1,14 +1,11 @@
 use std::collections::{hash_map::Entry, HashMap};
 
-use common_lang_types::{
-    DefinedField, NormalizationKey, ServerFieldDefinitionName, TypeWithFieldsId,
-    TypeWithoutFieldsId, WithSpan,
-};
+use common_lang_types::{DefinedField, NormalizationKey, ServerFieldDefinitionName, WithSpan};
 use intern::string_key::Intern;
 use isograph_lang_types::{
     LinkedFieldSelection, ScalarFieldSelection,
     Selection::{self, ServerField},
-    SelectionFieldArgument, ServerFieldSelection,
+    SelectionFieldArgument, ServerFieldSelection, TypeWithFieldsId, TypeWithoutFieldsId,
 };
 
 use crate::{SchemaTypeWithFields, ValidatedDefinedField, ValidatedSchema, ValidatedSelection};

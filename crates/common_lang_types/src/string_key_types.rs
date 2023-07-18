@@ -1,4 +1,3 @@
-use crate::ValidScalarFieldType;
 pub use string_key_newtype::StringKeyNewtype;
 
 use super::ValidTypeAnnotationInnerType;
@@ -86,7 +85,6 @@ string_key_conversion!(EnumTypeName, TypeWithoutFieldsName);
 
 // The name in the schema of the field
 string_key_newtype!(ScalarFieldName);
-impl ValidScalarFieldType for ScalarFieldName {}
 string_key_conversion!(ScalarFieldName, ServerFieldDefinitionName);
 
 string_key_newtype!(LinkedFieldName);

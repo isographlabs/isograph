@@ -1,5 +1,3 @@
-use crate::{FieldNameOrAlias, TypeAndField, TypeWithoutFieldsId};
-
 pub trait HasName {
     type Name;
     fn name(&self) -> Self::Name;
@@ -40,15 +38,6 @@ impl<TServerType: ValidTypeAnnotationInnerType, TResolverType>
     }
 }
 // TODO map both types
-
-/// Used to constrain the valid types that a ScalarFieldSelection can have to
-/// ScalarFieldName (for unvalidated scalar field selections) and DefinedFieldType<TypeWithoutFieldsId>
-/// (for validated scalar field selections).
-pub trait ValidScalarFieldType {}
-impl ValidScalarFieldType for () {}
-
-// TODO move to another crate
-impl ValidScalarFieldType for DefinedField<TypeWithoutFieldsId, (FieldNameOrAlias, TypeAndField)> {}
 
 // /// Used to constrain the valid types that a LinkedFieldSelection can have to
 // /// LinkedFieldName (for unvalidated linked field selections) and TypeWithFieldsId

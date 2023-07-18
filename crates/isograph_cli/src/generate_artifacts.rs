@@ -7,15 +7,15 @@ use std::{
 };
 
 use common_lang_types::{
-    DefinedField, FieldNameOrAlias, HasName, IsographObjectTypeName, OutputTypeId,
-    QueryOperationName, ResolverDefinitionPath, ServerFieldDefinitionName, TypeAndField,
-    TypeWithFieldsId, TypeWithoutFieldsId, UnvalidatedTypeName, ValidTypeAnnotationInnerType,
-    WithSpan,
+    DefinedField, FieldNameOrAlias, HasName, IsographObjectTypeName, QueryOperationName,
+    ResolverDefinitionPath, ServerFieldDefinitionName, TypeAndField, UnvalidatedTypeName,
+    ValidTypeAnnotationInnerType, WithSpan,
 };
 use graphql_lang_types::{ListTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
-    NonConstantValue, Selection, SelectionFieldArgument,
+    NonConstantValue, OutputTypeId, Selection, SelectionFieldArgument,
     ServerFieldSelection::{LinkedField, ScalarField},
+    TypeWithFieldsId, TypeWithoutFieldsId,
 };
 use isograph_schema::{
     merge_selection_set, MergedSelection, MergedSelectionSet, ResolverVariant,

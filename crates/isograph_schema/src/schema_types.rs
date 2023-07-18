@@ -1,19 +1,20 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    DefinedField, DescriptionValue, HasName, InputTypeId, InputTypeName, InterfaceTypeName,
-    IsographObjectTypeName, JavascriptName, ObjectId, OutputTypeId, ResolverDefinitionPath,
-    ResolverFieldId, ScalarFieldName, ScalarId, ScalarTypeName, ServerFieldDefinitionName,
-    ServerFieldId, TypeAndField, TypeId, TypeWithFieldsId, TypeWithoutFieldsId,
-    TypeWithoutFieldsName, UnvalidatedTypeName, ValidLinkedFieldType, ValidScalarFieldType,
-    ValidTypeAnnotationInnerType, WithSpan,
+    DefinedField, DescriptionValue, HasName, InputTypeName, InterfaceTypeName,
+    IsographObjectTypeName, JavascriptName, ResolverDefinitionPath, ScalarFieldName,
+    ScalarTypeName, ServerFieldDefinitionName, TypeAndField, TypeWithoutFieldsName,
+    UnvalidatedTypeName, ValidLinkedFieldType, ValidTypeAnnotationInnerType, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, Directive, InterfaceTypeDefinition, ObjectTypeDefinition, OutputFieldDefinition,
     TypeAnnotation,
 };
 use intern::string_key::Intern;
-use isograph_lang_types::{Selection, Unwrap, VariableDefinition};
+use isograph_lang_types::{
+    InputTypeId, ObjectId, OutputTypeId, ResolverFieldId, ScalarId, Selection, ServerFieldId,
+    TypeId, TypeWithFieldsId, TypeWithoutFieldsId, Unwrap, VariableDefinition,
+};
 use lazy_static::lazy_static;
 
 use crate::ResolverVariant;
@@ -41,7 +42,7 @@ lazy_static! {
 #[derive(Debug)]
 pub struct Schema<
     TServerType: ValidTypeAnnotationInnerType,
-    TScalarField: ValidScalarFieldType,
+    TScalarField,
     TLinkedField: ValidLinkedFieldType,
     TVariableType: ValidTypeAnnotationInnerType,
     // On objects, what does the HashMap of encountered types contain
@@ -59,6 +60,7 @@ pub struct Schema<
     pub int_type_id: ScalarId,
 
     // typename
+    // TODO name this root query type?
     pub query_type_id: Option<ObjectId>,
     // Subscription
     // Mutation
@@ -89,7 +91,7 @@ pub struct SchemaData<TEncounteredField> {
 
 impl<
         TServerType: ValidTypeAnnotationInnerType,
-        TScalarField: ValidScalarFieldType,
+        TScalarField,
         TLinkedField: ValidLinkedFieldType,
         TVariableType: ValidTypeAnnotationInnerType,
         TEncounteredField,
@@ -442,7 +444,7 @@ pub struct SchemaServerField<T> {
 
 #[derive(Debug)]
 pub struct SchemaResolver<
-    TScalarField: ValidScalarFieldType,
+    TScalarField,
     TLinkedField: ValidLinkedFieldType,
     TVariableDefinitionType: ValidTypeAnnotationInnerType,
 > {

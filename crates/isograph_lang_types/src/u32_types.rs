@@ -1,6 +1,5 @@
+use common_lang_types::{ValidLinkedFieldType, ValidTypeAnnotationInnerType};
 use u32_newtypes::u32_newtype;
-
-use crate::{ValidLinkedFieldType, ValidScalarFieldType, ValidTypeAnnotationInnerType};
 
 u32_newtype!(ServerFieldId);
 impl ValidTypeAnnotationInnerType for ServerFieldId {}
@@ -43,7 +42,6 @@ pub enum TypeWithoutFieldsId {
     // Enum
 }
 impl ValidTypeAnnotationInnerType for TypeWithoutFieldsId {}
-impl ValidScalarFieldType for TypeWithoutFieldsId {}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 pub enum TypeId {

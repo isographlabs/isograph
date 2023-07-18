@@ -2,13 +2,14 @@ use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
     DefinedField, IsographObjectTypeName, ScalarFieldName, ServerFieldDefinitionName,
-    ServerFieldId, TypeId, TypeWithFieldsId, UnvalidatedTypeName, WithSpan,
+    UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
     OutputFieldDefinition, ScalarTypeDefinition, TypeAnnotation, TypeSystemDefinition,
     TypeSystemDocument,
 };
 use intern::string_key::Intern;
+use isograph_lang_types::{ServerFieldId, TypeId, TypeWithFieldsId};
 use lazy_static::lazy_static;
 use thiserror::Error;
 

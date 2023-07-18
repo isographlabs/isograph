@@ -1,11 +1,11 @@
 use std::fmt;
 
 use common_lang_types::{
-    DefinedField, IsographDirectiveName, IsographObjectTypeName, ObjectId,
-    ServerFieldDefinitionName, TypeId, UnvalidatedTypeName, WithSpan,
+    DefinedField, IsographDirectiveName, IsographObjectTypeName, ServerFieldDefinitionName,
+    UnvalidatedTypeName, WithSpan,
 };
 use intern::string_key::Intern;
-use isograph_lang_types::{FragmentDirectiveUsage, ResolverDeclaration};
+use isograph_lang_types::{FragmentDirectiveUsage, ObjectId, ResolverDeclaration, TypeId};
 use lazy_static::lazy_static;
 use thiserror::Error;
 
