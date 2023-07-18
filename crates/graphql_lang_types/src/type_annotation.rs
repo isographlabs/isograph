@@ -1,17 +1,15 @@
 use std::{fmt, ops::Deref};
 
-use common_lang_types::{ValidTypeAnnotationInnerType, WithSpan};
+use common_lang_types::WithSpan;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum TypeAnnotation<TValue: ValidTypeAnnotationInnerType> {
+pub enum TypeAnnotation<TValue> {
     Named(NamedTypeAnnotation<TValue>),
     List(Box<ListTypeAnnotation<TValue>>),
     NonNull(Box<NonNullTypeAnnotation<TValue>>),
 }
 
-impl<T: ValidTypeAnnotationInnerType> ValidTypeAnnotationInnerType for TypeAnnotation<T> {}
-
-impl<TValue: ValidTypeAnnotationInnerType> TypeAnnotation<TValue> {
+impl<TValue> TypeAnnotation<TValue> {
     pub fn inner(&self) -> &TValue {
         match self {
             TypeAnnotation::Named(named) => &named.0.item,
@@ -20,7 +18,7 @@ impl<TValue: ValidTypeAnnotationInnerType> TypeAnnotation<TValue> {
         }
     }
 
-    pub fn map<F, TNewValue: ValidTypeAnnotationInnerType>(self, f: F) -> TypeAnnotation<TNewValue>
+    pub fn map<F, TNewValue>(self, f: F) -> TypeAnnotation<TNewValue>
     where
         F: FnOnce(TValue) -> TNewValue,
     {
@@ -33,10 +31,7 @@ impl<TValue: ValidTypeAnnotationInnerType> TypeAnnotation<TValue> {
         }
     }
 
-    pub fn and_then<F, TNewValue: ValidTypeAnnotationInnerType, E>(
-        self,
-        f: F,
-    ) -> Result<TypeAnnotation<TNewValue>, E>
+    pub fn and_then<F, TNewValue, E>(self, f: F) -> Result<TypeAnnotation<TNewValue>, E>
     where
         F: FnOnce(TValue) -> Result<TNewValue, E>,
     {
@@ -52,7 +47,7 @@ impl<TValue: ValidTypeAnnotationInnerType> TypeAnnotation<TValue> {
     }
 }
 
-impl<TValue: ValidTypeAnnotationInnerType + fmt::Display> fmt::Display for TypeAnnotation<TValue> {
+impl<TValue: fmt::Display> fmt::Display for TypeAnnotation<TValue> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             TypeAnnotation::Named(named) => named.fmt(f),
@@ -63,12 +58,12 @@ impl<TValue: ValidTypeAnnotationInnerType + fmt::Display> fmt::Display for TypeA
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum NonNullTypeAnnotation<TValue: ValidTypeAnnotationInnerType> {
+pub enum NonNullTypeAnnotation<TValue> {
     Named(NamedTypeAnnotation<TValue>),
     List(ListTypeAnnotation<TValue>),
 }
 
-impl<TValue: ValidTypeAnnotationInnerType> NonNullTypeAnnotation<TValue> {
+impl<TValue> NonNullTypeAnnotation<TValue> {
     pub fn inner(&self) -> &TValue {
         match self {
             NonNullTypeAnnotation::Named(named) => &named.0.item,
@@ -76,10 +71,7 @@ impl<TValue: ValidTypeAnnotationInnerType> NonNullTypeAnnotation<TValue> {
         }
     }
 
-    pub fn map<F, TNewValue: ValidTypeAnnotationInnerType>(
-        self,
-        f: F,
-    ) -> NonNullTypeAnnotation<TNewValue>
+    pub fn map<F, TNewValue>(self, f: F) -> NonNullTypeAnnotation<TNewValue>
     where
         F: FnOnce(TValue) -> TNewValue,
     {
@@ -91,10 +83,7 @@ impl<TValue: ValidTypeAnnotationInnerType> NonNullTypeAnnotation<TValue> {
         }
     }
 
-    pub fn and_then<F, TNewValue: ValidTypeAnnotationInnerType, E>(
-        self,
-        f: F,
-    ) -> Result<NonNullTypeAnnotation<TNewValue>, E>
+    pub fn and_then<F, TNewValue, E>(self, f: F) -> Result<NonNullTypeAnnotation<TNewValue>, E>
     where
         F: FnOnce(TValue) -> Result<TNewValue, E>,
     {
@@ -107,9 +96,7 @@ impl<TValue: ValidTypeAnnotationInnerType> NonNullTypeAnnotation<TValue> {
     }
 }
 
-impl<TValue: ValidTypeAnnotationInnerType + fmt::Display> fmt::Display
-    for NonNullTypeAnnotation<TValue>
-{
+impl<TValue: fmt::Display> fmt::Display for NonNullTypeAnnotation<TValue> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             NonNullTypeAnnotation::Named(named) => f.write_fmt(format_args!("{}!", named)),
@@ -119,9 +106,9 @@ impl<TValue: ValidTypeAnnotationInnerType + fmt::Display> fmt::Display
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct NamedTypeAnnotation<TValue: ValidTypeAnnotationInnerType>(pub WithSpan<TValue>);
+pub struct NamedTypeAnnotation<TValue>(pub WithSpan<TValue>);
 
-impl<TValue: ValidTypeAnnotationInnerType> Deref for NamedTypeAnnotation<TValue> {
+impl<TValue> Deref for NamedTypeAnnotation<TValue> {
     type Target = WithSpan<TValue>;
 
     fn deref(&self) -> &Self::Target {
@@ -129,32 +116,24 @@ impl<TValue: ValidTypeAnnotationInnerType> Deref for NamedTypeAnnotation<TValue>
     }
 }
 
-impl<TValue: ValidTypeAnnotationInnerType + fmt::Display> fmt::Display
-    for NamedTypeAnnotation<TValue>
-{
+impl<TValue: fmt::Display> fmt::Display for NamedTypeAnnotation<TValue> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct ListTypeAnnotation<TValue: ValidTypeAnnotationInnerType>(pub TypeAnnotation<TValue>);
+pub struct ListTypeAnnotation<TValue>(pub TypeAnnotation<TValue>);
 
-impl<TValue: ValidTypeAnnotationInnerType> ListTypeAnnotation<TValue> {
-    pub fn map<F, TNewValue: ValidTypeAnnotationInnerType>(
-        self,
-        f: F,
-    ) -> ListTypeAnnotation<TNewValue>
+impl<TValue> ListTypeAnnotation<TValue> {
+    pub fn map<F, TNewValue>(self, f: F) -> ListTypeAnnotation<TNewValue>
     where
         F: FnOnce(TValue) -> TNewValue,
     {
         ListTypeAnnotation(self.0.map(f))
     }
 
-    pub fn and_then<F, TNewValue: ValidTypeAnnotationInnerType, E>(
-        self,
-        f: F,
-    ) -> Result<ListTypeAnnotation<TNewValue>, E>
+    pub fn and_then<F, TNewValue, E>(self, f: F) -> Result<ListTypeAnnotation<TNewValue>, E>
     where
         F: FnOnce(TValue) -> Result<TNewValue, E>,
     {
@@ -162,7 +141,7 @@ impl<TValue: ValidTypeAnnotationInnerType> ListTypeAnnotation<TValue> {
     }
 }
 
-impl<TValue: ValidTypeAnnotationInnerType> Deref for ListTypeAnnotation<TValue> {
+impl<TValue> Deref for ListTypeAnnotation<TValue> {
     type Target = TypeAnnotation<TValue>;
 
     fn deref(&self) -> &Self::Target {
@@ -170,9 +149,7 @@ impl<TValue: ValidTypeAnnotationInnerType> Deref for ListTypeAnnotation<TValue> 
     }
 }
 
-impl<TValue: ValidTypeAnnotationInnerType + fmt::Display> fmt::Display
-    for ListTypeAnnotation<TValue>
-{
+impl<TValue: fmt::Display> fmt::Display for ListTypeAnnotation<TValue> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!("[{}]", self.0))
     }

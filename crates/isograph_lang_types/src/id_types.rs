@@ -1,13 +1,10 @@
-use common_lang_types::ValidTypeAnnotationInnerType;
 use u32_newtypes::u32_newtype;
 
 u32_newtype!(ServerFieldId);
-impl ValidTypeAnnotationInnerType for ServerFieldId {}
 
 u32_newtype!(ResolverFieldId);
 
 u32_newtype!(ObjectId);
-impl ValidTypeAnnotationInnerType for ObjectId {}
 
 impl From<ObjectId> for TypeWithFieldsId {
     fn from(id: ObjectId) -> Self {
@@ -16,7 +13,6 @@ impl From<ObjectId> for TypeWithFieldsId {
 }
 
 u32_newtype!(ScalarId);
-impl ValidTypeAnnotationInnerType for ScalarId {}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 pub enum OutputTypeId {
@@ -26,7 +22,6 @@ pub enum OutputTypeId {
     // Union
     // Enum
 }
-impl ValidTypeAnnotationInnerType for OutputTypeId {}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 pub enum InputTypeId {
@@ -34,14 +29,12 @@ pub enum InputTypeId {
     // Enum
     // InputObject
 }
-impl ValidTypeAnnotationInnerType for InputTypeId {}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 pub enum EncounteredTypeId {
     Object(ObjectId),
     Scalar(ScalarId),
 }
-impl ValidTypeAnnotationInnerType for EncounteredTypeId {}
 
 impl EncounteredTypeId {
     pub fn as_output_type_id(self) -> Option<OutputTypeId> {
@@ -67,4 +60,3 @@ pub enum TypeWithFieldsId {
     // Interface
     // Union
 }
-impl ValidTypeAnnotationInnerType for TypeWithFieldsId {}

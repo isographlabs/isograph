@@ -1,8 +1,6 @@
 use std::ops::ControlFlow;
 
-use common_lang_types::{
-    DescriptionValue, InterfaceTypeName, ValidTypeAnnotationInnerType, WithSpan,
-};
+use common_lang_types::{DescriptionValue, InterfaceTypeName, WithSpan};
 use graphql_syntax::TokenKind;
 use intern::string_key::StringKey;
 
@@ -348,7 +346,7 @@ fn parse_field<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResult<WithSpan<Outpu
         .transpose()
 }
 
-fn parse_type_annotation<T: ValidTypeAnnotationInnerType + From<StringKey>>(
+fn parse_type_annotation<T: From<StringKey>>(
     tokens: &mut PeekableLexer,
 ) -> ParseResult<TypeAnnotation<T>> {
     from_control_flow(|| {

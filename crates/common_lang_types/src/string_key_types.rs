@@ -1,6 +1,5 @@
 pub use string_key_newtype::StringKeyNewtype;
 
-use super::ValidTypeAnnotationInnerType;
 use string_key_newtype::{string_key_conversion, string_key_newtype};
 
 string_key_newtype!(DirectiveName);
@@ -21,9 +20,7 @@ string_key_newtype!(ValueKeyName);
 // side! Later, they should be converted to some sort of enums. These represent
 // unvalidated strings.
 string_key_newtype!(OutputTypeName);
-impl ValidTypeAnnotationInnerType for OutputTypeName {}
 string_key_newtype!(InputTypeName);
-impl ValidTypeAnnotationInnerType for InputTypeName {}
 
 // A string that is supposed to be a typename (of some sort), but we haven't
 // confirmed that the type exists and is the proper type yet (e.g. input, object,
@@ -35,21 +32,14 @@ impl ValidTypeAnnotationInnerType for InputTypeName {}
 // It can also be used in error messages a sort of top type name type, i.e. any type name
 // can be converted into this type name.
 string_key_newtype!(UnvalidatedTypeName);
-impl ValidTypeAnnotationInnerType for UnvalidatedTypeName {}
 string_key_conversion!(IsographObjectTypeName, UnvalidatedTypeName);
 
 string_key_newtype!(ObjectTypeName);
-impl ValidTypeAnnotationInnerType for ObjectTypeName {}
 string_key_newtype!(ScalarTypeName);
-impl ValidTypeAnnotationInnerType for ScalarTypeName {}
 string_key_newtype!(InterfaceTypeName);
-impl ValidTypeAnnotationInnerType for InterfaceTypeName {}
 string_key_newtype!(EnumTypeName);
-impl ValidTypeAnnotationInnerType for EnumTypeName {}
 string_key_newtype!(UnionTypeName);
-impl ValidTypeAnnotationInnerType for UnionTypeName {}
 string_key_newtype!(InputObjectTypeName);
-impl ValidTypeAnnotationInnerType for InputObjectTypeName {}
 
 // TODO this doesn't belong in common
 // This type represents any type with fields *in the Isograph world*.
@@ -108,8 +98,6 @@ string_key_conversion!(QueryOperationName, ServerFieldDefinitionName);
 
 // For scalars
 string_key_newtype!(JavascriptName);
-// This is getting ridiculous...
-impl ValidTypeAnnotationInnerType for JavascriptName {}
 
 string_key_newtype!(IsographDirectiveName);
 

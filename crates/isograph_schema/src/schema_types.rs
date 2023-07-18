@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use common_lang_types::{
     DefinedField, DescriptionValue, HasName, InputTypeName, InterfaceTypeName,
     IsographObjectTypeName, JavascriptName, ResolverDefinitionPath, ScalarFieldName,
-    ScalarTypeName, ServerFieldDefinitionName, TypeAndField, UnvalidatedTypeName,
-    ValidTypeAnnotationInnerType, WithSpan,
+    ScalarTypeName, ServerFieldDefinitionName, TypeAndField, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, Directive, InterfaceTypeDefinition, ObjectTypeDefinition, OutputFieldDefinition,
@@ -41,10 +40,10 @@ lazy_static! {
 /// this is OutputTypeId.
 #[derive(Debug)]
 pub struct Schema<
-    TServerType: ValidTypeAnnotationInnerType,
+    TServerType,
     TScalarField,
     TLinkedField,
-    TVariableType: ValidTypeAnnotationInnerType,
+    TVariableType,
     // On objects, what does the HashMap of encountered types contain
     TEncounteredField,
 > {
@@ -89,13 +88,8 @@ pub struct SchemaData<TEncounteredField> {
     pub defined_types: HashMap<UnvalidatedTypeName, EncounteredTypeId>,
 }
 
-impl<
-        TServerType: ValidTypeAnnotationInnerType,
-        TScalarField,
-        TLinkedField,
-        TVariableType: ValidTypeAnnotationInnerType,
-        TEncounteredField,
-    > Schema<TServerType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
+impl<TServerType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
+    Schema<TServerType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
 {
     pub fn field(
         &self,
@@ -419,11 +413,7 @@ pub struct SchemaServerField<T> {
 }
 
 #[derive(Debug)]
-pub struct SchemaResolver<
-    TScalarField,
-    TLinkedField,
-    TVariableDefinitionType: ValidTypeAnnotationInnerType,
-> {
+pub struct SchemaResolver<TScalarField, TLinkedField, TVariableDefinitionType> {
     pub description: Option<DescriptionValue>,
     pub name: ServerFieldDefinitionName,
     pub id: ResolverFieldId,

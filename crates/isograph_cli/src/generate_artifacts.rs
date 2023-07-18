@@ -8,8 +8,7 @@ use std::{
 
 use common_lang_types::{
     DefinedField, FieldNameOrAlias, HasName, IsographObjectTypeName, QueryOperationName,
-    ResolverDefinitionPath, ServerFieldDefinitionName, TypeAndField, UnvalidatedTypeName,
-    ValidTypeAnnotationInnerType, WithSpan,
+    ResolverDefinitionPath, ServerFieldDefinitionName, TypeAndField, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{ListTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
@@ -181,8 +180,6 @@ pub enum Artifact<'schema> {
 
 #[derive(Debug)]
 pub struct ResolverParameterType(pub String);
-
-impl ValidTypeAnnotationInnerType for ResolverParameterType {}
 
 impl fmt::Display for ResolverParameterType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -673,18 +670,13 @@ fn write_query_types_from_selection(
     }
 }
 
-fn print_type_annotation<T: Display + ValidTypeAnnotationInnerType>(
-    type_annotation: &TypeAnnotation<T>,
-) -> String {
+fn print_type_annotation<T: Display>(type_annotation: &TypeAnnotation<T>) -> String {
     let mut s = String::new();
     print_type_annotation_impl(type_annotation, &mut s);
     s
 }
 
-fn print_type_annotation_impl<T: Display + ValidTypeAnnotationInnerType>(
-    type_annotation: &TypeAnnotation<T>,
-    s: &mut String,
-) {
+fn print_type_annotation_impl<T: Display>(type_annotation: &TypeAnnotation<T>, s: &mut String) {
     match &type_annotation {
         TypeAnnotation::Named(named) => {
             s.push_str("(");
@@ -700,19 +692,13 @@ fn print_type_annotation_impl<T: Display + ValidTypeAnnotationInnerType>(
     }
 }
 
-fn print_list_type_annotation<T: Display + ValidTypeAnnotationInnerType>(
-    list: &ListTypeAnnotation<T>,
-    s: &mut String,
-) {
+fn print_list_type_annotation<T: Display>(list: &ListTypeAnnotation<T>, s: &mut String) {
     s.push_str("(");
     print_type_annotation_impl(&list.0, s);
     s.push_str(")[]");
 }
 
-fn print_non_null_type_annotation<T: Display + ValidTypeAnnotationInnerType>(
-    non_null: &NonNullTypeAnnotation<T>,
-    s: &mut String,
-) {
+fn print_non_null_type_annotation<T: Display>(non_null: &NonNullTypeAnnotation<T>, s: &mut String) {
     match non_null {
         NonNullTypeAnnotation::Named(named) => {
             s.push_str(&named.item.to_string());

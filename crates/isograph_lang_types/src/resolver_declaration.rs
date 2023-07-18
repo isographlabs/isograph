@@ -3,8 +3,7 @@ use std::fmt;
 use common_lang_types::{
     DescriptionValue, FieldArgumentName, FieldNameOrAlias, HasName, IsographDirectiveName,
     LinkedFieldAlias, LinkedFieldName, ResolverDefinitionPath, ScalarFieldAlias, ScalarFieldName,
-    ServerFieldDefinitionName, UnvalidatedTypeName, ValidTypeAnnotationInnerType, VariableName,
-    WithSpan,
+    ServerFieldDefinitionName, UnvalidatedTypeName, VariableName, WithSpan,
 };
 use graphql_lang_types::TypeAnnotation;
 
@@ -212,14 +211,14 @@ impl fmt::Display for NonConstantValue {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct VariableDefinition<TValue: ValidTypeAnnotationInnerType> {
+pub struct VariableDefinition<TValue> {
     pub name: WithSpan<VariableName>,
     pub type_: TypeAnnotation<TValue>,
     // pub default_value: Option<WithSpan<ConstantValue>>,
 }
 
-impl<TValue: ValidTypeAnnotationInnerType> VariableDefinition<TValue> {
-    pub fn map<TNewValue: ValidTypeAnnotationInnerType>(
+impl<TValue> VariableDefinition<TValue> {
+    pub fn map<TNewValue>(
         self,
         map: &mut impl FnMut(TValue) -> TNewValue,
     ) -> VariableDefinition<TNewValue> {
@@ -229,7 +228,7 @@ impl<TValue: ValidTypeAnnotationInnerType> VariableDefinition<TValue> {
         }
     }
 
-    pub fn and_then<TNewValue: ValidTypeAnnotationInnerType, E>(
+    pub fn and_then<TNewValue, E>(
         self,
         map: &mut impl FnMut(TValue) -> Result<TNewValue, E>,
     ) -> Result<VariableDefinition<TNewValue>, E> {
