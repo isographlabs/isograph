@@ -36,12 +36,32 @@ type Query {
   The currently authenticated user.
   """
   viewer: User!
+
+  """
+  Fetches an object given its ID.
+  """
+  node(
+    """
+    ID of the object.
+    """
+    id: ID!
+  ): Node
+
+  """
+  Lookup nodes by a list of IDs.
+  """
+  nodes(
+    """
+    The list of node IDs.
+    """
+    ids: [ID!]!
+  ): [Node]!
 }
 
 """
 A user is an individual's account on GitHub that owns repositories and can make new content.
 """
-type User {
+type User implements Actor & Node {
   """
   A URL pointing to the user's public avatar.
   """
@@ -786,7 +806,7 @@ type SocialAccountEdge {
 """
 The user's description of what they're currently doing.
 """
-type UserStatus {
+type UserStatus implements Node {
   """
   Identifies the date and time when the object was created.
   """
@@ -2017,12 +2037,7 @@ type Issue {
   viewerDidAuthor: Boolean!
 }
 
-# -------------------------------------------------------
-# THIS IS NOT A REAL TYPE IN THE SCHEMA
-# However, we currently don't support interfaces.
-# But, we can pretend this is its own type for now.
-# -------------------------------------------------------
-type Actor {
+interface Actor {
   """
   A URL pointing to the actor's public avatar.
   """
@@ -2052,7 +2067,7 @@ type Actor {
 """
 Represents an owner of a Repository.
 """
-type RepositoryOwner {
+interface RepositoryOwner {
   """
   A URL pointing to the owner's public avatar.
   """
@@ -2108,12 +2123,8 @@ type RepositoryOwner {
     """
     Returns the last _n_ elements from the list.
     """
-    last: Int # """ # Ordering options for repositories returned from the connection # """ # orderBy: RepositoryOrder # """ # Array of owner's affiliation options for repositories returned from the # connection. For example, OWNER will include only repositories that the # organization or user being viewed owns. # """ # ownerAffiliations: [RepositoryAffiliation] = [OWNER, COLLABORATOR]
-  ): # """
-  # If non-null, filters repositories according to privacy
-  # """
-  # privacy: RepositoryPrivacy
-  RepositoryConnection!
+    last: Int # """ # Ordering options for repositories returned from the connection # """ # orderBy: RepositoryOrder # """ # Array of owner's affiliation options for repositories returned from the # connection. For example, OWNER will include only repositories that the # organization or user being viewed owns. # """ # ownerAffiliations: [RepositoryAffiliation] = [OWNER, COLLABORATOR] # """ # If non-null, filters repositories according to privacy # """ # privacy: RepositoryPrivacy
+  ): RepositoryConnection!
 
   """
   Find Repository.
@@ -2141,6 +2152,210 @@ type RepositoryOwner {
   url: URI!
 }
 
+"""
+An object with an ID.
+"""
 interface Node {
   id: ID!
+}
+
+"""
+An account on GitHub, with one or more owners, that has repositories, members and teams.
+"""
+type Organization implements Actor & Node {
+  """
+  A URL pointing to the organization's public avatar.
+  """
+  avatarUrl(
+    """
+    The size of the resulting square image.
+    """
+    size: Int
+  ): URI!
+
+  """
+  Identifies the date and time when the object was created.
+  """
+  createdAt: DateTime!
+
+  """
+  Identifies the primary key from the database.
+  """
+  databaseId: Int
+
+  """
+  The organization's public profile description.
+  """
+  description: String
+
+  """
+  The organization's public profile description rendered to HTML.
+  """
+  descriptionHTML: String
+
+  """
+  The organization's public email.
+  """
+  email: String
+
+  id: ID!
+
+  """
+  The organization's public profile location.
+  """
+  location: String
+
+  """
+  The organization's login name.
+  """
+  login: String!
+
+  """
+  The organization's public profile name.
+  """
+  name: String
+
+  """
+  A list of repositories that the user owns.
+  """
+  repositories(
+    """
+    Array of viewer's affiliation options for repositories returned from the
+    connection. For example, OWNER will include only repositories that the
+    current viewer owns.
+    """
+    affiliations: [RepositoryAffiliation]
+
+    """
+    Returns the elements in the list that come after the specified cursor.
+    """
+    after: String
+
+    """
+    Returns the elements in the list that come before the specified cursor.
+    """
+    before: String
+
+    """
+    Returns the first _n_ elements from the list.
+    """
+    first: Int
+
+    """
+    If non-null, filters repositories according to whether they are forks of another repository
+    """
+    isFork: Boolean
+
+    """
+    If non-null, filters repositories according to whether they have been locked
+    """
+    isLocked: Boolean
+
+    """
+    Returns the last _n_ elements from the list.
+    """
+    last: Int
+
+    """
+    Ordering options for repositories returned from the connection
+    """
+    orderBy: RepositoryOrder
+
+    """
+    Array of owner's affiliation options for repositories returned from the
+    connection. For example, OWNER will include only repositories that the
+    organization or user being viewed owns.
+    """
+    ownerAffiliations: [RepositoryAffiliation] = [OWNER, COLLABORATOR]
+
+    """
+    If non-null, filters repositories according to privacy
+    """
+    privacy: RepositoryPrivacy
+  ): RepositoryConnection!
+
+  """
+  Find Repository.
+  """
+  repository(
+    """
+    Follow repository renames. If disabled, a repository referenced by its old name will return an error.
+    """
+    followRenames: Boolean = true
+
+    """
+    Name of Repository to find.
+    """
+    name: String!
+  ): Repository
+
+  """
+  The organization's Twitter username.
+  """
+  twitterUsername: String
+
+  """
+  Identifies the date and time when the object was last updated.
+  """
+  updatedAt: DateTime!
+
+  """
+  The HTTP URL for this organization.
+  """
+  url: URI!
+
+  """
+  Organization is adminable by the viewer.
+  """
+  viewerCanAdminister: Boolean!
+
+  """
+  Can the viewer pin repositories and gists to the profile?
+  """
+  viewerCanChangePinnedItems: Boolean!
+
+  """
+  Can the current viewer create new projects on this owner.
+  """
+  viewerCanCreateProjects: Boolean!
+
+  """
+  Viewer can create repositories on this organization
+  """
+  viewerCanCreateRepositories: Boolean!
+
+  """
+  Viewer can create teams on this organization.
+  """
+  viewerCanCreateTeams: Boolean!
+
+  """
+  Whether or not the viewer is able to sponsor this user/organization.
+  """
+  viewerCanSponsor: Boolean!
+
+  """
+  Viewer is an active member of this organization.
+  """
+  viewerIsAMember: Boolean!
+
+  """
+  Whether or not this Organization is followed by the viewer.
+  """
+  viewerIsFollowing: Boolean!
+
+  """
+  True if the viewer is sponsoring this user/organization.
+  """
+  viewerIsSponsoring: Boolean!
+
+  """
+  Whether contributors are required to sign off on web-based commits for repositories in this organization.
+  """
+  webCommitSignoffRequired: Boolean!
+
+  """
+  The organization's public profile URL.
+  """
+  websiteUrl: URI
 }
