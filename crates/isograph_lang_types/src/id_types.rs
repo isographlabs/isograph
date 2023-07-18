@@ -12,15 +12,11 @@ u32_newtype!(ScalarId);
 pub enum OutputTypeId {
     Object(ObjectId),
     Scalar(ScalarId),
-    // Interface
-    // Union
-    // Enum
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 pub enum InputTypeId {
     Scalar(ScalarId),
-    // Enum
     // InputObject
 }
 
@@ -28,6 +24,7 @@ pub enum InputTypeId {
 pub enum DefinedTypeId {
     Object(ObjectId),
     Scalar(ScalarId),
+    // InputObject?
 }
 
 impl DefinedTypeId {

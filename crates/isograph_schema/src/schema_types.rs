@@ -225,6 +225,12 @@ impl<TEncounteredField> SchemaData<TEncounteredField> {
             .get(object_id.as_usize())
             .expect("ObjectId should exist, this indicates a bug in Isograph")
     }
+
+    pub fn object_mut(&mut self, object_id: ObjectId) -> &mut SchemaObject<TEncounteredField> {
+        self.objects
+            .get_mut(object_id.as_usize())
+            .expect("ObjectId should exist, this indicates a bug in Isograph")
+    }
 }
 
 fn add_schema_defined_scalar_type(
@@ -330,7 +336,7 @@ pub struct SchemaObject<TEncounteredField> {
 /// union can be narrowed to. valid_refinements should be empty for concrete types.
 #[derive(Debug)]
 pub struct ValidRefinement {
-    concrete_type: ObjectId,
+    pub target: ObjectId,
 }
 
 #[derive(Debug)]

@@ -2108,13 +2108,8 @@ type RepositoryOwner {
     """
     Returns the last _n_ elements from the list.
     """
-    last: Int # """ # Ordering options for repositories returned from the connection # """ # orderBy: RepositoryOrder # """ # Array of owner's affiliation options for repositories returned from the
-  ): # connection. For example, OWNER will include only repositories that the
-  # organization or user being viewed owns.
-  # """
-  # ownerAffiliations: [RepositoryAffiliation] = [OWNER, COLLABORATOR]
-
-  # """
+    last: Int # """ # Ordering options for repositories returned from the connection # """ # orderBy: RepositoryOrder # """ # Array of owner's affiliation options for repositories returned from the # connection. For example, OWNER will include only repositories that the # organization or user being viewed owns. # """ # ownerAffiliations: [RepositoryAffiliation] = [OWNER, COLLABORATOR]
+  ): # """
   # If non-null, filters repositories according to privacy
   # """
   # privacy: RepositoryPrivacy

@@ -15,7 +15,7 @@ use thiserror::Error;
 
 use crate::{
     IsographObjectTypeDefinition, Schema, SchemaObject, SchemaScalar, SchemaServerField,
-    UnvalidatedSchema, UnvalidatedSchemaField, STRING_JAVASCRIPT_TYPE,
+    UnvalidatedSchema, UnvalidatedSchemaField, ValidRefinement, STRING_JAVASCRIPT_TYPE,
 };
 
 lazy_static! {
@@ -58,19 +58,40 @@ impl UnvalidatedSchema {
             }
         }
 
-        for (supertype_id, subtypes) in valid_type_refinement_map {
+        for (supertype_name, subtypes) in valid_type_refinement_map {
             // supertype, if it exists, can be refined to each subtype
             let supertype_id = self
                 .schema_data
                 .defined_types
-                .get(&supertype_id.into())
+                .get(&supertype_name.into())
                 .ok_or(
                     ProcessTypeDefinitionError::IsographObjectTypeNameNotDefined {
-                        type_name: supertype_id,
+                        type_name: supertype_name,
                     },
                 )?;
 
             // TODO modify supertype
+            match supertype_id {
+                DefinedTypeId::Scalar(_) => {
+                    return Err(ProcessTypeDefinitionError::IsographObjectTypeNameIsScalar {
+                        type_name: supertype_name,
+                    })
+                }
+                DefinedTypeId::Object(object_id) => {
+                    let supertype = self.schema_data.object_mut(*object_id);
+                    // TODO validate that supertype was defined as an interface, perhaps by
+                    // including references to the original definition (i.e. as a type parameter)
+                    // and having the schema be able to validate this. (i.e. this should be
+                    // a way to execute GraphQL-specific code in isograph-land without actually
+                    // putting the code here.)
+
+                    for subtype in subtypes {
+                        supertype
+                            .valid_refinements
+                            .push(ValidRefinement { target: subtype })
+                    }
+                }
+            }
         }
 
         Ok(())
@@ -79,10 +100,7 @@ impl UnvalidatedSchema {
     fn process_object_type_definition(
         &mut self,
         type_definition: IsographObjectTypeDefinition,
-        valid_type_refinement_map: &mut HashMap<
-            IsographObjectTypeName,
-            Vec<WithSpan<IsographObjectTypeName>>,
-        >,
+        valid_type_refinement_map: &mut HashMap<IsographObjectTypeName, Vec<ObjectId>>,
     ) -> ProcessTypeDefinitionResult<()> {
         let &mut Schema {
             fields: ref mut existing_fields,
@@ -139,7 +157,7 @@ impl UnvalidatedSchema {
             let definitions = valid_type_refinement_map
                 .entry(interface.item.into())
                 .or_default();
-            definitions.push(type_definition.name);
+            definitions.push(next_object_id);
         }
 
         Ok(())
@@ -244,4 +262,8 @@ pub enum ProcessTypeDefinitionError {
     // When type Foo implements Bar and Bar is not defined:
     #[error("Type \"{type_name}\" is never defined.")]
     IsographObjectTypeNameNotDefined { type_name: IsographObjectTypeName },
+
+    // When type Foo implements Bar and Bar is scalar
+    #[error("Type \"{type_name}\" is a scalar, but it should be an object type.")]
+    IsographObjectTypeNameIsScalar { type_name: IsographObjectTypeName },
 }
