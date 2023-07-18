@@ -9,7 +9,7 @@ use graphql_lang_types::{
     TypeSystemDocument,
 };
 use intern::string_key::Intern;
-use isograph_lang_types::{DefinedTypeId, ServerFieldId, TypeWithFieldsId};
+use isograph_lang_types::{DefinedTypeId, ObjectId, ServerFieldId};
 use lazy_static::lazy_static;
 use thiserror::Error;
 
@@ -104,7 +104,7 @@ impl UnvalidatedSchema {
                     get_field_objects_ids_and_names(
                         type_definition.fields,
                         existing_fields.len(),
-                        TypeWithFieldsId::Object(next_object_id),
+                        next_object_id,
                         type_definition.name.item.into(),
                     )?;
                 objects.push(SchemaObject {
@@ -183,7 +183,7 @@ impl UnvalidatedSchema {
 fn get_field_objects_ids_and_names(
     new_fields: Vec<WithSpan<OutputFieldDefinition>>,
     next_field_id: usize,
-    parent_type: TypeWithFieldsId,
+    parent_type: ObjectId,
     parent_type_name: IsographObjectTypeName,
 ) -> ProcessTypeDefinitionResult<(
     Vec<UnvalidatedSchemaField>,

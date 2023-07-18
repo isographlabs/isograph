@@ -12,7 +12,7 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     DefinedTypeId, InputTypeId, ObjectId, OutputTypeId, ResolverFieldId, ScalarId, Selection,
-    ServerFieldId, TypeWithFieldsId, Unwrap, VariableDefinition,
+    ServerFieldId, Unwrap, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -175,14 +175,9 @@ impl UnvalidatedSchema {
 impl<TEncounteredField> SchemaData<TEncounteredField> {
     pub fn lookup_type_with_fields(
         &self,
-        type_id: TypeWithFieldsId,
+        object_id: ObjectId,
     ) -> SchemaTypeWithFields<TEncounteredField> {
-        match type_id {
-            TypeWithFieldsId::Object(object_id) => {
-                // TODO replace with an unchecked lookup?
-                SchemaTypeWithFields::Object(&self.objects[object_id.as_usize()])
-            }
-        }
+        SchemaTypeWithFields::Object(&self.objects[object_id.as_usize()])
     }
 
     pub fn lookup_type_without_fields(&self, scalar_id: ScalarId) -> &SchemaScalar {
@@ -404,7 +399,7 @@ pub struct SchemaServerField<T> {
     pub name: ServerFieldDefinitionName,
     pub id: ServerFieldId,
     pub field_type: T,
-    pub parent_type_id: TypeWithFieldsId,
+    pub parent_type_id: ObjectId,
     // pub arguments: Vec<InputValue<ConstantValue>>,
     // pub directives: Vec<Directive<ConstantValue>>,
 }

@@ -3,14 +3,14 @@ use std::collections::{hash_map::Entry, HashMap};
 use common_lang_types::{DefinedField, NormalizationKey, ServerFieldDefinitionName, WithSpan};
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    LinkedFieldSelection, ScalarFieldSelection, ScalarId,
+    LinkedFieldSelection, ObjectId, ScalarFieldSelection, ScalarId,
     Selection::{self, ServerField},
-    SelectionFieldArgument, ServerFieldSelection, TypeWithFieldsId,
+    SelectionFieldArgument, ServerFieldSelection,
 };
 
 use crate::{SchemaTypeWithFields, ValidatedDefinedField, ValidatedSchema, ValidatedSelection};
 
-pub type MergedSelection = Selection<ScalarId, TypeWithFieldsId>;
+pub type MergedSelection = Selection<ScalarId, ObjectId>;
 pub type MergedSelectionSet = Vec<WithSpan<MergedSelection>>;
 
 /// A merged selection set is an input for generating:

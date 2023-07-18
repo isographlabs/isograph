@@ -7,8 +7,8 @@ use common_lang_types::{
 use graphql_lang_types::TypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    DefinedTypeId, InputTypeId, LinkedFieldSelection, OutputTypeId, ResolverFieldId,
-    ScalarFieldSelection, ScalarId, Selection, ServerFieldId, TypeWithFieldsId, VariableDefinition,
+    DefinedTypeId, InputTypeId, LinkedFieldSelection, ObjectId, OutputTypeId, ResolverFieldId,
+    ScalarFieldSelection, ScalarId, Selection, ServerFieldId, VariableDefinition,
 };
 use thiserror::Error;
 
@@ -21,21 +21,18 @@ use crate::{
 pub type ValidatedSchemaField = SchemaServerField<TypeAnnotation<OutputTypeId>>;
 
 pub type ValidatedSelection =
-    Selection<DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>, TypeWithFieldsId>;
+    Selection<DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>, ObjectId>;
 
 pub type ValidatedVariableDefinition = VariableDefinition<InputTypeId>;
-pub type ValidatedSchemaResolver = SchemaResolver<
-    DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>,
-    TypeWithFieldsId,
-    InputTypeId,
->;
+pub type ValidatedSchemaResolver =
+    SchemaResolver<DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>, ObjectId, InputTypeId>;
 
 pub type ValidatedDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;
 
 pub type ValidatedSchema = Schema<
     OutputTypeId,
     DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>,
-    TypeWithFieldsId,
+    ObjectId,
     InputTypeId,
     ValidatedDefinedField,
 >;
@@ -216,9 +213,8 @@ fn validate_resolver_fragment(
 
     match unvalidated_resolver.selection_set_and_unwraps {
         Some((selection_set, unwraps)) => {
-            let parent_type = schema_data.lookup_type_with_fields(TypeWithFieldsId::Object(
-                unvalidated_resolver.parent_object_id,
-            ));
+            let parent_type =
+                schema_data.lookup_type_with_fields(unvalidated_resolver.parent_object_id);
             let selection_set = validate_resolver_definition_selections_exist_and_types_match(
                 schema_data,
                 selection_set,
@@ -487,10 +483,7 @@ fn validate_field_type_exists_and_is_linked(
     parent_type: UnvalidatedSchemaTypeWithFields,
     linked_field_selection: LinkedFieldSelection<(), ()>,
 ) -> ValidateSelectionsResult<
-    LinkedFieldSelection<
-        DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>,
-        TypeWithFieldsId,
-    >,
+    LinkedFieldSelection<DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>, ObjectId>,
 > {
     let linked_field_name = linked_field_selection.name.item.into();
     match parent_fields.get(&linked_field_name) {
@@ -513,22 +506,22 @@ fn validate_field_type_exists_and_is_linked(
                         DefinedTypeId::Object(object_id) => {
                             let object = schema_data.objects.get(object_id.as_usize()).unwrap();
                             Ok(LinkedFieldSelection {
-                            name: linked_field_selection.name,
-                            reader_alias: linked_field_selection.reader_alias,
-                            normalization_alias: linked_field_selection.normalization_alias,
-                            selection_set: linked_field_selection.selection_set.into_iter().map(
-                                |selection| {
-                                    validate_resolver_definition_selection_exists_and_type_matches(
-                                        selection,
-                                        SchemaTypeWithFields::Object(object),
-                                        schema_data,
-                                    )
-                                },
-                            ).collect::<Result<Vec<_>, _>>()?,
-                            unwraps: linked_field_selection.unwraps,
-                            field: TypeWithFieldsId::Object(object_id),
-                            arguments: linked_field_selection.arguments,
-                        })
+                                name: linked_field_selection.name,
+                                reader_alias: linked_field_selection.reader_alias,
+                                normalization_alias: linked_field_selection.normalization_alias,
+                                selection_set: linked_field_selection.selection_set.into_iter().map(
+                                    |selection| {
+                                        validate_resolver_definition_selection_exists_and_type_matches(
+                                            selection,
+                                            SchemaTypeWithFields::Object(object),
+                                            schema_data,
+                                        )
+                                    },
+                                ).collect::<Result<Vec<_>, _>>()?,
+                                unwraps: linked_field_selection.unwraps,
+                                field: object_id,
+                                arguments: linked_field_selection.arguments,
+                            })
                         }
                     }
                 }

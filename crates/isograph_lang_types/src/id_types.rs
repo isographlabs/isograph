@@ -6,12 +6,6 @@ u32_newtype!(ResolverFieldId);
 
 u32_newtype!(ObjectId);
 
-impl From<ObjectId> for TypeWithFieldsId {
-    fn from(id: ObjectId) -> Self {
-        TypeWithFieldsId::Object(id)
-    }
-}
-
 u32_newtype!(ScalarId);
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
@@ -52,11 +46,4 @@ impl DefinedTypeId {
     }
 
     // as_scalar_id
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
-pub enum TypeWithFieldsId {
-    Object(ObjectId),
-    // Interface
-    // Union
 }
