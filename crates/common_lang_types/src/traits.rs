@@ -37,10 +37,3 @@ impl<TServerType: ValidTypeAnnotationInnerType, TResolverType>
         }
     }
 }
-// TODO map both types
-
-// /// Used to constrain the valid types that a LinkedFieldSelection can have to
-// /// LinkedFieldName (for unvalidated linked field selections) and TypeWithFieldsId
-// /// (for validated linked field selections).
-pub trait ValidLinkedFieldType {}
-impl ValidLinkedFieldType for () {}

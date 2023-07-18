@@ -1,4 +1,4 @@
-use common_lang_types::{ValidLinkedFieldType, ValidTypeAnnotationInnerType};
+use common_lang_types::ValidTypeAnnotationInnerType;
 use u32_newtypes::u32_newtype;
 
 u32_newtype!(ServerFieldId);

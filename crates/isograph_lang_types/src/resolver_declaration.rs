@@ -3,8 +3,8 @@ use std::fmt;
 use common_lang_types::{
     DescriptionValue, FieldArgumentName, FieldNameOrAlias, HasName, IsographDirectiveName,
     LinkedFieldAlias, LinkedFieldName, ResolverDefinitionPath, ScalarFieldAlias, ScalarFieldName,
-    ServerFieldDefinitionName, UnvalidatedTypeName, ValidLinkedFieldType,
-    ValidTypeAnnotationInnerType, VariableName, WithSpan,
+    ServerFieldDefinitionName, UnvalidatedTypeName, ValidTypeAnnotationInnerType, VariableName,
+    WithSpan,
 };
 use graphql_lang_types::TypeAnnotation;
 
