@@ -1,7 +1,4 @@
-use crate::{
-    FieldNameOrAlias, ServerFieldDefinitionName, TypeAndField, TypeWithFieldsName,
-    TypeWithoutFieldsId,
-};
+use crate::{FieldNameOrAlias, TypeAndField, TypeWithoutFieldsId};
 
 pub trait HasName {
     type Name;

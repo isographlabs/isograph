@@ -12,7 +12,7 @@ use common_lang_types::{
 pub enum TypeSystemDefinition {
     ObjectTypeDefinition(ObjectTypeDefinition),
     ScalarTypeDefinition(ScalarTypeDefinition),
-    // Interface
+    InterfaceTypeDefinition(InterfaceTypeDefinition),
     // Union
     // Enum
     // InputObject
@@ -24,6 +24,12 @@ pub enum TypeSystemDefinition {
 impl From<ObjectTypeDefinition> for TypeSystemDefinition {
     fn from(type_definition: ObjectTypeDefinition) -> Self {
         Self::ObjectTypeDefinition(type_definition)
+    }
+}
+
+impl From<InterfaceTypeDefinition> for TypeSystemDefinition {
+    fn from(type_definition: InterfaceTypeDefinition) -> Self {
+        Self::InterfaceTypeDefinition(type_definition)
     }
 }
 
@@ -60,6 +66,15 @@ pub struct ScalarTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithSpan<ScalarTypeName>,
     pub directives: Vec<Directive<ConstantValue>>,
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub struct InterfaceTypeDefinition {
+    pub description: Option<WithSpan<DescriptionValue>>,
+    pub name: WithSpan<InterfaceTypeName>,
+    pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
+    pub directives: Vec<Directive<ConstantValue>>,
+    pub fields: Vec<WithSpan<OutputFieldDefinition>>,
 }
 
 // TODO maybe parametrize with T: TypeTrait

@@ -4,8 +4,8 @@ use common_lang_types::{
     DefinedField, DescriptionValue, FieldArgumentName, FieldNameOrAlias, HasName,
     IsographDirectiveName, LinkedFieldAlias, LinkedFieldName, ResolverDefinitionPath,
     ScalarFieldAlias, ScalarFieldName, ServerFieldDefinitionName, TypeAndField, TypeWithFieldsId,
-    TypeWithFieldsName, TypeWithoutFieldsId, UnvalidatedTypeName, ValidLinkedFieldType,
-    ValidScalarFieldType, ValidTypeAnnotationInnerType, VariableName, WithSpan,
+    TypeWithoutFieldsId, UnvalidatedTypeName, ValidLinkedFieldType, ValidScalarFieldType,
+    ValidTypeAnnotationInnerType, VariableName, WithSpan,
 };
 use graphql_lang_types::TypeAnnotation;
 

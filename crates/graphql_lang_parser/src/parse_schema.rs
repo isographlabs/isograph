@@ -7,9 +7,10 @@ use graphql_syntax::TokenKind;
 use intern::string_key::StringKey;
 
 use graphql_lang_types::{
-    ConstantValue, Directive, InputValueDefinition, ListTypeAnnotation, NameValuePair,
-    NamedTypeAnnotation, NonNullTypeAnnotation, ObjectTypeDefinition, OutputFieldDefinition,
-    ScalarTypeDefinition, TypeAnnotation, TypeSystemDefinition, TypeSystemDocument, ValueType,
+    ConstantValue, Directive, InputValueDefinition, InterfaceTypeDefinition, ListTypeAnnotation,
+    NameValuePair, NamedTypeAnnotation, NonNullTypeAnnotation, ObjectTypeDefinition,
+    OutputFieldDefinition, ScalarTypeDefinition, TypeAnnotation, TypeSystemDefinition,
+    TypeSystemDocument, ValueType,
 };
 
 use crate::ParseResult;
@@ -43,6 +44,7 @@ fn parse_type_system_definition(tokens: &mut PeekableLexer) -> ParseResult<TypeS
     match identifier_source {
         "type" => parse_object_type_definition(tokens, description).map(|x| x.into()),
         "scalar" => parse_scalar_type_definition(tokens, description).map(|x| x.into()),
+        "interface" => parse_interface_type_definition(tokens, description).map(|x| x.into()),
         _ => Err(SchemaParseError::TopLevelSchemaDeclarationExpected {
             found_text: identifier_source.to_string(),
         }),
@@ -61,6 +63,26 @@ fn parse_object_type_definition(
     let fields = parse_optional_fields(tokens)?;
 
     Ok(ObjectTypeDefinition {
+        description,
+        name,
+        interfaces,
+        directives,
+        fields,
+    })
+}
+
+/// The state of the PeekableLexer is that it has processed the "interface" keyword
+fn parse_interface_type_definition(
+    tokens: &mut PeekableLexer,
+    description: Option<WithSpan<DescriptionValue>>,
+) -> ParseResult<InterfaceTypeDefinition> {
+    let name = tokens.parse_string_key_type(TokenKind::Identifier)?;
+
+    let interfaces = parse_implements_interfaces_if_present(tokens)?;
+    let directives = parse_constant_directives(tokens)?;
+    let fields = parse_optional_fields(tokens)?;
+
+    Ok(InterfaceTypeDefinition {
         description,
         name,
         interfaces,

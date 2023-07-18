@@ -5,8 +5,8 @@ use common_lang_types::{
     ServerFieldId, TypeId, TypeWithFieldsId, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
-    ObjectTypeDefinition, OutputFieldDefinition, ScalarTypeDefinition, TypeAnnotation,
-    TypeSystemDefinition, TypeSystemDocument,
+    InterfaceTypeDefinition, ObjectTypeDefinition, OutputFieldDefinition, ScalarTypeDefinition,
+    TypeAnnotation, TypeSystemDefinition, TypeSystemDocument,
 };
 use intern::string_key::Intern;
 use lazy_static::lazy_static;
@@ -33,6 +33,9 @@ impl UnvalidatedSchema {
                 }
                 TypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
                     self.process_scalar_definition(scalar_type_definition)?;
+                }
+                TypeSystemDefinition::InterfaceTypeDefinition(interface_type_definition) => {
+                    self.process_interface_type_definition(interface_type_definition)?;
                 }
             }
         }
@@ -78,7 +81,8 @@ impl UnvalidatedSchema {
                 });
 
                 // ----- HACK -----
-                // Instead of this, we possibly should parse GraphQL schema declarations.
+                // This should mutate a default query object; only if no schema declaration is ultimately
+                // encountered should we use the default query object.
                 if object_type_definition.name.item == *QUERY_TYPE {
                     self.query_type_id = Some(next_object_id);
                 }
@@ -88,6 +92,13 @@ impl UnvalidatedSchema {
                 vacant.insert(TypeId::Object(next_object_id));
             }
         }
+        Ok(())
+    }
+
+    fn process_interface_type_definition(
+        &mut self,
+        interface_type_definition: InterfaceTypeDefinition,
+    ) -> ProcessTypeDefinitionResult<()> {
         Ok(())
     }
 

@@ -8,9 +8,9 @@ use std::{
 
 use common_lang_types::{
     DefinedField, FieldNameOrAlias, HasName, OutputTypeId, QueryOperationName,
-    ResolverDefinitionPath, ResolverFieldId, ServerFieldDefinitionName, ServerFieldId,
-    TypeAndField, TypeWithFieldsId, TypeWithFieldsName, TypeWithoutFieldsId, UnvalidatedTypeName,
-    ValidTypeAnnotationInnerType, WithSpan,
+    ResolverDefinitionPath, ServerFieldDefinitionName, TypeAndField, TypeWithFieldsId,
+    TypeWithFieldsName, TypeWithoutFieldsId, UnvalidatedTypeName, ValidTypeAnnotationInnerType,
+    WithSpan,
 };
 use graphql_lang_types::{ListTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
