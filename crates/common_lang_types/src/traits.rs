@@ -10,7 +10,7 @@ pub trait ValidTypeAnnotationInnerType {}
 
 /// Distinguishes between server fields and locally-defined resolver fields.
 /// TServerType can be a ScalarFieldName in an unvalidated schema, or a
-/// TypeWithoutFieldsId, in a validated schema.
+/// ScalarId, in a validated schema.
 ///
 /// TResolverType can be an UnvalidatedTypeName in an unvalidated schema, or an
 /// OutputTypeId in a validated schema.

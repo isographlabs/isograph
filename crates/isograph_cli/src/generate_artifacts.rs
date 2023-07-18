@@ -13,9 +13,9 @@ use common_lang_types::{
 };
 use graphql_lang_types::{ListTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
-    NonConstantValue, OutputTypeId, Selection, SelectionFieldArgument,
+    NonConstantValue, OutputTypeId, ScalarId, Selection, SelectionFieldArgument,
     ServerFieldSelection::{LinkedField, ScalarField},
-    TypeWithFieldsId, TypeWithoutFieldsId,
+    TypeWithFieldsId,
 };
 use isograph_schema::{
     merge_selection_set, MergedSelection, MergedSelectionSet, ResolverVariant,
@@ -780,10 +780,7 @@ fn generate_reader_ast<'schema>(
 
 fn generate_reader_ast_node(
     item: &WithSpan<
-        Selection<
-            DefinedField<TypeWithoutFieldsId, (FieldNameOrAlias, TypeAndField)>,
-            TypeWithFieldsId,
-        >,
+        Selection<DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>, TypeWithFieldsId>,
     >,
     parent_type: SchemaTypeWithFields<'_, ValidatedDefinedField>,
     schema: &ValidatedSchema,

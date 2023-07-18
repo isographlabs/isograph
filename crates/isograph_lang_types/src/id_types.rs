@@ -37,13 +37,6 @@ pub enum InputTypeId {
 impl ValidTypeAnnotationInnerType for InputTypeId {}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
-pub enum TypeWithoutFieldsId {
-    Scalar(ScalarId),
-    // Enum
-}
-impl ValidTypeAnnotationInnerType for TypeWithoutFieldsId {}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 pub enum EncounteredTypeId {
     Object(ObjectId),
     Scalar(ScalarId),

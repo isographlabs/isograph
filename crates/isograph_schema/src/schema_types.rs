@@ -4,7 +4,7 @@ use common_lang_types::{
     DefinedField, DescriptionValue, HasName, InputTypeName, InterfaceTypeName,
     IsographObjectTypeName, JavascriptName, ResolverDefinitionPath, ScalarFieldName,
     ScalarTypeName, ServerFieldDefinitionName, TypeAndField, TypeWithoutFieldsName,
-    UnvalidatedTypeName, ValidLinkedFieldType, ValidTypeAnnotationInnerType, WithSpan,
+    UnvalidatedTypeName, ValidTypeAnnotationInnerType, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, Directive, InterfaceTypeDefinition, ObjectTypeDefinition, OutputFieldDefinition,
@@ -13,7 +13,7 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     EncounteredTypeId, InputTypeId, ObjectId, OutputTypeId, ResolverFieldId, ScalarId, Selection,
-    ServerFieldId, TypeWithFieldsId, TypeWithoutFieldsId, Unwrap, VariableDefinition,
+    ServerFieldId, TypeWithFieldsId, Unwrap, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -191,15 +191,8 @@ impl<TEncounteredField> SchemaData<TEncounteredField> {
         }
     }
 
-    pub fn lookup_type_without_fields(
-        &self,
-        type_without_fields_id: TypeWithoutFieldsId,
-    ) -> SchemaTypeWithoutFields {
-        match type_without_fields_id {
-            TypeWithoutFieldsId::Scalar(scalar_id) => {
-                SchemaTypeWithoutFields::Scalar(self.scalar(scalar_id))
-            }
-        }
+    pub fn lookup_type_without_fields(&self, scalar_id: ScalarId) -> SchemaTypeWithoutFields {
+        SchemaTypeWithoutFields::Scalar(self.scalar(scalar_id))
     }
 
     pub fn scalar(&self, scalar_id: ScalarId) -> &SchemaScalar {

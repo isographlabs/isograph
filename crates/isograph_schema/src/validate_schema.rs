@@ -8,8 +8,7 @@ use graphql_lang_types::TypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
     EncounteredTypeId, InputTypeId, LinkedFieldSelection, OutputTypeId, ResolverFieldId,
-    ScalarFieldSelection, Selection, ServerFieldId, TypeWithFieldsId, TypeWithoutFieldsId,
-    VariableDefinition,
+    ScalarFieldSelection, ScalarId, Selection, ServerFieldId, TypeWithFieldsId, VariableDefinition,
 };
 use thiserror::Error;
 
@@ -21,14 +20,12 @@ use crate::{
 
 pub type ValidatedSchemaField = SchemaServerField<TypeAnnotation<OutputTypeId>>;
 
-pub type ValidatedSelection = Selection<
-    DefinedField<TypeWithoutFieldsId, (FieldNameOrAlias, TypeAndField)>,
-    TypeWithFieldsId,
->;
+pub type ValidatedSelection =
+    Selection<DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>, TypeWithFieldsId>;
 
 pub type ValidatedVariableDefinition = VariableDefinition<InputTypeId>;
 pub type ValidatedSchemaResolver = SchemaResolver<
-    DefinedField<TypeWithoutFieldsId, (FieldNameOrAlias, TypeAndField)>,
+    DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>,
     TypeWithFieldsId,
     InputTypeId,
 >;
@@ -37,7 +34,7 @@ pub type ValidatedDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;
 
 pub type ValidatedSchema = Schema<
     OutputTypeId,
-    DefinedField<TypeWithoutFieldsId, (FieldNameOrAlias, TypeAndField)>,
+    DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>,
     TypeWithFieldsId,
     InputTypeId,
     ValidatedDefinedField,
@@ -429,7 +426,7 @@ fn validate_field_type_exists_and_is_scalar(
     parent_type: UnvalidatedSchemaTypeWithFields,
     scalar_field_selection: ScalarFieldSelection<()>,
 ) -> ValidateSelectionsResult<
-    ScalarFieldSelection<DefinedField<TypeWithoutFieldsId, (FieldNameOrAlias, TypeAndField)>>,
+    ScalarFieldSelection<DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>>,
 > {
     let scalar_field_name = scalar_field_selection.name.item.into();
     match parent_encountered_fields.get(&scalar_field_name) {
@@ -442,7 +439,7 @@ fn validate_field_type_exists_and_is_scalar(
                 match field_type_id {
                     EncounteredTypeId::Scalar(scalar_id) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
-                        field: DefinedField::ServerField(TypeWithoutFieldsId::Scalar(scalar_id)),
+                        field: DefinedField::ServerField(scalar_id),
                         reader_alias: scalar_field_selection.reader_alias,
                         normalization_alias: scalar_field_selection.normalization_alias,
                         unwraps: scalar_field_selection.unwraps,
@@ -491,7 +488,7 @@ fn validate_field_type_exists_and_is_linked(
     linked_field_selection: LinkedFieldSelection<(), ()>,
 ) -> ValidateSelectionsResult<
     LinkedFieldSelection<
-        DefinedField<TypeWithoutFieldsId, (FieldNameOrAlias, TypeAndField)>,
+        DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>,
         TypeWithFieldsId,
     >,
 > {
