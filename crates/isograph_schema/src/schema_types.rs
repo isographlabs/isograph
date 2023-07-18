@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use common_lang_types::{
     DefinedField, DescriptionValue, HasName, InputTypeName, InterfaceTypeName,
     IsographObjectTypeName, JavascriptName, ResolverDefinitionPath, ScalarFieldName,
-    ScalarTypeName, ServerFieldDefinitionName, TypeAndField, TypeWithoutFieldsName,
-    UnvalidatedTypeName, ValidTypeAnnotationInnerType, WithSpan,
+    ScalarTypeName, ServerFieldDefinitionName, TypeAndField, UnvalidatedTypeName,
+    ValidTypeAnnotationInnerType, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, Directive, InterfaceTypeDefinition, ObjectTypeDefinition, OutputFieldDefinition,
@@ -355,16 +355,6 @@ impl<'a> HasName for SchemaInputType<'a> {
 pub enum SchemaTypeWithoutFields<'a> {
     Scalar(&'a SchemaScalar),
     // enum
-}
-
-impl<'a> HasName for SchemaTypeWithoutFields<'a> {
-    type Name = TypeWithoutFieldsName;
-
-    fn name(&self) -> Self::Name {
-        match self {
-            SchemaTypeWithoutFields::Scalar(scalar) => scalar.name.into(),
-        }
-    }
 }
 
 impl<'schema> SchemaTypeWithoutFields<'schema> {

@@ -38,8 +38,6 @@ string_key_newtype!(UnvalidatedTypeName);
 impl ValidTypeAnnotationInnerType for UnvalidatedTypeName {}
 string_key_conversion!(IsographObjectTypeName, UnvalidatedTypeName);
 
-string_key_newtype!(TypeWithoutFieldsName);
-
 string_key_newtype!(ObjectTypeName);
 impl ValidTypeAnnotationInnerType for ObjectTypeName {}
 string_key_newtype!(ScalarTypeName);
@@ -79,9 +77,6 @@ string_key_conversion!(UnionTypeName, UnvalidatedTypeName);
 string_key_conversion!(InputObjectTypeName, UnvalidatedTypeName);
 string_key_conversion!(OutputTypeName, UnvalidatedTypeName);
 string_key_conversion!(InputTypeName, UnvalidatedTypeName);
-
-string_key_conversion!(ScalarTypeName, TypeWithoutFieldsName);
-string_key_conversion!(EnumTypeName, TypeWithoutFieldsName);
 
 // The name in the schema of the field
 string_key_newtype!(ScalarFieldName);
