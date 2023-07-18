@@ -12,8 +12,8 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    InputTypeId, ObjectId, OutputTypeId, ResolverFieldId, ScalarId, Selection, ServerFieldId,
-    TypeId, TypeWithFieldsId, TypeWithoutFieldsId, Unwrap, VariableDefinition,
+    EncounteredTypeId, InputTypeId, ObjectId, OutputTypeId, ResolverFieldId, ScalarId, Selection,
+    ServerFieldId, TypeWithFieldsId, TypeWithoutFieldsId, Unwrap, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -43,7 +43,7 @@ lazy_static! {
 pub struct Schema<
     TServerType: ValidTypeAnnotationInnerType,
     TScalarField,
-    TLinkedField: ValidLinkedFieldType,
+    TLinkedField,
     TVariableType: ValidTypeAnnotationInnerType,
     // On objects, what does the HashMap of encountered types contain
     TEncounteredField,
@@ -86,13 +86,13 @@ pub struct SchemaData<TEncounteredField> {
     pub objects: Vec<SchemaObject<TEncounteredField>>,
     pub scalars: Vec<SchemaScalar>,
     // enums, unions, interfaces, input objects
-    pub defined_types: HashMap<UnvalidatedTypeName, TypeId>,
+    pub defined_types: HashMap<UnvalidatedTypeName, EncounteredTypeId>,
 }
 
 impl<
         TServerType: ValidTypeAnnotationInnerType,
         TScalarField,
-        TLinkedField: ValidLinkedFieldType,
+        TLinkedField,
         TVariableType: ValidTypeAnnotationInnerType,
         TEncounteredField,
     > Schema<TServerType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
@@ -208,10 +208,17 @@ impl<TEncounteredField> SchemaData<TEncounteredField> {
             .expect("Invalid ScalarId")
     }
 
-    pub fn lookup_unvalidated_type(&self, type_id: TypeId) -> SchemaType<TEncounteredField> {
+    pub fn lookup_unvalidated_type(
+        &self,
+        type_id: EncounteredTypeId,
+    ) -> SchemaType<TEncounteredField> {
         match type_id {
-            TypeId::Object(id) => SchemaType::Object(self.objects.get(id.as_usize()).unwrap()),
-            TypeId::Scalar(id) => SchemaType::Scalar(self.scalars.get(id.as_usize()).unwrap()),
+            EncounteredTypeId::Object(id) => {
+                SchemaType::Object(self.objects.get(id.as_usize()).unwrap())
+            }
+            EncounteredTypeId::Scalar(id) => {
+                SchemaType::Scalar(self.scalars.get(id.as_usize()).unwrap())
+            }
         }
     }
 
@@ -246,7 +253,7 @@ impl<TEncounteredField> SchemaData<TEncounteredField> {
 
 fn add_schema_defined_scalar_type(
     scalars: &mut Vec<SchemaScalar>,
-    defined_types: &mut HashMap<UnvalidatedTypeName, TypeId>,
+    defined_types: &mut HashMap<UnvalidatedTypeName, EncounteredTypeId>,
     field_name: &'static str,
     javascript_name: JavascriptName,
 ) -> ScalarId {
@@ -259,7 +266,7 @@ fn add_schema_defined_scalar_type(
         id: scalar_id,
         javascript_name,
     });
-    defined_types.insert(typename.into(), TypeId::Scalar(scalar_id.into()));
+    defined_types.insert(typename.into(), EncounteredTypeId::Scalar(scalar_id.into()));
     scalar_id
 }
 
@@ -445,7 +452,7 @@ pub struct SchemaServerField<T> {
 #[derive(Debug)]
 pub struct SchemaResolver<
     TScalarField,
-    TLinkedField: ValidLinkedFieldType,
+    TLinkedField,
     TVariableDefinitionType: ValidTypeAnnotationInnerType,
 > {
     pub description: Option<DescriptionValue>,

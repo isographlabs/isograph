@@ -9,7 +9,7 @@ use graphql_lang_types::{
     TypeSystemDocument,
 };
 use intern::string_key::Intern;
-use isograph_lang_types::{ServerFieldId, TypeId, TypeWithFieldsId};
+use isograph_lang_types::{EncounteredTypeId, ServerFieldId, TypeWithFieldsId};
 use lazy_static::lazy_static;
 use thiserror::Error;
 
@@ -130,7 +130,7 @@ impl UnvalidatedSchema {
                 // --- END HACK ---
 
                 existing_fields.extend(new_fields);
-                vacant.insert(TypeId::Object(next_object_id));
+                vacant.insert(EncounteredTypeId::Object(next_object_id));
             }
         }
 
@@ -171,7 +171,7 @@ impl UnvalidatedSchema {
                     javascript_name: *STRING_JAVASCRIPT_TYPE,
                 });
 
-                vacant.insert(TypeId::Scalar(next_scalar_id));
+                vacant.insert(EncounteredTypeId::Scalar(next_scalar_id));
             }
         }
         Ok(())

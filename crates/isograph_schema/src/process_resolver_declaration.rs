@@ -5,7 +5,9 @@ use common_lang_types::{
     UnvalidatedTypeName, WithSpan,
 };
 use intern::string_key::Intern;
-use isograph_lang_types::{FragmentDirectiveUsage, ObjectId, ResolverDeclaration, TypeId};
+use isograph_lang_types::{
+    EncounteredTypeId, FragmentDirectiveUsage, ObjectId, ResolverDeclaration,
+};
 use lazy_static::lazy_static;
 use thiserror::Error;
 
@@ -25,10 +27,10 @@ impl UnvalidatedSchema {
             })?;
 
         match parent_type_id {
-            TypeId::Object(object_id) => {
+            EncounteredTypeId::Object(object_id) => {
                 self.add_resolver_field_to_object(*object_id, resolver_declaration)?;
             }
-            TypeId::Scalar(scalar_id) => {
+            EncounteredTypeId::Scalar(scalar_id) => {
                 let scalar_name = self.schema_data.scalars[scalar_id.as_usize()].name;
                 return Err(ProcessResolverDeclarationError::InvalidParentType {
                     parent_type: "scalar",

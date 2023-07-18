@@ -7,8 +7,9 @@ use common_lang_types::{
 use graphql_lang_types::TypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    InputTypeId, LinkedFieldSelection, OutputTypeId, ResolverFieldId, ScalarFieldSelection,
-    Selection, ServerFieldId, TypeId, TypeWithFieldsId, TypeWithoutFieldsId, VariableDefinition,
+    EncounteredTypeId, InputTypeId, LinkedFieldSelection, OutputTypeId, ResolverFieldId,
+    ScalarFieldSelection, Selection, ServerFieldId, TypeWithFieldsId, TypeWithoutFieldsId,
+    VariableDefinition,
 };
 use thiserror::Error;
 
@@ -439,7 +440,7 @@ fn validate_field_type_exists_and_is_scalar(
                     .get(server_field_name.inner())
                     .expect("Expected field type to be defined, which I think was validated earlier, probably indicates a bug in Isograph");
                 match field_type_id {
-                    TypeId::Scalar(scalar_id) => Ok(ScalarFieldSelection {
+                    EncounteredTypeId::Scalar(scalar_id) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
                         field: DefinedField::ServerField(TypeWithoutFieldsId::Scalar(scalar_id)),
                         reader_alias: scalar_field_selection.reader_alias,
@@ -447,7 +448,7 @@ fn validate_field_type_exists_and_is_scalar(
                         unwraps: scalar_field_selection.unwraps,
                         arguments: scalar_field_selection.arguments,
                     }),
-                    TypeId::Object(_) => Err(
+                    EncounteredTypeId::Object(_) => Err(
                         ValidateSelectionsError::FieldSelectedAsScalarButTypeIsNotScalar {
                             field_parent_type_name: parent_type.name(),
                             field_name: scalar_field_name,
@@ -504,7 +505,7 @@ fn validate_field_type_exists_and_is_linked(
                     .get(server_field_name.inner())
                     .expect("Expected field type to be defined, which I think was validated earlier, probably indicates a bug in Isograph");
                     match field_type_id {
-                        TypeId::Scalar(_) => Err(
+                        EncounteredTypeId::Scalar(_) => Err(
                             ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsScalar {
                                 field_parent_type_name: parent_type.name(),
                                 field_name: linked_field_name,
@@ -512,7 +513,7 @@ fn validate_field_type_exists_and_is_linked(
                                 target_type_name: *server_field_name.inner(),
                             },
                         ),
-                        TypeId::Object(object_id) => {
+                        EncounteredTypeId::Object(object_id) => {
                             let object = schema_data.objects.get(object_id.as_usize()).unwrap();
                             Ok(LinkedFieldSelection {
                             name: linked_field_selection.name,

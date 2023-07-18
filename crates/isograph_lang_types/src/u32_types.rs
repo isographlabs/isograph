@@ -44,27 +44,23 @@ pub enum TypeWithoutFieldsId {
 impl ValidTypeAnnotationInnerType for TypeWithoutFieldsId {}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
-pub enum TypeId {
+pub enum EncounteredTypeId {
     Object(ObjectId),
     Scalar(ScalarId),
-    // Enum
-    // Interface
-    // Union
-    // AND ALSO: InputObject
 }
-impl ValidTypeAnnotationInnerType for TypeId {}
+impl ValidTypeAnnotationInnerType for EncounteredTypeId {}
 
-impl TypeId {
+impl EncounteredTypeId {
     pub fn as_output_type_id(self) -> Option<OutputTypeId> {
         match self {
-            TypeId::Object(id) => Some(OutputTypeId::Object(id)),
-            TypeId::Scalar(id) => Some(OutputTypeId::Scalar(id)),
+            EncounteredTypeId::Object(id) => Some(OutputTypeId::Object(id)),
+            EncounteredTypeId::Scalar(id) => Some(OutputTypeId::Scalar(id)),
         }
     }
 
     pub fn as_input_type_id(self) -> Option<InputTypeId> {
         match self {
-            TypeId::Scalar(id) => Some(InputTypeId::Scalar(id)),
+            EncounteredTypeId::Scalar(id) => Some(InputTypeId::Scalar(id)),
             _ => None,
         }
     }
@@ -78,5 +74,4 @@ pub enum TypeWithFieldsId {
     // Interface
     // Union
 }
-impl ValidLinkedFieldType for TypeWithFieldsId {}
 impl ValidTypeAnnotationInnerType for TypeWithFieldsId {}
