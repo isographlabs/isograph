@@ -35,7 +35,6 @@ impl UnvalidatedSchema {
         // - First, create types for interfaces, objects, scalars, etc.
         // - Then, validate that all implemented interfaces exist, and add refinements
         //   to the found interface.
-        //
         let mut valid_type_refinement_map = HashMap::new();
 
         for type_system_definition in type_system_document.0 {
@@ -70,7 +69,6 @@ impl UnvalidatedSchema {
                     },
                 )?;
 
-            // TODO modify supertype
             match supertype_id {
                 DefinedTypeId::Scalar(_) => {
                     return Err(ProcessTypeDefinitionError::IsographObjectTypeNameIsScalar {
@@ -85,10 +83,10 @@ impl UnvalidatedSchema {
                     // a way to execute GraphQL-specific code in isograph-land without actually
                     // putting the code here.)
 
-                    for subtype in subtypes {
+                    for subtype_id in subtypes {
                         supertype
                             .valid_refinements
-                            .push(ValidRefinement { target: subtype })
+                            .push(ValidRefinement { target: subtype_id });
                     }
                 }
             }
