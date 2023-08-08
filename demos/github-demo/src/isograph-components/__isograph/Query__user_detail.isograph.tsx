@@ -20,7 +20,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
       {
         kind: "Scalar",
         response_name: "id",
-        alias: null,
+        alias: "foo",
         arguments: null,
       },
       {
@@ -43,7 +43,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 export type ResolverParameterType = { data:
 {
   user: ({
-    id: string,
+    foo: string,
     name: (string | null),
     repository_list: User__repository_list__outputType,
   } | null),

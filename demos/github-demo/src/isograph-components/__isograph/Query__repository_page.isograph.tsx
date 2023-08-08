@@ -7,15 +7,12 @@ import Query__repository_detail, { ReadOutType as Query__repository_detail__outp
 const queryText = 'query repository_page ($repositoryName: String!, $repositoryOwner: String!, $first: Int!) {\
   repository____name___repositoryName____owner___repositoryOwner: repository(name: $repositoryName, owner: $repositoryOwner) {\
     id,\
-    id,\
     nameWithOwner,\
     parent {\
-      id,\
       id,\
       name,\
       nameWithOwner,\
       owner {\
-        id,\
         id,\
         login,\
       },\
@@ -26,7 +23,6 @@ const queryText = 'query repository_page ($repositoryName: String!, $repositoryO
           id,\
           closed,\
           createdAt,\
-          id,\
           number,\
           title,\
           totalCommentsCount,\
@@ -48,7 +44,6 @@ const queryText = 'query repository_page ($repositoryName: String!, $repositoryO
   viewer {\
     id,\
     avatarUrl,\
-    id,\
     name,\
   },\
 }';

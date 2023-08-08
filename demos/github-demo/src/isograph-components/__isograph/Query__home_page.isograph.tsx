@@ -8,7 +8,6 @@ const queryText = 'query home_page ($first: Int!) {\
   viewer {\
     id,\
     avatarUrl,\
-    id,\
     login,\
     name,\
     repositories____last___first: repositories(last: $first) {\
@@ -17,12 +16,10 @@ const queryText = 'query home_page ($first: Int!) {\
           id,\
           description,\
           forkCount,\
-          id,\
           name,\
           nameWithOwner,\
           stargazerCount,\
           owner {\
-            id,\
             id,\
             login,\
           },\

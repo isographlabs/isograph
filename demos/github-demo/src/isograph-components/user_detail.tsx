@@ -5,7 +5,7 @@ import { RepoLink } from "./RepoLink";
 export const user_detail = iso<UserDetailParams, ReturnType<typeof UserDetail>>`
   Query.user_detail @component {
     user(login: $userLogin) {
-      id,
+      foo: id,
       name,
       repository_list,
     },

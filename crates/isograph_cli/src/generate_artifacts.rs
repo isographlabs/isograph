@@ -393,47 +393,72 @@ fn write_selections_for_query_text(
     items: &[WithSpan<MergedSelection>],
     indentation_level: u8,
 ) {
+    let mut id_field_opt = None;
     if let Some(id_field) = root_object.id_field {
+        let id_field = schema.field(id_field);
+
         // We found an id field, we must select it
         query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+        query_text.push_str(&format!("{},\\\n", id_field.name));
 
-        let id_field_name = schema.field(id_field).name;
-        query_text.push_str(&format!("{},\\\n", id_field_name));
+        // This is bad!
+        match id_field.field_type.inner() {
+            OutputTypeId::Object(_) => {
+                panic!("id field must be a scalar, TODO enforce this with types :(")
+            }
+            OutputTypeId::Scalar(id_field_id) => id_field_opt = Some(*id_field_id),
+        }
     }
 
-    // TODO avoid selecting id twice here
-    for item in items.iter() {
-        query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+    'item: for item in items.iter() {
         match &item.item {
-            Selection::ServerField(field) => match field {
-                ScalarField(scalar_field) => {
-                    if let Some(alias) = scalar_field.normalization_alias {
-                        query_text.push_str(&format!("{}: ", alias));
+            Selection::ServerField(field) => {
+                match field {
+                    ScalarField(scalar_field) => {
+                        // ------ HACK ------
+                        // Here, we are avoiding selecting the id field twice.
+                        if let Some(id_field_id) = id_field_opt {
+                            // Note: we aren't checking for reader alias because reader aliases
+                            // don't exist in generated query texts! We can check for the presence
+                            // of a normalization alias, but we know that that won't exist for
+                            // a field with no arguments (as we are assuming is the case with ID).
+                            if scalar_field.field == id_field_id {
+                                continue 'item;
+                            }
+                        }
+                        // ---- END HACK ----
+                        query_text
+                            .push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+                        if let Some(alias) = scalar_field.normalization_alias {
+                            query_text.push_str(&format!("{}: ", alias));
+                        }
+                        let name = scalar_field.name.item;
+                        let arguments = get_serialized_arguments(&scalar_field.arguments);
+                        query_text.push_str(&format!("{}{},\\\n", name, arguments));
                     }
-                    let name = scalar_field.name.item;
-                    let arguments = get_serialized_arguments(&scalar_field.arguments);
-                    query_text.push_str(&format!("{}{},\\\n", name, arguments));
-                }
-                LinkedField(linked_field) => {
-                    if let Some(alias) = linked_field.normalization_alias {
-                        query_text.push_str(&format!("{}: ", alias));
+                    LinkedField(linked_field) => {
+                        query_text
+                            .push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+                        if let Some(alias) = linked_field.normalization_alias {
+                            query_text.push_str(&format!("{}: ", alias));
+                        }
+                        let name = linked_field.name.item;
+                        let arguments = get_serialized_arguments(&linked_field.arguments);
+                        query_text.push_str(&format!("{}{} {{\\\n", name, arguments));
+                        write_selections_for_query_text(
+                            query_text,
+                            schema,
+                            schema.schema_data.object(linked_field.field),
+                            &linked_field.selection_set,
+                            indentation_level + 1,
+                        );
+                        query_text.push_str(&format!(
+                            "{}}},\\\n",
+                            "  ".repeat(indentation_level as usize)
+                        ));
                     }
-                    let name = linked_field.name.item;
-                    let arguments = get_serialized_arguments(&linked_field.arguments);
-                    query_text.push_str(&format!("{}{} {{\\\n", name, arguments));
-                    write_selections_for_query_text(
-                        query_text,
-                        schema,
-                        schema.schema_data.object(linked_field.field),
-                        &linked_field.selection_set,
-                        indentation_level + 1,
-                    );
-                    query_text.push_str(&format!(
-                        "{}}},\\\n",
-                        "  ".repeat(indentation_level as usize)
-                    ));
                 }
-            },
+            }
         }
     }
 }

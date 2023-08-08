@@ -7,7 +7,6 @@ import Query__user_detail, { ReadOutType as Query__user_detail__outputType } fro
 const queryText = 'query user_page ($first: Int!, $userLogin: String!) {\
   user____login___userLogin: user(login: $userLogin) {\
     id,\
-    id,\
     name,\
     repositories____last___first: repositories(last: $first) {\
       edges {\
@@ -15,12 +14,10 @@ const queryText = 'query user_page ($first: Int!, $userLogin: String!) {\
           id,\
           description,\
           forkCount,\
-          id,\
           name,\
           nameWithOwner,\
           stargazerCount,\
           owner {\
-            id,\
             id,\
             login,\
           },\
@@ -37,7 +34,6 @@ const queryText = 'query user_page ($first: Int!, $userLogin: String!) {\
   viewer {\
     id,\
     avatarUrl,\
-    id,\
     name,\
   },\
 }';
