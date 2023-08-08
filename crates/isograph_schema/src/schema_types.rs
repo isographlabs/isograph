@@ -324,9 +324,8 @@ pub struct SchemaObject<TEncounteredField> {
     pub id: ObjectId,
     // pub interfaces: Vec<InterfaceTypeName>,
     // pub directives: Vec<Directive<ConstantValue>>,
-    /// Invariant: if id_field is Some, it should also show up in the fields Vec
-    /// ...or... we should enforce that id_field is never in fields. For now,
-    /// we do the former.
+    /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
+    /// to something else.
     pub id_field: Option<ServerFieldId>,
     pub fields: Vec<ServerFieldId>,
     pub resolvers: Vec<ResolverFieldId>,

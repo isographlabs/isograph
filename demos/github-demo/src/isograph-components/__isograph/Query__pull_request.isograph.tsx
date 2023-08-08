@@ -7,13 +7,16 @@ import Query__pull_request_detail, { ReadOutType as Query__pull_request_detail__
 const queryText = 'query pull_request ($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!) {\
   repository____owner___repositoryOwner____name___repositoryName: repository(owner: $repositoryOwner, name: $repositoryName) {\
     id,\
+    id,\
     pullRequest____number___pullRequestNumber: pullRequest(number: $pullRequestNumber) {\
+      id,\
       bodyHTML,\
       id,\
       title,\
       comments____last___last: comments(last: $last) {\
         edges {\
           node {\
+            id,\
             bodyText,\
             createdAt,\
             id,\
@@ -26,6 +29,7 @@ const queryText = 'query pull_request ($repositoryOwner: String!, $repositoryNam
     },\
   },\
   viewer {\
+    id,\
     avatarUrl,\
     id,\
     name,\

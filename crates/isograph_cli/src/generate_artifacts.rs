@@ -393,6 +393,15 @@ fn write_selections_for_query_text(
     items: &[WithSpan<MergedSelection>],
     indentation_level: u8,
 ) {
+    if let Some(id_field) = root_object.id_field {
+        // We found an id field, we must select it
+        query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+
+        let id_field_name = schema.field(id_field).name;
+        query_text.push_str(&format!("{},\\\n", id_field_name));
+    }
+
+    // TODO avoid selecting id twice here
     for item in items.iter() {
         query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
         match &item.item {
