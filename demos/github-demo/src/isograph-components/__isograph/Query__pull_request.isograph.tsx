@@ -5,13 +5,13 @@ import Query__header, { ReadOutType as Query__header__outputType } from './Query
 import Query__pull_request_detail, { ReadOutType as Query__pull_request_detail__outputType } from './Query__pull_request_detail.isograph';
 
 const queryText = 'query pull_request ($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!) {\
-  repository__owner_repositoryOwner__name_repositoryName: repository(owner: $repositoryOwner, name: $repositoryName) {\
+  repository____owner___repositoryOwner____name___repositoryName: repository(owner: $repositoryOwner, name: $repositoryName) {\
     id,\
-    pullRequest__number_pullRequestNumber: pullRequest(number: $pullRequestNumber) {\
+    pullRequest____number___pullRequestNumber: pullRequest(number: $pullRequestNumber) {\
       bodyHTML,\
       id,\
       title,\
-      comments__last_last: comments(last: $last) {\
+      comments____last___last: comments(last: $last) {\
         edges {\
           node {\
             bodyText,\

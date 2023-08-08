@@ -20,7 +20,9 @@ export function HomeRoute({
   route: Route;
   setRoute: (route: Route) => void;
 }) {
-  const { queryReference } = useLazyReference(homePageQuery, { first: 15 });
+  const { queryReference } = useLazyReference(homePageQuery, {
+    first: 15,
+  });
   const data = read(queryReference);
   return (
     <>

@@ -180,6 +180,10 @@ function getFieldOrNormalize(
   return { __link: dataId };
 }
 
+// an alias might be pullRequests____first___first____after___cursor
+const FIRST_SPLIT_KEY = "____";
+const SECOND_SPLIT_KEY = "___";
+
 /// Fields that use variables have aliases like nameOfField__fieldName1_variableName2__...
 /// so e.g. node(id: $ID) becomes node__id_ID. Here, we map that back to node__id_4
 /// for writing to the store.
@@ -188,13 +192,14 @@ function HACK_get_store_key(
   // {ID: "4"} and the like
   variablesToValues: { [index: string]: string }
 ): string {
-  const parts = networkResponseKey.split("__");
+  const parts = networkResponseKey.split(FIRST_SPLIT_KEY);
   let fieldName = parts[0];
 
   // {id: "ID"} and the like
   const fieldArgToUsedVariable: { [index: string]: string } = {};
   for (const variable_key_val of parts.slice(1)) {
-    const [fieldArgName, usedVariable] = variable_key_val.split("_");
+    const [fieldArgName, usedVariable] =
+      variable_key_val.split(SECOND_SPLIT_KEY);
     fieldArgToUsedVariable[fieldArgName] = usedVariable;
   }
 

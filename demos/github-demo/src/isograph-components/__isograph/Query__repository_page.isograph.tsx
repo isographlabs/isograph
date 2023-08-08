@@ -5,7 +5,7 @@ import Query__header, { ReadOutType as Query__header__outputType } from './Query
 import Query__repository_detail, { ReadOutType as Query__repository_detail__outputType } from './Query__repository_detail.isograph';
 
 const queryText = 'query repository_page ($repositoryName: String!, $repositoryOwner: String!, $first: Int!) {\
-  repository__name_repositoryName__owner_repositoryOwner: repository(name: $repositoryName, owner: $repositoryOwner) {\
+  repository____name___repositoryName____owner___repositoryOwner: repository(name: $repositoryName, owner: $repositoryOwner) {\
     id,\
     nameWithOwner,\
     parent {\
@@ -17,7 +17,7 @@ const queryText = 'query repository_page ($repositoryName: String!, $repositoryO
         login,\
       },\
     },\
-    pullRequests__last_first: pullRequests(last: $first) {\
+    pullRequests____last___first: pullRequests(last: $first) {\
       edges {\
         node {\
           closed,\

@@ -5,10 +5,10 @@ import Query__header, { ReadOutType as Query__header__outputType } from './Query
 import Query__user_detail, { ReadOutType as Query__user_detail__outputType } from './Query__user_detail.isograph';
 
 const queryText = 'query user_page ($first: Int!, $userLogin: String!) {\
-  user__login_userLogin: user(login: $userLogin) {\
+  user____login___userLogin: user(login: $userLogin) {\
     id,\
     name,\
-    repositories__last_first: repositories(last: $first) {\
+    repositories____last___first: repositories(last: $first) {\
       edges {\
         node {\
           description,\
@@ -21,10 +21,10 @@ const queryText = 'query user_page ($first: Int!, $userLogin: String!) {\
             id,\
             login,\
           },\
-          pullRequests__first_first: pullRequests(first: $first) {\
+          pullRequests____first___first: pullRequests(first: $first) {\
             totalCount,\
           },\
-          watchers__first_first: watchers(first: $first) {\
+          watchers____first___first: watchers(first: $first) {\
             totalCount,\
           },\
         },\

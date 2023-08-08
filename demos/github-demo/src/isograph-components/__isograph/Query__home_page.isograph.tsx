@@ -10,7 +10,7 @@ const queryText = 'query home_page ($first: Int!) {\
     id,\
     login,\
     name,\
-    repositories__last_first: repositories(last: $first) {\
+    repositories____last___first: repositories(last: $first) {\
       edges {\
         node {\
           description,\
@@ -23,10 +23,10 @@ const queryText = 'query home_page ($first: Int!) {\
             id,\
             login,\
           },\
-          pullRequests__first_first: pullRequests(first: $first) {\
+          pullRequests____first___first: pullRequests(first: $first) {\
             totalCount,\
           },\
-          watchers__first_first: watchers(first: $first) {\
+          watchers____first___first: watchers(first: $first) {\
             totalCount,\
           },\
         },\

@@ -1,12 +1,12 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    DefinedField, IsographObjectTypeName, ScalarFieldName, ServerFieldDefinitionName,
+    DefinedField, IsographObjectTypeName, ScalarFieldName, ServerFieldDefinitionName, Span,
     UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
-    OutputFieldDefinition, ScalarTypeDefinition, TypeAnnotation, TypeSystemDefinition,
-    TypeSystemDocument,
+    NamedTypeAnnotation, NonNullTypeAnnotation, OutputFieldDefinition, ScalarTypeDefinition,
+    TypeAnnotation, TypeSystemDefinition, TypeSystemDocument,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{DefinedTypeId, ObjectId, ServerFieldId};
@@ -106,6 +106,7 @@ impl UnvalidatedSchema {
             ..
         } = self;
         let next_object_id = schema_data.objects.len().into();
+        let string_type_for_typename = schema_data.scalar(self.string_type_id).name;
         let ref mut type_names = schema_data.defined_types;
         let ref mut objects = schema_data.objects;
         match type_names.entry(type_definition.name.item.into()) {
@@ -122,6 +123,13 @@ impl UnvalidatedSchema {
                         existing_fields.len(),
                         next_object_id,
                         type_definition.name.item.into(),
+                        TypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
+                            NamedTypeAnnotation(WithSpan::new(
+                                string_type_for_typename.into(),
+                                // TODO we probably need a generated or built-in span type
+                                Span::new(0, 0),
+                            )),
+                        ))),
                     )?;
                 objects.push(SchemaObject {
                     description: type_definition.description.map(|d| d.item),
@@ -199,8 +207,9 @@ impl UnvalidatedSchema {
 fn get_field_objects_ids_and_names(
     new_fields: Vec<WithSpan<OutputFieldDefinition>>,
     next_field_id: usize,
-    parent_type: ObjectId,
+    parent_type_id: ObjectId,
     parent_type_name: IsographObjectTypeName,
+    typename_type: TypeAnnotation<UnvalidatedTypeName>,
 ) -> ProcessTypeDefinitionResult<(
     Vec<UnvalidatedSchemaField>,
     Vec<ServerFieldId>,
@@ -225,7 +234,7 @@ fn get_field_objects_ids_and_names(
                     name: field.item.name.item,
                     id: (next_field_id + current_field_index).into(),
                     field_type: field.item.type_,
-                    parent_type_id: parent_type,
+                    parent_type_id,
                 });
                 field_ids.push((next_field_id + current_field_index).into());
             }
@@ -237,6 +246,30 @@ fn get_field_objects_ids_and_names(
             }
         }
     }
+
+    // ------- HACK -------
+    // Magic __typename field
+    // TODO: find a way to do this that is less tied to GraphQL
+    let typename_field_id = (next_field_id + field_ids.len()).into();
+    let typename_name = "__typename".intern().into();
+    field_ids.push(typename_field_id);
+    unvalidated_fields.push(SchemaServerField {
+        description: None,
+        name: typename_name,
+        id: typename_field_id,
+        field_type: typename_type.clone(),
+        parent_type_id,
+    });
+    if field_names_to_type_name
+        .insert(typename_name, DefinedField::ServerField(typename_type))
+        .is_some()
+    {
+        return Err(ProcessTypeDefinitionError::TypenameCannotBeDefined {
+            parent_type: parent_type_name,
+        });
+    }
+    // ----- END HACK -----
+
     Ok((unvalidated_fields, field_ids, field_names_to_type_name))
 }
 
@@ -264,4 +297,9 @@ pub enum ProcessTypeDefinitionError {
     // When type Foo implements Bar and Bar is scalar
     #[error("Type \"{type_name}\" is a scalar, but it should be an object type.")]
     IsographObjectTypeNameIsScalar { type_name: IsographObjectTypeName },
+
+    #[error(
+        "You cannot manually defined the \"__typename\" field, which is defined in \"{parent_type}\"."
+    )]
+    TypenameCannotBeDefined { parent_type: IsographObjectTypeName },
 }
