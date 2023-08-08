@@ -100,6 +100,7 @@ fn transform_object_field_ids(
         encountered_field_names,
         resolvers,
         valid_refinements,
+        id_field,
     } = object;
 
     let encountered_field_names = encountered_field_names
@@ -135,6 +136,7 @@ fn transform_object_field_ids(
         encountered_field_names,
         resolvers,
         valid_refinements,
+        id_field,
     }
 }
 

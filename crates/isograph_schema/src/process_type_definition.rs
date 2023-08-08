@@ -117,7 +117,7 @@ impl UnvalidatedSchema {
                 });
             }
             Entry::Vacant(vacant) => {
-                let (new_fields, server_field_ids, encountered_field_names) =
+                let (new_fields, server_field_ids, encountered_field_names, id_field) =
                     get_field_objects_ids_and_names(
                         type_definition.fields,
                         existing_fields.len(),
@@ -141,6 +141,7 @@ impl UnvalidatedSchema {
                     resolvers: vec![],
                     encountered_field_names,
                     valid_refinements: vec![],
+                    id_field,
                 });
 
                 // ----- HACK -----
@@ -210,18 +211,24 @@ fn get_field_objects_ids_and_names(
     parent_type_id: ObjectId,
     parent_type_name: IsographObjectTypeName,
     typename_type: TypeAnnotation<UnvalidatedTypeName>,
-) -> ProcessTypeDefinitionResult<(
-    Vec<UnvalidatedSchemaField>,
-    Vec<ServerFieldId>,
-    HashMap<
-        ServerFieldDefinitionName,
-        DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>,
-    >,
-)> {
+) -> ProcessTypeDefinitionResult<
+    // TODO replace this tuple with a struct
+    (
+        Vec<UnvalidatedSchemaField>,
+        Vec<ServerFieldId>,
+        HashMap<
+            ServerFieldDefinitionName,
+            DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>,
+        >,
+        Option<ServerFieldId>,
+    ),
+> {
     let new_field_count = new_fields.len();
     let mut field_names_to_type_name = HashMap::with_capacity(new_field_count);
     let mut unvalidated_fields = Vec::with_capacity(new_field_count);
     let mut field_ids = Vec::with_capacity(new_field_count);
+    let mut id_field = None;
+    let id_name = "id".intern().into();
     for (current_field_index, field) in new_fields.into_iter().enumerate() {
         // TODO use entry
         match field_names_to_type_name.insert(
@@ -229,14 +236,22 @@ fn get_field_objects_ids_and_names(
             DefinedField::ServerField(field.item.type_.clone()),
         ) {
             None => {
+                let current_field_id = (next_field_id + current_field_index).into();
                 unvalidated_fields.push(SchemaServerField {
                     description: field.item.description.map(|d| d.item),
                     name: field.item.name.item,
-                    id: (next_field_id + current_field_index).into(),
+                    id: current_field_id,
                     field_type: field.item.type_,
                     parent_type_id,
                 });
                 field_ids.push((next_field_id + current_field_index).into());
+
+                // TODO check for @strong directive instead!
+                if field.item.name.item == id_name {
+                    // N.B. id_field is guaranteed to be None; otherwise field_names_to_type_name would
+                    // have contained this field name already.
+                    id_field = Some(current_field_id);
+                }
             }
             Some(_) => {
                 return Err(ProcessTypeDefinitionError::DuplicateField {
@@ -270,7 +285,12 @@ fn get_field_objects_ids_and_names(
     }
     // ----- END HACK -----
 
-    Ok((unvalidated_fields, field_ids, field_names_to_type_name))
+    Ok((
+        unvalidated_fields,
+        field_ids,
+        field_names_to_type_name,
+        id_field,
+    ))
 }
 
 type ProcessTypeDefinitionResult<T> = Result<T, ProcessTypeDefinitionError>;
