@@ -329,6 +329,7 @@ pub struct SchemaObject<TEncounteredField> {
     pub encountered_field_names: HashMap<ServerFieldDefinitionName, TEncounteredField>,
     pub valid_refinements: Vec<ValidRefinement>,
 }
+
 // Unvalidated => TScalarField: TypeAnnotation<UnvalidatedTypeName>,
 // Validated => FieldId
 

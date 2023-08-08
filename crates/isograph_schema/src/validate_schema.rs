@@ -29,6 +29,8 @@ pub type ValidatedSchemaResolver =
 
 pub type ValidatedDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;
 
+pub type ValidatedSchemaObject = SchemaObject<ValidatedDefinedField>;
+
 pub type ValidatedSchema = Schema<
     OutputTypeId,
     DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>,
