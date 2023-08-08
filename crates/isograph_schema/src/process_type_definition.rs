@@ -275,7 +275,7 @@ fn get_field_objects_ids_and_names(
 
 type ProcessTypeDefinitionResult<T> = Result<T, ProcessTypeDefinitionError>;
 
-/// Errors tha make semantic sense when referring to creating a GraphQL schema in-memory representation
+/// Errors that make semantic sense when referring to creating a GraphQL schema in-memory representation
 #[derive(Error, Debug)]
 pub enum ProcessTypeDefinitionError {
     #[error("Duplicate type definition ({type_definition_type}) named \"{type_name}\"")]

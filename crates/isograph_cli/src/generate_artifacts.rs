@@ -568,7 +568,7 @@ fn write_query_types_from_selection(
         Selection::ServerField(field) => match field {
             ScalarField(scalar_field) => {
                 match scalar_field.field {
-                    DefinedField::ServerField(server_field) => {
+                    DefinedField::ServerField(_server_field) => {
                         let parent_field = parent_type
                             .encountered_field_names
                             .get(&scalar_field.name.item.into())
