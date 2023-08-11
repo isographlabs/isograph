@@ -327,11 +327,12 @@ pub struct SchemaObject<TEncounteredField> {
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
     pub id_field: Option<ServerFieldId>,
-    pub fields: Vec<ServerFieldId>,
+    pub server_fields: Vec<ServerFieldId>,
     pub resolvers: Vec<ResolverFieldId>,
-    pub encountered_field_names: HashMap<ServerFieldDefinitionName, TEncounteredField>,
+    pub encountered_fields: HashMap<ServerFieldDefinitionName, TEncounteredField>,
     pub valid_refinements: Vec<ValidRefinement>,
 }
+// TODO iterator of fields that includes id_field?
 
 // Unvalidated => TScalarField: TypeAnnotation<UnvalidatedTypeName>,
 // Validated => FieldId

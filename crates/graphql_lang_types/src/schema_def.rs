@@ -77,7 +77,6 @@ pub struct InterfaceTypeDefinition {
     pub fields: Vec<WithSpan<OutputFieldDefinition>>,
 }
 
-// TODO maybe parametrize with T: TypeTrait
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct OutputFieldDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,

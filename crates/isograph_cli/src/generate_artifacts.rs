@@ -53,7 +53,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
     fetchable_resolver: &ValidatedSchemaResolver,
 ) -> FetchableResolver<'schema> {
     if let Some((ref selection_set, _)) = fetchable_resolver.selection_set_and_unwraps {
-        let query_name: QueryOperationName = fetchable_resolver.name.into();
+        let query_name = fetchable_resolver.name.into();
 
         let merged_selection_set = merge_selection_set(
             schema,
@@ -609,7 +609,7 @@ fn write_query_types_from_selection(
                 match scalar_field.field {
                     DefinedField::ServerField(_server_field) => {
                         let parent_field = parent_type
-                            .encountered_field_names
+                            .encountered_fields
                             .get(&scalar_field.name.item.into())
                             .expect("parent_field should exist 1")
                             .as_server_field()
@@ -673,7 +673,7 @@ fn write_query_types_from_selection(
             }
             LinkedField(linked_field) => {
                 let parent_field = parent_type
-                    .encountered_field_names
+                    .encountered_fields
                     .get(&linked_field.name.item.into())
                     .expect("parent_field should exist 2")
                     .as_server_field()

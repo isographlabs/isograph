@@ -49,7 +49,7 @@ impl UnvalidatedSchema {
         let resolver_field_name = resolver_declaration.item.resolver_field_name.item;
 
         if object
-            .encountered_field_names
+            .encountered_fields
             .insert(
                 resolver_field_name.into(),
                 DefinedField::ResolverField(resolver_field_name),

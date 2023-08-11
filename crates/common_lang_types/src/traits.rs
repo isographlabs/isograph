@@ -12,7 +12,7 @@ pub trait HasName {
 #[derive(Debug, Clone, Copy)]
 pub enum DefinedField<TServerType, TResolverType> {
     ServerField(TServerType),
-    ResolverField(TResolverType), // Resolvers have an opaque scalar type
+    ResolverField(TResolverType),
 }
 
 impl<TServerType, TResolverType> DefinedField<TServerType, TResolverType> {

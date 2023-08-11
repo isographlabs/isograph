@@ -94,10 +94,10 @@ fn transform_object_field_ids(
 ) -> SchemaObject<ValidatedDefinedField> {
     let SchemaObject {
         name,
-        fields,
+        server_fields,
         description,
         id,
-        encountered_field_names,
+        encountered_fields: encountered_field_names,
         resolvers,
         valid_refinements,
         id_field,
@@ -106,8 +106,8 @@ fn transform_object_field_ids(
     let encountered_field_names = encountered_field_names
         .into_iter()
         .map(|(encountered_field_name, _)| {
-            for field in fields.iter() {
-                let field = &schema_fields[field.as_usize()];
+            for server_field_id in server_fields.iter() {
+                let field = &schema_fields[server_field_id.as_usize()];
                 if field.name == encountered_field_name {
                     return (encountered_field_name, DefinedField::ServerField(field.id));
                 }
@@ -132,8 +132,8 @@ fn transform_object_field_ids(
         description,
         name,
         id,
-        fields,
-        encountered_field_names,
+        server_fields,
+        encountered_fields: encountered_field_names,
         resolvers,
         valid_refinements,
         id_field,
@@ -399,7 +399,7 @@ fn validate_resolver_definition_selection_exists_and_type_matches(
             field_selection.and_then(
                 &mut |scalar_field_selection| {
                     validate_field_type_exists_and_is_scalar(
-                        &parent_type.encountered_field_names,
+                        &parent_type.encountered_fields,
                         schema_data,
                         parent_type,
                         scalar_field_selection,
@@ -407,7 +407,7 @@ fn validate_resolver_definition_selection_exists_and_type_matches(
                 },
                 &mut |linked_field_selection| {
                     validate_field_type_exists_and_is_linked(
-                        &parent_type.encountered_field_names,
+                        &parent_type.encountered_fields,
                         schema_data,
                         parent_type,
                         linked_field_selection,

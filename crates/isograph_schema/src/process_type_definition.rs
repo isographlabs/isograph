@@ -117,29 +117,33 @@ impl UnvalidatedSchema {
                 });
             }
             Entry::Vacant(vacant) => {
-                let (new_fields, server_field_ids, encountered_field_names, id_field) =
-                    get_field_objects_ids_and_names(
-                        type_definition.fields,
-                        existing_fields.len(),
-                        next_object_id,
-                        type_definition.name.item.into(),
-                        TypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
-                            NamedTypeAnnotation(WithSpan::new(
-                                string_type_for_typename.into(),
-                                // TODO we probably need a generated or built-in span type
-                                Span::new(0, 0),
-                            )),
-                        ))),
-                    )?;
+                let FieldObjectIdsEtc {
+                    unvalidated_schema_fields,
+                    server_fields,
+                    encountered_fields,
+                    id_field,
+                } = get_field_objects_ids_and_names(
+                    type_definition.fields,
+                    existing_fields.len(),
+                    next_object_id,
+                    type_definition.name.item.into(),
+                    TypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
+                        NamedTypeAnnotation(WithSpan::new(
+                            string_type_for_typename.into(),
+                            // TODO we probably need a generated or built-in span type
+                            Span::new(0, 0),
+                        )),
+                    ))),
+                )?;
                 objects.push(SchemaObject {
                     description: type_definition.description.map(|d| d.item),
                     name: type_definition.name.item,
                     id: next_object_id,
-                    fields: server_field_ids,
+                    server_fields,
                     // Resolvers are not defined until we process iso literals. They're not contained in
                     // the schema definition.
                     resolvers: vec![],
-                    encountered_field_names,
+                    encountered_fields,
                     valid_refinements: vec![],
                     id_field,
                 });
@@ -154,7 +158,7 @@ impl UnvalidatedSchema {
                 }
                 // --- END HACK ---
 
-                existing_fields.extend(new_fields);
+                existing_fields.extend(unvalidated_schema_fields);
                 vacant.insert(DefinedTypeId::Object(next_object_id));
             }
         }
@@ -203,6 +207,17 @@ impl UnvalidatedSchema {
     }
 }
 
+struct FieldObjectIdsEtc {
+    unvalidated_schema_fields: Vec<UnvalidatedSchemaField>,
+    server_fields: Vec<ServerFieldId>,
+    encountered_fields: HashMap<
+        ServerFieldDefinitionName,
+        DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>,
+    >,
+    // TODO this should not be a ServerFieldId, but a special type
+    id_field: Option<ServerFieldId>,
+}
+
 /// Given a vector of fields from the schema AST all belonging to the same object/interface,
 /// return a vector of unvalidated fields and a set of field names.
 fn get_field_objects_ids_and_names(
@@ -211,27 +226,16 @@ fn get_field_objects_ids_and_names(
     parent_type_id: ObjectId,
     parent_type_name: IsographObjectTypeName,
     typename_type: TypeAnnotation<UnvalidatedTypeName>,
-) -> ProcessTypeDefinitionResult<
-    // TODO replace this tuple with a struct
-    (
-        Vec<UnvalidatedSchemaField>,
-        Vec<ServerFieldId>,
-        HashMap<
-            ServerFieldDefinitionName,
-            DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>,
-        >,
-        Option<ServerFieldId>,
-    ),
-> {
+) -> ProcessTypeDefinitionResult<FieldObjectIdsEtc> {
     let new_field_count = new_fields.len();
-    let mut field_names_to_type_name = HashMap::with_capacity(new_field_count);
+    let mut encountered_fields = HashMap::with_capacity(new_field_count);
     let mut unvalidated_fields = Vec::with_capacity(new_field_count);
     let mut field_ids = Vec::with_capacity(new_field_count);
     let mut id_field = None;
     let id_name = "id".intern().into();
     for (current_field_index, field) in new_fields.into_iter().enumerate() {
         // TODO use entry
-        match field_names_to_type_name.insert(
+        match encountered_fields.insert(
             field.item.name.item,
             DefinedField::ServerField(field.item.type_.clone()),
         ) {
@@ -275,7 +279,7 @@ fn get_field_objects_ids_and_names(
         field_type: typename_type.clone(),
         parent_type_id,
     });
-    if field_names_to_type_name
+    if encountered_fields
         .insert(typename_name, DefinedField::ServerField(typename_type))
         .is_some()
     {
@@ -285,12 +289,12 @@ fn get_field_objects_ids_and_names(
     }
     // ----- END HACK -----
 
-    Ok((
-        unvalidated_fields,
-        field_ids,
-        field_names_to_type_name,
+    Ok(FieldObjectIdsEtc {
+        unvalidated_schema_fields: unvalidated_fields,
+        server_fields: field_ids,
+        encountered_fields,
         id_field,
-    ))
+    })
 }
 
 type ProcessTypeDefinitionResult<T> = Result<T, ProcessTypeDefinitionError>;
