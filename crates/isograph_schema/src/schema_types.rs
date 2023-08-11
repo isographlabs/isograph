@@ -173,11 +173,11 @@ impl UnvalidatedSchema {
 }
 
 impl<TEncounteredField> SchemaData<TEncounteredField> {
-    pub fn lookup_type_with_fields(&self, object_id: ObjectId) -> &SchemaObject<TEncounteredField> {
+    pub fn lookup_object(&self, object_id: ObjectId) -> &SchemaObject<TEncounteredField> {
         &self.objects[object_id.as_usize()]
     }
 
-    pub fn lookup_type_without_fields(&self, scalar_id: ScalarId) -> &SchemaScalar {
+    pub fn lookup_scalar(&self, scalar_id: ScalarId) -> &SchemaScalar {
         self.scalar(scalar_id)
     }
 

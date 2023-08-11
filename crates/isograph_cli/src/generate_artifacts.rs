@@ -886,9 +886,7 @@ fn generate_reader_ast_node(
                     .reader_alias
                     .map(|x| format!("\"{}\"", x.item))
                     .unwrap_or("null".to_string());
-                let linked_field_type = schema
-                    .schema_data
-                    .lookup_type_with_fields(linked_field.field);
+                let linked_field_type = schema.schema_data.lookup_object(linked_field.field);
                 let inner_reader_ast = generate_reader_ast(
                     schema,
                     &linked_field.selection_set,
