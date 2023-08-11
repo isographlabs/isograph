@@ -1,7 +1,7 @@
 use std::fmt;
 
 use common_lang_types::{
-    DefinedField, IsographDirectiveName, IsographObjectTypeName, ServerFieldDefinitionName,
+    DefinedField, IsographDirectiveName, IsographObjectTypeName, SelectableFieldName,
     UnvalidatedTypeName, WithSpan,
 };
 use intern::string_key::Intern;
@@ -116,7 +116,7 @@ pub enum ProcessResolverDeclarationError {
     ParentAlreadyHasField {
         parent_type: &'static str,
         parent_type_name: IsographObjectTypeName,
-        resolver_field_name: ServerFieldDefinitionName,
+        resolver_field_name: SelectableFieldName,
     },
 
     #[error(

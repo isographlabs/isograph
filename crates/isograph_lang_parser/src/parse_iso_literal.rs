@@ -1,7 +1,7 @@
 use std::ops::ControlFlow;
 
 use common_lang_types::{
-    ResolverDefinitionPath, ServerFieldDefinitionName, Span, StringKeyNewtype, UnvalidatedTypeName,
+    ResolverDefinitionPath, SelectableFieldName, Span, StringKeyNewtype, UnvalidatedTypeName,
     WithSpan,
 };
 use graphql_lang_types::{
@@ -372,7 +372,7 @@ fn from_control_flow<T, E>(control_flow: impl FnOnce() -> ControlFlow<T, E>) -> 
 /// used in the alias. Once we have a normalization AST, we can remove this.
 #[allow(non_snake_case)]
 fn HACK_combine_name_and_variables_into_normalization_alias<T: StringKeyNewtype>(
-    name: WithSpan<ServerFieldDefinitionName>,
+    name: WithSpan<SelectableFieldName>,
     arguments: &[WithSpan<SelectionFieldArgument>],
 ) -> Option<WithSpan<T>> {
     if arguments.is_empty() {

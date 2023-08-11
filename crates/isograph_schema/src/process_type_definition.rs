@@ -1,7 +1,7 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    DefinedField, IsographObjectTypeName, ScalarFieldName, ServerFieldDefinitionName, Span,
+    DefinedField, IsographObjectTypeName, ScalarFieldName, SelectableFieldName, Span,
     UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
@@ -211,7 +211,7 @@ struct FieldObjectIdsEtc {
     unvalidated_schema_fields: Vec<UnvalidatedSchemaField>,
     server_fields: Vec<ServerFieldId>,
     encountered_fields: HashMap<
-        ServerFieldDefinitionName,
+        SelectableFieldName,
         DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>,
     >,
     // TODO this should not be a ServerFieldId, but a special type
@@ -310,7 +310,7 @@ pub enum ProcessTypeDefinitionError {
 
     #[error("Duplicate field named \"{field_name}\" on type \"{parent_type}\"")]
     DuplicateField {
-        field_name: ServerFieldDefinitionName,
+        field_name: SelectableFieldName,
         parent_type: IsographObjectTypeName,
     },
 

@@ -3,7 +3,7 @@ use std::fmt;
 use common_lang_types::{
     DescriptionValue, FieldArgumentName, FieldNameOrAlias, HasName, IsographDirectiveName,
     LinkedFieldAlias, LinkedFieldName, ResolverDefinitionPath, ScalarFieldAlias, ScalarFieldName,
-    ServerFieldDefinitionName, UnvalidatedTypeName, VariableName, WithSpan,
+    SelectableFieldName, UnvalidatedTypeName, VariableName, WithSpan,
 };
 use graphql_lang_types::TypeAnnotation;
 
@@ -113,7 +113,7 @@ impl<TScalarField, TLinkedField> ServerFieldSelection<TScalarField, TLinkedField
 }
 
 impl<TScalarField, TLinkedField> HasName for ServerFieldSelection<TScalarField, TLinkedField> {
-    type Name = ServerFieldDefinitionName;
+    type Name = SelectableFieldName;
     fn name(&self) -> Self::Name {
         match self {
             ServerFieldSelection::ScalarField(s) => s.name.item.into(),

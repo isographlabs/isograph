@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use common_lang_types::{
     DefinedField, DescriptionValue, HasName, InputTypeName, InterfaceTypeName,
     IsographObjectTypeName, JavascriptName, ResolverDefinitionPath, ScalarFieldName,
-    ScalarTypeName, ServerFieldDefinitionName, TypeAndField, UnvalidatedTypeName, WithSpan,
+    ScalarTypeName, SelectableFieldName, TypeAndField, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, Directive, InterfaceTypeDefinition, ObjectTypeDefinition, OutputFieldDefinition,
@@ -329,7 +329,7 @@ pub struct SchemaObject<TEncounteredField> {
     pub id_field: Option<ServerFieldId>,
     pub server_fields: Vec<ServerFieldId>,
     pub resolvers: Vec<ResolverFieldId>,
-    pub encountered_fields: HashMap<ServerFieldDefinitionName, TEncounteredField>,
+    pub encountered_fields: HashMap<SelectableFieldName, TEncounteredField>,
     pub valid_refinements: Vec<ValidRefinement>,
 }
 // TODO iterator of fields that includes id_field?
@@ -347,7 +347,7 @@ pub struct ValidRefinement {
 #[derive(Debug)]
 pub struct SchemaServerField<T> {
     pub description: Option<DescriptionValue>,
-    pub name: ServerFieldDefinitionName,
+    pub name: SelectableFieldName,
     pub id: ServerFieldId,
     pub field_type: T,
     pub parent_type_id: ObjectId,
@@ -358,7 +358,7 @@ pub struct SchemaServerField<T> {
 #[derive(Debug)]
 pub struct SchemaResolver<TScalarField, TLinkedField, TVariableDefinitionType> {
     pub description: Option<DescriptionValue>,
-    pub name: ServerFieldDefinitionName,
+    pub name: SelectableFieldName,
     pub id: ResolverFieldId,
     pub resolver_definition_path: ResolverDefinitionPath,
     // TODO it makes no sense for a resolver to not select fields!

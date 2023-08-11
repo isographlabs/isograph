@@ -1,6 +1,6 @@
 use std::collections::{hash_map::Entry, HashMap};
 
-use common_lang_types::{DefinedField, NormalizationKey, ServerFieldDefinitionName, WithSpan};
+use common_lang_types::{DefinedField, NormalizationKey, SelectableFieldName, WithSpan};
 use intern::string_key::Intern;
 use isograph_lang_types::{
     LinkedFieldSelection, ObjectId, ScalarFieldSelection, ScalarId,
@@ -176,7 +176,7 @@ fn merge_selections_into_set(
 /// used in the alias. Once we have a normalization AST, we can remove this.
 #[allow(non_snake_case)]
 fn HACK_combine_name_and_variables_into_normalization_alias(
-    name: WithSpan<ServerFieldDefinitionName>,
+    name: WithSpan<SelectableFieldName>,
     arguments: &[WithSpan<SelectionFieldArgument>],
 ) -> WithSpan<NormalizationKey> {
     if arguments.is_empty() {

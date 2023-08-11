@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    DefinedField, FieldNameOrAlias, IsographObjectTypeName, ServerFieldDefinitionName,
-    TypeAndField, UnvalidatedTypeName, VariableName, WithSpan,
+    DefinedField, FieldNameOrAlias, IsographObjectTypeName, SelectableFieldName, TypeAndField,
+    UnvalidatedTypeName, VariableName, WithSpan,
 };
 use graphql_lang_types::TypeAnnotation;
 use intern::string_key::Intern;
@@ -350,22 +350,22 @@ type ValidateSelectionsResult<T> = Result<T, ValidateSelectionsError>;
 
 #[derive(Debug)]
 enum ValidateSelectionsError {
-    FieldDoesNotExist(IsographObjectTypeName, ServerFieldDefinitionName),
+    FieldDoesNotExist(IsographObjectTypeName, SelectableFieldName),
     FieldSelectedAsScalarButTypeIsNotScalar {
         field_parent_type_name: IsographObjectTypeName,
-        field_name: ServerFieldDefinitionName,
+        field_name: SelectableFieldName,
         target_type: &'static str,
         target_type_name: UnvalidatedTypeName,
     },
     FieldSelectedAsLinkedButTypeIsScalar {
         field_parent_type_name: IsographObjectTypeName,
-        field_name: ServerFieldDefinitionName,
+        field_name: SelectableFieldName,
         target_type: &'static str,
         target_type_name: UnvalidatedTypeName,
     },
     FieldSelectedAsLinkedButTypeIsResolver {
         field_parent_type_name: IsographObjectTypeName,
-        field_name: ServerFieldDefinitionName,
+        field_name: SelectableFieldName,
     },
 }
 
@@ -421,7 +421,7 @@ fn validate_resolver_definition_selection_exists_and_type_matches(
 /// Given that we selected a scalar field, the field should exist on the parent,
 /// and type should be a resolver (which is a scalar) or a server scalar type.
 fn validate_field_type_exists_and_is_scalar(
-    parent_encountered_fields: &HashMap<ServerFieldDefinitionName, UnvalidatedObjectFieldInfo>,
+    parent_encountered_fields: &HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
     schema_data: &UnvalidatedSchemaData,
     parent_type: &SchemaObject<UnvalidatedObjectFieldInfo>,
     scalar_field_selection: ScalarFieldSelection<()>,
@@ -482,7 +482,7 @@ fn validate_field_type_exists_and_is_scalar(
 /// Given that we selected a linked field, the field should exist on the parent,
 /// and type should be a server interface, object or union.
 fn validate_field_type_exists_and_is_linked(
-    parent_fields: &HashMap<ServerFieldDefinitionName, UnvalidatedObjectFieldInfo>,
+    parent_fields: &HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
     schema_data: &UnvalidatedSchemaData,
     parent_type: &SchemaObject<UnvalidatedObjectFieldInfo>,
     linked_field_selection: LinkedFieldSelection<(), ()>,
@@ -553,7 +553,7 @@ pub enum ValidateSchemaError {
     )]
     FieldTypenameDoesNotExist {
         parent_type_name: IsographObjectTypeName,
-        field_name: ServerFieldDefinitionName,
+        field_name: SelectableFieldName,
         field_type: UnvalidatedTypeName,
     },
 
@@ -562,9 +562,9 @@ pub enum ValidateSchemaError {
     )]
     ResolverSelectionFieldDoesNotExist {
         resolver_parent_type_name: IsographObjectTypeName,
-        resolver_field_name: ServerFieldDefinitionName,
+        resolver_field_name: SelectableFieldName,
         field_parent_type_name: IsographObjectTypeName,
-        field_name: ServerFieldDefinitionName,
+        field_name: SelectableFieldName,
     },
 
     #[error(
@@ -572,9 +572,9 @@ pub enum ValidateSchemaError {
     )]
     ResolverSelectionFieldIsNotScalar {
         resolver_parent_type_name: IsographObjectTypeName,
-        resolver_field_name: ServerFieldDefinitionName,
+        resolver_field_name: SelectableFieldName,
         field_parent_type_name: IsographObjectTypeName,
-        field_name: ServerFieldDefinitionName,
+        field_name: SelectableFieldName,
         field_type: &'static str,
         target_type_name: UnvalidatedTypeName,
     },
@@ -584,9 +584,9 @@ pub enum ValidateSchemaError {
     )]
     ResolverSelectionFieldIsScalar {
         resolver_parent_type_name: IsographObjectTypeName,
-        resolver_field_name: ServerFieldDefinitionName,
+        resolver_field_name: SelectableFieldName,
         field_parent_type_name: IsographObjectTypeName,
-        field_name: ServerFieldDefinitionName,
+        field_name: SelectableFieldName,
         field_type: &'static str,
         target_type_name: UnvalidatedTypeName,
     },
@@ -596,9 +596,9 @@ pub enum ValidateSchemaError {
     )]
     ResolverSelectionFieldIsResolver {
         resolver_parent_type_name: IsographObjectTypeName,
-        resolver_field_name: ServerFieldDefinitionName,
+        resolver_field_name: SelectableFieldName,
         field_parent_type_name: IsographObjectTypeName,
-        field_name: ServerFieldDefinitionName,
+        field_name: SelectableFieldName,
     },
 
     #[error(
@@ -606,7 +606,7 @@ pub enum ValidateSchemaError {
     )]
     FieldTypenameIsInputObject {
         parent_type_name: IsographObjectTypeName,
-        field_name: ServerFieldDefinitionName,
+        field_name: SelectableFieldName,
         field_type: UnvalidatedTypeName,
     },
 

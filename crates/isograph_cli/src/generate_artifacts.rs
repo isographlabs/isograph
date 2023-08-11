@@ -8,7 +8,7 @@ use std::{
 
 use common_lang_types::{
     DefinedField, FieldNameOrAlias, HasName, IsographObjectTypeName, QueryOperationName,
-    ResolverDefinitionPath, ServerFieldDefinitionName, TypeAndField, UnvalidatedTypeName, WithSpan,
+    ResolverDefinitionPath, SelectableFieldName, TypeAndField, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{ListTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
@@ -267,7 +267,7 @@ fn get_read_out_type_text(read_out_type: ResolverReadOutType) -> String {
 #[derive(Debug)]
 pub struct NonFetchableResolver<'schema> {
     pub parent_type: &'schema SchemaObject<ValidatedDefinedField>,
-    pub resolver_field_name: ServerFieldDefinitionName,
+    pub resolver_field_name: SelectableFieldName,
     pub nested_resolver_artifact_imports: HashMap<TypeAndField, ResolverImport>,
     pub resolver_read_out_type: ResolverReadOutType,
     pub reader_ast: ReaderAst,
@@ -377,7 +377,7 @@ pub enum GenerateArtifactsError {
 
 fn generated_file_name(
     parent_type_name: IsographObjectTypeName,
-    field_name: ServerFieldDefinitionName,
+    field_name: SelectableFieldName,
 ) -> PathBuf {
     PathBuf::from(format!("{}__{}.isograph.tsx", parent_type_name, field_name))
 }
@@ -748,7 +748,7 @@ fn print_non_null_type_annotation<T: Display>(non_null: &NonNullTypeAnnotation<T
 }
 
 fn generate_resolver_import_statement(
-    resolver_name: ServerFieldDefinitionName,
+    resolver_name: SelectableFieldName,
     resolver_path: ResolverDefinitionPath,
     has_associated_js_function: bool,
 ) -> ResolverImportStatement {
@@ -1043,7 +1043,7 @@ fn generate_resolver_return_type_declaration(
 
 fn generate_convert_function(
     variant: &Option<WithSpan<ResolverVariant>>,
-    field_name: ServerFieldDefinitionName,
+    field_name: SelectableFieldName,
 ) -> ConvertFunction {
     match variant {
         Some(variant) => {
