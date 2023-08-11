@@ -230,7 +230,7 @@ fn get_field_objects_ids_and_names(
     let new_field_count = new_fields.len();
     let mut encountered_fields = HashMap::with_capacity(new_field_count);
     let mut unvalidated_fields = Vec::with_capacity(new_field_count);
-    let mut field_ids = Vec::with_capacity(new_field_count);
+    let mut field_ids = Vec::with_capacity(new_field_count + 1); // +1 for the typename
     let mut id_field = None;
     let id_name = "id".intern().into();
     for (current_field_index, field) in new_fields.into_iter().enumerate() {
@@ -248,7 +248,7 @@ fn get_field_objects_ids_and_names(
                     field_type: field.item.type_,
                     parent_type_id,
                 });
-                field_ids.push((next_field_id + current_field_index).into());
+                field_ids.push(current_field_id);
 
                 // TODO check for @strong directive instead!
                 if field.item.name.item == id_name {
