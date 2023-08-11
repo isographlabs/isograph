@@ -39,3 +39,14 @@ macro_rules! u32_newtype {
         }
     };
 }
+
+#[macro_export]
+macro_rules! u32_conversion {
+    ($from:ident, $to:ident) => {
+        impl From<$from> for $to {
+            fn from(other: $from) -> Self {
+                Self(other.0)
+            }
+        }
+    };
+}

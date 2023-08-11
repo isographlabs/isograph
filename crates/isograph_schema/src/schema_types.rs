@@ -12,7 +12,7 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     DefinedTypeId, InputTypeId, ObjectId, OutputTypeId, ResolverFieldId, ScalarId, Selection,
-    ServerFieldId, Unwrap, VariableDefinition,
+    ServerFieldId, ServerIdFieldId, Unwrap, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -345,13 +345,25 @@ pub struct ValidRefinement {
 }
 
 #[derive(Debug)]
-pub struct SchemaServerField<T> {
+pub struct SchemaServerField<TData> {
     pub description: Option<DescriptionValue>,
     pub name: SelectableFieldName,
     pub id: ServerFieldId,
-    pub field_type: T,
+    pub field_type: TData,
     pub parent_type_id: ObjectId,
     // pub arguments: Vec<InputValue<ConstantValue>>,
+    // pub directives: Vec<Directive<ConstantValue>>,
+}
+
+// TODO make SchemaServerField generic over TData, TId and TArguments, instead of just TData.
+// Then, SchemaIdField can be the same struct.
+#[derive(Debug)]
+pub struct SchemaIdField<TData> {
+    pub description: Option<DescriptionValue>,
+    pub name: SelectableFieldName,
+    pub id: ServerIdFieldId,
+    pub field_type: TData,
+    pub parent_type_id: ObjectId,
     // pub directives: Vec<Directive<ConstantValue>>,
 }
 

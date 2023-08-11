@@ -1,6 +1,11 @@
-use u32_newtypes::u32_newtype;
+use u32_newtypes::{u32_conversion, u32_newtype};
 
+// Any field defined on the server
 u32_newtype!(ServerFieldId);
+// A field that acts as an id
+u32_newtype!(ServerIdFieldId);
+
+u32_conversion!(ServerIdFieldId, ServerFieldId);
 
 u32_newtype!(ResolverFieldId);
 
