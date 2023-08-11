@@ -33,7 +33,7 @@ string_key_newtype!(InputTypeName);
 // It can also be used in error messages a sort of top type name type, i.e. any type name
 // can be converted into this type name.
 string_key_newtype!(UnvalidatedTypeName);
-string_key_conversion!(IsographObjectTypeName, UnvalidatedTypeName);
+string_key_conversion!(from: IsographObjectTypeName, to: UnvalidatedTypeName);
 
 string_key_newtype!(ObjectTypeName);
 string_key_newtype!(ScalarTypeName);
@@ -46,45 +46,45 @@ string_key_newtype!(InputObjectTypeName);
 // This type represents any type with fields *in the Isograph world*.
 // TypeWithFields is a GraphQL concept, this is an Isograph concept.
 string_key_newtype!(IsographObjectTypeName);
-string_key_conversion!(ObjectTypeName, IsographObjectTypeName);
-string_key_conversion!(InterfaceTypeName, IsographObjectTypeName);
-string_key_conversion!(UnionTypeName, IsographObjectTypeName);
+string_key_conversion!(from: ObjectTypeName, to: IsographObjectTypeName);
+string_key_conversion!(from: InterfaceTypeName, to: IsographObjectTypeName);
+string_key_conversion!(from: UnionTypeName, to: IsographObjectTypeName);
 
-string_key_conversion!(ObjectTypeName, OutputTypeName);
-string_key_conversion!(ScalarTypeName, OutputTypeName);
-string_key_conversion!(InterfaceTypeName, OutputTypeName);
-string_key_conversion!(EnumTypeName, OutputTypeName);
-string_key_conversion!(UnionTypeName, OutputTypeName);
+string_key_conversion!(from: ObjectTypeName, to: OutputTypeName);
+string_key_conversion!(from: ScalarTypeName, to: OutputTypeName);
+string_key_conversion!(from: InterfaceTypeName, to: OutputTypeName);
+string_key_conversion!(from: EnumTypeName, to: OutputTypeName);
+string_key_conversion!(from: UnionTypeName, to: OutputTypeName);
 
-string_key_conversion!(ScalarTypeName, InputTypeName);
-string_key_conversion!(EnumTypeName, InputTypeName);
-string_key_conversion!(InputObjectTypeName, InputTypeName);
+string_key_conversion!(from: ScalarTypeName, to: InputTypeName);
+string_key_conversion!(from: EnumTypeName, to: InputTypeName);
+string_key_conversion!(from: InputObjectTypeName, to: InputTypeName);
 
-string_key_conversion!(ObjectTypeName, UnvalidatedTypeName);
-string_key_conversion!(ScalarTypeName, UnvalidatedTypeName);
-string_key_conversion!(InterfaceTypeName, UnvalidatedTypeName);
-string_key_conversion!(EnumTypeName, UnvalidatedTypeName);
-string_key_conversion!(UnionTypeName, UnvalidatedTypeName);
-string_key_conversion!(InputObjectTypeName, UnvalidatedTypeName);
-string_key_conversion!(OutputTypeName, UnvalidatedTypeName);
-string_key_conversion!(InputTypeName, UnvalidatedTypeName);
+string_key_conversion!(from: ObjectTypeName, to: UnvalidatedTypeName);
+string_key_conversion!(from: ScalarTypeName, to: UnvalidatedTypeName);
+string_key_conversion!(from: InterfaceTypeName, to: UnvalidatedTypeName);
+string_key_conversion!(from: EnumTypeName, to: UnvalidatedTypeName);
+string_key_conversion!(from: UnionTypeName, to: UnvalidatedTypeName);
+string_key_conversion!(from: InputObjectTypeName, to: UnvalidatedTypeName);
+string_key_conversion!(from: OutputTypeName, to: UnvalidatedTypeName);
+string_key_conversion!(from: InputTypeName, to: UnvalidatedTypeName);
 
 // The name in the schema of the field
 string_key_newtype!(ScalarFieldName);
-string_key_conversion!(ScalarFieldName, SelectableFieldName);
+string_key_conversion!(from: ScalarFieldName, to: SelectableFieldName);
 
 string_key_newtype!(LinkedFieldName);
-string_key_conversion!(LinkedFieldName, SelectableFieldName);
+string_key_conversion!(from: LinkedFieldName, to: SelectableFieldName);
 
 string_key_newtype!(ScalarFieldAlias);
 string_key_newtype!(LinkedFieldAlias);
 
 string_key_newtype!(FieldNameOrAlias);
-string_key_conversion!(ScalarFieldName, FieldNameOrAlias);
-string_key_conversion!(LinkedFieldName, FieldNameOrAlias);
-string_key_conversion!(ScalarFieldAlias, FieldNameOrAlias);
-string_key_conversion!(LinkedFieldAlias, FieldNameOrAlias);
-string_key_conversion!(SelectableFieldName, FieldNameOrAlias);
+string_key_conversion!(from: ScalarFieldName, to: FieldNameOrAlias);
+string_key_conversion!(from: LinkedFieldName, to: FieldNameOrAlias);
+string_key_conversion!(from: ScalarFieldAlias, to: FieldNameOrAlias);
+string_key_conversion!(from: LinkedFieldAlias, to: FieldNameOrAlias);
+string_key_conversion!(from: SelectableFieldName, to: FieldNameOrAlias);
 
 string_key_newtype!(ResolverDefinitionPath);
 
@@ -93,9 +93,9 @@ string_key_newtype!(ResolverDefinitionPath);
 string_key_newtype!(QueryOperationName);
 // Explanation: any resolver field that is on the Query object is eligible
 // to be a query.
-string_key_conversion!(SelectableFieldName, QueryOperationName);
+string_key_conversion!(from: SelectableFieldName, to: QueryOperationName);
 // The reverse is safe as well.
-string_key_conversion!(QueryOperationName, SelectableFieldName);
+string_key_conversion!(from: QueryOperationName, to: SelectableFieldName);
 
 // For scalars
 string_key_newtype!(JavascriptName);
@@ -108,4 +108,4 @@ string_key_newtype!(FieldArgumentName);
 string_key_newtype!(TypeAndField);
 
 string_key_newtype!(NormalizationKey);
-string_key_conversion!(SelectableFieldName, NormalizationKey);
+string_key_conversion!(from: SelectableFieldName, to: NormalizationKey);

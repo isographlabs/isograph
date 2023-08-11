@@ -35,7 +35,7 @@ macro_rules! string_key_newtype {
 
 #[macro_export]
 macro_rules! string_key_conversion {
-    ($from:ident, $to:ident) => {
+    (from: $from:ident, to: $to:ident) => {
         impl From<$from> for $to {
             fn from(other: $from) -> Self {
                 Self(other.0)

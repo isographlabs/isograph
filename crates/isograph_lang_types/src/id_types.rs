@@ -5,7 +5,7 @@ u32_newtype!(ServerFieldId);
 // A field that acts as an id
 u32_newtype!(ServerIdFieldId);
 
-u32_conversion!(ServerIdFieldId, ServerFieldId);
+u32_conversion!(from: ServerIdFieldId, to: ServerFieldId);
 
 u32_newtype!(ResolverFieldId);
 
