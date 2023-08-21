@@ -246,6 +246,7 @@ fn get_field_objects_ids_and_names(
                 if field.item.name.item == id_name {
                     // N.B. id_field is guaranteed to be None; otherwise field_names_to_type_name would
                     // have contained this field name already.
+                    debug_assert!(id_field.is_none(), "id field should not be defined twice");
                     id_field = Some(current_field_id);
 
                     if field.item.type_.inner_non_null_named_type().is_none() {
