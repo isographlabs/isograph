@@ -2,5 +2,8 @@
   "private": true,
   "devDependencies": {
     "typescript": "^5.0.3"
+  },
+  "scripts": {
+    "watch-iso": "cargo watch -x build -d 0.1 -w ./crates/"
   }
 }
