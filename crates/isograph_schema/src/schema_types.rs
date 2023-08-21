@@ -20,6 +20,7 @@ use crate::ResolverVariant;
 
 lazy_static! {
     pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
+    pub static ref ID_GRAPHQL_TYPE: ScalarTypeName = "ID".intern().into();
 }
 
 /// The first, unvalidated in-memory representation of a schema.

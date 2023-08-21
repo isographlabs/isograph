@@ -8,14 +8,15 @@ use graphql_lang_types::{
     NamedTypeAnnotation, NonNullTypeAnnotation, OutputFieldDefinition, ScalarTypeDefinition,
     TypeAnnotation, TypeSystemDefinition, TypeSystemDocument,
 };
-use intern::string_key::Intern;
+use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{DefinedTypeId, ObjectId, ServerFieldId};
 use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
     IsographObjectTypeDefinition, Schema, SchemaObject, SchemaScalar, SchemaServerField,
-    UnvalidatedSchema, UnvalidatedSchemaField, ValidRefinement, STRING_JAVASCRIPT_TYPE,
+    UnvalidatedSchema, UnvalidatedSchemaField, ValidRefinement, ID_GRAPHQL_TYPE,
+    STRING_JAVASCRIPT_TYPE,
 };
 
 lazy_static! {
@@ -254,6 +255,13 @@ fn get_field_objects_ids_and_names(
                             parent_type: parent_type_name,
                         });
                     }
+                    if ID_GRAPHQL_TYPE.lookup() != field.item.type_.inner().lookup() {
+                        return Err(ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {
+                            parent_type: parent_type_name,
+                        });
+                    }
+                    // We should change the type here! It should not be ID! It should be a
+                    // type specific to the concrete type, e.g. UserID.
                 }
 
                 unvalidated_fields.push(SchemaServerField {
@@ -335,9 +343,6 @@ pub enum ProcessTypeDefinitionError {
     )]
     TypenameCannotBeDefined { parent_type: IsographObjectTypeName },
 
-    // We should also check that the ID type has type ID!, not just that it is a non-null named type.
-    #[error(
-        "The id field on \"{parent_type}\" must have a simple, non-null type (ID!), it cannot be an array or optional."
-    )]
+    #[error("The id field on \"{parent_type}\" must be \"ID!\".")]
     IdFieldMustBeNonNullIdType { parent_type: IsographObjectTypeName },
 }
