@@ -6,8 +6,8 @@ use common_lang_types::{
     ScalarTypeName, SelectableFieldName, TypeAndField, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
-    ConstantValue, Directive, InterfaceTypeDefinition, ObjectTypeDefinition, OutputFieldDefinition,
-    TypeAnnotation,
+    ConstantValue, Directive, InterfaceTypeDefinition, NamedTypeAnnotation, ObjectTypeDefinition,
+    OutputFieldDefinition, TypeAnnotation,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -109,6 +109,32 @@ impl<TServerType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
         self.query_type_id
             .as_ref()
             .map(|id| self.schema_data.object(*id))
+    }
+}
+
+impl<TServerType: Copy, TScalarField, TLinkedField, TVariableType, TEncounteredField>
+    Schema<TServerType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
+{
+    pub fn id_field(
+        &self,
+        id_field_id: ServerIdFieldId,
+    ) -> SchemaIdField<NamedTypeAnnotation<TServerType>> {
+        let field_id = id_field_id.into();
+
+        let field = self
+            .field(field_id)
+            .and_then(|e| match e.inner_non_null_named_type() {
+                Some(inner) => Ok(*inner),
+                None => Err(()),
+            })
+            .expect(
+                "We had an id field, the type annotation should be named. \
+                    This indicates a bug in Isograph.",
+            );
+
+        field.try_into().expect(
+            "We had an id field, no arguments should exist. This indicates a bug in Isograph.",
+        )
     }
 }
 
@@ -344,7 +370,7 @@ pub struct ValidRefinement {
     pub target: ObjectId,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct SchemaServerField<TData> {
     pub description: Option<DescriptionValue>,
     pub name: SelectableFieldName,
@@ -355,9 +381,24 @@ pub struct SchemaServerField<TData> {
     // pub directives: Vec<Directive<ConstantValue>>,
 }
 
+impl<TData> SchemaServerField<TData> {
+    pub fn and_then<TData2, E>(
+        &self,
+        convert: impl FnOnce(&TData) -> Result<TData2, E>,
+    ) -> Result<SchemaServerField<TData2>, E> {
+        Ok(SchemaServerField {
+            description: self.description,
+            name: self.name,
+            id: self.id,
+            field_type: convert(&self.field_type)?,
+            parent_type_id: self.parent_type_id,
+        })
+    }
+}
+
 // TODO make SchemaServerField generic over TData, TId and TArguments, instead of just TData.
 // Then, SchemaIdField can be the same struct.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct SchemaIdField<TData> {
     pub description: Option<DescriptionValue>,
     pub name: SelectableFieldName,
@@ -365,6 +406,31 @@ pub struct SchemaIdField<TData> {
     pub field_type: TData,
     pub parent_type_id: ObjectId,
     // pub directives: Vec<Directive<ConstantValue>>,
+}
+
+impl<'schema, TData: Copy> TryFrom<SchemaServerField<TData>> for SchemaIdField<TData> {
+    type Error = ();
+
+    fn try_from(value: SchemaServerField<TData>) -> Result<Self, Self::Error> {
+        // If the field is valid as an id field, we succeed, otherwise, fail.
+        // Initially, that will mean checking that there are no arguments.
+        // This will result in a lot of false positives, and that can be improved
+        // by requiring a specific directive or something.
+        //
+        // There are no arguments now, so this will always succeed.
+        //
+        // Also, before this is called, we have already converted the field_type to be valid
+        // (it should go from TypeAnnotation<T> to NamedTypeAnnotation<T>) via
+        // inner_non_null_named_type. We should eventually add some NewType wrapper to
+        // enforce that we didn't just call .inner()
+        Ok(SchemaIdField {
+            description: value.description,
+            name: value.name,
+            id: value.id.0.into(),
+            field_type: value.field_type,
+            parent_type_id: value.parent_type_id,
+        })
+    }
 }
 
 #[derive(Debug)]

@@ -45,6 +45,19 @@ impl<TValue> TypeAnnotation<TValue> {
             }
         })
     }
+
+    /// If a TypeAnnotation is of the form X!, i.e. it is a NonNull named type, then
+    /// this method returns Some(X). Otherwise, returns None.
+    pub fn inner_non_null_named_type(&self) -> Option<&NamedTypeAnnotation<TValue>> {
+        match self {
+            TypeAnnotation::Named(_) => None,
+            TypeAnnotation::List(_) => None,
+            TypeAnnotation::NonNull(non_null) => match non_null.as_ref() {
+                NonNullTypeAnnotation::Named(named) => Some(named),
+                NonNullTypeAnnotation::List(_) => None,
+            },
+        }
+    }
 }
 
 impl<TValue: fmt::Display> fmt::Display for TypeAnnotation<TValue> {
@@ -105,7 +118,7 @@ impl<TValue: fmt::Display> fmt::Display for NonNullTypeAnnotation<TValue> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct NamedTypeAnnotation<TValue>(pub WithSpan<TValue>);
 
 impl<TValue> Deref for NamedTypeAnnotation<TValue> {

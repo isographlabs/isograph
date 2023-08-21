@@ -241,6 +241,20 @@ fn get_field_objects_ids_and_names(
         ) {
             None => {
                 let current_field_id = (next_field_id + current_field_index).into();
+
+                // TODO check for @strong directive instead!
+                if field.item.name.item == id_name {
+                    // N.B. id_field is guaranteed to be None; otherwise field_names_to_type_name would
+                    // have contained this field name already.
+                    id_field = Some(current_field_id);
+
+                    if field.item.type_.inner_non_null_named_type().is_none() {
+                        return Err(ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {
+                            parent_type: parent_type_name,
+                        });
+                    }
+                }
+
                 unvalidated_fields.push(SchemaServerField {
                     description: field.item.description.map(|d| d.item),
                     name: field.item.name.item,
@@ -249,13 +263,6 @@ fn get_field_objects_ids_and_names(
                     parent_type_id,
                 });
                 field_ids.push(current_field_id);
-
-                // TODO check for @strong directive instead!
-                if field.item.name.item == id_name {
-                    // N.B. id_field is guaranteed to be None; otherwise field_names_to_type_name would
-                    // have contained this field name already.
-                    id_field = Some(current_field_id);
-                }
             }
             Some(_) => {
                 return Err(ProcessTypeDefinitionError::DuplicateField {
@@ -326,4 +333,10 @@ pub enum ProcessTypeDefinitionError {
         "You cannot manually defined the \"__typename\" field, which is defined in \"{parent_type}\"."
     )]
     TypenameCannotBeDefined { parent_type: IsographObjectTypeName },
+
+    // We should also check that the ID type has type ID!, not just that it is a non-null named type.
+    #[error(
+        "The id field on \"{parent_type}\" must have a simple, non-null type (ID!), it cannot be an array or optional."
+    )]
+    IdFieldMustBeNonNullIdType { parent_type: IsographObjectTypeName },
 }
