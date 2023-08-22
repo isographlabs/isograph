@@ -395,7 +395,8 @@ fn write_selections_for_query_text(
 ) {
     let mut id_field_opt = None;
     if let Some(id_field) = root_object.id_field {
-        let id_field = schema.field(id_field);
+        // TODO do not do .0, but call schema.id_field
+        let id_field = schema.field(id_field.0.into());
 
         // We found an id field, we must select it
         query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));

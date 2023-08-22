@@ -9,7 +9,7 @@ use graphql_lang_types::{
     TypeAnnotation, TypeSystemDefinition, TypeSystemDocument,
 };
 use intern::{string_key::Intern, Lookup};
-use isograph_lang_types::{DefinedTypeId, ObjectId, ServerFieldId};
+use isograph_lang_types::{DefinedTypeId, ObjectId, ServerFieldId, ServerIdFieldId};
 use lazy_static::lazy_static;
 use thiserror::Error;
 
@@ -216,7 +216,7 @@ struct FieldObjectIdsEtc {
         DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>,
     >,
     // TODO this should not be a ServerFieldId, but a special type
-    id_field: Option<ServerFieldId>,
+    id_field: Option<ServerIdFieldId>,
 }
 
 /// Given a vector of fields from the schema AST all belonging to the same object/interface,
@@ -241,14 +241,14 @@ fn get_field_objects_ids_and_names(
             DefinedField::ServerField(field.item.type_.clone()),
         ) {
             None => {
-                let current_field_id = (next_field_id + current_field_index).into();
+                let current_field_id = next_field_id + current_field_index;
 
                 // TODO check for @strong directive instead!
                 if field.item.name.item == id_name {
                     // N.B. id_field is guaranteed to be None; otherwise field_names_to_type_name would
                     // have contained this field name already.
                     debug_assert!(id_field.is_none(), "id field should not be defined twice");
-                    id_field = Some(current_field_id);
+                    id_field = Some(current_field_id.into());
 
                     if field.item.type_.inner_non_null_named_type().is_none() {
                         return Err(ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {
@@ -267,11 +267,11 @@ fn get_field_objects_ids_and_names(
                 unvalidated_fields.push(SchemaServerField {
                     description: field.item.description.map(|d| d.item),
                     name: field.item.name.item,
-                    id: current_field_id,
+                    id: current_field_id.into(),
                     field_type: field.item.type_,
                     parent_type_id,
                 });
-                field_ids.push(current_field_id);
+                field_ids.push(current_field_id.into());
             }
             Some(_) => {
                 return Err(ProcessTypeDefinitionError::DuplicateField {

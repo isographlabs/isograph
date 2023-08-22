@@ -353,7 +353,7 @@ pub struct SchemaObject<TEncounteredField> {
     // pub directives: Vec<Directive<ConstantValue>>,
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
-    pub id_field: Option<ServerFieldId>,
+    pub id_field: Option<ServerIdFieldId>,
     pub server_fields: Vec<ServerFieldId>,
     pub resolvers: Vec<ResolverFieldId>,
     pub encountered_fields: HashMap<SelectableFieldName, TEncounteredField>,
