@@ -121,16 +121,24 @@ impl<TFieldAssociatedType, TScalarField, TLinkedField, TVariableType, TEncounter
 impl<TFieldAssociatedType: Copy, TScalarField, TLinkedField, TVariableType, TEncounteredField>
     Schema<TFieldAssociatedType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
 {
-    pub fn id_field(
+    pub fn id_field<TIdFieldAssociatedType: TryFrom<TFieldAssociatedType> + Copy>(
         &self,
         id_field_id: ServerIdFieldId,
-    ) -> SchemaIdField<NamedTypeAnnotation<TFieldAssociatedType>> {
+    ) -> SchemaIdField<NamedTypeAnnotation<TIdFieldAssociatedType>> {
         let field_id = id_field_id.into();
 
         let field = self
             .field(field_id)
             .and_then(|e| match e.inner_non_null_named_type() {
-                Some(inner) => Ok(*inner),
+                Some(inner) => Ok(NamedTypeAnnotation(inner.0.map(|x| {
+                    let y: Result<TIdFieldAssociatedType, _> = x.try_into();
+                    match y {
+                        Ok(y) => y,
+                        Err(_) => {
+                            panic!("Conversion failed. This indicates a bug in Isograph")
+                        }
+                    }
+                }))),
                 None => Err(()),
             })
             .expect(
@@ -414,7 +422,7 @@ pub struct SchemaIdField<TData> {
     // pub directives: Vec<Directive<ConstantValue>>,
 }
 
-impl<'schema, TData: Copy> TryFrom<SchemaServerField<TData>> for SchemaIdField<TData> {
+impl<TData: Copy> TryFrom<SchemaServerField<TData>> for SchemaIdField<TData> {
     type Error = ();
 
     fn try_from(value: SchemaServerField<TData>) -> Result<Self, Self::Error> {

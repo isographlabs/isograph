@@ -19,6 +19,17 @@ pub enum OutputTypeId {
     Scalar(ScalarId),
 }
 
+impl TryFrom<OutputTypeId> for ScalarId {
+    type Error = ();
+
+    fn try_from(value: OutputTypeId) -> Result<Self, Self::Error> {
+        match value {
+            OutputTypeId::Object(_) => Err(()),
+            OutputTypeId::Scalar(scalar_id) => Ok(scalar_id),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 pub enum InputTypeId {
     Scalar(ScalarId),

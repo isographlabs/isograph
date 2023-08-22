@@ -17,8 +17,8 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     merge_selection_set, MergedSelection, MergedSelectionSet, ResolverVariant, SchemaObject,
-    ValidatedDefinedField, ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver,
-    ValidatedSelection, ValidatedVariableDefinition,
+    ValidatedDefinedField, ValidatedSchema, ValidatedSchemaIdField, ValidatedSchemaObject,
+    ValidatedSchemaResolver, ValidatedSelection, ValidatedVariableDefinition,
 };
 use thiserror::Error;
 
@@ -393,7 +393,7 @@ fn write_selections_for_query_text(
     items: &[WithSpan<MergedSelection>],
     indentation_level: u8,
 ) {
-    let id_field = root_object
+    let id_field: Option<ValidatedSchemaIdField> = root_object
         .id_field
         .map(|id_field_id| schema.id_field(id_field_id));
 
@@ -419,13 +419,8 @@ fn write_selections_for_query_text(
                             // THIS IS BLATANTLY WRONG!!
                             // This causes us to skip fields with type ID, in addition to the "ID"
                             // field.
-                            match id_field.field_type.0.item {
-                                OutputTypeId::Object(_) => {}
-                                OutputTypeId::Scalar(scalar_id) => {
-                                    if scalar_field.field == scalar_id {
-                                        continue 'item;
-                                    }
-                                }
+                            if scalar_field.field == id_field.field_type.0.item {
+                                continue 'item;
                             }
                         }
                         // ---- END HACK ----

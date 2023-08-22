@@ -4,7 +4,7 @@ use common_lang_types::{
     DefinedField, FieldNameOrAlias, IsographObjectTypeName, SelectableFieldName, TypeAndField,
     UnvalidatedTypeName, VariableName, WithSpan,
 };
-use graphql_lang_types::TypeAnnotation;
+use graphql_lang_types::{NamedTypeAnnotation, TypeAnnotation};
 use intern::string_key::Intern;
 use isograph_lang_types::{
     DefinedTypeId, InputTypeId, LinkedFieldSelection, ObjectId, OutputTypeId, ResolverFieldId,
@@ -13,7 +13,7 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    Schema, SchemaData, SchemaObject, SchemaResolver, SchemaServerField,
+    Schema, SchemaData, SchemaIdField, SchemaObject, SchemaResolver, SchemaServerField,
     UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData, UnvalidatedSchemaField,
     UnvalidatedSchemaResolver,
 };
@@ -30,6 +30,8 @@ pub type ValidatedSchemaResolver =
 pub type ValidatedDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;
 
 pub type ValidatedSchemaObject = SchemaObject<ValidatedDefinedField>;
+
+pub type ValidatedSchemaIdField = SchemaIdField<NamedTypeAnnotation<ScalarId>>;
 
 pub type ValidatedSchema = Schema<
     OutputTypeId,
