@@ -13,7 +13,7 @@ use common_lang_types::{
 use graphql_lang_types::{ListTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
     NonConstantValue, ObjectId, OutputTypeId, ScalarId, Selection, SelectionFieldArgument,
-    ServerFieldSelection::{LinkedField, ScalarField},
+    ServerFieldSelection,
 };
 use isograph_schema::{
     merge_selection_set, MergedSelection, MergedSelectionSet, ResolverVariant, SchemaObject,
@@ -393,38 +393,39 @@ fn write_selections_for_query_text(
     items: &[WithSpan<MergedSelection>],
     indentation_level: u8,
 ) {
-    let mut id_field_opt = None;
-    if let Some(id_field) = root_object.id_field {
-        // TODO do not do .0, but call schema.id_field
-        let id_field = schema.field(id_field.0.into());
+    let id_field = root_object
+        .id_field
+        .map(|id_field_id| schema.id_field(id_field_id));
 
-        // We found an id field, we must select it
+    // If the type has an id field, we must select it.
+    if let Some(id_field) = id_field {
         query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
         query_text.push_str(&format!("{},\\\n", id_field.name));
-
-        // This is bad!
-        match id_field.field_type.inner() {
-            OutputTypeId::Object(_) => {
-                panic!("id field must be a scalar, TODO enforce this with types :(")
-            }
-            OutputTypeId::Scalar(id_field_id) => id_field_opt = Some(*id_field_id),
-        }
     }
 
     'item: for item in items.iter() {
         match &item.item {
             Selection::ServerField(field) => {
                 match field {
-                    ScalarField(scalar_field) => {
+                    ServerFieldSelection::ScalarField(scalar_field) => {
                         // ------ HACK ------
                         // Here, we are avoiding selecting the id field twice.
-                        if let Some(id_field_id) = id_field_opt {
+                        if let Some(id_field) = id_field {
                             // Note: we aren't checking for reader alias because reader aliases
                             // don't exist in generated query texts! We can check for the presence
                             // of a normalization alias, but we know that that won't exist for
                             // a field with no arguments (as we are assuming is the case with ID).
-                            if scalar_field.field == id_field_id {
-                                continue 'item;
+
+                            // THIS IS BLATANTLY WRONG!!
+                            // This causes us to skip fields with type ID, in addition to the "ID"
+                            // field.
+                            match id_field.field_type.0.item {
+                                OutputTypeId::Object(_) => {}
+                                OutputTypeId::Scalar(scalar_id) => {
+                                    if scalar_field.field == scalar_id {
+                                        continue 'item;
+                                    }
+                                }
                             }
                         }
                         // ---- END HACK ----
@@ -437,7 +438,7 @@ fn write_selections_for_query_text(
                         let arguments = get_serialized_arguments(&scalar_field.arguments);
                         query_text.push_str(&format!("{}{},\\\n", name, arguments));
                     }
-                    LinkedField(linked_field) => {
+                    ServerFieldSelection::LinkedField(linked_field) => {
                         query_text
                             .push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
                         if let Some(alias) = linked_field.normalization_alias {
@@ -606,7 +607,7 @@ fn write_query_types_from_selection(
 
     match &selection.item {
         Selection::ServerField(field) => match field {
-            ScalarField(scalar_field) => {
+            ServerFieldSelection::ScalarField(scalar_field) => {
                 match scalar_field.field {
                     DefinedField::ServerField(_server_field) => {
                         let parent_field = parent_type
@@ -672,7 +673,7 @@ fn write_query_types_from_selection(
                     }
                 }
             }
-            LinkedField(linked_field) => {
+            ServerFieldSelection::LinkedField(linked_field) => {
                 let parent_field = parent_type
                     .encountered_fields
                     .get(&linked_field.name.item.into())
@@ -812,7 +813,7 @@ fn generate_reader_ast_node(
 ) -> String {
     match &item.item {
         Selection::ServerField(field) => match field {
-            ScalarField(scalar_field) => {
+            ServerFieldSelection::ScalarField(scalar_field) => {
                 let field_name = scalar_field.name.item;
 
                 match scalar_field.field {
@@ -881,7 +882,7 @@ fn generate_reader_ast_node(
                     }
                 }
             }
-            LinkedField(linked_field) => {
+            ServerFieldSelection::LinkedField(linked_field) => {
                 let name = linked_field.name.item;
                 let alias = linked_field
                     .reader_alias
