@@ -35,17 +35,22 @@ lazy_static! {
 /// Invariant: a schema is append-only, because pointers into the Schema are in the
 /// form of newtype wrappers around u32 indexes (e.g. FieldId, etc.) As a result,
 /// the schema does not support removing items.
-///
-/// TServerType: the type of a parsed or validated server field in the fields array.
-/// In an unvalidated schema, this is UnvalidatedTypeName. In a validated schema,
-/// this is OutputTypeId.
 #[derive(Debug)]
 pub struct Schema<
+    // Fields contain a field_type: TypeAnnotation<TServerType>
+    // Validated: OutputTypeId, Unvalidated: UnvalidatedTypeName
     TServerType,
+    // The associated data type of scalars in resolvers' selection sets and unwraps
+    // Validated: DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>, Unvalidated: ()
     TScalarField,
+    // The associated data type of linked fields in resolvers' selection sets and unwraps
+    // Validated: ObjectId, Unvalidated: ()
     TLinkedField,
+    // The associated data type of resolvers' variable definitions
+    // Validated: InputTypeId, Unvalidated: UnvalidatedTypeName
     TVariableType,
     // On objects, what does the HashMap of encountered types contain
+    // Validated: ValidatedDefinedField, Unvalidated: UnvalidatedObjectFieldInfo
     TEncounteredField,
 > {
     pub fields: Vec<SchemaServerField<TypeAnnotation<TServerType>>>,
