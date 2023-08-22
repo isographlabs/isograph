@@ -182,7 +182,7 @@ fn validate_server_field_type_exists_and_is_output_type(
         // Why do we need to clone here? Can we avoid this?
         Some(type_id) => server_field_type.clone().and_then(|_| {
             type_id.as_output_type_id().ok_or_else(|| {
-                let parent_type = schema_data.lookup_object(field.parent_type_id);
+                let parent_type = schema_data.object(field.parent_type_id);
                 ValidateSchemaError::FieldTypenameIsInputObject {
                     parent_type_name: parent_type.name,
                     field_name: field.name,
@@ -191,7 +191,7 @@ fn validate_server_field_type_exists_and_is_output_type(
             })
         }),
         None => Err(ValidateSchemaError::FieldTypenameDoesNotExist {
-            parent_type_name: schema_data.lookup_object(field.parent_type_id).name,
+            parent_type_name: schema_data.object(field.parent_type_id).name,
             field_name: field.name,
             field_type: *server_field_type.inner(),
         }),
@@ -217,7 +217,7 @@ fn validate_resolver_fragment(
 
     match unvalidated_resolver.selection_set_and_unwraps {
         Some((selection_set, unwraps)) => {
-            let parent_type = schema_data.lookup_object(unvalidated_resolver.parent_object_id);
+            let parent_type = schema_data.object(unvalidated_resolver.parent_object_id);
             let selection_set = validate_resolver_definition_selections_exist_and_types_match(
                 schema_data,
                 selection_set,

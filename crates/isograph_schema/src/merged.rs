@@ -123,7 +123,7 @@ fn merge_selections_into_set(
                                     ServerFieldSelection::LinkedField(existing_linked_field) => {
                                         let type_id = new_linked_field.field;
                                         let linked_field_parent_type =
-                                            schema.schema_data.lookup_object(type_id);
+                                            schema.schema_data.object(type_id);
                                         HACK__merge_linked_fields(
                                             schema,
                                             &mut existing_linked_field.selection_set,
@@ -144,7 +144,7 @@ fn merge_selections_into_set(
                                         selection_set: {
                                             let type_id = new_linked_field.field;
                                             let linked_field_parent_type =
-                                                schema.schema_data.lookup_object(type_id);
+                                                schema.schema_data.object(type_id);
                                             merge_selection_set(
                                                 schema,
                                                 linked_field_parent_type,

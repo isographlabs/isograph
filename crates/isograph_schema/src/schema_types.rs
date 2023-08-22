@@ -97,6 +97,7 @@ pub struct SchemaData<TEncounteredField> {
 impl<TFieldAssociatedType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
     Schema<TFieldAssociatedType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
 {
+    /// Get a reference to a given field by its id.
     pub fn field(
         &self,
         field_id: ServerFieldId,
@@ -104,6 +105,7 @@ impl<TFieldAssociatedType, TScalarField, TLinkedField, TVariableType, TEncounter
         &self.fields[field_id.as_usize()]
     }
 
+    /// Get a reference to a given resolver by its id.
     pub fn resolver(
         &self,
         resolver_field_id: ResolverFieldId,
@@ -111,6 +113,7 @@ impl<TFieldAssociatedType, TScalarField, TLinkedField, TVariableType, TEncounter
         &self.resolvers[resolver_field_id.as_usize()]
     }
 
+    /// Get a reference to the root query_object, if it's defined.
     pub fn query_object(&self) -> Option<&SchemaObject<TEncounteredField>> {
         self.query_type_id
             .as_ref()
@@ -121,6 +124,7 @@ impl<TFieldAssociatedType, TScalarField, TLinkedField, TVariableType, TEncounter
 impl<TFieldAssociatedType: Copy, TScalarField, TLinkedField, TVariableType, TEncounteredField>
     Schema<TFieldAssociatedType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
 {
+    /// Get a reference to a given id field by its id.
     pub fn id_field<TIdFieldAssociatedType: TryFrom<TFieldAssociatedType> + Copy>(
         &self,
         id_field_id: ServerIdFieldId,
@@ -213,18 +217,9 @@ impl UnvalidatedSchema {
 }
 
 impl<TEncounteredField> SchemaData<TEncounteredField> {
-    pub fn lookup_object(&self, object_id: ObjectId) -> &SchemaObject<TEncounteredField> {
-        &self.objects[object_id.as_usize()]
-    }
-
-    pub fn lookup_scalar(&self, scalar_id: ScalarId) -> &SchemaScalar {
-        self.scalar(scalar_id)
-    }
-
+    /// Get a reference to a given scalar type by its id.
     pub fn scalar(&self, scalar_id: ScalarId) -> &SchemaScalar {
-        self.scalars
-            .get(scalar_id.as_usize())
-            .expect("Invalid ScalarId")
+        &self.scalars[scalar_id.as_usize()]
     }
 
     pub fn lookup_unvalidated_type(&self, type_id: DefinedTypeId) -> SchemaType<TEncounteredField> {
@@ -260,16 +255,14 @@ impl<TEncounteredField> SchemaData<TEncounteredField> {
         }
     }
 
+    /// Get a reference to a given object type by its id.
     pub fn object(&self, object_id: ObjectId) -> &SchemaObject<TEncounteredField> {
-        self.objects
-            .get(object_id.as_usize())
-            .expect("ObjectId should exist, this indicates a bug in Isograph")
+        &self.objects[object_id.as_usize()]
     }
 
+    /// Get a mutable reference to a given object type by its id.
     pub fn object_mut(&mut self, object_id: ObjectId) -> &mut SchemaObject<TEncounteredField> {
-        self.objects
-            .get_mut(object_id.as_usize())
-            .expect("ObjectId should exist, this indicates a bug in Isograph")
+        &mut self.objects[object_id.as_usize()]
     }
 }
 
@@ -357,12 +350,12 @@ impl From<InterfaceTypeDefinition> for IsographObjectTypeDefinition {
     }
 }
 
+/// An object type in the schema.
 #[derive(Debug)]
 pub struct SchemaObject<TEncounteredField> {
     pub description: Option<DescriptionValue>,
     pub name: IsographObjectTypeName,
     pub id: ObjectId,
-    // pub interfaces: Vec<InterfaceTypeName>,
     // pub directives: Vec<Directive<ConstantValue>>,
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
@@ -374,14 +367,12 @@ pub struct SchemaObject<TEncounteredField> {
 }
 // TODO iterator of fields that includes id_field?
 
-// Unvalidated => TScalarField: TypeAnnotation<UnvalidatedTypeName>,
-// Validated => FieldId
-
 /// In GraphQL, ValidRefinement's are essentially the concrete types that an interface or
 /// union can be narrowed to. valid_refinements should be empty for concrete types.
 #[derive(Debug)]
 pub struct ValidRefinement {
     pub target: ObjectId,
+    // pub is_guaranteed_to_work: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -496,6 +487,7 @@ impl<T> SchemaServerField<T> {
     }
 }
 
+/// A scalar type in the schema.
 #[derive(Debug)]
 pub struct SchemaScalar {
     pub description: Option<DescriptionValue>,
