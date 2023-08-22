@@ -37,9 +37,9 @@ lazy_static! {
 /// the schema does not support removing items.
 #[derive(Debug)]
 pub struct Schema<
-    // Fields contain a field_type: TypeAnnotation<TServerType>
+    // Fields contain a field_type: TypeAnnotation<TFieldAssociatedType>
     // Validated: OutputTypeId, Unvalidated: UnvalidatedTypeName
-    TServerType,
+    TFieldAssociatedType,
     // The associated data type of scalars in resolvers' selection sets and unwraps
     // Validated: DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>, Unvalidated: ()
     TScalarField,
@@ -53,7 +53,7 @@ pub struct Schema<
     // Validated: ValidatedDefinedField, Unvalidated: UnvalidatedObjectFieldInfo
     TEncounteredField,
 > {
-    pub fields: Vec<SchemaServerField<TypeAnnotation<TServerType>>>,
+    pub fields: Vec<SchemaServerField<TypeAnnotation<TFieldAssociatedType>>>,
     pub resolvers: Vec<SchemaResolver<TScalarField, TLinkedField, TVariableType>>,
     pub schema_data: SchemaData<TEncounteredField>,
 
@@ -94,13 +94,13 @@ pub struct SchemaData<TEncounteredField> {
     pub defined_types: HashMap<UnvalidatedTypeName, DefinedTypeId>,
 }
 
-impl<TServerType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
-    Schema<TServerType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
+impl<TFieldAssociatedType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
+    Schema<TFieldAssociatedType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
 {
     pub fn field(
         &self,
         field_id: ServerFieldId,
-    ) -> &SchemaServerField<TypeAnnotation<TServerType>> {
+    ) -> &SchemaServerField<TypeAnnotation<TFieldAssociatedType>> {
         &self.fields[field_id.as_usize()]
     }
 
@@ -118,13 +118,13 @@ impl<TServerType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
     }
 }
 
-impl<TServerType: Copy, TScalarField, TLinkedField, TVariableType, TEncounteredField>
-    Schema<TServerType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
+impl<TFieldAssociatedType: Copy, TScalarField, TLinkedField, TVariableType, TEncounteredField>
+    Schema<TFieldAssociatedType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
 {
     pub fn id_field(
         &self,
         id_field_id: ServerIdFieldId,
-    ) -> SchemaIdField<NamedTypeAnnotation<TServerType>> {
+    ) -> SchemaIdField<NamedTypeAnnotation<TFieldAssociatedType>> {
         let field_id = id_field_id.into();
 
         let field = self

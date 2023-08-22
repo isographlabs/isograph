@@ -4,19 +4,19 @@ pub trait HasName {
 }
 
 /// Distinguishes between server fields and locally-defined resolver fields.
-/// TServerType can be a ScalarFieldName in an unvalidated schema, or a
+/// TFieldAssociatedType can be a ScalarFieldName in an unvalidated schema, or a
 /// ScalarId, in a validated schema.
 ///
 /// TResolverType can be an UnvalidatedTypeName in an unvalidated schema, or an
 /// OutputTypeId in a validated schema.
 #[derive(Debug, Clone, Copy)]
-pub enum DefinedField<TServerType, TResolverType> {
-    ServerField(TServerType),
+pub enum DefinedField<TFieldAssociatedType, TResolverType> {
+    ServerField(TFieldAssociatedType),
     ResolverField(TResolverType),
 }
 
-impl<TServerType, TResolverType> DefinedField<TServerType, TResolverType> {
-    pub fn as_server_field(&self) -> Option<&TServerType> {
+impl<TFieldAssociatedType, TResolverType> DefinedField<TFieldAssociatedType, TResolverType> {
+    pub fn as_server_field(&self) -> Option<&TFieldAssociatedType> {
         match self {
             DefinedField::ServerField(server_field) => Some(server_field),
             DefinedField::ResolverField(_) => None,
