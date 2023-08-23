@@ -3,8 +3,7 @@ use std::collections::{hash_map::Entry, HashMap};
 use common_lang_types::{DefinedField, NormalizationKey, SelectableFieldName, WithSpan};
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    LinkedFieldSelection, ObjectId, ScalarFieldSelection, ScalarId,
-    Selection::{self, ServerField},
+    LinkedFieldSelection, ObjectId, ScalarFieldSelection, ScalarId, Selection,
     SelectionFieldArgument, ServerFieldSelection,
 };
 
@@ -50,7 +49,7 @@ fn merge_selections_into_set(
     for validated_selection in validated_selections.iter() {
         let span = validated_selection.span;
         match &validated_selection.item {
-            ServerField(field) => match field {
+            Selection::ServerField(field) => match field {
                 ServerFieldSelection::ScalarField(scalar_field) => {
                     match &scalar_field.associated_data {
                         DefinedField::ServerField(server_field_id) => {
@@ -116,7 +115,7 @@ fn merge_selections_into_set(
                         Entry::Occupied(mut occupied) => {
                             let existing_selection = occupied.get_mut();
                             match &mut existing_selection.item {
-                                ServerField(field) => match field {
+                                Selection::ServerField(field) => match field {
                                     ServerFieldSelection::ScalarField(_) => {
                                         panic!("expected linked, probably a bug in Isograph")
                                     }
@@ -216,7 +215,7 @@ fn HACK__merge_linked_fields(
     for item in existing_selection_set.iter() {
         let span = item.span;
         match &item.item {
-            ServerField(ServerFieldSelection::ScalarField(scalar_field)) => {
+            Selection::ServerField(ServerFieldSelection::ScalarField(scalar_field)) => {
                 let normalization_key = HACK_combine_name_and_variables_into_normalization_alias(
                     scalar_field.name.map(|x| x.into()),
                     &scalar_field.arguments,
@@ -231,7 +230,7 @@ fn HACK__merge_linked_fields(
                     ),
                 )
             }
-            ServerField(ServerFieldSelection::LinkedField(linked_field)) => {
+            Selection::ServerField(ServerFieldSelection::LinkedField(linked_field)) => {
                 let normalization_key = HACK_combine_name_and_variables_into_normalization_alias(
                     linked_field.name.map(|x| x.into()),
                     &linked_field.arguments,
