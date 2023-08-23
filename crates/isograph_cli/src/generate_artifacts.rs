@@ -18,8 +18,7 @@ use isograph_lang_types::{
 use isograph_schema::{
     create_merged_selection_set, MergedSelection, MergedSelectionSet, ResolverVariant,
     SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
-    ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
-    ValidatedVariableDefinition,
+    ValidatedSchemaResolver, ValidatedSelection, ValidatedVariableDefinition,
 };
 use thiserror::Error;
 
@@ -323,9 +322,6 @@ fn generate_query_text(
     write_selections_for_query_text(
         &mut query_text,
         schema,
-        schema
-            .query_object()
-            .expect("Expected query object to exist"),
         // TODO do not do this here, instead do it during validation, and topologically sort first
         &merged_selection_set,
         1,
@@ -390,7 +386,6 @@ fn generated_file_path(project_root: &PathBuf, file_name: &PathBuf) -> PathBuf {
 fn write_selections_for_query_text(
     query_text: &mut String,
     schema: &ValidatedSchema,
-    _root_object: &ValidatedSchemaObject,
     items: &[WithSpan<MergedSelection>],
     indentation_level: u8,
 ) {
@@ -417,7 +412,6 @@ fn write_selections_for_query_text(
                     write_selections_for_query_text(
                         query_text,
                         schema,
-                        schema.schema_data.object(linked_field.associated_data),
                         &linked_field.selection_set,
                         indentation_level + 1,
                     );
