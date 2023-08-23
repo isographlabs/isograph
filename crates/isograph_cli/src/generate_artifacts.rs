@@ -416,10 +416,6 @@ fn write_selections_for_query_text(
                             // don't exist in generated query texts! We can check for the presence
                             // of a normalization alias, but we know that that won't exist for
                             // a field with no arguments (as we are assuming is the case with ID).
-
-                            // THIS IS BLATANTLY WRONG!!
-                            // This causes us to skip fields with type ID, in addition to the "ID"
-                            // field.
                             if scalar_field.associated_data == id_field.id.into() {
                                 continue 'item;
                             }
