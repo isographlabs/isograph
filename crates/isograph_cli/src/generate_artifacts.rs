@@ -420,7 +420,7 @@ fn write_selections_for_query_text(
                             // THIS IS BLATANTLY WRONG!!
                             // This causes us to skip fields with type ID, in addition to the "ID"
                             // field.
-                            if scalar_field.associated_data == id_field.associated_data.0.item {
+                            if scalar_field.associated_data.1 == id_field.id.into() {
                                 continue 'item;
                             }
                         }

@@ -4,12 +4,12 @@ use common_lang_types::{DefinedField, NormalizationKey, SelectableFieldName, Wit
 use intern::string_key::Intern;
 use isograph_lang_types::{
     LinkedFieldSelection, ObjectId, ScalarFieldSelection, ScalarId, Selection,
-    SelectionFieldArgument, ServerFieldSelection,
+    SelectionFieldArgument, ServerFieldId, ServerFieldSelection,
 };
 
 use crate::{SchemaObject, ValidatedEncounteredDefinedField, ValidatedSchema, ValidatedSelection};
 
-pub type MergedSelection = Selection<ScalarId, ObjectId>;
+pub type MergedSelection = Selection<(ScalarId, ServerFieldId), ObjectId>;
 pub type MergedSelectionSet = Vec<WithSpan<MergedSelection>>;
 
 /// A merged selection set is an input for generating:
@@ -70,7 +70,7 @@ fn merge_selections_into_set(
                                                 name: scalar_field.name,
                                                 reader_alias: scalar_field.reader_alias,
                                                 unwraps: scalar_field.unwraps.clone(),
-                                                associated_data: *scalar_id,
+                                                associated_data: (*scalar_id, *server_field_id),
                                                 arguments: scalar_field.arguments.clone(),
                                                 normalization_alias: scalar_field
                                                     .normalization_alias,
