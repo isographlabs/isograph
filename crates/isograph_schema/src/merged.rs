@@ -52,7 +52,7 @@ fn merge_selections_into_set(
             Selection::ServerField(field) => match field {
                 ServerFieldSelection::ScalarField(scalar_field) => {
                     match &scalar_field.associated_data {
-                        DefinedField::ServerField(server_field_id) => {
+                        DefinedField::ServerField((scalar_id, server_field_id)) => {
                             let normalization_key =
                                 HACK_combine_name_and_variables_into_normalization_alias(
                                     scalar_field.name.map(|x| x.into()),
@@ -70,7 +70,7 @@ fn merge_selections_into_set(
                                                 name: scalar_field.name,
                                                 reader_alias: scalar_field.reader_alias,
                                                 unwraps: scalar_field.unwraps.clone(),
-                                                associated_data: *server_field_id,
+                                                associated_data: *scalar_id,
                                                 arguments: scalar_field.arguments.clone(),
                                                 normalization_alias: scalar_field
                                                     .normalization_alias,

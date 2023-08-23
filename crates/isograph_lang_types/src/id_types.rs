@@ -40,7 +40,6 @@ pub enum InputTypeId {
 pub enum DefinedTypeId {
     Object(ObjectId),
     Scalar(ScalarId),
-    // InputObject?
 }
 
 impl DefinedTypeId {

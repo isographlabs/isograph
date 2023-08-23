@@ -86,6 +86,8 @@ pub(crate) type UnvalidatedSchemaField = SchemaServerField<TypeAnnotation<Unvali
 
 pub(crate) type UnvalidatedSchemaResolver = SchemaResolver<(), (), UnvalidatedTypeName>;
 
+pub(crate) type UnvalidatedSchemaServerField = SchemaServerField<TypeAnnotation<OutputTypeId>>;
+
 #[derive(Debug)]
 pub struct SchemaData<TEncounteredField> {
     pub objects: Vec<SchemaObject<TEncounteredField>>,
