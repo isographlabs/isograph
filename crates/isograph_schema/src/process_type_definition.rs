@@ -268,7 +268,7 @@ fn get_field_objects_ids_and_names(
                     description: field.item.description.map(|d| d.item),
                     name: field.item.name.item,
                     id: current_field_id.into(),
-                    field_type: field.item.type_,
+                    associated_data: field.item.type_,
                     parent_type_id,
                 });
                 field_ids.push(current_field_id.into());
@@ -292,7 +292,7 @@ fn get_field_objects_ids_and_names(
         description: None,
         name: typename_name,
         id: typename_field_id,
-        field_type: typename_type.clone(),
+        associated_data: typename_type.clone(),
         parent_type_id,
     });
     if encountered_fields

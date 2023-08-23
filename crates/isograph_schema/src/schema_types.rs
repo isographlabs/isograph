@@ -380,7 +380,7 @@ pub struct SchemaServerField<TData> {
     pub description: Option<DescriptionValue>,
     pub name: SelectableFieldName,
     pub id: ServerFieldId,
-    pub field_type: TData,
+    pub associated_data: TData,
     pub parent_type_id: ObjectId,
     // pub arguments: Vec<InputValue<ConstantValue>>,
     // pub directives: Vec<Directive<ConstantValue>>,
@@ -395,7 +395,7 @@ impl<TData> SchemaServerField<TData> {
             description: self.description,
             name: self.name,
             id: self.id,
-            field_type: convert(&self.field_type)?,
+            associated_data: convert(&self.associated_data)?,
             parent_type_id: self.parent_type_id,
         })
     }
@@ -408,7 +408,7 @@ pub struct SchemaIdField<TData> {
     pub description: Option<DescriptionValue>,
     pub name: SelectableFieldName,
     pub id: ServerIdFieldId,
-    pub field_type: TData,
+    pub associated_data: TData,
     pub parent_type_id: ObjectId,
     // pub directives: Vec<Directive<ConstantValue>>,
 }
@@ -432,7 +432,7 @@ impl<TData: Copy> TryFrom<SchemaServerField<TData>> for SchemaIdField<TData> {
             description: value.description,
             name: value.name,
             id: value.id.0.into(),
-            field_type: value.field_type,
+            associated_data: value.associated_data,
             parent_type_id: value.parent_type_id,
         })
     }
@@ -471,7 +471,7 @@ impl<T> SchemaServerField<T> {
             description,
             name,
             id,
-            field_type,
+            associated_data: field_type,
             parent_type_id,
         } = self;
         (
@@ -479,7 +479,7 @@ impl<T> SchemaServerField<T> {
                 description,
                 name,
                 id,
-                field_type: (),
+                associated_data: (),
                 parent_type_id,
             },
             field_type,

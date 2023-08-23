@@ -419,7 +419,7 @@ fn write_selections_for_query_text(
                             // THIS IS BLATANTLY WRONG!!
                             // This causes us to skip fields with type ID, in addition to the "ID"
                             // field.
-                            if scalar_field.field == id_field.field_type.0.item {
+                            if scalar_field.associated_data == id_field.associated_data.0.item {
                                 continue 'item;
                             }
                         }
@@ -445,7 +445,7 @@ fn write_selections_for_query_text(
                         write_selections_for_query_text(
                             query_text,
                             schema,
-                            schema.schema_data.object(linked_field.field),
+                            schema.schema_data.object(linked_field.associated_data),
                             &linked_field.selection_set,
                             indentation_level + 1,
                         );
@@ -603,7 +603,7 @@ fn write_query_types_from_selection(
     match &selection.item {
         Selection::ServerField(field) => match field {
             ServerFieldSelection::ScalarField(scalar_field) => {
-                match scalar_field.field {
+                match scalar_field.associated_data {
                     DefinedField::ServerField(_server_field) => {
                         let parent_field = parent_type
                             .encountered_fields
@@ -615,7 +615,7 @@ fn write_query_types_from_selection(
                         let name_or_alias = scalar_field.name_or_alias().item;
 
                         // TODO there should be a clever way to print without cloning
-                        let output_type = field.field_type.clone().map(|output_type_id| {
+                        let output_type = field.associated_data.clone().map(|output_type_id| {
                             // TODO not just scalars, enums as well. Both should have a javascript name
                             let scalar_id = if let OutputTypeId::Scalar(scalar) = output_type_id {
                                 scalar
@@ -677,7 +677,7 @@ fn write_query_types_from_selection(
                     .expect("Parent field should exist and be server field");
                 let field = schema.field(*parent_field);
                 let name_or_alias = linked_field.name_or_alias().item;
-                let type_annotation = field.field_type.clone().map(|output_type_id| {
+                let type_annotation = field.associated_data.clone().map(|output_type_id| {
                     // TODO Or interface or union type
                     let object_id = if let OutputTypeId::Object(object) = output_type_id {
                         object
@@ -811,7 +811,7 @@ fn generate_reader_ast_node(
             ServerFieldSelection::ScalarField(scalar_field) => {
                 let field_name = scalar_field.name.item;
 
-                match scalar_field.field {
+                match scalar_field.associated_data {
                     DefinedField::ServerField(_server_field) => {
                         let alias = scalar_field
                             .reader_alias
@@ -883,7 +883,7 @@ fn generate_reader_ast_node(
                     .reader_alias
                     .map(|x| format!("\"{}\"", x.item))
                     .unwrap_or("null".to_string());
-                let linked_field_type = schema.schema_data.object(linked_field.field);
+                let linked_field_type = schema.schema_data.object(linked_field.associated_data);
                 let inner_reader_ast = generate_reader_ast(
                     schema,
                     &linked_field.selection_set,

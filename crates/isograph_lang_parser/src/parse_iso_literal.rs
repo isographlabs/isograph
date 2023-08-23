@@ -161,7 +161,7 @@ fn parse_selection<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResult<WithSpan<S
                         name: field_name.map(|string_key| string_key.into()),
                         reader_alias: alias
                             .map(|with_span| with_span.map(|string_key| string_key.into())),
-                        field: (),
+                        associated_data: (),
                         selection_set,
                         unwraps,
                         normalization_alias:
@@ -177,7 +177,7 @@ fn parse_selection<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResult<WithSpan<S
                         name: field_name.map(|string_key| string_key.into()),
                         reader_alias: alias
                             .map(|with_span| with_span.map(|string_key| string_key.into())),
-                        field: (),
+                        associated_data: (),
                         unwraps,
                         normalization_alias:
                             HACK_combine_name_and_variables_into_normalization_alias(

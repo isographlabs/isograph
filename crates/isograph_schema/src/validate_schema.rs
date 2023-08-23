@@ -167,7 +167,7 @@ fn validate_and_transform_field(
         description: empty_field.description,
         name: empty_field.name,
         id: empty_field.id,
-        field_type,
+        associated_data: field_type,
         parent_type_id: empty_field.parent_type_id,
     })
 }
@@ -438,7 +438,7 @@ fn validate_field_type_exists_and_is_scalar(
                 match field_type_id {
                     DefinedTypeId::Scalar(scalar_id) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
-                        field: DefinedField::ServerField(scalar_id),
+                        associated_data: DefinedField::ServerField(scalar_id),
                         reader_alias: scalar_field_selection.reader_alias,
                         normalization_alias: scalar_field_selection.normalization_alias,
                         unwraps: scalar_field_selection.unwraps,
@@ -460,7 +460,7 @@ fn validate_field_type_exists_and_is_scalar(
                     name: scalar_field_selection.name,
                     reader_alias: scalar_field_selection.reader_alias,
                     unwraps: scalar_field_selection.unwraps,
-                    field: DefinedField::ResolverField((
+                    associated_data: DefinedField::ResolverField((
                         (*resolver_name).into(),
                         format!("{}__{}", parent_type.name, resolver_name)
                             .intern()
@@ -522,7 +522,7 @@ fn validate_field_type_exists_and_is_linked(
                                     },
                                 ).collect::<Result<Vec<_>, _>>()?,
                                 unwraps: linked_field_selection.unwraps,
-                                field: object_id,
+                                associated_data: object_id,
                                 arguments: linked_field_selection.arguments,
                             })
                         }

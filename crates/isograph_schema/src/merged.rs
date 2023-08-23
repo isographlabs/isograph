@@ -52,7 +52,7 @@ fn merge_selections_into_set(
         match &validated_selection.item {
             ServerField(field) => match field {
                 ServerFieldSelection::ScalarField(scalar_field) => {
-                    match &scalar_field.field {
+                    match &scalar_field.associated_data {
                         DefinedField::ServerField(server_field_id) => {
                             let normalization_key =
                                 HACK_combine_name_and_variables_into_normalization_alias(
@@ -71,7 +71,7 @@ fn merge_selections_into_set(
                                                 name: scalar_field.name,
                                                 reader_alias: scalar_field.reader_alias,
                                                 unwraps: scalar_field.unwraps.clone(),
-                                                field: *server_field_id,
+                                                associated_data: *server_field_id,
                                                 arguments: scalar_field.arguments.clone(),
                                                 normalization_alias: scalar_field
                                                     .normalization_alias,
@@ -121,7 +121,7 @@ fn merge_selections_into_set(
                                         panic!("expected linked, probably a bug in Isograph")
                                     }
                                     ServerFieldSelection::LinkedField(existing_linked_field) => {
-                                        let type_id = new_linked_field.field;
+                                        let type_id = new_linked_field.associated_data;
                                         let linked_field_parent_type =
                                             schema.schema_data.object(type_id);
                                         HACK__merge_linked_fields(
@@ -140,9 +140,9 @@ fn merge_selections_into_set(
                                     LinkedFieldSelection {
                                         name: new_linked_field.name,
                                         reader_alias: new_linked_field.reader_alias,
-                                        field: new_linked_field.field,
+                                        associated_data: new_linked_field.associated_data,
                                         selection_set: {
-                                            let type_id = new_linked_field.field;
+                                            let type_id = new_linked_field.associated_data;
                                             let linked_field_parent_type =
                                                 schema.schema_data.object(type_id);
                                             merge_selection_set(
