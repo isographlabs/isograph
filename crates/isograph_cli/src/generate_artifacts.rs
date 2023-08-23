@@ -16,8 +16,8 @@ use isograph_lang_types::{
     ServerFieldSelection,
 };
 use isograph_schema::{
-    merge_selection_set, MergedSelection, MergedSelectionSet, ResolverVariant, SchemaObject,
-    ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
+    create_merged_selection_set, MergedSelection, MergedSelectionSet, ResolverVariant,
+    SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
     ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
     ValidatedVariableDefinition,
 };
@@ -56,7 +56,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
     if let Some((ref selection_set, _)) = fetchable_resolver.selection_set_and_unwraps {
         let query_name = fetchable_resolver.name.into();
 
-        let merged_selection_set = merge_selection_set(
+        let merged_selection_set = create_merged_selection_set(
             schema,
             // TODO here we are assuming that the resolver is only on the Query type.
             // That restriction should be loosened.

@@ -1,24 +1,31 @@
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{
+    hash_map::{Entry, OccupiedEntry, VacantEntry},
+    HashMap,
+};
 
-use common_lang_types::{DefinedField, NormalizationKey, SelectableFieldName, WithSpan};
+use common_lang_types::{DefinedField, NormalizationKey, SelectableFieldName, Span, WithSpan};
 use intern::string_key::Intern;
 use isograph_lang_types::{
     LinkedFieldSelection, ObjectId, ScalarFieldSelection, Selection, SelectionFieldArgument,
     ServerFieldId, ServerFieldSelection,
 };
 
-use crate::{SchemaObject, ValidatedEncounteredDefinedField, ValidatedSchema, ValidatedSelection};
+use crate::{
+    SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
+    ValidatedSelection,
+};
 
 pub type MergedSelection = Selection<ServerFieldId, ObjectId>;
 pub type MergedSelectionSet = Vec<WithSpan<MergedSelection>>;
+pub type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedSelection>>;
 
 /// A merged selection set is an input for generating:
 /// - query texts
-/// - normalization artifacts
-/// - raw response types
+/// - normalization artifacts (TODO)
+/// - raw response types (TODO)
 ///
 /// TODO: SelectionSetAndUnwraps should be generic enough to handle this
-pub fn merge_selection_set(
+pub fn create_merged_selection_set(
     schema: &ValidatedSchema,
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
@@ -36,13 +43,14 @@ pub fn merge_selection_set(
         .into_iter()
         .map(|(_key, value)| value)
         .collect();
+    // TODO sort in a special way: __typename and id go first, then alphabetical
     merged_fields.sort();
     merged_fields
 }
 
 fn merge_selections_into_set(
     schema: &ValidatedSchema,
-    merged_selection_set: &mut HashMap<NormalizationKey, WithSpan<MergedSelection>>,
+    merged_selection_set: &mut MergedSelectionMap,
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     validated_selections: &Vec<WithSpan<ValidatedSelection>>,
 ) {
@@ -52,57 +60,18 @@ fn merge_selections_into_set(
             Selection::ServerField(field) => match field {
                 ServerFieldSelection::ScalarField(scalar_field) => {
                     match &scalar_field.associated_data {
-                        DefinedField::ServerField(server_field_id) => {
-                            let normalization_key =
-                                HACK_combine_name_and_variables_into_normalization_alias(
-                                    scalar_field.name.map(|x| x.into()),
-                                    &scalar_field.arguments,
-                                );
-                            match merged_selection_set.entry(normalization_key.item) {
-                                Entry::Occupied(_) => {
-                                    // TODO: do we need to check for merge conflicts on scalars? Not while
-                                    // we are auto-aliasing.
-                                }
-                                Entry::Vacant(vacant_entry) => {
-                                    vacant_entry.insert(WithSpan::new(
-                                        Selection::ServerField(ServerFieldSelection::ScalarField(
-                                            ScalarFieldSelection {
-                                                name: scalar_field.name,
-                                                reader_alias: scalar_field.reader_alias,
-                                                unwraps: scalar_field.unwraps.clone(),
-                                                associated_data: *server_field_id,
-                                                arguments: scalar_field.arguments.clone(),
-                                                normalization_alias: scalar_field
-                                                    .normalization_alias,
-                                            },
-                                        )),
-                                        span,
-                                    ));
-                                }
-                            }
-                        }
-                        DefinedField::ResolverField(_) => {
-                            let resolver_field_name = scalar_field.name.item;
-                            let parent_field_id = parent_type
-                                .resolvers
-                                .iter()
-                                .find(|parent_field_id| {
-                                    let field = schema.resolver(**parent_field_id);
-                                    field.name == resolver_field_name.into()
-                                })
-                                .expect("expect field to exist");
-                            let resolver_field = schema.resolver(*parent_field_id);
-                            if let Some((ref selection_set, _)) =
-                                resolver_field.selection_set_and_unwraps
-                            {
-                                merge_selections_into_set(
-                                    schema,
-                                    merged_selection_set,
-                                    parent_type,
-                                    selection_set,
-                                )
-                            }
-                        }
+                        DefinedField::ServerField(server_field_id) => merge_scalar_server_field(
+                            scalar_field,
+                            merged_selection_set,
+                            server_field_id,
+                            span,
+                        ),
+                        DefinedField::ResolverField(_) => merge_scalar_resolver_field(
+                            scalar_field,
+                            parent_type,
+                            schema,
+                            merged_selection_set,
+                        ),
                     };
                 }
                 ServerFieldSelection::LinkedField(new_linked_field) => {
@@ -112,61 +81,131 @@ fn merge_selections_into_set(
                             &new_linked_field.arguments,
                         );
                     match merged_selection_set.entry(normalization_key.item) {
-                        Entry::Occupied(mut occupied) => {
-                            let existing_selection = occupied.get_mut();
-                            match &mut existing_selection.item {
-                                Selection::ServerField(field) => match field {
-                                    ServerFieldSelection::ScalarField(_) => {
-                                        panic!("expected linked, probably a bug in Isograph")
-                                    }
-                                    ServerFieldSelection::LinkedField(existing_linked_field) => {
-                                        let type_id = new_linked_field.associated_data;
-                                        let linked_field_parent_type =
-                                            schema.schema_data.object(type_id);
-                                        HACK__merge_linked_fields(
-                                            schema,
-                                            &mut existing_linked_field.selection_set,
-                                            &new_linked_field.selection_set,
-                                            linked_field_parent_type,
-                                        );
-                                    }
-                                },
-                            }
-                        }
-                        Entry::Vacant(vacant_entry) => {
-                            vacant_entry.insert(WithSpan::new(
-                                Selection::ServerField(ServerFieldSelection::LinkedField(
-                                    LinkedFieldSelection {
-                                        name: new_linked_field.name,
-                                        reader_alias: new_linked_field.reader_alias,
-                                        associated_data: new_linked_field.associated_data,
-                                        selection_set: {
-                                            let type_id = new_linked_field.associated_data;
-                                            let linked_field_parent_type =
-                                                schema.schema_data.object(type_id);
-                                            merge_selection_set(
-                                                schema,
-                                                linked_field_parent_type,
-                                                &new_linked_field.selection_set,
-                                            )
-                                        },
-                                        // Unwraps **aren't necessary** in the merged data structure. The merged fields
-                                        // should either be generic over the type of unwraps or it should be a different
-                                        // data structure.
-                                        unwraps: new_linked_field
-                                            .unwraps
-                                            // TODO this sucks
-                                            .clone(),
-                                        arguments: new_linked_field.arguments.clone(),
-                                        normalization_alias: new_linked_field.normalization_alias,
-                                    },
-                                )),
-                                span,
-                            ));
-                        }
+                        Entry::Occupied(occupied) => merge_linked_field_into_occupied_entry(
+                            occupied,
+                            new_linked_field,
+                            schema,
+                        ),
+                        Entry::Vacant(vacant_entry) => merge_linked_field_into_vacant_entry(
+                            vacant_entry,
+                            new_linked_field,
+                            schema,
+                            span,
+                        ),
                     };
                 }
             },
+        }
+    }
+}
+
+fn merge_linked_field_into_vacant_entry(
+    vacant_entry: VacantEntry<'_, NormalizationKey, WithSpan<MergedSelection>>,
+    new_linked_field: &LinkedFieldSelection<ValidatedScalarDefinedField, ObjectId>,
+    schema: &ValidatedSchema,
+    span: Span,
+) {
+    vacant_entry.insert(WithSpan::new(
+        Selection::ServerField(ServerFieldSelection::LinkedField(LinkedFieldSelection {
+            name: new_linked_field.name,
+            reader_alias: new_linked_field.reader_alias,
+            associated_data: new_linked_field.associated_data,
+            selection_set: {
+                let type_id = new_linked_field.associated_data;
+                let linked_field_parent_type = schema.schema_data.object(type_id);
+                create_merged_selection_set(
+                    schema,
+                    linked_field_parent_type,
+                    &new_linked_field.selection_set,
+                )
+            },
+            // Unwraps **aren't necessary** in the merged data structure. The merged fields
+            // should either be generic over the type of unwraps or it should be a different
+            // data structure.
+            unwraps: new_linked_field
+                .unwraps
+                // TODO this sucks
+                .clone(),
+            arguments: new_linked_field.arguments.clone(),
+            normalization_alias: new_linked_field.normalization_alias,
+        })),
+        span,
+    ));
+}
+
+fn merge_linked_field_into_occupied_entry(
+    mut occupied: OccupiedEntry<'_, NormalizationKey, WithSpan<MergedSelection>>,
+    new_linked_field: &LinkedFieldSelection<ValidatedScalarDefinedField, ObjectId>,
+    schema: &ValidatedSchema,
+) {
+    let existing_selection = occupied.get_mut();
+    match &mut existing_selection.item {
+        Selection::ServerField(field) => match field {
+            ServerFieldSelection::ScalarField(_) => {
+                panic!("expected linked, probably a bug in Isograph")
+            }
+            ServerFieldSelection::LinkedField(existing_linked_field) => {
+                let type_id = new_linked_field.associated_data;
+                let linked_field_parent_type = schema.schema_data.object(type_id);
+                HACK__merge_linked_fields(
+                    schema,
+                    &mut existing_linked_field.selection_set,
+                    &new_linked_field.selection_set,
+                    linked_field_parent_type,
+                );
+            }
+        },
+    }
+}
+
+fn merge_scalar_resolver_field(
+    scalar_field: &ScalarFieldSelection<ValidatedScalarDefinedField>,
+    parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
+    schema: &ValidatedSchema,
+    merged_selection_set: &mut MergedSelectionMap,
+) {
+    let resolver_field_name = scalar_field.name.item;
+    let parent_field_id = parent_type
+        .resolvers
+        .iter()
+        .find(|parent_field_id| {
+            let field = schema.resolver(**parent_field_id);
+            field.name == resolver_field_name.into()
+        })
+        .expect("expect field to exist");
+    let resolver_field = schema.resolver(*parent_field_id);
+    if let Some((ref selection_set, _)) = resolver_field.selection_set_and_unwraps {
+        merge_selections_into_set(schema, merged_selection_set, parent_type, selection_set)
+    }
+}
+
+fn merge_scalar_server_field(
+    scalar_field: &ScalarFieldSelection<ValidatedScalarDefinedField>,
+    merged_selection_set: &mut MergedSelectionMap,
+    server_field_id: &ServerFieldId,
+    span: Span,
+) {
+    let normalization_key = HACK_combine_name_and_variables_into_normalization_alias(
+        scalar_field.name.map(|x| x.into()),
+        &scalar_field.arguments,
+    );
+    match merged_selection_set.entry(normalization_key.item) {
+        Entry::Occupied(_) => {
+            // TODO: do we need to check for merge conflicts on scalars? Not while
+            // we are auto-aliasing.
+        }
+        Entry::Vacant(vacant_entry) => {
+            vacant_entry.insert(WithSpan::new(
+                Selection::ServerField(ServerFieldSelection::ScalarField(ScalarFieldSelection {
+                    name: scalar_field.name,
+                    reader_alias: scalar_field.reader_alias,
+                    unwraps: scalar_field.unwraps.clone(),
+                    associated_data: *server_field_id,
+                    arguments: scalar_field.arguments.clone(),
+                    normalization_alias: scalar_field.normalization_alias,
+                })),
+                span,
+            ));
         }
     }
 }
@@ -205,6 +244,7 @@ fn HACK_combine_name_and_variables_into_normalization_alias(
 ///
 /// In this function, we convert the Vec to a HashMap, do the merging, then
 /// convert back. Blah!
+#[allow(non_snake_case)]
 fn HACK__merge_linked_fields(
     schema: &ValidatedSchema,
     existing_selection_set: &mut Vec<WithSpan<MergedSelection>>,
