@@ -30,7 +30,7 @@ pub type ValidatedSchemaResolver =
 pub type ValidatedEncounteredDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;
 /// The validated defined field that shows up in the TScalarField generic.
 pub type ValidatedScalarDefinedField =
-    DefinedField<(ScalarId, ServerFieldId), (FieldNameOrAlias, TypeAndField)>;
+    DefinedField<ServerFieldId, (FieldNameOrAlias, TypeAndField)>;
 
 pub type ValidatedSchemaObject = SchemaObject<ValidatedEncounteredDefinedField>;
 
@@ -450,17 +450,16 @@ fn validate_field_type_exists_and_is_scalar(
                         was validated earlier, probably indicates a bug in Isograph",
                     );
                 match field_type_id {
-                    DefinedTypeId::Scalar(scalar_id) => Ok(ScalarFieldSelection {
+                    DefinedTypeId::Scalar(_scalar_id) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
-                        associated_data: DefinedField::ServerField((
-                            scalar_id,
+                        associated_data: DefinedField::ServerField(
                             find_server_field_id(
                                 server_fields,
                                 scalar_field_selection.name.item,
                                 &parent_object.server_fields,
                             )
                             .expect("Expected to find scalar field, this probably indicates a bug in Isograph"),
-                        )),
+                        ),
                         reader_alias: scalar_field_selection.reader_alias,
                         normalization_alias: scalar_field_selection.normalization_alias,
                         unwraps: scalar_field_selection.unwraps,

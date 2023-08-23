@@ -3,13 +3,13 @@ use std::collections::{hash_map::Entry, HashMap};
 use common_lang_types::{DefinedField, NormalizationKey, SelectableFieldName, WithSpan};
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    LinkedFieldSelection, ObjectId, ScalarFieldSelection, ScalarId, Selection,
-    SelectionFieldArgument, ServerFieldId, ServerFieldSelection,
+    LinkedFieldSelection, ObjectId, ScalarFieldSelection, Selection, SelectionFieldArgument,
+    ServerFieldId, ServerFieldSelection,
 };
 
 use crate::{SchemaObject, ValidatedEncounteredDefinedField, ValidatedSchema, ValidatedSelection};
 
-pub type MergedSelection = Selection<(ScalarId, ServerFieldId), ObjectId>;
+pub type MergedSelection = Selection<ServerFieldId, ObjectId>;
 pub type MergedSelectionSet = Vec<WithSpan<MergedSelection>>;
 
 /// A merged selection set is an input for generating:
@@ -52,7 +52,7 @@ fn merge_selections_into_set(
             Selection::ServerField(field) => match field {
                 ServerFieldSelection::ScalarField(scalar_field) => {
                     match &scalar_field.associated_data {
-                        DefinedField::ServerField((scalar_id, server_field_id)) => {
+                        DefinedField::ServerField(server_field_id) => {
                             let normalization_key =
                                 HACK_combine_name_and_variables_into_normalization_alias(
                                     scalar_field.name.map(|x| x.into()),
@@ -70,7 +70,7 @@ fn merge_selections_into_set(
                                                 name: scalar_field.name,
                                                 reader_alias: scalar_field.reader_alias,
                                                 unwraps: scalar_field.unwraps.clone(),
-                                                associated_data: (*scalar_id, *server_field_id),
+                                                associated_data: *server_field_id,
                                                 arguments: scalar_field.arguments.clone(),
                                                 normalization_alias: scalar_field
                                                     .normalization_alias,
