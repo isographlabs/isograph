@@ -20,25 +20,27 @@ use crate::{
 
 pub type ValidatedSchemaField = SchemaServerField<TypeAnnotation<OutputTypeId>>;
 
-pub type ValidatedSelection =
-    Selection<DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>, ObjectId>;
+pub type ValidatedSelection = Selection<ValidatedScalarDefinedField, ObjectId>;
 
 pub type ValidatedVariableDefinition = VariableDefinition<InputTypeId>;
 pub type ValidatedSchemaResolver =
-    SchemaResolver<DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>, ObjectId, InputTypeId>;
+    SchemaResolver<ValidatedScalarDefinedField, ObjectId, InputTypeId>;
 
-pub type ValidatedDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;
+/// The validated defined field that shows up in the encountered field generic.
+pub type ValidatedEncounteredDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;
+/// The validated defined field that shows up in the TScalarField generic.
+pub type ValidatedScalarDefinedField = DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>;
 
-pub type ValidatedSchemaObject = SchemaObject<ValidatedDefinedField>;
+pub type ValidatedSchemaObject = SchemaObject<ValidatedEncounteredDefinedField>;
 
 pub type ValidatedSchemaIdField = SchemaIdField<NamedTypeAnnotation<ScalarId>>;
 
 pub type ValidatedSchema = Schema<
     OutputTypeId,
-    DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>,
+    ValidatedScalarDefinedField,
     ObjectId,
     InputTypeId,
-    ValidatedDefinedField,
+    ValidatedEncounteredDefinedField,
 >;
 
 impl ValidatedSchema {
@@ -93,7 +95,7 @@ fn transform_object_field_ids(
     schema_fields: &[ValidatedSchemaField],
     schema_resolvers: &[ValidatedSchemaResolver],
     object: SchemaObject<UnvalidatedObjectFieldInfo>,
-) -> SchemaObject<ValidatedDefinedField> {
+) -> SchemaObject<ValidatedEncounteredDefinedField> {
     let SchemaObject {
         name,
         server_fields,
@@ -424,9 +426,7 @@ fn validate_field_type_exists_and_is_scalar(
     schema_data: &UnvalidatedSchemaData,
     parent_type: &SchemaObject<UnvalidatedObjectFieldInfo>,
     scalar_field_selection: ScalarFieldSelection<()>,
-) -> ValidateSelectionsResult<
-    ScalarFieldSelection<DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>>,
-> {
+) -> ValidateSelectionsResult<ScalarFieldSelection<ValidatedScalarDefinedField>> {
     let scalar_field_name = scalar_field_selection.name.item.into();
     match parent_encountered_fields.get(&scalar_field_name) {
         Some(defined_field_type) => match defined_field_type {
@@ -485,9 +485,7 @@ fn validate_field_type_exists_and_is_linked(
     schema_data: &UnvalidatedSchemaData,
     parent_type: &SchemaObject<UnvalidatedObjectFieldInfo>,
     linked_field_selection: LinkedFieldSelection<(), ()>,
-) -> ValidateSelectionsResult<
-    LinkedFieldSelection<DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>, ObjectId>,
-> {
+) -> ValidateSelectionsResult<LinkedFieldSelection<ValidatedScalarDefinedField, ObjectId>> {
     let linked_field_name = linked_field_selection.name.item.into();
     match parent_fields.get(&linked_field_name) {
         Some(defined_field_type) => {

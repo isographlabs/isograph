@@ -7,18 +7,19 @@ use std::{
 };
 
 use common_lang_types::{
-    DefinedField, FieldNameOrAlias, HasName, IsographObjectTypeName, QueryOperationName,
-    ResolverDefinitionPath, SelectableFieldName, TypeAndField, UnvalidatedTypeName, WithSpan,
+    DefinedField, HasName, IsographObjectTypeName, QueryOperationName, ResolverDefinitionPath,
+    SelectableFieldName, TypeAndField, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{ListTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
-    NonConstantValue, ObjectId, OutputTypeId, ScalarId, Selection, SelectionFieldArgument,
+    NonConstantValue, ObjectId, OutputTypeId, Selection, SelectionFieldArgument,
     ServerFieldSelection,
 };
 use isograph_schema::{
     merge_selection_set, MergedSelection, MergedSelectionSet, ResolverVariant, SchemaObject,
-    ValidatedDefinedField, ValidatedSchema, ValidatedSchemaIdField, ValidatedSchemaObject,
-    ValidatedSchemaResolver, ValidatedSelection, ValidatedVariableDefinition,
+    ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
+    ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
+    ValidatedVariableDefinition,
 };
 use thiserror::Error;
 
@@ -205,7 +206,7 @@ pub struct ConvertFunction(pub String);
 pub struct FetchableResolver<'schema> {
     pub query_text: QueryText,
     pub query_name: QueryOperationName,
-    pub parent_type: &'schema SchemaObject<ValidatedDefinedField>,
+    pub parent_type: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
     pub resolver_import_statement: ResolverImportStatement,
     pub resolver_parameter_type: ResolverParameterType,
     pub resolver_return_type: ResolverReturnType,
@@ -266,7 +267,7 @@ fn get_read_out_type_text(read_out_type: ResolverReadOutType) -> String {
 
 #[derive(Debug)]
 pub struct NonFetchableResolver<'schema> {
-    pub parent_type: &'schema SchemaObject<ValidatedDefinedField>,
+    pub parent_type: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
     pub resolver_field_name: SelectableFieldName,
     pub nested_resolver_artifact_imports: HashMap<TypeAndField, ResolverImport>,
     pub resolver_read_out_type: ResolverReadOutType,
@@ -555,7 +556,7 @@ fn generate_resolver_parameter_type(
     schema: &ValidatedSchema,
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
     variant: Option<WithSpan<ResolverVariant>>,
-    parent_type: &SchemaObject<ValidatedDefinedField>,
+    parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
     indentation_level: u8,
 ) -> ResolverParameterType {
@@ -594,7 +595,7 @@ fn write_query_types_from_selection(
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
     variant: Option<WithSpan<ResolverVariant>>,
-    parent_type: &SchemaObject<ValidatedDefinedField>,
+    parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
     indentation_level: u8,
 ) {
@@ -780,7 +781,7 @@ pub struct ResolverImport {
 fn generate_reader_ast<'schema>(
     schema: &'schema ValidatedSchema,
     selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
-    parent_type: &SchemaObject<ValidatedDefinedField>,
+    parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     indentation_level: u8,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
 ) -> ReaderAst {
@@ -800,8 +801,8 @@ fn generate_reader_ast<'schema>(
 }
 
 fn generate_reader_ast_node(
-    item: &WithSpan<Selection<DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>, ObjectId>>,
-    parent_type: &SchemaObject<ValidatedDefinedField>,
+    item: &WithSpan<Selection<ValidatedScalarDefinedField, ObjectId>>,
+    parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     schema: &ValidatedSchema,
     indentation_level: u8,
     nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,

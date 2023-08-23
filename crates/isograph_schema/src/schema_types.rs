@@ -41,7 +41,7 @@ pub struct Schema<
     // Validated: OutputTypeId, Unvalidated: UnvalidatedTypeName
     TFieldAssociatedType,
     // The associated data type of scalars in resolvers' selection sets and unwraps
-    // Validated: DefinedField<ScalarId, (FieldNameOrAlias, TypeAndField)>, Unvalidated: ()
+    // Validated: ValidatedScalarDefinedField, Unvalidated: ()
     TScalarField,
     // The associated data type of linked fields in resolvers' selection sets and unwraps
     // Validated: ObjectId, Unvalidated: ()
