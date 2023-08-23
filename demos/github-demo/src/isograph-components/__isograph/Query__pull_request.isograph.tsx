@@ -8,26 +8,26 @@ const queryText = 'query pull_request ($repositoryOwner: String!, $repositoryNam
   repository____owner___repositoryOwner____name___repositoryName: repository(owner: $repositoryOwner, name: $repositoryName) {\
     id,\
     pullRequest____number___pullRequestNumber: pullRequest(number: $pullRequestNumber) {\
-      bodyHTML,\
       id,\
-      title,\
+      bodyHTML,\
       comments____last___last: comments(last: $last) {\
         edges {\
           node {\
-            bodyText,\
-            createdAt,\
             id,\
             author {\
               login,\
             },\
+            bodyText,\
+            createdAt,\
           },\
         },\
       },\
+      title,\
     },\
   },\
   viewer {\
-    avatarUrl,\
     id,\
+    avatarUrl,\
     name,\
   },\
 }';

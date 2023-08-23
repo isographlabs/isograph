@@ -13,12 +13,11 @@ const queryText = 'query home_page ($first: Int!) {\
     repositories____last___first: repositories(last: $first) {\
       edges {\
         node {\
+          id,\
           description,\
           forkCount,\
-          id,\
           name,\
           nameWithOwner,\
-          stargazerCount,\
           owner {\
             id,\
             login,\
@@ -26,6 +25,7 @@ const queryText = 'query home_page ($first: Int!) {\
           pullRequests____first___first: pullRequests(first: $first) {\
             totalCount,\
           },\
+          stargazerCount,\
           watchers____first___first: watchers(first: $first) {\
             totalCount,\
           },\

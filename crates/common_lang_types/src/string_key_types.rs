@@ -107,5 +107,5 @@ string_key_newtype!(FieldArgumentName);
 // e.g. Query__foo
 string_key_newtype!(TypeAndField);
 
-string_key_newtype!(NormalizationKey);
-string_key_conversion!(from: SelectableFieldName, to: NormalizationKey);
+string_key_newtype!(ServerFieldNormalizationKey);
+string_key_conversion!(from: SelectableFieldName, to: ServerFieldNormalizationKey);

@@ -20,15 +20,13 @@ const queryText = 'query repository_page ($repositoryName: String!, $repositoryO
     pullRequests____last___first: pullRequests(last: $first) {\
       edges {\
         node {\
-          closed,\
-          createdAt,\
           id,\
-          number,\
-          title,\
-          totalCommentsCount,\
           author {\
             login,\
           },\
+          closed,\
+          createdAt,\
+          number,\
           repository {\
             id,\
             name,\
@@ -37,13 +35,15 @@ const queryText = 'query repository_page ($repositoryName: String!, $repositoryO
               login,\
             },\
           },\
+          title,\
+          totalCommentsCount,\
         },\
       },\
     },\
   },\
   viewer {\
-    avatarUrl,\
     id,\
+    avatarUrl,\
     name,\
   },\
 }';

@@ -3,7 +3,9 @@ use std::collections::{
     HashMap,
 };
 
-use common_lang_types::{DefinedField, NormalizationKey, SelectableFieldName, Span, WithSpan};
+use common_lang_types::{
+    DefinedField, SelectableFieldName, ServerFieldNormalizationKey, Span, WithSpan,
+};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     LinkedFieldSelection, ObjectId, ScalarFieldSelection, Selection, SelectionFieldArgument,
@@ -19,7 +21,14 @@ use crate::{
 // not used for the reader pipeline.
 pub type MergedSelection = Selection<ServerFieldId, ObjectId>;
 pub type MergedSelectionSet = Vec<WithSpan<MergedSelection>>;
-pub type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedSelection>>;
+type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedSelection>>;
+
+#[derive(Debug, Eq, PartialEq, Clone, Copy, PartialOrd, Ord, Hash)]
+enum NormalizationKey {
+    // __typename,
+    Id,
+    ServerField(ServerFieldNormalizationKey),
+}
 
 /// A merged selection set is an input for generating:
 /// - query texts
@@ -43,14 +52,10 @@ pub fn create_merged_selection_set(
 
     add_typename_and_id_fields(schema, &mut merged_selection_set, parent_type);
 
-    let mut merged_fields: Vec<_> = merged_selection_set
-        .into_iter()
-        .map(|(_key, value)| value)
-        .collect();
+    let mut merged_fields: Vec<_> = merged_selection_set.into_iter().collect();
 
-    // TODO sort in a special way: __typename and id go first, then alphabetical
-    merged_fields.sort();
-    merged_fields
+    merged_fields.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
+    merged_fields.into_iter().map(|(_, value)| value).collect()
 }
 
 fn merge_selections_into_set(
@@ -59,7 +64,7 @@ fn merge_selections_into_set(
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     validated_selections: &Vec<WithSpan<ValidatedSelection>>,
 ) {
-    for validated_selection in validated_selections.iter() {
+    for validated_selection in validated_selections.iter().filter(filter_id_fields) {
         let span = validated_selection.span;
         match &validated_selection.item {
             Selection::ServerField(field) => match field {
@@ -80,11 +85,12 @@ fn merge_selections_into_set(
                     };
                 }
                 ServerFieldSelection::LinkedField(new_linked_field) => {
-                    let normalization_key =
+                    let normalization_key = NormalizationKey::ServerField(
                         HACK_combine_name_and_variables_into_normalization_alias(
                             new_linked_field.name.item.into(),
                             &new_linked_field.arguments,
-                        );
+                        ),
+                    );
                     match merged_selection_set.entry(normalization_key) {
                         Entry::Occupied(occupied) => merge_linked_field_into_occupied_entry(
                             occupied,
@@ -101,6 +107,23 @@ fn merge_selections_into_set(
                 }
             },
         }
+    }
+}
+
+fn filter_id_fields(field: &&WithSpan<Selection<ValidatedScalarDefinedField, ObjectId>>) -> bool {
+    // filter out id fields, and eventually other always-selected fields like __typename
+    match &field.item {
+        Selection::ServerField(server_field) => match server_field {
+            ServerFieldSelection::ScalarField(scalar_field) => {
+                // -------- HACK --------
+                // Here, we check whether the field is named "id", but we should really
+                // know whether it is an id field in some other way. There can be non-id fields
+                // named id.
+                scalar_field.name.item != "id".intern().into()
+                // ------ END HACK ------
+            }
+            ServerFieldSelection::LinkedField(_) => true,
+        },
     }
 }
 
@@ -191,10 +214,11 @@ fn merge_scalar_server_field(
     server_field_id: &ServerFieldId,
     span: Span,
 ) {
-    let normalization_key = HACK_combine_name_and_variables_into_normalization_alias(
-        scalar_field.name.item.into(),
-        &scalar_field.arguments,
-    );
+    let normalization_key =
+        NormalizationKey::ServerField(HACK_combine_name_and_variables_into_normalization_alias(
+            scalar_field.name.item.into(),
+            &scalar_field.arguments,
+        ));
     match merged_selection_set.entry(normalization_key) {
         Entry::Occupied(_) => {
             // TODO: do we need to check for merge conflicts on scalars? Not while
@@ -223,7 +247,7 @@ fn merge_scalar_server_field(
 fn HACK_combine_name_and_variables_into_normalization_alias(
     name: SelectableFieldName,
     arguments: &[WithSpan<SelectionFieldArgument>],
-) -> NormalizationKey {
+) -> ServerFieldNormalizationKey {
     if arguments.is_empty() {
         name.into()
     } else {
@@ -263,10 +287,15 @@ fn HACK__merge_linked_fields(
         let span = item.span;
         match &item.item {
             Selection::ServerField(ServerFieldSelection::ScalarField(scalar_field)) => {
-                let normalization_key = HACK_combine_name_and_variables_into_normalization_alias(
-                    scalar_field.name.item.into(),
-                    &scalar_field.arguments,
+                // N.B. if you have a field named "id" which is a linked field, this will probably
+                // work incorrectly!
+                let normalization_key = NormalizationKey::ServerField(
+                    HACK_combine_name_and_variables_into_normalization_alias(
+                        scalar_field.name.item.into(),
+                        &scalar_field.arguments,
+                    ),
                 );
+
                 merged_selection_set.insert(
                     normalization_key,
                     WithSpan::new(
@@ -278,9 +307,11 @@ fn HACK__merge_linked_fields(
                 )
             }
             Selection::ServerField(ServerFieldSelection::LinkedField(linked_field)) => {
-                let normalization_key = HACK_combine_name_and_variables_into_normalization_alias(
-                    linked_field.name.item.into(),
-                    &linked_field.arguments,
+                let normalization_key = NormalizationKey::ServerField(
+                    HACK_combine_name_and_variables_into_normalization_alias(
+                        linked_field.name.item.into(),
+                        &linked_field.arguments,
+                    ),
                 );
                 merged_selection_set.insert(
                     normalization_key,
@@ -324,8 +355,7 @@ fn add_typename_and_id_fields(
 
     // If the type has an id field, we must select it.
     if let Some(id_field) = id_field {
-        let key = HACK_combine_name_and_variables_into_normalization_alias(id_field.name, &vec![]);
-        match merged_selection_set.entry(key) {
+        match merged_selection_set.entry(NormalizationKey::Id) {
             Entry::Occupied(_) => {
                 // TODO: do we need to check for merge conflicts on scalars? Not while
                 // we are auto-aliasing.
