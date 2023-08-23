@@ -11,9 +11,9 @@ const queryText = 'query user_page ($first: Int!, $userLogin: String!) {\
     repositories____last___first: repositories(last: $first) {\
       edges {\
         node {\
-          id,\
           description,\
           forkCount,\
+          id,\
           name,\
           nameWithOwner,\
           stargazerCount,\
@@ -32,8 +32,8 @@ const queryText = 'query user_page ($first: Int!, $userLogin: String!) {\
     },\
   },\
   viewer {\
-    id,\
     avatarUrl,\
+    id,\
     name,\
   },\
 }';

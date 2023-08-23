@@ -18,7 +18,7 @@ use isograph_lang_types::{
 use isograph_schema::{
     create_merged_selection_set, MergedSelection, MergedSelectionSet, ResolverVariant,
     SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
-    ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
+    ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
     ValidatedVariableDefinition,
 };
 use thiserror::Error;
@@ -390,69 +390,43 @@ fn generated_file_path(project_root: &PathBuf, file_name: &PathBuf) -> PathBuf {
 fn write_selections_for_query_text(
     query_text: &mut String,
     schema: &ValidatedSchema,
-    root_object: &ValidatedSchemaObject,
+    _root_object: &ValidatedSchemaObject,
     items: &[WithSpan<MergedSelection>],
     indentation_level: u8,
 ) {
-    let id_field: Option<ValidatedSchemaIdField> = root_object
-        .id_field
-        .map(|id_field_id| schema.id_field(id_field_id));
-
-    // If the type has an id field, we must select it.
-    if let Some(id_field) = id_field {
-        query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
-        query_text.push_str(&format!("{},\\\n", id_field.name));
-    }
-
-    'item: for item in items.iter() {
+    for item in items.iter() {
         match &item.item {
-            Selection::ServerField(field) => {
-                match field {
-                    ServerFieldSelection::ScalarField(scalar_field) => {
-                        // ------ HACK ------
-                        // Here, we are avoiding selecting the id field twice.
-                        if let Some(id_field) = id_field {
-                            // Note: we aren't checking for reader alias because reader aliases
-                            // don't exist in generated query texts! We can check for the presence
-                            // of a normalization alias, but we know that that won't exist for
-                            // a field with no arguments (as we are assuming is the case with ID).
-                            if scalar_field.associated_data == id_field.id.into() {
-                                continue 'item;
-                            }
-                        }
-                        // ---- END HACK ----
-                        query_text
-                            .push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
-                        if let Some(alias) = scalar_field.normalization_alias {
-                            query_text.push_str(&format!("{}: ", alias));
-                        }
-                        let name = scalar_field.name.item;
-                        let arguments = get_serialized_arguments(&scalar_field.arguments);
-                        query_text.push_str(&format!("{}{},\\\n", name, arguments));
+            Selection::ServerField(field) => match field {
+                ServerFieldSelection::ScalarField(scalar_field) => {
+                    query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+                    if let Some(alias) = scalar_field.normalization_alias {
+                        query_text.push_str(&format!("{}: ", alias));
                     }
-                    ServerFieldSelection::LinkedField(linked_field) => {
-                        query_text
-                            .push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
-                        if let Some(alias) = linked_field.normalization_alias {
-                            query_text.push_str(&format!("{}: ", alias));
-                        }
-                        let name = linked_field.name.item;
-                        let arguments = get_serialized_arguments(&linked_field.arguments);
-                        query_text.push_str(&format!("{}{} {{\\\n", name, arguments));
-                        write_selections_for_query_text(
-                            query_text,
-                            schema,
-                            schema.schema_data.object(linked_field.associated_data),
-                            &linked_field.selection_set,
-                            indentation_level + 1,
-                        );
-                        query_text.push_str(&format!(
-                            "{}}},\\\n",
-                            "  ".repeat(indentation_level as usize)
-                        ));
-                    }
+                    let name = scalar_field.name.item;
+                    let arguments = get_serialized_arguments(&scalar_field.arguments);
+                    query_text.push_str(&format!("{}{},\\\n", name, arguments));
                 }
-            }
+                ServerFieldSelection::LinkedField(linked_field) => {
+                    query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+                    if let Some(alias) = linked_field.normalization_alias {
+                        query_text.push_str(&format!("{}: ", alias));
+                    }
+                    let name = linked_field.name.item;
+                    let arguments = get_serialized_arguments(&linked_field.arguments);
+                    query_text.push_str(&format!("{}{} {{\\\n", name, arguments));
+                    write_selections_for_query_text(
+                        query_text,
+                        schema,
+                        schema.schema_data.object(linked_field.associated_data),
+                        &linked_field.selection_set,
+                        indentation_level + 1,
+                    );
+                    query_text.push_str(&format!(
+                        "{}}},\\\n",
+                        "  ".repeat(indentation_level as usize)
+                    ));
+                }
+            },
         }
     }
 }

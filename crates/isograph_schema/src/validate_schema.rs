@@ -300,6 +300,7 @@ fn validate_variable_definitions(
         .collect()
 }
 
+#[allow(unused)]
 fn validate_selections_error_to_validate_schema_error(
     err: ValidateSelectionsError,
     parent_object: &SchemaObject<UnvalidatedObjectFieldInfo>,
@@ -354,6 +355,7 @@ fn validate_selections_error_to_validate_schema_error(
 
 type ValidateSelectionsResult<T> = Result<T, ValidateSelectionsError>;
 
+#[allow(unused)]
 #[derive(Debug)]
 enum ValidateSelectionsError {
     FieldDoesNotExist(IsographObjectTypeName, SelectableFieldName),
