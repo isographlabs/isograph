@@ -20,8 +20,35 @@ use crate::{
 // This is *wrong*! Selections contain reader aliases, but merged selection sets are
 // not used for the reader pipeline.
 pub type MergedSelection = Selection<ServerFieldId, ObjectId>;
-pub type MergedSelectionSet = Vec<WithSpan<MergedSelection>>;
 type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedSelection>>;
+
+pub struct MergedSelectionSet(Vec<WithSpan<MergedSelection>>);
+
+impl std::ops::Deref for MergedSelectionSet {
+    type Target = Vec<WithSpan<MergedSelection>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl MergedSelectionSet {
+    fn new(
+        mut unsorted_vec: Vec<(
+            NormalizationKey,
+            WithSpan<Selection<ServerFieldId, ObjectId>>,
+        )>,
+    ) -> Self {
+        unsorted_vec.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
+        MergedSelectionSet(unsorted_vec.into_iter().map(|(_, value)| value).collect())
+    }
+}
+
+impl Into<Vec<WithSpan<MergedSelection>>> for MergedSelectionSet {
+    fn into(self) -> Vec<WithSpan<MergedSelection>> {
+        self.0
+    }
+}
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, PartialOrd, Ord, Hash)]
 enum NormalizationKey {
@@ -52,10 +79,7 @@ pub fn create_merged_selection_set(
 
     add_typename_and_id_fields(schema, &mut merged_selection_set, parent_type);
 
-    let mut merged_fields: Vec<_> = merged_selection_set.into_iter().collect();
-
-    merged_fields.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
-    merged_fields.into_iter().map(|(_, value)| value).collect()
+    MergedSelectionSet::new(merged_selection_set.into_iter().collect())
 }
 
 fn merge_selections_into_set(
@@ -147,6 +171,7 @@ fn merge_linked_field_into_vacant_entry(
                     linked_field_parent_type,
                     &new_linked_field.selection_set,
                 )
+                .into()
             },
             // Unwraps **aren't necessary** in the merged data structure. The merged fields
             // should either be generic over the type of unwraps or it should be a different
