@@ -4,8 +4,8 @@ use std::collections::{
 };
 
 use common_lang_types::{
-    DefinedField, LinkedFieldAlias, LinkedFieldName, SelectableFieldName,
-    ServerFieldNormalizationKey, Span, WithSpan,
+    DefinedField, LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName,
+    SelectableFieldName, ServerFieldNormalizationKey, Span, WithSpan,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -20,16 +20,27 @@ use crate::{
 
 type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSelection>>;
 
+// TODO add id and typename variants, impl Ord, and get rid of the NormalizationKey enum
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum MergedServerFieldSelection {
-    ScalarField(ScalarFieldSelection<ServerFieldId>),
+    ScalarField(MergedScalarFieldSelection),
     LinkedField(MergedLinkedFieldSelection),
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub struct MergedScalarFieldSelection {
+    pub name: WithSpan<ScalarFieldName>,
+    pub normalization_alias: Option<WithSpan<ScalarFieldAlias>>,
+    // TODO rename, since this isn't generic
+    pub associated_data: ServerFieldId,
+    pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct MergedLinkedFieldSelection {
     pub name: WithSpan<LinkedFieldName>,
     pub normalization_alias: Option<WithSpan<LinkedFieldAlias>>,
+    // TODO rename, since this isn't generic
     pub associated_data: ObjectId,
     pub selection_set: Vec<WithSpan<MergedServerFieldSelection>>,
     pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
@@ -250,11 +261,8 @@ fn merge_scalar_server_field(
         }
         Entry::Vacant(vacant_entry) => {
             vacant_entry.insert(WithSpan::new(
-                MergedServerFieldSelection::ScalarField(ScalarFieldSelection {
+                MergedServerFieldSelection::ScalarField(MergedScalarFieldSelection {
                     name: scalar_field.name,
-                    // Can this be none with no visible changes?
-                    reader_alias: scalar_field.reader_alias,
-                    unwraps: scalar_field.unwraps.clone(),
                     associated_data: *server_field_id,
                     arguments: scalar_field.arguments.clone(),
                     normalization_alias: scalar_field.normalization_alias,
@@ -382,17 +390,15 @@ fn add_typename_and_id_fields(
             }
             Entry::Vacant(vacant_entry) => {
                 vacant_entry.insert(WithSpan::new(
-                    MergedServerFieldSelection::ScalarField(ScalarFieldSelection {
+                    MergedServerFieldSelection::ScalarField(MergedScalarFieldSelection {
                         // major HACK alert
                         name: WithSpan::new(
                             id_field.name.lookup().intern().into(),
                             Span::new(0, 0),
                         ),
-                        reader_alias: None,
-                        unwraps: vec![],
                         associated_data: id_field.id.into(),
                         arguments: vec![],
-                        // Can this always be None?
+                        // This indicates that there should be a separate MergedServerFieldSelection variant
                         normalization_alias: None,
                     }),
                     Span::new(0, 0),
