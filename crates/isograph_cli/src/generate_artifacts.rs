@@ -16,7 +16,7 @@ use isograph_lang_types::{
     ServerFieldSelection,
 };
 use isograph_schema::{
-    create_merged_selection_set, MergedSelection, MergedSelectionSet, ResolverVariant,
+    create_merged_selection_set, MergedSelectionSet, MergedServerFieldSelection, ResolverVariant,
     SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
     ValidatedSchemaResolver, ValidatedSelection, ValidatedVariableDefinition,
 };
@@ -386,41 +386,39 @@ fn generated_file_path(project_root: &PathBuf, file_name: &PathBuf) -> PathBuf {
 fn write_selections_for_query_text(
     query_text: &mut String,
     schema: &ValidatedSchema,
-    items: &[WithSpan<MergedSelection>],
+    items: &[WithSpan<MergedServerFieldSelection>],
     indentation_level: u8,
 ) {
     for item in items.iter() {
         match &item.item {
-            Selection::ServerField(field) => match field {
-                ServerFieldSelection::ScalarField(scalar_field) => {
-                    query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
-                    if let Some(alias) = scalar_field.normalization_alias {
-                        query_text.push_str(&format!("{}: ", alias));
-                    }
-                    let name = scalar_field.name.item;
-                    let arguments = get_serialized_arguments(&scalar_field.arguments);
-                    query_text.push_str(&format!("{}{},\\\n", name, arguments));
+            MergedServerFieldSelection::ScalarField(scalar_field) => {
+                query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+                if let Some(alias) = scalar_field.normalization_alias {
+                    query_text.push_str(&format!("{}: ", alias));
                 }
-                ServerFieldSelection::LinkedField(linked_field) => {
-                    query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
-                    if let Some(alias) = linked_field.normalization_alias {
-                        query_text.push_str(&format!("{}: ", alias));
-                    }
-                    let name = linked_field.name.item;
-                    let arguments = get_serialized_arguments(&linked_field.arguments);
-                    query_text.push_str(&format!("{}{} {{\\\n", name, arguments));
-                    write_selections_for_query_text(
-                        query_text,
-                        schema,
-                        &linked_field.selection_set,
-                        indentation_level + 1,
-                    );
-                    query_text.push_str(&format!(
-                        "{}}},\\\n",
-                        "  ".repeat(indentation_level as usize)
-                    ));
+                let name = scalar_field.name.item;
+                let arguments = get_serialized_arguments(&scalar_field.arguments);
+                query_text.push_str(&format!("{}{},\\\n", name, arguments));
+            }
+            MergedServerFieldSelection::LinkedField(linked_field) => {
+                query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+                if let Some(alias) = linked_field.normalization_alias {
+                    query_text.push_str(&format!("{}: ", alias));
                 }
-            },
+                let name = linked_field.name.item;
+                let arguments = get_serialized_arguments(&linked_field.arguments);
+                query_text.push_str(&format!("{}{} {{\\\n", name, arguments));
+                write_selections_for_query_text(
+                    query_text,
+                    schema,
+                    &linked_field.selection_set,
+                    indentation_level + 1,
+                );
+                query_text.push_str(&format!(
+                    "{}}},\\\n",
+                    "  ".repeat(indentation_level as usize)
+                ));
+            }
         }
     }
 }

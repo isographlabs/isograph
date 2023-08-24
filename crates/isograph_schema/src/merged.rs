@@ -4,7 +4,8 @@ use std::collections::{
 };
 
 use common_lang_types::{
-    DefinedField, SelectableFieldName, ServerFieldNormalizationKey, Span, WithSpan,
+    DefinedField, LinkedFieldAlias, LinkedFieldName, SelectableFieldName,
+    ServerFieldNormalizationKey, Span, WithSpan,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -17,15 +18,27 @@ use crate::{
     ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSelection,
 };
 
-// This is *wrong*! Selections contain reader aliases, but merged selection sets are
-// not used for the reader pipeline.
-pub type MergedSelection = Selection<ServerFieldId, ObjectId>;
-type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedSelection>>;
+type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSelection>>;
 
-pub struct MergedSelectionSet(Vec<WithSpan<MergedSelection>>);
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub enum MergedServerFieldSelection {
+    ScalarField(ScalarFieldSelection<ServerFieldId>),
+    LinkedField(MergedLinkedFieldSelection),
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub struct MergedLinkedFieldSelection {
+    pub name: WithSpan<LinkedFieldName>,
+    pub normalization_alias: Option<WithSpan<LinkedFieldAlias>>,
+    pub associated_data: ObjectId,
+    pub selection_set: Vec<WithSpan<MergedServerFieldSelection>>,
+    pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
+}
+
+pub struct MergedSelectionSet(Vec<WithSpan<MergedServerFieldSelection>>);
 
 impl std::ops::Deref for MergedSelectionSet {
-    type Target = Vec<WithSpan<MergedSelection>>;
+    type Target = Vec<WithSpan<MergedServerFieldSelection>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -34,18 +47,15 @@ impl std::ops::Deref for MergedSelectionSet {
 
 impl MergedSelectionSet {
     fn new(
-        mut unsorted_vec: Vec<(
-            NormalizationKey,
-            WithSpan<Selection<ServerFieldId, ObjectId>>,
-        )>,
+        mut unsorted_vec: Vec<(NormalizationKey, WithSpan<MergedServerFieldSelection>)>,
     ) -> Self {
         unsorted_vec.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
         MergedSelectionSet(unsorted_vec.into_iter().map(|(_, value)| value).collect())
     }
 }
 
-impl Into<Vec<WithSpan<MergedSelection>>> for MergedSelectionSet {
-    fn into(self) -> Vec<WithSpan<MergedSelection>> {
+impl Into<Vec<WithSpan<MergedServerFieldSelection>>> for MergedSelectionSet {
+    fn into(self) -> Vec<WithSpan<MergedServerFieldSelection>> {
         self.0
     }
 }
@@ -91,7 +101,7 @@ fn merge_selections_into_set(
     for validated_selection in validated_selections.iter().filter(filter_id_fields) {
         let span = validated_selection.span;
         match &validated_selection.item {
-            Selection::ServerField(field) => match field {
+            Selection::ServerField(validated_server_field) => match validated_server_field {
                 ServerFieldSelection::ScalarField(scalar_field) => {
                     match &scalar_field.associated_data {
                         DefinedField::ServerField(server_field_id) => merge_scalar_server_field(
@@ -142,7 +152,7 @@ fn filter_id_fields(field: &&WithSpan<Selection<ValidatedScalarDefinedField, Obj
                 // -------- HACK --------
                 // Here, we check whether the field is named "id", but we should really
                 // know whether it is an id field in some other way. There can be non-id fields
-                // named id.
+                // named id and id fields not named "id".
                 scalar_field.name.item != "id".intern().into()
                 // ------ END HACK ------
             }
@@ -152,16 +162,14 @@ fn filter_id_fields(field: &&WithSpan<Selection<ValidatedScalarDefinedField, Obj
 }
 
 fn merge_linked_field_into_vacant_entry(
-    vacant_entry: VacantEntry<'_, NormalizationKey, WithSpan<MergedSelection>>,
+    vacant_entry: VacantEntry<'_, NormalizationKey, WithSpan<MergedServerFieldSelection>>,
     new_linked_field: &LinkedFieldSelection<ValidatedScalarDefinedField, ObjectId>,
     schema: &ValidatedSchema,
     span: Span,
 ) {
     vacant_entry.insert(WithSpan::new(
-        Selection::ServerField(ServerFieldSelection::LinkedField(LinkedFieldSelection {
+        MergedServerFieldSelection::LinkedField(MergedLinkedFieldSelection {
             name: new_linked_field.name,
-            // Can this be None with no visible changes?
-            reader_alias: new_linked_field.reader_alias,
             associated_data: new_linked_field.associated_data,
             selection_set: {
                 let type_id = new_linked_field.associated_data;
@@ -173,42 +181,33 @@ fn merge_linked_field_into_vacant_entry(
                 )
                 .into()
             },
-            // Unwraps **aren't necessary** in the merged data structure. The merged fields
-            // should either be generic over the type of unwraps or it should be a different
-            // data structure.
-            unwraps: new_linked_field
-                .unwraps
-                // TODO this sucks
-                .clone(),
             arguments: new_linked_field.arguments.clone(),
             normalization_alias: new_linked_field.normalization_alias,
-        })),
+        }),
         span,
     ));
 }
 
 fn merge_linked_field_into_occupied_entry(
-    mut occupied: OccupiedEntry<'_, NormalizationKey, WithSpan<MergedSelection>>,
+    mut occupied: OccupiedEntry<'_, NormalizationKey, WithSpan<MergedServerFieldSelection>>,
     new_linked_field: &LinkedFieldSelection<ValidatedScalarDefinedField, ObjectId>,
     schema: &ValidatedSchema,
 ) {
     let existing_selection = occupied.get_mut();
     match &mut existing_selection.item {
-        Selection::ServerField(field) => match field {
-            ServerFieldSelection::ScalarField(_) => {
-                panic!("expected linked, probably a bug in Isograph")
-            }
-            ServerFieldSelection::LinkedField(existing_linked_field) => {
-                let type_id = new_linked_field.associated_data;
-                let linked_field_parent_type = schema.schema_data.object(type_id);
-                HACK__merge_linked_fields(
-                    schema,
-                    &mut existing_linked_field.selection_set,
-                    &new_linked_field.selection_set,
-                    linked_field_parent_type,
-                );
-            }
-        },
+        MergedServerFieldSelection::ScalarField(_) => {
+            panic!("expected linked, probably a bug in Isograph")
+        }
+        MergedServerFieldSelection::LinkedField(existing_linked_field) => {
+            let type_id = new_linked_field.associated_data;
+            let linked_field_parent_type = schema.schema_data.object(type_id);
+            HACK__merge_linked_fields(
+                schema,
+                &mut existing_linked_field.selection_set,
+                &new_linked_field.selection_set,
+                linked_field_parent_type,
+            );
+        }
     }
 }
 
@@ -251,7 +250,7 @@ fn merge_scalar_server_field(
         }
         Entry::Vacant(vacant_entry) => {
             vacant_entry.insert(WithSpan::new(
-                Selection::ServerField(ServerFieldSelection::ScalarField(ScalarFieldSelection {
+                MergedServerFieldSelection::ScalarField(ScalarFieldSelection {
                     name: scalar_field.name,
                     // Can this be none with no visible changes?
                     reader_alias: scalar_field.reader_alias,
@@ -259,7 +258,7 @@ fn merge_scalar_server_field(
                     associated_data: *server_field_id,
                     arguments: scalar_field.arguments.clone(),
                     normalization_alias: scalar_field.normalization_alias,
-                })),
+                }),
                 span,
             ));
         }
@@ -303,7 +302,7 @@ fn HACK_combine_name_and_variables_into_normalization_alias(
 #[allow(non_snake_case)]
 fn HACK__merge_linked_fields(
     schema: &ValidatedSchema,
-    existing_selection_set: &mut Vec<WithSpan<MergedSelection>>,
+    existing_selection_set: &mut Vec<WithSpan<MergedServerFieldSelection>>,
     new_selection_set: &Vec<WithSpan<ValidatedSelection>>,
     linked_field_parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
 ) {
@@ -311,7 +310,7 @@ fn HACK__merge_linked_fields(
     for item in existing_selection_set.iter() {
         let span = item.span;
         match &item.item {
-            Selection::ServerField(ServerFieldSelection::ScalarField(scalar_field)) => {
+            MergedServerFieldSelection::ScalarField(scalar_field) => {
                 // N.B. if you have a field named "id" which is a linked field, this will probably
                 // work incorrectly!
                 let normalization_key = NormalizationKey::ServerField(
@@ -324,14 +323,12 @@ fn HACK__merge_linked_fields(
                 merged_selection_set.insert(
                     normalization_key,
                     WithSpan::new(
-                        Selection::ServerField(ServerFieldSelection::ScalarField(
-                            scalar_field.clone(),
-                        )),
+                        MergedServerFieldSelection::ScalarField(scalar_field.clone()),
                         span,
                     ),
                 )
             }
-            Selection::ServerField(ServerFieldSelection::LinkedField(linked_field)) => {
+            MergedServerFieldSelection::LinkedField(linked_field) => {
                 let normalization_key = NormalizationKey::ServerField(
                     HACK_combine_name_and_variables_into_normalization_alias(
                         linked_field.name.item.into(),
@@ -341,9 +338,7 @@ fn HACK__merge_linked_fields(
                 merged_selection_set.insert(
                     normalization_key,
                     WithSpan::new(
-                        Selection::ServerField(ServerFieldSelection::LinkedField(
-                            linked_field.clone(),
-                        )),
+                        MergedServerFieldSelection::LinkedField(linked_field.clone()),
                         span,
                     ),
                 )
@@ -387,21 +382,19 @@ fn add_typename_and_id_fields(
             }
             Entry::Vacant(vacant_entry) => {
                 vacant_entry.insert(WithSpan::new(
-                    Selection::ServerField(ServerFieldSelection::ScalarField(
-                        ScalarFieldSelection {
-                            // major HACK alert
-                            name: WithSpan::new(
-                                id_field.name.lookup().intern().into(),
-                                Span::new(0, 0),
-                            ),
-                            reader_alias: None,
-                            unwraps: vec![],
-                            associated_data: id_field.id.into(),
-                            arguments: vec![],
-                            // Can this always be None?
-                            normalization_alias: None,
-                        },
-                    )),
+                    MergedServerFieldSelection::ScalarField(ScalarFieldSelection {
+                        // major HACK alert
+                        name: WithSpan::new(
+                            id_field.name.lookup().intern().into(),
+                            Span::new(0, 0),
+                        ),
+                        reader_alias: None,
+                        unwraps: vec![],
+                        associated_data: id_field.id.into(),
+                        arguments: vec![],
+                        // Can this always be None?
+                        normalization_alias: None,
+                    }),
                     Span::new(0, 0),
                 ));
             }
