@@ -8,72 +8,86 @@ use crate::generate_artifacts::{
 
 impl<'schema> FetchableResolver<'schema> {
     pub(crate) fn file_contents(self) -> String {
+        let FetchableResolver {
+            query_text,
+            resolver_import_statement,
+            resolver_parameter_type,
+            resolver_return_type,
+            resolver_read_out_type,
+            reader_ast,
+            nested_resolver_artifact_imports,
+            convert_function,
+            ..
+        } = self;
+        let read_out_type_text = get_read_out_type_text(resolver_read_out_type);
+        let nested_resolver_artifact_imports =
+            nested_resolver_names_to_import_statement(nested_resolver_artifact_imports);
+
         format!(
             "import type {{IsographFetchableResolver, ReaderAst, FragmentReference}} from '@isograph/react';\n\
             import {{ getRefRendererForName }} from '@isograph/react';\n\
-            {}\n\
-            {}\n\
-            const queryText = '{}';\n\n\
+            {resolver_import_statement}\n\
+            {nested_resolver_artifact_imports}\n\
+            const queryText = '{query_text}';\n\n\
             // TODO support changing this,\n\
             export type ReadFromStoreType = ResolverParameterType;\n\n\
             const normalizationAst = {{notNeededForDemo: true}};\n\
-            const readerAst: ReaderAst<ReadFromStoreType> = {};\n\n\
-            export type ResolverParameterType = {};\n\n\
+            const readerAst: ReaderAst<ReadFromStoreType> = {reader_ast};\n\n\
+            export type ResolverParameterType = {resolver_parameter_type};\n\n\
             // The type, when returned from the resolver\n\
-            export type ResolverReturnType = {};\n\n\
-            {}\n\n\
+            export type ResolverReturnType = {resolver_return_type};\n\n\
+            {read_out_type_text}\n\n\
             const artifact: IsographFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {{\n\
             {}kind: 'FetchableResolver',\n\
             {}queryText,\n\
             {}normalizationAst,\n\
             {}readerAst,\n\
             {}resolver: resolver as any,\n\
-            {}convert: {},\n\
+            {}convert: {convert_function},\n\
             }};\n\n\
             export default artifact;\n",
-            self.resolver_import_statement,
-            nested_resolver_names_to_import_statement(self.nested_resolver_artifact_imports),
-            self.query_text,
-            self.reader_ast,
-            self.resolver_parameter_type,
-            self.resolver_return_type,
-            get_read_out_type_text(self.resolver_read_out_type),
             "  ",
             "  ",
             "  ",
             "  ",
             "  ",
             "  ",
-            self.convert_function,
         )
     }
 }
 
 impl<'schema> NonFetchableResolver<'schema> {
     pub(crate) fn file_contents(self) -> String {
+        let NonFetchableResolver {
+            resolver_import_statement,
+            resolver_parameter_type,
+            resolver_return_type,
+            resolver_read_out_type,
+            reader_ast,
+            nested_resolver_artifact_imports,
+            ..
+        } = self;
+        let nested_resolver_import_statement =
+            nested_resolver_names_to_import_statement(nested_resolver_artifact_imports);
+        let read_out_type_text = get_read_out_type_text(resolver_read_out_type);
+
         format!(
             "import type {{IsographNonFetchableResolver, ReaderAst}} from '@isograph/react';\n\
-            {}\n\
-            {}\n\
-            {}\n\n\
+            {resolver_import_statement}\n\
+            {nested_resolver_import_statement}\n\
+            {read_out_type_text}\n\n\
             // TODO support changing this\n\
             export type ReadFromStoreType = ResolverParameterType;\n\n\
-            const readerAst: ReaderAst<ReadFromStoreType> = {};\n\n\
-            export type ResolverParameterType = {};\n\n\
+            const readerAst: ReaderAst<ReadFromStoreType> = {reader_ast};\n\n\
+            export type ResolverParameterType = {resolver_parameter_type};\n\n\
             // The type, when returned from the resolver\n\
-            export type ResolverReturnType = {};\n\n\
+            export type ResolverReturnType = {resolver_return_type};\n\n\
             const artifact: IsographNonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {{\n\
             {}kind: 'NonFetchableResolver',\n\
             {}resolver: resolver as any,\n\
             {}readerAst,\n\
             }};\n\n\
             export default artifact;\n",
-            self.resolver_import_statement,
-            nested_resolver_names_to_import_statement(self.nested_resolver_artifact_imports),
-            get_read_out_type_text(self.resolver_read_out_type),
-            self.reader_ast,
-            self.resolver_parameter_type,
-            self.resolver_return_type,
             "  ",
             "  ",
             "  ",

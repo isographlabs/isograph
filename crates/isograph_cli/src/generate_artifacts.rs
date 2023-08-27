@@ -215,8 +215,8 @@ derive_display!(ConvertFunction);
 #[derive(Debug)]
 pub(crate) struct FetchableResolver<'schema> {
     pub query_text: QueryText,
-    pub query_name: QueryOperationName,
-    pub parent_type: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
+    query_name: QueryOperationName,
+    parent_type: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
     pub resolver_import_statement: ResolverImportStatement,
     pub resolver_parameter_type: ResolverParameterType,
     pub resolver_return_type: ResolverReturnType,
@@ -228,8 +228,8 @@ pub(crate) struct FetchableResolver<'schema> {
 
 #[derive(Debug)]
 pub(crate) struct NonFetchableResolver<'schema> {
-    pub parent_type: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
-    pub resolver_field_name: SelectableFieldName,
+    parent_type: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
+    resolver_field_name: SelectableFieldName,
     pub nested_resolver_artifact_imports: HashMap<TypeAndField, ResolverImport>,
     pub resolver_read_out_type: ResolverReadOutType,
     pub reader_ast: ReaderAst,
