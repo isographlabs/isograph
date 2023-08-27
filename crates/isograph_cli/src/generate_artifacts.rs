@@ -22,6 +22,16 @@ use isograph_schema::{
 };
 use thiserror::Error;
 
+macro_rules! derive_display {
+    ($type:ident) => {
+        impl fmt::Display for $type {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                fmt::Display::fmt(&self.0, f)
+            }
+        }
+    };
+}
+
 pub(crate) fn generate_artifacts(
     schema: &ValidatedSchema,
     project_root: &PathBuf,
@@ -169,9 +179,6 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
 }
 
 #[derive(Debug)]
-pub(crate) struct QueryText(pub String);
-
-#[derive(Debug)]
 pub(crate) enum Artifact<'schema> {
     FetchableResolver(FetchableResolver<'schema>),
     NonFetchableResolver(NonFetchableResolver<'schema>),
@@ -179,27 +186,31 @@ pub(crate) enum Artifact<'schema> {
 
 #[derive(Debug)]
 pub(crate) struct ResolverParameterType(pub String);
+derive_display!(ResolverParameterType);
 
-impl fmt::Display for ResolverParameterType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&self.0, f)
-    }
-}
+#[derive(Debug)]
+pub(crate) struct QueryText(pub String);
+derive_display!(QueryText);
 
 #[derive(Debug)]
 pub(crate) struct ResolverImportStatement(pub String);
+derive_display!(ResolverImportStatement);
 
 #[derive(Debug)]
 pub(crate) struct ResolverReturnType(pub String);
+derive_display!(ResolverReturnType);
 
 #[derive(Debug)]
 pub(crate) struct ResolverReadOutType(pub String);
+derive_display!(ResolverReadOutType);
 
 #[derive(Debug)]
 pub(crate) struct ReaderAst(pub String);
+derive_display!(ReaderAst);
 
 #[derive(Debug)]
 pub(crate) struct ConvertFunction(pub String);
+derive_display!(ConvertFunction);
 
 #[derive(Debug)]
 pub(crate) struct FetchableResolver<'schema> {
@@ -645,8 +656,11 @@ fn generate_resolver_import_statement(
 
 #[derive(Debug)]
 pub(crate) struct ResolverImportName(pub String);
+derive_display!(ResolverImportName);
+
 #[derive(Debug)]
 pub(crate) struct ResolverImportAlias(pub String);
+derive_display!(ResolverImportAlias);
 
 #[derive(Debug)]
 pub struct ResolverImportType {

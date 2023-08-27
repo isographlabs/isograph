@@ -31,12 +31,12 @@ impl<'schema> FetchableResolver<'schema> {
             {}convert: {},\n\
             }};\n\n\
             export default artifact;\n",
-            self.resolver_import_statement.0,
+            self.resolver_import_statement,
             nested_resolver_names_to_import_statement(self.nested_resolver_artifact_imports),
-            self.query_text.0,
-            self.reader_ast.0,
-            self.resolver_parameter_type.0,
-            self.resolver_return_type.0,
+            self.query_text,
+            self.reader_ast,
+            self.resolver_parameter_type,
+            self.resolver_return_type,
             get_read_out_type_text(self.resolver_read_out_type),
             "  ",
             "  ",
@@ -44,7 +44,7 @@ impl<'schema> FetchableResolver<'schema> {
             "  ",
             "  ",
             "  ",
-            self.convert_function.0,
+            self.convert_function,
         )
     }
 }
@@ -68,12 +68,12 @@ impl<'schema> NonFetchableResolver<'schema> {
             {}readerAst,\n\
             }};\n\n\
             export default artifact;\n",
-            self.resolver_import_statement.0,
+            self.resolver_import_statement,
             nested_resolver_names_to_import_statement(self.nested_resolver_artifact_imports),
             get_read_out_type_text(self.resolver_read_out_type),
-            self.reader_ast.0,
-            self.resolver_parameter_type.0,
-            self.resolver_return_type.0,
+            self.reader_ast,
+            self.resolver_parameter_type,
+            self.resolver_return_type,
             "  ",
             "  ",
             "  ",
@@ -105,9 +105,9 @@ fn nested_resolver_names_to_import_statement(
                 s.push_str(",");
             }
             s.push_str(" { ");
-            s.push_str(&format!("{} as {} ", first.original.0, first.alias.0));
+            s.push_str(&format!("{} as {} ", first.original, first.alias));
             for value in types {
-                s.push_str(&format!(", {} as {} ", value.original.0, value.alias.0));
+                s.push_str(&format!(", {} as {} ", value.original, value.alias));
             }
             s.push_str("}");
         }
@@ -118,5 +118,5 @@ fn nested_resolver_names_to_import_statement(
 }
 
 fn get_read_out_type_text(read_out_type: ResolverReadOutType) -> String {
-    format!("// the type, when read out (either via useLazyReference or via graph)\nexport type ReadOutType = {};", read_out_type.0)
+    format!("// the type, when read out (either via useLazyReference or via graph)\nexport type ReadOutType = {};", read_out_type)
 }
