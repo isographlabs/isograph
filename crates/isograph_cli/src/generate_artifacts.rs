@@ -250,13 +250,7 @@ fn generate_query_text(
     let variable_text = write_variables_to_string(schema, query_variables);
 
     query_text.push_str(&format!("query {} {} {{\\\n", query_name, variable_text));
-    write_selections_for_query_text(
-        &mut query_text,
-        schema,
-        // TODO do not do this here, instead do it during validation, and topologically sort first
-        &merged_selection_set,
-        1,
-    );
+    write_selections_for_query_text(&mut query_text, schema, &merged_selection_set, 1);
     query_text.push_str("}");
     QueryText(query_text)
 }
