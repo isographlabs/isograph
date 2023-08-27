@@ -8,8 +8,6 @@ use crate::generate_artifacts::{
 
 impl<'schema> FetchableResolver<'schema> {
     pub(crate) fn file_contents(self) -> String {
-        // TODO don't use merged, use regular selection set when generating fragment type
-        // (i.e. we are not data masking)
         format!(
             "import type {{IsographFetchableResolver, ReaderAst, FragmentReference}} from '@isograph/react';\n\
             import {{ getRefRendererForName }} from '@isograph/react';\n\
