@@ -1,3 +1,4 @@
+mod artifact_file_contents;
 mod batch_compile;
 mod generate_artifacts;
 mod isograph_literals;
