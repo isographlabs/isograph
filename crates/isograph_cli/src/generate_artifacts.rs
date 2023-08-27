@@ -10,15 +10,16 @@ use common_lang_types::{
     UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{ListTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation};
+use intern::Lookup;
 use isograph_lang_types::{
     NonConstantValue, ObjectId, OutputTypeId, Selection, SelectionFieldArgument,
     ServerFieldSelection,
 };
 use isograph_schema::{
-    create_merged_selection_set, MergedSelectionSet, MergedServerFieldSelection,
-    ResolverTypeAndField, ResolverVariant, SchemaObject, ValidatedEncounteredDefinedField,
-    ValidatedScalarDefinedField, ValidatedSchema, ValidatedSchemaResolver, ValidatedSelection,
-    ValidatedVariableDefinition,
+    create_merged_selection_set, MergedLinkedFieldSelection, MergedScalarFieldSelection,
+    MergedSelectionSet, MergedServerFieldSelection, ResolverTypeAndField, ResolverVariant,
+    SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
+    ValidatedSchemaResolver, ValidatedSelection, ValidatedVariableDefinition,
 };
 use thiserror::Error;
 
@@ -114,6 +115,8 @@ fn generate_fetchable_resolver_artifact<'schema>(
         let convert_function =
             generate_convert_function(&fetchable_resolver.variant, fetchable_resolver.name);
 
+        let normalization_ast = generate_normalization_ast(schema, &merged_selection_set, 0);
+
         FetchableResolver {
             query_text,
             query_name,
@@ -125,7 +128,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
             reader_ast,
             nested_resolver_artifact_imports,
             convert_function,
-            normalization_ast: NormalizationAst("null".to_string()),
+            normalization_ast,
         }
     } else {
         // TODO convert to error
@@ -319,7 +322,7 @@ fn write_selections_for_query_text(
                     query_text.push_str(&format!("{}: ", alias));
                 }
                 let name = scalar_field.name.item;
-                let arguments = get_serialized_arguments(&scalar_field.arguments);
+                let arguments = get_serialized_arguments_for_query_text(&scalar_field.arguments);
                 query_text.push_str(&format!("{}{},\\\n", name, arguments));
             }
             MergedServerFieldSelection::LinkedField(linked_field) => {
@@ -328,7 +331,7 @@ fn write_selections_for_query_text(
                     query_text.push_str(&format!("{}: ", alias));
                 }
                 let name = linked_field.name.item;
-                let arguments = get_serialized_arguments(&linked_field.arguments);
+                let arguments = get_serialized_arguments_for_query_text(&linked_field.arguments);
                 query_text.push_str(&format!("{}{} {{\\\n", name, arguments));
                 write_selections_for_query_text(
                     query_text,
@@ -617,7 +620,12 @@ fn generate_reader_ast_node(
                         let arguments =
                             format_arguments(&scalar_field.arguments, indentation_level + 1);
                         format!(
-                            "{}{{\n{}kind: \"Scalar\",\n{}response_name: \"{}\",\n{}alias: {},\n{}arguments: {},\n{}}},\n",
+                            "{}{{\n\
+                            {}kind: \"Scalar\",\n\
+                            {}response_name: \"{}\",\n\
+                            {}alias: {},\n\
+                            {}arguments: {},\n\
+                            {}}},\n",
                             "  ".repeat(indentation_level as usize),
                             "  ".repeat((indentation_level + 1) as usize),
                             "  ".repeat((indentation_level + 1) as usize),
@@ -706,7 +714,84 @@ fn generate_reader_ast_node(
         },
     }
 }
-fn get_serialized_arguments(arguments: &[WithSpan<SelectionFieldArgument>]) -> String {
+
+fn generate_normalization_ast<'schema>(
+    schema: &'schema ValidatedSchema,
+    selection_set: &Vec<WithSpan<MergedServerFieldSelection>>,
+    indentation_level: u8,
+) -> NormalizationAst {
+    let mut normalization_ast = "[\n".to_string();
+    for item in selection_set.iter() {
+        let s = generate_normalization_ast_node(item, schema, indentation_level + 1);
+        normalization_ast.push_str(&s);
+    }
+    normalization_ast.push_str(&format!("{}]", "  ".repeat(indentation_level as usize)));
+    NormalizationAst(normalization_ast)
+}
+
+fn generate_normalization_ast_node(
+    item: &WithSpan<MergedServerFieldSelection>,
+    schema: &ValidatedSchema,
+    indentation_level: u8,
+) -> String {
+    match &item.item {
+        MergedServerFieldSelection::ScalarField(scalar_field) => {
+            let MergedScalarFieldSelection {
+                name,
+                normalization_alias,
+                arguments,
+            } = scalar_field;
+            let indent = "  ".repeat(indentation_level as usize);
+            let indent_2 = "  ".repeat((indentation_level + 1) as usize);
+            let serialized_arguments =
+                get_serialized_field_arguments(arguments, indentation_level + 1);
+            let normalization_alias = normalization_alias
+                .map(|x| format!("\"{}\"", x.item.lookup()))
+                .unwrap_or("null".to_string());
+
+            format!(
+                "{indent}{{\n\
+                {indent_2}kind: \"Scalar\",\n\
+                {indent_2}field_name: \"{name}\",\n\
+                {indent_2}alias: {normalization_alias},\n\
+                {indent_2}arguments: {serialized_arguments},\n\
+                {indent}}},\n"
+            )
+        }
+        MergedServerFieldSelection::LinkedField(linked_field) => {
+            let MergedLinkedFieldSelection {
+                name,
+                normalization_alias,
+                selection_set,
+                arguments,
+            } = linked_field;
+            let indent = "  ".repeat(indentation_level as usize);
+            let indent_2 = "  ".repeat((indentation_level + 1) as usize);
+            let serialized_arguments =
+                get_serialized_field_arguments(arguments, indentation_level + 1);
+
+            let selections =
+                generate_normalization_ast(schema, selection_set, indentation_level + 1);
+            let normalization_alias = normalization_alias
+                .map(|x| format!("\"{}\"", x.item.lookup()))
+                .unwrap_or("null".to_string());
+
+            format!(
+                "{indent}{{\n\
+                {indent_2}kind: \"Linked\",\n\
+                {indent_2}field_name: \"{name}\",\n\
+                {indent_2}alias: {normalization_alias},\n\
+                {indent_2}arguments: {serialized_arguments},\n\
+                {indent_2}selections: {selections},\n\
+                {indent}}},\n"
+            )
+        }
+    }
+}
+
+fn get_serialized_arguments_for_query_text(
+    arguments: &[WithSpan<SelectionFieldArgument>],
+) -> String {
     if arguments.is_empty() {
         return "".to_string();
     } else {
@@ -727,6 +812,32 @@ fn get_serialized_arguments(arguments: &[WithSpan<SelectionFieldArgument>]) -> S
         s.push_str(")");
         s
     }
+}
+
+fn get_serialized_field_arguments(
+    arguments: &[WithSpan<SelectionFieldArgument>],
+    indentation_level: u8,
+) -> String {
+    if arguments.is_empty() {
+        return "null".to_string();
+    }
+
+    let mut s = "[".to_string();
+
+    for argument in arguments {
+        s.push_str(&format!(
+            "\n{}{{\n{}argument_name: \"{}\",\n{}variable_name: {},\n{}}},\n",
+            "  ".repeat((indentation_level + 1) as usize),
+            "  ".repeat((indentation_level + 2) as usize),
+            argument.item.name.item,
+            "  ".repeat((indentation_level + 2) as usize),
+            serialize_non_constant_value_for_js(&argument.item.value.item),
+            "  ".repeat((indentation_level + 1) as usize),
+        ));
+    }
+
+    s.push_str(&format!("{}]", "  ".repeat(indentation_level as usize)));
+    s
 }
 
 fn serialize_non_constant_value_for_graphql(value: &NonConstantValue) -> String {

@@ -76,7 +76,7 @@ enum NormalizationKey {
 
 /// A merged selection set is an input for generating:
 /// - query texts
-/// - normalization artifacts (TODO)
+/// - normalization ASTs
 /// - raw response types (TODO)
 ///
 /// TODO: SelectionSetAndUnwraps should be generic enough to handle this

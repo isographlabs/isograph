@@ -51,7 +51,229 @@ const queryText = 'query repository_page ($repositoryName: String!, $repositoryO
 // TODO support changing this,
 export type ReadFromStoreType = ResolverParameterType;
 
-const normalizationAst = null;
+const normalizationAst = [
+  {
+    kind: "Linked",
+    field_name: "repository",
+    alias: "repository____name___repositoryName____owner___repositoryOwner",
+    arguments: [
+      {
+        argument_name: "name",
+        variable_name: "repositoryName",
+      },
+
+      {
+        argument_name: "owner",
+        variable_name: "repositoryOwner",
+      },
+    ],
+    selections: [
+      {
+        kind: "Scalar",
+        field_name: "id",
+        alias: null,
+        arguments: null,
+      },
+      {
+        kind: "Scalar",
+        field_name: "nameWithOwner",
+        alias: null,
+        arguments: null,
+      },
+      {
+        kind: "Linked",
+        field_name: "parent",
+        alias: null,
+        arguments: null,
+        selections: [
+          {
+            kind: "Scalar",
+            field_name: "id",
+            alias: null,
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            field_name: "name",
+            alias: null,
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            field_name: "nameWithOwner",
+            alias: null,
+            arguments: null,
+          },
+          {
+            kind: "Linked",
+            field_name: "owner",
+            alias: null,
+            arguments: null,
+            selections: [
+              {
+                kind: "Scalar",
+                field_name: "id",
+                alias: null,
+                arguments: null,
+              },
+              {
+                kind: "Scalar",
+                field_name: "login",
+                alias: null,
+                arguments: null,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        kind: "Linked",
+        field_name: "pullRequests",
+        alias: "pullRequests____last___first",
+        arguments: [
+          {
+            argument_name: "last",
+            variable_name: "first",
+          },
+        ],
+        selections: [
+          {
+            kind: "Linked",
+            field_name: "edges",
+            alias: null,
+            arguments: null,
+            selections: [
+              {
+                kind: "Linked",
+                field_name: "node",
+                alias: null,
+                arguments: null,
+                selections: [
+                  {
+                    kind: "Scalar",
+                    field_name: "id",
+                    alias: null,
+                    arguments: null,
+                  },
+                  {
+                    kind: "Linked",
+                    field_name: "author",
+                    alias: null,
+                    arguments: null,
+                    selections: [
+                      {
+                        kind: "Scalar",
+                        field_name: "login",
+                        alias: null,
+                        arguments: null,
+                      },
+                    ],
+                  },
+                  {
+                    kind: "Scalar",
+                    field_name: "closed",
+                    alias: null,
+                    arguments: null,
+                  },
+                  {
+                    kind: "Scalar",
+                    field_name: "createdAt",
+                    alias: null,
+                    arguments: null,
+                  },
+                  {
+                    kind: "Scalar",
+                    field_name: "number",
+                    alias: null,
+                    arguments: null,
+                  },
+                  {
+                    kind: "Linked",
+                    field_name: "repository",
+                    alias: null,
+                    arguments: null,
+                    selections: [
+                      {
+                        kind: "Scalar",
+                        field_name: "id",
+                        alias: null,
+                        arguments: null,
+                      },
+                      {
+                        kind: "Scalar",
+                        field_name: "name",
+                        alias: null,
+                        arguments: null,
+                      },
+                      {
+                        kind: "Linked",
+                        field_name: "owner",
+                        alias: null,
+                        arguments: null,
+                        selections: [
+                          {
+                            kind: "Scalar",
+                            field_name: "id",
+                            alias: null,
+                            arguments: null,
+                          },
+                          {
+                            kind: "Scalar",
+                            field_name: "login",
+                            alias: null,
+                            arguments: null,
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                  {
+                    kind: "Scalar",
+                    field_name: "title",
+                    alias: null,
+                    arguments: null,
+                  },
+                  {
+                    kind: "Scalar",
+                    field_name: "totalCommentsCount",
+                    alias: null,
+                    arguments: null,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    kind: "Linked",
+    field_name: "viewer",
+    alias: null,
+    arguments: null,
+    selections: [
+      {
+        kind: "Scalar",
+        field_name: "id",
+        alias: null,
+        arguments: null,
+      },
+      {
+        kind: "Scalar",
+        field_name: "avatarUrl",
+        alias: null,
+        arguments: null,
+      },
+      {
+        kind: "Scalar",
+        field_name: "name",
+        alias: null,
+        arguments: null,
+      },
+    ],
+  },
+];
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Resolver",
