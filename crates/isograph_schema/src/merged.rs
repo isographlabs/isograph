@@ -391,9 +391,16 @@ fn add_typename_and_id_fields(
     // If the type has an id field, we must select it.
     if let Some(id_field) = id_field {
         match merged_selection_set.entry(NormalizationKey::Id) {
-            Entry::Occupied(_) => {
-                // TODO: do we need to check for merge conflicts on scalars? Not while
-                // we are auto-aliasing.
+            Entry::Occupied(occupied) => {
+                match occupied.get().item {
+                    MergedServerFieldSelection::ScalarField(_) => {
+                        // TODO check that the existing server field matches the one we
+                        // would create.
+                    }
+                    MergedServerFieldSelection::LinkedField(_) => {
+                        panic!("Unexpected linked field for id, probably a bug in Isograph")
+                    }
+                };
             }
             Entry::Vacant(vacant_entry) => {
                 vacant_entry.insert(WithSpan::new(
