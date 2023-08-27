@@ -51,7 +51,7 @@ const queryText = 'query repository_page ($repositoryName: String!, $repositoryO
 // TODO support changing this,
 export type ReadFromStoreType = ResolverParameterType;
 
-const normalizationAst = {notNeededForDemo: true};
+const normalizationAst = null;
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Resolver",

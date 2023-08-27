@@ -38,7 +38,7 @@ const queryText = 'query home_page ($first: Int!) {\
 // TODO support changing this,
 export type ReadFromStoreType = ResolverParameterType;
 
-const normalizationAst = {notNeededForDemo: true};
+const normalizationAst = null;
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Resolver",

@@ -35,7 +35,7 @@ const queryText = 'query pull_request ($repositoryOwner: String!, $repositoryNam
 // TODO support changing this,
 export type ReadFromStoreType = ResolverParameterType;
 
-const normalizationAst = {notNeededForDemo: true};
+const normalizationAst = null;
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Resolver",

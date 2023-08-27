@@ -19,6 +19,7 @@ impl<'schema> FetchableResolver<'schema> {
             nested_resolver_artifact_imports,
             convert_function,
             parent_type,
+            normalization_ast,
             ..
         } = self;
         let read_out_type_text = get_read_out_type_text(resolver_read_out_type);
@@ -35,7 +36,7 @@ impl<'schema> FetchableResolver<'schema> {
             const queryText = '{query_text}';\n\n\
             // TODO support changing this,\n\
             export type ReadFromStoreType = ResolverParameterType;\n\n\
-            const normalizationAst = {{notNeededForDemo: true}};\n\
+            const normalizationAst = {normalization_ast};\n\
             const readerAst: ReaderAst<ReadFromStoreType> = {reader_ast};\n\n\
             export type ResolverParameterType = {resolver_parameter_type};\n\n\
             // The type, when returned from the resolver\n\

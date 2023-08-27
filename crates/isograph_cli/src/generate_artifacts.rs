@@ -125,6 +125,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
             reader_ast,
             nested_resolver_artifact_imports,
             convert_function,
+            normalization_ast: NormalizationAst("null".to_string()),
         }
     } else {
         // TODO convert to error
@@ -212,6 +213,10 @@ pub(crate) struct ReaderAst(pub String);
 derive_display!(ReaderAst);
 
 #[derive(Debug)]
+pub(crate) struct NormalizationAst(pub String);
+derive_display!(NormalizationAst);
+
+#[derive(Debug)]
 pub(crate) struct ConvertFunction(pub String);
 derive_display!(ConvertFunction);
 
@@ -227,6 +232,7 @@ pub(crate) struct FetchableResolver<'schema> {
     pub reader_ast: ReaderAst,
     pub nested_resolver_artifact_imports: NestedResolverImports,
     pub convert_function: ConvertFunction,
+    pub normalization_ast: NormalizationAst,
 }
 
 #[derive(Debug)]
