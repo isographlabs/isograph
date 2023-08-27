@@ -53,7 +53,6 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
     let validated_schema = Schema::validate_and_construct(schema)?;
 
     generate_artifacts(&validated_schema, &opt.project_root)?;
-    // dbg!(validated_schema);
 
     Ok(())
 }
