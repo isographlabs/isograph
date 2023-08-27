@@ -1,14 +1,13 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
     fmt::{self, Debug, Display},
-    fs::{self, File},
-    io::{self, Write},
+    io,
     path::PathBuf,
 };
 
 use common_lang_types::{
-    DefinedField, HasName, IsographObjectTypeName, QueryOperationName, ResolverDefinitionPath,
-    SelectableFieldName, TypeAndField, UnvalidatedTypeName, WithSpan,
+    DefinedField, HasName, QueryOperationName, ResolverDefinitionPath, SelectableFieldName,
+    TypeAndField, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{ListTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
@@ -21,6 +20,8 @@ use isograph_schema::{
     ValidatedSchemaResolver, ValidatedSelection, ValidatedVariableDefinition,
 };
 use thiserror::Error;
+
+use crate::write_artifacts::write_artifacts;
 
 macro_rules! derive_display {
     ($type:ident) => {
@@ -214,9 +215,9 @@ derive_display!(ConvertFunction);
 
 #[derive(Debug)]
 pub(crate) struct FetchableResolver<'schema> {
+    pub(crate) query_name: QueryOperationName,
+    pub(crate) parent_type: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
     pub query_text: QueryText,
-    query_name: QueryOperationName,
-    parent_type: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
     pub resolver_import_statement: ResolverImportStatement,
     pub resolver_parameter_type: ResolverParameterType,
     pub resolver_return_type: ResolverReturnType,
@@ -228,8 +229,8 @@ pub(crate) struct FetchableResolver<'schema> {
 
 #[derive(Debug)]
 pub(crate) struct NonFetchableResolver<'schema> {
-    parent_type: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
-    resolver_field_name: SelectableFieldName,
+    pub(crate) parent_type: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
+    pub(crate) resolver_field_name: SelectableFieldName,
     pub nested_resolver_artifact_imports: HashMap<TypeAndField, ResolverImport>,
     pub resolver_read_out_type: ResolverReadOutType,
     pub reader_ast: ReaderAst,
@@ -302,17 +303,6 @@ pub enum GenerateArtifactsError {
     UnableToCanonicalizePath { path: PathBuf, message: io::Error },
 }
 
-fn generated_file_name(
-    parent_type_name: IsographObjectTypeName,
-    field_name: SelectableFieldName,
-) -> PathBuf {
-    PathBuf::from(format!("{}__{}.isograph.tsx", parent_type_name, field_name))
-}
-
-fn generated_file_path(project_root: &PathBuf, file_name: &PathBuf) -> PathBuf {
-    project_root.join(file_name)
-}
-
 fn write_selections_for_query_text(
     query_text: &mut String,
     schema: &ValidatedSchema,
@@ -351,97 +341,6 @@ fn write_selections_for_query_text(
             }
         }
     }
-}
-
-fn write_artifacts<'schema>(
-    artifacts: impl Iterator<Item = Artifact<'schema>> + 'schema,
-    project_root: &PathBuf,
-) -> Result<(), GenerateArtifactsError> {
-    let current_dir = std::env::current_dir().expect("current_dir should exist");
-    let project_root = current_dir.join(project_root).canonicalize().map_err(|e| {
-        GenerateArtifactsError::UnableToCanonicalizePath {
-            path: project_root.clone(),
-            message: e,
-        }
-    })?;
-
-    let generated_folder_root = project_root.join("__isograph");
-
-    if generated_folder_root.exists() {
-        fs::remove_dir_all(&generated_folder_root).map_err(|e| {
-            GenerateArtifactsError::UnableToDeleteDirectory {
-                path: project_root.clone(),
-                message: e,
-            }
-        })?;
-    }
-    fs::create_dir_all(&generated_folder_root).map_err(|e| {
-        GenerateArtifactsError::UnableToCreateDirectory {
-            path: project_root.clone(),
-            message: e,
-        }
-    })?;
-    for artifact in artifacts {
-        match artifact {
-            Artifact::FetchableResolver(fetchable_resolver) => {
-                let FetchableResolver {
-                    query_name,
-                    parent_type,
-                    ..
-                } = &fetchable_resolver;
-
-                let generated_file_name =
-                    generated_file_name(parent_type.name, (*query_name).into());
-                let generated_file_path =
-                    generated_file_path(&generated_folder_root, &generated_file_name);
-
-                let mut file = File::create(&generated_file_path).map_err(|e| {
-                    GenerateArtifactsError::UnableToWriteToArtifactFile {
-                        path: generated_file_path.clone(),
-                        message: e,
-                    }
-                })?;
-
-                let file_contents = fetchable_resolver.file_contents();
-
-                file.write(file_contents.as_bytes()).map_err(|e| {
-                    GenerateArtifactsError::UnableToWriteToArtifactFile {
-                        path: generated_file_path.clone(),
-                        message: e,
-                    }
-                })?;
-            }
-            Artifact::NonFetchableResolver(non_fetchable_resolver) => {
-                let NonFetchableResolver {
-                    parent_type,
-                    resolver_field_name,
-                    ..
-                } = &non_fetchable_resolver;
-
-                let generated_file_name =
-                    generated_file_name(parent_type.name, *resolver_field_name);
-                let generated_file_path =
-                    generated_file_path(&generated_folder_root, &generated_file_name);
-
-                let mut file = File::create(&generated_file_path).map_err(|e| {
-                    GenerateArtifactsError::UnableToWriteToArtifactFile {
-                        path: generated_file_path.clone(),
-                        message: e,
-                    }
-                })?;
-
-                let file_contents = non_fetchable_resolver.file_contents();
-
-                file.write(file_contents.as_bytes()).map_err(|e| {
-                    GenerateArtifactsError::UnableToWriteToArtifactFile {
-                        path: generated_file_path.clone(),
-                        message: e,
-                    }
-                })?;
-            }
-        }
-    }
-    Ok(())
 }
 
 fn generate_resolver_parameter_type(

@@ -3,6 +3,7 @@ mod batch_compile;
 mod generate_artifacts;
 mod isograph_literals;
 mod schema;
+mod write_artifacts;
 
 use batch_compile::{handle_compile_command, BatchCompileCliOptions};
 use structopt::StructOpt;
