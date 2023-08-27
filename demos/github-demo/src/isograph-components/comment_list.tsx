@@ -55,7 +55,7 @@ function CommentList(props: CommentListProps) {
           {comment.bodyText}
           <p>
             <small>
-              {comment.author.login} commented on{" "}
+              {comment.author?.login} commented on{" "}
               {comment.formatted_comment_creation_date}
             </small>
           </p>
