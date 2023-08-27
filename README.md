@@ -66,7 +66,7 @@ It would combine the dependencies of the `Query.header`, `Query.home_page_body` 
 For example, the data might be fetched during render as follows:
 
 ```js
-const UserListPageQuery = require("./__isograph/Query__user_list_page.isograph");
+const UserListPageQuery = require("./__isograph/Query/user_list_page.isograph");
 
 function UserListPageRoute() {
   const { queryReference } = isograph.useLazyReference(UserListPageQuery);

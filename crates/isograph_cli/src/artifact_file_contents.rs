@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use common_lang_types::TypeAndField;
+use common_lang_types::IsographObjectTypeName;
+use isograph_schema::ResolverTypeAndField;
 
 use crate::generate_artifacts::{
     FetchableResolver, NonFetchableResolver, ResolverImport, ResolverReadOutType,
@@ -17,11 +18,14 @@ impl<'schema> FetchableResolver<'schema> {
             reader_ast,
             nested_resolver_artifact_imports,
             convert_function,
+            parent_type,
             ..
         } = self;
         let read_out_type_text = get_read_out_type_text(resolver_read_out_type);
-        let nested_resolver_artifact_imports =
-            nested_resolver_names_to_import_statement(nested_resolver_artifact_imports);
+        let nested_resolver_artifact_imports = nested_resolver_names_to_import_statement(
+            nested_resolver_artifact_imports,
+            parent_type.name,
+        );
 
         format!(
             "import type {{IsographFetchableResolver, ReaderAst, FragmentReference}} from '@isograph/react';\n\
@@ -65,10 +69,13 @@ impl<'schema> NonFetchableResolver<'schema> {
             resolver_read_out_type,
             reader_ast,
             nested_resolver_artifact_imports,
+            parent_type,
             ..
         } = self;
-        let nested_resolver_import_statement =
-            nested_resolver_names_to_import_statement(nested_resolver_artifact_imports);
+        let nested_resolver_import_statement = nested_resolver_names_to_import_statement(
+            nested_resolver_artifact_imports,
+            parent_type.name,
+        );
         let read_out_type_text = get_read_out_type_text(resolver_read_out_type);
 
         format!(
@@ -96,7 +103,8 @@ impl<'schema> NonFetchableResolver<'schema> {
 }
 
 fn nested_resolver_names_to_import_statement(
-    nested_resolver_imports: HashMap<TypeAndField, ResolverImport>,
+    nested_resolver_imports: HashMap<ResolverTypeAndField, ResolverImport>,
+    current_file_type_name: IsographObjectTypeName,
 ) -> String {
     let mut overall = String::new();
 
@@ -105,30 +113,47 @@ fn nested_resolver_names_to_import_statement(
     nested_resolver_imports.sort_by(|(a, _), (b, _)| a.cmp(b));
 
     for (nested_resolver_name, resolver_import) in nested_resolver_imports {
-        if !resolver_import.default_import && resolver_import.types.is_empty() {
-            continue;
-        }
-
-        let mut s = "import ".to_string();
-        if resolver_import.default_import {
-            s.push_str(&format!("{}", nested_resolver_name));
-        }
-        let mut types = resolver_import.types.iter();
-        if let Some(first) = types.next() {
-            if resolver_import.default_import {
-                s.push_str(",");
-            }
-            s.push_str(" { ");
-            s.push_str(&format!("{} as {} ", first.original, first.alias));
-            for value in types {
-                s.push_str(&format!(", {} as {} ", value.original, value.alias));
-            }
-            s.push_str("}");
-        }
-        s.push_str(&format!(" from './{}.isograph';\n", nested_resolver_name));
-        overall.push_str(&s);
+        write_resolver_import(
+            resolver_import,
+            nested_resolver_name,
+            &mut overall,
+            current_file_type_name,
+        );
     }
     overall
+}
+
+fn write_resolver_import(
+    resolver_import: ResolverImport,
+    nested_resolver_name: ResolverTypeAndField,
+    overall: &mut String,
+    current_file_type_name: IsographObjectTypeName,
+) {
+    if !resolver_import.default_import && resolver_import.types.is_empty() {
+        panic!("Resolver imports should not be created in an empty state.");
+    }
+
+    let mut s = "import ".to_string();
+    if resolver_import.default_import {
+        s.push_str(&format!("{}", nested_resolver_name.underscore_separated()));
+    }
+    let mut types = resolver_import.types.iter();
+    if let Some(first) = types.next() {
+        if resolver_import.default_import {
+            s.push_str(",");
+        }
+        s.push_str(" { ");
+        s.push_str(&format!("{} as {} ", first.original, first.alias));
+        for value in types {
+            s.push_str(&format!(", {} as {} ", value.original, value.alias));
+        }
+        s.push_str("}");
+    }
+    s.push_str(&format!(
+        " from '{}';\n",
+        nested_resolver_name.relative_path(current_file_type_name)
+    ));
+    overall.push_str(&s);
 }
 
 fn get_read_out_type_text(read_out_type: ResolverReadOutType) -> String {

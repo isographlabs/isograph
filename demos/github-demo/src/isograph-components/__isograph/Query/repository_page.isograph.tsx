@@ -1,32 +1,42 @@
 import type {IsographFetchableResolver, ReaderAst, FragmentReference} from '@isograph/react';
 import { getRefRendererForName } from '@isograph/react';
 const resolver = x => x;
-import Query__header, { ReadOutType as Query__header__outputType } from './Query__header.isograph';
-import Query__user_detail, { ReadOutType as Query__user_detail__outputType } from './Query__user_detail.isograph';
+import Query__header, { ReadOutType as Query__header__outputType } from './header.isograph';
+import Query__repository_detail, { ReadOutType as Query__repository_detail__outputType } from './repository_detail.isograph';
 
-const queryText = 'query user_page ($first: Int!, $userLogin: String!) {\
-  user____login___userLogin: user(login: $userLogin) {\
+const queryText = 'query repository_page ($repositoryName: String!, $repositoryOwner: String!, $first: Int!) {\
+  repository____name___repositoryName____owner___repositoryOwner: repository(name: $repositoryName, owner: $repositoryOwner) {\
     id,\
-    name,\
-    repositories____last___first: repositories(last: $first) {\
+    nameWithOwner,\
+    parent {\
+      id,\
+      name,\
+      nameWithOwner,\
+      owner {\
+        id,\
+        login,\
+      },\
+    },\
+    pullRequests____last___first: pullRequests(last: $first) {\
       edges {\
         node {\
           id,\
-          description,\
-          forkCount,\
-          name,\
-          nameWithOwner,\
-          owner {\
-            id,\
+          author {\
             login,\
           },\
-          pullRequests____first___first: pullRequests(first: $first) {\
-            totalCount,\
+          closed,\
+          createdAt,\
+          number,\
+          repository {\
+            id,\
+            name,\
+            owner {\
+              id,\
+              login,\
+            },\
           },\
-          stargazerCount,\
-          watchers____first___first: watchers(first: $first) {\
-            totalCount,\
-          },\
+          title,\
+          totalCommentsCount,\
         },\
       },\
     },\
@@ -52,16 +62,16 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
   {
     kind: "Resolver",
-    alias: "user_detail",
+    alias: "repository_detail",
     arguments: null,
-    resolver: Query__user_detail,
+    resolver: Query__repository_detail,
     variant: "Component",
   },
 ];
 
 export type ResolverParameterType = {
   header: Query__header__outputType,
-  user_detail: Query__user_detail__outputType,
+  repository_detail: Query__repository_detail__outputType,
 };
 
 // The type, when returned from the resolver

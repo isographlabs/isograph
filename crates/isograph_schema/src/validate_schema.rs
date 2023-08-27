@@ -2,10 +2,9 @@ use std::collections::HashMap;
 
 use common_lang_types::{
     DefinedField, FieldNameOrAlias, IsographObjectTypeName, ScalarFieldName, SelectableFieldName,
-    TypeAndField, UnvalidatedTypeName, VariableName, WithSpan,
+    UnvalidatedTypeName, VariableName, WithSpan,
 };
 use graphql_lang_types::{NamedTypeAnnotation, TypeAnnotation};
-use intern::string_key::Intern;
 use isograph_lang_types::{
     DefinedTypeId, InputTypeId, LinkedFieldSelection, ObjectId, OutputTypeId, ResolverFieldId,
     ScalarFieldSelection, ScalarId, Selection, ServerFieldId, VariableDefinition,
@@ -13,9 +12,9 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    Schema, SchemaData, SchemaIdField, SchemaObject, SchemaResolver, SchemaServerField,
-    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData, UnvalidatedSchemaField,
-    UnvalidatedSchemaResolver, UnvalidatedSchemaServerField,
+    ResolverTypeAndField, Schema, SchemaData, SchemaIdField, SchemaObject, SchemaResolver,
+    SchemaServerField, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData,
+    UnvalidatedSchemaField, UnvalidatedSchemaResolver, UnvalidatedSchemaServerField,
 };
 
 pub type ValidatedSchemaField = SchemaServerField<TypeAnnotation<OutputTypeId>>;
@@ -30,7 +29,7 @@ pub type ValidatedSchemaResolver =
 pub type ValidatedEncounteredDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;
 /// The validated defined field that shows up in the TScalarField generic.
 pub type ValidatedScalarDefinedField =
-    DefinedField<ServerFieldId, (FieldNameOrAlias, TypeAndField)>;
+    DefinedField<ServerFieldId, (FieldNameOrAlias, ResolverTypeAndField)>;
 
 pub type ValidatedSchemaObject = SchemaObject<ValidatedEncounteredDefinedField>;
 
@@ -485,9 +484,10 @@ fn validate_field_type_exists_and_is_scalar(
                     unwraps: scalar_field_selection.unwraps,
                     associated_data: DefinedField::ResolverField((
                         (*resolver_name).into(),
-                        format!("{}__{}", parent_object.name, resolver_name)
-                            .intern()
-                            .into(),
+                        ResolverTypeAndField {
+                            type_name: parent_object.name,
+                            field_name: (*resolver_name).into(),
+                        },
                     )),
                     arguments: scalar_field_selection.arguments,
                     normalization_alias: scalar_field_selection.normalization_alias,

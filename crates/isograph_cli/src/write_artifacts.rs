@@ -5,6 +5,7 @@ use std::{
 };
 
 use common_lang_types::{IsographObjectTypeName, SelectableFieldName};
+use intern::Lookup;
 
 use crate::generate_artifacts::{
     Artifact, FetchableResolver, GenerateArtifactsError, NonFetchableResolver,
@@ -47,10 +48,21 @@ pub(crate) fn write_artifacts<'schema>(
                     ..
                 } = &fetchable_resolver;
 
-                let generated_file_name =
-                    generated_file_name(parent_type.name, (*query_name).into());
-                let generated_file_path =
-                    generated_file_path(&generated_folder_root, &generated_file_name);
+                let generated_file_name = generated_file_name((*query_name).into());
+                let generated_file_path = generated_file_path(
+                    &generated_folder_root,
+                    parent_type.name,
+                    &generated_file_name,
+                );
+                let intermediate_folder =
+                    generated_intermediate_folder(&generated_folder_root, parent_type.name);
+
+                fs::create_dir_all(&intermediate_folder).map_err(|e| {
+                    GenerateArtifactsError::UnableToCreateDirectory {
+                        path: intermediate_folder.clone(),
+                        message: e,
+                    }
+                })?;
 
                 let mut file = File::create(&generated_file_path).map_err(|e| {
                     GenerateArtifactsError::UnableToWriteToArtifactFile {
@@ -75,10 +87,21 @@ pub(crate) fn write_artifacts<'schema>(
                     ..
                 } = &non_fetchable_resolver;
 
-                let generated_file_name =
-                    generated_file_name(parent_type.name, *resolver_field_name);
-                let generated_file_path =
-                    generated_file_path(&generated_folder_root, &generated_file_name);
+                let generated_file_name = generated_file_name(*resolver_field_name);
+                let generated_file_path = generated_file_path(
+                    &generated_folder_root,
+                    parent_type.name,
+                    &generated_file_name,
+                );
+                let intermediate_folder =
+                    generated_intermediate_folder(&generated_folder_root, parent_type.name);
+
+                fs::create_dir_all(&intermediate_folder).map_err(|e| {
+                    GenerateArtifactsError::UnableToCreateDirectory {
+                        path: intermediate_folder.clone(),
+                        message: e,
+                    }
+                })?;
 
                 let mut file = File::create(&generated_file_path).map_err(|e| {
                     GenerateArtifactsError::UnableToWriteToArtifactFile {
@@ -101,13 +124,21 @@ pub(crate) fn write_artifacts<'schema>(
     Ok(())
 }
 
-fn generated_file_name(
-    parent_type_name: IsographObjectTypeName,
-    field_name: SelectableFieldName,
-) -> PathBuf {
-    PathBuf::from(format!("{}__{}.isograph.tsx", parent_type_name, field_name))
+fn generated_file_name(field_name: SelectableFieldName) -> PathBuf {
+    PathBuf::from(format!("{}.isograph.tsx", field_name))
 }
 
-fn generated_file_path(project_root: &PathBuf, file_name: &PathBuf) -> PathBuf {
-    project_root.join(file_name)
+fn generated_file_path(
+    project_root: &PathBuf,
+    parent_type_name: IsographObjectTypeName,
+    file_name: &PathBuf,
+) -> PathBuf {
+    project_root.join(parent_type_name.lookup()).join(file_name)
+}
+
+fn generated_intermediate_folder(
+    project_root: &PathBuf,
+    parent_type_name: IsographObjectTypeName,
+) -> PathBuf {
+    project_root.join(parent_type_name.lookup())
 }

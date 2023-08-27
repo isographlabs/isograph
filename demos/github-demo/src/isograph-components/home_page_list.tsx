@@ -1,5 +1,5 @@
 import { iso } from "@isograph/react";
-import type { ResolverParameterType as HomePageListParams } from "./__isograph/Query__home_page_list.isograph";
+import type { ResolverParameterType as HomePageListParams } from "./__isograph/Query/home_page_list.isograph";
 import { RepoLink } from "./RepoLink";
 
 export const home_page_list = iso<

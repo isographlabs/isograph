@@ -1,5 +1,5 @@
 import { iso } from "@isograph/react";
-import type { ResolverParameterType as RepositoryDetailParams } from "./__isograph/Query__repository_detail.isograph";
+import type { ResolverParameterType as RepositoryDetailParams } from "./__isograph/Query/repository_detail.isograph";
 import { RepoLink } from "./RepoLink";
 
 export const repository_detail = iso<

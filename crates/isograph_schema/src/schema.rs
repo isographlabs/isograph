@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use common_lang_types::{
     DefinedField, DescriptionValue, HasName, InputTypeName, InterfaceTypeName,
     IsographObjectTypeName, JavascriptName, ResolverDefinitionPath, ScalarFieldName,
-    ScalarTypeName, SelectableFieldName, TypeAndField, UnvalidatedTypeName, WithSpan,
+    ScalarTypeName, SelectableFieldName, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, Directive, InterfaceTypeDefinition, NamedTypeAnnotation, ObjectTypeDefinition,
@@ -440,6 +440,30 @@ impl<TData: Copy> TryFrom<SchemaServerField<TData>> for SchemaIdField<TData> {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Hash, Ord, PartialOrd, Clone, Copy)]
+pub struct ResolverTypeAndField {
+    pub type_name: IsographObjectTypeName,
+    pub field_name: SelectableFieldName,
+}
+
+impl ResolverTypeAndField {
+    pub fn underscore_separated(&self) -> String {
+        format!("{}__{}", self.type_name, self.field_name)
+    }
+
+    pub fn relative_path(&self, current_file_type_name: IsographObjectTypeName) -> String {
+        let ResolverTypeAndField {
+            type_name,
+            field_name,
+        } = *self;
+        if type_name != current_file_type_name {
+            format!("../{type_name}/{field_name}.isograph")
+        } else {
+            format!("./{field_name}.isograph")
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct SchemaResolver<TScalarField, TLinkedField, TVariableDefinitionType> {
     pub description: Option<DescriptionValue>,
@@ -458,8 +482,9 @@ pub struct SchemaResolver<TScalarField, TLinkedField, TVariableDefinitionType> {
     pub is_fetchable: bool,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<TVariableDefinitionType>>>,
 
+    // TODO this is probably unused
     // Why is this not calculated when needed?
-    pub type_and_field: TypeAndField,
+    pub type_and_field: ResolverTypeAndField,
     pub has_associated_js_function: bool,
 
     // TODO should this be TypeWithFieldsId???

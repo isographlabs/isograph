@@ -1,6 +1,6 @@
 import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
-import { comment_list as resolver } from '../comment_list.tsx';
-import IssueComment__formatted_comment_creation_date, { ReadOutType as IssueComment__formatted_comment_creation_date__outputType } from './IssueComment__formatted_comment_creation_date.isograph';
+import { comment_list as resolver } from '../../comment_list.tsx';
+import IssueComment__formatted_comment_creation_date, { ReadOutType as IssueComment__formatted_comment_creation_date__outputType } from '../IssueComment/formatted_comment_creation_date.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);

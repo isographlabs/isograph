@@ -7,7 +7,7 @@ use std::{
 
 use common_lang_types::{
     DefinedField, HasName, QueryOperationName, ResolverDefinitionPath, SelectableFieldName,
-    TypeAndField, UnvalidatedTypeName, WithSpan,
+    UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{ListTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
@@ -15,13 +15,16 @@ use isograph_lang_types::{
     ServerFieldSelection,
 };
 use isograph_schema::{
-    create_merged_selection_set, MergedSelectionSet, MergedServerFieldSelection, ResolverVariant,
-    SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
-    ValidatedSchemaResolver, ValidatedSelection, ValidatedVariableDefinition,
+    create_merged_selection_set, MergedSelectionSet, MergedServerFieldSelection,
+    ResolverTypeAndField, ResolverVariant, SchemaObject, ValidatedEncounteredDefinedField,
+    ValidatedScalarDefinedField, ValidatedSchema, ValidatedSchemaResolver, ValidatedSelection,
+    ValidatedVariableDefinition,
 };
 use thiserror::Error;
 
 use crate::write_artifacts::write_artifacts;
+
+type NestedResolverImports = HashMap<ResolverTypeAndField, ResolverImport>;
 
 macro_rules! derive_display {
     ($type:ident) => {
@@ -83,8 +86,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
             &merged_selection_set,
             &fetchable_resolver.variable_definitions,
         );
-        let mut nested_resolver_artifact_imports: HashMap<TypeAndField, ResolverImport> =
-            HashMap::new();
+        let mut nested_resolver_artifact_imports = HashMap::new();
         let resolver_parameter_type = generate_resolver_parameter_type(
             schema,
             &selection_set,
@@ -216,22 +218,22 @@ derive_display!(ConvertFunction);
 #[derive(Debug)]
 pub(crate) struct FetchableResolver<'schema> {
     pub(crate) query_name: QueryOperationName,
-    pub(crate) parent_type: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
+    pub parent_type: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
     pub query_text: QueryText,
     pub resolver_import_statement: ResolverImportStatement,
     pub resolver_parameter_type: ResolverParameterType,
     pub resolver_return_type: ResolverReturnType,
     pub resolver_read_out_type: ResolverReadOutType,
     pub reader_ast: ReaderAst,
-    pub nested_resolver_artifact_imports: HashMap<TypeAndField, ResolverImport>,
+    pub nested_resolver_artifact_imports: NestedResolverImports,
     pub convert_function: ConvertFunction,
 }
 
 #[derive(Debug)]
 pub(crate) struct NonFetchableResolver<'schema> {
-    pub(crate) parent_type: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
+    pub parent_type: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
     pub(crate) resolver_field_name: SelectableFieldName,
-    pub nested_resolver_artifact_imports: HashMap<TypeAndField, ResolverImport>,
+    pub nested_resolver_artifact_imports: NestedResolverImports,
     pub resolver_read_out_type: ResolverReadOutType,
     pub reader_ast: ReaderAst,
     pub resolver_parameter_type: ResolverParameterType,
@@ -342,7 +344,7 @@ fn generate_resolver_parameter_type(
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
     variant: Option<WithSpan<ResolverVariant>>,
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
-    nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
+    nested_resolver_imports: &mut NestedResolverImports,
     indentation_level: u8,
 ) -> ResolverParameterType {
     // TODO use unwraps
@@ -381,7 +383,7 @@ fn write_query_types_from_selection(
     selection: &WithSpan<ValidatedSelection>,
     variant: Option<WithSpan<ResolverVariant>>,
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
-    nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
+    nested_resolver_imports: &mut NestedResolverImports,
     indentation_level: u8,
 ) {
     query_type_declaration.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
@@ -429,7 +431,7 @@ fn write_query_types_from_selection(
                                     original: ResolverImportName("ReadOutType".to_string()),
                                     alias: ResolverImportAlias(format!(
                                         "{}__outputType",
-                                        resolver.type_and_field
+                                        resolver.type_and_field.underscore_separated()
                                     )),
                                 });
                             }
@@ -440,7 +442,7 @@ fn write_query_types_from_selection(
                                         original: ResolverImportName("ReadOutType".to_string()),
                                         alias: ResolverImportAlias(format!(
                                             "{}__outputType",
-                                            resolver.type_and_field
+                                            resolver.type_and_field.underscore_separated()
                                         )),
                                     }],
                                 });
@@ -449,7 +451,8 @@ fn write_query_types_from_selection(
 
                         query_type_declaration.push_str(&format!(
                             "{}: {}__outputType,\n",
-                            name_or_alias, resolver.type_and_field
+                            name_or_alias,
+                            resolver.type_and_field.underscore_separated()
                         ));
                     }
                 }
@@ -537,10 +540,9 @@ fn generate_resolver_import_statement(
 ) -> ResolverImportStatement {
     // TODO make this an enum/option instead of three variables
     if has_associated_js_function {
-        // ../ gets us to the project root from the __isograph folder
+        // ../.. gets us back to the root
         ResolverImportStatement(format!(
-            "import {{ {} as resolver }} from '../{}';",
-            resolver_name, resolver_path
+            "import {{ {resolver_name} as resolver }} from '../../{resolver_path}';",
         ))
     } else {
         ResolverImportStatement("const resolver = x => x;".to_string())
@@ -571,7 +573,7 @@ fn generate_reader_ast<'schema>(
     selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     indentation_level: u8,
-    nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
+    nested_resolver_imports: &mut NestedResolverImports,
 ) -> ReaderAst {
     let mut reader_ast = "[\n".to_string();
     for item in selection_set {
@@ -593,7 +595,7 @@ fn generate_reader_ast_node(
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     schema: &ValidatedSchema,
     indentation_level: u8,
-    nested_resolver_imports: &mut HashMap<TypeAndField, ResolverImport>,
+    nested_resolver_imports: &mut NestedResolverImports,
 ) -> String {
     match &item.item {
         Selection::ServerField(field) => match field {
@@ -646,7 +648,7 @@ fn generate_reader_ast_node(
                                     "  ".repeat((indentation_level + 1) as usize),
                                     arguments,
                                     "  ".repeat((indentation_level + 1) as usize),
-                                    resolver_field.type_and_field,
+                                    resolver_field.type_and_field.underscore_separated(),
                                     "  ".repeat((indentation_level + 1) as usize),
                                     resolver_field.variant.map(|x| format!("\"{}\"", x)).unwrap_or_else(|| "null".to_string()),
                                     "  ".repeat(indentation_level as usize),

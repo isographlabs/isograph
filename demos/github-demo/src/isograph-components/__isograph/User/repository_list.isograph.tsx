@@ -1,6 +1,6 @@
 import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
-import { repository_list as resolver } from '../user_repository_list.tsx';
-import Repository__repository_link, { ReadOutType as Repository__repository_link__outputType } from './Repository__repository_link.isograph';
+import { repository_list as resolver } from '../../user_repository_list.tsx';
+import Repository__repository_link, { ReadOutType as Repository__repository_link__outputType } from '../Repository/repository_link.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);

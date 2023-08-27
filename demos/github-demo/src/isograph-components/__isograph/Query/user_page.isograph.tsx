@@ -1,14 +1,12 @@
 import type {IsographFetchableResolver, ReaderAst, FragmentReference} from '@isograph/react';
 import { getRefRendererForName } from '@isograph/react';
 const resolver = x => x;
-import Query__header, { ReadOutType as Query__header__outputType } from './Query__header.isograph';
-import Query__home_page_list, { ReadOutType as Query__home_page_list__outputType } from './Query__home_page_list.isograph';
+import Query__header, { ReadOutType as Query__header__outputType } from './header.isograph';
+import Query__user_detail, { ReadOutType as Query__user_detail__outputType } from './user_detail.isograph';
 
-const queryText = 'query home_page ($first: Int!) {\
-  viewer {\
-    avatarUrl,\
+const queryText = 'query user_page ($first: Int!, $userLogin: String!) {\
+  user____login___userLogin: user(login: $userLogin) {\
     id,\
-    login,\
     name,\
     repositories____last___first: repositories(last: $first) {\
       edges {\
@@ -33,6 +31,11 @@ const queryText = 'query home_page ($first: Int!) {\
       },\
     },\
   },\
+  viewer {\
+    id,\
+    avatarUrl,\
+    name,\
+  },\
 }';
 
 // TODO support changing this,
@@ -49,16 +52,16 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
   {
     kind: "Resolver",
-    alias: "home_page_list",
+    alias: "user_detail",
     arguments: null,
-    resolver: Query__home_page_list,
+    resolver: Query__user_detail,
     variant: "Component",
   },
 ];
 
 export type ResolverParameterType = {
   header: Query__header__outputType,
-  home_page_list: Query__home_page_list__outputType,
+  user_detail: Query__user_detail__outputType,
 };
 
 // The type, when returned from the resolver

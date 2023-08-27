@@ -1,5 +1,5 @@
 import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
-import { repository_link as resolver } from '../repository_link.tsx';
+import { avatar as resolver } from '../../avatar.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
@@ -21,35 +21,18 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     arguments: null,
   },
   {
-    kind: "Linked",
-    response_name: "owner",
+    kind: "Scalar",
+    response_name: "avatarUrl",
     alias: null,
     arguments: null,
-    selections: [
-      {
-        kind: "Scalar",
-        response_name: "id",
-        alias: null,
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        response_name: "login",
-        alias: null,
-        arguments: null,
-      },
-    ],
   },
 ];
 
 export type ResolverParameterType = { data:
 {
   id: string,
-  name: string,
-  owner: {
-    id: string,
-    login: string,
-  },
+  name: (string | null),
+  avatarUrl: string,
 },
 [index: string]: any };
 

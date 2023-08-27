@@ -1,34 +1,37 @@
 import type {IsographFetchableResolver, ReaderAst, FragmentReference} from '@isograph/react';
 import { getRefRendererForName } from '@isograph/react';
 const resolver = x => x;
-import Query__header, { ReadOutType as Query__header__outputType } from './Query__header.isograph';
-import Query__pull_request_detail, { ReadOutType as Query__pull_request_detail__outputType } from './Query__pull_request_detail.isograph';
+import Query__header, { ReadOutType as Query__header__outputType } from './header.isograph';
+import Query__home_page_list, { ReadOutType as Query__home_page_list__outputType } from './home_page_list.isograph';
 
-const queryText = 'query pull_request ($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!) {\
-  repository____owner___repositoryOwner____name___repositoryName: repository(owner: $repositoryOwner, name: $repositoryName) {\
+const queryText = 'query home_page ($first: Int!) {\
+  viewer {\
+    avatarUrl,\
     id,\
-    pullRequest____number___pullRequestNumber: pullRequest(number: $pullRequestNumber) {\
-      id,\
-      bodyHTML,\
-      comments____last___last: comments(last: $last) {\
-        edges {\
-          node {\
+    login,\
+    name,\
+    repositories____last___first: repositories(last: $first) {\
+      edges {\
+        node {\
+          id,\
+          description,\
+          forkCount,\
+          name,\
+          nameWithOwner,\
+          owner {\
             id,\
-            author {\
-              login,\
-            },\
-            bodyText,\
-            createdAt,\
+            login,\
+          },\
+          pullRequests____first___first: pullRequests(first: $first) {\
+            totalCount,\
+          },\
+          stargazerCount,\
+          watchers____first___first: watchers(first: $first) {\
+            totalCount,\
           },\
         },\
       },\
-      title,\
     },\
-  },\
-  viewer {\
-    id,\
-    avatarUrl,\
-    name,\
   },\
 }';
 
@@ -46,16 +49,16 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
   {
     kind: "Resolver",
-    alias: "pull_request_detail",
+    alias: "home_page_list",
     arguments: null,
-    resolver: Query__pull_request_detail,
+    resolver: Query__home_page_list,
     variant: "Component",
   },
 ];
 
 export type ResolverParameterType = {
   header: Query__header__outputType,
-  pull_request_detail: Query__pull_request_detail__outputType,
+  home_page_list: Query__home_page_list__outputType,
 };
 
 // The type, when returned from the resolver

@@ -9,7 +9,7 @@ use isograph_lang_types::{DefinedTypeId, FragmentDirectiveUsage, ObjectId, Resol
 use lazy_static::lazy_static;
 use thiserror::Error;
 
-use crate::{SchemaResolver, UnvalidatedSchema};
+use crate::{ResolverTypeAndField, SchemaResolver, UnvalidatedSchema};
 
 impl UnvalidatedSchema {
     pub fn process_resolver_declaration(
@@ -87,7 +87,10 @@ impl UnvalidatedSchema {
             variant,
             is_fetchable: is_fetchable(&resolver_declaration.item.directives),
             variable_definitions: resolver_declaration.item.variable_definitions,
-            type_and_field: format!("{}__{}", object.name, name).intern().into(),
+            type_and_field: ResolverTypeAndField {
+                type_name: object.name,
+                field_name: name,
+            },
             has_associated_js_function,
             parent_object_id,
         });

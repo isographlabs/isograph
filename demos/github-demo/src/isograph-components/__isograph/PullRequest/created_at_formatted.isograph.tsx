@@ -1,5 +1,5 @@
 import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
-import { created_at_formatted as resolver } from '../pull_request_table.tsx';
+import { created_at_formatted as resolver } from '../../pull_request_table.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = ResolverReturnType;

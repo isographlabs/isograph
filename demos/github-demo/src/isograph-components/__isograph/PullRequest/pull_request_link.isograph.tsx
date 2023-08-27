@@ -1,6 +1,5 @@
 import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
-import { home_page_list as resolver } from '../home_page_list.tsx';
-import User__repository_list, { ReadOutType as User__repository_list__outputType } from './User__repository_list.isograph';
+import { pull_request_link as resolver } from '../../pull_request_link.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
@@ -10,23 +9,17 @@ export type ReadFromStoreType = ResolverParameterType;
 
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
+    kind: "Scalar",
+    response_name: "number",
+    alias: null,
+    arguments: null,
+  },
+  {
     kind: "Linked",
-    response_name: "viewer",
+    response_name: "repository",
     alias: null,
     arguments: null,
     selections: [
-      {
-        kind: "Scalar",
-        response_name: "login",
-        alias: null,
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        response_name: "id",
-        alias: null,
-        arguments: null,
-      },
       {
         kind: "Scalar",
         response_name: "name",
@@ -34,11 +27,18 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
         arguments: null,
       },
       {
-        kind: "Resolver",
-        alias: "repository_list",
+        kind: "Linked",
+        response_name: "owner",
+        alias: null,
         arguments: null,
-        resolver: User__repository_list,
-        variant: "Component",
+        selections: [
+          {
+            kind: "Scalar",
+            response_name: "login",
+            alias: null,
+            arguments: null,
+          },
+        ],
       },
     ],
   },
@@ -46,11 +46,12 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 
 export type ResolverParameterType = { data:
 {
-  viewer: {
-    login: string,
-    id: string,
-    name: (string | null),
-    repository_list: User__repository_list__outputType,
+  number: number,
+  repository: {
+    name: string,
+    owner: {
+      login: string,
+    },
   },
 },
 [index: string]: any };

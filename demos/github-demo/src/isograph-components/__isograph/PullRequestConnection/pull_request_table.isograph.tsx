@@ -1,8 +1,8 @@
 import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
-import { pull_request_table as resolver } from '../pull_request_table.tsx';
-import Actor__user_link, { ReadOutType as Actor__user_link__outputType } from './Actor__user_link.isograph';
-import PullRequest__created_at_formatted, { ReadOutType as PullRequest__created_at_formatted__outputType } from './PullRequest__created_at_formatted.isograph';
-import PullRequest__pull_request_link, { ReadOutType as PullRequest__pull_request_link__outputType } from './PullRequest__pull_request_link.isograph';
+import { pull_request_table as resolver } from '../../pull_request_table.tsx';
+import Actor__user_link, { ReadOutType as Actor__user_link__outputType } from '../Actor/user_link.isograph';
+import PullRequest__created_at_formatted, { ReadOutType as PullRequest__created_at_formatted__outputType } from '../PullRequest/created_at_formatted.isograph';
+import PullRequest__pull_request_link, { ReadOutType as PullRequest__pull_request_link__outputType } from '../PullRequest/pull_request_link.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);

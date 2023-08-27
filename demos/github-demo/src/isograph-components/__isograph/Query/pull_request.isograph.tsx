@@ -1,44 +1,28 @@
 import type {IsographFetchableResolver, ReaderAst, FragmentReference} from '@isograph/react';
 import { getRefRendererForName } from '@isograph/react';
 const resolver = x => x;
-import Query__header, { ReadOutType as Query__header__outputType } from './Query__header.isograph';
-import Query__repository_detail, { ReadOutType as Query__repository_detail__outputType } from './Query__repository_detail.isograph';
+import Query__header, { ReadOutType as Query__header__outputType } from './header.isograph';
+import Query__pull_request_detail, { ReadOutType as Query__pull_request_detail__outputType } from './pull_request_detail.isograph';
 
-const queryText = 'query repository_page ($repositoryName: String!, $repositoryOwner: String!, $first: Int!) {\
-  repository____name___repositoryName____owner___repositoryOwner: repository(name: $repositoryName, owner: $repositoryOwner) {\
+const queryText = 'query pull_request ($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!) {\
+  repository____owner___repositoryOwner____name___repositoryName: repository(owner: $repositoryOwner, name: $repositoryName) {\
     id,\
-    nameWithOwner,\
-    parent {\
+    pullRequest____number___pullRequestNumber: pullRequest(number: $pullRequestNumber) {\
       id,\
-      name,\
-      nameWithOwner,\
-      owner {\
-        id,\
-        login,\
-      },\
-    },\
-    pullRequests____last___first: pullRequests(last: $first) {\
-      edges {\
-        node {\
-          id,\
-          author {\
-            login,\
-          },\
-          closed,\
-          createdAt,\
-          number,\
-          repository {\
+      bodyHTML,\
+      comments____last___last: comments(last: $last) {\
+        edges {\
+          node {\
             id,\
-            name,\
-            owner {\
-              id,\
+            author {\
               login,\
             },\
+            bodyText,\
+            createdAt,\
           },\
-          title,\
-          totalCommentsCount,\
         },\
       },\
+      title,\
     },\
   },\
   viewer {\
@@ -62,16 +46,16 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
   {
     kind: "Resolver",
-    alias: "repository_detail",
+    alias: "pull_request_detail",
     arguments: null,
-    resolver: Query__repository_detail,
+    resolver: Query__pull_request_detail,
     variant: "Component",
   },
 ];
 
 export type ResolverParameterType = {
   header: Query__header__outputType,
-  repository_detail: Query__repository_detail__outputType,
+  pull_request_detail: Query__pull_request_detail__outputType,
 };
 
 // The type, when returned from the resolver
