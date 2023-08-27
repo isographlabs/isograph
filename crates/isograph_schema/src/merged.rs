@@ -255,9 +255,16 @@ fn merge_scalar_server_field(
             &scalar_field.arguments,
         ));
     match merged_selection_set.entry(normalization_key) {
-        Entry::Occupied(_) => {
-            // TODO: do we need to check for merge conflicts on scalars? Not while
-            // we are auto-aliasing.
+        Entry::Occupied(occupied) => {
+            match occupied.get().item {
+                MergedServerFieldSelection::ScalarField(_) => {
+                    // TODO check that the existing server field matches the one we
+                    // would create.
+                }
+                MergedServerFieldSelection::LinkedField(_) => {
+                    panic!("Unexpected linked field, probably a bug in Isograph")
+                }
+            };
         }
         Entry::Vacant(vacant_entry) => {
             vacant_entry.insert(WithSpan::new(
