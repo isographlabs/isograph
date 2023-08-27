@@ -37,3 +37,8 @@
 
 - Typegen for non-eager non-component resolvers shows the eager type. There needs to be an additional type that is generated and threaded through.
 - If a useLazyReference commits then receives new props, it does not make a new network request.
+
+## Priorities for GraphQL conf
+
+- Mutations
+- Errors displayed in console
