@@ -10,7 +10,7 @@ use common_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     LinkedFieldSelection, ObjectId, ScalarFieldSelection, Selection, SelectionFieldArgument,
-    ServerFieldId, ServerFieldSelection,
+    ServerFieldSelection,
 };
 
 use crate::{
@@ -31,8 +31,6 @@ pub enum MergedServerFieldSelection {
 pub struct MergedScalarFieldSelection {
     pub name: WithSpan<ScalarFieldName>,
     pub normalization_alias: Option<WithSpan<ScalarFieldAlias>>,
-    // TODO rename, since this isn't generic
-    pub associated_data: ServerFieldId,
     pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
 }
 
@@ -40,8 +38,6 @@ pub struct MergedScalarFieldSelection {
 pub struct MergedLinkedFieldSelection {
     pub name: WithSpan<LinkedFieldName>,
     pub normalization_alias: Option<WithSpan<LinkedFieldAlias>>,
-    // TODO rename, since this isn't generic
-    pub associated_data: ObjectId,
     pub selection_set: Vec<WithSpan<MergedServerFieldSelection>>,
     pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
 }
@@ -115,12 +111,9 @@ fn merge_selections_into_set(
             Selection::ServerField(validated_server_field) => match validated_server_field {
                 ServerFieldSelection::ScalarField(scalar_field) => {
                     match &scalar_field.associated_data {
-                        DefinedField::ServerField(server_field_id) => merge_scalar_server_field(
-                            scalar_field,
-                            merged_selection_set,
-                            server_field_id,
-                            span,
-                        ),
+                        DefinedField::ServerField(_) => {
+                            merge_scalar_server_field(scalar_field, merged_selection_set, span)
+                        }
                         DefinedField::ResolverField(_) => merge_scalar_resolver_field(
                             scalar_field,
                             parent_type,
@@ -181,7 +174,6 @@ fn merge_linked_field_into_vacant_entry(
     vacant_entry.insert(WithSpan::new(
         MergedServerFieldSelection::LinkedField(MergedLinkedFieldSelection {
             name: new_linked_field.name,
-            associated_data: new_linked_field.associated_data,
             selection_set: {
                 let type_id = new_linked_field.associated_data;
                 let linked_field_parent_type = schema.schema_data.object(type_id);
@@ -246,7 +238,6 @@ fn merge_scalar_resolver_field(
 fn merge_scalar_server_field(
     scalar_field: &ScalarFieldSelection<ValidatedScalarDefinedField>,
     merged_selection_set: &mut MergedSelectionMap,
-    server_field_id: &ServerFieldId,
     span: Span,
 ) {
     let normalization_key =
@@ -270,7 +261,6 @@ fn merge_scalar_server_field(
             vacant_entry.insert(WithSpan::new(
                 MergedServerFieldSelection::ScalarField(MergedScalarFieldSelection {
                     name: scalar_field.name,
-                    associated_data: *server_field_id,
                     arguments: scalar_field.arguments.clone(),
                     normalization_alias: scalar_field.normalization_alias,
                 }),
@@ -410,7 +400,6 @@ fn add_typename_and_id_fields(
                             id_field.name.lookup().intern().into(),
                             Span::new(0, 0),
                         ),
-                        associated_data: id_field.id.into(),
                         arguments: vec![],
                         // This indicates that there should be a separate MergedServerFieldSelection variant
                         normalization_alias: None,
