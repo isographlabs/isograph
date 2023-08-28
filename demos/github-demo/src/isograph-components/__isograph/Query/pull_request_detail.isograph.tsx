@@ -11,7 +11,7 @@ export type ReadFromStoreType = ResolverParameterType;
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Linked",
-    response_name: "repository",
+    fieldName: "repository",
     alias: null,
     arguments: {
       "owner": "repositoryOwner",
@@ -20,13 +20,13 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     selections: [
       {
         kind: "Scalar",
-        response_name: "id",
+        fieldName: "id",
         alias: null,
         arguments: null,
       },
       {
         kind: "Linked",
-        response_name: "pullRequest",
+        fieldName: "pullRequest",
         alias: null,
         arguments: {
           "number": "pullRequestNumber",
@@ -34,19 +34,19 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
         selections: [
           {
             kind: "Scalar",
-            response_name: "id",
+            fieldName: "id",
             alias: null,
             arguments: null,
           },
           {
             kind: "Scalar",
-            response_name: "title",
+            fieldName: "title",
             alias: null,
             arguments: null,
           },
           {
             kind: "Scalar",
-            response_name: "bodyHTML",
+            fieldName: "bodyHTML",
             alias: null,
             arguments: null,
           },

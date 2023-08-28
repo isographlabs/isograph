@@ -13,13 +13,13 @@ export type ReadFromStoreType = ResolverParameterType;
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Linked",
-    response_name: "edges",
+    fieldName: "edges",
     alias: null,
     arguments: null,
     selections: [
       {
         kind: "Linked",
-        response_name: "node",
+        fieldName: "node",
         alias: null,
         arguments: null,
         selections: [
@@ -32,25 +32,25 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
           },
           {
             kind: "Scalar",
-            response_name: "number",
+            fieldName: "number",
             alias: null,
             arguments: null,
           },
           {
             kind: "Scalar",
-            response_name: "id",
+            fieldName: "id",
             alias: null,
             arguments: null,
           },
           {
             kind: "Scalar",
-            response_name: "title",
+            fieldName: "title",
             alias: null,
             arguments: null,
           },
           {
             kind: "Linked",
-            response_name: "author",
+            fieldName: "author",
             alias: null,
             arguments: null,
             selections: [
@@ -63,7 +63,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
               },
               {
                 kind: "Scalar",
-                response_name: "login",
+                fieldName: "login",
                 alias: null,
                 arguments: null,
               },
@@ -71,13 +71,13 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
           },
           {
             kind: "Scalar",
-            response_name: "closed",
+            fieldName: "closed",
             alias: null,
             arguments: null,
           },
           {
             kind: "Scalar",
-            response_name: "totalCommentsCount",
+            fieldName: "totalCommentsCount",
             alias: null,
             arguments: null,
           },

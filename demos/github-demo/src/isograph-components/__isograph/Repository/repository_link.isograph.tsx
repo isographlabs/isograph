@@ -10,31 +10,31 @@ export type ReadFromStoreType = ResolverParameterType;
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Scalar",
-    response_name: "id",
+    fieldName: "id",
     alias: null,
     arguments: null,
   },
   {
     kind: "Scalar",
-    response_name: "name",
+    fieldName: "name",
     alias: null,
     arguments: null,
   },
   {
     kind: "Linked",
-    response_name: "owner",
+    fieldName: "owner",
     alias: null,
     arguments: null,
     selections: [
       {
         kind: "Scalar",
-        response_name: "id",
+        fieldName: "id",
         alias: null,
         arguments: null,
       },
       {
         kind: "Scalar",
-        response_name: "login",
+        fieldName: "login",
         alias: null,
         arguments: null,
       },

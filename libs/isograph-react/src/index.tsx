@@ -66,13 +66,13 @@ export type ReaderAst<TReadFromStore> = ReaderAstNode[];
 
 export type ReaderScalarField = {
   kind: "Scalar";
-  response_name: string;
+  fieldName: string;
   alias: string | null;
   arguments: Object | null;
 };
 export type ReaderLinkedField = {
   kind: "Linked";
-  response_name: string;
+  fieldName: string;
   alias: string | null;
   selections: ReaderAst<unknown>;
   arguments: Object | null;
@@ -258,7 +258,7 @@ function readData<TReadFromStore>(
     switch (field.kind) {
       case "Scalar": {
         const storeRecordName = getStoreFieldName(
-          field.response_name,
+          field.fieldName,
           field.arguments,
           variables
         );
@@ -271,12 +271,12 @@ function readData<TReadFromStore>(
             reason: "No value for " + storeRecordName + " on root " + root,
           };
         }
-        target[field.alias ?? field.response_name] = value;
+        target[field.alias ?? field.fieldName] = value;
         break;
       }
       case "Linked": {
         const storeRecordName = getStoreFieldName(
-          field.response_name,
+          field.fieldName,
           field.arguments,
           variables
         );
@@ -316,7 +316,7 @@ function readData<TReadFromStore>(
             }
             results.push(result.data);
           }
-          target[field.alias ?? field.response_name] = results;
+          target[field.alias ?? field.fieldName] = results;
           break;
         }
         let link = assertLink(value);
@@ -325,7 +325,7 @@ function readData<TReadFromStore>(
           const altLink = HACK_missingFieldHandler(
             storeRecord,
             root,
-            field.response_name,
+            field.fieldName,
             field.arguments,
             variables
           );
@@ -344,7 +344,7 @@ function readData<TReadFromStore>(
             link = altLink;
           }
         } else if (link === null) {
-          target[field.alias ?? field.response_name] = null;
+          target[field.alias ?? field.fieldName] = null;
           break;
         }
         const targetId = link.__link;
@@ -356,7 +356,7 @@ function readData<TReadFromStore>(
             nestedReason: data,
           };
         }
-        target[field.alias ?? field.response_name] = data.data;
+        target[field.alias ?? field.fieldName] = data.data;
         break;
       }
       case "Resolver": {

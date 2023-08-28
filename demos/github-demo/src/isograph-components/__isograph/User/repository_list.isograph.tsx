@@ -11,7 +11,7 @@ export type ReadFromStoreType = ResolverParameterType;
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Linked",
-    response_name: "repositories",
+    fieldName: "repositories",
     alias: null,
     arguments: {
       "last": "first",
@@ -19,19 +19,19 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     selections: [
       {
         kind: "Linked",
-        response_name: "edges",
+        fieldName: "edges",
         alias: null,
         arguments: null,
         selections: [
           {
             kind: "Linked",
-            response_name: "node",
+            fieldName: "node",
             alias: null,
             arguments: null,
             selections: [
               {
                 kind: "Scalar",
-                response_name: "id",
+                fieldName: "id",
                 alias: null,
                 arguments: null,
               },
@@ -44,31 +44,31 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
               },
               {
                 kind: "Scalar",
-                response_name: "name",
+                fieldName: "name",
                 alias: null,
                 arguments: null,
               },
               {
                 kind: "Scalar",
-                response_name: "nameWithOwner",
+                fieldName: "nameWithOwner",
                 alias: null,
                 arguments: null,
               },
               {
                 kind: "Scalar",
-                response_name: "description",
+                fieldName: "description",
                 alias: null,
                 arguments: null,
               },
               {
                 kind: "Scalar",
-                response_name: "forkCount",
+                fieldName: "forkCount",
                 alias: null,
                 arguments: null,
               },
               {
                 kind: "Linked",
-                response_name: "pullRequests",
+                fieldName: "pullRequests",
                 alias: null,
                 arguments: {
                   "first": "first",
@@ -76,7 +76,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
                 selections: [
                   {
                     kind: "Scalar",
-                    response_name: "totalCount",
+                    fieldName: "totalCount",
                     alias: null,
                     arguments: null,
                   },
@@ -84,13 +84,13 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
               },
               {
                 kind: "Scalar",
-                response_name: "stargazerCount",
+                fieldName: "stargazerCount",
                 alias: null,
                 arguments: null,
               },
               {
                 kind: "Linked",
-                response_name: "watchers",
+                fieldName: "watchers",
                 alias: null,
                 arguments: {
                   "first": "first",
@@ -98,7 +98,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
                 selections: [
                   {
                     kind: "Scalar",
-                    response_name: "totalCount",
+                    fieldName: "totalCount",
                     alias: null,
                     arguments: null,
                   },

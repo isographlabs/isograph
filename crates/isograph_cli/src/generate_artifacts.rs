@@ -622,7 +622,7 @@ fn generate_reader_ast_node(
                         format!(
                             "{}{{\n\
                             {}kind: \"Scalar\",\n\
-                            {}response_name: \"{}\",\n\
+                            {}fieldName: \"{}\",\n\
                             {}alias: {},\n\
                             {}arguments: {},\n\
                             {}}},\n",
@@ -698,7 +698,7 @@ fn generate_reader_ast_node(
                 );
                 let arguments = format_arguments(&linked_field.arguments, indentation_level + 1);
                 format!(
-                    "{}{{\n{}kind: \"Linked\",\n{}response_name: \"{}\",\n{}alias: {},\n{}arguments: {},\n{}selections: {},\n{}}},\n",
+                    "{}{{\n{}kind: \"Linked\",\n{}fieldName: \"{}\",\n{}alias: {},\n{}arguments: {},\n{}selections: {},\n{}}},\n",
                     "  ".repeat(indentation_level as usize),
                     "  ".repeat((indentation_level + 1) as usize),
                     "  ".repeat((indentation_level + 1) as usize),
