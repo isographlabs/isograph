@@ -618,22 +618,17 @@ fn generate_reader_ast_node(
                             .unwrap_or("null".to_string());
                         let arguments =
                             format_arguments(&scalar_field.arguments, indentation_level + 1);
+
+                        let indent_1 = "  ".repeat(indentation_level as usize);
+                        let indent_2 = "  ".repeat((indentation_level + 1) as usize);
+
                         format!(
-                            "{}{{\n\
-                            {}kind: \"Scalar\",\n\
-                            {}fieldName: \"{}\",\n\
-                            {}alias: {},\n\
-                            {}arguments: {},\n\
-                            {}}},\n",
-                            "  ".repeat(indentation_level as usize),
-                            "  ".repeat((indentation_level + 1) as usize),
-                            "  ".repeat((indentation_level + 1) as usize),
-                            field_name,
-                            "  ".repeat((indentation_level + 1) as usize),
-                            alias,
-                            "  ".repeat((indentation_level + 1) as usize),
-                            arguments,
-                            "  ".repeat((indentation_level) as usize),
+                            "{indent_1}{{\n\
+                            {indent_2}kind: \"Scalar\",\n\
+                            {indent_2}fieldName: \"{field_name}\",\n\
+                            {indent_2}alias: {alias},\n\
+                            {indent_2}arguments: {arguments},\n\
+                            {indent_1}}},\n",
                         )
                     }
                     DefinedField::ResolverField(_) => {
@@ -652,20 +647,23 @@ fn generate_reader_ast_node(
                         let resolver_field = schema.resolver(*resolver_field_id);
                         let arguments =
                             format_arguments(&scalar_field.arguments, indentation_level + 1);
+                        let indent_1 = "  ".repeat(indentation_level as usize);
+                        let indent_2 = "  ".repeat((indentation_level + 1) as usize);
+                        let resolver_field_string =
+                            resolver_field.type_and_field.underscore_separated();
+                        let variant = resolver_field
+                            .variant
+                            .map(|x| format!("\"{}\"", x))
+                            .unwrap_or_else(|| "null".to_string());
                         let res = format!(
-                                    "{}{{\n{}kind: \"Resolver\",\n{}alias: \"{}\",\n{}arguments: {},\n{}resolver: {},\n{}variant: {},\n{}}},\n",
-                                    "  ".repeat(indentation_level as usize),
-                                    "  ".repeat((indentation_level + 1) as usize),
-                                    "  ".repeat((indentation_level + 1) as usize),
-                                    alias,
-                                    "  ".repeat((indentation_level + 1) as usize),
-                                    arguments,
-                                    "  ".repeat((indentation_level + 1) as usize),
-                                    resolver_field.type_and_field.underscore_separated(),
-                                    "  ".repeat((indentation_level + 1) as usize),
-                                    resolver_field.variant.map(|x| format!("\"{}\"", x)).unwrap_or_else(|| "null".to_string()),
-                                    "  ".repeat(indentation_level as usize),
-                                );
+                            "{indent_1}{{\n\
+                            {indent_2}kind: \"Resolver\",\n\
+                            {indent_2}alias: \"{alias}\",\n\
+                            {indent_2}arguments: {arguments},\n\
+                            {indent_2}resolver: {resolver_field_string},\n\
+                            {indent_2}variant: {variant},\n\
+                            {indent_1}}},\n",
+                        );
                         match nested_resolver_imports.entry(resolver_field.type_and_field) {
                             Entry::Occupied(mut occupied) => {
                                 occupied.get_mut().default_import = true;
@@ -696,18 +694,16 @@ fn generate_reader_ast_node(
                     nested_resolver_imports,
                 );
                 let arguments = format_arguments(&linked_field.arguments, indentation_level + 1);
+                let indent_1 = "  ".repeat(indentation_level as usize);
+                let indent_2 = "  ".repeat((indentation_level + 1) as usize);
                 format!(
-                    "{}{{\n{}kind: \"Linked\",\n{}fieldName: \"{}\",\n{}alias: {},\n{}arguments: {},\n{}selections: {},\n{}}},\n",
-                    "  ".repeat(indentation_level as usize),
-                    "  ".repeat((indentation_level + 1) as usize),
-                    "  ".repeat((indentation_level + 1) as usize),
-                    name,
-                    "  ".repeat((indentation_level + 1) as usize),
-                    alias,
-                    "  ".repeat((indentation_level + 1) as usize),
-                    arguments,
-                    "  ".repeat((indentation_level + 1) as usize),
-                    inner_reader_ast.0, "  ".repeat(indentation_level as usize),
+                    "{indent_1}{{\n\
+                    {indent_2}kind: \"Linked\",\n\
+                    {indent_2}fieldName: \"{name}\",\n\
+                    {indent_2}alias: {alias},\n\
+                    {indent_2}arguments: {arguments},\n\
+                    {indent_2}selections: {inner_reader_ast},\n\
+                    {indent_1}}},\n",
                 )
             }
         },
@@ -812,16 +808,19 @@ fn get_serialized_field_arguments(
     }
 
     let mut s = "[".to_string();
+    let indent_1 = "  ".repeat((indentation_level + 1) as usize);
+    let indent_2 = "  ".repeat((indentation_level + 2) as usize);
 
     for argument in arguments {
+        let argument_name = argument.item.name.item;
+        let non_constant_value_for_js =
+            serialize_non_constant_value_for_js(&argument.item.value.item);
         s.push_str(&format!(
-            "\n{}{{\n{}argument_name: \"{}\",\n{}variable_name: {},\n{}}},\n",
-            "  ".repeat((indentation_level + 1) as usize),
-            "  ".repeat((indentation_level + 2) as usize),
-            argument.item.name.item,
-            "  ".repeat((indentation_level + 2) as usize),
-            serialize_non_constant_value_for_js(&argument.item.value.item),
-            "  ".repeat((indentation_level + 1) as usize),
+            "\n\
+            {indent_1}{{\n\
+            {indent_2}argument_name: \"{argument_name}\",\n\
+            {indent_2}variable_name: {non_constant_value_for_js},\n\
+            {indent_1}}},\n",
         ));
     }
 
@@ -905,18 +904,17 @@ fn generate_convert_function(
             if let ResolverVariant::Component = variant.item {
                 return ConvertFunction(format!(
                     "(() => {{\n\
-                {}const RefRendererForName = getRefRendererForName('{}');\n\
-                {}return ((resolver, data) => additionalRuntimeProps => \n\
-                {}{{\n\
-                {}return <RefRendererForName \n\
-                {}resolver={{resolver}}\n\
-                {}data={{data}}\n\
-                {}additionalRuntimeProps={{additionalRuntimeProps}}\n\
-                {}/>;\n\
-                {}}})\n\
-                {}}})()",
+                    {}const RefRendererForName = getRefRendererForName('{field_name}');\n\
+                    {}return ((resolver, data) => additionalRuntimeProps => \n\
+                    {}{{\n\
+                    {}return <RefRendererForName \n\
+                    {}resolver={{resolver}}\n\
+                    {}data={{data}}\n\
+                    {}additionalRuntimeProps={{additionalRuntimeProps}}\n\
+                    {}/>;\n\
+                    {}}})\n\
+                    {}}})()",
                     "  ".repeat(2),
-                    field_name,
                     "  ".repeat(2),
                     "  ".repeat(3),
                     "  ".repeat(4),
