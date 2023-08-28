@@ -68,14 +68,14 @@ export type ReaderScalarField = {
   kind: "Scalar";
   fieldName: string;
   alias: string | null;
-  arguments: Object | null;
+  arguments: Arguments | null;
 };
 export type ReaderLinkedField = {
   kind: "Linked";
   fieldName: string;
   alias: string | null;
   selections: ReaderAst<unknown>;
-  arguments: Object | null;
+  arguments: Arguments | null;
 };
 
 export type ReaderResolverVariant = "Eager" | "Component";
@@ -505,30 +505,26 @@ export type IsographComponentProps<TDataType, TOtherProps = Object> = {
 // TODO can we re-use a function from ./cache?
 function getStoreFieldName(
   name: string,
-  args: { [index: string]: any } | null,
+  args: Arguments | null,
   variables: { [index: string]: any } | null
 ): string {
   if (args === null) {
     return name;
   }
+
   if (variables == null) {
-    throw new Error("Missing variables when args are present");
+    throw new Error("Variables must be defined if arguments is not null");
   }
 
-  let keys = Object.keys(args ?? {});
-  keys.sort();
-
-  if (keys.length === 0) {
-    return name;
-  } else {
-    let out = name;
-    for (const key of keys) {
-      if (variables[args[key]] == null) {
-        throw new Error("Undefined variable " + args[key]);
-      }
-      out =
-        out + FIRST_SPLIT_KEY + key + SECOND_SPLIT_KEY + variables[args[key]];
+  let out = name;
+  for (const arg of args) {
+    const valueToUse = variables[arg.variableName];
+    if (valueToUse == null) {
+      throw new Error("Undefined variable " + arg.variableName);
     }
-    return out;
+    out =
+      out + FIRST_SPLIT_KEY + arg.argumentName + SECOND_SPLIT_KEY + valueToUse;
   }
+
+  return out;
 }

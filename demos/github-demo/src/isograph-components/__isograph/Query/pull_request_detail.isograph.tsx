@@ -13,10 +13,17 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     kind: "Linked",
     fieldName: "repository",
     alias: null,
-    arguments: {
-      "owner": "repositoryOwner",
-      "name": "repositoryName",
-    },
+    arguments: [
+      {
+        argumentName: "owner",
+        variableName: "repositoryOwner",
+      },
+
+      {
+        argumentName: "name",
+        variableName: "repositoryName",
+      },
+    ],
     selections: [
       {
         kind: "Scalar",
@@ -28,9 +35,12 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
         kind: "Linked",
         fieldName: "pullRequest",
         alias: null,
-        arguments: {
-          "number": "pullRequestNumber",
-        },
+        arguments: [
+          {
+            argumentName: "number",
+            variableName: "pullRequestNumber",
+          },
+        ],
         selections: [
           {
             kind: "Scalar",

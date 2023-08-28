@@ -19,9 +19,12 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     kind: "Linked",
     fieldName: "comments",
     alias: null,
-    arguments: {
-      "last": "last",
-    },
+    arguments: [
+      {
+        argumentName: "last",
+        variableName: "last",
+      },
+    ],
     selections: [
       {
         kind: "Linked",

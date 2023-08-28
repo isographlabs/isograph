@@ -13,9 +13,12 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     kind: "Linked",
     fieldName: "user",
     alias: null,
-    arguments: {
-      "login": "userLogin",
-    },
+    arguments: [
+      {
+        argumentName: "login",
+        variableName: "userLogin",
+      },
+    ],
     selections: [
       {
         kind: "Scalar",

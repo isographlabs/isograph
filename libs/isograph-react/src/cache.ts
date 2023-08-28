@@ -369,7 +369,7 @@ function getParentRecordKey(
   return parentRecordKey;
 }
 
-function getNetworkResponseKey(
+export function getNetworkResponseKey(
   astNode: NormalizationLinkedField | NormalizationScalarField
 ): string {
   let networkResponseKey = astNode.fieldName;

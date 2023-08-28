@@ -616,8 +616,10 @@ fn generate_reader_ast_node(
                             .reader_alias
                             .map(|x| format!("\"{}\"", x.item))
                             .unwrap_or("null".to_string());
-                        let arguments =
-                            format_arguments(&scalar_field.arguments, indentation_level + 1);
+                        let arguments = get_serialized_field_arguments(
+                            &scalar_field.arguments,
+                            indentation_level + 1,
+                        );
 
                         let indent_1 = "  ".repeat(indentation_level as usize);
                         let indent_2 = "  ".repeat((indentation_level + 1) as usize);
@@ -645,8 +647,10 @@ fn generate_reader_ast_node(
                             })
                             .expect("expect field to exist");
                         let resolver_field = schema.resolver(*resolver_field_id);
-                        let arguments =
-                            format_arguments(&scalar_field.arguments, indentation_level + 1);
+                        let arguments = get_serialized_field_arguments(
+                            &scalar_field.arguments,
+                            indentation_level + 1,
+                        );
                         let indent_1 = "  ".repeat(indentation_level as usize);
                         let indent_2 = "  ".repeat((indentation_level + 1) as usize);
                         let resolver_field_string =
@@ -693,7 +697,8 @@ fn generate_reader_ast_node(
                     indentation_level + 1,
                     nested_resolver_imports,
                 );
-                let arguments = format_arguments(&linked_field.arguments, indentation_level + 1);
+                let arguments =
+                    get_serialized_field_arguments(&linked_field.arguments, indentation_level + 1);
                 let indent_1 = "  ".repeat(indentation_level as usize);
                 let indent_2 = "  ".repeat((indentation_level + 1) as usize);
                 format!(
@@ -838,27 +843,6 @@ fn serialize_non_constant_value_for_graphql(value: &NonConstantValue) -> String 
 fn serialize_non_constant_value_for_js(value: &NonConstantValue) -> String {
     match value {
         NonConstantValue::Variable(variable_name) => format!("\"{}\"", variable_name),
-    }
-}
-
-fn format_arguments(
-    arguments: &[WithSpan<SelectionFieldArgument>],
-    indentation_level: u8,
-) -> String {
-    if arguments.is_empty() {
-        return "null".to_string();
-    } else {
-        let mut out_str = "{".to_string();
-        for argument in arguments {
-            out_str.push_str(&format!(
-                "\n{}\"{}\": {},",
-                "  ".repeat((indentation_level + 1) as usize),
-                argument.item.name.item,
-                serialize_non_constant_value_for_js(&argument.item.value.item)
-            ));
-        }
-        out_str.push_str(&format!("\n{}}}", "  ".repeat(indentation_level as usize)));
-        out_str
     }
 }
 
