@@ -29,14 +29,14 @@ impl<'schema> FetchableResolver<'schema> {
         );
 
         format!(
-            "import type {{IsographFetchableResolver, ReaderAst, FragmentReference}} from '@isograph/react';\n\
-            import {{ getRefRendererForName }} from '@isograph/react';\n\
+            "import type {{IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst}} from '@isograph/react';\n\
+            import {{getRefRendererForName}} from '@isograph/react';\n\
             {resolver_import_statement}\n\
             {nested_resolver_artifact_imports}\n\
             const queryText = '{query_text}';\n\n\
             // TODO support changing this,\n\
             export type ReadFromStoreType = ResolverParameterType;\n\n\
-            const normalizationAst = {normalization_ast};\n\
+            const normalizationAst: NormalizationAst = {normalization_ast};\n\
             const readerAst: ReaderAst<ReadFromStoreType> = {reader_ast};\n\n\
             export type ResolverParameterType = {resolver_parameter_type};\n\n\
             // The type, when returned from the resolver\n\

@@ -1,5 +1,5 @@
-import type {IsographFetchableResolver, ReaderAst, FragmentReference} from '@isograph/react';
-import { getRefRendererForName } from '@isograph/react';
+import type {IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst} from '@isograph/react';
+import {getRefRendererForName} from '@isograph/react';
 const resolver = x => x;
 import Query__header, { ReadOutType as Query__header__outputType } from './header.isograph';
 import Query__user_detail, { ReadOutType as Query__user_detail__outputType } from './user_detail.isograph';
@@ -41,7 +41,7 @@ const queryText = 'query user_page ($first: Int!, $userLogin: String!) {\
 // TODO support changing this,
 export type ReadFromStoreType = ResolverParameterType;
 
-const normalizationAst = [
+const normalizationAst: NormalizationAst = [
   {
     kind: "Linked",
     field_name: "user",

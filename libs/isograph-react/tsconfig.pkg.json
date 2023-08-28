@@ -4,7 +4,8 @@
     "outDir": "./dist/",
     "rootDir": "./src/",
     "declaration": true,
-    "jsx": "react"
+    "jsx": "react",
+    "lib": ["es2017", "DOM"]
   },
   "include": ["./**/*.ts", "./**/*.tsx"]
 }

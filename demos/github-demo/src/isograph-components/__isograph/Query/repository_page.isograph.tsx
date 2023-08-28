@@ -1,5 +1,5 @@
-import type {IsographFetchableResolver, ReaderAst, FragmentReference} from '@isograph/react';
-import { getRefRendererForName } from '@isograph/react';
+import type {IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst} from '@isograph/react';
+import {getRefRendererForName} from '@isograph/react';
 const resolver = x => x;
 import Query__header, { ReadOutType as Query__header__outputType } from './header.isograph';
 import Query__repository_detail, { ReadOutType as Query__repository_detail__outputType } from './repository_detail.isograph';
@@ -51,7 +51,7 @@ const queryText = 'query repository_page ($repositoryName: String!, $repositoryO
 // TODO support changing this,
 export type ReadFromStoreType = ResolverParameterType;
 
-const normalizationAst = [
+const normalizationAst: NormalizationAst = [
   {
     kind: "Linked",
     field_name: "repository",

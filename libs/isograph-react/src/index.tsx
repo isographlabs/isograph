@@ -22,7 +22,7 @@ export type IsographFetchableResolver<
 > = {
   kind: "FetchableResolver";
   queryText: string;
-  normalizationAst: any;
+  normalizationAst: NormalizationAST;
   readerAst: ReaderAst<TReadFromStore>;
   resolver: (data: TResolverProps) => TResolverResult;
   // TODO ReaderAst<TResolverProps> should contain the convert function
@@ -58,6 +58,8 @@ export type ReaderAstNode =
   | ReaderScalarField
   | ReaderLinkedField
   | ReaderResolverField;
+
+// @ts-ignore
 export type ReaderAst<TReadFromStore> = ReaderAstNode[];
 
 export type ReaderScalarField = {
@@ -83,6 +85,33 @@ export type ReaderResolverField = {
   arguments: Object | null;
 };
 
+export type NormalizationASTNode =
+  | NormalizationScalarField
+  | NormalizationLinkedField;
+// @ts-ignore
+export type NormalizationAST = NormalizationASTNode[];
+
+export type NormalizationScalarField = {
+  kind: "Scalar";
+  field_name: string;
+  alias: string | null;
+  arguments: Arguments | null;
+};
+
+export type NormalizationLinkedField = {
+  kind: "Linked";
+  field_name: string;
+  alias: string | null;
+  arguments: Arguments | null;
+  selections: NormalizationAST;
+};
+
+export type Arguments = Argument[];
+export type Argument = {
+  argument_name: string;
+  variable_name: string;
+};
+
 export type FragmentReference<
   TReadFromStore extends Object,
   TResolverProps,
@@ -101,7 +130,7 @@ export type FragmentReference<
 };
 
 export function iso<TResolverParameter, TResolverReturn = TResolverParameter>(
-  queryText: TemplateStringsArray
+  _queryText: TemplateStringsArray
 ): (
   x: ((param: TResolverParameter) => TResolverReturn) | void
 ) => (param: TResolverParameter) => TResolverReturn {
@@ -140,7 +169,11 @@ export function useLazyReference<
 } {
   // Typechecking fails here... TODO investigate
   const cache = getOrCreateCacheForUrl(artifact.queryText, variables);
+
+  // TODO add comment explaining why we never use this value
+  // @ts-ignore
   const data =
+    // @ts-ignore
     useLazyDisposableState<PromiseWrapper<TResolverResult>>(cache).state;
   return {
     queryReference: {
@@ -197,6 +230,8 @@ type ReadDataResult<TReadFromStore> =
     }
   | {
       kind: "MissingData";
+      reason: string;
+      nestedReason?: ReadDataResult<unknown>;
     };
 
 function readData<TReadFromStore>(
@@ -332,7 +367,7 @@ function readData<TReadFromStore>(
         } else if (field.variant === "Component") {
           // const data = readData(field.resolver.readerAst, root);
           const resolver_function = field.resolver.resolver;
-          target[field.alias] = (additionalRuntimeProps) => {
+          target[field.alias] = (additionalRuntimeProps: any) => {
             // TODO also incorporate field.type
             const RefReaderForName = getRefReaderForName(field.alias);
             return (
@@ -364,7 +399,7 @@ function readData<TReadFromStore>(
             //
             // lint rules will ameliorate this
             resolver: field.resolver.resolver ?? ((x) => x),
-            convert: (resolver, data) => resolver(data),
+            convert: (resolver: any, data: any) => resolver(data),
           };
           target[field.alias] = fragmentReference;
         }

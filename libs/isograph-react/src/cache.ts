@@ -33,11 +33,13 @@ function stableCopy<T>(value: T): T {
     return value;
   }
   if (Array.isArray(value)) {
+    // @ts-ignore
     return value.map(stableCopy);
   }
   const keys = Object.keys(value).sort();
   const stable: { [index: string]: any } = {};
   for (let i = 0; i < keys.length; i++) {
+    // @ts-ignore
     stable[keys[i]] = stableCopy(value[keys[i]]);
   }
   return stable as any;
@@ -106,7 +108,7 @@ export const store: { [index: DataId]: DataType } = {};
 export const ROOT_ID = "ROOT";
 
 function normalizeData(data: DataType, variables: Object) {
-  normalizeDataWithPath(data, ROOT_ID, variables);
+  normalizeDataWithPath(data, ROOT_ID, variables as any);
   console.log("after normalization", { store });
   callSubscriptions();
 }
