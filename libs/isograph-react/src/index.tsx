@@ -9,6 +9,7 @@ import {
   store,
   FIRST_SPLIT_KEY,
   SECOND_SPLIT_KEY,
+  getParentRecordKey,
 } from "./cache";
 import { useLazyDisposableState } from "@isograph/react-disposable-state";
 import { type PromiseWrapper } from "./PromiseWrapper";
@@ -125,7 +126,7 @@ export type FragmentReference<
   readerAst: ReaderAst<TReadFromStore>;
   root: DataId;
   resolver: (props: TResolverProps) => TResolverResult;
-  variables: Object | null;
+  variables: { [index: string]: string } | null;
   // TODO: We should instead have ReaderAst<TResolverProps>
   convert: (
     resolver: (data: TResolverProps) => TResolverResult,
@@ -201,7 +202,7 @@ export function read<
   const response = readData(
     reference.readerAst,
     reference.root,
-    reference.variables
+    reference.variables ?? {}
   );
   console.log("done reading", { response });
   if (response.kind === "MissingData") {
@@ -217,7 +218,7 @@ export function readButDoNotEvaluate<TReadFromStore extends Object>(
   const response = readData(
     reference.readerAst,
     reference.root,
-    reference.variables
+    reference.variables ?? {}
   );
   console.log("done reading but not evaluating", { response });
   if (response.kind === "MissingData") {
@@ -241,7 +242,7 @@ type ReadDataResult<TReadFromStore> =
 function readData<TReadFromStore>(
   ast: ReaderAst<TReadFromStore>,
   root: DataId,
-  variables: Object | null
+  variables: { [index: string]: string }
 ): ReadDataResult<TReadFromStore> {
   let storeRecord = store[root];
   if (storeRecord === undefined) {
@@ -257,11 +258,7 @@ function readData<TReadFromStore>(
   for (const field of ast) {
     switch (field.kind) {
       case "Scalar": {
-        const storeRecordName = getStoreFieldName(
-          field.fieldName,
-          field.arguments,
-          variables
-        );
+        const storeRecordName = getParentRecordKey(field, variables);
         const value = storeRecord[storeRecordName];
         // TODO consider making scalars into discriminated unions. This probably has
         // to happen for when we handle errors.
@@ -275,11 +272,7 @@ function readData<TReadFromStore>(
         break;
       }
       case "Linked": {
-        const storeRecordName = getStoreFieldName(
-          field.fieldName,
-          field.arguments,
-          variables
-        );
+        const storeRecordName = getParentRecordKey(field, variables);
         const value = storeRecord[storeRecordName];
         if (Array.isArray(value)) {
           const results = [];
@@ -501,30 +494,3 @@ export function getRefRendererForName(name: string) {
 export type IsographComponentProps<TDataType, TOtherProps = Object> = {
   data: TDataType;
 } & TOtherProps;
-
-// TODO can we re-use a function from ./cache?
-function getStoreFieldName(
-  name: string,
-  args: Arguments | null,
-  variables: { [index: string]: any } | null
-): string {
-  if (args === null) {
-    return name;
-  }
-
-  if (variables == null) {
-    throw new Error("Variables must be defined if arguments is not null");
-  }
-
-  let out = name;
-  for (const arg of args) {
-    const valueToUse = variables[arg.variableName];
-    if (valueToUse == null) {
-      throw new Error("Undefined variable " + arg.variableName);
-    }
-    out =
-      out + FIRST_SPLIT_KEY + arg.argumentName + SECOND_SPLIT_KEY + valueToUse;
-  }
-
-  return out;
-}

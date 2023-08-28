@@ -10,6 +10,8 @@ import {
   NormalizationAST,
   NormalizationLinkedField,
   NormalizationScalarField,
+  ReaderLinkedField,
+  ReaderScalarField,
 } from "./index";
 
 const cache: { [index: string]: ParentCache<any> } = {};
@@ -352,8 +354,12 @@ function isScalarButNotEmptyArray(
   return isScalarValue;
 }
 
-function getParentRecordKey(
-  astNode: NormalizationLinkedField | NormalizationScalarField,
+export function getParentRecordKey(
+  astNode:
+    | NormalizationLinkedField
+    | NormalizationScalarField
+    | ReaderLinkedField
+    | ReaderScalarField,
   variables: { [index: string]: string }
 ): string {
   let parentRecordKey = astNode.fieldName;
@@ -369,7 +375,7 @@ function getParentRecordKey(
   return parentRecordKey;
 }
 
-export function getNetworkResponseKey(
+function getNetworkResponseKey(
   astNode: NormalizationLinkedField | NormalizationScalarField
 ): string {
   let networkResponseKey = astNode.fieldName;
