@@ -400,7 +400,7 @@ function getDataIdOfNetworkResponse(
   astNode: NormalizationLinkedField | NormalizationScalarField,
   variables: { [index: string]: string },
   index?: number
-): string {
+): DataId {
   // Check whether the dataToNormalize has an id field. If so, that is the key.
   // If not, we construct an id from the parentRecordId and the field parameters.
 
