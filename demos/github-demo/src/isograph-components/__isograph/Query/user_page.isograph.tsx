@@ -47,8 +47,8 @@ const normalizationAst: NormalizationAst = [
     fieldName: "user",
     arguments: [
       {
-        argument_name: "login",
-        variable_name: "userLogin",
+        argumentName: "login",
+        variableName: "userLogin",
       },
     ],
     selections: [
@@ -67,8 +67,8 @@ const normalizationAst: NormalizationAst = [
         fieldName: "repositories",
         arguments: [
           {
-            argument_name: "last",
-            variable_name: "first",
+            argumentName: "last",
+            variableName: "first",
           },
         ],
         selections: [
@@ -129,8 +129,8 @@ const normalizationAst: NormalizationAst = [
                     fieldName: "pullRequests",
                     arguments: [
                       {
-                        argument_name: "first",
-                        variable_name: "first",
+                        argumentName: "first",
+                        variableName: "first",
                       },
                     ],
                     selections: [
@@ -151,8 +151,8 @@ const normalizationAst: NormalizationAst = [
                     fieldName: "watchers",
                     arguments: [
                       {
-                        argument_name: "first",
-                        variable_name: "first",
+                        argumentName: "first",
+                        variableName: "first",
                       },
                     ],
                     selections: [

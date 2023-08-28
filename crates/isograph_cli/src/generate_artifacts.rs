@@ -818,8 +818,8 @@ fn get_serialized_field_arguments(
         s.push_str(&format!(
             "\n\
             {indent_1}{{\n\
-            {indent_2}argument_name: \"{argument_name}\",\n\
-            {indent_2}variable_name: {non_constant_value_for_js},\n\
+            {indent_2}argumentName: \"{argument_name}\",\n\
+            {indent_2}variableName: {non_constant_value_for_js},\n\
             {indent_1}}},\n",
         ));
     }

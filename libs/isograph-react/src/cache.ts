@@ -360,9 +360,9 @@ function getParentRecordKey(
   const fieldParameters = astNode.arguments;
   if (fieldParameters != null) {
     for (const fieldParameter of fieldParameters) {
-      const { argument_name, variable_name } = fieldParameter;
-      const valueToUse = variables[variable_name];
-      parentRecordKey += `${FIRST_SPLIT_KEY}${argument_name}${SECOND_SPLIT_KEY}${valueToUse}`;
+      const { argumentName, variableName } = fieldParameter;
+      const valueToUse = variables[variableName];
+      parentRecordKey += `${FIRST_SPLIT_KEY}${argumentName}${SECOND_SPLIT_KEY}${valueToUse}`;
     }
   }
 
@@ -376,8 +376,8 @@ function getNetworkResponseKey(
   const fieldParameters = astNode.arguments;
   if (fieldParameters != null) {
     for (const fieldParameter of fieldParameters) {
-      const { argument_name, variable_name } = fieldParameter;
-      networkResponseKey += `${FIRST_SPLIT_KEY}${argument_name}${SECOND_SPLIT_KEY}${variable_name}`;
+      const { argumentName, variableName } = fieldParameter;
+      networkResponseKey += `${FIRST_SPLIT_KEY}${argumentName}${SECOND_SPLIT_KEY}${variableName}`;
     }
   }
   return networkResponseKey;
@@ -414,9 +414,9 @@ function getDataIdOfNetworkResponse(
   }
 
   for (const fieldParameter of fieldParameters) {
-    const { argument_name, variable_name } = fieldParameter;
-    const valueToUse = variables[variable_name];
-    storeKey += `${FIRST_SPLIT_KEY}${argument_name}${SECOND_SPLIT_KEY}${valueToUse}`;
+    const { argumentName, variableName } = fieldParameter;
+    const valueToUse = variables[variableName];
+    storeKey += `${FIRST_SPLIT_KEY}${argumentName}${SECOND_SPLIT_KEY}${valueToUse}`;
   }
   return storeKey;
 }

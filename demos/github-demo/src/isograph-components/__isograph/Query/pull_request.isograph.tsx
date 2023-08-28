@@ -41,13 +41,13 @@ const normalizationAst: NormalizationAst = [
     fieldName: "repository",
     arguments: [
       {
-        argument_name: "owner",
-        variable_name: "repositoryOwner",
+        argumentName: "owner",
+        variableName: "repositoryOwner",
       },
 
       {
-        argument_name: "name",
-        variable_name: "repositoryName",
+        argumentName: "name",
+        variableName: "repositoryName",
       },
     ],
     selections: [
@@ -61,8 +61,8 @@ const normalizationAst: NormalizationAst = [
         fieldName: "pullRequest",
         arguments: [
           {
-            argument_name: "number",
-            variable_name: "pullRequestNumber",
+            argumentName: "number",
+            variableName: "pullRequestNumber",
           },
         ],
         selections: [
@@ -81,8 +81,8 @@ const normalizationAst: NormalizationAst = [
             fieldName: "comments",
             arguments: [
               {
-                argument_name: "last",
-                variable_name: "last",
+                argumentName: "last",
+                variableName: "last",
               },
             ],
             selections: [

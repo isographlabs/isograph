@@ -112,8 +112,8 @@ export type NormalizationLinkedField = {
 
 export type Arguments = Argument[];
 export type Argument = {
-  argument_name: string;
-  variable_name: string;
+  argumentName: string;
+  variableName: string;
 };
 
 export type FragmentReference<

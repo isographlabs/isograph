@@ -69,8 +69,8 @@ const normalizationAst: NormalizationAst = [
         fieldName: "repositories",
         arguments: [
           {
-            argument_name: "last",
-            variable_name: "first",
+            argumentName: "last",
+            variableName: "first",
           },
         ],
         selections: [
@@ -131,8 +131,8 @@ const normalizationAst: NormalizationAst = [
                     fieldName: "pullRequests",
                     arguments: [
                       {
-                        argument_name: "first",
-                        variable_name: "first",
+                        argumentName: "first",
+                        variableName: "first",
                       },
                     ],
                     selections: [
@@ -153,8 +153,8 @@ const normalizationAst: NormalizationAst = [
                     fieldName: "watchers",
                     arguments: [
                       {
-                        argument_name: "first",
-                        variable_name: "first",
+                        argumentName: "first",
+                        variableName: "first",
                       },
                     ],
                     selections: [
