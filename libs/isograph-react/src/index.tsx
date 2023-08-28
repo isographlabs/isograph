@@ -7,8 +7,6 @@ import {
   getOrCreateCacheForArtifact,
   onNextChange,
   store,
-  FIRST_SPLIT_KEY,
-  SECOND_SPLIT_KEY,
   getParentRecordKey,
 } from "./cache";
 import { useLazyDisposableState } from "@isograph/react-disposable-state";

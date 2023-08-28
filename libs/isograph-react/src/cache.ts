@@ -5,7 +5,6 @@ import {
 } from "@isograph/react-disposable-state";
 import { PromiseWrapper, wrapPromise } from "./PromiseWrapper";
 import {
-  Arguments,
   IsographFetchableResolver,
   NormalizationAST,
   NormalizationLinkedField,
