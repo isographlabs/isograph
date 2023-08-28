@@ -41,37 +41,37 @@ export type ReadFromStoreType = ResolverParameterType;
 const normalizationAst: NormalizationAst = [
   {
     kind: "Linked",
-    field_name: "viewer",
+    fieldName: "viewer",
     alias: null,
     arguments: null,
     selections: [
       {
         kind: "Scalar",
-        field_name: "avatarUrl",
+        fieldName: "avatarUrl",
         alias: null,
         arguments: null,
       },
       {
         kind: "Scalar",
-        field_name: "id",
+        fieldName: "id",
         alias: null,
         arguments: null,
       },
       {
         kind: "Scalar",
-        field_name: "login",
+        fieldName: "login",
         alias: null,
         arguments: null,
       },
       {
         kind: "Scalar",
-        field_name: "name",
+        fieldName: "name",
         alias: null,
         arguments: null,
       },
       {
         kind: "Linked",
-        field_name: "repositories",
+        fieldName: "repositories",
         alias: "repositories____last___first",
         arguments: [
           {
@@ -82,61 +82,61 @@ const normalizationAst: NormalizationAst = [
         selections: [
           {
             kind: "Linked",
-            field_name: "edges",
+            fieldName: "edges",
             alias: null,
             arguments: null,
             selections: [
               {
                 kind: "Linked",
-                field_name: "node",
+                fieldName: "node",
                 alias: null,
                 arguments: null,
                 selections: [
                   {
                     kind: "Scalar",
-                    field_name: "id",
+                    fieldName: "id",
                     alias: null,
                     arguments: null,
                   },
                   {
                     kind: "Scalar",
-                    field_name: "description",
+                    fieldName: "description",
                     alias: null,
                     arguments: null,
                   },
                   {
                     kind: "Scalar",
-                    field_name: "forkCount",
+                    fieldName: "forkCount",
                     alias: null,
                     arguments: null,
                   },
                   {
                     kind: "Scalar",
-                    field_name: "name",
+                    fieldName: "name",
                     alias: null,
                     arguments: null,
                   },
                   {
                     kind: "Scalar",
-                    field_name: "nameWithOwner",
+                    fieldName: "nameWithOwner",
                     alias: null,
                     arguments: null,
                   },
                   {
                     kind: "Linked",
-                    field_name: "owner",
+                    fieldName: "owner",
                     alias: null,
                     arguments: null,
                     selections: [
                       {
                         kind: "Scalar",
-                        field_name: "id",
+                        fieldName: "id",
                         alias: null,
                         arguments: null,
                       },
                       {
                         kind: "Scalar",
-                        field_name: "login",
+                        fieldName: "login",
                         alias: null,
                         arguments: null,
                       },
@@ -144,7 +144,7 @@ const normalizationAst: NormalizationAst = [
                   },
                   {
                     kind: "Linked",
-                    field_name: "pullRequests",
+                    fieldName: "pullRequests",
                     alias: "pullRequests____first___first",
                     arguments: [
                       {
@@ -155,7 +155,7 @@ const normalizationAst: NormalizationAst = [
                     selections: [
                       {
                         kind: "Scalar",
-                        field_name: "totalCount",
+                        fieldName: "totalCount",
                         alias: null,
                         arguments: null,
                       },
@@ -163,13 +163,13 @@ const normalizationAst: NormalizationAst = [
                   },
                   {
                     kind: "Scalar",
-                    field_name: "stargazerCount",
+                    fieldName: "stargazerCount",
                     alias: null,
                     arguments: null,
                   },
                   {
                     kind: "Linked",
-                    field_name: "watchers",
+                    fieldName: "watchers",
                     alias: "watchers____first___first",
                     arguments: [
                       {
@@ -180,7 +180,7 @@ const normalizationAst: NormalizationAst = [
                     selections: [
                       {
                         kind: "Scalar",
-                        field_name: "totalCount",
+                        fieldName: "totalCount",
                         alias: null,
                         arguments: null,
                       },

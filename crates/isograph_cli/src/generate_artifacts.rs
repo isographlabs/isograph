@@ -752,7 +752,7 @@ fn generate_normalization_ast_node(
             format!(
                 "{indent}{{\n\
                 {indent_2}kind: \"Scalar\",\n\
-                {indent_2}field_name: \"{name}\",\n\
+                {indent_2}fieldName: \"{name}\",\n\
                 {indent_2}alias: {normalization_alias},\n\
                 {indent_2}arguments: {serialized_arguments},\n\
                 {indent}}},\n"
@@ -779,7 +779,7 @@ fn generate_normalization_ast_node(
             format!(
                 "{indent}{{\n\
                 {indent_2}kind: \"Linked\",\n\
-                {indent_2}field_name: \"{name}\",\n\
+                {indent_2}fieldName: \"{name}\",\n\
                 {indent_2}alias: {normalization_alias},\n\
                 {indent_2}arguments: {serialized_arguments},\n\
                 {indent_2}selections: {selections},\n\

@@ -38,7 +38,7 @@ export type ReadFromStoreType = ResolverParameterType;
 const normalizationAst: NormalizationAst = [
   {
     kind: "Linked",
-    field_name: "repository",
+    fieldName: "repository",
     alias: "repository____owner___repositoryOwner____name___repositoryName",
     arguments: [
       {
@@ -54,13 +54,13 @@ const normalizationAst: NormalizationAst = [
     selections: [
       {
         kind: "Scalar",
-        field_name: "id",
+        fieldName: "id",
         alias: null,
         arguments: null,
       },
       {
         kind: "Linked",
-        field_name: "pullRequest",
+        fieldName: "pullRequest",
         alias: "pullRequest____number___pullRequestNumber",
         arguments: [
           {
@@ -71,19 +71,19 @@ const normalizationAst: NormalizationAst = [
         selections: [
           {
             kind: "Scalar",
-            field_name: "id",
+            fieldName: "id",
             alias: null,
             arguments: null,
           },
           {
             kind: "Scalar",
-            field_name: "bodyHTML",
+            fieldName: "bodyHTML",
             alias: null,
             arguments: null,
           },
           {
             kind: "Linked",
-            field_name: "comments",
+            fieldName: "comments",
             alias: "comments____last___last",
             arguments: [
               {
@@ -94,31 +94,31 @@ const normalizationAst: NormalizationAst = [
             selections: [
               {
                 kind: "Linked",
-                field_name: "edges",
+                fieldName: "edges",
                 alias: null,
                 arguments: null,
                 selections: [
                   {
                     kind: "Linked",
-                    field_name: "node",
+                    fieldName: "node",
                     alias: null,
                     arguments: null,
                     selections: [
                       {
                         kind: "Scalar",
-                        field_name: "id",
+                        fieldName: "id",
                         alias: null,
                         arguments: null,
                       },
                       {
                         kind: "Linked",
-                        field_name: "author",
+                        fieldName: "author",
                         alias: null,
                         arguments: null,
                         selections: [
                           {
                             kind: "Scalar",
-                            field_name: "login",
+                            fieldName: "login",
                             alias: null,
                             arguments: null,
                           },
@@ -126,13 +126,13 @@ const normalizationAst: NormalizationAst = [
                       },
                       {
                         kind: "Scalar",
-                        field_name: "bodyText",
+                        fieldName: "bodyText",
                         alias: null,
                         arguments: null,
                       },
                       {
                         kind: "Scalar",
-                        field_name: "createdAt",
+                        fieldName: "createdAt",
                         alias: null,
                         arguments: null,
                       },
@@ -144,7 +144,7 @@ const normalizationAst: NormalizationAst = [
           },
           {
             kind: "Scalar",
-            field_name: "title",
+            fieldName: "title",
             alias: null,
             arguments: null,
           },
@@ -154,25 +154,25 @@ const normalizationAst: NormalizationAst = [
   },
   {
     kind: "Linked",
-    field_name: "viewer",
+    fieldName: "viewer",
     alias: null,
     arguments: null,
     selections: [
       {
         kind: "Scalar",
-        field_name: "id",
+        fieldName: "id",
         alias: null,
         arguments: null,
       },
       {
         kind: "Scalar",
-        field_name: "avatarUrl",
+        fieldName: "avatarUrl",
         alias: null,
         arguments: null,
       },
       {
         kind: "Scalar",
-        field_name: "name",
+        fieldName: "name",
         alias: null,
         arguments: null,
       },

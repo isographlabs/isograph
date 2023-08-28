@@ -356,7 +356,7 @@ function getParentRecordKey(
   astNode: NormalizationLinkedField | NormalizationScalarField,
   variables: { [index: string]: string }
 ): string {
-  let parentRecordKey = astNode.field_name;
+  let parentRecordKey = astNode.fieldName;
   const fieldParameters = astNode.arguments;
   if (fieldParameters != null) {
     for (const fieldParameter of fieldParameters) {
@@ -372,7 +372,7 @@ function getParentRecordKey(
 function getNetworkResponseKey(
   astNode: NormalizationLinkedField | NormalizationScalarField
 ): string {
-  let networkResponseKey = astNode.field_name;
+  let networkResponseKey = astNode.fieldName;
   const fieldParameters = astNode.arguments;
   if (fieldParameters != null) {
     for (const fieldParameter of fieldParameters) {
@@ -403,7 +403,7 @@ function getDataIdOfNetworkResponse(
     return dataId;
   }
 
-  let storeKey = `${parentRecordId}.${astNode.field_name}`;
+  let storeKey = `${parentRecordId}.${astNode.fieldName}`;
   if (index != null) {
     storeKey += `.${index}`;
   }
