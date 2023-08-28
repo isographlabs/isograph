@@ -10,7 +10,6 @@ use common_lang_types::{
     UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{ListTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation};
-use intern::Lookup;
 use isograph_lang_types::{
     NonConstantValue, ObjectId, OutputTypeId, Selection, SelectionFieldArgument,
     ServerFieldSelection,
@@ -737,23 +736,17 @@ fn generate_normalization_ast_node(
     match &item.item {
         MergedServerFieldSelection::ScalarField(scalar_field) => {
             let MergedScalarFieldSelection {
-                name,
-                normalization_alias,
-                arguments,
+                name, arguments, ..
             } = scalar_field;
             let indent = "  ".repeat(indentation_level as usize);
             let indent_2 = "  ".repeat((indentation_level + 1) as usize);
             let serialized_arguments =
                 get_serialized_field_arguments(arguments, indentation_level + 1);
-            let normalization_alias = normalization_alias
-                .map(|x| format!("\"{}\"", x.item.lookup()))
-                .unwrap_or("null".to_string());
 
             format!(
                 "{indent}{{\n\
                 {indent_2}kind: \"Scalar\",\n\
                 {indent_2}fieldName: \"{name}\",\n\
-                {indent_2}alias: {normalization_alias},\n\
                 {indent_2}arguments: {serialized_arguments},\n\
                 {indent}}},\n"
             )
@@ -761,9 +754,9 @@ fn generate_normalization_ast_node(
         MergedServerFieldSelection::LinkedField(linked_field) => {
             let MergedLinkedFieldSelection {
                 name,
-                normalization_alias,
                 selection_set,
                 arguments,
+                ..
             } = linked_field;
             let indent = "  ".repeat(indentation_level as usize);
             let indent_2 = "  ".repeat((indentation_level + 1) as usize);
@@ -772,15 +765,11 @@ fn generate_normalization_ast_node(
 
             let selections =
                 generate_normalization_ast(schema, selection_set, indentation_level + 1);
-            let normalization_alias = normalization_alias
-                .map(|x| format!("\"{}\"", x.item.lookup()))
-                .unwrap_or("null".to_string());
 
             format!(
                 "{indent}{{\n\
                 {indent_2}kind: \"Linked\",\n\
                 {indent_2}fieldName: \"{name}\",\n\
-                {indent_2}alias: {normalization_alias},\n\
                 {indent_2}arguments: {serialized_arguments},\n\
                 {indent_2}selections: {selections},\n\
                 {indent}}},\n"

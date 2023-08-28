@@ -45,7 +45,6 @@ const normalizationAst: NormalizationAst = [
   {
     kind: "Linked",
     fieldName: "user",
-    alias: "user____login___userLogin",
     arguments: [
       {
         argument_name: "login",
@@ -56,19 +55,16 @@ const normalizationAst: NormalizationAst = [
       {
         kind: "Scalar",
         fieldName: "id",
-        alias: null,
         arguments: null,
       },
       {
         kind: "Scalar",
         fieldName: "name",
-        alias: null,
         arguments: null,
       },
       {
         kind: "Linked",
         fieldName: "repositories",
-        alias: "repositories____last___first",
         arguments: [
           {
             argument_name: "last",
@@ -79,61 +75,51 @@ const normalizationAst: NormalizationAst = [
           {
             kind: "Linked",
             fieldName: "edges",
-            alias: null,
             arguments: null,
             selections: [
               {
                 kind: "Linked",
                 fieldName: "node",
-                alias: null,
                 arguments: null,
                 selections: [
                   {
                     kind: "Scalar",
                     fieldName: "id",
-                    alias: null,
                     arguments: null,
                   },
                   {
                     kind: "Scalar",
                     fieldName: "description",
-                    alias: null,
                     arguments: null,
                   },
                   {
                     kind: "Scalar",
                     fieldName: "forkCount",
-                    alias: null,
                     arguments: null,
                   },
                   {
                     kind: "Scalar",
                     fieldName: "name",
-                    alias: null,
                     arguments: null,
                   },
                   {
                     kind: "Scalar",
                     fieldName: "nameWithOwner",
-                    alias: null,
                     arguments: null,
                   },
                   {
                     kind: "Linked",
                     fieldName: "owner",
-                    alias: null,
                     arguments: null,
                     selections: [
                       {
                         kind: "Scalar",
                         fieldName: "id",
-                        alias: null,
                         arguments: null,
                       },
                       {
                         kind: "Scalar",
                         fieldName: "login",
-                        alias: null,
                         arguments: null,
                       },
                     ],
@@ -141,7 +127,6 @@ const normalizationAst: NormalizationAst = [
                   {
                     kind: "Linked",
                     fieldName: "pullRequests",
-                    alias: "pullRequests____first___first",
                     arguments: [
                       {
                         argument_name: "first",
@@ -152,7 +137,6 @@ const normalizationAst: NormalizationAst = [
                       {
                         kind: "Scalar",
                         fieldName: "totalCount",
-                        alias: null,
                         arguments: null,
                       },
                     ],
@@ -160,13 +144,11 @@ const normalizationAst: NormalizationAst = [
                   {
                     kind: "Scalar",
                     fieldName: "stargazerCount",
-                    alias: null,
                     arguments: null,
                   },
                   {
                     kind: "Linked",
                     fieldName: "watchers",
-                    alias: "watchers____first___first",
                     arguments: [
                       {
                         argument_name: "first",
@@ -177,7 +159,6 @@ const normalizationAst: NormalizationAst = [
                       {
                         kind: "Scalar",
                         fieldName: "totalCount",
-                        alias: null,
                         arguments: null,
                       },
                     ],
@@ -193,25 +174,21 @@ const normalizationAst: NormalizationAst = [
   {
     kind: "Linked",
     fieldName: "viewer",
-    alias: null,
     arguments: null,
     selections: [
       {
         kind: "Scalar",
         fieldName: "id",
-        alias: null,
         arguments: null,
       },
       {
         kind: "Scalar",
         fieldName: "avatarUrl",
-        alias: null,
         arguments: null,
       },
       {
         kind: "Scalar",
         fieldName: "name",
-        alias: null,
         arguments: null,
       },
     ],

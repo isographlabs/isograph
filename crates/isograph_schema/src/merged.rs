@@ -30,6 +30,7 @@ pub enum MergedServerFieldSelection {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct MergedScalarFieldSelection {
     pub name: WithSpan<ScalarFieldName>,
+    // TODO calculate this when needed
     pub normalization_alias: Option<WithSpan<ScalarFieldAlias>>,
     pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
 }
@@ -37,6 +38,7 @@ pub struct MergedScalarFieldSelection {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct MergedLinkedFieldSelection {
     pub name: WithSpan<LinkedFieldName>,
+    // TODO calculate this when needed
     pub normalization_alias: Option<WithSpan<LinkedFieldAlias>>,
     pub selection_set: Vec<WithSpan<MergedServerFieldSelection>>,
     pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
