@@ -1,12 +1,14 @@
 import {
   DataId,
-  DataType,
+  StoreRecord,
   DataTypeValue,
   Link,
   ROOT_ID,
-  getOrCreateCacheForUrl,
+  getOrCreateCacheForArtifact,
   onNextChange,
   store,
+  FIRST_SPLIT_KEY,
+  SECOND_SPLIT_KEY,
 } from "./cache";
 import { useLazyDisposableState } from "@isograph/react-disposable-state";
 import { type PromiseWrapper } from "./PromiseWrapper";
@@ -94,6 +96,7 @@ export type NormalizationAST = NormalizationASTNode[];
 export type NormalizationScalarField = {
   kind: "Scalar";
   field_name: string;
+  // TODO consider getting rid of, and always deriving this from arguments
   alias: string | null;
   arguments: Arguments | null;
 };
@@ -101,6 +104,7 @@ export type NormalizationScalarField = {
 export type NormalizationLinkedField = {
   kind: "Linked";
   field_name: string;
+  // TODO consider getting rid of, and always deriving this from arguments
   alias: string | null;
   arguments: Arguments | null;
   selections: NormalizationAST;
@@ -168,7 +172,7 @@ export function useLazyReference<
   >;
 } {
   // Typechecking fails here... TODO investigate
-  const cache = getOrCreateCacheForUrl(artifact.queryText, variables);
+  const cache = getOrCreateCacheForArtifact(artifact, variables);
 
   // TODO add comment explaining why we never use this value
   // @ts-ignore
@@ -242,6 +246,10 @@ function readData<TReadFromStore>(
   let storeRecord = store[root];
   if (storeRecord === undefined) {
     return { kind: "MissingData", reason: "No record for root " + root };
+  }
+
+  if (storeRecord === null) {
+    return { kind: "Success", data: null as any };
   }
 
   let target: { [index: string]: any } = {};
@@ -411,7 +419,7 @@ function readData<TReadFromStore>(
 }
 
 function HACK_missingFieldHandler(
-  storeRecord: DataType,
+  storeRecord: StoreRecord,
   root: DataId,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
@@ -494,6 +502,7 @@ export type IsographComponentProps<TDataType, TOtherProps = Object> = {
   data: TDataType;
 } & TOtherProps;
 
+// TODO can we re-use a function from ./cache?
 function getStoreFieldName(
   name: string,
   args: { [index: string]: any } | null,
@@ -517,7 +526,8 @@ function getStoreFieldName(
       if (variables[args[key]] == null) {
         throw new Error("Undefined variable " + args[key]);
       }
-      out = out + "__" + key + "_" + variables[args[key]];
+      out =
+        out + FIRST_SPLIT_KEY + key + SECOND_SPLIT_KEY + variables[args[key]];
     }
     return out;
   }

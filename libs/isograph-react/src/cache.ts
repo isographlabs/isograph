@@ -4,6 +4,13 @@ import {
   ParentCache,
 } from "@isograph/react-disposable-state";
 import { PromiseWrapper, wrapPromise } from "./PromiseWrapper";
+import {
+  Arguments,
+  IsographFetchableResolver,
+  NormalizationAST,
+  NormalizationLinkedField,
+  NormalizationScalarField,
+} from "./index";
 
 const cache: { [index: string]: ParentCache<any> } = {};
 
@@ -45,13 +52,15 @@ function stableCopy<T>(value: T): T {
   return stable as any;
 }
 
-export function getOrCreateCacheForUrl<T>(
-  queryText: string,
+type IsoResolver = IsographFetchableResolver<any, any, any>;
+
+export function getOrCreateCacheForArtifact<T>(
+  artifact: IsoResolver,
   variables: object
 ): ParentCache<PromiseWrapper<T>> {
-  const cacheKey = queryText + JSON.stringify(stableCopy(variables));
+  const cacheKey = artifact.queryText + JSON.stringify(stableCopy(variables));
   const factory: Factory<PromiseWrapper<T>> = () =>
-    makeNetworkRequest<T>(queryText, variables);
+    makeNetworkRequest<T>(artifact, variables);
   return getOrCreateCache<PromiseWrapper<T>>(cacheKey, factory);
 }
 
@@ -63,7 +72,7 @@ export function setNetwork(newNetwork: typeof network) {
 }
 
 function makeNetworkRequest<T>(
-  queryText: string,
+  artifact: IsoResolver,
   variables: object
 ): ItemCleanupPair<PromiseWrapper<T>> {
   if (network == null) {
@@ -71,10 +80,12 @@ function makeNetworkRequest<T>(
   }
 
   console.log("making network request", variables);
-  const promise = network(queryText, variables).then((networkResponse) => {
-    normalizeData(networkResponse.data, variables);
-    return networkResponse.data;
-  });
+  const promise = network(artifact.queryText, variables).then(
+    (networkResponse) => {
+      normalizeData(artifact.normalizationAst, networkResponse.data, variables);
+      return networkResponse.data;
+    }
+  );
 
   const wrapper = wrapPromise(promise);
 
@@ -91,24 +102,62 @@ export type Link = {
   __link: DataId;
 };
 export type DataTypeValue =
-  | string
+  // N.B. undefined is here to support optional id's, but
+  // undefined should not *actually* be present in the store.
   | undefined
-  | DataId
+  // Singular scalar fields:
+  | number
+  | boolean
+  | string
+  | null
+  // Singular linked fields:
   | Link
+  // Plural scalar and linked fields:
   | DataTypeValue[];
 
-export type DataType = {
+export type StoreRecord = {
   [index: DataId | string]: DataTypeValue;
+  // TODO __typename?: T, which is restricted to being a concrete string
+  // TODO this shouldn't always be named id
   id?: DataId;
 };
+
 export type DataId = string;
 
-export const store: { [index: DataId]: DataType } = {};
+export const ROOT_ID: DataId & "__ROOT" = "__ROOT";
+export const store: {
+  [index: DataId]: StoreRecord | null;
+  __ROOT: StoreRecord;
+} = {
+  __ROOT: {},
+};
 
-export const ROOT_ID = "ROOT";
+type NetworkResponseScalarValue = string | number | boolean;
+type NetworkResponseValue =
+  | NetworkResponseScalarValue
+  | null
+  | NetworkResponseObject
+  | NetworkResponseObject[]
+  | NetworkResponseScalarValue[];
+type NetworkResponseObject = {
+  // N.B. undefined is here to support optional id's, but
+  // undefined should not *actually* be present in the network response.
+  [index: string]: undefined | NetworkResponseValue;
+  id?: DataId;
+};
 
-function normalizeData(data: DataType, variables: Object) {
-  normalizeDataWithPath(data, ROOT_ID, variables as any);
+function normalizeData(
+  normalizationAst: NormalizationAST,
+  networkResponse: NetworkResponseObject,
+  variables: Object
+) {
+  normalizeDataIntoRecord(
+    normalizationAst,
+    networkResponse,
+    store.__ROOT,
+    ROOT_ID,
+    variables as any
+  );
   console.log("after normalization", { store });
   callSubscriptions();
 }
@@ -133,97 +182,241 @@ function callSubscriptions() {
   subscriptions.forEach((callback) => callback());
 }
 
-function normalizeDataWithPath(
-  dataToNormalize: DataType,
-  parentId: string,
+/**
+ * Mutate targetParentRecord according to the normalizationAst and networkResponseParentRecord.
+ */
+function normalizeDataIntoRecord(
+  normalizationAst: NormalizationAST,
+  networkResponseParentRecord: NetworkResponseObject,
+  targetParentRecord: StoreRecord,
+  targetParentRecordId: DataId,
   variables: { [index: string]: string }
-): DataId {
-  const dataId = dataToNormalize["id"] ?? parentId;
-  const targetRecord: DataType = store[dataId] ?? {};
-  store[dataId] = targetRecord;
-
-  Object.keys(dataToNormalize).forEach((networkResponseKey) => {
-    const storeKey = HACK_get_store_key(networkResponseKey, variables);
-    targetRecord[storeKey] = getFieldOrNormalize(
-      dataToNormalize[networkResponseKey],
-      `${dataId ?? parentId}.${storeKey}`,
-      variables
-    );
-  });
-
-  return dataId;
+) {
+  for (const normalizationNode of normalizationAst) {
+    switch (normalizationNode.kind) {
+      case "Scalar": {
+        normalizeScalarField(
+          normalizationNode,
+          networkResponseParentRecord,
+          targetParentRecord,
+          variables
+        );
+        break;
+      }
+      case "Linked": {
+        normalizeLinkedField(
+          normalizationNode,
+          networkResponseParentRecord,
+          targetParentRecord,
+          targetParentRecordId,
+          variables
+        );
+        break;
+      }
+    }
+  }
 }
 
-// Normalizes + returns the value that we want to store in the record
-function getFieldOrNormalize(
-  dataToNormalize: DataTypeValue,
-  idOrPathToRecord: string,
+function normalizeScalarField(
+  astNode: NormalizationScalarField,
+  networkResponseParentRecord: NetworkResponseObject,
+  targetStoreRecord: StoreRecord,
   variables: { [index: string]: string }
-): DataTypeValue {
+) {
+  const networkResponseKey = getNetworkResponseKey(astNode);
+  const networkResponseData = networkResponseParentRecord[networkResponseKey];
+  const parentRecordKey = getParentRecordKey(astNode, variables);
+
   if (
-    typeof dataToNormalize === "string" ||
-    typeof dataToNormalize === "number" ||
-    typeof dataToNormalize === "boolean" ||
-    dataToNormalize == null
+    networkResponseData == null ||
+    isScalarOrEmptyArray(networkResponseData)
   ) {
-    return dataToNormalize;
+    targetStoreRecord[parentRecordKey] = networkResponseData;
+  } else {
+    throw new Error("Unexpected object array when normalizing scalar");
   }
-  if (Array.isArray(dataToNormalize)) {
-    return dataToNormalize.map((item, index) =>
-      getFieldOrNormalize(item, `${idOrPathToRecord}.${index}`, variables)
+}
+
+/**
+ * Mutate targetParentRecord with a given linked field ast node.
+ */
+function normalizeLinkedField(
+  astNode: NormalizationLinkedField,
+  networkResponseParentRecord: NetworkResponseObject,
+  targetParentRecord: StoreRecord,
+  targetParentRecordId: DataId,
+  variables: { [index: string]: string }
+) {
+  const networkResponseKey = getNetworkResponseKey(astNode);
+  const networkResponseData = networkResponseParentRecord[networkResponseKey];
+  const parentRecordKey = getParentRecordKey(astNode, variables);
+
+  if (networkResponseData == null) {
+    targetParentRecord[parentRecordKey] = null;
+    return;
+  }
+
+  if (isScalarButNotEmptyArray(networkResponseData)) {
+    throw new Error(
+      "Unexpected scalar network response when normalizing a linked field"
     );
   }
 
-  const dataId = normalizeDataWithPath(
-    dataToNormalize,
-    idOrPathToRecord,
+  if (Array.isArray(networkResponseData)) {
+    // TODO check astNode.plural or the like
+    const dataIds = [];
+    for (let i = 0; i < networkResponseData.length; i++) {
+      const networkResponseObject = networkResponseData[i];
+      const newStoreRecordId = normalizeNetworkResponseObject(
+        astNode,
+        networkResponseObject,
+        targetParentRecordId,
+        variables,
+        i
+      );
+      dataIds.push({ __link: newStoreRecordId });
+    }
+    targetParentRecord[parentRecordKey] = dataIds;
+  } else {
+    const newStoreRecordId = normalizeNetworkResponseObject(
+      astNode,
+      networkResponseData,
+      targetParentRecordId,
+      variables
+    );
+    targetParentRecord[parentRecordKey] = {
+      __link: newStoreRecordId,
+    };
+  }
+}
+
+function normalizeNetworkResponseObject(
+  astNode: NormalizationLinkedField,
+  networkResponseData: NetworkResponseObject,
+  targetParentRecordId: string,
+  variables: { [index: string]: string },
+  index?: number
+): DataId /* The id of the modified or newly created item */ {
+  const newStoreRecordId = getDataIdOfNetworkResponse(
+    targetParentRecordId,
+    networkResponseData,
+    astNode,
+    variables,
+    index
+  );
+
+  const newStoreRecord = store[newStoreRecordId] ?? {};
+  store[newStoreRecordId] = newStoreRecord;
+
+  normalizeDataIntoRecord(
+    astNode.selections,
+    networkResponseData,
+    newStoreRecord,
+    newStoreRecordId,
     variables
   );
-  return { __link: dataId };
+
+  return newStoreRecordId;
+}
+
+function isScalarOrEmptyArray(
+  data: NonNullable<NetworkResponseValue>
+): data is NetworkResponseScalarValue | NetworkResponseScalarValue[] {
+  // N.B. empty arrays count as empty arrays of scalar fields.
+  if (Array.isArray(data)) {
+    // This is maybe fixed in a new version of Typescript??
+    return (data as any).every((x: any) => isScalarOrEmptyArray(x));
+  }
+  const isScalarValue =
+    typeof data === "string" ||
+    typeof data === "number" ||
+    typeof data === "boolean";
+  return isScalarValue;
+}
+
+function isScalarButNotEmptyArray(
+  data: NonNullable<NetworkResponseValue>
+): data is NetworkResponseScalarValue | NetworkResponseScalarValue[] {
+  // N.B. empty arrays count as empty arrays of linked fields.
+  if (Array.isArray(data)) {
+    if (data.length === 0) {
+      return false;
+    }
+    // This is maybe fixed in a new version of Typescript??
+    return (data as any).every((x: any) => isScalarOrEmptyArray(x));
+  }
+  const isScalarValue =
+    typeof data === "string" ||
+    typeof data === "number" ||
+    typeof data === "boolean";
+  return isScalarValue;
+}
+
+function getParentRecordKey(
+  astNode: NormalizationLinkedField | NormalizationScalarField,
+  variables: { [index: string]: string }
+): string {
+  let parentRecordKey = astNode.field_name;
+  const fieldParameters = astNode.arguments;
+  if (fieldParameters != null) {
+    for (const fieldParameter of fieldParameters) {
+      const { argument_name, variable_name } = fieldParameter;
+      const valueToUse = variables[variable_name];
+      parentRecordKey += `${FIRST_SPLIT_KEY}${argument_name}${SECOND_SPLIT_KEY}${valueToUse}`;
+    }
+  }
+
+  return parentRecordKey;
+}
+
+function getNetworkResponseKey(
+  astNode: NormalizationLinkedField | NormalizationScalarField
+): string {
+  let networkResponseKey = astNode.field_name;
+  const fieldParameters = astNode.arguments;
+  if (fieldParameters != null) {
+    for (const fieldParameter of fieldParameters) {
+      const { argument_name, variable_name } = fieldParameter;
+      networkResponseKey += `${FIRST_SPLIT_KEY}${argument_name}${SECOND_SPLIT_KEY}${variable_name}`;
+    }
+  }
+  return networkResponseKey;
 }
 
 // an alias might be pullRequests____first___first____after___cursor
-const FIRST_SPLIT_KEY = "____";
-const SECOND_SPLIT_KEY = "___";
+export const FIRST_SPLIT_KEY = "____";
+export const SECOND_SPLIT_KEY = "___";
 
-/// Fields that use variables have aliases like nameOfField__fieldName1_variableName2__...
-/// so e.g. node(id: $ID) becomes node__id_ID. Here, we map that back to node__id_4
-/// for writing to the store.
-function HACK_get_store_key(
-  networkResponseKey: string,
-  // {ID: "4"} and the like
-  variablesToValues: { [index: string]: string }
+// Returns a key to look up an item in the store
+function getDataIdOfNetworkResponse(
+  parentRecordId: DataId,
+  dataToNormalize: NetworkResponseObject,
+  astNode: NormalizationLinkedField | NormalizationScalarField,
+  variables: { [index: string]: string },
+  index?: number
 ): string {
-  const parts = networkResponseKey.split(FIRST_SPLIT_KEY);
-  let fieldName = parts[0];
+  // Check whether the dataToNormalize has an id field. If so, that is the key.
+  // If not, we construct an id from the parentRecordId and the field parameters.
 
-  // {id: "ID"} and the like
-  const fieldArgToUsedVariable: { [index: string]: string } = {};
-  for (const variable_key_val of parts.slice(1)) {
-    const [fieldArgName, usedVariable] =
-      variable_key_val.split(SECOND_SPLIT_KEY);
-    fieldArgToUsedVariable[fieldArgName] = usedVariable;
+  const dataId = dataToNormalize.id;
+  if (dataId != null) {
+    return dataId;
   }
 
-  // {id: 4} and the like
-  const fieldArgToValue: { [index: string]: string } = {};
-  for (const fieldArgName in fieldArgToUsedVariable) {
-    const usedVariable = fieldArgToUsedVariable[fieldArgName];
-    if (variablesToValues[usedVariable] == null) {
-      throw new Error(
-        `Variable ${fieldArgName} used in ${networkResponseKey} but not provided in variables`
-      );
-    }
-    fieldArgToValue[fieldArgName] = variablesToValues[usedVariable];
+  let storeKey = `${parentRecordId}.${astNode.field_name}`;
+  if (index != null) {
+    storeKey += `.${index}`;
   }
 
-  const sortedFields = Object.entries(fieldArgToValue).sort((a, b) =>
-    a[0].localeCompare(b[0])
-  );
-
-  for (const [fieldArgName, value] of sortedFields) {
-    fieldName += `__${fieldArgName}_${value}`;
+  const fieldParameters = astNode.arguments;
+  if (fieldParameters == null) {
+    return storeKey;
   }
 
-  return fieldName;
+  for (const fieldParameter of fieldParameters) {
+    const { argument_name, variable_name } = fieldParameter;
+    const valueToUse = variables[variable_name];
+    storeKey += `${FIRST_SPLIT_KEY}${argument_name}${SECOND_SPLIT_KEY}${valueToUse}`;
+  }
+  return storeKey;
 }
