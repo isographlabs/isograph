@@ -123,7 +123,7 @@ impl<TFieldAssociatedType, TScalarField, TLinkedField, TVariableType, TEncounter
     }
 }
 
-impl<TFieldAssociatedType: Copy, TScalarField, TLinkedField, TVariableType, TEncounteredField>
+impl<TFieldAssociatedType: Clone, TScalarField, TLinkedField, TVariableType, TEncounteredField>
     Schema<TFieldAssociatedType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
 {
     /// Get a reference to a given id field by its id.
@@ -136,7 +136,7 @@ impl<TFieldAssociatedType: Copy, TScalarField, TLinkedField, TVariableType, TEnc
         let field = self
             .field(field_id)
             .and_then(|e| match e.inner_non_null_named_type() {
-                Some(inner) => Ok(NamedTypeAnnotation(inner.0.map(|x| {
+                Some(inner) => Ok(NamedTypeAnnotation(inner.0.clone().map(|x| {
                     let y: Result<TIdFieldAssociatedType, _> = x.try_into();
                     match y {
                         Ok(y) => y,
