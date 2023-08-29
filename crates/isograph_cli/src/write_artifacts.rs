@@ -12,7 +12,7 @@ use crate::generate_artifacts::{
 };
 
 pub(crate) fn write_artifacts<'schema>(
-    artifacts: impl Iterator<Item = Artifact<'schema>> + 'schema,
+    artifacts: Vec<Artifact<'schema>>,
     project_root: &PathBuf,
 ) -> Result<(), GenerateArtifactsError> {
     let current_dir = std::env::current_dir().expect("current_dir should exist");

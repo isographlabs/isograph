@@ -37,6 +37,7 @@ macro_rules! derive_display {
     };
 }
 
+// TODO move to another module
 pub(crate) fn generate_artifacts(
     schema: &ValidatedSchema,
     project_root: &PathBuf,
@@ -46,25 +47,55 @@ pub(crate) fn generate_artifacts(
     Ok(())
 }
 
-fn get_all_artifacts<'schema>(
-    schema: &'schema ValidatedSchema,
-) -> impl Iterator<Item = Artifact<'schema>> + 'schema {
-    schema
+enum ArtifactQueueItem<'schema> {
+    Resolver(&'schema ValidatedSchemaResolver),
+}
+
+/// get all artifacts that we must generate according to the following rough plan:
+/// - initially, we know we must generate artifacts for each resolver
+/// - we must also generate an artifact for each refetch field we encounter while
+///   generating an artifact for a fetchable resolver (TODO)
+///
+/// We do this by keeping a queue of artifacts to generate, and adding to the queue
+/// as we process fetchable resolvers.
+fn get_all_artifacts<'schema>(schema: &'schema ValidatedSchema) -> Vec<Artifact<'schema>> {
+    let mut artifact_queue: Vec<_> = schema
         .resolvers
         .iter()
-        .map(|resolver| get_artifact_for_resolver(resolver, schema))
+        .map(ArtifactQueueItem::Resolver)
+        .collect();
+
+    let mut artifacts = vec![];
+    while let Some(queue_item) = artifact_queue.pop() {
+        artifacts.push(generate_artifact(queue_item, schema, &mut artifact_queue));
+    }
+
+    artifacts
+}
+
+fn generate_artifact<'schema>(
+    queue_item: ArtifactQueueItem<'schema>,
+    schema: &'schema ValidatedSchema,
+    artifact_queue: &mut Vec<ArtifactQueueItem<'schema>>,
+) -> Artifact<'schema> {
+    match queue_item {
+        ArtifactQueueItem::Resolver(resolver) => {
+            get_artifact_for_resolver(resolver, schema, artifact_queue)
+        }
+    }
 }
 
 fn get_artifact_for_resolver<'schema>(
     resolver: &'schema ValidatedSchemaResolver,
     schema: &'schema ValidatedSchema,
+    artifact_queue: &mut Vec<ArtifactQueueItem<'schema>>,
 ) -> Artifact<'schema> {
     match resolver.artifact_kind {
         ResolverArtifactKind::FetchableOnQuery => {
             Artifact::FetchableResolver(generate_fetchable_resolver_artifact(schema, resolver))
         }
         ResolverArtifactKind::NonFetchable => Artifact::NonFetchableResolver(
-            generate_non_fetchable_resolver_artifact(schema, resolver),
+            generate_non_fetchable_resolver_artifact(schema, resolver, artifact_queue),
         ),
     }
 }
@@ -148,6 +179,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
 fn generate_non_fetchable_resolver_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     non_fetchable_resolver: &ValidatedSchemaResolver,
+    _artifact_queue: &mut Vec<ArtifactQueueItem<'schema>>,
 ) -> NonFetchableResolver<'schema> {
     if let Some((selection_set, _)) = &non_fetchable_resolver.selection_set_and_unwraps {
         let parent_type = schema
