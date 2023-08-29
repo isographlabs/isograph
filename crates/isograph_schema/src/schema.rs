@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use common_lang_types::{
     DefinedField, DescriptionValue, HasName, InputTypeName, InterfaceTypeName,
-    IsographObjectTypeName, JavascriptName, ResolverDefinitionPath, ScalarFieldName,
-    ScalarTypeName, SelectableFieldName, UnvalidatedTypeName, WithSpan,
+    IsographObjectTypeName, JavascriptName, ResolverDefinitionPath, ScalarTypeName,
+    SelectableFieldName, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, Directive, InterfaceTypeDefinition, NamedTypeAnnotation, ObjectTypeDefinition,
@@ -78,7 +78,7 @@ pub(crate) type UnvalidatedSchema =
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
 /// resolver.)
 pub type UnvalidatedObjectFieldInfo =
-    DefinedField<TypeAnnotation<UnvalidatedTypeName>, (ScalarFieldName, ResolverFieldId)>;
+    DefinedField<TypeAnnotation<UnvalidatedTypeName>, ResolverFieldId>;
 
 pub(crate) type UnvalidatedSchemaData = SchemaData<UnvalidatedObjectFieldInfo>;
 

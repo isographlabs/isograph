@@ -480,7 +480,7 @@ fn validate_field_type_exists_and_is_scalar(
                     ),
                 }
             }
-            DefinedField::ResolverField((resolver_name, resolver_field_id)) => {
+            DefinedField::ResolverField(resolver_field_id) => {
                 // TODO confirm this works if resolver_name is an alias
                 Ok(ScalarFieldSelection {
                     name: scalar_field_selection.name,

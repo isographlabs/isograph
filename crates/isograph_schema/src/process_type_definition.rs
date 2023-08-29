@@ -1,24 +1,22 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    DefinedField, IsographObjectTypeName, ScalarFieldName, ScalarTypeName, SelectableFieldName,
-    Span, UnvalidatedTypeName, WithSpan,
+    DefinedField, IsographObjectTypeName, ScalarTypeName, SelectableFieldName, Span,
+    UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
     NamedTypeAnnotation, NonNullTypeAnnotation, OutputFieldDefinition, ScalarTypeDefinition,
     TypeAnnotation, TypeSystemDefinition, TypeSystemDocument,
 };
 use intern::{string_key::Intern, Lookup};
-use isograph_lang_types::{
-    DefinedTypeId, ObjectId, ResolverFieldId, ServerFieldId, ServerIdFieldId,
-};
+use isograph_lang_types::{DefinedTypeId, ObjectId, ServerFieldId, ServerIdFieldId};
 use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
     IsographObjectTypeDefinition, Schema, SchemaObject, SchemaScalar, SchemaServerField,
-    UnvalidatedSchema, UnvalidatedSchemaField, ValidRefinement, ID_GRAPHQL_TYPE,
-    STRING_JAVASCRIPT_TYPE,
+    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField, ValidRefinement,
+    ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
 };
 
 lazy_static! {
@@ -219,10 +217,7 @@ fn get_typename_type(
 struct FieldObjectIdsEtc {
     unvalidated_schema_fields: Vec<UnvalidatedSchemaField>,
     server_fields: Vec<ServerFieldId>,
-    encountered_fields: HashMap<
-        SelectableFieldName,
-        DefinedField<TypeAnnotation<UnvalidatedTypeName>, (ScalarFieldName, ResolverFieldId)>,
-    >,
+    encountered_fields: HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
     // TODO this should not be a ServerFieldId, but a special type
     id_field: Option<ServerIdFieldId>,
 }

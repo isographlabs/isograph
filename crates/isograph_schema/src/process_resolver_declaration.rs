@@ -54,7 +54,7 @@ impl UnvalidatedSchema {
             .encountered_fields
             .insert(
                 resolver_field_name.into(),
-                DefinedField::ResolverField((resolver_field_name, next_resolver_id)),
+                DefinedField::ResolverField(next_resolver_id),
             )
             .is_some()
         {
