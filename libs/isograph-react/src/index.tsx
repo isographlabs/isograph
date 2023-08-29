@@ -83,7 +83,7 @@ export type ReaderResolverField = {
   alias: string;
   resolver: IsographResolver<any, any, any>;
   variant: ReaderResolverVariant | null;
-  arguments: Object | null;
+  arguments: Arguments | null;
 };
 
 export type NormalizationASTNode =
