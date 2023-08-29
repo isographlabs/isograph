@@ -78,7 +78,7 @@ pub(crate) type UnvalidatedSchema =
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
 /// resolver.)
 pub type UnvalidatedObjectFieldInfo =
-    DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>;
+    DefinedField<TypeAnnotation<UnvalidatedTypeName>, (ScalarFieldName, ResolverFieldId)>;
 
 pub(crate) type UnvalidatedSchemaData = SchemaData<UnvalidatedObjectFieldInfo>;
 

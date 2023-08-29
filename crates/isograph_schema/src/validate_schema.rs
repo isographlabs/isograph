@@ -29,7 +29,7 @@ pub type ValidatedSchemaResolver =
 pub type ValidatedEncounteredDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;
 /// The validated defined field that shows up in the TScalarField generic.
 pub type ValidatedScalarDefinedField =
-    DefinedField<ServerFieldId, (FieldNameOrAlias, ResolverTypeAndField)>;
+    DefinedField<ServerFieldId, (FieldNameOrAlias, ResolverTypeAndField, ResolverFieldId)>;
 
 pub type ValidatedSchemaObject = SchemaObject<ValidatedEncounteredDefinedField>;
 
@@ -37,19 +37,14 @@ pub type ValidatedSchemaIdField = SchemaIdField<NamedTypeAnnotation<ScalarId>>;
 
 pub type ValidatedSchema = Schema<
     // Fields contain a field_type: TypeAnnotation<TFieldAssociatedType>
-    // Validated: OutputTypeId, Unvalidated: UnvalidatedTypeName
     OutputTypeId,
     // The associated data type of scalars in resolvers' selection sets and unwraps
-    // Validated: ValidatedScalarDefinedField, Unvalidated: ()
     ValidatedScalarDefinedField,
     // The associated data type of linked fields in resolvers' selection sets and unwraps
-    // Validated: ObjectId, Unvalidated: ()
     ObjectId,
     // The associated data type of resolvers' variable definitions
-    // Validated: InputTypeId, Unvalidated: UnvalidatedTypeName
     InputTypeId,
     // On objects, what does the HashMap of encountered types contain
-    // Validated: ValidatedDefinedField, Unvalidated: UnvalidatedObjectFieldInfo
     ValidatedEncounteredDefinedField,
 >;
 
@@ -486,7 +481,7 @@ fn validate_field_type_exists_and_is_scalar(
                     ),
                 }
             }
-            DefinedField::ResolverField(resolver_name) => {
+            DefinedField::ResolverField((resolver_name, resolver_field_id)) => {
                 // TODO confirm this works if resolver_name is an alias
                 Ok(ScalarFieldSelection {
                     name: scalar_field_selection.name,
@@ -498,6 +493,7 @@ fn validate_field_type_exists_and_is_scalar(
                             type_name: parent_object.name,
                             field_name: (*resolver_name).into(),
                         },
+                        *resolver_field_id,
                     )),
                     arguments: scalar_field_selection.arguments,
                     normalization_alias: scalar_field_selection.normalization_alias,

@@ -9,7 +9,9 @@ use graphql_lang_types::{
     TypeAnnotation, TypeSystemDefinition, TypeSystemDocument,
 };
 use intern::{string_key::Intern, Lookup};
-use isograph_lang_types::{DefinedTypeId, ObjectId, ServerFieldId, ServerIdFieldId};
+use isograph_lang_types::{
+    DefinedTypeId, ObjectId, ResolverFieldId, ServerFieldId, ServerIdFieldId,
+};
 use lazy_static::lazy_static;
 use thiserror::Error;
 
@@ -219,7 +221,7 @@ struct FieldObjectIdsEtc {
     server_fields: Vec<ServerFieldId>,
     encountered_fields: HashMap<
         SelectableFieldName,
-        DefinedField<TypeAnnotation<UnvalidatedTypeName>, ScalarFieldName>,
+        DefinedField<TypeAnnotation<UnvalidatedTypeName>, (ScalarFieldName, ResolverFieldId)>,
     >,
     // TODO this should not be a ServerFieldId, but a special type
     id_field: Option<ServerIdFieldId>,

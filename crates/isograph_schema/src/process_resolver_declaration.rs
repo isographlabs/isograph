@@ -48,11 +48,13 @@ impl UnvalidatedSchema {
         let object = &mut self.schema_data.objects[parent_object_id.as_usize()];
         let resolver_field_name = resolver_declaration.item.resolver_field_name.item;
 
+        let next_resolver_id = self.resolvers.len().into();
+
         if object
             .encountered_fields
             .insert(
                 resolver_field_name.into(),
-                DefinedField::ResolverField(resolver_field_name),
+                DefinedField::ResolverField((resolver_field_name, next_resolver_id)),
             )
             .is_some()
         {
@@ -64,7 +66,6 @@ impl UnvalidatedSchema {
             });
         }
 
-        let next_resolver_id = self.resolvers.len().into();
         object.resolvers.push(next_resolver_id);
 
         let name = resolver_declaration.item.resolver_field_name.item.into();
