@@ -23,14 +23,12 @@ lazy_static! {
     pub static ref ID_GRAPHQL_TYPE: ScalarTypeName = "ID".intern().into();
 }
 
-/// The first, unvalidated in-memory representation of a schema.
+/// The in-memory representation of a schema.
 ///
-/// The things that are unvalidated include:
-/// - That each field's type exists
-/// - That each resolver's fragment is valid, i.e. that fields
-///   exist, no duplicates, etc.
-///
-/// This is almost certainly a subset of validations we should do.
+/// The generics with which the Schema type is instantiated vary based on
+/// how far along in the validation pipeline the schema is. In particular,
+/// there is an [UnvalidatedSchema](UnvalidatedSchema) type and a
+/// ValidatedSchema type.
 ///
 /// Invariant: a schema is append-only, because pointers into the Schema are in the
 /// form of newtype wrappers around u32 indexes (e.g. FieldId, etc.) As a result,
