@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    DefinedField, DescriptionValue, HasName, InputTypeName, InterfaceTypeName,
-    IsographObjectTypeName, JavascriptName, ResolverDefinitionPath, ScalarTypeName,
-    SelectableFieldName, UnvalidatedTypeName, WithSpan,
+    DescriptionValue, HasName, InputTypeName, InterfaceTypeName, IsographObjectTypeName,
+    JavascriptName, ResolverDefinitionPath, ScalarTypeName, SelectableFieldName,
+    UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, Directive, InterfaceTypeDefinition, NamedTypeAnnotation, ObjectTypeDefinition,
@@ -71,6 +71,34 @@ pub struct Schema<
 
 pub(crate) type UnvalidatedSchema =
     Schema<UnvalidatedTypeName, (), (), UnvalidatedTypeName, UnvalidatedObjectFieldInfo>;
+
+/// Distinguishes between server fields and locally-defined resolver fields.
+/// TFieldAssociatedType can be a ScalarFieldName in an unvalidated schema, or a
+/// ScalarId, in a validated schema.
+///
+/// TResolverType can be an UnvalidatedTypeName in an unvalidated schema, or an
+/// OutputTypeId in a validated schema.
+#[derive(Debug, Clone, Copy)]
+pub enum DefinedField<TFieldAssociatedType, TResolverType> {
+    ServerField(TFieldAssociatedType),
+    ResolverField(TResolverType),
+}
+
+impl<TFieldAssociatedType, TResolverType> DefinedField<TFieldAssociatedType, TResolverType> {
+    pub fn as_server_field(&self) -> Option<&TFieldAssociatedType> {
+        match self {
+            DefinedField::ServerField(server_field) => Some(server_field),
+            DefinedField::ResolverField(_) => None,
+        }
+    }
+
+    pub fn as_resolver_field(&self) -> Option<&TResolverType> {
+        match self {
+            DefinedField::ServerField(_) => None,
+            DefinedField::ResolverField(resolver_field) => Some(resolver_field),
+        }
+    }
+}
 
 /// On unvalidated schema objects, the encountered types are either a type annotation
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the

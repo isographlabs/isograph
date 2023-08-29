@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    DefinedField, IsographObjectTypeName, ScalarFieldName, SelectableFieldName,
-    UnvalidatedTypeName, VariableName, WithSpan,
+    IsographObjectTypeName, ScalarFieldName, SelectableFieldName, UnvalidatedTypeName,
+    VariableName, WithSpan,
 };
 use graphql_lang_types::{NamedTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
@@ -12,9 +12,9 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    Schema, SchemaData, SchemaIdField, SchemaObject, SchemaResolver, SchemaServerField,
-    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData, UnvalidatedSchemaField,
-    UnvalidatedSchemaResolver, UnvalidatedSchemaServerField,
+    DefinedField, Schema, SchemaData, SchemaIdField, SchemaObject, SchemaResolver,
+    SchemaServerField, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData,
+    UnvalidatedSchemaField, UnvalidatedSchemaResolver, UnvalidatedSchemaServerField,
 };
 
 pub type ValidatedSchemaField = SchemaServerField<TypeAnnotation<OutputTypeId>>;

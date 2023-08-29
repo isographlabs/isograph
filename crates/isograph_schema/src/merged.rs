@@ -4,8 +4,8 @@ use std::collections::{
 };
 
 use common_lang_types::{
-    DefinedField, LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName,
-    SelectableFieldName, ServerFieldNormalizationKey, Span, WithSpan,
+    LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName, SelectableFieldName,
+    ServerFieldNormalizationKey, Span, WithSpan,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -14,8 +14,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
-    ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSelection,
+    DefinedField, SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField,
+    ValidatedSchema, ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSelection,
 };
 
 type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSelection>>;

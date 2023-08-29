@@ -6,8 +6,8 @@ use std::{
 };
 
 use common_lang_types::{
-    DefinedField, HasName, QueryOperationName, ResolverDefinitionPath, SelectableFieldName,
-    UnvalidatedTypeName, WithSpan,
+    HasName, QueryOperationName, ResolverDefinitionPath, SelectableFieldName, UnvalidatedTypeName,
+    WithSpan,
 };
 use graphql_lang_types::{ListTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
@@ -15,10 +15,11 @@ use isograph_lang_types::{
     ServerFieldSelection,
 };
 use isograph_schema::{
-    create_merged_selection_set, MergedLinkedFieldSelection, MergedScalarFieldSelection,
-    MergedSelectionSet, MergedServerFieldSelection, ResolverArtifactKind, ResolverTypeAndField,
-    ResolverVariant, SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField,
-    ValidatedSchema, ValidatedSchemaResolver, ValidatedSelection, ValidatedVariableDefinition,
+    create_merged_selection_set, DefinedField, MergedLinkedFieldSelection,
+    MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection,
+    ResolverArtifactKind, ResolverTypeAndField, ResolverVariant, SchemaObject,
+    ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
+    ValidatedSchemaResolver, ValidatedSelection, ValidatedVariableDefinition,
 };
 use thiserror::Error;
 

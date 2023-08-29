@@ -1,8 +1,8 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    DefinedField, IsographObjectTypeName, ScalarTypeName, SelectableFieldName, Span,
-    UnvalidatedTypeName, WithSpan,
+    IsographObjectTypeName, ScalarTypeName, SelectableFieldName, Span, UnvalidatedTypeName,
+    WithSpan,
 };
 use graphql_lang_types::{
     NamedTypeAnnotation, NonNullTypeAnnotation, OutputFieldDefinition, ScalarTypeDefinition,
@@ -14,9 +14,9 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    IsographObjectTypeDefinition, Schema, SchemaObject, SchemaScalar, SchemaServerField,
-    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField, ValidRefinement,
-    ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
+    DefinedField, IsographObjectTypeDefinition, Schema, SchemaObject, SchemaScalar,
+    SchemaServerField, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
+    ValidRefinement, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
 };
 
 lazy_static! {

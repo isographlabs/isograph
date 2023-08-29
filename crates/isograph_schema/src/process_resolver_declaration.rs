@@ -1,15 +1,17 @@
 use std::fmt;
 
 use common_lang_types::{
-    DefinedField, IsographDirectiveName, IsographObjectTypeName, SelectableFieldName,
-    UnvalidatedTypeName, WithSpan,
+    IsographDirectiveName, IsographObjectTypeName, SelectableFieldName, UnvalidatedTypeName,
+    WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{DefinedTypeId, FragmentDirectiveUsage, ObjectId, ResolverDeclaration};
 use lazy_static::lazy_static;
 use thiserror::Error;
 
-use crate::{ResolverArtifactKind, ResolverTypeAndField, SchemaResolver, UnvalidatedSchema};
+use crate::{
+    DefinedField, ResolverArtifactKind, ResolverTypeAndField, SchemaResolver, UnvalidatedSchema,
+};
 
 impl UnvalidatedSchema {
     pub fn process_resolver_declaration(
