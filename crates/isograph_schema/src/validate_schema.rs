@@ -36,10 +36,20 @@ pub type ValidatedSchemaObject = SchemaObject<ValidatedEncounteredDefinedField>;
 pub type ValidatedSchemaIdField = SchemaIdField<NamedTypeAnnotation<ScalarId>>;
 
 pub type ValidatedSchema = Schema<
+    // Fields contain a field_type: TypeAnnotation<TFieldAssociatedType>
+    // Validated: OutputTypeId, Unvalidated: UnvalidatedTypeName
     OutputTypeId,
+    // The associated data type of scalars in resolvers' selection sets and unwraps
+    // Validated: ValidatedScalarDefinedField, Unvalidated: ()
     ValidatedScalarDefinedField,
+    // The associated data type of linked fields in resolvers' selection sets and unwraps
+    // Validated: ObjectId, Unvalidated: ()
     ObjectId,
+    // The associated data type of resolvers' variable definitions
+    // Validated: InputTypeId, Unvalidated: UnvalidatedTypeName
     InputTypeId,
+    // On objects, what does the HashMap of encountered types contain
+    // Validated: ValidatedDefinedField, Unvalidated: UnvalidatedObjectFieldInfo
     ValidatedEncounteredDefinedField,
 >;
 
