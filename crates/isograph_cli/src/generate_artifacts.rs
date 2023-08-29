@@ -435,7 +435,7 @@ fn write_query_types_from_selection(
                             print_type_annotation(&output_type)
                         ));
                     }
-                    DefinedField::ResolverField((name_or_alias, resolver_field_id)) => {
+                    DefinedField::ResolverField(resolver_field_id) => {
                         let resolver = schema.resolver(resolver_field_id);
 
                         match nested_resolver_imports.entry(resolver.type_and_field) {
@@ -464,7 +464,7 @@ fn write_query_types_from_selection(
 
                         query_type_declaration.push_str(&format!(
                             "{}: {}__outputType,\n",
-                            name_or_alias,
+                            scalar_field.name_or_alias().item,
                             resolver.type_and_field.underscore_separated()
                         ));
                     }

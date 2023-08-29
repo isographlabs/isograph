@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    DefinedField, FieldNameOrAlias, IsographObjectTypeName, ScalarFieldName, SelectableFieldName,
+    DefinedField, IsographObjectTypeName, ScalarFieldName, SelectableFieldName,
     UnvalidatedTypeName, VariableName, WithSpan,
 };
 use graphql_lang_types::{NamedTypeAnnotation, TypeAnnotation};
@@ -28,8 +28,7 @@ pub type ValidatedSchemaResolver =
 /// The validated defined field that shows up in the encountered field generic.
 pub type ValidatedEncounteredDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;
 /// The validated defined field that shows up in the TScalarField generic.
-pub type ValidatedScalarDefinedField =
-    DefinedField<ServerFieldId, (FieldNameOrAlias, ResolverFieldId)>;
+pub type ValidatedScalarDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;
 
 pub type ValidatedSchemaObject = SchemaObject<ValidatedEncounteredDefinedField>;
 
@@ -487,10 +486,7 @@ fn validate_field_type_exists_and_is_scalar(
                     name: scalar_field_selection.name,
                     reader_alias: scalar_field_selection.reader_alias,
                     unwraps: scalar_field_selection.unwraps,
-                    associated_data: DefinedField::ResolverField((
-                        (*resolver_name).into(),
-                        *resolver_field_id,
-                    )),
+                    associated_data: DefinedField::ResolverField(*resolver_field_id),
                     arguments: scalar_field_selection.arguments,
                     normalization_alias: scalar_field_selection.normalization_alias,
                 })
