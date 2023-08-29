@@ -80,8 +80,6 @@ enum NormalizationKey {
 /// - query texts
 /// - normalization ASTs
 /// - raw response types (TODO)
-///
-/// TODO: SelectionSetAndUnwraps should be generic enough to handle this
 pub fn create_merged_selection_set(
     schema: &ValidatedSchema,
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
