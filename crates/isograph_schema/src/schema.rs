@@ -465,6 +465,12 @@ impl ResolverTypeAndField {
 }
 
 #[derive(Debug)]
+pub enum ResolverArtifactKind {
+    FetchableOnQuery,
+    NonFetchable,
+}
+
+#[derive(Debug)]
 pub struct SchemaResolver<TScalarField, TLinkedField, TVariableDefinitionType> {
     pub description: Option<DescriptionValue>,
     pub name: SelectableFieldName,
@@ -478,8 +484,8 @@ pub struct SchemaResolver<TScalarField, TLinkedField, TVariableDefinitionType> {
         Vec<WithSpan<Unwrap>>,
     )>,
     pub variant: Option<WithSpan<ResolverVariant>>,
-    // This should not be a bool; this should be an enum?
-    pub is_fetchable: bool,
+
+    pub artifact_kind: ResolverArtifactKind,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<TVariableDefinitionType>>>,
 
     // TODO this is probably unused

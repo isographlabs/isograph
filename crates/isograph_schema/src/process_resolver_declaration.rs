@@ -9,7 +9,7 @@ use isograph_lang_types::{DefinedTypeId, FragmentDirectiveUsage, ObjectId, Resol
 use lazy_static::lazy_static;
 use thiserror::Error;
 
-use crate::{ResolverTypeAndField, SchemaResolver, UnvalidatedSchema};
+use crate::{ResolverArtifactKind, ResolverTypeAndField, SchemaResolver, UnvalidatedSchema};
 
 impl UnvalidatedSchema {
     pub fn process_resolver_declaration(
@@ -85,7 +85,7 @@ impl UnvalidatedSchema {
             resolver_definition_path: resolver_declaration.item.resolver_definition_path,
             selection_set_and_unwraps: resolver_declaration.item.selection_set_and_unwraps,
             variant,
-            is_fetchable: is_fetchable(&resolver_declaration.item.directives),
+            artifact_kind: get_resolver_artifact_kind(&resolver_declaration.item.directives),
             variable_definitions: resolver_declaration.item.variable_definitions,
             type_and_field: ResolverTypeAndField {
                 type_name: object.name,
@@ -168,11 +168,13 @@ fn get_resolver_variant(
     None
 }
 
-fn is_fetchable(directives: &[WithSpan<FragmentDirectiveUsage>]) -> bool {
+fn get_resolver_artifact_kind(
+    directives: &[WithSpan<FragmentDirectiveUsage>],
+) -> ResolverArtifactKind {
     for directive in directives.iter() {
         if directive.item.name.item == *FETCHABLE {
-            return true;
+            return ResolverArtifactKind::FetchableOnQuery;
         }
     }
-    false
+    ResolverArtifactKind::NonFetchable
 }

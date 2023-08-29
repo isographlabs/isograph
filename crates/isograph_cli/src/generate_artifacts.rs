@@ -16,9 +16,9 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     create_merged_selection_set, MergedLinkedFieldSelection, MergedScalarFieldSelection,
-    MergedSelectionSet, MergedServerFieldSelection, ResolverTypeAndField, ResolverVariant,
-    SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
-    ValidatedSchemaResolver, ValidatedSelection, ValidatedVariableDefinition,
+    MergedSelectionSet, MergedServerFieldSelection, ResolverArtifactKind, ResolverTypeAndField,
+    ResolverVariant, SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField,
+    ValidatedSchema, ValidatedSchemaResolver, ValidatedSelection, ValidatedVariableDefinition,
 };
 use thiserror::Error;
 
@@ -48,15 +48,17 @@ pub(crate) fn generate_artifacts(
 fn get_all_artifacts<'schema>(
     schema: &'schema ValidatedSchema,
 ) -> impl Iterator<Item = Artifact<'schema>> + 'schema {
-    schema.resolvers.iter().map(|resolver| {
-        if resolver.is_fetchable {
-            Artifact::FetchableResolver(generate_fetchable_resolver_artifact(schema, resolver))
-        } else {
-            Artifact::NonFetchableResolver(generate_non_fetchable_resolver_artifact(
-                schema, resolver,
-            ))
-        }
-    })
+    schema
+        .resolvers
+        .iter()
+        .map(|resolver| match resolver.artifact_kind {
+            ResolverArtifactKind::FetchableOnQuery => {
+                Artifact::FetchableResolver(generate_fetchable_resolver_artifact(schema, resolver))
+            }
+            ResolverArtifactKind::NonFetchable => Artifact::NonFetchableResolver(
+                generate_non_fetchable_resolver_artifact(schema, resolver),
+            ),
+        })
 }
 
 fn generate_fetchable_resolver_artifact<'schema>(
