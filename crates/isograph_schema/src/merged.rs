@@ -96,7 +96,11 @@ pub fn create_merged_selection_set(
         selection_set,
     );
 
-    add_typename_and_id_fields(schema, &mut merged_selection_set, parent_type);
+    select_typename_and_id_fields_in_merged_selection(
+        schema,
+        &mut merged_selection_set,
+        parent_type,
+    );
 
     MergedSelectionSet::new(merged_selection_set.into_iter().collect())
 }
@@ -369,7 +373,7 @@ fn HACK__merge_linked_fields(
     *existing_selection_set = merged_fields;
 }
 
-fn add_typename_and_id_fields(
+fn select_typename_and_id_fields_in_merged_selection(
     schema: &ValidatedSchema,
     merged_selection_set: &mut MergedSelectionMap,
     parent_type: &ValidatedSchemaObject,
