@@ -1,8 +1,8 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    DefinedField, IsographObjectTypeName, ScalarFieldName, SelectableFieldName, Span,
-    UnvalidatedTypeName, WithSpan,
+    DefinedField, IsographObjectTypeName, ScalarFieldName, ScalarTypeName, SelectableFieldName,
+    Span, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
     NamedTypeAnnotation, NonNullTypeAnnotation, OutputFieldDefinition, ScalarTypeDefinition,
@@ -128,13 +128,7 @@ impl UnvalidatedSchema {
                     existing_fields.len(),
                     next_object_id,
                     type_definition.name.item.into(),
-                    TypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
-                        NamedTypeAnnotation(WithSpan::new(
-                            string_type_for_typename.into(),
-                            // TODO we probably need a generated or built-in span type
-                            Span::new(0, 0),
-                        )),
-                    ))),
+                    get_typename_type(string_type_for_typename),
                 )?;
                 objects.push(SchemaObject {
                     description: type_definition.description.map(|d| d.item),
@@ -206,6 +200,18 @@ impl UnvalidatedSchema {
         }
         Ok(())
     }
+}
+
+fn get_typename_type(
+    string_type_for_typename: ScalarTypeName,
+) -> TypeAnnotation<UnvalidatedTypeName> {
+    TypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(NamedTypeAnnotation(
+        WithSpan::new(
+            string_type_for_typename.into(),
+            // TODO we probably need a generated or built-in span type
+            Span::new(0, 0),
+        ),
+    ))))
 }
 
 struct FieldObjectIdsEtc {
