@@ -118,7 +118,6 @@ pub(crate) type UnvalidatedSchemaServerField = SchemaServerField<TypeAnnotation<
 pub struct SchemaData<TEncounteredField> {
     pub objects: Vec<SchemaObject<TEncounteredField>>,
     pub scalars: Vec<SchemaScalar>,
-    // enums, unions, interfaces, input objects
     pub defined_types: HashMap<UnvalidatedTypeName, DefinedTypeId>,
 }
 

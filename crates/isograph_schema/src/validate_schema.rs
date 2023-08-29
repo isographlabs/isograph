@@ -106,13 +106,13 @@ fn transform_object_field_ids(
         server_fields,
         description,
         id,
-        encountered_fields: encountered_field_names,
+        encountered_fields: unvalidated_encountered_fields,
         resolvers,
         valid_refinements,
         id_field,
     } = object;
 
-    let encountered_field_names = encountered_field_names
+    let validated_encountered_fields = unvalidated_encountered_fields
         .into_iter()
         .map(|(encountered_field_name, _)| {
             for server_field_id in server_fields.iter() {
@@ -142,7 +142,7 @@ fn transform_object_field_ids(
         name,
         id,
         server_fields,
-        encountered_fields: encountered_field_names,
+        encountered_fields: validated_encountered_fields,
         resolvers,
         valid_refinements,
         id_field,
