@@ -28,12 +28,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     selections: [
       {
         kind: "Scalar",
-        fieldName: "id",
-        alias: null,
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
         fieldName: "nameWithOwner",
         alias: null,
         arguments: null,
@@ -50,12 +44,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
             arguments: null,
             resolver: Repository__repository_link,
             variant: "Component",
-          },
-          {
-            kind: "Scalar",
-            fieldName: "id",
-            alias: null,
-            arguments: null,
           },
           {
             kind: "Scalar",
@@ -92,11 +80,9 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 export type ResolverParameterType = { data:
 {
   repository: ({
-    id: string,
     nameWithOwner: string,
     parent: ({
       repository_link: Repository__repository_link__outputType,
-      id: string,
       nameWithOwner: string,
     } | null),
     pullRequests: {

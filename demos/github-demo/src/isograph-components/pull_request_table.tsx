@@ -30,9 +30,9 @@ export const pull_request_table = iso<
   PullRequestConnection.pull_request_table @component {
     edges {
       node {
+        id,
         pull_request_link,
         number,
-        id,
         title,
         author {
           user_link,

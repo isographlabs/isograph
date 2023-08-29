@@ -12,7 +12,6 @@ export const repository_link = iso<
     id,
     name,
     owner {
-      id, 
       login,
     },
   }

@@ -9,7 +9,6 @@ export const home_page_list = iso<
   Query.home_page_list @component {
     viewer {
       login,
-      id,
       name,
       repository_list,
     },

@@ -17,7 +17,6 @@ export const repository_list = iso<
     repositories(last: $first) {
       edges {
         node {
-          id,
           repository_link,
           name,
           nameWithOwner,

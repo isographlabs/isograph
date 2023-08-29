@@ -10,12 +10,6 @@ export type ReadFromStoreType = ResolverParameterType;
 
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
-    kind: "Scalar",
-    fieldName: "id",
-    alias: null,
-    arguments: null,
-  },
-  {
     kind: "Linked",
     fieldName: "comments",
     alias: null,
@@ -81,7 +75,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 
 export type ResolverParameterType = { data:
 {
-  id: string,
   comments: {
     edges: (({
       node: ({

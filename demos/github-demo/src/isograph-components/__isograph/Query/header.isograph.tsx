@@ -17,12 +17,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     selections: [
       {
         kind: "Scalar",
-        fieldName: "id",
-        alias: null,
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
         fieldName: "name",
         alias: null,
         arguments: null,
@@ -41,7 +35,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 export type ResolverParameterType = { data:
 {
   viewer: {
-    id: string,
     name: (string | null),
     avatar: User__avatar__outputType,
   },

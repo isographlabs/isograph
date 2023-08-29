@@ -25,7 +25,6 @@ export const comment_list = iso<
   ReturnType<typeof CommentList>
 >`
   PullRequest.comment_list @component {
-    id,
     comments(last: $last,) {
       edges {
         node {

@@ -23,12 +23,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
       },
       {
         kind: "Scalar",
-        fieldName: "id",
-        alias: null,
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
         fieldName: "name",
         alias: null,
         arguments: null,
@@ -48,7 +42,6 @@ export type ResolverParameterType = { data:
 {
   viewer: {
     login: string,
-    id: string,
     name: (string | null),
     repository_list: User__repository_list__outputType,
   },

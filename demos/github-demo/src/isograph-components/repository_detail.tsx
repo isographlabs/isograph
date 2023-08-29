@@ -8,11 +8,9 @@ export const repository_detail = iso<
 >`
   Query.repository_detail @component {
     repository(name: $repositoryName, owner: $repositoryOwner) {
-      id,
       nameWithOwner,
       parent {
         repository_link,
-        id,
         nameWithOwner,
       },
 

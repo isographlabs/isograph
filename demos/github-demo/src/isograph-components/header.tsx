@@ -11,7 +11,6 @@ import logo from "./svgs/dark-logo.svg";
 export const header = iso<HeaderProps, ReturnType<typeof Header>>`
   Query.header @component {
     viewer {
-      id,
       name,
       avatar,
     },

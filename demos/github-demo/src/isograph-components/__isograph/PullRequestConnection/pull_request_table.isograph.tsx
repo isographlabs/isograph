@@ -24,6 +24,12 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
         arguments: null,
         selections: [
           {
+            kind: "Scalar",
+            fieldName: "id",
+            alias: null,
+            arguments: null,
+          },
+          {
             kind: "Resolver",
             alias: "pull_request_link",
             arguments: null,
@@ -33,12 +39,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
           {
             kind: "Scalar",
             fieldName: "number",
-            alias: null,
-            arguments: null,
-          },
-          {
-            kind: "Scalar",
-            fieldName: "id",
             alias: null,
             arguments: null,
           },
@@ -98,9 +98,9 @@ export type ResolverParameterType = { data:
 {
   edges: (({
     node: ({
+      id: string,
       pull_request_link: PullRequest__pull_request_link__outputType,
       number: number,
-      id: string,
       title: string,
       author: ({
         user_link: Actor__user_link__outputType,

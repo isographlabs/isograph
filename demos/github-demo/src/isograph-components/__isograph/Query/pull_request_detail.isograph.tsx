@@ -26,12 +26,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     ],
     selections: [
       {
-        kind: "Scalar",
-        fieldName: "id",
-        alias: null,
-        arguments: null,
-      },
-      {
         kind: "Linked",
         fieldName: "pullRequest",
         alias: null,
@@ -42,12 +36,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
           },
         ],
         selections: [
-          {
-            kind: "Scalar",
-            fieldName: "id",
-            alias: null,
-            arguments: null,
-          },
           {
             kind: "Scalar",
             fieldName: "title",
@@ -76,9 +64,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 export type ResolverParameterType = { data:
 {
   repository: ({
-    id: string,
     pullRequest: ({
-      id: string,
       title: string,
       bodyHTML: string,
       comment_list: PullRequest__comment_list__outputType,
