@@ -92,7 +92,6 @@ impl UnvalidatedSchema {
             description: resolver_declaration.item.description.map(|d| d.item),
             name,
             id: next_resolver_id,
-            resolver_definition_path: resolver_declaration.item.resolver_definition_path,
             selection_set_and_unwraps: resolver_declaration.item.selection_set_and_unwraps,
             variant,
             artifact_kind: get_resolver_artifact_kind(&resolver_declaration.item.directives),

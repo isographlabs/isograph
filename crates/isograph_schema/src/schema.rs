@@ -508,7 +508,6 @@ pub struct SchemaResolver<TScalarField, TLinkedField, TVariableDefinitionType> {
     pub description: Option<DescriptionValue>,
     pub name: SelectableFieldName,
     pub id: ResolverFieldId,
-    pub resolver_definition_path: ResolverDefinitionPath,
     // TODO it makes no sense for a resolver to not select fields!
     // Why not just make it a global function at that point? Who knows.
     // Unless you'll eventually select fields?

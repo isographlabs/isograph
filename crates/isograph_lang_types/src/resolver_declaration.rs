@@ -14,13 +14,12 @@ pub struct ResolverDeclaration {
     pub resolver_field_name: WithSpan<ScalarFieldName>,
     pub selection_set_and_unwraps:
         Option<(Vec<WithSpan<Selection<(), ()>>>, Vec<WithSpan<Unwrap>>)>,
-    // TODO intern the path buf instead of the string?
-    pub resolver_definition_path: ResolverDefinitionPath,
     pub directives: Vec<WithSpan<FragmentDirectiveUsage>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
 
-    // TODO convert to ResolverActionKind
+    // TODO convert these to ResolverActionKind
     pub has_associated_js_function: bool,
+    pub resolver_definition_path: ResolverDefinitionPath,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
