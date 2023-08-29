@@ -6,8 +6,7 @@ use std::{
 };
 
 use common_lang_types::{
-    HasName, QueryOperationName, ResolverDefinitionPath, SelectableFieldName, UnvalidatedTypeName,
-    WithSpan,
+    HasName, QueryOperationName, SelectableFieldName, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{ListTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
@@ -136,11 +135,8 @@ fn generate_fetchable_resolver_artifact<'schema>(
             &mut nested_resolver_artifact_imports,
             0,
         );
-        let resolver_import_statement = generate_resolver_import_statement(
-            fetchable_resolver.name,
-            fetchable_resolver.resolver_definition_path,
-            fetchable_resolver.action_kind,
-        );
+        let resolver_import_statement =
+            generate_resolver_import_statement(fetchable_resolver.action_kind);
         let resolver_return_type =
             generate_resolver_return_type_declaration(fetchable_resolver.action_kind);
         let resolver_read_out_type = generate_read_out_type(fetchable_resolver);
@@ -204,11 +200,8 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
         let resolver_return_type =
             generate_resolver_return_type_declaration(non_fetchable_resolver.action_kind);
         let resolver_read_out_type = generate_read_out_type(non_fetchable_resolver);
-        let resolver_import_statement = generate_resolver_import_statement(
-            non_fetchable_resolver.name,
-            non_fetchable_resolver.resolver_definition_path,
-            non_fetchable_resolver.action_kind,
-        );
+        let resolver_import_statement =
+            generate_resolver_import_statement(non_fetchable_resolver.action_kind);
         NonFetchableResolver {
             parent_type: parent_type.into(),
             resolver_field_name: non_fetchable_resolver.name,
@@ -578,16 +571,14 @@ fn print_non_null_type_annotation<T: Display>(non_null: &NonNullTypeAnnotation<T
 }
 
 fn generate_resolver_import_statement(
-    resolver_name: SelectableFieldName,
-    resolver_path: ResolverDefinitionPath,
     resolver_action_kind: ResolverActionKind,
 ) -> ResolverImportStatement {
     match resolver_action_kind {
         ResolverActionKind::Identity => {
             ResolverImportStatement("const resolver = x => x;".to_string())
         }
-        ResolverActionKind::NamedImport => ResolverImportStatement(format!(
-            "import {{ {resolver_name} as resolver }} from '../../{resolver_path}';",
+        ResolverActionKind::NamedImport((name, path)) => ResolverImportStatement(format!(
+            "import {{ {name} as resolver }} from '../../{path}';",
         )),
     }
 }
@@ -909,7 +900,7 @@ fn generate_resolver_return_type_declaration(
 ) -> ResolverReturnType {
     match action_kind {
         ResolverActionKind::Identity => ResolverReturnType("ResolverParameterType".to_string()),
-        ResolverActionKind::NamedImport => {
+        ResolverActionKind::NamedImport(_) => {
             ResolverReturnType("ReturnType<typeof resolver>".to_string())
         }
     }

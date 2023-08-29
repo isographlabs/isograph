@@ -500,7 +500,7 @@ pub enum ResolverActionKind {
     // No associated js function
     Identity,
     // Associated js function
-    NamedImport,
+    NamedImport((SelectableFieldName, ResolverDefinitionPath)),
 }
 
 #[derive(Debug)]
