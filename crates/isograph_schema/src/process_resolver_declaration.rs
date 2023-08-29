@@ -60,7 +60,6 @@ impl UnvalidatedSchema {
         {
             // Did not insert, so this object already has a field with the same name :(
             return Err(ProcessResolverDeclarationError::ParentAlreadyHasField {
-                parent_type: "object",
                 parent_type_name: object.name.into(),
                 resolver_field_name: resolver_field_name.into(),
             });
@@ -115,10 +114,9 @@ pub enum ProcessResolverDeclarationError {
     },
 
     #[error(
-        "The {parent_type} {parent_type_name} already has a field named `{resolver_field_name}`."
+        "The Isograph object type \"{parent_type_name}\" already has a field named \"{resolver_field_name}\"."
     )]
     ParentAlreadyHasField {
-        parent_type: &'static str,
         parent_type_name: IsographObjectTypeName,
         resolver_field_name: SelectableFieldName,
     },
