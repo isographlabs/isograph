@@ -12,9 +12,9 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    ResolverTypeAndField, Schema, SchemaData, SchemaIdField, SchemaObject, SchemaResolver,
-    SchemaServerField, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData,
-    UnvalidatedSchemaField, UnvalidatedSchemaResolver, UnvalidatedSchemaServerField,
+    Schema, SchemaData, SchemaIdField, SchemaObject, SchemaResolver, SchemaServerField,
+    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData, UnvalidatedSchemaField,
+    UnvalidatedSchemaResolver, UnvalidatedSchemaServerField,
 };
 
 pub type ValidatedSchemaField = SchemaServerField<TypeAnnotation<OutputTypeId>>;
@@ -29,7 +29,7 @@ pub type ValidatedSchemaResolver =
 pub type ValidatedEncounteredDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;
 /// The validated defined field that shows up in the TScalarField generic.
 pub type ValidatedScalarDefinedField =
-    DefinedField<ServerFieldId, (FieldNameOrAlias, ResolverTypeAndField, ResolverFieldId)>;
+    DefinedField<ServerFieldId, (FieldNameOrAlias, ResolverFieldId)>;
 
 pub type ValidatedSchemaObject = SchemaObject<ValidatedEncounteredDefinedField>;
 
@@ -489,10 +489,6 @@ fn validate_field_type_exists_and_is_scalar(
                     unwraps: scalar_field_selection.unwraps,
                     associated_data: DefinedField::ResolverField((
                         (*resolver_name).into(),
-                        ResolverTypeAndField {
-                            type_name: parent_object.name,
-                            field_name: (*resolver_name).into(),
-                        },
                         *resolver_field_id,
                     )),
                     arguments: scalar_field_selection.arguments,
