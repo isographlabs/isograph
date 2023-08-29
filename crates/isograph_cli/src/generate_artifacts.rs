@@ -51,14 +51,21 @@ fn get_all_artifacts<'schema>(
     schema
         .resolvers
         .iter()
-        .map(|resolver| match resolver.artifact_kind {
-            ResolverArtifactKind::FetchableOnQuery => {
-                Artifact::FetchableResolver(generate_fetchable_resolver_artifact(schema, resolver))
-            }
-            ResolverArtifactKind::NonFetchable => Artifact::NonFetchableResolver(
-                generate_non_fetchable_resolver_artifact(schema, resolver),
-            ),
-        })
+        .map(|resolver| get_artifact_for_resolver(resolver, schema))
+}
+
+fn get_artifact_for_resolver<'schema>(
+    resolver: &'schema ValidatedSchemaResolver,
+    schema: &'schema ValidatedSchema,
+) -> Artifact<'schema> {
+    match resolver.artifact_kind {
+        ResolverArtifactKind::FetchableOnQuery => {
+            Artifact::FetchableResolver(generate_fetchable_resolver_artifact(schema, resolver))
+        }
+        ResolverArtifactKind::NonFetchable => Artifact::NonFetchableResolver(
+            generate_non_fetchable_resolver_artifact(schema, resolver),
+        ),
+    }
 }
 
 fn generate_fetchable_resolver_artifact<'schema>(
