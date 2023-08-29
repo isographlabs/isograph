@@ -311,25 +311,28 @@ fn set_and_validate_id_field(
     field: &WithSpan<OutputFieldDefinition>,
     parent_type_name: IsographObjectTypeName,
 ) -> ProcessTypeDefinitionResult<()> {
+    // N.B. id_field is guaranteed to be None; otherwise field_names_to_type_name would
+    // have contained this field name already.
     debug_assert!(id_field.is_none(), "id field should not be defined twice");
 
     // We should change the type here! It should not be ID! It should be a
     // type specific to the concrete type, e.g. UserID.
     *id_field = Some(current_field_id.into());
-    if field.item.type_.inner_non_null_named_type().is_none() {
-        return Err(ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {
-            parent_type: parent_type_name,
-        });
-    }
-    // N.B. id_field is guaranteed to be None; otherwise field_names_to_type_name would
-    // have contained this field name already.
 
-    if ID_GRAPHQL_TYPE.lookup() != field.item.type_.inner().lookup() {
-        return Err(ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {
+    match field.item.type_.inner_non_null_named_type() {
+        Some(type_) => {
+            if (*type_).0.item.lookup() != ID_GRAPHQL_TYPE.lookup() {
+                Err(ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {
+                    parent_type: parent_type_name,
+                })
+            } else {
+                Ok(())
+            }
+        }
+        None => Err(ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {
             parent_type: parent_type_name,
-        });
+        }),
     }
-    Ok(())
 }
 
 type ProcessTypeDefinitionResult<T> = Result<T, ProcessTypeDefinitionError>;
