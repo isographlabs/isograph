@@ -247,8 +247,8 @@ fn validate_resolver_fragment(
                 artifact_kind: unvalidated_resolver.artifact_kind,
                 variable_definitions,
                 type_and_field: unvalidated_resolver.type_and_field,
-                has_associated_js_function: unvalidated_resolver.has_associated_js_function,
                 parent_object_id: unvalidated_resolver.parent_object_id,
+                action_kind: unvalidated_resolver.action_kind,
             })
         }
         None => Ok(SchemaResolver {
@@ -261,8 +261,8 @@ fn validate_resolver_fragment(
             artifact_kind: unvalidated_resolver.artifact_kind,
             variable_definitions,
             type_and_field: unvalidated_resolver.type_and_field,
-            has_associated_js_function: unvalidated_resolver.has_associated_js_function,
             parent_object_id: unvalidated_resolver.parent_object_id,
+            action_kind: unvalidated_resolver.action_kind,
         }),
     }
 }

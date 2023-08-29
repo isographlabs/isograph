@@ -10,7 +10,8 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    DefinedField, ResolverArtifactKind, ResolverTypeAndField, SchemaResolver, UnvalidatedSchema,
+    DefinedField, ResolverActionKind, ResolverArtifactKind, ResolverTypeAndField, SchemaResolver,
+    UnvalidatedSchema,
 };
 
 impl UnvalidatedSchema {
@@ -71,11 +72,15 @@ impl UnvalidatedSchema {
 
         let name = resolver_declaration.item.resolver_field_name.item.into();
         let variant = get_resolver_variant(&resolver_declaration.item.directives);
-        let has_associated_js_function = resolver_declaration.item.has_associated_js_function;
+        let resolver_action_kind = if resolver_declaration.item.has_associated_js_function {
+            ResolverActionKind::NamedImport
+        } else {
+            ResolverActionKind::Identity
+        };
 
         // TODO variant should carry payloads, instead of this check
         if variant.as_ref().map(|span| span.item) == Some(ResolverVariant::Component) {
-            if !has_associated_js_function {
+            if !matches!(resolver_action_kind, ResolverActionKind::NamedImport) {
                 return Err(ProcessResolverDeclarationError::ComponentResolverMissingJsFunction {});
             }
         }
@@ -93,8 +98,9 @@ impl UnvalidatedSchema {
                 type_name: object.name,
                 field_name: name,
             },
-            has_associated_js_function,
+
             parent_object_id,
+            action_kind: resolver_action_kind,
         });
         Ok(())
     }

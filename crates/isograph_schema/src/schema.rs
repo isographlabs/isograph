@@ -495,6 +495,14 @@ pub enum ResolverArtifactKind {
     NonFetchable,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum ResolverActionKind {
+    // No associated js function
+    Identity,
+    // Associated js function
+    NamedImport,
+}
+
 #[derive(Debug)]
 pub struct SchemaResolver<TScalarField, TLinkedField, TVariableDefinitionType> {
     pub description: Option<DescriptionValue>,
@@ -511,12 +519,13 @@ pub struct SchemaResolver<TScalarField, TLinkedField, TVariableDefinitionType> {
     pub variant: Option<WithSpan<ResolverVariant>>,
 
     pub artifact_kind: ResolverArtifactKind,
+    pub action_kind: ResolverActionKind,
+
     pub variable_definitions: Vec<WithSpan<VariableDefinition<TVariableDefinitionType>>>,
 
     // TODO this is probably unused
     // Why is this not calculated when needed?
     pub type_and_field: ResolverTypeAndField,
-    pub has_associated_js_function: bool,
 
     // TODO should this be TypeWithFieldsId???
     pub parent_object_id: ObjectId,

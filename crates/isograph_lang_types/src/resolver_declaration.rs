@@ -19,6 +19,7 @@ pub struct ResolverDeclaration {
     pub directives: Vec<WithSpan<FragmentDirectiveUsage>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
 
+    // TODO convert to ResolverActionKind
     pub has_associated_js_function: bool,
 }
 

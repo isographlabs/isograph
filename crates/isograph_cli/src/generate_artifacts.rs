@@ -16,7 +16,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     create_merged_selection_set, DefinedField, MergedLinkedFieldSelection,
-    MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection,
+    MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection, ResolverActionKind,
     ResolverArtifactKind, ResolverTypeAndField, ResolverVariant, SchemaObject,
     ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
     ValidatedSchemaResolver, ValidatedSelection, ValidatedVariableDefinition,
@@ -139,11 +139,10 @@ fn generate_fetchable_resolver_artifact<'schema>(
         let resolver_import_statement = generate_resolver_import_statement(
             fetchable_resolver.name,
             fetchable_resolver.resolver_definition_path,
-            fetchable_resolver.has_associated_js_function,
+            fetchable_resolver.action_kind,
         );
-        let resolver_return_type = generate_resolver_return_type_declaration(
-            fetchable_resolver.has_associated_js_function,
-        );
+        let resolver_return_type =
+            generate_resolver_return_type_declaration(fetchable_resolver.action_kind);
         let resolver_read_out_type = generate_read_out_type(fetchable_resolver);
         let reader_ast = generate_reader_ast(
             schema,
@@ -202,14 +201,13 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
             &mut nested_resolver_artifact_imports,
             0,
         );
-        let resolver_return_type = generate_resolver_return_type_declaration(
-            non_fetchable_resolver.has_associated_js_function,
-        );
+        let resolver_return_type =
+            generate_resolver_return_type_declaration(non_fetchable_resolver.action_kind);
         let resolver_read_out_type = generate_read_out_type(non_fetchable_resolver);
         let resolver_import_statement = generate_resolver_import_statement(
             non_fetchable_resolver.name,
             non_fetchable_resolver.resolver_definition_path,
-            non_fetchable_resolver.has_associated_js_function,
+            non_fetchable_resolver.action_kind,
         );
         NonFetchableResolver {
             parent_type: parent_type.into(),
@@ -582,16 +580,15 @@ fn print_non_null_type_annotation<T: Display>(non_null: &NonNullTypeAnnotation<T
 fn generate_resolver_import_statement(
     resolver_name: SelectableFieldName,
     resolver_path: ResolverDefinitionPath,
-    has_associated_js_function: bool,
+    resolver_action_kind: ResolverActionKind,
 ) -> ResolverImportStatement {
-    // TODO make this an enum/option instead of three variables
-    if has_associated_js_function {
-        // ../.. gets us back to the root
-        ResolverImportStatement(format!(
+    match resolver_action_kind {
+        ResolverActionKind::Identity => {
+            ResolverImportStatement("const resolver = x => x;".to_string())
+        }
+        ResolverActionKind::NamedImport => ResolverImportStatement(format!(
             "import {{ {resolver_name} as resolver }} from '../../{resolver_path}';",
-        ))
-    } else {
-        ResolverImportStatement("const resolver = x => x;".to_string())
+        )),
     }
 }
 
@@ -908,12 +905,13 @@ fn generate_read_out_type(resolver_definition: &ValidatedSchemaResolver) -> Reso
 }
 
 fn generate_resolver_return_type_declaration(
-    has_associated_js_function: bool,
+    action_kind: ResolverActionKind,
 ) -> ResolverReturnType {
-    if has_associated_js_function {
-        ResolverReturnType("ReturnType<typeof resolver>".to_string())
-    } else {
-        ResolverReturnType("ResolverParameterType".to_string())
+    match action_kind {
+        ResolverActionKind::Identity => ResolverReturnType("ResolverParameterType".to_string()),
+        ResolverActionKind::NamedImport => {
+            ResolverReturnType("ReturnType<typeof resolver>".to_string())
+        }
     }
 }
 
