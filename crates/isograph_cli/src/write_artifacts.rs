@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
 };
 
-use common_lang_types::{IsographObjectTypeName, SelectableFieldName};
+use common_lang_types::SelectableFieldName;
 use intern::{string_key::Intern, Lookup};
 
 use crate::generate_artifacts::{
@@ -49,15 +49,11 @@ pub(crate) fn write_artifacts<'schema>(
                 } = &fetchable_resolver;
 
                 let generated_file_name = generated_file_name((*query_name).into());
-                let generated_file_path = generated_file_path(
-                    &generated_folder_root,
-                    parent_type.name,
-                    &generated_file_name,
-                );
                 let intermediate_folder = generated_intermediate_folder(
                     &generated_folder_root,
                     &[parent_type.name.lookup()],
                 );
+                let generated_file_path = intermediate_folder.join(generated_file_name);
 
                 fs::create_dir_all(&intermediate_folder).map_err(|e| {
                     GenerateArtifactsError::UnableToCreateDirectory {
@@ -90,15 +86,11 @@ pub(crate) fn write_artifacts<'schema>(
                 } = &non_fetchable_resolver;
 
                 let generated_file_name = generated_file_name(*resolver_field_name);
-                let generated_file_path = generated_file_path(
-                    &generated_folder_root,
-                    parent_type.name,
-                    &generated_file_name,
-                );
                 let intermediate_folder = generated_intermediate_folder(
                     &generated_folder_root,
                     &[parent_type.name.lookup()],
                 );
+                let generated_file_path = intermediate_folder.join(generated_file_name);
 
                 fs::create_dir_all(&intermediate_folder).map_err(|e| {
                     GenerateArtifactsError::UnableToCreateDirectory {
@@ -128,15 +120,11 @@ pub(crate) fn write_artifacts<'schema>(
 
                 // TODO we will generate many different refetch queries; this clobbers all of them
                 let generated_file_name = generated_file_name("__refetchQuery".intern().into());
-                let generated_file_path = generated_file_path(
-                    &generated_folder_root,
-                    parent_object.name,
-                    &generated_file_name,
-                );
                 let intermediate_folder = generated_intermediate_folder(
                     &generated_folder_root,
                     &[parent_object.name.lookup()],
                 );
+                let generated_file_path = intermediate_folder.join(generated_file_name);
 
                 fs::create_dir_all(&intermediate_folder).map_err(|e| {
                     GenerateArtifactsError::UnableToCreateDirectory {
@@ -168,14 +156,6 @@ pub(crate) fn write_artifacts<'schema>(
 
 fn generated_file_name(field_name: SelectableFieldName) -> PathBuf {
     PathBuf::from(format!("{}.isograph.tsx", field_name))
-}
-
-fn generated_file_path(
-    project_root: &PathBuf,
-    parent_type_name: IsographObjectTypeName,
-    file_name: &PathBuf,
-) -> PathBuf {
-    project_root.join(parent_type_name.lookup()).join(file_name)
 }
 
 fn generated_intermediate_folder(project_root: &PathBuf, items: &[&'static str]) -> PathBuf {
