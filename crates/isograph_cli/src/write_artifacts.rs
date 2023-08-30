@@ -116,13 +116,21 @@ pub(crate) fn write_artifacts<'schema>(
                 })?;
             }
             Artifact::RefetchQuery(refetch_query_resolver) => {
-                let RefetchQueryResolver { parent_object, .. } = &refetch_query_resolver;
+                let RefetchQueryResolver {
+                    root_fetchable_field,
+                    root_fetchable_field_parent_object,
+                    ..
+                } = &refetch_query_resolver;
 
-                // TODO we will generate many different refetch queries; this clobbers all of them
+                // TODO we will generate many different queries; they need unique names. For now,
+                // they have a single name each artifact clobbers the previous.
                 let generated_file_name = generated_file_name("__refetchQuery".intern().into());
                 let intermediate_folder = generated_intermediate_folder(
                     &generated_folder_root,
-                    &[parent_object.name.lookup()],
+                    &[
+                        root_fetchable_field_parent_object.lookup(),
+                        root_fetchable_field.lookup(),
+                    ],
                 );
                 let generated_file_path = intermediate_folder.join(generated_file_name);
 

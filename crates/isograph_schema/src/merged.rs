@@ -4,8 +4,8 @@ use std::collections::{
 };
 
 use common_lang_types::{
-    LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName, SelectableFieldName,
-    ServerFieldNormalizationKey, Span, WithSpan,
+    IsographObjectTypeName, LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName,
+    SelectableFieldName, ServerFieldNormalizationKey, Span, WithSpan,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -88,6 +88,8 @@ pub struct RefetchFieldResolverInfo {
     pub merged_selection_set: MergedSelectionSet,
     pub parent_id: ObjectId,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<InputTypeId>>>,
+    pub root_parent_object: IsographObjectTypeName,
+    pub root_fetchable_field: SelectableFieldName,
 }
 
 /// A merged selection set is an input for generating:
@@ -127,6 +129,11 @@ pub fn create_merged_selection_set(
             merged_selection_set: merged.clone(),
             parent_id: parent_type.id,
             variable_definitions: root_fetchable_resolver.variable_definitions.clone(),
+            root_fetchable_field: root_fetchable_resolver.name,
+            root_parent_object: schema
+                .schema_data
+                .object(root_fetchable_resolver.parent_object_id)
+                .name,
         }));
     }
 
@@ -451,6 +458,11 @@ fn HACK__merge_linked_fields(
             merged_selection_set: MergedSelectionSet(merged_fields.clone()),
             parent_id: linked_field_parent_type.id,
             variable_definitions: root_fetchable_resolver.variable_definitions.clone(),
+            root_fetchable_field: root_fetchable_resolver.name,
+            root_parent_object: schema
+                .schema_data
+                .object(root_fetchable_resolver.parent_object_id)
+                .name,
         }))
     }
 

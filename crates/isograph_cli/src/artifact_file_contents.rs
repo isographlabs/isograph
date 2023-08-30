@@ -103,7 +103,7 @@ impl<'schema> NonFetchableResolver<'schema> {
     }
 }
 
-impl<'schema> RefetchQueryResolver<'schema> {
+impl RefetchQueryResolver {
     pub(crate) fn file_contents(self) -> String {
         let RefetchQueryResolver {
             normalization_ast,

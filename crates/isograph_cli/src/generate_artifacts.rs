@@ -6,7 +6,8 @@ use std::{
 };
 
 use common_lang_types::{
-    HasName, QueryOperationName, SelectableFieldName, Span, UnvalidatedTypeName, WithSpan,
+    HasName, IsographObjectTypeName, QueryOperationName, SelectableFieldName, Span,
+    UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
     ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation,
@@ -97,6 +98,9 @@ fn get_artifact_for_refetch_field<'schema>(
         merged_selection_set,
         parent_id,
         variable_definitions,
+        root_fetchable_field,
+        root_parent_object,
+        ..
     } = refetch_info;
 
     let parent_object = schema.schema_data.object(parent_id);
@@ -122,9 +126,10 @@ fn get_artifact_for_refetch_field<'schema>(
     // ------- END HACK -------
 
     Artifact::RefetchQuery(RefetchQueryResolver {
-        parent_object,
         normalization_ast,
         query_text,
+        root_fetchable_field,
+        root_fetchable_field_parent_object: root_parent_object,
     })
 }
 
@@ -298,7 +303,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
 pub(crate) enum Artifact<'schema> {
     FetchableResolver(FetchableResolver<'schema>),
     NonFetchableResolver(NonFetchableResolver<'schema>),
-    RefetchQuery(RefetchQueryResolver<'schema>),
+    RefetchQuery(RefetchQueryResolver),
 }
 
 #[derive(Debug)]
@@ -361,10 +366,11 @@ pub(crate) struct NonFetchableResolver<'schema> {
 }
 
 #[derive(Debug)]
-pub(crate) struct RefetchQueryResolver<'schema> {
-    pub parent_object: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
+pub(crate) struct RefetchQueryResolver {
     pub normalization_ast: NormalizationAst,
     pub query_text: QueryText,
+    pub root_fetchable_field: SelectableFieldName,
+    pub root_fetchable_field_parent_object: IsographObjectTypeName,
 }
 
 fn generate_query_text(

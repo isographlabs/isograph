@@ -509,11 +509,14 @@ pub enum ResolverActionKind {
 #[derive(Debug)]
 pub struct SchemaResolver<TScalarField, TLinkedField, TVariableDefinitionType> {
     pub description: Option<DescriptionValue>,
+    // TODO make this a ResolverName that can be converted into a SelectableFieldName
     pub name: SelectableFieldName,
     pub id: ResolverFieldId,
     // TODO it makes no sense for a resolver to not select fields!
     // Why not just make it a global function at that point? Who knows.
     // Unless you'll eventually select fields?
+    // Perhaps refetch fields for viewer (or other fields that have a known path
+    // that don't require id) will have no selection set.
     pub selection_set_and_unwraps: Option<(
         Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
         Vec<WithSpan<Unwrap>>,
