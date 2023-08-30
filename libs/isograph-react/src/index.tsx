@@ -14,7 +14,7 @@ import { type PromiseWrapper } from "./PromiseWrapper";
 import React from "react";
 import nodeQuery from "./node_query";
 
-export { setNetwork, makeNetworkRequest } from "./cache";
+export { setNetwork, makeNetworkRequest, subscribe } from "./cache";
 
 // This type should be treated as an opaque type.
 export type IsographFetchableResolver<
@@ -24,7 +24,7 @@ export type IsographFetchableResolver<
 > = {
   kind: "FetchableResolver";
   queryText: string;
-  normalizationAst: NormalizationAST;
+  normalizationAst: NormalizationAst;
   readerAst: ReaderAst<TReadFromStore>;
   resolver: (data: TResolverProps) => TResolverResult;
   // TODO ReaderAst<TResolverProps> should contain the convert function
@@ -87,11 +87,11 @@ export type ReaderResolverField = {
   arguments: Arguments | null;
 };
 
-export type NormalizationASTNode =
+export type NormalizationAstNode =
   | NormalizationScalarField
   | NormalizationLinkedField;
 // @ts-ignore
-export type NormalizationAST = NormalizationASTNode[];
+export type NormalizationAst = NormalizationAstNode[];
 
 export type NormalizationScalarField = {
   kind: "Scalar";
@@ -107,7 +107,7 @@ export type NormalizationLinkedField = {
   // TODO consider getting rid of, and always deriving this from arguments
   alias: string | null;
   arguments: Arguments | null;
-  selections: NormalizationAST;
+  selections: NormalizationAst;
 };
 
 export type Arguments = Argument[];
@@ -399,7 +399,10 @@ function readData<TReadFromStore>(
             };
           } else {
             // TODO do we also need to call convert?
-            target[field.alias] = field.resolver.resolver(nodeQuery, data.data);
+            target[field.alias] = field.resolver.resolver(nodeQuery, {
+              ...data.data,
+              ...variables,
+            });
           }
         } else {
           const fragmentReference = {

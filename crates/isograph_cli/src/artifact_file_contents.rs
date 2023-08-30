@@ -4,7 +4,8 @@ use common_lang_types::IsographObjectTypeName;
 use isograph_schema::ResolverTypeAndField;
 
 use crate::generate_artifacts::{
-    FetchableResolver, NonFetchableResolver, ResolverImport, ResolverReadOutType,
+    FetchableResolver, NonFetchableResolver, RefetchQueryResolver, ResolverImport,
+    ResolverReadOutType,
 };
 
 impl<'schema> FetchableResolver<'schema> {
@@ -99,6 +100,32 @@ impl<'schema> NonFetchableResolver<'schema> {
             "  ",
             "  ",
             "  ",
+        )
+    }
+}
+
+impl<'schema> RefetchQueryResolver<'schema> {
+    pub(crate) fn file_contents(self) -> String {
+        let RefetchQueryResolver {
+            normalization_ast,
+            query_text,
+            ..
+        } = self;
+
+        format!(
+            "import type {{IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst}} from '@isograph/react';\n\
+            const queryText = '{query_text}';\n\n\
+            const normalizationAst: NormalizationAst = {normalization_ast};\n\
+            const artifact: any = {{\n\
+            {}kind: 'RefetchQuery',\n\
+            {}queryText,\n\
+            {}normalizationAst,\n\
+            }};\n\n\
+            export default artifact;\n",
+            "  ",
+            "  ",
+            "  ",
+
         )
     }
 }

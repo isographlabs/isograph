@@ -5,10 +5,10 @@ use std::{
 };
 
 use common_lang_types::{IsographObjectTypeName, SelectableFieldName};
-use intern::Lookup;
+use intern::{string_key::Intern, Lookup};
 
 use crate::generate_artifacts::{
-    Artifact, FetchableResolver, GenerateArtifactsError, NonFetchableResolver,
+    Artifact, FetchableResolver, GenerateArtifactsError, NonFetchableResolver, RefetchQueryResolver,
 };
 
 pub(crate) fn write_artifacts<'schema>(
@@ -111,6 +111,42 @@ pub(crate) fn write_artifacts<'schema>(
                 })?;
 
                 let file_contents = non_fetchable_resolver.file_contents();
+
+                file.write(file_contents.as_bytes()).map_err(|e| {
+                    GenerateArtifactsError::UnableToWriteToArtifactFile {
+                        path: generated_file_path.clone(),
+                        message: e,
+                    }
+                })?;
+            }
+            Artifact::RefetchQuery(refetch_query_resolver) => {
+                let RefetchQueryResolver { parent_object, .. } = &refetch_query_resolver;
+
+                // TODO we will generate many different refetch queries; this clobbers all of them
+                let generated_file_name = generated_file_name("__refetchQuery".intern().into());
+                let generated_file_path = generated_file_path(
+                    &generated_folder_root,
+                    parent_object.name,
+                    &generated_file_name,
+                );
+                let intermediate_folder =
+                    generated_intermediate_folder(&generated_folder_root, parent_object.name);
+
+                fs::create_dir_all(&intermediate_folder).map_err(|e| {
+                    GenerateArtifactsError::UnableToCreateDirectory {
+                        path: intermediate_folder.clone(),
+                        message: e,
+                    }
+                })?;
+
+                let mut file = File::create(&generated_file_path).map_err(|e| {
+                    GenerateArtifactsError::UnableToWriteToArtifactFile {
+                        path: generated_file_path.clone(),
+                        message: e,
+                    }
+                })?;
+
+                let file_contents = refetch_query_resolver.file_contents();
 
                 file.write(file_contents.as_bytes()).map_err(|e| {
                     GenerateArtifactsError::UnableToWriteToArtifactFile {

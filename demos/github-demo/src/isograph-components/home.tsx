@@ -1,5 +1,5 @@
-import React from "react";
-import { iso, read, useLazyReference } from "@isograph/react";
+import React, { useEffect, useState } from "react";
+import { iso, read, useLazyReference, subscribe } from "@isograph/react";
 import { Container } from "@mui/material";
 
 import homePageQuery from "./__isograph/Query/home_page.isograph";
@@ -28,6 +28,10 @@ export function HomeRoute({
   route: Route;
   setRoute: (route: Route) => void;
 }) {
+  const [, setState] = useState();
+  useEffect(() => {
+    return subscribe(() => setState({}));
+  });
   const { queryReference } = useLazyReference(homePageQuery, {
     first: 15,
   });

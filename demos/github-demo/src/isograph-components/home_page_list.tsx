@@ -1,6 +1,7 @@
 import { iso } from "@isograph/react";
 import type { ResolverParameterType as HomePageListParams } from "./__isograph/Query/home_page_list.isograph";
 import { RepoLink } from "./RepoLink";
+import { Button } from "@mui/material";
 
 export const home_page_list = iso<
   HomePageListParams,
@@ -23,7 +24,9 @@ function HomePageList(props: HomePageListParams) {
         Home Page List Component
       </RepoLink>
       <h1>rbalicki2's repository stats</h1>
-      <div onClick={() => props.data.viewer.__refetch()}>refetch</div>
+      <Button onClick={() => props.data.viewer.__refetch()} variant="contained">
+        Refetch viewer
+      </Button>
       {props.data.viewer.repository_list({ setRoute: props.setRoute })}
     </>
   );

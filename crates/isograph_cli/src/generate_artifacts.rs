@@ -6,19 +6,23 @@ use std::{
 };
 
 use common_lang_types::{
-    HasName, QueryOperationName, SelectableFieldName, UnvalidatedTypeName, WithSpan,
+    HasName, QueryOperationName, SelectableFieldName, Span, UnvalidatedTypeName, WithSpan,
 };
-use graphql_lang_types::{ListTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation};
+use graphql_lang_types::{
+    ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation,
+};
+use intern::string_key::Intern;
 use isograph_lang_types::{
-    NonConstantValue, ObjectId, OutputTypeId, Selection, SelectionFieldArgument,
-    ServerFieldSelection,
+    InputTypeId, NonConstantValue, ObjectId, OutputTypeId, Selection, SelectionFieldArgument,
+    ServerFieldSelection, VariableDefinition,
 };
 use isograph_schema::{
-    create_merged_selection_set, DefinedField, MergedLinkedFieldSelection,
-    MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection, ResolverActionKind,
-    ResolverArtifactKind, ResolverTypeAndField, ResolverVariant, SchemaObject,
-    ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
-    ValidatedSchemaResolver, ValidatedSelection, ValidatedVariableDefinition,
+    create_merged_selection_set, ArtifactQueueItem, DefinedField, MergedLinkedFieldSelection,
+    MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection,
+    RefetchFieldResolverInfo, ResolverActionKind, ResolverArtifactKind, ResolverTypeAndField,
+    ResolverVariant, SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField,
+    ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
+    ValidatedVariableDefinition,
 };
 use thiserror::Error;
 
@@ -44,10 +48,6 @@ pub(crate) fn generate_artifacts(
     write_artifacts(get_all_artifacts(schema), project_root)?;
 
     Ok(())
-}
-
-enum ArtifactQueueItem<'schema> {
-    Resolver(&'schema ValidatedSchemaResolver),
 }
 
 /// get all artifacts that we must generate according to the following rough plan:
@@ -81,7 +81,82 @@ fn generate_artifact<'schema>(
         ArtifactQueueItem::Resolver(resolver) => {
             get_artifact_for_resolver(resolver, schema, artifact_queue)
         }
+        ArtifactQueueItem::RefetchField(refetch_info) => {
+            get_artifact_for_refetch_field(schema, refetch_info)
+        }
     }
+}
+
+// N.B. this was originally copied from generate_fetchable_resolver_artifact,
+// and it could use some de-duplicatoni
+fn get_artifact_for_refetch_field<'schema>(
+    schema: &'schema ValidatedSchema,
+    refetch_info: RefetchFieldResolverInfo,
+) -> Artifact<'schema> {
+    let RefetchFieldResolverInfo {
+        merged_selection_set,
+        parent_id,
+        variable_definitions,
+    } = refetch_info;
+
+    let parent_object = schema.schema_data.object(parent_id);
+
+    // --------- HACK ---------
+    // Merged selection sets do not support type refinements, so for now,
+    // we are hard-coding the outside of the query text (which includes
+    // `... on Type`) and the outside of the normalization AST (which can
+    // ignore the type refinement for now.)
+    let query_text = generate_refetchable_query_text(
+        parent_object,
+        schema,
+        &merged_selection_set,
+        variable_definitions,
+    );
+
+    let normalization_ast = NormalizationAst(format!(
+        "[{{ kind: \"Linked\", fieldName: \"node\", \
+        alias: null, arguments: [{{ argumentName: \"id\", variableName: \"id\" }}], \
+        selections: {} }}]",
+        generate_normalization_ast(schema, &merged_selection_set, 0).0,
+    ));
+    // ------- END HACK -------
+
+    Artifact::RefetchQuery(RefetchQueryResolver {
+        parent_object,
+        normalization_ast,
+        query_text,
+    })
+}
+
+fn generate_refetchable_query_text<'schema>(
+    parent_object_type: &'schema ValidatedSchemaObject,
+    schema: &'schema ValidatedSchema,
+    merged_selection_set: &MergedSelectionSet,
+    mut variable_definitions: Vec<WithSpan<ValidatedVariableDefinition>>,
+) -> QueryText {
+    let mut query_text = String::new();
+
+    variable_definitions.push(WithSpan {
+        item: VariableDefinition {
+            name: WithSpan::new("id".intern().into(), Span::new(0, 0)),
+            type_: TypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
+                NamedTypeAnnotation(WithSpan {
+                    item: InputTypeId::Scalar(schema.id_type_id),
+                    span: Span::new(0, 0),
+                }),
+            ))),
+        },
+        span: Span::new(0, 0),
+    });
+    let variable_text = write_variables_to_string(schema, &variable_definitions);
+
+    query_text.push_str(&format!(
+        "query {}_refetch {} {{ node____id___id: node(id: $id) {{ ... on {} {{ \\\n",
+        parent_object_type.name, variable_text, parent_object_type.name,
+    ));
+    write_selections_for_query_text(&mut query_text, schema, &merged_selection_set, 1);
+    query_text.push_str("}}}");
+    QueryText(query_text)
 }
 
 fn get_artifact_for_resolver<'schema>(
@@ -90,11 +165,11 @@ fn get_artifact_for_resolver<'schema>(
     artifact_queue: &mut Vec<ArtifactQueueItem<'schema>>,
 ) -> Artifact<'schema> {
     match resolver.artifact_kind {
-        ResolverArtifactKind::FetchableOnQuery => {
-            Artifact::FetchableResolver(generate_fetchable_resolver_artifact(schema, resolver))
-        }
+        ResolverArtifactKind::FetchableOnQuery => Artifact::FetchableResolver(
+            generate_fetchable_resolver_artifact(schema, resolver, artifact_queue),
+        ),
         ResolverArtifactKind::NonFetchable => Artifact::NonFetchableResolver(
-            generate_non_fetchable_resolver_artifact(schema, resolver, artifact_queue),
+            generate_non_fetchable_resolver_artifact(schema, resolver),
         ),
     }
 }
@@ -102,6 +177,7 @@ fn get_artifact_for_resolver<'schema>(
 fn generate_fetchable_resolver_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     fetchable_resolver: &ValidatedSchemaResolver,
+    artifact_queue: &mut Vec<ArtifactQueueItem<'schema>>,
 ) -> FetchableResolver<'schema> {
     if let Some((ref selection_set, _)) = fetchable_resolver.selection_set_and_unwraps {
         let query_name = fetchable_resolver.name.into();
@@ -115,6 +191,8 @@ fn generate_fetchable_resolver_artifact<'schema>(
                 .object(schema.query_type_id.expect("expect query type to exist"))
                 .into(),
             selection_set,
+            artifact_queue,
+            &fetchable_resolver.variable_definitions,
         );
 
         let query_object = schema
@@ -174,7 +252,6 @@ fn generate_fetchable_resolver_artifact<'schema>(
 fn generate_non_fetchable_resolver_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     non_fetchable_resolver: &ValidatedSchemaResolver,
-    _artifact_queue: &mut Vec<ArtifactQueueItem<'schema>>,
 ) -> NonFetchableResolver<'schema> {
     if let Some((selection_set, _)) = &non_fetchable_resolver.selection_set_and_unwraps {
         let parent_type = schema
@@ -221,6 +298,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
 pub(crate) enum Artifact<'schema> {
     FetchableResolver(FetchableResolver<'schema>),
     NonFetchableResolver(NonFetchableResolver<'schema>),
+    RefetchQuery(RefetchQueryResolver<'schema>),
 }
 
 #[derive(Debug)]
@@ -280,6 +358,13 @@ pub(crate) struct NonFetchableResolver<'schema> {
     pub resolver_parameter_type: ResolverParameterType,
     pub resolver_return_type: ResolverReturnType,
     pub resolver_import_statement: ResolverImportStatement,
+}
+
+#[derive(Debug)]
+pub(crate) struct RefetchQueryResolver<'schema> {
+    pub parent_object: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
+    pub normalization_ast: NormalizationAst,
+    pub query_text: QueryText,
 }
 
 fn generate_query_text(

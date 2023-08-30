@@ -6,7 +6,7 @@ import {
 import { PromiseWrapper, wrapPromise } from "./PromiseWrapper";
 import {
   IsographFetchableResolver,
-  NormalizationAST,
+  NormalizationAst,
   NormalizationLinkedField,
   NormalizationScalarField,
   ReaderLinkedField,
@@ -150,7 +150,7 @@ type NetworkResponseObject = {
 };
 
 function normalizeData(
-  normalizationAst: NormalizationAST,
+  normalizationAst: NormalizationAst,
   networkResponse: NetworkResponseObject,
   variables: Object
 ) {
@@ -188,6 +188,7 @@ export function onNextChange(): Promise<void> {
 const subscriptions: Set<() => void> = new Set();
 
 function callSubscriptions() {
+  console.log("subscriptions");
   subscriptions.forEach((callback) => callback());
 }
 
@@ -195,14 +196,15 @@ function callSubscriptions() {
  * Mutate targetParentRecord according to the normalizationAst and networkResponseParentRecord.
  */
 function normalizeDataIntoRecord(
-  normalizationAst: NormalizationAST,
+  normalizationAst: NormalizationAst,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
   targetParentRecordId: DataId,
   variables: { [index: string]: string }
 ) {
-  console.log(normalizationAst);
+  console.log("normalizing", { normalizationAst });
   for (const normalizationNode of normalizationAst) {
+    console.log("norm node", { normalizationNode });
     switch (normalizationNode.kind) {
       case "Scalar": {
         normalizeScalarField(
@@ -258,6 +260,7 @@ function normalizeLinkedField(
   variables: { [index: string]: string }
 ) {
   const networkResponseKey = getNetworkResponseKey(astNode);
+  console.log({ networkResponseKey });
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
   const parentRecordKey = getParentRecordKey(astNode, variables);
 
@@ -380,6 +383,7 @@ export function getParentRecordKey(
     }
   }
 
+  console.log("parent record key", { parentRecordKey });
   return parentRecordKey;
 }
 

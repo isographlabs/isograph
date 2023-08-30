@@ -9,13 +9,14 @@ use common_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    LinkedFieldSelection, ObjectId, ScalarFieldSelection, Selection, SelectionFieldArgument,
-    ServerFieldSelection,
+    InputTypeId, LinkedFieldSelection, ObjectId, ScalarFieldSelection, Selection,
+    SelectionFieldArgument, ServerFieldSelection, VariableDefinition,
 };
 
 use crate::{
-    DefinedField, SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField,
-    ValidatedSchema, ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSelection,
+    DefinedField, ResolverVariant, SchemaObject, ValidatedEncounteredDefinedField,
+    ValidatedScalarDefinedField, ValidatedSchema, ValidatedSchemaIdField, ValidatedSchemaObject,
+    ValidatedSchemaResolver, ValidatedSelection,
 };
 
 type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSelection>>;
@@ -44,6 +45,7 @@ pub struct MergedLinkedFieldSelection {
     pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
 }
 
+#[derive(Clone, Debug)]
 pub struct MergedSelectionSet(Vec<WithSpan<MergedServerFieldSelection>>);
 
 impl std::ops::Deref for MergedSelectionSet {
@@ -76,6 +78,18 @@ enum NormalizationKey {
     ServerField(ServerFieldNormalizationKey),
 }
 
+pub enum ArtifactQueueItem<'schema> {
+    Resolver(&'schema ValidatedSchemaResolver),
+    RefetchField(RefetchFieldResolverInfo),
+}
+
+#[derive(Debug, Clone)]
+pub struct RefetchFieldResolverInfo {
+    pub merged_selection_set: MergedSelectionSet,
+    pub parent_id: ObjectId,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<InputTypeId>>>,
+}
+
 /// A merged selection set is an input for generating:
 /// - query texts
 /// - normalization ASTs
@@ -84,14 +98,20 @@ pub fn create_merged_selection_set(
     schema: &ValidatedSchema,
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
+    artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
+    variable_definitions: &Vec<WithSpan<VariableDefinition<InputTypeId>>>,
 ) -> MergedSelectionSet {
     let mut merged_selection_set = HashMap::new();
 
+    let mut encountered_refetch_field = false;
     merge_selections_into_set(
         schema,
         &mut merged_selection_set,
         parent_type,
         selection_set,
+        &mut encountered_refetch_field,
+        artifact_queue,
+        variable_definitions,
     );
 
     select_typename_and_id_fields_in_merged_selection(
@@ -100,7 +120,17 @@ pub fn create_merged_selection_set(
         parent_type,
     );
 
-    MergedSelectionSet::new(merged_selection_set.into_iter().collect())
+    let merged = MergedSelectionSet::new(merged_selection_set.into_iter().collect());
+    if encountered_refetch_field {
+        // TODO attempt to avoid cloning here
+        artifact_queue.push(ArtifactQueueItem::RefetchField(RefetchFieldResolverInfo {
+            merged_selection_set: merged.clone(),
+            parent_id: parent_type.id,
+            variable_definitions: variable_definitions.clone(),
+        }));
+    }
+
+    merged
 }
 
 fn merge_selections_into_set(
@@ -108,6 +138,9 @@ fn merge_selections_into_set(
     merged_selection_set: &mut MergedSelectionMap,
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     validated_selections: &Vec<WithSpan<ValidatedSelection>>,
+    encountered_refetch_field: &mut bool,
+    artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
+    variable_definitions: &Vec<WithSpan<VariableDefinition<InputTypeId>>>,
 ) {
     for validated_selection in validated_selections.iter().filter(filter_id_fields) {
         let span = validated_selection.span;
@@ -123,6 +156,9 @@ fn merge_selections_into_set(
                             parent_type,
                             schema,
                             merged_selection_set,
+                            encountered_refetch_field,
+                            artifact_queue,
+                            variable_definitions,
                         ),
                     };
                 }
@@ -138,12 +174,16 @@ fn merge_selections_into_set(
                             occupied,
                             new_linked_field,
                             schema,
+                            artifact_queue,
+                            variable_definitions,
                         ),
                         Entry::Vacant(vacant_entry) => merge_linked_field_into_vacant_entry(
                             vacant_entry,
                             new_linked_field,
                             schema,
                             span,
+                            artifact_queue,
+                            variable_definitions,
                         ),
                     };
                 }
@@ -174,6 +214,8 @@ fn merge_linked_field_into_vacant_entry(
     new_linked_field: &LinkedFieldSelection<ValidatedScalarDefinedField, ObjectId>,
     schema: &ValidatedSchema,
     span: Span,
+    artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
+    variables: &Vec<WithSpan<VariableDefinition<InputTypeId>>>,
 ) {
     vacant_entry.insert(WithSpan::new(
         MergedServerFieldSelection::LinkedField(MergedLinkedFieldSelection {
@@ -185,6 +227,8 @@ fn merge_linked_field_into_vacant_entry(
                     schema,
                     linked_field_parent_type,
                     &new_linked_field.selection_set,
+                    artifact_queue,
+                    variables,
                 )
                 .into()
             },
@@ -199,6 +243,8 @@ fn merge_linked_field_into_occupied_entry(
     mut occupied: OccupiedEntry<'_, NormalizationKey, WithSpan<MergedServerFieldSelection>>,
     new_linked_field: &LinkedFieldSelection<ValidatedScalarDefinedField, ObjectId>,
     schema: &ValidatedSchema,
+    artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
+    variable_definitions: &Vec<WithSpan<VariableDefinition<InputTypeId>>>,
 ) {
     let existing_selection = occupied.get_mut();
     match &mut existing_selection.item {
@@ -213,6 +259,8 @@ fn merge_linked_field_into_occupied_entry(
                 &mut existing_linked_field.selection_set,
                 &new_linked_field.selection_set,
                 linked_field_parent_type,
+                artifact_queue,
+                variable_definitions,
             );
         }
     }
@@ -223,6 +271,9 @@ fn merge_scalar_resolver_field(
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     schema: &ValidatedSchema,
     merged_selection_set: &mut MergedSelectionMap,
+    encountered_refetch_field: &mut bool,
+    artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
+    variable_definitions: &Vec<WithSpan<VariableDefinition<InputTypeId>>>,
 ) {
     let resolver_field_name = scalar_field.name.item;
     let parent_field_id = parent_type
@@ -235,7 +286,26 @@ fn merge_scalar_resolver_field(
         .expect("expect field to exist");
     let resolver_field = schema.resolver(*parent_field_id);
     if let Some((ref selection_set, _)) = resolver_field.selection_set_and_unwraps {
-        merge_selections_into_set(schema, merged_selection_set, parent_type, selection_set)
+        merge_selections_into_set(
+            schema,
+            merged_selection_set,
+            parent_type,
+            selection_set,
+            encountered_refetch_field,
+            artifact_queue,
+            variable_definitions,
+        )
+    }
+
+    // HACK... can we do better
+    if matches!(
+        resolver_field.variant,
+        Some(WithSpan {
+            item: ResolverVariant::RefetchField,
+            ..
+        })
+    ) {
+        *encountered_refetch_field = true;
     }
 }
 
@@ -314,6 +384,8 @@ fn HACK__merge_linked_fields(
     existing_selection_set: &mut Vec<WithSpan<MergedServerFieldSelection>>,
     new_selection_set: &Vec<WithSpan<ValidatedSelection>>,
     linked_field_parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
+    artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
+    variable_definitions: &Vec<WithSpan<VariableDefinition<InputTypeId>>>,
 ) {
     let mut merged_selection_set = HashMap::new();
     for item in existing_selection_set.iter() {
@@ -355,11 +427,15 @@ fn HACK__merge_linked_fields(
         };
     }
 
+    let mut encountered_refetch_field = false;
     merge_selections_into_set(
         schema,
         &mut merged_selection_set,
         linked_field_parent_type,
         new_selection_set,
+        &mut encountered_refetch_field,
+        artifact_queue,
+        variable_definitions,
     );
 
     let mut merged_fields: Vec<_> = merged_selection_set
@@ -367,6 +443,14 @@ fn HACK__merge_linked_fields(
         .map(|(_key, value)| value)
         .collect();
     merged_fields.sort();
+
+    if encountered_refetch_field {
+        artifact_queue.push(ArtifactQueueItem::RefetchField(RefetchFieldResolverInfo {
+            merged_selection_set: MergedSelectionSet(merged_fields.clone()),
+            parent_id: linked_field_parent_type.id,
+            variable_definitions: variable_definitions.clone(),
+        }))
+    }
 
     *existing_selection_set = merged_fields;
 }
