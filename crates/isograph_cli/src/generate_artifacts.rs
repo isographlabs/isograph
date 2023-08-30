@@ -580,6 +580,12 @@ fn generate_resolver_import_statement(
         ResolverActionKind::NamedImport((name, path)) => ResolverImportStatement(format!(
             "import {{ {name} as resolver }} from '../../{path}';",
         )),
+        ResolverActionKind::RefetchField => ResolverImportStatement(
+            "// import { makeRefetchableFieldResolver } from '@isograph/react';\n\
+            // const resolver = makeRefetchableFieldResolver(artifact);\n\
+            const resolver = x => x;"
+                .to_string(),
+        ),
     }
 }
 
@@ -900,7 +906,7 @@ fn generate_resolver_return_type_declaration(
 ) -> ResolverReturnType {
     match action_kind {
         ResolverActionKind::Identity => ResolverReturnType("ResolverParameterType".to_string()),
-        ResolverActionKind::NamedImport(_) => {
+        ResolverActionKind::NamedImport(_) | ResolverActionKind::RefetchField => {
             ResolverReturnType("ReturnType<typeof resolver>".to_string())
         }
     }

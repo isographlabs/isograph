@@ -5,6 +5,7 @@ import { RepoLink } from "./RepoLink";
 export const user_detail = iso<UserDetailParams, ReturnType<typeof UserDetail>>`
   Query.user_detail @component {
     user(login: $userLogin) {
+      __refetch,
       name,
       repository_list,
     },
@@ -12,7 +13,7 @@ export const user_detail = iso<UserDetailParams, ReturnType<typeof UserDetail>>`
 `(UserDetail);
 
 function UserDetail(props: UserDetailParams) {
-  console.log("repo detail", props.data);
+  console.log("user detail props.data:", props.data);
   const user = props.data.user;
   if (user == null) {
     return <h1>user not found</h1>;

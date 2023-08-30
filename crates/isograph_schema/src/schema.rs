@@ -497,10 +497,13 @@ pub enum ResolverArtifactKind {
 
 #[derive(Debug, Clone, Copy)]
 pub enum ResolverActionKind {
-    // No associated js function
+    /// No associated js function
     Identity,
-    // Associated js function
+    /// Associated js function
+    /// TODO the first element should have a type of JavascriptName
     NamedImport((SelectableFieldName, ResolverDefinitionPath)),
+    /// Refetch fields
+    RefetchField,
 }
 
 #[derive(Debug)]
@@ -517,6 +520,7 @@ pub struct SchemaResolver<TScalarField, TLinkedField, TVariableDefinitionType> {
     )>,
     pub variant: Option<WithSpan<ResolverVariant>>,
 
+    // TODO should this be create_normalization_ast: bool?
     pub artifact_kind: ResolverArtifactKind,
     pub action_kind: ResolverActionKind,
 

@@ -9,14 +9,18 @@ use graphql_lang_types::{
     TypeAnnotation, TypeSystemDefinition, TypeSystemDocument,
 };
 use intern::{string_key::Intern, Lookup};
-use isograph_lang_types::{DefinedTypeId, ObjectId, ServerFieldId, ServerIdFieldId};
+use isograph_lang_types::{
+    DefinedTypeId, ObjectId, ResolverFieldId, ScalarFieldSelection, Selection, ServerFieldId,
+    ServerFieldSelection, ServerIdFieldId,
+};
 use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    DefinedField, IsographObjectTypeDefinition, Schema, SchemaObject, SchemaScalar,
+    DefinedField, IsographObjectTypeDefinition, ResolverActionKind, ResolverArtifactKind,
+    ResolverTypeAndField, ResolverVariant, Schema, SchemaObject, SchemaResolver, SchemaScalar,
     SchemaServerField, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
-    ValidRefinement, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
+    UnvalidatedSchemaResolver, ValidRefinement, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
 };
 
 lazy_static! {
@@ -102,8 +106,9 @@ impl UnvalidatedSchema {
         valid_type_refinement_map: &mut HashMap<IsographObjectTypeName, Vec<ObjectId>>,
     ) -> ProcessTypeDefinitionResult<()> {
         let &mut Schema {
-            fields: ref mut existing_fields,
+            fields: ref mut schema_fields,
             ref mut schema_data,
+            resolvers: ref mut schema_resolvers,
             ..
         } = self;
         let next_object_id = schema_data.objects.len().into();
@@ -118,26 +123,35 @@ impl UnvalidatedSchema {
                 });
             }
             Entry::Vacant(vacant) => {
+                // TODO avoid this
+                let type_def_2 = type_definition.clone();
                 let FieldObjectIdsEtc {
                     unvalidated_schema_fields,
                     server_fields,
-                    encountered_fields,
+                    mut encountered_fields,
                     id_field,
                 } = get_field_objects_ids_and_names(
-                    type_definition.fields,
-                    existing_fields.len(),
+                    type_def_2.fields,
+                    schema_fields.len(),
                     next_object_id,
-                    type_definition.name.item.into(),
+                    type_def_2.name.item.into(),
                     get_typename_type(string_type_for_typename),
                 )?;
+
+                let object_resolvers = get_resolvers_for_schema_object(
+                    &id_field,
+                    &mut encountered_fields,
+                    schema_resolvers,
+                    next_object_id,
+                    &type_definition,
+                );
+
                 objects.push(SchemaObject {
                     description: type_definition.description.map(|d| d.item),
                     name: type_definition.name.item,
                     id: next_object_id,
                     server_fields,
-                    // Resolvers are not defined until we process iso literals. They're not contained in
-                    // the schema definition.
-                    resolvers: vec![],
+                    resolvers: object_resolvers,
                     encountered_fields,
                     valid_refinements: vec![],
                     id_field,
@@ -153,7 +167,7 @@ impl UnvalidatedSchema {
                 }
                 // --- END HACK ---
 
-                existing_fields.extend(unvalidated_schema_fields);
+                schema_fields.extend(unvalidated_schema_fields);
                 vacant.insert(DefinedTypeId::Object(next_object_id));
             }
         }
@@ -199,6 +213,56 @@ impl UnvalidatedSchema {
             }
         }
         Ok(())
+    }
+}
+
+/// Returns the resolvers for a schema object that we know up-front (before processing
+/// iso literals.) This is either a refetch field (if the object is refetchable), or
+/// nothing.
+fn get_resolvers_for_schema_object(
+    id_field_id: &Option<ServerIdFieldId>,
+    encountered_fields: &mut HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
+    schema_resolvers: &mut Vec<UnvalidatedSchemaResolver>,
+    parent_object_id: ObjectId,
+    type_definition: &IsographObjectTypeDefinition,
+) -> Vec<ResolverFieldId> {
+    if let Some(_id_field_id) = id_field_id {
+        let next_resolver_id = schema_resolvers.len().into();
+        let id_field_selection = WithSpan::new(
+            Selection::ServerField(ServerFieldSelection::ScalarField(ScalarFieldSelection {
+                name: WithSpan::new("id".intern().into(), Span::new(0, 0)),
+                reader_alias: None,
+                normalization_alias: None,
+                associated_data: (),
+                unwraps: vec![],
+                arguments: vec![],
+            })),
+            Span::new(0, 0),
+        );
+        schema_resolvers.push(SchemaResolver {
+            description: Some("A refetch field for this object.".intern().into()),
+            name: "__refetch".intern().into(),
+            id: next_resolver_id,
+            selection_set_and_unwraps: Some((vec![id_field_selection], vec![])),
+            variant: Some(WithSpan::new(ResolverVariant::Eager, Span::new(0, 0))),
+            variable_definitions: vec![],
+            type_and_field: ResolverTypeAndField {
+                type_name: type_definition.name.item,
+                field_name: "__refetch".intern().into(),
+            },
+            parent_object_id,
+            // N.B. __refetch fields are non-fetchable, but they do execute queries which
+            // have fetchable artifacts (i.e. normalization ASTs).
+            artifact_kind: ResolverArtifactKind::NonFetchable,
+            action_kind: ResolverActionKind::RefetchField,
+        });
+        encountered_fields.insert(
+            "__refetch".intern().into(),
+            DefinedField::ResolverField(next_resolver_id),
+        );
+        vec![next_resolver_id]
+    } else {
+        vec![]
     }
 }
 
