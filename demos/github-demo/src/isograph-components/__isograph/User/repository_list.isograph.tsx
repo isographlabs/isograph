@@ -33,6 +33,12 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
             arguments: null,
             selections: [
               {
+                kind: "Scalar",
+                fieldName: "id",
+                alias: null,
+                arguments: null,
+              },
+              {
                 kind: "Resolver",
                 alias: "repository_link",
                 arguments: null,
@@ -120,6 +126,7 @@ export type ResolverParameterType = { data:
   repositories: {
     edges: (({
       node: ({
+        id: string,
         repository_link: Repository__repository_link__outputType,
         name: string,
         nameWithOwner: string,

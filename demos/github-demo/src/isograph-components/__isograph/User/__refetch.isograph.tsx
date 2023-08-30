@@ -1,10 +1,10 @@
 import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
-// import { makeRefetchableFieldResolver } from '@isograph/react';
+import { makeNetworkRequest } from '@isograph/react';
 // const resolver = makeRefetchableFieldResolver(artifact);
-const resolver = x => x;
+const resolver = () => (artifact, variables) => makeNetworkRequest(artifact, variables);
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = ResolverReturnType;
+export type ReadOutType = any;
 
 // TODO support changing this
 export type ReadFromStoreType = ResolverParameterType;

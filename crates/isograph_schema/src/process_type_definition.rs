@@ -244,7 +244,7 @@ fn get_resolvers_for_schema_object(
             name: "__refetch".intern().into(),
             id: next_resolver_id,
             selection_set_and_unwraps: Some((vec![id_field_selection], vec![])),
-            variant: Some(WithSpan::new(ResolverVariant::Eager, Span::new(0, 0))),
+            variant: Some(WithSpan::new(ResolverVariant::Refetch, Span::new(0, 0))),
             variable_definitions: vec![],
             type_and_field: ResolverTypeAndField {
                 type_name: type_definition.name.item,

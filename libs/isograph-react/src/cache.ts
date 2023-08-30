@@ -72,7 +72,7 @@ export function setNetwork(newNetwork: typeof network) {
   network = newNetwork;
 }
 
-function makeNetworkRequest<T>(
+export function makeNetworkRequest<T>(
   artifact: IsoResolver,
   variables: object
 ): ItemCleanupPair<PromiseWrapper<T>> {
@@ -83,6 +83,7 @@ function makeNetworkRequest<T>(
   console.log("making network request", variables);
   const promise = network(artifact.queryText, variables).then(
     (networkResponse) => {
+      console.log("network response", artifact);
       normalizeData(artifact.normalizationAst, networkResponse.data, variables);
       return networkResponse.data;
     }
@@ -152,6 +153,12 @@ function normalizeData(
   networkResponse: NetworkResponseObject,
   variables: Object
 ) {
+  console.log(
+    "about to normalize",
+    normalizationAst,
+    networkResponse,
+    variables
+  );
   normalizeDataIntoRecord(
     normalizationAst,
     networkResponse,
@@ -193,6 +200,7 @@ function normalizeDataIntoRecord(
   targetParentRecordId: DataId,
   variables: { [index: string]: string }
 ) {
+  console.log(normalizationAst);
   for (const normalizationNode of normalizationAst) {
     switch (normalizationNode.kind) {
       case "Scalar": {

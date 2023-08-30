@@ -13,7 +13,7 @@ import { useLazyDisposableState } from "@isograph/react-disposable-state";
 import { type PromiseWrapper } from "./PromiseWrapper";
 import React from "react";
 
-export { setNetwork } from "./cache";
+export { setNetwork, makeNetworkRequest } from "./cache";
 
 // This type should be treated as an opaque type.
 export type IsographFetchableResolver<
@@ -77,7 +77,7 @@ export type ReaderLinkedField = {
   arguments: Arguments | null;
 };
 
-export type ReaderResolverVariant = "Eager" | "Component";
+export type ReaderResolverVariant = "Eager" | "Component" | "RefetchField";
 export type ReaderResolverField = {
   kind: "Resolver";
   alias: string;
@@ -458,7 +458,6 @@ export function getRefReaderForName(name: string) {
       reference: FragmentReference<any, any, any>;
       additionalRuntimeProps: any;
     }) {
-      console.log("Rendering RefReader:", { name, reference });
       const data = readButDoNotEvaluate(reference);
       return reference.resolver({ data, ...additionalRuntimeProps });
     }
