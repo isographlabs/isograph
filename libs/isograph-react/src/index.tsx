@@ -12,6 +12,7 @@ import {
 import { useLazyDisposableState } from "@isograph/react-disposable-state";
 import { type PromiseWrapper } from "./PromiseWrapper";
 import React from "react";
+import nodeQuery from "./node_query";
 
 export { setNetwork, makeNetworkRequest } from "./cache";
 
@@ -387,6 +388,19 @@ function readData<TReadFromStore>(
               />
             );
           };
+        } else if (field.variant === "RefetchField") {
+          const data = readData(field.resolver.readerAst, root, variables);
+          console.log("refetch field data", data, field);
+          if (data.kind === "MissingData") {
+            return {
+              kind: "MissingData",
+              reason: "Missing data for " + field.alias + " on root " + root,
+              nestedReason: data,
+            };
+          } else {
+            // TODO do we also need to call convert?
+            target[field.alias] = field.resolver.resolver(nodeQuery, data.data);
+          }
         } else {
           const fragmentReference = {
             kind: "FragmentReference",

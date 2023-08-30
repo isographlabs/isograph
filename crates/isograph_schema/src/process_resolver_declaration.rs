@@ -143,7 +143,7 @@ pub enum ProcessResolverDeclarationError {
 pub enum ResolverVariant {
     Component,
     Eager,
-    Refetch,
+    RefetchField,
 }
 
 impl fmt::Display for ResolverVariant {
@@ -151,7 +151,7 @@ impl fmt::Display for ResolverVariant {
         match self {
             ResolverVariant::Component => write!(f, "Component"),
             ResolverVariant::Eager => write!(f, "Eager"),
-            ResolverVariant::Refetch => write!(f, "Refetch"),
+            ResolverVariant::RefetchField => write!(f, "RefetchField"),
         }
     }
 }

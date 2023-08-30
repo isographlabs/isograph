@@ -26,7 +26,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
         alias: "__refetch",
         arguments: null,
         resolver: User____refetch,
-        variant: "Refetch",
+        variant: "RefetchField",
       },
       {
         kind: "Scalar",

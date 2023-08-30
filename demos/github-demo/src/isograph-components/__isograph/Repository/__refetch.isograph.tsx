@@ -1,7 +1,7 @@
 import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
 import { makeNetworkRequest } from '@isograph/react';
 // const resolver = makeRefetchableFieldResolver(artifact);
-const resolver = () => (artifact, variables) => makeNetworkRequest(artifact, variables);
+const resolver = (artifact, variables) => () => makeNetworkRequest(artifact, variables);
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = any;

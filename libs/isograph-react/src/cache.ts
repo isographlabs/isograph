@@ -76,6 +76,7 @@ export function makeNetworkRequest<T>(
   artifact: IsoResolver,
   variables: object
 ): ItemCleanupPair<PromiseWrapper<T>> {
+  console.log("make network request", artifact, variables);
   if (network == null) {
     throw new Error("Network must be set before makeNetworkRequest is called");
   }

@@ -7,12 +7,17 @@ import { FullPageLoading, Route } from "./github_demo";
 import { RepoLink } from "./RepoLink";
 
 iso`
+  Query.node_query($id: ID!) @fetchable {
+    node(id: $id) {
+      id,
+    },
+  }
+`;
+
+iso`
   Query.home_page($first: Int!) @fetchable {
     header,
     home_page_list,
-    viewer {
-      __refetch,
-    },
   }
 `;
 

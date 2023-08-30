@@ -3,7 +3,6 @@ import {getRefRendererForName} from '@isograph/react';
 const resolver = x => x;
 import Query__header, { ReadOutType as Query__header__outputType } from './header.isograph';
 import Query__home_page_list, { ReadOutType as Query__home_page_list__outputType } from './home_page_list.isograph';
-import User____refetch, { ReadOutType as User____refetch__outputType } from '../User/__refetch.isograph';
 
 const queryText = 'query home_page ($first: Int!) {\
   viewer {\
@@ -190,29 +189,11 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     resolver: Query__home_page_list,
     variant: "Component",
   },
-  {
-    kind: "Linked",
-    fieldName: "viewer",
-    alias: null,
-    arguments: null,
-    selections: [
-      {
-        kind: "Resolver",
-        alias: "__refetch",
-        arguments: null,
-        resolver: User____refetch,
-        variant: "Refetch",
-      },
-    ],
-  },
 ];
 
 export type ResolverParameterType = {
   header: Query__header__outputType,
   home_page_list: Query__home_page_list__outputType,
-  viewer: {
-    __refetch: User____refetch__outputType,
-  },
 };
 
 // The type, when returned from the resolver

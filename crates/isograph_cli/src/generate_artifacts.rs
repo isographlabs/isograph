@@ -583,7 +583,7 @@ fn generate_resolver_import_statement(
         ResolverActionKind::RefetchField => ResolverImportStatement(
             "import { makeNetworkRequest } from '@isograph/react';\n\
             // const resolver = makeRefetchableFieldResolver(artifact);\n\
-            const resolver = () => (artifact, variables) => makeNetworkRequest(artifact, variables);"
+            const resolver = (artifact, variables) => () => makeNetworkRequest(artifact, variables);"
                 .to_string(),
         ),
     }
@@ -890,7 +890,7 @@ fn generate_read_out_type(resolver_definition: &ValidatedSchemaResolver) -> Reso
                 )
             }
             ResolverVariant::Eager => ResolverReadOutType("ResolverReturnType".to_string()),
-            ResolverVariant::Refetch => ResolverReadOutType("any".to_string()),
+            ResolverVariant::RefetchField => ResolverReadOutType("any".to_string()),
         },
         None => ResolverReadOutType(
             // This is correct:

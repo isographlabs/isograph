@@ -11,6 +11,7 @@ export const home_page_list = iso<
       login,
       name,
       repository_list,
+      __refetch,
     },
   }
 `(HomePageList);
@@ -22,6 +23,7 @@ function HomePageList(props: HomePageListParams) {
         Home Page List Component
       </RepoLink>
       <h1>rbalicki2's repository stats</h1>
+      <div onClick={() => props.data.viewer.__refetch()}>refetch</div>
       {props.data.viewer.repository_list({ setRoute: props.setRoute })}
     </>
   );
