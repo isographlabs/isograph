@@ -99,7 +99,7 @@ pub fn create_merged_selection_set(
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
     artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
-    variable_definitions: &Vec<WithSpan<VariableDefinition<InputTypeId>>>,
+    root_fetchable_resolver: &ValidatedSchemaResolver,
 ) -> MergedSelectionSet {
     let mut merged_selection_set = HashMap::new();
 
@@ -111,7 +111,7 @@ pub fn create_merged_selection_set(
         selection_set,
         &mut encountered_refetch_field,
         artifact_queue,
-        variable_definitions,
+        root_fetchable_resolver,
     );
 
     select_typename_and_id_fields_in_merged_selection(
@@ -126,7 +126,7 @@ pub fn create_merged_selection_set(
         artifact_queue.push(ArtifactQueueItem::RefetchField(RefetchFieldResolverInfo {
             merged_selection_set: merged.clone(),
             parent_id: parent_type.id,
-            variable_definitions: variable_definitions.clone(),
+            variable_definitions: root_fetchable_resolver.variable_definitions.clone(),
         }));
     }
 
@@ -140,7 +140,7 @@ fn merge_selections_into_set(
     validated_selections: &Vec<WithSpan<ValidatedSelection>>,
     encountered_refetch_field: &mut bool,
     artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
-    variable_definitions: &Vec<WithSpan<VariableDefinition<InputTypeId>>>,
+    root_fetchable_resolver: &ValidatedSchemaResolver,
 ) {
     for validated_selection in validated_selections.iter().filter(filter_id_fields) {
         let span = validated_selection.span;
@@ -158,7 +158,7 @@ fn merge_selections_into_set(
                             merged_selection_set,
                             encountered_refetch_field,
                             artifact_queue,
-                            variable_definitions,
+                            root_fetchable_resolver,
                         ),
                     };
                 }
@@ -175,7 +175,7 @@ fn merge_selections_into_set(
                             new_linked_field,
                             schema,
                             artifact_queue,
-                            variable_definitions,
+                            root_fetchable_resolver,
                         ),
                         Entry::Vacant(vacant_entry) => merge_linked_field_into_vacant_entry(
                             vacant_entry,
@@ -183,7 +183,7 @@ fn merge_selections_into_set(
                             schema,
                             span,
                             artifact_queue,
-                            variable_definitions,
+                            root_fetchable_resolver,
                         ),
                     };
                 }
@@ -215,7 +215,7 @@ fn merge_linked_field_into_vacant_entry(
     schema: &ValidatedSchema,
     span: Span,
     artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
-    variables: &Vec<WithSpan<VariableDefinition<InputTypeId>>>,
+    root_fetchable_resolver: &ValidatedSchemaResolver,
 ) {
     vacant_entry.insert(WithSpan::new(
         MergedServerFieldSelection::LinkedField(MergedLinkedFieldSelection {
@@ -228,7 +228,7 @@ fn merge_linked_field_into_vacant_entry(
                     linked_field_parent_type,
                     &new_linked_field.selection_set,
                     artifact_queue,
-                    variables,
+                    root_fetchable_resolver,
                 )
                 .into()
             },
@@ -244,7 +244,7 @@ fn merge_linked_field_into_occupied_entry(
     new_linked_field: &LinkedFieldSelection<ValidatedScalarDefinedField, ObjectId>,
     schema: &ValidatedSchema,
     artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
-    variable_definitions: &Vec<WithSpan<VariableDefinition<InputTypeId>>>,
+    root_fetchable_resolver: &ValidatedSchemaResolver,
 ) {
     let existing_selection = occupied.get_mut();
     match &mut existing_selection.item {
@@ -260,7 +260,7 @@ fn merge_linked_field_into_occupied_entry(
                 &new_linked_field.selection_set,
                 linked_field_parent_type,
                 artifact_queue,
-                variable_definitions,
+                root_fetchable_resolver,
             );
         }
     }
@@ -273,7 +273,7 @@ fn merge_scalar_resolver_field(
     merged_selection_set: &mut MergedSelectionMap,
     encountered_refetch_field: &mut bool,
     artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
-    variable_definitions: &Vec<WithSpan<VariableDefinition<InputTypeId>>>,
+    root_fetchable_resolver: &ValidatedSchemaResolver,
 ) {
     let resolver_field_name = scalar_field.name.item;
     let parent_field_id = parent_type
@@ -293,7 +293,7 @@ fn merge_scalar_resolver_field(
             selection_set,
             encountered_refetch_field,
             artifact_queue,
-            variable_definitions,
+            root_fetchable_resolver,
         )
     }
 
@@ -385,7 +385,7 @@ fn HACK__merge_linked_fields(
     new_selection_set: &Vec<WithSpan<ValidatedSelection>>,
     linked_field_parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
-    variable_definitions: &Vec<WithSpan<VariableDefinition<InputTypeId>>>,
+    root_fetchable_resolver: &ValidatedSchemaResolver,
 ) {
     let mut merged_selection_set = HashMap::new();
     for item in existing_selection_set.iter() {
@@ -435,7 +435,7 @@ fn HACK__merge_linked_fields(
         new_selection_set,
         &mut encountered_refetch_field,
         artifact_queue,
-        variable_definitions,
+        root_fetchable_resolver,
     );
 
     let mut merged_fields: Vec<_> = merged_selection_set
@@ -450,7 +450,7 @@ fn HACK__merge_linked_fields(
         artifact_queue.push(ArtifactQueueItem::RefetchField(RefetchFieldResolverInfo {
             merged_selection_set: MergedSelectionSet(merged_fields.clone()),
             parent_id: linked_field_parent_type.id,
-            variable_definitions: variable_definitions.clone(),
+            variable_definitions: root_fetchable_resolver.variable_definitions.clone(),
         }))
     }
 

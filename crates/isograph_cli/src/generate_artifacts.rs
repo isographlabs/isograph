@@ -192,7 +192,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
                 .into(),
             selection_set,
             artifact_queue,
-            &fetchable_resolver.variable_definitions,
+            &fetchable_resolver,
         );
 
         let query_object = schema
