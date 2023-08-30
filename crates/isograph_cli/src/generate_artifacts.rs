@@ -667,7 +667,6 @@ fn generate_resolver_import_statement(
         )),
         ResolverActionKind::RefetchField => ResolverImportStatement(
             "import { makeNetworkRequest } from '@isograph/react';\n\
-            // const resolver = makeRefetchableFieldResolver(artifact);\n\
             const resolver = (artifact, variables) => () => makeNetworkRequest(artifact, variables);"
                 .to_string(),
         ),
