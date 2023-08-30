@@ -81,7 +81,6 @@ export function makeNetworkRequest<T>(
     throw new Error("Network must be set before makeNetworkRequest is called");
   }
 
-  console.log("making network request", variables);
   const promise = network(artifact.queryText, variables).then(
     (networkResponse) => {
       console.log("network response", artifact);
@@ -188,7 +187,6 @@ export function onNextChange(): Promise<void> {
 const subscriptions: Set<() => void> = new Set();
 
 function callSubscriptions() {
-  console.log("subscriptions");
   subscriptions.forEach((callback) => callback());
 }
 
@@ -202,9 +200,7 @@ function normalizeDataIntoRecord(
   targetParentRecordId: DataId,
   variables: { [index: string]: string }
 ) {
-  console.log("normalizing", { normalizationAst });
   for (const normalizationNode of normalizationAst) {
-    console.log("norm node", { normalizationNode });
     switch (normalizationNode.kind) {
       case "Scalar": {
         normalizeScalarField(
@@ -260,7 +256,6 @@ function normalizeLinkedField(
   variables: { [index: string]: string }
 ) {
   const networkResponseKey = getNetworkResponseKey(astNode);
-  console.log({ networkResponseKey });
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
   const parentRecordKey = getParentRecordKey(astNode, variables);
 
@@ -383,7 +378,6 @@ export function getParentRecordKey(
     }
   }
 
-  console.log("parent record key", { parentRecordKey });
   return parentRecordKey;
 }
 

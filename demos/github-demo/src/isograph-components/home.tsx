@@ -27,9 +27,7 @@ export function HomeRoute({
   const { queryReference } = useLazyReference(homePageQuery, {
     first: 15,
   });
-  console.log("Home page");
   const data = read(queryReference);
-  console.log("Home page data", data);
   return (
     <>
       {data.header({ route, setRoute })}
