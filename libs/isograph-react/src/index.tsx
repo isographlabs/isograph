@@ -96,8 +96,6 @@ export type NormalizationAst = NormalizationAstNode[];
 export type NormalizationScalarField = {
   kind: "Scalar";
   fieldName: string;
-  // TODO consider getting rid of, and always deriving this from arguments
-  alias: string | null;
   arguments: Arguments | null;
 };
 
