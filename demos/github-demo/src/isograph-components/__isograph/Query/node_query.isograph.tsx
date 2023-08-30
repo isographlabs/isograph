@@ -1,5 +1,4 @@
 import type {IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst} from '@isograph/react';
-import {getRefRendererForName} from '@isograph/react';
 const resolver = x => x;
 
 const queryText = 'query node_query ($id: ID!) {\

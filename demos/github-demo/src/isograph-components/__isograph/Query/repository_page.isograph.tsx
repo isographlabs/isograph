@@ -1,5 +1,4 @@
 import type {IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst} from '@isograph/react';
-import {getRefRendererForName} from '@isograph/react';
 const resolver = x => x;
 import Query__header, { ReadOutType as Query__header__outputType } from './header.isograph';
 import Query__repository_detail, { ReadOutType as Query__repository_detail__outputType } from './repository_detail.isograph';

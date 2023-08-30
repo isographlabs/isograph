@@ -31,7 +31,6 @@ impl<'schema> FetchableResolver<'schema> {
 
         format!(
             "import type {{IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst}} from '@isograph/react';\n\
-            import {{getRefRendererForName}} from '@isograph/react';\n\
             {resolver_import_statement}\n\
             {nested_resolver_artifact_imports}\n\
             const queryText = '{query_text}';\n\n\
@@ -117,7 +116,7 @@ impl<'schema> RefetchQueryResolver<'schema> {
             const queryText = '{query_text}';\n\n\
             const normalizationAst: NormalizationAst = {normalization_ast};\n\
             const artifact: any = {{\n\
-            {}kind: 'RefetchQuery',\n\
+            {}kind: \"RefetchQuery\",\n\
             {}queryText,\n\
             {}normalizationAst,\n\
             }};\n\n\

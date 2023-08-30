@@ -1,11 +1,5 @@
-import type {
-  IsographFetchableResolver,
-  ReaderAst,
-  FragmentReference,
-  NormalizationAst,
-} from "@isograph/react";
-const queryText =
-  "query User_refetch ($first: Int!, $id: ID!) { node____id___id: node(id: $id) { ... on User { \
+import type {IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst} from '@isograph/react';
+const queryText = 'query User_refetch ($first: Int!, $id: ID!) { node____id___id: node(id: $id) { ... on User { \
   avatarUrl,\
   id,\
   login,\
@@ -32,53 +26,77 @@ const queryText =
       },\
     },\
   },\
-}}}";
+}}}';
 
-const normalizationAst: NormalizationAst = [
+const normalizationAst: NormalizationAst = [{ kind: "Linked", fieldName: "node", alias: null, arguments: [{ argumentName: "id", variableName: "id" }], selections: [
+  {
+    kind: "Scalar",
+    fieldName: "avatarUrl",
+    arguments: null,
+  },
+  {
+    kind: "Scalar",
+    fieldName: "id",
+    arguments: null,
+  },
+  {
+    kind: "Scalar",
+    fieldName: "login",
+    arguments: null,
+  },
+  {
+    kind: "Scalar",
+    fieldName: "name",
+    arguments: null,
+  },
   {
     kind: "Linked",
-    fieldName: "node",
-    alias: null,
-    arguments: [{ argumentName: "id", variableName: "id" }],
+    fieldName: "repositories",
+    arguments: [
+      {
+        argumentName: "last",
+        variableName: "first",
+      },
+    ],
     selections: [
       {
-        kind: "Scalar",
-        fieldName: "avatarUrl",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "id",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "login",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "name",
-        arguments: null,
-      },
-      {
         kind: "Linked",
-        fieldName: "repositories",
-        arguments: [
-          {
-            argumentName: "last",
-            variableName: "first",
-          },
-        ],
+        fieldName: "edges",
+        arguments: null,
         selections: [
           {
             kind: "Linked",
-            fieldName: "edges",
+            fieldName: "node",
             arguments: null,
             selections: [
               {
+                kind: "Scalar",
+                fieldName: "id",
+                arguments: null,
+              },
+              {
+                kind: "Scalar",
+                fieldName: "description",
+                arguments: null,
+              },
+              {
+                kind: "Scalar",
+                fieldName: "forkCount",
+                arguments: null,
+              },
+              {
+                kind: "Scalar",
+                fieldName: "name",
+                arguments: null,
+              },
+              {
+                kind: "Scalar",
+                fieldName: "nameWithOwner",
+                arguments: null,
+              },
+              {
                 kind: "Linked",
-                fieldName: "node",
+                fieldName: "owner",
                 arguments: null,
                 selections: [
                   {
@@ -88,79 +106,47 @@ const normalizationAst: NormalizationAst = [
                   },
                   {
                     kind: "Scalar",
-                    fieldName: "description",
+                    fieldName: "login",
                     arguments: null,
                   },
+                ],
+              },
+              {
+                kind: "Linked",
+                fieldName: "pullRequests",
+                arguments: [
+                  {
+                    argumentName: "first",
+                    variableName: "first",
+                  },
+                ],
+                selections: [
                   {
                     kind: "Scalar",
-                    fieldName: "forkCount",
+                    fieldName: "totalCount",
                     arguments: null,
                   },
+                ],
+              },
+              {
+                kind: "Scalar",
+                fieldName: "stargazerCount",
+                arguments: null,
+              },
+              {
+                kind: "Linked",
+                fieldName: "watchers",
+                arguments: [
+                  {
+                    argumentName: "first",
+                    variableName: "first",
+                  },
+                ],
+                selections: [
                   {
                     kind: "Scalar",
-                    fieldName: "name",
+                    fieldName: "totalCount",
                     arguments: null,
-                  },
-                  {
-                    kind: "Scalar",
-                    fieldName: "nameWithOwner",
-                    arguments: null,
-                  },
-                  {
-                    kind: "Linked",
-                    fieldName: "owner",
-                    arguments: null,
-                    selections: [
-                      {
-                        kind: "Scalar",
-                        fieldName: "id",
-                        arguments: null,
-                      },
-                      {
-                        kind: "Scalar",
-                        fieldName: "login",
-                        arguments: null,
-                      },
-                    ],
-                  },
-                  {
-                    kind: "Linked",
-                    fieldName: "pullRequests",
-                    arguments: [
-                      {
-                        argumentName: "first",
-                        variableName: "first",
-                      },
-                    ],
-                    selections: [
-                      {
-                        kind: "Scalar",
-                        fieldName: "totalCount",
-                        arguments: null,
-                      },
-                    ],
-                  },
-                  {
-                    kind: "Scalar",
-                    fieldName: "stargazerCount",
-                    arguments: null,
-                  },
-                  {
-                    kind: "Linked",
-                    fieldName: "watchers",
-                    arguments: [
-                      {
-                        argumentName: "first",
-                        variableName: "first",
-                      },
-                    ],
-                    selections: [
-                      {
-                        kind: "Scalar",
-                        fieldName: "totalCount",
-                        arguments: null,
-                      },
-                    ],
                   },
                 ],
               },
@@ -170,7 +156,7 @@ const normalizationAst: NormalizationAst = [
       },
     ],
   },
-];
+] }];
 const artifact: any = {
   kind: "RefetchQuery",
   queryText,
