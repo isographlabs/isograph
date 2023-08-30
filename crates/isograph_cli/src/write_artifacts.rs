@@ -54,8 +54,10 @@ pub(crate) fn write_artifacts<'schema>(
                     parent_type.name,
                     &generated_file_name,
                 );
-                let intermediate_folder =
-                    generated_intermediate_folder(&generated_folder_root, parent_type.name);
+                let intermediate_folder = generated_intermediate_folder(
+                    &generated_folder_root,
+                    &[parent_type.name.lookup()],
+                );
 
                 fs::create_dir_all(&intermediate_folder).map_err(|e| {
                     GenerateArtifactsError::UnableToCreateDirectory {
@@ -93,8 +95,10 @@ pub(crate) fn write_artifacts<'schema>(
                     parent_type.name,
                     &generated_file_name,
                 );
-                let intermediate_folder =
-                    generated_intermediate_folder(&generated_folder_root, parent_type.name);
+                let intermediate_folder = generated_intermediate_folder(
+                    &generated_folder_root,
+                    &[parent_type.name.lookup()],
+                );
 
                 fs::create_dir_all(&intermediate_folder).map_err(|e| {
                     GenerateArtifactsError::UnableToCreateDirectory {
@@ -129,8 +133,10 @@ pub(crate) fn write_artifacts<'schema>(
                     parent_object.name,
                     &generated_file_name,
                 );
-                let intermediate_folder =
-                    generated_intermediate_folder(&generated_folder_root, parent_object.name);
+                let intermediate_folder = generated_intermediate_folder(
+                    &generated_folder_root,
+                    &[parent_object.name.lookup()],
+                );
 
                 fs::create_dir_all(&intermediate_folder).map_err(|e| {
                     GenerateArtifactsError::UnableToCreateDirectory {
@@ -172,9 +178,10 @@ fn generated_file_path(
     project_root.join(parent_type_name.lookup()).join(file_name)
 }
 
-fn generated_intermediate_folder(
-    project_root: &PathBuf,
-    parent_type_name: IsographObjectTypeName,
-) -> PathBuf {
-    project_root.join(parent_type_name.lookup())
+fn generated_intermediate_folder(project_root: &PathBuf, items: &[&'static str]) -> PathBuf {
+    let mut project_root = project_root.clone();
+    for item in items.iter() {
+        project_root = project_root.join(item);
+    }
+    project_root
 }

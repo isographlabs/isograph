@@ -445,6 +445,8 @@ fn HACK__merge_linked_fields(
     merged_fields.sort();
 
     if encountered_refetch_field {
+        // This might cause the refetch artifact to be generated multiple times. Hopefully
+        // redundantly? Needs investigation.
         artifact_queue.push(ArtifactQueueItem::RefetchField(RefetchFieldResolverInfo {
             merged_selection_set: MergedSelectionSet(merged_fields.clone()),
             parent_id: linked_field_parent_type.id,
