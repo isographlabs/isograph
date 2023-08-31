@@ -92,6 +92,16 @@ pub struct RefetchFieldResolverInfo {
     pub root_fetchable_field: SelectableFieldName,
 }
 
+struct RootSchemaResolverInfo<'a> {
+    resolver: &'a ValidatedSchemaResolver,
+}
+
+impl<'a> RootSchemaResolverInfo<'a> {
+    pub fn new(resolver: &'a ValidatedSchemaResolver) -> Self {
+        Self { resolver }
+    }
+}
+
 /// A merged selection set is an input for generating:
 /// - query texts
 /// - normalization ASTs
@@ -106,6 +116,7 @@ pub fn create_merged_selection_set(
     let mut merged_selection_set = HashMap::new();
 
     let mut encountered_refetch_field = false;
+    let mut root_resolver_info = RootSchemaResolverInfo::new(root_fetchable_resolver);
     merge_selections_into_set(
         schema,
         &mut merged_selection_set,
@@ -113,7 +124,7 @@ pub fn create_merged_selection_set(
         selection_set,
         &mut encountered_refetch_field,
         artifact_queue,
-        root_fetchable_resolver,
+        &mut root_resolver_info,
     );
 
     select_typename_and_id_fields_in_merged_selection(
@@ -147,7 +158,7 @@ fn merge_selections_into_set(
     validated_selections: &Vec<WithSpan<ValidatedSelection>>,
     encountered_refetch_field: &mut bool,
     artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
-    root_fetchable_resolver: &ValidatedSchemaResolver,
+    root_fetchable_resolver: &mut RootSchemaResolverInfo<'_>,
 ) {
     for validated_selection in validated_selections.iter().filter(filter_id_fields) {
         let span = validated_selection.span;
@@ -222,7 +233,7 @@ fn merge_linked_field_into_vacant_entry(
     schema: &ValidatedSchema,
     span: Span,
     artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
-    root_fetchable_resolver: &ValidatedSchemaResolver,
+    root_fetchable_resolver: &mut RootSchemaResolverInfo<'_>,
 ) {
     vacant_entry.insert(WithSpan::new(
         MergedServerFieldSelection::LinkedField(MergedLinkedFieldSelection {
@@ -235,7 +246,7 @@ fn merge_linked_field_into_vacant_entry(
                     linked_field_parent_type,
                     &new_linked_field.selection_set,
                     artifact_queue,
-                    root_fetchable_resolver,
+                    root_fetchable_resolver.resolver,
                 )
                 .into()
             },
@@ -251,7 +262,7 @@ fn merge_linked_field_into_occupied_entry(
     new_linked_field: &LinkedFieldSelection<ValidatedScalarDefinedField, ObjectId>,
     schema: &ValidatedSchema,
     artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
-    root_fetchable_resolver: &ValidatedSchemaResolver,
+    root_fetchable_resolver: &mut RootSchemaResolverInfo<'_>,
 ) {
     let existing_selection = occupied.get_mut();
     match &mut existing_selection.item {
@@ -280,7 +291,7 @@ fn merge_scalar_resolver_field(
     merged_selection_set: &mut MergedSelectionMap,
     encountered_refetch_field: &mut bool,
     artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
-    root_fetchable_resolver: &ValidatedSchemaResolver,
+    root_fetchable_resolver: &mut RootSchemaResolverInfo<'_>,
 ) {
     let resolver_field_name = scalar_field.name.item;
     let parent_field_id = parent_type
@@ -392,7 +403,7 @@ fn HACK__merge_linked_fields(
     new_selection_set: &Vec<WithSpan<ValidatedSelection>>,
     linked_field_parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
-    root_fetchable_resolver: &ValidatedSchemaResolver,
+    root_fetchable_resolver: &mut RootSchemaResolverInfo<'_>,
 ) {
     let mut merged_selection_set = HashMap::new();
     for item in existing_selection_set.iter() {
@@ -457,11 +468,14 @@ fn HACK__merge_linked_fields(
         artifact_queue.push(ArtifactQueueItem::RefetchField(RefetchFieldResolverInfo {
             merged_selection_set: MergedSelectionSet(merged_fields.clone()),
             parent_id: linked_field_parent_type.id,
-            variable_definitions: root_fetchable_resolver.variable_definitions.clone(),
-            root_fetchable_field: root_fetchable_resolver.name,
+            variable_definitions: root_fetchable_resolver
+                .resolver
+                .variable_definitions
+                .clone(),
+            root_fetchable_field: root_fetchable_resolver.resolver.name,
             root_parent_object: schema
                 .schema_data
-                .object(root_fetchable_resolver.parent_object_id)
+                .object(root_fetchable_resolver.resolver.parent_object_id)
                 .name,
         }))
     }
