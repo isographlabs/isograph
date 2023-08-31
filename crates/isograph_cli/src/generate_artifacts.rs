@@ -788,6 +788,9 @@ fn generate_reader_ast_node(
                             {indent_2}arguments: {arguments},\n\
                             {indent_2}resolver: {resolver_field_string},\n\
                             {indent_2}variant: {variant},\n\
+                            {indent_2}usedRefetchQueries: [0],\n\
+                            {indent_2}// This should only exist on refetch queries\n\
+                            {indent_2}refetchQuery: 0,\n\
                             {indent_1}}},\n",
                         );
                         match nested_resolver_imports.entry(resolver_field.type_and_field) {

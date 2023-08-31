@@ -32,6 +32,9 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
         arguments: null,
         resolver: User__repository_list,
         variant: "Component",
+        usedRefetchQueries: [0],
+        // This should only exist on refetch queries
+        refetchQuery: 0,
       },
     ],
   },

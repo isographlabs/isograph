@@ -50,6 +50,9 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
                 arguments: null,
                 resolver: IssueComment__formatted_comment_creation_date,
                 variant: "Eager",
+                usedRefetchQueries: [0],
+                // This should only exist on refetch queries
+                refetchQuery: 0,
               },
               {
                 kind: "Linked",

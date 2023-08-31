@@ -3,6 +3,7 @@ const resolver = x => x;
 import Query__header, { ReadOutType as Query__header__outputType } from './header.isograph';
 import Query__pull_request_detail, { ReadOutType as Query__pull_request_detail__outputType } from './pull_request_detail.isograph';
 
+import rf1 from '../Query/home_page/__refetchQuery.isograph'
 const queryText = 'query pull_request ($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!) {\
   repository____owner___repositoryOwner____name___repositoryName: repository(owner: $repositoryOwner, name: $repositoryName) {\
     id,\
@@ -167,6 +168,9 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     arguments: null,
     resolver: Query__header,
     variant: "Component",
+    usedRefetchQueries: [0],
+    // This should only exist on refetch queries
+    refetchQuery: 0,
   },
   {
     kind: "Resolver",
@@ -174,6 +178,9 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     arguments: null,
     resolver: Query__pull_request_detail,
     variant: "Component",
+    usedRefetchQueries: [0],
+    // This should only exist on refetch queries
+    refetchQuery: 0,
   },
 ];
 
@@ -195,6 +202,7 @@ const artifact: IsographFetchableResolver<ReadFromStoreType, ResolverParameterTy
   readerAst,
   resolver: resolver as any,
   convert: ((resolver, data) => resolver(data)),
+  nestedRefetchQueries: [rf1],
 };
 
 export default artifact;

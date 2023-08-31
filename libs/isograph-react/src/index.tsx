@@ -32,6 +32,7 @@ export type IsographFetchableResolver<
     resolver: (data: TResolverProps) => TResolverResult,
     data: TReadFromStore
   ) => TResolverResult; // TODO this should be a different return type
+  nestedRefetchQueries: RefetchQueryArtifact[];
 };
 
 export type IsographNonFetchableResolver<
@@ -85,6 +86,7 @@ export type ReaderResolverField = {
   resolver: IsographResolver<any, any, any>;
   variant: ReaderResolverVariant | null;
   arguments: Arguments | null;
+  usedRefetchQueries: number[];
 };
 
 export type NormalizationAstNode =
@@ -108,6 +110,12 @@ export type NormalizationLinkedField = {
   selections: NormalizationAst;
 };
 
+export type RefetchQueryArtifact = {
+  kind: "RefetchQuery";
+  queryText: string;
+  normalizationAst: NormalizationAst;
+};
+
 export type Arguments = Argument[];
 export type Argument = {
   argumentName: string;
@@ -129,6 +137,7 @@ export type FragmentReference<
     resolver: (data: TResolverProps) => TResolverResult,
     data: TReadFromStore
   ) => TResolverResult;
+  nestedRefetchQueries: RefetchQueryArtifact[];
 };
 
 export function iso<TResolverParameter, TResolverReturn = TResolverParameter>(
@@ -185,6 +194,7 @@ export function useLazyReference<
       convert: artifact.convert,
       resolver: artifact.resolver,
       variables,
+      nestedRefetchQueries: artifact.nestedRefetchQueries,
     },
   };
 }
@@ -199,7 +209,8 @@ export function read<
   const response = readData(
     reference.readerAst,
     reference.root,
-    reference.variables ?? {}
+    reference.variables ?? {},
+    reference.nestedRefetchQueries
   );
   console.log("done reading", { response });
   if (response.kind === "MissingData") {
@@ -215,7 +226,8 @@ export function readButDoNotEvaluate<TReadFromStore extends Object>(
   const response = readData(
     reference.readerAst,
     reference.root,
-    reference.variables ?? {}
+    reference.variables ?? {},
+    reference.nestedRefetchQueries
   );
   console.log("done reading but not evaluating", { response });
   if (response.kind === "MissingData") {
@@ -239,7 +251,8 @@ type ReadDataResult<TReadFromStore> =
 function readData<TReadFromStore>(
   ast: ReaderAst<TReadFromStore>,
   root: DataId,
-  variables: { [index: string]: string }
+  variables: { [index: string]: string },
+  nestedRefetchQueries: RefetchQueryArtifact[]
 ): ReadDataResult<TReadFromStore> {
   let storeRecord = store[root];
   if (storeRecord === undefined) {
@@ -290,7 +303,12 @@ function readData<TReadFromStore>(
               results.push(null);
               continue;
             }
-            const result = readData(field.selections, link.__link, variables);
+            const result = readData(
+              field.selections,
+              link.__link,
+              variables,
+              nestedRefetchQueries
+            );
             if (result.kind === "MissingData") {
               return {
                 kind: "MissingData",
@@ -338,7 +356,12 @@ function readData<TReadFromStore>(
           break;
         }
         const targetId = link.__link;
-        const data = readData(field.selections, targetId, variables);
+        const data = readData(
+          field.selections,
+          targetId,
+          variables,
+          nestedRefetchQueries
+        );
         if (data.kind === "MissingData") {
           return {
             kind: "MissingData",
@@ -350,8 +373,18 @@ function readData<TReadFromStore>(
         break;
       }
       case "Resolver": {
+        const usedRefetchQueries = field.usedRefetchQueries;
+        const resolverRefetchQueries = usedRefetchQueries.map(
+          (index) => nestedRefetchQueries[index]
+        );
+
         if (field.variant === "Eager") {
-          const data = readData(field.resolver.readerAst, root, variables);
+          const data = readData(
+            field.resolver.readerAst,
+            root,
+            variables,
+            resolverRefetchQueries
+          );
           if (data.kind === "MissingData") {
             return {
               kind: "MissingData",
@@ -359,6 +392,8 @@ function readData<TReadFromStore>(
               nestedReason: data,
             };
           } else {
+            // // Does this go here??
+
             // TODO do we also need to call convert?
             target[field.alias] = field.resolver.resolver(data.data);
           }
@@ -381,13 +416,19 @@ function readData<TReadFromStore>(
                     console.log(new Error().stack);
                     throw new Error("where did I convert 1 ");
                   },
+                  nestedRefetchQueries: resolverRefetchQueries,
                 }}
                 additionalRuntimeProps={additionalRuntimeProps}
               />
             );
           };
         } else if (field.variant === "RefetchField") {
-          const data = readData(field.resolver.readerAst, root, variables);
+          const data = readData(
+            field.resolver.readerAst,
+            root,
+            variables,
+            resolverRefetchQueries
+          );
           console.log("refetch field data", data, field);
           if (data.kind === "MissingData") {
             return {
@@ -397,6 +438,9 @@ function readData<TReadFromStore>(
             };
           } else {
             // TODO do we also need to call convert?
+            if (usedRefetchQueries == null) {
+              throw new Error("usedRefetchQueries is null");
+            }
             target[field.alias] = field.resolver.resolver(nodeQuery, {
               ...data.data,
               ...variables,
@@ -414,6 +458,7 @@ function readData<TReadFromStore>(
             // lint rules will ameliorate this
             resolver: field.resolver.resolver ?? ((x) => x),
             convert: (resolver: any, data: any) => resolver(data),
+            nestedRefetchQueries: resolverRefetchQueries,
           };
           target[field.alias] = fragmentReference;
         }

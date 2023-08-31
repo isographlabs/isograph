@@ -11,6 +11,7 @@ import {
   NormalizationScalarField,
   ReaderLinkedField,
   ReaderScalarField,
+  RefetchQueryArtifact,
 } from "./index";
 
 const cache: { [index: string]: ParentCache<any> } = {};
@@ -84,7 +85,12 @@ export function makeNetworkRequest<T>(
   const promise = network(artifact.queryText, variables).then(
     (networkResponse) => {
       console.log("network response", artifact);
-      normalizeData(artifact.normalizationAst, networkResponse.data, variables);
+      normalizeData(
+        artifact.normalizationAst,
+        networkResponse.data,
+        variables,
+        artifact.nestedRefetchQueries
+      );
       return networkResponse.data;
     }
   );
@@ -151,7 +157,8 @@ type NetworkResponseObject = {
 function normalizeData(
   normalizationAst: NormalizationAst,
   networkResponse: NetworkResponseObject,
-  variables: Object
+  variables: Object,
+  nestedRefetchQueries: RefetchQueryArtifact[]
 ) {
   console.log(
     "about to normalize",
@@ -164,7 +171,8 @@ function normalizeData(
     networkResponse,
     store.__ROOT,
     ROOT_ID,
-    variables as any
+    variables as any,
+    nestedRefetchQueries
   );
   console.log("after normalization", { store });
   callSubscriptions();
@@ -198,7 +206,8 @@ function normalizeDataIntoRecord(
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
   targetParentRecordId: DataId,
-  variables: { [index: string]: string }
+  variables: { [index: string]: string },
+  nestedRefetchQueries: RefetchQueryArtifact[]
 ) {
   for (const normalizationNode of normalizationAst) {
     switch (normalizationNode.kind) {
@@ -217,7 +226,8 @@ function normalizeDataIntoRecord(
           networkResponseParentRecord,
           targetParentRecord,
           targetParentRecordId,
-          variables
+          variables,
+          nestedRefetchQueries
         );
         break;
       }
@@ -253,7 +263,8 @@ function normalizeLinkedField(
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
   targetParentRecordId: DataId,
-  variables: { [index: string]: string }
+  variables: { [index: string]: string },
+  nestedRefetchQueries: RefetchQueryArtifact[]
 ) {
   const networkResponseKey = getNetworkResponseKey(astNode);
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
@@ -280,7 +291,8 @@ function normalizeLinkedField(
         networkResponseObject,
         targetParentRecordId,
         variables,
-        i
+        i,
+        nestedRefetchQueries
       );
       dataIds.push({ __link: newStoreRecordId });
     }
@@ -290,7 +302,9 @@ function normalizeLinkedField(
       astNode,
       networkResponseData,
       targetParentRecordId,
-      variables
+      variables,
+      null,
+      nestedRefetchQueries
     );
     targetParentRecord[parentRecordKey] = {
       __link: newStoreRecordId,
@@ -303,7 +317,8 @@ function normalizeNetworkResponseObject(
   networkResponseData: NetworkResponseObject,
   targetParentRecordId: string,
   variables: { [index: string]: string },
-  index?: number
+  index: number | null,
+  nestedRefetchQueries: RefetchQueryArtifact[]
 ): DataId /* The id of the modified or newly created item */ {
   const newStoreRecordId = getDataIdOfNetworkResponse(
     targetParentRecordId,
@@ -321,7 +336,8 @@ function normalizeNetworkResponseObject(
     networkResponseData,
     newStoreRecord,
     newStoreRecordId,
-    variables
+    variables,
+    nestedRefetchQueries
   );
 
   return newStoreRecordId;
@@ -405,7 +421,7 @@ function getDataIdOfNetworkResponse(
   dataToNormalize: NetworkResponseObject,
   astNode: NormalizationLinkedField | NormalizationScalarField,
   variables: { [index: string]: string },
-  index?: number
+  index: number | null
 ): DataId {
   // Check whether the dataToNormalize has an id field. If so, that is the key.
   // If not, we construct an id from the parentRecordId and the field parameters.

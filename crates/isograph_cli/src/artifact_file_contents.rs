@@ -33,6 +33,7 @@ impl<'schema> FetchableResolver<'schema> {
             "import type {{IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst}} from '@isograph/react';\n\
             {resolver_import_statement}\n\
             {nested_resolver_artifact_imports}\n\
+            import rf1 from '../Query/home_page/__refetchQuery.isograph'\n\
             const queryText = '{query_text}';\n\n\
             // TODO support changing this,\n\
             export type ReadFromStoreType = ResolverParameterType;\n\n\
@@ -49,8 +50,10 @@ impl<'schema> FetchableResolver<'schema> {
             {}readerAst,\n\
             {}resolver: resolver as any,\n\
             {}convert: {convert_function},\n\
+            {}nestedRefetchQueries: [rf1],\n\
             }};\n\n\
             export default artifact;\n",
+            "  ",
             "  ",
             "  ",
             "  ",
