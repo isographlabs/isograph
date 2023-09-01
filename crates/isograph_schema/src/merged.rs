@@ -109,6 +109,7 @@ enum NormalizationKey {
     ServerField(ServerFieldNormalizationKey),
 }
 
+#[derive(Debug)]
 pub enum ArtifactQueueItem<'schema> {
     Resolver(&'schema ValidatedSchemaResolver),
     RefetchField(RefetchFieldResolverInfo),
@@ -119,10 +120,12 @@ pub struct RefetchFieldResolverInfo {
     pub merged_selection_set: MergedSelectionSet,
     /// Used to look up what type to narrow on in the generated refetch query,
     /// among other things.
-    pub parent_id: ObjectId,
+    pub refetch_field_parent_id: ObjectId,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<InputTypeId>>>,
     pub root_parent_object: IsographObjectTypeName,
     pub root_fetchable_field: SelectableFieldName,
+    // TODO wrap in a newtype
+    pub refetch_query_index: usize,
 }
 
 /// This struct contains everything that is available when we start
@@ -131,7 +134,7 @@ pub struct RefetchFieldResolverInfo {
 #[derive(Debug)]
 struct MergeTraversalState<'a> {
     resolver: &'a ValidatedSchemaResolver,
-    paths_to_refetch_fields: Vec<PathToRefetchField>,
+    paths_to_refetch_fields: Vec<(PathToRefetchField, ObjectId)>,
     current_path: PathToRefetchField,
 }
 
@@ -186,13 +189,17 @@ pub fn create_merged_selection_set(
         &mut merge_traversal_state,
     );
 
-    for path_to_refetch_field in merge_traversal_state.paths_to_refetch_fields.into_iter() {
+    for (index, (path_to_refetch_field, refetch_field_parent_id)) in merge_traversal_state
+        .paths_to_refetch_fields
+        .into_iter()
+        .enumerate()
+    {
         let nested_merged_selection_set =
             find_by_path(&merged_selection_set, &path_to_refetch_field);
 
         artifact_queue.push(ArtifactQueueItem::RefetchField(RefetchFieldResolverInfo {
             merged_selection_set: nested_merged_selection_set,
-            parent_id: root_fetchable_resolver.parent_object_id,
+            refetch_field_parent_id,
             // TODO
             variable_definitions: vec![],
             root_parent_object: schema
@@ -200,6 +207,7 @@ pub fn create_merged_selection_set(
                 .object(root_fetchable_resolver.parent_object_id)
                 .name,
             root_fetchable_field: root_fetchable_resolver.name,
+            refetch_query_index: index,
         }));
     }
 
@@ -410,7 +418,7 @@ fn merge_scalar_resolver_field(
     ) {
         merge_traversal_state
             .paths_to_refetch_fields
-            .push(merge_traversal_state.current_path.clone());
+            .push((merge_traversal_state.current_path.clone(), parent_type.id));
     }
 }
 

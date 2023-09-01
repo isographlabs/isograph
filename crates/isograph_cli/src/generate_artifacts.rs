@@ -96,10 +96,11 @@ fn get_artifact_for_refetch_field<'schema>(
 ) -> Artifact<'schema> {
     let RefetchFieldResolverInfo {
         merged_selection_set,
-        parent_id,
+        refetch_field_parent_id: parent_id,
         variable_definitions,
         root_fetchable_field,
         root_parent_object,
+        refetch_query_index,
         ..
     } = refetch_info;
 
@@ -130,6 +131,7 @@ fn get_artifact_for_refetch_field<'schema>(
         query_text,
         root_fetchable_field,
         root_fetchable_field_parent_object: root_parent_object,
+        refetch_query_index,
     })
 }
 
@@ -371,6 +373,8 @@ pub(crate) struct RefetchQueryResolver {
     pub query_text: QueryText,
     pub root_fetchable_field: SelectableFieldName,
     pub root_fetchable_field_parent_object: IsographObjectTypeName,
+    // TODO wrap in a newtype
+    pub refetch_query_index: usize,
 }
 
 fn generate_query_text(

@@ -1,5 +1,5 @@
 import type {IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst} from '@isograph/react';
-const queryText = 'query Query_refetch ($id: ID!) { node____id___id: node(id: $id) { ... on Query { \
+const queryText = 'query User_refetch ($id: ID!) { node____id___id: node(id: $id) { ... on User { \
   avatarUrl,\
   id,\
   login,\

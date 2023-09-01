@@ -119,12 +119,17 @@ pub(crate) fn write_artifacts<'schema>(
                 let RefetchQueryResolver {
                     root_fetchable_field,
                     root_fetchable_field_parent_object,
+                    refetch_query_index,
                     ..
                 } = &refetch_query_resolver;
 
                 // TODO we will generate many different queries; they need unique names. For now,
                 // they have a single name each artifact clobbers the previous.
-                let generated_file_name = generated_file_name("__refetchQuery".intern().into());
+                let generated_file_name = generated_file_name(
+                    format!("__refetch__{}", refetch_query_index)
+                        .intern()
+                        .into(),
+                );
                 let intermediate_folder = generated_intermediate_folder(
                     &generated_folder_root,
                     &[
