@@ -12,9 +12,6 @@ export const home_page_list = iso<
       login,
       name,
       repository_list,
-      repository(name: $isograph) {
-        __refetch,
-      },
       __refetch,
     },
   }

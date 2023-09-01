@@ -32,9 +32,6 @@ const queryText = 'query home_page ($first: Int!) {\
         },\
       },\
     },\
-    repository____name___isograph: repository(name: $isograph) {\
-      id,\
-    },\
   },\
 }';
 
@@ -171,23 +168,6 @@ const normalizationAst: NormalizationAst = [
                 ],
               },
             ],
-          },
-        ],
-      },
-      {
-        kind: "Linked",
-        fieldName: "repository",
-        arguments: [
-          {
-            argumentName: "name",
-            variableName: "isograph",
-          },
-        ],
-        selections: [
-          {
-            kind: "Scalar",
-            fieldName: "id",
-            arguments: null,
           },
         ],
       },

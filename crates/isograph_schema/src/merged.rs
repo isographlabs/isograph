@@ -70,6 +70,31 @@ impl MergedSelectionSet {
         MergedSelectionSet(unsorted_vec.into_iter().map(|(_, value)| value).collect())
     }
 }
+fn find_by_path(
+    mut root: &[WithSpan<MergedServerFieldSelection>],
+    path: &PathToRefetchField,
+) -> MergedSelectionSet {
+    for item in path.linked_fields.iter() {
+        let linked_field_selection = root
+            .iter()
+            .find_map(|linked_field_selection| {
+                if let MergedServerFieldSelection::LinkedField(linked_field) =
+                    &linked_field_selection.item
+                {
+                    if linked_field.name.item == item.name {
+                        return Some(linked_field);
+                    }
+                }
+                None
+            })
+            .expect("Linked field not found. This is indicative of a bug in Isograph.");
+
+        root = &linked_field_selection.selection_set;
+    }
+
+    // TODO is this already sorted?
+    MergedSelectionSet(root.to_vec())
+}
 
 impl Into<Vec<WithSpan<MergedServerFieldSelection>>> for MergedSelectionSet {
     fn into(self) -> Vec<WithSpan<MergedServerFieldSelection>> {
@@ -92,6 +117,8 @@ pub enum ArtifactQueueItem<'schema> {
 #[derive(Debug, Clone)]
 pub struct RefetchFieldResolverInfo {
     pub merged_selection_set: MergedSelectionSet,
+    /// Used to look up what type to narrow on in the generated refetch query,
+    /// among other things.
     pub parent_id: ObjectId,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<InputTypeId>>>,
     pub root_parent_object: IsographObjectTypeName,
@@ -152,12 +179,31 @@ pub fn create_merged_selection_set(
     root_fetchable_resolver: &ValidatedSchemaResolver,
 ) -> MergedSelectionSet {
     let mut merge_traversal_state = MergeTraversalState::new(root_fetchable_resolver);
-    create_merged_selection_set_with_resolver_state(
+    let merged_selection_set = create_merged_selection_set_with_resolver_state(
         schema,
         parent_type,
         validated_selections,
         &mut merge_traversal_state,
-    )
+    );
+
+    for path_to_refetch_field in merge_traversal_state.paths_to_refetch_fields.into_iter() {
+        let nested_merged_selection_set =
+            find_by_path(&merged_selection_set, &path_to_refetch_field);
+
+        artifact_queue.push(ArtifactQueueItem::RefetchField(RefetchFieldResolverInfo {
+            merged_selection_set: nested_merged_selection_set,
+            parent_id: root_fetchable_resolver.parent_object_id,
+            // TODO
+            variable_definitions: vec![],
+            root_parent_object: schema
+                .schema_data
+                .object(root_fetchable_resolver.parent_object_id)
+                .name,
+            root_fetchable_field: root_fetchable_resolver.name,
+        }));
+    }
+
+    merged_selection_set
 }
 
 fn create_merged_selection_set_with_resolver_state(
