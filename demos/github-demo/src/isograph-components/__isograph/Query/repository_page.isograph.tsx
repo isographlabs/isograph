@@ -251,7 +251,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     arguments: null,
     resolver: Query__header,
     variant: "Component",
-    usedRefetchQueries: [0],
+    usedRefetchQueries: [0, ],
     // This should only exist on refetch queries
     refetchQuery: 0,
   },
@@ -261,7 +261,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     arguments: null,
     resolver: Query__repository_detail,
     variant: "Component",
-    usedRefetchQueries: [0],
+    usedRefetchQueries: [0, ],
     // This should only exist on refetch queries
     refetchQuery: 0,
   },

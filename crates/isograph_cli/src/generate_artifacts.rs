@@ -176,7 +176,7 @@ fn get_artifact_for_resolver<'schema>(
             generate_fetchable_resolver_artifact(schema, resolver, artifact_queue),
         ),
         ResolverArtifactKind::NonFetchable => Artifact::NonFetchableResolver(
-            generate_non_fetchable_resolver_artifact(schema, resolver),
+            generate_non_fetchable_resolver_artifact(schema, resolver, QueryCount(1)),
         ),
     }
 }
@@ -233,6 +233,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
             query_object.into(),
             0,
             &mut nested_resolver_artifact_imports,
+            QueryCount(1),
         );
         let convert_function =
             generate_convert_function(&fetchable_resolver.variant, fetchable_resolver.name);
@@ -262,6 +263,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
 fn generate_non_fetchable_resolver_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     non_fetchable_resolver: &ValidatedSchemaResolver,
+    nested_refetch_query_count: QueryCount,
 ) -> NonFetchableResolver<'schema> {
     if let Some((selection_set, _)) = &non_fetchable_resolver.selection_set_and_unwraps {
         let parent_type = schema
@@ -274,6 +276,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
             parent_type.into(),
             0,
             &mut nested_resolver_artifact_imports,
+            nested_refetch_query_count,
         );
 
         let resolver_parameter_type = generate_resolver_parameter_type(
@@ -733,6 +736,8 @@ fn generate_reader_ast<'schema>(
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     indentation_level: u8,
     nested_resolver_imports: &mut NestedResolverImports,
+    // TODO change this
+    nested_refetch_query_count: QueryCount,
 ) -> ReaderAst {
     let mut reader_ast = "[\n".to_string();
     for item in selection_set {
@@ -742,6 +747,7 @@ fn generate_reader_ast<'schema>(
             schema,
             indentation_level + 1,
             nested_resolver_imports,
+            nested_refetch_query_count,
         );
         reader_ast.push_str(&s);
     }
@@ -755,6 +761,8 @@ fn generate_reader_ast_node(
     schema: &ValidatedSchema,
     indentation_level: u8,
     nested_resolver_imports: &mut NestedResolverImports,
+    // TODO change this
+    nested_refetch_query_count: QueryCount,
 ) -> String {
     match &item.item {
         Selection::ServerField(field) => match field {
@@ -810,6 +818,10 @@ fn generate_reader_ast_node(
                             .variant
                             .map(|x| format!("\"{}\"", x))
                             .unwrap_or_else(|| "null".to_string());
+
+                        let nested_refetch_queries =
+                            get_nested_refetch_query_text(nested_refetch_query_count);
+
                         let res = format!(
                             "{indent_1}{{\n\
                             {indent_2}kind: \"Resolver\",\n\
@@ -817,7 +829,7 @@ fn generate_reader_ast_node(
                             {indent_2}arguments: {arguments},\n\
                             {indent_2}resolver: {resolver_field_string},\n\
                             {indent_2}variant: {variant},\n\
-                            {indent_2}usedRefetchQueries: [0],\n\
+                            {indent_2}usedRefetchQueries: {nested_refetch_queries},\n\
                             {indent_2}// This should only exist on refetch queries\n\
                             {indent_2}refetchQuery: 0,\n\
                             {indent_1}}},\n",
@@ -850,6 +862,7 @@ fn generate_reader_ast_node(
                     linked_field_type,
                     indentation_level + 1,
                     nested_resolver_imports,
+                    nested_refetch_query_count,
                 );
                 let arguments =
                     get_serialized_field_arguments(&linked_field.arguments, indentation_level + 1);
@@ -881,6 +894,15 @@ fn generate_normalization_ast<'schema>(
     }
     normalization_ast.push_str(&format!("{}]", "  ".repeat(indentation_level as usize)));
     NormalizationAst(normalization_ast)
+}
+
+fn get_nested_refetch_query_text(count: QueryCount) -> String {
+    let mut s = "[".to_string();
+    for i in 0..(count.0) {
+        s.push_str(&format!("{}, ", i));
+    }
+    s.push_str("]");
+    s
 }
 
 fn generate_normalization_ast_node(

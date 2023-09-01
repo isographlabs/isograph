@@ -131,6 +131,7 @@ pub struct RefetchFieldResolverInfo {
 /// This struct contains everything that is available when we start
 /// generating a merged selection set for a given fetchable resolver root.
 /// A mutable reference to this struct is passed down to all children.
+#[allow(unused)]
 #[derive(Debug)]
 struct MergeTraversalState<'a> {
     resolver: &'a ValidatedSchemaResolver,
@@ -143,12 +144,14 @@ struct PathToRefetchField {
     linked_fields: Vec<NameAndArguments>,
 }
 
+#[allow(unused)]
 #[derive(Debug, Clone)]
 struct NameAndArguments {
     pub name: LinkedFieldName,
     pub arguments: Vec<ArgumentKeyAndValue>,
 }
 
+#[allow(unused)]
 #[derive(Debug, Clone)]
 struct ArgumentKeyAndValue {
     pub key: FieldArgumentName,
@@ -165,6 +168,7 @@ impl<'a> MergeTraversalState<'a> {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct QueryCount(pub usize);
 
 /// As we traverse selection sets, we need to keep track of the path we have
@@ -190,17 +194,6 @@ pub fn create_merged_selection_set(
         validated_selections,
         &mut merge_traversal_state,
     );
-
-    // todo!(
-    //     "
-    //   - Return merged selection set and the generated refetch queries
-    //   - generate non-fetchable resolvers first, in a topological sort, and include info about which
-    //     refetch queries are selected
-    //   reader AST code gen:
-    //   - pass the correct refetch query artifacts to each resolver
-    //   - pass the correct refetch query artifact to the refetch field
-    // "
-    // );
 
     let count = QueryCount(merge_traversal_state.paths_to_refetch_fields.len());
     for (index, (path_to_refetch_field, refetch_field_parent_id)) in merge_traversal_state
