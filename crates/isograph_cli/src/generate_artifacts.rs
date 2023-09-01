@@ -19,7 +19,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     create_merged_selection_set, ArtifactQueueItem, DefinedField, MergedLinkedFieldSelection,
-    MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection,
+    MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection, QueryCount,
     RefetchFieldResolverInfo, ResolverActionKind, ResolverArtifactKind, ResolverTypeAndField,
     ResolverVariant, SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField,
     ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
@@ -189,7 +189,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
     if let Some((ref selection_set, _)) = fetchable_resolver.selection_set_and_unwraps {
         let query_name = fetchable_resolver.name.into();
 
-        let merged_selection_set = create_merged_selection_set(
+        let (merged_selection_set, query_count) = create_merged_selection_set(
             schema,
             // TODO here we are assuming that the resolver is only on the Query type.
             // That restriction should be loosened.
@@ -220,6 +220,8 @@ fn generate_fetchable_resolver_artifact<'schema>(
             &mut nested_resolver_artifact_imports,
             0,
         );
+        let refetch_query_artifact_imports =
+            generate_refetch_query_artifact_imports(query_count, fetchable_resolver.name);
         let resolver_import_statement =
             generate_resolver_import_statement(fetchable_resolver.action_kind);
         let resolver_return_type =
@@ -249,6 +251,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
             nested_resolver_artifact_imports,
             convert_function,
             normalization_ast,
+            refetch_query_artifact_import: refetch_query_artifact_imports,
         }
     } else {
         // TODO convert to error
@@ -341,6 +344,10 @@ pub(crate) struct ConvertFunction(pub String);
 derive_display!(ConvertFunction);
 
 #[derive(Debug)]
+pub(crate) struct RefetchQueryArtifactImport(pub String);
+derive_display!(RefetchQueryArtifactImport);
+
+#[derive(Debug)]
 pub(crate) struct FetchableResolver<'schema> {
     pub(crate) query_name: QueryOperationName,
     pub parent_type: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
@@ -353,6 +360,7 @@ pub(crate) struct FetchableResolver<'schema> {
     pub nested_resolver_artifact_imports: NestedResolverImports,
     pub convert_function: ConvertFunction,
     pub normalization_ast: NormalizationAst,
+    pub refetch_query_artifact_import: RefetchQueryArtifactImport,
 }
 
 #[derive(Debug)]
@@ -391,6 +399,23 @@ fn generate_query_text(
     write_selections_for_query_text(&mut query_text, schema, &merged_selection_set, 1);
     query_text.push_str("}");
     QueryText(query_text)
+}
+
+fn generate_refetch_query_artifact_imports(
+    count: QueryCount,
+    root_resolver_field_name: SelectableFieldName,
+) -> RefetchQueryArtifactImport {
+    let mut output = String::new();
+    let mut array_syntax = String::new();
+    for query_index in 0..(count.0) {
+        output.push_str(&format!(
+            "import refetchQuery{} from './{}/__refetch__{}.isograph';\n",
+            query_index, root_resolver_field_name, query_index,
+        ));
+        array_syntax.push_str(&format!("refetchQuery{}, ", query_index));
+    }
+    output.push_str(&format!("const nestedRefetchQueries = [{}];", array_syntax));
+    RefetchQueryArtifactImport(output)
 }
 
 fn write_variables_to_string(

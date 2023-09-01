@@ -165,6 +165,8 @@ impl<'a> MergeTraversalState<'a> {
     }
 }
 
+pub struct QueryCount(pub usize);
+
 /// As we traverse selection sets, we need to keep track of the path we have
 /// taken so far. This is because when we encounter a refetch query, we need
 /// to take note of the path we took to reach that query, but continue
@@ -180,7 +182,7 @@ pub fn create_merged_selection_set(
     validated_selections: &Vec<WithSpan<ValidatedSelection>>,
     artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
     root_fetchable_resolver: &ValidatedSchemaResolver,
-) -> MergedSelectionSet {
+) -> (MergedSelectionSet, QueryCount) {
     let mut merge_traversal_state = MergeTraversalState::new(root_fetchable_resolver);
     let merged_selection_set = create_merged_selection_set_with_resolver_state(
         schema,
@@ -189,6 +191,18 @@ pub fn create_merged_selection_set(
         &mut merge_traversal_state,
     );
 
+    // todo!(
+    //     "
+    //   - Return merged selection set and the generated refetch queries
+    //   - generate non-fetchable resolvers first, in a topological sort, and include info about which
+    //     refetch queries are selected
+    //   reader AST code gen:
+    //   - pass the correct refetch query artifacts to each resolver
+    //   - pass the correct refetch query artifact to the refetch field
+    // "
+    // );
+
+    let count = QueryCount(merge_traversal_state.paths_to_refetch_fields.len());
     for (index, (path_to_refetch_field, refetch_field_parent_id)) in merge_traversal_state
         .paths_to_refetch_fields
         .into_iter()
@@ -211,7 +225,7 @@ pub fn create_merged_selection_set(
         }));
     }
 
-    merged_selection_set
+    (merged_selection_set, count)
 }
 
 fn create_merged_selection_set_with_resolver_state(

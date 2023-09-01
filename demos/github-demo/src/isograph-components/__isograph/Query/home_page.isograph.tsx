@@ -3,7 +3,9 @@ const resolver = x => x;
 import Query__header, { ReadOutType as Query__header__outputType } from './header.isograph';
 import Query__home_page_list, { ReadOutType as Query__home_page_list__outputType } from './home_page_list.isograph';
 
-import rf1 from '../Query/home_page/__refetchQuery.isograph'
+import refetchQuery0 from './home_page/__refetch__0.isograph';
+const nestedRefetchQueries = [refetchQuery0, ];
+
 const queryText = 'query home_page ($first: Int!) {\
   viewer {\
     avatarUrl,\
@@ -215,7 +217,7 @@ const artifact: IsographFetchableResolver<ReadFromStoreType, ResolverParameterTy
   readerAst,
   resolver: resolver as any,
   convert: ((resolver, data) => resolver(data)),
-  nestedRefetchQueries: [rf1],
+  nestedRefetchQueries,
 };
 
 export default artifact;
