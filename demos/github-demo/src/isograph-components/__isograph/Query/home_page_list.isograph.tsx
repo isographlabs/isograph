@@ -1,5 +1,6 @@
 import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
 import { home_page_list as resolver } from '../../home_page_list.tsx';
+import Repository____refetch, { ReadOutType as Repository____refetch__outputType } from '../Repository/__refetch.isograph';
 import User____refetch, { ReadOutType as User____refetch__outputType } from '../User/__refetch.isograph';
 import User__repository_list, { ReadOutType as User__repository_list__outputType } from '../User/repository_list.isograph';
 
@@ -39,6 +40,29 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
         refetchQuery: 0,
       },
       {
+        kind: "Linked",
+        fieldName: "repository",
+        alias: null,
+        arguments: [
+          {
+            argumentName: "name",
+            variableName: "isograph",
+          },
+        ],
+        selections: [
+          {
+            kind: "Resolver",
+            alias: "__refetch",
+            arguments: null,
+            resolver: Repository____refetch,
+            variant: "RefetchField",
+            usedRefetchQueries: [0],
+            // This should only exist on refetch queries
+            refetchQuery: 0,
+          },
+        ],
+      },
+      {
         kind: "Resolver",
         alias: "__refetch",
         arguments: null,
@@ -58,6 +82,9 @@ export type ResolverParameterType = { data:
     login: string,
     name: (string | null),
     repository_list: User__repository_list__outputType,
+    repository: ({
+      __refetch: Repository____refetch__outputType,
+    } | null),
     __refetch: User____refetch__outputType,
   },
 },

@@ -197,7 +197,7 @@ pub struct SelectionFieldArgument {
     pub value: WithSpan<NonConstantValue>,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum NonConstantValue {
     Variable(VariableName),
 }
