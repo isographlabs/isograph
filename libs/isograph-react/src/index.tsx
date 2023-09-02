@@ -87,6 +87,8 @@ export type ReaderResolverField = {
   variant: ReaderResolverVariant | null;
   arguments: Arguments | null;
   usedRefetchQueries: number[];
+  // TODO this should only appear on variant: "Resolver", we are modeling this poorly
+  refetchQuery: number | null;
 };
 
 export type NormalizationAstNode =
@@ -438,13 +440,20 @@ function readData<TReadFromStore>(
             };
           } else {
             // TODO do we also need to call convert?
-            if (usedRefetchQueries == null) {
-              throw new Error("usedRefetchQueries is null");
+            const refetchQueryIndex = field.refetchQuery;
+            if (refetchQueryIndex == null) {
+              throw new Error("refetchQuery is null in RefetchField");
             }
-            target[field.alias] = field.resolver.resolver(nodeQuery, {
-              ...data.data,
-              ...variables,
-            });
+            const refetchQueryArtifact =
+              nestedRefetchQueries[refetchQueryIndex];
+
+            target[field.alias] = field.resolver.resolver(
+              refetchQueryArtifact,
+              {
+                ...data.data,
+                ...variables,
+              }
+            );
           }
         } else {
           const fragmentReference = {
