@@ -55,8 +55,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
             resolver: PullRequest__comment_list,
             variant: "Component",
             usedRefetchQueries: [0, ],
-            // This should only exist on refetch queries
-            refetchQuery: 0,
           },
         ],
       },

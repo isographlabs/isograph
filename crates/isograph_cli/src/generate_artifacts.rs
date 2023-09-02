@@ -808,18 +808,6 @@ fn generate_reader_ast_node(
                         let nested_refetch_queries =
                             get_nested_refetch_query_text(nested_refetch_query_count);
 
-                        let res = format!(
-                            "{indent_1}{{\n\
-                            {indent_2}kind: \"Resolver\",\n\
-                            {indent_2}alias: \"{alias}\",\n\
-                            {indent_2}arguments: {arguments},\n\
-                            {indent_2}resolver: {resolver_field_string},\n\
-                            {indent_2}variant: {variant},\n\
-                            {indent_2}usedRefetchQueries: {nested_refetch_queries},\n\
-                            {indent_2}// This should only exist on refetch queries\n\
-                            {indent_2}refetchQuery: 0,\n\
-                            {indent_1}}},\n",
-                        );
                         match nested_resolver_imports.entry(resolver_field.type_and_field) {
                             Entry::Occupied(mut occupied) => {
                                 occupied.get_mut().default_import = true;
@@ -831,7 +819,35 @@ fn generate_reader_ast_node(
                                 });
                             }
                         }
-                        res
+
+                        // This is indicative of poor data modeling.
+                        match resolver_field.variant {
+                            Some(WithSpan {
+                                item: ResolverVariant::RefetchField,
+                                ..
+                            }) => {
+                                format!(
+                                    "{indent_1}{{\n\
+                                    {indent_2}kind: \"RefetchField\",\n\
+                                    {indent_2}alias: \"{alias}\",\n\
+                                    {indent_2}resolver: {resolver_field_string},\n\
+                                    {indent_2}refetchQuery: 0,\n\
+                                    {indent_1}}},\n",
+                                )
+                            }
+                            _ => {
+                                format!(
+                                    "{indent_1}{{\n\
+                                    {indent_2}kind: \"Resolver\",\n\
+                                    {indent_2}alias: \"{alias}\",\n\
+                                    {indent_2}arguments: {arguments},\n\
+                                    {indent_2}resolver: {resolver_field_string},\n\
+                                    {indent_2}variant: {variant},\n\
+                                    {indent_2}usedRefetchQueries: {nested_refetch_queries},\n\
+                                    {indent_1}}},\n",
+                                )
+                            }
+                        }
                     }
                 }
             }

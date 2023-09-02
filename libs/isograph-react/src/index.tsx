@@ -60,7 +60,8 @@ export type IsographResolver<
 export type ReaderAstNode =
   | ReaderScalarField
   | ReaderLinkedField
-  | ReaderResolverField;
+  | ReaderResolverField
+  | ReaderRefetchField;
 
 // @ts-ignore
 export type ReaderAst<TReadFromStore> = ReaderAstNode[];
@@ -79,7 +80,7 @@ export type ReaderLinkedField = {
   arguments: Arguments | null;
 };
 
-export type ReaderResolverVariant = "Eager" | "Component" | "RefetchField";
+export type ReaderResolverVariant = "Eager" | "Component";
 export type ReaderResolverField = {
   kind: "Resolver";
   alias: string;
@@ -87,8 +88,13 @@ export type ReaderResolverField = {
   variant: ReaderResolverVariant | null;
   arguments: Arguments | null;
   usedRefetchQueries: number[];
-  // TODO this should only appear on variant: "Resolver", we are modeling this poorly
-  refetchQuery: number | null;
+};
+
+export type ReaderRefetchField = {
+  kind: "RefetchField";
+  alias: string;
+  resolver: IsographResolver<any, any, any>;
+  refetchQuery: number;
 };
 
 export type NormalizationAstNode =
@@ -374,6 +380,36 @@ function readData<TReadFromStore>(
         target[field.alias ?? field.fieldName] = data.data;
         break;
       }
+      case "RefetchField": {
+        const data = readData(
+          field.resolver.readerAst,
+          root,
+          variables,
+          // Refetch fields just read the id, and don't need refetch query artifacts
+          []
+        );
+        console.log("refetch field data", data, field);
+        if (data.kind === "MissingData") {
+          return {
+            kind: "MissingData",
+            reason: "Missing data for " + field.alias + " on root " + root,
+            nestedReason: data,
+          };
+        } else {
+          // TODO do we also need to call convert?
+          const refetchQueryIndex = field.refetchQuery;
+          if (refetchQueryIndex == null) {
+            throw new Error("refetchQuery is null in RefetchField");
+          }
+          const refetchQueryArtifact = nestedRefetchQueries[refetchQueryIndex];
+
+          target[field.alias] = field.resolver.resolver(refetchQueryArtifact, {
+            ...data.data,
+            ...variables,
+          });
+        }
+        break;
+      }
       case "Resolver": {
         const usedRefetchQueries = field.usedRefetchQueries;
         const resolverRefetchQueries = usedRefetchQueries.map(
@@ -424,37 +460,6 @@ function readData<TReadFromStore>(
               />
             );
           };
-        } else if (field.variant === "RefetchField") {
-          const data = readData(
-            field.resolver.readerAst,
-            root,
-            variables,
-            resolverRefetchQueries
-          );
-          console.log("refetch field data", data, field);
-          if (data.kind === "MissingData") {
-            return {
-              kind: "MissingData",
-              reason: "Missing data for " + field.alias + " on root " + root,
-              nestedReason: data,
-            };
-          } else {
-            // TODO do we also need to call convert?
-            const refetchQueryIndex = field.refetchQuery;
-            if (refetchQueryIndex == null) {
-              throw new Error("refetchQuery is null in RefetchField");
-            }
-            const refetchQueryArtifact =
-              nestedRefetchQueries[refetchQueryIndex];
-
-            target[field.alias] = field.resolver.resolver(
-              refetchQueryArtifact,
-              {
-                ...data.data,
-                ...variables,
-              }
-            );
-          }
         } else {
           const fragmentReference = {
             kind: "FragmentReference",

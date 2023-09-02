@@ -45,8 +45,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
             resolver: Repository__repository_link,
             variant: "Component",
             usedRefetchQueries: [0, ],
-            // This should only exist on refetch queries
-            refetchQuery: 0,
           },
           {
             kind: "Scalar",
@@ -74,8 +72,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
             resolver: PullRequestConnection__pull_request_table,
             variant: "Component",
             usedRefetchQueries: [0, ],
-            // This should only exist on refetch queries
-            refetchQuery: 0,
           },
         ],
       },

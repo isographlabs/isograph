@@ -35,16 +35,11 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
         resolver: User__repository_list,
         variant: "Component",
         usedRefetchQueries: [0, ],
-        // This should only exist on refetch queries
-        refetchQuery: 0,
       },
       {
-        kind: "Resolver",
+        kind: "RefetchField",
         alias: "__refetch",
-        arguments: null,
         resolver: User____refetch,
-        variant: "RefetchField",
-        usedRefetchQueries: [0, ],
         // This should only exist on refetch queries
         refetchQuery: 0,
       },

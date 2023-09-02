@@ -28,8 +28,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
         resolver: User__avatar,
         variant: "Component",
         usedRefetchQueries: [0, ],
-        // This should only exist on refetch queries
-        refetchQuery: 0,
       },
     ],
   },

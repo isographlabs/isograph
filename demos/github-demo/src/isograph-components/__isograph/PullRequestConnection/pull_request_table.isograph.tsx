@@ -36,8 +36,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
             resolver: PullRequest__pull_request_link,
             variant: "Component",
             usedRefetchQueries: [0, ],
-            // This should only exist on refetch queries
-            refetchQuery: 0,
           },
           {
             kind: "Scalar",
@@ -64,8 +62,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
                 resolver: Actor__user_link,
                 variant: "Component",
                 usedRefetchQueries: [0, ],
-                // This should only exist on refetch queries
-                refetchQuery: 0,
               },
               {
                 kind: "Scalar",
@@ -94,8 +90,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
             resolver: PullRequest__created_at_formatted,
             variant: "Eager",
             usedRefetchQueries: [0, ],
-            // This should only exist on refetch queries
-            refetchQuery: 0,
           },
         ],
       },

@@ -184,8 +184,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     resolver: Query__header,
     variant: "Component",
     usedRefetchQueries: [0, ],
-    // This should only exist on refetch queries
-    refetchQuery: 0,
   },
   {
     kind: "Resolver",
@@ -194,8 +192,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     resolver: Query__home_page_list,
     variant: "Component",
     usedRefetchQueries: [0, ],
-    // This should only exist on refetch queries
-    refetchQuery: 0,
   },
 ];
 
