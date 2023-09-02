@@ -202,6 +202,14 @@ pub enum NonConstantValue {
     Variable(VariableName),
 }
 
+impl NonConstantValue {
+    pub fn reachable_variables(&self) -> Vec<VariableName> {
+        match self {
+            NonConstantValue::Variable(name) => vec![*name],
+        }
+    }
+}
+
 impl fmt::Display for NonConstantValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

@@ -1,11 +1,12 @@
 use std::collections::{
     hash_map::{Entry, OccupiedEntry, VacantEntry},
-    HashMap,
+    HashMap, HashSet,
 };
 
 use common_lang_types::{
     FieldArgumentName, IsographObjectTypeName, LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias,
-    ScalarFieldName, SelectableFieldName, ServerFieldNormalizationKey, Span, WithSpan,
+    ScalarFieldName, SelectableFieldName, ServerFieldNormalizationKey, Span, VariableName,
+    WithSpan,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -26,6 +27,32 @@ type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSe
 pub enum MergedServerFieldSelection {
     ScalarField(MergedScalarFieldSelection),
     LinkedField(MergedLinkedFieldSelection),
+}
+
+impl MergedServerFieldSelection {
+    pub fn reachable_variables(&self) -> HashSet<VariableName> {
+        match self {
+            MergedServerFieldSelection::ScalarField(scalar_field) => {
+                get_variable_selections(&scalar_field.arguments)
+            }
+            MergedServerFieldSelection::LinkedField(linked_field) => {
+                let mut reachable_variables = get_variable_selections(&linked_field.arguments);
+                for selection in linked_field.selection_set.iter() {
+                    reachable_variables.extend(selection.item.reachable_variables());
+                }
+                reachable_variables
+            }
+        }
+    }
+}
+
+pub fn get_variable_selections(
+    arguments: &[WithSpan<SelectionFieldArgument>],
+) -> HashSet<VariableName> {
+    arguments
+        .iter()
+        .flat_map(|argument| argument.item.value.item.reachable_variables())
+        .collect()
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -68,6 +95,13 @@ impl MergedSelectionSet {
     ) -> Self {
         unsorted_vec.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
         MergedSelectionSet(unsorted_vec.into_iter().map(|(_, value)| value).collect())
+    }
+
+    fn reachable_variables(&self) -> HashSet<VariableName> {
+        self.0
+            .iter()
+            .flat_map(|x| x.item.reachable_variables())
+            .collect()
     }
 }
 fn find_by_path(
@@ -204,11 +238,28 @@ pub fn create_merged_selection_set(
         let nested_merged_selection_set =
             find_by_path(&merged_selection_set, &path_to_refetch_field);
 
+        // TODO we can pre-calculate this instead of re-iterating here
+        let reachable_variables = nested_merged_selection_set.reachable_variables();
+        let variable_definitions = reachable_variables
+            .into_iter()
+            .map(|variable_name| {
+                root_fetchable_resolver
+                    .variable_definitions
+                    .iter()
+                    .find(|definition| definition.item.name.item == variable_name)
+                    .expect(
+                        "Did not find matching variable definition. \
+                        This might not be validated yet.",
+                    )
+                    .clone()
+            })
+            .collect();
+
         artifact_queue.push(ArtifactQueueItem::RefetchField(RefetchFieldResolverInfo {
             merged_selection_set: nested_merged_selection_set,
             refetch_field_parent_id,
             // TODO
-            variable_definitions: vec![],
+            variable_definitions,
             root_parent_object: schema
                 .schema_data
                 .object(root_fetchable_resolver.parent_object_id)
