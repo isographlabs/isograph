@@ -10,8 +10,9 @@ use common_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    InputTypeId, LinkedFieldSelection, NonConstantValue, ObjectId, ScalarFieldSelection, Selection,
-    SelectionFieldArgument, ServerFieldSelection, VariableDefinition,
+    InputTypeId, LinkedFieldSelection, NonConstantValue, ObjectId, ResolverFieldId,
+    ScalarFieldSelection, Selection, SelectionFieldArgument, ServerFieldSelection,
+    VariableDefinition,
 };
 
 use crate::{
@@ -315,13 +316,15 @@ fn merge_selections_into_set(
                         DefinedField::ServerField(_) => {
                             merge_scalar_server_field(scalar_field, merged_selection_map, span);
                         }
-                        DefinedField::ResolverField(_) => merge_scalar_resolver_field(
-                            scalar_field,
-                            parent_type,
-                            schema,
-                            merged_selection_map,
-                            merge_traversal_state,
-                        ),
+                        DefinedField::ResolverField(resolver_field_id) => {
+                            merge_scalar_resolver_field(
+                                parent_type,
+                                schema,
+                                merged_selection_map,
+                                merge_traversal_state,
+                                *resolver_field_id,
+                            )
+                        }
                     };
                 }
                 ServerFieldSelection::LinkedField(new_linked_field) => {
@@ -440,22 +443,13 @@ fn merge_linked_field_into_occupied_entry(
 }
 
 fn merge_scalar_resolver_field(
-    scalar_field: &ScalarFieldSelection<ValidatedScalarDefinedField>,
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     schema: &ValidatedSchema,
     merged_selection_map: &mut MergedSelectionMap,
     merge_traversal_state: &mut MergeTraversalState<'_>,
+    resolver_field_id: ResolverFieldId,
 ) {
-    let resolver_field_name = scalar_field.name.item;
-    let parent_field_id = parent_type
-        .resolvers
-        .iter()
-        .find(|parent_field_id| {
-            let field = schema.resolver(**parent_field_id);
-            field.name == resolver_field_name.into()
-        })
-        .expect("expect field to exist");
-    let resolver_field = schema.resolver(*parent_field_id);
+    let resolver_field = schema.resolver(resolver_field_id);
     if let Some((ref selection_set, _)) = resolver_field.selection_set_and_unwraps {
         merge_selections_into_set(
             schema,
