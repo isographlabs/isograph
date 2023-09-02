@@ -230,7 +230,6 @@ fn generate_fetchable_resolver_artifact<'schema>(
         let reader_ast = generate_reader_ast(
             schema,
             selection_set,
-            query_object.into(),
             0,
             &mut nested_resolver_artifact_imports,
             QueryCount(1),
@@ -273,7 +272,6 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
         let reader_ast = generate_reader_ast(
             schema,
             selection_set,
-            parent_type.into(),
             0,
             &mut nested_resolver_artifact_imports,
             nested_refetch_query_count,
@@ -733,7 +731,6 @@ pub struct ResolverImport {
 fn generate_reader_ast<'schema>(
     schema: &'schema ValidatedSchema,
     selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
-    parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     indentation_level: u8,
     nested_resolver_imports: &mut NestedResolverImports,
     // TODO change this
@@ -743,7 +740,6 @@ fn generate_reader_ast<'schema>(
     for item in selection_set {
         let s = generate_reader_ast_node(
             item,
-            parent_type,
             schema,
             indentation_level + 1,
             nested_resolver_imports,
@@ -756,15 +752,14 @@ fn generate_reader_ast<'schema>(
 }
 
 fn generate_reader_ast_node(
-    item: &WithSpan<Selection<ValidatedScalarDefinedField, ObjectId>>,
-    parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
+    selection: &WithSpan<Selection<ValidatedScalarDefinedField, ObjectId>>,
     schema: &ValidatedSchema,
     indentation_level: u8,
     nested_resolver_imports: &mut NestedResolverImports,
     // TODO change this
     nested_refetch_query_count: QueryCount,
 ) -> String {
-    match &item.item {
+    match &selection.item {
         Selection::ServerField(field) => match field {
             ServerFieldSelection::ScalarField(scalar_field) => {
                 let field_name = scalar_field.name.item;
@@ -792,20 +787,11 @@ fn generate_reader_ast_node(
                             {indent_1}}},\n",
                         )
                     }
-                    DefinedField::ResolverField(_) => {
-                        let alias = scalar_field.name_or_alias().item;
+                    DefinedField::ResolverField(resolver_field_id) => {
                         // This field is a resolver, so we need to look up the field in the
                         // schema.
-                        let resolver_field_name = scalar_field.name.item;
-                        let resolver_field_id = parent_type
-                            .resolvers
-                            .iter()
-                            .find(|parent_field_id| {
-                                let field = schema.resolver(**parent_field_id);
-                                field.name == resolver_field_name.into()
-                            })
-                            .expect("expect field to exist");
-                        let resolver_field = schema.resolver(*resolver_field_id);
+                        let alias = scalar_field.name_or_alias().item;
+                        let resolver_field = schema.resolver(resolver_field_id);
                         let arguments = get_serialized_field_arguments(
                             &scalar_field.arguments,
                             indentation_level + 1,
@@ -855,11 +841,9 @@ fn generate_reader_ast_node(
                     .reader_alias
                     .map(|x| format!("\"{}\"", x.item))
                     .unwrap_or("null".to_string());
-                let linked_field_type = schema.schema_data.object(linked_field.associated_data);
                 let inner_reader_ast = generate_reader_ast(
                     schema,
                     &linked_field.selection_set,
-                    linked_field_type,
                     indentation_level + 1,
                     nested_resolver_imports,
                     nested_refetch_query_count,
