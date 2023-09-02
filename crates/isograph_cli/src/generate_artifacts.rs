@@ -896,15 +896,6 @@ fn generate_normalization_ast<'schema>(
     NormalizationAst(normalization_ast)
 }
 
-fn get_nested_refetch_query_text(count: QueryCount) -> String {
-    let mut s = "[".to_string();
-    for i in 0..(count.0) {
-        s.push_str(&format!("{}, ", i));
-    }
-    s.push_str("]");
-    s
-}
-
 fn generate_normalization_ast_node(
     item: &WithSpan<MergedServerFieldSelection>,
     schema: &ValidatedSchema,
@@ -1020,6 +1011,15 @@ fn serialize_non_constant_value_for_js(value: &NonConstantValue) -> String {
     match value {
         NonConstantValue::Variable(variable_name) => format!("\"{}\"", variable_name),
     }
+}
+
+fn get_nested_refetch_query_text(count: QueryCount) -> String {
+    let mut s = "[".to_string();
+    for i in 0..(count.0) {
+        s.push_str(&format!("{}, ", i));
+    }
+    s.push_str("]");
+    s
 }
 
 fn generate_read_out_type(resolver_definition: &ValidatedSchemaResolver) -> ResolverReadOutType {
