@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    DescriptionValue, HasName, InputTypeName, InterfaceTypeName, IsographObjectTypeName,
-    JavascriptName, ResolverDefinitionPath, ScalarTypeName, SelectableFieldName,
-    UnvalidatedTypeName, WithSpan,
+    DescriptionValue, FieldArgumentName, HasName, InputTypeName, InterfaceTypeName,
+    IsographObjectTypeName, JavascriptName, LinkedFieldName, ResolverDefinitionPath,
+    ScalarTypeName, SelectableFieldName, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, Directive, InterfaceTypeDefinition, NamedTypeAnnotation, ObjectTypeDefinition,
@@ -11,8 +11,8 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    DefinedTypeId, InputTypeId, ObjectId, OutputTypeId, ResolverFieldId, ScalarId, Selection,
-    ServerFieldId, ServerIdFieldId, Unwrap, VariableDefinition,
+    DefinedTypeId, InputTypeId, NonConstantValue, ObjectId, OutputTypeId, ResolverFieldId,
+    ScalarId, Selection, ServerFieldId, ServerIdFieldId, Unwrap, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -535,6 +535,25 @@ pub struct SchemaResolver<TScalarField, TLinkedField, TVariableDefinitionType> {
 
     // TODO should this be TypeWithFieldsId???
     pub parent_object_id: ObjectId,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct PathToRefetchField {
+    pub linked_fields: Vec<NameAndArguments>,
+}
+
+#[allow(unused)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct NameAndArguments {
+    pub name: LinkedFieldName,
+    pub arguments: Vec<ArgumentKeyAndValue>,
+}
+
+#[allow(unused)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ArgumentKeyAndValue {
+    pub key: FieldArgumentName,
+    pub value: NonConstantValue,
 }
 
 impl<T> SchemaServerField<T> {

@@ -4,21 +4,19 @@ use std::collections::{
 };
 
 use common_lang_types::{
-    FieldArgumentName, IsographObjectTypeName, LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias,
-    ScalarFieldName, SelectableFieldName, ServerFieldNormalizationKey, Span, VariableName,
-    WithSpan,
+    IsographObjectTypeName, LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName,
+    SelectableFieldName, ServerFieldNormalizationKey, Span, VariableName, WithSpan,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    InputTypeId, LinkedFieldSelection, NonConstantValue, ObjectId, ResolverFieldId,
-    ScalarFieldSelection, Selection, SelectionFieldArgument, ServerFieldSelection,
-    VariableDefinition,
+    InputTypeId, LinkedFieldSelection, ObjectId, ResolverFieldId, ScalarFieldSelection, Selection,
+    SelectionFieldArgument, ServerFieldSelection, VariableDefinition,
 };
 
 use crate::{
-    DefinedField, ResolverVariant, SchemaObject, ValidatedEncounteredDefinedField,
-    ValidatedScalarDefinedField, ValidatedSchema, ValidatedSchemaIdField, ValidatedSchemaObject,
-    ValidatedSchemaResolver, ValidatedSelection,
+    ArgumentKeyAndValue, DefinedField, NameAndArguments, PathToRefetchField, ResolverVariant,
+    SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
+    ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
 };
 
 type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSelection>>;
@@ -174,25 +172,6 @@ struct MergeTraversalState<'a> {
     current_path: PathToRefetchField,
 }
 
-#[derive(Default, Debug, Clone)]
-struct PathToRefetchField {
-    linked_fields: Vec<NameAndArguments>,
-}
-
-#[allow(unused)]
-#[derive(Debug, Clone)]
-struct NameAndArguments {
-    pub name: LinkedFieldName,
-    pub arguments: Vec<ArgumentKeyAndValue>,
-}
-
-#[allow(unused)]
-#[derive(Debug, Clone)]
-struct ArgumentKeyAndValue {
-    pub key: FieldArgumentName,
-    pub value: NonConstantValue,
-}
-
 impl<'a> MergeTraversalState<'a> {
     pub fn new(resolver: &'a ValidatedSchemaResolver) -> Self {
         Self {
@@ -202,9 +181,6 @@ impl<'a> MergeTraversalState<'a> {
         }
     }
 }
-
-#[derive(Debug, Copy, Clone)]
-pub struct QueryCount(pub usize);
 
 /// As we traverse selection sets, we need to keep track of the path we have
 /// taken so far. This is because when we encounter a refetch query, we need
@@ -220,8 +196,9 @@ pub fn create_merged_selection_set(
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     validated_selections: &Vec<WithSpan<ValidatedSelection>>,
     artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
+    // N.B. we call this for non-fetchable resolvers now, but that is a smell
     root_fetchable_resolver: &ValidatedSchemaResolver,
-) -> (MergedSelectionSet, QueryCount) {
+) -> (MergedSelectionSet, Vec<PathToRefetchField>) {
     let mut merge_traversal_state = MergeTraversalState::new(root_fetchable_resolver);
     let merged_selection_set = create_merged_selection_set_with_resolver_state(
         schema,
@@ -230,10 +207,9 @@ pub fn create_merged_selection_set(
         &mut merge_traversal_state,
     );
 
-    let count = QueryCount(merge_traversal_state.paths_to_refetch_fields.len());
     for (index, (path_to_refetch_field, refetch_field_parent_id)) in merge_traversal_state
         .paths_to_refetch_fields
-        .into_iter()
+        .iter()
         .enumerate()
     {
         let nested_merged_selection_set =
@@ -241,6 +217,7 @@ pub fn create_merged_selection_set(
 
         // TODO we can pre-calculate this instead of re-iterating here
         let reachable_variables = nested_merged_selection_set.reachable_variables();
+
         let variable_definitions = reachable_variables
             .into_iter()
             .map(|variable_name| {
@@ -248,18 +225,18 @@ pub fn create_merged_selection_set(
                     .variable_definitions
                     .iter()
                     .find(|definition| definition.item.name.item == variable_name)
-                    .expect(
+                    .expect(&format!(
                         "Did not find matching variable definition. \
-                        This might not be validated yet.",
-                    )
+                            This might not be validated yet. def {:?} not found {} ",
+                        root_fetchable_resolver.variable_definitions, variable_name
+                    ))
                     .clone()
             })
             .collect();
 
         artifact_queue.push(ArtifactQueueItem::RefetchField(RefetchFieldResolverInfo {
             merged_selection_set: nested_merged_selection_set,
-            refetch_field_parent_id,
-            // TODO
+            refetch_field_parent_id: *refetch_field_parent_id,
             variable_definitions,
             root_parent_object: schema
                 .schema_data
@@ -270,7 +247,14 @@ pub fn create_merged_selection_set(
         }));
     }
 
-    (merged_selection_set, count)
+    (
+        merged_selection_set,
+        merge_traversal_state
+            .paths_to_refetch_fields
+            .iter()
+            .map(|x| x.0.clone())
+            .collect(),
+    )
 }
 
 fn create_merged_selection_set_with_resolver_state(

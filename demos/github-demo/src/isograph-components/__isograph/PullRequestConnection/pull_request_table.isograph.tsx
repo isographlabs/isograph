@@ -35,7 +35,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
             arguments: null,
             resolver: PullRequest__pull_request_link,
             variant: "Component",
-            usedRefetchQueries: [0, ],
+            usedRefetchQueries: [0, 1, ],
           },
           {
             kind: "Scalar",
@@ -61,7 +61,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
                 arguments: null,
                 resolver: Actor__user_link,
                 variant: "Component",
-                usedRefetchQueries: [0, ],
+                usedRefetchQueries: [0, 1, ],
               },
               {
                 kind: "Scalar",
@@ -89,7 +89,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
             arguments: null,
             resolver: PullRequest__created_at_formatted,
             variant: "Eager",
-            usedRefetchQueries: [0, ],
+            usedRefetchQueries: [0, 1, ],
           },
         ],
       },

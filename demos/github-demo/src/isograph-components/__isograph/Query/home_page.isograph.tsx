@@ -183,7 +183,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     arguments: null,
     resolver: Query__header,
     variant: "Component",
-    usedRefetchQueries: [0, ],
+    usedRefetchQueries: [0, 1, ],
   },
   {
     kind: "Resolver",
@@ -191,7 +191,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     arguments: null,
     resolver: Query__home_page_list,
     variant: "Component",
-    usedRefetchQueries: [0, ],
+    usedRefetchQueries: [0, 1, ],
   },
 ];
 

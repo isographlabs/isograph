@@ -18,8 +18,9 @@ use isograph_lang_types::{
     ServerFieldSelection, VariableDefinition,
 };
 use isograph_schema::{
-    create_merged_selection_set, ArtifactQueueItem, DefinedField, MergedLinkedFieldSelection,
-    MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection, QueryCount,
+    create_merged_selection_set, refetched_paths_for_linked_field_selection,
+    refetched_paths_for_resolver, ArtifactQueueItem, DefinedField, MergedLinkedFieldSelection,
+    MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection, PathToRefetchField,
     RefetchFieldResolverInfo, ResolverActionKind, ResolverArtifactKind, ResolverTypeAndField,
     ResolverVariant, SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField,
     ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
@@ -176,7 +177,7 @@ fn get_artifact_for_resolver<'schema>(
             generate_fetchable_resolver_artifact(schema, resolver, artifact_queue),
         ),
         ResolverArtifactKind::NonFetchable => Artifact::NonFetchableResolver(
-            generate_non_fetchable_resolver_artifact(schema, resolver, QueryCount(1)),
+            generate_non_fetchable_resolver_artifact(schema, resolver),
         ),
     }
 }
@@ -189,7 +190,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
     if let Some((ref selection_set, _)) = fetchable_resolver.selection_set_and_unwraps {
         let query_name = fetchable_resolver.name.into();
 
-        let (merged_selection_set, query_count) = create_merged_selection_set(
+        let (merged_selection_set, root_refetched_paths) = create_merged_selection_set(
             schema,
             // TODO here we are assuming that the resolver is only on the Query type.
             // That restriction should be loosened.
@@ -221,7 +222,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
             0,
         );
         let refetch_query_artifact_imports =
-            generate_refetch_query_artifact_imports(query_count, fetchable_resolver.name);
+            generate_refetch_query_artifact_imports(&root_refetched_paths, fetchable_resolver.name);
         let resolver_import_statement =
             generate_resolver_import_statement(fetchable_resolver.action_kind);
         let resolver_return_type =
@@ -232,7 +233,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
             selection_set,
             0,
             &mut nested_resolver_artifact_imports,
-            QueryCount(1),
+            &root_refetched_paths,
         );
         let convert_function =
             generate_convert_function(&fetchable_resolver.variant, fetchable_resolver.name);
@@ -262,19 +263,33 @@ fn generate_fetchable_resolver_artifact<'schema>(
 fn generate_non_fetchable_resolver_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     non_fetchable_resolver: &ValidatedSchemaResolver,
-    nested_refetch_query_count: QueryCount,
 ) -> NonFetchableResolver<'schema> {
     if let Some((selection_set, _)) = &non_fetchable_resolver.selection_set_and_unwraps {
         let parent_type = schema
             .schema_data
             .object(non_fetchable_resolver.parent_object_id);
         let mut nested_resolver_artifact_imports = HashMap::new();
+
+        let (_merged_selection_set, root_refetched_paths) = create_merged_selection_set(
+            schema,
+            // TODO here we are assuming that the resolver is only on the Query type.
+            // That restriction should be loosened.
+            schema
+                .schema_data
+                .object(schema.query_type_id.expect("expect query type to exist"))
+                .into(),
+            selection_set,
+            // TODO obviously a smell
+            &mut vec![],
+            &non_fetchable_resolver,
+        );
+
         let reader_ast = generate_reader_ast(
             schema,
             selection_set,
             0,
             &mut nested_resolver_artifact_imports,
-            nested_refetch_query_count,
+            &root_refetched_paths,
         );
 
         let resolver_parameter_type = generate_resolver_parameter_type(
@@ -403,12 +418,12 @@ fn generate_query_text(
 }
 
 fn generate_refetch_query_artifact_imports(
-    count: QueryCount,
+    root_refetched_paths: &[PathToRefetchField],
     root_resolver_field_name: SelectableFieldName,
 ) -> RefetchQueryArtifactImport {
     let mut output = String::new();
     let mut array_syntax = String::new();
-    for query_index in 0..(count.0) {
+    for query_index in 0..root_refetched_paths.len() {
         output.push_str(&format!(
             "import refetchQuery{} from './{}/__refetch__{}.isograph';\n",
             query_index, root_resolver_field_name, query_index,
@@ -733,8 +748,7 @@ fn generate_reader_ast<'schema>(
     selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
     indentation_level: u8,
     nested_resolver_imports: &mut NestedResolverImports,
-    // TODO change this
-    nested_refetch_query_count: QueryCount,
+    root_refetched_paths: &[PathToRefetchField],
 ) -> ReaderAst {
     let mut reader_ast = "[\n".to_string();
     for item in selection_set {
@@ -743,7 +757,7 @@ fn generate_reader_ast<'schema>(
             schema,
             indentation_level + 1,
             nested_resolver_imports,
-            nested_refetch_query_count,
+            root_refetched_paths,
         );
         reader_ast.push_str(&s);
     }
@@ -756,8 +770,8 @@ fn generate_reader_ast_node(
     schema: &ValidatedSchema,
     indentation_level: u8,
     nested_resolver_imports: &mut NestedResolverImports,
-    // TODO change this
-    nested_refetch_query_count: QueryCount,
+    // TODO use this to generate usedRefetchQueries
+    root_refetched_paths: &[PathToRefetchField],
 ) -> String {
     match &selection.item {
         Selection::ServerField(field) => match field {
@@ -805,8 +819,10 @@ fn generate_reader_ast_node(
                             .map(|x| format!("\"{}\"", x))
                             .unwrap_or_else(|| "null".to_string());
 
+                        let refetched_paths = refetched_paths_for_resolver(resolver_field, schema);
+
                         let nested_refetch_queries =
-                            get_nested_refetch_query_text(nested_refetch_query_count);
+                            get_nested_refetch_query_text(&refetched_paths);
 
                         match nested_resolver_imports.entry(resolver_field.type_and_field) {
                             Entry::Occupied(mut occupied) => {
@@ -857,12 +873,17 @@ fn generate_reader_ast_node(
                     .reader_alias
                     .map(|x| format!("\"{}\"", x.item))
                     .unwrap_or("null".to_string());
+
+                let non_root_refetched_paths =
+                    refetched_paths_for_linked_field_selection(&linked_field.selection_set, schema);
+
                 let inner_reader_ast = generate_reader_ast(
                     schema,
                     &linked_field.selection_set,
                     indentation_level + 1,
                     nested_resolver_imports,
-                    nested_refetch_query_count,
+                    // TODO this is not correct
+                    &non_root_refetched_paths,
                 );
                 let arguments =
                     get_serialized_field_arguments(&linked_field.arguments, indentation_level + 1);
@@ -1013,9 +1034,10 @@ fn serialize_non_constant_value_for_js(value: &NonConstantValue) -> String {
     }
 }
 
-fn get_nested_refetch_query_text(count: QueryCount) -> String {
+fn get_nested_refetch_query_text(_nested_refetch_queries: &[PathToRefetchField]) -> String {
+    // Assuming count is 2... TODO fix
     let mut s = "[".to_string();
-    for i in 0..(count.0) {
+    for i in 0..2 {
         s.push_str(&format!("{}, ", i));
     }
     s.push_str("]");

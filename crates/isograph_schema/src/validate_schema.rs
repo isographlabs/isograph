@@ -12,9 +12,10 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    DefinedField, Schema, SchemaData, SchemaIdField, SchemaObject, SchemaResolver,
-    SchemaServerField, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData,
-    UnvalidatedSchemaField, UnvalidatedSchemaResolver, UnvalidatedSchemaServerField,
+    refetched_paths::refetched_paths_with_path, DefinedField, PathToRefetchField, Schema,
+    SchemaData, SchemaIdField, SchemaObject, SchemaResolver, SchemaServerField,
+    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData, UnvalidatedSchemaField,
+    UnvalidatedSchemaResolver, UnvalidatedSchemaServerField,
 };
 
 pub type ValidatedSchemaField = SchemaServerField<TypeAnnotation<OutputTypeId>>;
@@ -659,4 +660,32 @@ pub enum ValidateSchemaError {
         type_: String,
         inner_type: UnvalidatedTypeName,
     },
+}
+
+pub fn refetched_paths_for_resolver(
+    schema_resolver: &ValidatedSchemaResolver,
+    schema: &ValidatedSchema,
+) -> Vec<PathToRefetchField> {
+    // TODO this is a smell
+    let path = &mut vec![];
+    let path_set = match &schema_resolver.selection_set_and_unwraps {
+        Some((selection_set, _)) => refetched_paths_with_path(&selection_set, schema, path),
+        None => panic!("unexpected non-existent selection set on resolver"),
+    };
+    let mut paths: Vec<_> = path_set.into_iter().collect();
+    paths.sort();
+    paths
+}
+
+pub fn refetched_paths_for_linked_field_selection(
+    linked_field_selection_set: &[WithSpan<Selection<ValidatedScalarDefinedField, ObjectId>>],
+    schema: &ValidatedSchema,
+) -> Vec<PathToRefetchField> {
+    // TODO this is a smell
+    let path = &mut vec![];
+    let mut paths: Vec<_> = refetched_paths_with_path(linked_field_selection_set, schema, path)
+        .into_iter()
+        .collect();
+    paths.sort();
+    paths
 }

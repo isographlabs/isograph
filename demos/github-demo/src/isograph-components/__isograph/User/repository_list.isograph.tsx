@@ -44,7 +44,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
                 arguments: null,
                 resolver: Repository__repository_link,
                 variant: "Component",
-                usedRefetchQueries: [0, ],
+                usedRefetchQueries: [0, 1, ],
               },
               {
                 kind: "Scalar",
