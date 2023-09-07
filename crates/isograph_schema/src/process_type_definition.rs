@@ -25,6 +25,7 @@ use crate::{
 
 lazy_static! {
     static ref QUERY_TYPE: IsographObjectTypeName = "Query".intern().into();
+    static ref MUTATION_TYPE: IsographObjectTypeName = "Mutation".intern().into();
 }
 
 impl UnvalidatedSchema {
@@ -42,22 +43,28 @@ impl UnvalidatedSchema {
         //   to the found interface.
         let mut valid_type_refinement_map = HashMap::new();
 
+        let mut mutation_type_id = None;
         for type_system_definition in type_system_document.0 {
             match type_system_definition {
                 TypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
-                    self.process_object_type_definition(
+                    let mutation_id = self.process_object_type_definition(
                         object_type_definition.into(),
                         &mut valid_type_refinement_map,
                     )?;
+                    if let Some(mutation_id) = mutation_id {
+                        mutation_type_id = Some(mutation_id);
+                    }
                 }
                 TypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
                     self.process_scalar_definition(scalar_type_definition)?;
+                    // N.B. we assume that Mutation will be an object, not a scalar
                 }
                 TypeSystemDefinition::InterfaceTypeDefinition(interface_type_definition) => {
                     self.process_object_type_definition(
                         interface_type_definition.into(),
                         &mut valid_type_refinement_map,
                     )?;
+                    // N.B. we assume that Mutation will be an object, not an interface
                 }
             }
         }
@@ -97,6 +104,10 @@ impl UnvalidatedSchema {
             }
         }
 
+        if let Some(mutation_id) = mutation_type_id {
+            self.add_mutation_fields(mutation_id)?;
+        }
+
         Ok(())
     }
 
@@ -104,7 +115,7 @@ impl UnvalidatedSchema {
         &mut self,
         type_definition: IsographObjectTypeDefinition,
         valid_type_refinement_map: &mut HashMap<IsographObjectTypeName, Vec<ObjectId>>,
-    ) -> ProcessTypeDefinitionResult<()> {
+    ) -> ProcessTypeDefinitionResult<Option<ObjectId>> {
         let &mut Schema {
             fields: ref mut schema_fields,
             ref mut schema_data,
@@ -115,6 +126,7 @@ impl UnvalidatedSchema {
         let string_type_for_typename = schema_data.scalar(self.string_type_id).name;
         let ref mut type_names = schema_data.defined_types;
         let ref mut objects = schema_data.objects;
+        let mut mutation_id = None;
         match type_names.entry(type_definition.name.item.into()) {
             Entry::Occupied(_) => {
                 return Err(ProcessTypeDefinitionError::DuplicateTypeDefinition {
@@ -161,9 +173,16 @@ impl UnvalidatedSchema {
                 // This should mutate a default query object; only if no schema declaration is ultimately
                 // encountered should we use the default query object.
                 //
-                // Also, this is a GraphQL concept, but it's leaking into Isograph land :/
+                // Also, this is a GraphQL concept, but it's leaking into Isograph land :/ (is it?)
                 if type_definition.name.item == *QUERY_TYPE {
                     self.query_type_id = Some(next_object_id);
+                }
+                // --- END HACK ---
+
+                // ----- HACK -----
+                // It's unclear to me that this is the best way to add magic mutation fields.
+                if type_definition.name.item == *MUTATION_TYPE {
+                    mutation_id = Some(next_object_id)
                 }
                 // --- END HACK ---
 
@@ -180,7 +199,7 @@ impl UnvalidatedSchema {
             definitions.push(next_object_id);
         }
 
-        Ok(())
+        Ok(mutation_id)
     }
 
     fn process_scalar_definition(
@@ -212,6 +231,37 @@ impl UnvalidatedSchema {
                 vacant.insert(DefinedTypeId::Scalar(next_scalar_id));
             }
         }
+        Ok(())
+    }
+
+    /// Add magical mutation fields.
+    ///
+    /// > This is a bit hacky! It should be controlled more by directives. Instead, lots of behavior
+    /// > is hard-coded now.
+    ///
+    /// For each field on a mutation object, if:
+    /// - that field's type is a non-nullable object and **exactly one** of that object's fields:
+    ///   - either
+    ///     - has directive "@primary", or
+    ///     - is the only field
+    ///   - has no arguments, and
+    ///   - is an object type (call it TargetType)
+    /// - and that field's arguments contain an argument named "id" of type "ID!"
+    ///
+    /// then, add a magical field to TargetType whose name is __ + mutation_name, which:
+    /// - executes the mutation
+    /// - has the mutation's arguments (except an id)
+    /// - then acts as a __refetch field on that TargetType, i.e. refetches all the fields
+    ///   selected in the merged selection set.
+    fn add_mutation_fields(&mut self, mutation_id: ObjectId) -> ProcessTypeDefinitionResult<()> {
+        let mutation_object = self.schema_data.object(mutation_id);
+
+        for field_id in mutation_object.server_fields.iter() {
+            let _field = self.field(*field_id);
+
+            // TODO: check that the field has an id: ID! argument
+        }
+
         Ok(())
     }
 }

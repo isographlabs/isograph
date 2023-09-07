@@ -2359,3 +2359,11 @@ type Organization implements Actor & Node {
   """
   websiteUrl: URI
 }
+
+type Mutation {
+  update_user_bio(id: ID!, bio: String): UpdateUserBioMutationResponse!
+}
+
+type UpdateUserBioMutationResponse {
+  user: User!
+}
