@@ -5,8 +5,8 @@ use common_lang_types::{
     WithSpan,
 };
 use graphql_lang_types::{
-    NamedTypeAnnotation, NonNullTypeAnnotation, OutputFieldDefinition, ScalarTypeDefinition,
-    TypeAnnotation, TypeSystemDefinition, TypeSystemDocument,
+    InputValueDefinition, NamedTypeAnnotation, NonNullTypeAnnotation, OutputFieldDefinition,
+    ScalarTypeDefinition, TypeAnnotation, TypeSystemDefinition, TypeSystemDocument,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -257,13 +257,112 @@ impl UnvalidatedSchema {
         let mutation_object = self.schema_data.object(mutation_id);
 
         for field_id in mutation_object.server_fields.iter() {
-            let _field = self.field(*field_id);
+            let field = self.field(*field_id);
 
-            // TODO: check that the field has an id: ID! argument
+            if let Some((_parent_object_id, _mutation_field_args)) =
+                self.get_valid_mutation_field_target_type(field)
+            {
+                // Woohoo! We found a valid object type onto which we can add a magic mutation field.
+                // TODO continue from here
+            }
         }
 
         Ok(())
     }
+
+    fn get_valid_mutation_field_target_type(
+        &self,
+        // The top level field, e.g. create_user
+        mutation_field: &SchemaServerField<TypeAnnotation<UnvalidatedTypeName>>,
+    ) -> Option<(ObjectId, Vec<WithSpan<InputValueDefinition>>)> {
+        // Is the mutation_field's type a non-nullable type?
+        let mutation_response_inner_non_nullable_named_type =
+            mutation_field.associated_data.inner_non_null_named_type()?;
+
+        // Is the mutation_field's type an object type?
+        if let DefinedTypeId::Object(mutation_response_object_id) = self
+            .schema_data
+            .defined_types
+            .get(&mutation_response_inner_non_nullable_named_type.0.item)
+            .expect("object type should exist. This indicates a bug in Isograph")
+        {
+            // Does the mutation field have an argument named "id"
+            // (TODO validate it has type ID!)
+            let arguments_without_id_arg = arguments_without_id_arg(&mutation_field.arguments)?;
+
+            // This is the mutation response object, in other words something like CreateUserResponse
+            let mutation_response_object = self.schema_data.object(*mutation_response_object_id);
+
+            // Does the mutation response object have exactly one field?
+            // TODO handle the @primary directive
+            let mutation_response_only_field = self.field(get_only_non_typename_field(
+                self,
+                &mutation_response_object.server_fields,
+            )?);
+
+            // Does the mutation response object's only field have no arguments?
+            if mutation_response_only_field.arguments.is_empty() {
+                let primary_field_type = mutation_response_only_field
+                    .associated_data
+                    .inner_non_null_named_type()?;
+                if let DefinedTypeId::Object(primary_field_object_id) = self
+                    .schema_data
+                    .defined_types
+                    .get(&primary_field_type.0.item)
+                    .expect("object type should exist. This indicates a bug in Isograph.")
+                {
+                    return Some((*primary_field_object_id, arguments_without_id_arg));
+                }
+            }
+        }
+
+        None
+    }
+}
+
+fn arguments_without_id_arg(
+    arguments: &[WithSpan<InputValueDefinition>],
+) -> Option<Vec<WithSpan<InputValueDefinition>>> {
+    let mut found_id = false;
+    let new_arguments = arguments
+        .iter()
+        .filter_map(|arg| {
+            // TODO also confirm stuff like that the type is ID!
+            if arg.item.name.item == "id".intern().into() {
+                found_id = true;
+                None
+            } else {
+                Some(arg.clone())
+            }
+        })
+        .collect();
+
+    if found_id {
+        Some(new_arguments)
+    } else {
+        None
+    }
+}
+
+fn get_only_non_typename_field(
+    schema: &UnvalidatedSchema,
+    server_fields: &[ServerFieldId],
+) -> Option<ServerFieldId> {
+    let mut found_field = None;
+    let typename_field_name = "__typename".intern().into();
+
+    for field_id in server_fields {
+        let field = schema.field(*field_id);
+        // TODO this is a hacky check
+        if field.name != typename_field_name {
+            if found_field.is_some() {
+                return None;
+            } else {
+                found_field = Some(*field_id);
+            }
+        }
+    }
+    found_field
 }
 
 /// Returns the resolvers for a schema object that we know up-front (before processing
@@ -395,6 +494,9 @@ fn get_field_objects_ids_and_names(
     // ------- HACK -------
     // Magic __typename field
     // TODO: find a way to do this that is less tied to GraphQL
+    // TODO: the only way to determine that a field is a magic __typename field is
+    // to check the name! That's a bit unfortunate. We should model these differently,
+    // perhaps fields should contain an enum (IdField, TypenameField, ActualField)
     let typename_field_id = (next_field_id + field_ids.len()).into();
     let typename_name = "__typename".intern().into();
     field_ids.push(typename_field_id);

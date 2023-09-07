@@ -96,6 +96,7 @@ impl fmt::Display for OutputFieldDefinition {
     }
 }
 
+/// This is an argument definition, but we're using the GraphQL spec lingo here.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct InputValueDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
