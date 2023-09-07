@@ -1,6 +1,6 @@
 import React from "react";
 import NoSSR from "react-no-ssr";
-import { HomeRoute } from "./home";
+import { HomeRoute } from "./home_page";
 import { RepositoryRoute } from "./repository";
 import { Container } from "@mui/material";
 import { UserRoute } from "./user";
