@@ -1,7 +1,7 @@
 import type {IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst} from '@isograph/react';
 const resolver = x => x;
 import Query__header, { ReadOutType as Query__header__outputType } from './header.isograph';
-import Query__home_page_list, { ReadOutType as Query__home_page_list__outputType } from './home_page_list.isograph';
+import Query__home_page_list_wrapper, { ReadOutType as Query__home_page_list_wrapper__outputType } from './home_page_list_wrapper.isograph';
 
 import refetchQuery0 from './home_page/__refetch__0.isograph';
 const nestedRefetchQueries = [refetchQuery0, ];
@@ -187,17 +187,17 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
   {
     kind: "Resolver",
-    alias: "home_page_list",
+    alias: "home_page_list_wrapper",
     arguments: null,
-    resolver: Query__home_page_list,
-    variant: "Component",
+    resolver: Query__home_page_list_wrapper,
+    variant: "Eager",
     usedRefetchQueries: [0, ],
   },
 ];
 
 export type ResolverParameterType = {
   header: Query__header__outputType,
-  home_page_list: Query__home_page_list__outputType,
+  home_page_list_wrapper: Query__home_page_list_wrapper__outputType,
 };
 
 // The type, when returned from the resolver

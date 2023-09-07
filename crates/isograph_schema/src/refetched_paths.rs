@@ -33,7 +33,19 @@ pub fn refetched_paths_with_path(
                                     linked_fields: path.clone(),
                                 });
                             }
-                            _ => {}
+                            _ => {
+                                // For non-refetch fields, we need to recurse into the selection set
+                                // (if there is one)
+                                match &resolver_field.selection_set_and_unwraps {
+                                    Some((selection_set, _unwraps)) => {
+                                        let new_paths =
+                                            refetched_paths_with_path(selection_set, schema, path);
+
+                                        paths.extend(new_paths.into_iter());
+                                    }
+                                    None => panic!("Resolver field has no selection set"),
+                                };
+                            }
                         }
                     }
                 },

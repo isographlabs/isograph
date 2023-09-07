@@ -9,6 +9,12 @@ import { RepoLink } from "./RepoLink";
 iso`
   Query.home_page($first: Int!) @fetchable {
     header,
+    home_page_list_wrapper,
+  }
+`;
+
+export const home_page_list_wrapper = iso`
+  Query.home_page_list_wrapper($first: Int!) @eager {
     home_page_list,
   }
 `;
@@ -36,9 +42,7 @@ export function HomeRoute({
           Home Page Route
         </RepoLink>
         <React.Suspense fallback={<FullPageLoading />}>
-          {data.home_page_list({
-            setRoute,
-          })}
+          {data.home_page_list_wrapper.home_page_list({})}
         </React.Suspense>
       </Container>
     </>
