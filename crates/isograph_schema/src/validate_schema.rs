@@ -177,6 +177,7 @@ fn validate_and_transform_field(
         id: empty_field.id,
         associated_data: field_type,
         parent_type_id: empty_field.parent_type_id,
+        arguments: empty_field.arguments,
     })
 }
 

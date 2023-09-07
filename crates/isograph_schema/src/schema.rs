@@ -6,8 +6,8 @@ use common_lang_types::{
     ScalarTypeName, SelectableFieldName, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
-    ConstantValue, Directive, InterfaceTypeDefinition, NamedTypeAnnotation, ObjectTypeDefinition,
-    OutputFieldDefinition, TypeAnnotation,
+    ConstantValue, Directive, InputValueDefinition, InterfaceTypeDefinition, NamedTypeAnnotation,
+    ObjectTypeDefinition, OutputFieldDefinition, TypeAnnotation,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -403,15 +403,15 @@ pub struct ValidRefinement {
     // pub is_guaranteed_to_work: bool,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct SchemaServerField<TData> {
     pub description: Option<DescriptionValue>,
     pub name: SelectableFieldName,
     pub id: ServerFieldId,
     pub associated_data: TData,
     pub parent_type_id: ObjectId,
-    // pub arguments: Vec<InputValue<ConstantValue>>,
     // pub directives: Vec<Directive<ConstantValue>>,
+    pub arguments: Vec<WithSpan<InputValueDefinition>>,
 }
 
 impl<TData> SchemaServerField<TData> {
@@ -425,6 +425,7 @@ impl<TData> SchemaServerField<TData> {
             id: self.id,
             associated_data: convert(&self.associated_data)?,
             parent_type_id: self.parent_type_id,
+            arguments: self.arguments.clone(),
         })
     }
 }
@@ -580,6 +581,7 @@ impl<T> SchemaServerField<T> {
             id,
             associated_data: field_type,
             parent_type_id,
+            arguments,
         } = self;
         (
             SchemaServerField {
@@ -588,6 +590,7 @@ impl<T> SchemaServerField<T> {
                 id,
                 associated_data: (),
                 parent_type_id,
+                arguments,
             },
             field_type,
         )

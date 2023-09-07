@@ -379,6 +379,7 @@ fn get_field_objects_ids_and_names(
                     id: current_field_id.into(),
                     associated_data: field.item.type_,
                     parent_type_id,
+                    arguments: field.item.arguments,
                 });
                 field_ids.push(current_field_id.into());
             }
@@ -403,6 +404,7 @@ fn get_field_objects_ids_and_names(
         id: typename_field_id,
         associated_data: typename_type.clone(),
         parent_type_id,
+        arguments: vec![],
     });
     if encountered_fields
         .insert(typename_name, DefinedField::ServerField(typename_type))
