@@ -870,12 +870,14 @@ fn generate_reader_ast_node(
                                 item: ResolverVariant::RefetchField,
                                 ..
                             }) => {
+                                let refetch_query_index =
+                                    find_refetch_query_index(root_refetched_paths, path);
                                 format!(
                                     "{indent_1}{{\n\
                                     {indent_2}kind: \"RefetchField\",\n\
                                     {indent_2}alias: \"{alias}\",\n\
                                     {indent_2}resolver: {resolver_field_string},\n\
-                                    {indent_2}refetchQuery: 0,\n\
+                                    {indent_2}refetchQuery: {refetch_query_index},\n\
                                     {indent_1}}},\n",
                                 )
                             }
@@ -1163,4 +1165,18 @@ fn generate_convert_function(
         None => {}
     }
     ConvertFunction("((resolver, data) => resolver(data))".to_string())
+}
+
+fn find_refetch_query_index(paths: &[PathToRefetchField], path: &[NameAndArguments]) -> usize {
+    paths
+        .iter()
+        .enumerate()
+        .find_map(|(index, path_to_field)| {
+            if &path_to_field.linked_fields == path {
+                Some(index)
+            } else {
+                None
+            }
+        })
+        .expect("Expected refetch query to be found")
 }

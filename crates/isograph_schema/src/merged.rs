@@ -227,8 +227,10 @@ pub fn create_merged_selection_set(
                     .find(|definition| definition.item.name.item == variable_name)
                     .expect(&format!(
                         "Did not find matching variable definition. \
-                            This might not be validated yet. def {:?} not found {} ",
-                        root_fetchable_resolver.variable_definitions, variable_name
+                            This might not be validated yet. For now, each resolver \
+                            containing a __refetch field must re-defined all used variables. \
+                            Resolver {} is missing variable definition {}",
+                        root_fetchable_resolver.name, variable_name
                     ))
                     .clone()
             })
