@@ -18,13 +18,12 @@ use isograph_lang_types::{
     ServerFieldSelection, VariableDefinition,
 };
 use isograph_schema::{
-    create_merged_selection_set, into_name_and_arguments,
-    refetched_paths_for_linked_field_selection, refetched_paths_for_resolver, ArtifactQueueItem,
-    DefinedField, MergedLinkedFieldSelection, MergedScalarFieldSelection, MergedSelectionSet,
-    MergedServerFieldSelection, NameAndArguments, PathToRefetchField, RefetchFieldResolverInfo,
-    ResolverActionKind, ResolverArtifactKind, ResolverTypeAndField, ResolverVariant, SchemaObject,
-    ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
-    ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
+    create_merged_selection_set, into_name_and_arguments, refetched_paths_for_resolver,
+    ArtifactQueueItem, DefinedField, MergedLinkedFieldSelection, MergedScalarFieldSelection,
+    MergedSelectionSet, MergedServerFieldSelection, NameAndArguments, PathToRefetchField,
+    RefetchFieldResolverInfo, ResolverActionKind, ResolverArtifactKind, ResolverTypeAndField,
+    ResolverVariant, SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField,
+    ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
     ValidatedVariableDefinition,
 };
 use thiserror::Error;
@@ -422,6 +421,8 @@ fn generate_refetch_query_artifact_imports(
     root_refetched_paths: &[PathToRefetchField],
     root_resolver_field_name: SelectableFieldName,
 ) -> RefetchQueryArtifactImport {
+    // TODO name the refetch queries with the path, or something, instead of
+    // with indexes.
     let mut output = String::new();
     let mut array_syntax = String::new();
     for (query_index, _) in root_refetched_paths.iter().enumerate() {
@@ -905,18 +906,13 @@ fn generate_reader_ast_node(
                     .unwrap_or("null".to_string());
 
                 path.push(into_name_and_arguments(&linked_field));
-                let linked_field_refetched_paths = refetched_paths_for_linked_field_selection(
-                    &linked_field.selection_set,
-                    schema,
-                    path,
-                );
 
                 let inner_reader_ast = generate_reader_ast_with_path(
                     schema,
                     &linked_field.selection_set,
                     indentation_level + 1,
                     nested_resolver_imports,
-                    &linked_field_refetched_paths,
+                    root_refetched_paths,
                     path,
                 );
 

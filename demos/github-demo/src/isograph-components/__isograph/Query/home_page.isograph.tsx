@@ -4,7 +4,8 @@ import Query__header, { ReadOutType as Query__header__outputType } from './heade
 import Query__home_page_list_wrapper, { ReadOutType as Query__home_page_list_wrapper__outputType } from './home_page_list_wrapper.isograph';
 
 import refetchQuery0 from './home_page/__refetch__0.isograph';
-const nestedRefetchQueries = [refetchQuery0, ];
+import refetchQuery1 from './home_page/__refetch__1.isograph';
+const nestedRefetchQueries = [refetchQuery0, refetchQuery1, ];
 
 const queryText = 'query home_page ($first: Int!) {\
   viewer {\
@@ -33,6 +34,10 @@ const queryText = 'query home_page ($first: Int!) {\
           },\
         },\
       },\
+    },\
+    status {\
+      id,\
+      emoji,\
     },\
   },\
 }';
@@ -173,6 +178,23 @@ const normalizationAst: NormalizationAst = [
           },
         ],
       },
+      {
+        kind: "Linked",
+        fieldName: "status",
+        arguments: null,
+        selections: [
+          {
+            kind: "Scalar",
+            fieldName: "id",
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            fieldName: "emoji",
+            arguments: null,
+          },
+        ],
+      },
     ],
   },
 ];
@@ -191,7 +213,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     arguments: null,
     resolver: Query__home_page_list_wrapper,
     variant: "Eager",
-    usedRefetchQueries: [0, ],
+    usedRefetchQueries: [0, 1, ],
   },
 ];
 

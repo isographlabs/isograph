@@ -12,8 +12,8 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    refetched_paths::refetched_paths_with_path, DefinedField, NameAndArguments, PathToRefetchField,
-    Schema, SchemaData, SchemaIdField, SchemaObject, SchemaResolver, SchemaServerField,
+    refetched_paths::refetched_paths_with_path, DefinedField, PathToRefetchField, Schema,
+    SchemaData, SchemaIdField, SchemaObject, SchemaResolver, SchemaServerField,
     UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData, UnvalidatedSchemaField,
     UnvalidatedSchemaResolver, UnvalidatedSchemaServerField,
 };
@@ -673,18 +673,6 @@ pub fn refetched_paths_for_resolver(
         None => panic!("unexpected non-existent selection set on resolver"),
     };
     let mut paths: Vec<_> = path_set.into_iter().collect();
-    paths.sort();
-    paths
-}
-
-pub fn refetched_paths_for_linked_field_selection(
-    linked_field_selection_set: &[WithSpan<Selection<ValidatedScalarDefinedField, ObjectId>>],
-    schema: &ValidatedSchema,
-    path: &mut Vec<NameAndArguments>,
-) -> Vec<PathToRefetchField> {
-    let mut paths: Vec<_> = refetched_paths_with_path(linked_field_selection_set, schema, path)
-        .into_iter()
-        .collect();
     paths.sort();
     paths
 }

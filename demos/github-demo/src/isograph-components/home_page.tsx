@@ -13,9 +13,16 @@ iso`
   }
 `;
 
+// home_page_list_wrapper exists solely to test some __refetch things.
 export const home_page_list_wrapper = iso`
   Query.home_page_list_wrapper($first: Int!) @eager {
     home_page_list,
+    viewer {
+      status {
+        emoji,
+        __refetch,
+      },
+    },
   }
 `;
 
