@@ -11,8 +11,9 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    DefinedTypeId, InputTypeId, NonConstantValue, ObjectId, OutputTypeId, ResolverFieldId,
-    ScalarId, Selection, ServerFieldId, ServerIdFieldId, Unwrap, VariableDefinition,
+    DefinedTypeId, InputTypeId, LinkedFieldSelection, NonConstantValue, ObjectId, OutputTypeId,
+    ResolverFieldId, ScalarId, Selection, ServerFieldId, ServerIdFieldId, Unwrap,
+    VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -549,7 +550,21 @@ pub struct NameAndArguments {
     pub arguments: Vec<ArgumentKeyAndValue>,
 }
 
-#[allow(unused)]
+pub fn into_name_and_arguments<T, U>(field: &LinkedFieldSelection<T, U>) -> NameAndArguments {
+    NameAndArguments {
+        name: field.name.item,
+        arguments: field
+            .arguments
+            .iter()
+            .map(|selection_field_argument| ArgumentKeyAndValue {
+                key: selection_field_argument.item.name.item,
+                // TODO do we need to clone here?
+                value: selection_field_argument.item.value.item.clone(),
+            })
+            .collect(),
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ArgumentKeyAndValue {
     pub key: FieldArgumentName,

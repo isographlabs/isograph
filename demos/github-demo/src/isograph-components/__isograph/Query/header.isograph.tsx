@@ -27,7 +27,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
         arguments: null,
         resolver: User__avatar,
         variant: "Component",
-        usedRefetchQueries: [0, 1, ],
+        usedRefetchQueries: [],
       },
     ],
   },

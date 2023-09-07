@@ -18,12 +18,13 @@ use isograph_lang_types::{
     ServerFieldSelection, VariableDefinition,
 };
 use isograph_schema::{
-    create_merged_selection_set, refetched_paths_for_linked_field_selection,
-    refetched_paths_for_resolver, ArtifactQueueItem, DefinedField, MergedLinkedFieldSelection,
-    MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection, PathToRefetchField,
-    RefetchFieldResolverInfo, ResolverActionKind, ResolverArtifactKind, ResolverTypeAndField,
-    ResolverVariant, SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField,
-    ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
+    create_merged_selection_set, into_name_and_arguments,
+    refetched_paths_for_linked_field_selection, refetched_paths_for_resolver, ArtifactQueueItem,
+    DefinedField, MergedLinkedFieldSelection, MergedScalarFieldSelection, MergedSelectionSet,
+    MergedServerFieldSelection, NameAndArguments, PathToRefetchField, RefetchFieldResolverInfo,
+    ResolverActionKind, ResolverArtifactKind, ResolverTypeAndField, ResolverVariant, SchemaObject,
+    ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
+    ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
     ValidatedVariableDefinition,
 };
 use thiserror::Error;
@@ -423,7 +424,7 @@ fn generate_refetch_query_artifact_imports(
 ) -> RefetchQueryArtifactImport {
     let mut output = String::new();
     let mut array_syntax = String::new();
-    for query_index in 0..root_refetched_paths.len() {
+    for (query_index, _) in root_refetched_paths.iter().enumerate() {
         output.push_str(&format!(
             "import refetchQuery{} from './{}/__refetch__{}.isograph';\n",
             query_index, root_resolver_field_name, query_index,
@@ -748,7 +749,29 @@ fn generate_reader_ast<'schema>(
     selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
     indentation_level: u8,
     nested_resolver_imports: &mut NestedResolverImports,
+    // N.B. this is not root_refetched_paths when we're generating a non-fetchable resolver :(
     root_refetched_paths: &[PathToRefetchField],
+) -> ReaderAst {
+    generate_reader_ast_with_path(
+        schema,
+        selection_set,
+        indentation_level,
+        nested_resolver_imports,
+        root_refetched_paths,
+        // TODO we are not starting at the root when generating ASTs for non-fetchable resolvers
+        // (and in theory some fetchable resolvers).
+        &mut vec![],
+    )
+}
+
+fn generate_reader_ast_with_path<'schema>(
+    schema: &'schema ValidatedSchema,
+    selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
+    indentation_level: u8,
+    nested_resolver_imports: &mut NestedResolverImports,
+    // N.B. this is not root_refetched_paths when we're generating a non-fetchable resolver :(
+    root_refetched_paths: &[PathToRefetchField],
+    path: &mut Vec<NameAndArguments>,
 ) -> ReaderAst {
     let mut reader_ast = "[\n".to_string();
     for item in selection_set {
@@ -758,6 +781,7 @@ fn generate_reader_ast<'schema>(
             indentation_level + 1,
             nested_resolver_imports,
             root_refetched_paths,
+            path,
         );
         reader_ast.push_str(&s);
     }
@@ -772,6 +796,7 @@ fn generate_reader_ast_node(
     nested_resolver_imports: &mut NestedResolverImports,
     // TODO use this to generate usedRefetchQueries
     root_refetched_paths: &[PathToRefetchField],
+    path: &mut Vec<NameAndArguments>,
 ) -> String {
     match &selection.item {
         Selection::ServerField(field) => match field {
@@ -779,7 +804,7 @@ fn generate_reader_ast_node(
                 let field_name = scalar_field.name.item;
 
                 match scalar_field.associated_data {
-                    DefinedField::ServerField(_server_field) => {
+                    DefinedField::ServerField(_) => {
                         let alias = scalar_field
                             .reader_alias
                             .map(|x| format!("\"{}\"", x.item))
@@ -819,10 +844,13 @@ fn generate_reader_ast_node(
                             .map(|x| format!("\"{}\"", x))
                             .unwrap_or_else(|| "null".to_string());
 
-                        let refetched_paths = refetched_paths_for_resolver(resolver_field, schema);
+                        let resolver_refetched_paths =
+                            refetched_paths_for_resolver(resolver_field, schema);
 
-                        let nested_refetch_queries =
-                            get_nested_refetch_query_text(&refetched_paths);
+                        let nested_refetch_queries = get_nested_refetch_query_text(
+                            &root_refetched_paths,
+                            &resolver_refetched_paths,
+                        );
 
                         match nested_resolver_imports.entry(resolver_field.type_and_field) {
                             Entry::Occupied(mut occupied) => {
@@ -874,17 +902,24 @@ fn generate_reader_ast_node(
                     .map(|x| format!("\"{}\"", x.item))
                     .unwrap_or("null".to_string());
 
-                let non_root_refetched_paths =
-                    refetched_paths_for_linked_field_selection(&linked_field.selection_set, schema);
+                path.push(into_name_and_arguments(&linked_field));
+                let linked_field_refetched_paths = refetched_paths_for_linked_field_selection(
+                    &linked_field.selection_set,
+                    schema,
+                    path,
+                );
 
-                let inner_reader_ast = generate_reader_ast(
+                let inner_reader_ast = generate_reader_ast_with_path(
                     schema,
                     &linked_field.selection_set,
                     indentation_level + 1,
                     nested_resolver_imports,
-                    // TODO this is not correct
-                    &non_root_refetched_paths,
+                    &linked_field_refetched_paths,
+                    path,
                 );
+
+                path.pop();
+
                 let arguments =
                     get_serialized_field_arguments(&linked_field.arguments, indentation_level + 1);
                 let indent_1 = "  ".repeat(indentation_level as usize);
@@ -1034,11 +1069,25 @@ fn serialize_non_constant_value_for_js(value: &NonConstantValue) -> String {
     }
 }
 
-fn get_nested_refetch_query_text(_nested_refetch_queries: &[PathToRefetchField]) -> String {
+fn get_nested_refetch_query_text(
+    root_refetched_paths: &[PathToRefetchField],
+    nested_refetch_queries: &[PathToRefetchField],
+) -> String {
     // Assuming count is 2... TODO fix
     let mut s = "[".to_string();
-    for i in 0..2 {
-        s.push_str(&format!("{}, ", i));
+    for nested_refetch_query in nested_refetch_queries.iter() {
+        let index = root_refetched_paths
+            .iter()
+            .enumerate()
+            .find_map(|(index, root_path)| {
+                if root_path == nested_refetch_query {
+                    Some(index)
+                } else {
+                    None
+                }
+            })
+            .expect("nested refetch query should be in root refetched paths");
+        s.push_str(&format!("{}, ", index));
     }
     s.push_str("]");
     s
