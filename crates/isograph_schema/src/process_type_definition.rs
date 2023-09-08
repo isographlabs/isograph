@@ -262,12 +262,14 @@ impl UnvalidatedSchema {
             let mutation_field = self.field(*field_id);
             let magic_mutation_field_name = format!("__{}", mutation_field.name).intern().into();
 
-            if let Some((parent_object_id, _mutation_field_args)) = self
-                .get_valid_mutation_field_target_type(
-                    mutation_field.associated_data.clone(),
-                    &mutation_field.arguments,
-                )
-            {
+            if let Some((
+                parent_object_id,
+                mutation_response_primary_field_name,
+                mutation_field_args,
+            )) = self.get_valid_mutation_field_target_type(
+                mutation_field.associated_data.clone(),
+                &mutation_field.arguments,
+            ) {
                 // Woohoo! We found a valid object type onto which we can add a magic mutation field.
                 // TODO continue from here
                 let description = mutation_field.description.clone();
@@ -295,7 +297,11 @@ impl UnvalidatedSchema {
                     id: next_resolver_id,
                     selection_set_and_unwraps: Some((vec![id_field_selection], vec![])),
                     variant: Some(WithSpan::new(
-                        ResolverVariant::MutationField,
+                        ResolverVariant::MutationField((
+                            magic_mutation_field_name,
+                            mutation_response_primary_field_name,
+                            mutation_field_args,
+                        )),
                         Span::new(0, 0),
                     )),
                     variable_definitions: vec![],
@@ -334,7 +340,11 @@ impl UnvalidatedSchema {
         // From the top level field, e.g. create_user
         type_: TypeAnnotation<UnvalidatedTypeName>,
         arguments: &[WithSpan<InputValueDefinition>],
-    ) -> Option<(ObjectId, Vec<WithSpan<InputValueDefinition>>)> {
+    ) -> Option<(
+        ObjectId,
+        SelectableFieldName,
+        Vec<WithSpan<InputValueDefinition>>,
+    )> {
         // Is the mutation_field's type a non-nullable type?
         let mutation_response_inner_non_nullable_named_type = type_.inner_non_null_named_type()?;
 
@@ -370,7 +380,11 @@ impl UnvalidatedSchema {
                     .get(&primary_field_type.0.item)
                     .expect("object type should exist. This indicates a bug in Isograph.")
                 {
-                    return Some((*primary_field_object_id, arguments_without_id_arg));
+                    return Some((
+                        *primary_field_object_id,
+                        mutation_response_only_field.name,
+                        arguments_without_id_arg,
+                    ));
                 }
             }
         }

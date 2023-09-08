@@ -1,7 +1,7 @@
 import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
 const resolver = x => x;
 import Query__home_page_list, { ReadOutType as Query__home_page_list__outputType } from './home_page_list.isograph';
-import UserStatus____refetch, { ReadOutType as UserStatus____refetch__outputType } from '../UserStatus/__refetch.isograph';
+import UserStatus____update_user_bio, { ReadOutType as UserStatus____update_user_bio__outputType } from '../UserStatus/__update_user_bio.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = ResolverReturnType;
@@ -37,9 +37,9 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
             arguments: null,
           },
           {
-            kind: "RefetchField",
-            alias: "__refetch",
-            resolver: UserStatus____refetch,
+            kind: "MutationField",
+            alias: "__update_user_bio",
+            resolver: UserStatus____update_user_bio,
             refetchQuery: 1,
           },
         ],
@@ -53,7 +53,7 @@ export type ResolverParameterType = {
   viewer: {
     status: ({
       emoji: (string | null),
-      __refetch: UserStatus____refetch__outputType,
+      __update_user_bio: UserStatus____update_user_bio__outputType,
     } | null),
   },
 };

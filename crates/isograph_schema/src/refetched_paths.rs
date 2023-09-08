@@ -26,7 +26,8 @@ pub fn refetched_paths_with_path(
                         let resolver_field = schema.resolver(resolver_field_id);
                         match resolver_field.variant {
                             Some(WithSpan {
-                                item: ResolverVariant::RefetchField,
+                                item:
+                                    ResolverVariant::RefetchField | ResolverVariant::MutationField(_),
                                 ..
                             }) => {
                                 paths.insert(PathToRefetchField {

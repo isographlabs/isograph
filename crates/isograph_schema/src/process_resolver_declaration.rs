@@ -4,6 +4,7 @@ use common_lang_types::{
     IsographDirectiveName, IsographObjectTypeName, SelectableFieldName, UnvalidatedTypeName,
     WithSpan,
 };
+use graphql_lang_types::InputValueDefinition;
 use intern::string_key::Intern;
 use isograph_lang_types::{DefinedTypeId, FragmentDirectiveUsage, ObjectId, ResolverDeclaration};
 use lazy_static::lazy_static;
@@ -82,7 +83,7 @@ impl UnvalidatedSchema {
         };
 
         // TODO variant should carry payloads, instead of this check
-        if variant.as_ref().map(|span| span.item) == Some(ResolverVariant::Component) {
+        if variant.as_ref().map(|span| &span.item) == Some(&ResolverVariant::Component) {
             if !matches!(resolver_action_kind, ResolverActionKind::NamedImport(_)) {
                 return Err(ProcessResolverDeclarationError::ComponentResolverMissingJsFunction {});
             }
@@ -139,12 +140,18 @@ pub enum ProcessResolverDeclarationError {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ResolverVariant {
     Component,
     Eager,
     RefetchField,
-    MutationField,
+    MutationField(
+        (
+            SelectableFieldName,
+            SelectableFieldName,
+            Vec<WithSpan<InputValueDefinition>>,
+        ),
+    ),
 }
 
 impl fmt::Display for ResolverVariant {
@@ -153,7 +160,7 @@ impl fmt::Display for ResolverVariant {
             ResolverVariant::Component => write!(f, "Component"),
             ResolverVariant::Eager => write!(f, "Eager"),
             ResolverVariant::RefetchField => write!(f, "RefetchField"),
-            ResolverVariant::MutationField => write!(f, "MutationField"),
+            ResolverVariant::MutationField(_) => write!(f, "MutationField"),
         }
     }
 }

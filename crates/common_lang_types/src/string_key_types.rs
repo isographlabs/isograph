@@ -11,6 +11,9 @@ string_key_newtype!(DirectiveArgumentName);
 string_key_newtype!(SelectableFieldName);
 
 string_key_newtype!(InputValueName);
+string_key_conversion!(from: InputValueName, to: VariableName);
+string_key_conversion!(from: InputValueName, to: FieldArgumentName);
+
 string_key_newtype!(EnumLiteralValue);
 string_key_newtype!(StringLiteralValue);
 string_key_newtype!(DescriptionValue);

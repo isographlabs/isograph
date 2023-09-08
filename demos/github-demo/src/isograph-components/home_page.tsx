@@ -20,7 +20,7 @@ export const home_page_list_wrapper = iso`
     viewer {
       status {
         emoji,
-        __refetch,
+        __update_user_bio,
       },
     },
   }

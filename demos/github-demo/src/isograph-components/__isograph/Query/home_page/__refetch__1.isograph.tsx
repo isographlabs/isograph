@@ -1,5 +1,5 @@
 import type {IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst} from '@isograph/react';
-const queryText = 'query UserStatus_refetch ($id: ID!) { node____id___id: node(id: $id) { ... on UserStatus { \
+const queryText = 'mutation UserStatus__update_user_bio ($id: ID!, $bio: String) { __update_user_bio(bio: $bio) { user { \
   id,\
   emoji,\
 }}}';

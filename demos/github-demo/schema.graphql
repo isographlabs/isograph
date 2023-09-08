@@ -2365,5 +2365,5 @@ type Mutation {
 }
 
 type UpdateUserBioMutationResponse {
-  user: User!
+  user: UserStatus!
 }

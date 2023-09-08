@@ -10,7 +10,8 @@ use common_lang_types::{
     UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
-    ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation,
+    InputValueDefinition, ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
+    TypeAnnotation,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -20,11 +21,11 @@ use isograph_lang_types::{
 use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_resolver,
     ArtifactQueueItem, DefinedField, MergedLinkedFieldSelection, MergedScalarFieldSelection,
-    MergedSelectionSet, MergedServerFieldSelection, NameAndArguments, PathToRefetchField,
-    RefetchFieldResolverInfo, ResolverActionKind, ResolverArtifactKind, ResolverTypeAndField,
-    ResolverVariant, SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField,
-    ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
-    ValidatedVariableDefinition,
+    MergedSelectionSet, MergedServerFieldSelection, MutationFieldResolverInfo, NameAndArguments,
+    PathToRefetchField, RefetchFieldResolverInfo, ResolverActionKind, ResolverArtifactKind,
+    ResolverTypeAndField, ResolverVariant, SchemaObject, ValidatedEncounteredDefinedField,
+    ValidatedScalarDefinedField, ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver,
+    ValidatedSelection, ValidatedVariableDefinition,
 };
 use thiserror::Error;
 
@@ -86,6 +87,9 @@ fn generate_artifact<'schema>(
         ArtifactQueueItem::RefetchField(refetch_info) => {
             get_artifact_for_refetch_field(schema, refetch_info)
         }
+        ArtifactQueueItem::MutationField(mutation_info) => {
+            get_artifact_for_mutation_field(schema, mutation_info)
+        }
     }
 }
 
@@ -136,6 +140,51 @@ fn get_artifact_for_refetch_field<'schema>(
     })
 }
 
+fn get_artifact_for_mutation_field<'schema>(
+    schema: &'schema ValidatedSchema,
+    refetch_info: MutationFieldResolverInfo,
+) -> Artifact<'schema> {
+    let MutationFieldResolverInfo {
+        merged_selection_set,
+        refetch_field_parent_id: parent_id,
+        variable_definitions,
+        root_fetchable_field,
+        root_parent_object,
+        refetch_query_index,
+        mutation_field_name,
+        mutation_primary_field_name,
+        mutation_field_arguments,
+        ..
+    } = refetch_info;
+
+    let parent_object = schema.schema_data.object(parent_id);
+
+    let query_text = generate_mutation_query_text(
+        parent_object,
+        schema,
+        &merged_selection_set,
+        variable_definitions,
+        mutation_field_name,
+        mutation_primary_field_name,
+        mutation_field_arguments,
+    );
+
+    let normalization_ast = NormalizationAst(format!(
+        "[{{ kind: \"Linked\", fieldName: \"node\", \
+        alias: null, arguments: [{{ argumentName: \"id\", variableName: \"id\" }}], \
+        selections: {} }}]",
+        generate_normalization_ast(schema, &merged_selection_set, 0).0,
+    ));
+
+    Artifact::RefetchQuery(RefetchQueryResolver {
+        normalization_ast,
+        query_text,
+        root_fetchable_field,
+        root_fetchable_field_parent_object: root_parent_object,
+        refetch_query_index,
+    })
+}
+
 fn generate_refetchable_query_text<'schema>(
     parent_object_type: &'schema ValidatedSchemaObject,
     schema: &'schema ValidatedSchema,
@@ -156,11 +205,75 @@ fn generate_refetchable_query_text<'schema>(
         },
         span: Span::new(0, 0),
     });
-    let variable_text = write_variables_to_string(schema, &variable_definitions);
+    let variable_text = write_variables_to_string(schema, variable_definitions.iter());
 
     query_text.push_str(&format!(
         "query {}_refetch {} {{ node____id___id: node(id: $id) {{ ... on {} {{ \\\n",
         parent_object_type.name, variable_text, parent_object_type.name,
+    ));
+    write_selections_for_query_text(&mut query_text, schema, &merged_selection_set, 1);
+    query_text.push_str("}}}");
+    QueryText(query_text)
+}
+
+fn generate_mutation_query_text<'schema>(
+    parent_object_type: &'schema ValidatedSchemaObject,
+    schema: &'schema ValidatedSchema,
+    merged_selection_set: &MergedSelectionSet,
+    mut variable_definitions: Vec<WithSpan<ValidatedVariableDefinition>>,
+    mutation_field_name: SelectableFieldName,
+    mutation_primary_field_name: SelectableFieldName,
+    mutation_field_arguments: Vec<WithSpan<InputValueDefinition>>,
+) -> QueryText {
+    let mut query_text = String::new();
+
+    variable_definitions.push(WithSpan {
+        item: VariableDefinition {
+            name: WithSpan::new("id".intern().into(), Span::new(0, 0)),
+            type_: TypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
+                NamedTypeAnnotation(WithSpan {
+                    item: InputTypeId::Scalar(schema.id_type_id),
+                    span: Span::new(0, 0),
+                }),
+            ))),
+        },
+        span: Span::new(0, 0),
+    });
+
+    let mutation_parameters: Vec<_> = mutation_field_arguments.iter().map(|argument| {
+        let variable_name = argument.item.name.map(|x| x.into());
+        variable_definitions.push(WithSpan {
+            item: VariableDefinition {
+                name: variable_name,
+                type_: argument.item.type_.clone().map(|x| {
+                    schema
+                        .schema_data
+                        .defined_types
+                        .get(&x.into())
+                        .expect("Expected type to be found, this indicates a bug in Isograph")
+                        .as_input_type_id()
+                        .expect("Expected a valid input type. Objects are not yet supported as parameters here.")
+                }),
+            },
+            span: Span::new(0, 0),
+        });
+        WithSpan::new(SelectionFieldArgument {
+            name: argument.item.name.map(|x| x.into()),
+            value: variable_name.map(|x| NonConstantValue::Variable(x)),
+        }, Span::new(0,0))
+    }).collect();
+
+    let variable_text = write_variables_to_string(schema, &mut variable_definitions.iter());
+    let mutation_field_arguments = get_serialized_arguments_for_query_text(&mutation_parameters);
+
+    query_text.push_str(&format!(
+        "mutation {}{} {} {{ {}{} {{ {} {{ \\\n",
+        parent_object_type.name,
+        mutation_field_name,
+        variable_text,
+        mutation_field_name,
+        mutation_field_arguments,
+        mutation_primary_field_name,
     ));
     write_selections_for_query_text(&mut query_text, schema, &merged_selection_set, 1);
     query_text.push_str("}}}");
@@ -216,7 +329,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
         let resolver_parameter_type = generate_resolver_parameter_type(
             schema,
             &selection_set,
-            fetchable_resolver.variant,
+            fetchable_resolver.variant.as_ref(),
             query_object.into(),
             &mut nested_resolver_artifact_imports,
             0,
@@ -295,7 +408,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
         let resolver_parameter_type = generate_resolver_parameter_type(
             schema,
             &selection_set,
-            non_fetchable_resolver.variant,
+            non_fetchable_resolver.variant.as_ref(),
             parent_type.into(),
             &mut nested_resolver_artifact_imports,
             0,
@@ -409,7 +522,7 @@ fn generate_query_text(
 ) -> QueryText {
     let mut query_text = String::new();
 
-    let variable_text = write_variables_to_string(schema, query_variables);
+    let variable_text = write_variables_to_string(schema, query_variables.iter());
 
     query_text.push_str(&format!("query {} {} {{\\\n", query_name, variable_text));
     write_selections_for_query_text(&mut query_text, schema, &merged_selection_set, 1);
@@ -436,28 +549,34 @@ fn generate_refetch_query_artifact_imports(
     RefetchQueryArtifactImport(output)
 }
 
-fn write_variables_to_string(
+fn write_variables_to_string<'a>(
     schema: &ValidatedSchema,
-    variables: &[WithSpan<ValidatedVariableDefinition>],
+    mut variables: impl Iterator<Item = &'a WithSpan<ValidatedVariableDefinition>> + 'a,
 ) -> String {
-    if variables.is_empty() {
+    let mut empty = true;
+    let mut first = true;
+    let mut variable_text = String::new();
+    variable_text.push('(');
+    while let Some(variable) = variables.next() {
+        empty = false;
+        if !first {
+            variable_text.push_str(", ");
+        } else {
+            first = false;
+        }
+        // TODO can we consume the variables here?
+        let x: TypeAnnotation<UnvalidatedTypeName> =
+            variable.item.type_.clone().map(|input_type_id| {
+                // schema.
+                let schema_input_type = schema.schema_data.lookup_input_type(input_type_id);
+                schema_input_type.name().into()
+            });
+        variable_text.push_str(&format!("${}: {}", variable.item.name, x));
+    }
+
+    if empty {
         String::new()
     } else {
-        let mut variable_text = String::new();
-        variable_text.push('(');
-        for (i, variable) in variables.iter().enumerate() {
-            if i != 0 {
-                variable_text.push_str(", ");
-            }
-            // TODO can we consume the variables here?
-            let x: TypeAnnotation<UnvalidatedTypeName> =
-                variable.item.type_.clone().map(|input_type_id| {
-                    // schema.
-                    let schema_input_type = schema.schema_data.lookup_input_type(input_type_id);
-                    schema_input_type.name().into()
-                });
-            variable_text.push_str(&format!("${}: {}", variable.item.name, x));
-        }
         variable_text.push(')');
         variable_text
     }
@@ -521,7 +640,7 @@ fn write_selections_for_query_text(
 fn generate_resolver_parameter_type(
     schema: &ValidatedSchema,
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
-    variant: Option<WithSpan<ResolverVariant>>,
+    variant: Option<&WithSpan<ResolverVariant>>,
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     nested_resolver_imports: &mut NestedResolverImports,
     indentation_level: u8,
@@ -544,7 +663,7 @@ fn generate_resolver_parameter_type(
     }
     resolver_parameter_type.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
 
-    if let Some(ResolverVariant::Component) = variant.map(|v| v.item) {
+    if let Some(&ResolverVariant::Component) = variant.as_ref().map(|v| &v.item) {
         resolver_parameter_type = format!(
             "{{ data:\n{}{},\n{}[index: string]: any }}",
             "  ".repeat(indentation_level as usize),
@@ -560,7 +679,7 @@ fn write_query_types_from_selection(
     schema: &ValidatedSchema,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
-    variant: Option<WithSpan<ResolverVariant>>,
+    variant: Option<&WithSpan<ResolverVariant>>,
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     nested_resolver_imports: &mut NestedResolverImports,
     indentation_level: u8,
@@ -847,6 +966,7 @@ fn generate_reader_ast_node(
                             resolver_field.type_and_field.underscore_separated();
                         let variant = resolver_field
                             .variant
+                            .as_ref()
                             .map(|x| format!("\"{}\"", x))
                             .unwrap_or_else(|| "null".to_string());
 
@@ -881,6 +1001,21 @@ fn generate_reader_ast_node(
                                 format!(
                                     "{indent_1}{{\n\
                                     {indent_2}kind: \"RefetchField\",\n\
+                                    {indent_2}alias: \"{alias}\",\n\
+                                    {indent_2}resolver: {resolver_field_string},\n\
+                                    {indent_2}refetchQuery: {refetch_query_index},\n\
+                                    {indent_1}}},\n",
+                                )
+                            }
+                            Some(WithSpan {
+                                item: ResolverVariant::MutationField(_),
+                                ..
+                            }) => {
+                                let refetch_query_index =
+                                    find_refetch_query_index(root_refetched_paths, path);
+                                format!(
+                                    "{indent_1}{{\n\
+                                    {indent_2}kind: \"MutationField\",\n\
                                     {indent_2}alias: \"{alias}\",\n\
                                     {indent_2}resolver: {resolver_field_string},\n\
                                     {indent_2}refetchQuery: {refetch_query_index},\n\
@@ -1097,7 +1232,7 @@ fn get_nested_refetch_query_text(
 }
 
 fn generate_read_out_type(resolver_definition: &ValidatedSchemaResolver) -> ResolverReadOutType {
-    match resolver_definition.variant {
+    match &resolver_definition.variant {
         Some(variant) => match variant.item {
             ResolverVariant::Component => {
                 // The read out type of a component is a function that accepts additional
@@ -1109,7 +1244,7 @@ fn generate_read_out_type(resolver_definition: &ValidatedSchemaResolver) -> Reso
             }
             ResolverVariant::Eager => ResolverReadOutType("ResolverReturnType".to_string()),
             ResolverVariant::RefetchField => ResolverReadOutType("any".to_string()),
-            ResolverVariant::MutationField => ResolverReadOutType("any".to_string()),
+            ResolverVariant::MutationField(_) => ResolverReadOutType("any".to_string()),
         },
         None => ResolverReadOutType(
             // This is correct:
