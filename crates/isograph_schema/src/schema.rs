@@ -506,6 +506,8 @@ pub enum ResolverActionKind {
     NamedImport((SelectableFieldName, ResolverDefinitionPath)),
     /// Refetch fields
     RefetchField,
+    /// Mutation field
+    MutationField,
 }
 
 #[derive(Debug)]

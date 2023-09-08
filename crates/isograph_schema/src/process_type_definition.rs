@@ -253,17 +253,76 @@ impl UnvalidatedSchema {
     /// - has the mutation's arguments (except an id)
     /// - then acts as a __refetch field on that TargetType, i.e. refetches all the fields
     ///   selected in the merged selection set.
+    ///
+    /// There is lots of cloning going on here! Not ideal.
     fn add_mutation_fields(&mut self, mutation_id: ObjectId) -> ProcessTypeDefinitionResult<()> {
-        let mutation_object = self.schema_data.object(mutation_id);
+        let mutation_object_fields = self.schema_data.object(mutation_id).server_fields.clone();
 
-        for field_id in mutation_object.server_fields.iter() {
-            let field = self.field(*field_id);
+        for field_id in mutation_object_fields.iter() {
+            let mutation_field = self.field(*field_id);
+            let magic_mutation_field_name = format!("__{}", mutation_field.name).intern().into();
 
-            if let Some((_parent_object_id, _mutation_field_args)) =
-                self.get_valid_mutation_field_target_type(field)
+            if let Some((parent_object_id, _mutation_field_args)) = self
+                .get_valid_mutation_field_target_type(
+                    mutation_field.associated_data.clone(),
+                    &mutation_field.arguments,
+                )
             {
                 // Woohoo! We found a valid object type onto which we can add a magic mutation field.
                 // TODO continue from here
+                let description = mutation_field.description.clone();
+                let parent_object = self.schema_data.object_mut(parent_object_id);
+
+                let next_resolver_id = self.resolvers.len().into();
+
+                let id_field_selection = WithSpan::new(
+                    Selection::ServerField(ServerFieldSelection::ScalarField(
+                        ScalarFieldSelection {
+                            name: WithSpan::new("id".intern().into(), Span::new(0, 0)),
+                            reader_alias: None,
+                            normalization_alias: None,
+                            associated_data: (),
+                            unwraps: vec![],
+                            arguments: vec![],
+                        },
+                    )),
+                    Span::new(0, 0),
+                );
+
+                self.resolvers.push(SchemaResolver {
+                    description,
+                    name: magic_mutation_field_name,
+                    id: next_resolver_id,
+                    selection_set_and_unwraps: Some((vec![id_field_selection], vec![])),
+                    variant: Some(WithSpan::new(
+                        ResolverVariant::MutationField,
+                        Span::new(0, 0),
+                    )),
+                    variable_definitions: vec![],
+                    type_and_field: ResolverTypeAndField {
+                        type_name: parent_object.name,
+                        field_name: magic_mutation_field_name,
+                    },
+                    parent_object_id,
+                    artifact_kind: ResolverArtifactKind::NonFetchable,
+                    action_kind: ResolverActionKind::MutationField,
+                });
+
+                if parent_object
+                    .encountered_fields
+                    .insert(
+                        magic_mutation_field_name,
+                        DefinedField::ResolverField(next_resolver_id),
+                    )
+                    .is_some()
+                {
+                    return Err(ProcessTypeDefinitionError::DuplicateField {
+                        field_name: magic_mutation_field_name,
+                        parent_type: parent_object.name,
+                    });
+                }
+
+                parent_object.resolvers.push(next_resolver_id);
             }
         }
 
@@ -272,12 +331,12 @@ impl UnvalidatedSchema {
 
     fn get_valid_mutation_field_target_type(
         &self,
-        // The top level field, e.g. create_user
-        mutation_field: &SchemaServerField<TypeAnnotation<UnvalidatedTypeName>>,
+        // From the top level field, e.g. create_user
+        type_: TypeAnnotation<UnvalidatedTypeName>,
+        arguments: &[WithSpan<InputValueDefinition>],
     ) -> Option<(ObjectId, Vec<WithSpan<InputValueDefinition>>)> {
         // Is the mutation_field's type a non-nullable type?
-        let mutation_response_inner_non_nullable_named_type =
-            mutation_field.associated_data.inner_non_null_named_type()?;
+        let mutation_response_inner_non_nullable_named_type = type_.inner_non_null_named_type()?;
 
         // Is the mutation_field's type an object type?
         if let DefinedTypeId::Object(mutation_response_object_id) = self
@@ -288,7 +347,7 @@ impl UnvalidatedSchema {
         {
             // Does the mutation field have an argument named "id"
             // (TODO validate it has type ID!)
-            let arguments_without_id_arg = arguments_without_id_arg(&mutation_field.arguments)?;
+            let arguments_without_id_arg = arguments_without_id_arg(arguments)?;
 
             // This is the mutation response object, in other words something like CreateUserResponse
             let mutation_response_object = self.schema_data.object(*mutation_response_object_id);

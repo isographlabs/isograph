@@ -144,6 +144,7 @@ pub enum ResolverVariant {
     Component,
     Eager,
     RefetchField,
+    MutationField,
 }
 
 impl fmt::Display for ResolverVariant {
@@ -152,6 +153,7 @@ impl fmt::Display for ResolverVariant {
             ResolverVariant::Component => write!(f, "Component"),
             ResolverVariant::Eager => write!(f, "Eager"),
             ResolverVariant::RefetchField => write!(f, "RefetchField"),
+            ResolverVariant::MutationField => write!(f, "MutationField"),
         }
     }
 }
