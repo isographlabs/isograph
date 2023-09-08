@@ -839,12 +839,15 @@ fn generate_resolver_import_statement(
         )),
         ResolverActionKind::RefetchField => ResolverImportStatement(
             "import { makeNetworkRequest } from '@isograph/react';\n\
-            const resolver = (artifact, variables) => () => makeNetworkRequest(artifact, variables);"
+            const resolver = (artifact, variables) => () => \
+            makeNetworkRequest(artifact, variables);"
                 .to_string(),
         ),
         ResolverActionKind::MutationField => ResolverImportStatement(
             "import { makeNetworkRequest } from '@isograph/react';\n\
-            const resolver = (artifact, variables) => () => makeNetworkRequest(artifact, variables);"
+            const resolver = (artifact, variables) => (mutationParams) => \
+            makeNetworkRequest(artifact, \
+            {...variables, ...mutationParams});"
                 .to_string(),
         ),
     }

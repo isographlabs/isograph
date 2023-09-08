@@ -48,6 +48,15 @@ export function HomeRoute({
         <RepoLink filePath="demos/github-demo/src/isograph-components/home.tsx">
           Home Page Route
         </RepoLink>
+        <div
+          onClick={() =>
+            data.home_page_list_wrapper.viewer?.status?.__update_user_bio({
+              bio: "asdf",
+            })
+          }
+        >
+          Update user bio
+        </div>
         <React.Suspense fallback={<FullPageLoading />}>
           {data.home_page_list_wrapper.home_page_list({})}
         </React.Suspense>

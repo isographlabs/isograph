@@ -61,7 +61,8 @@ export type ReaderAstNode =
   | ReaderScalarField
   | ReaderLinkedField
   | ReaderResolverField
-  | ReaderRefetchField;
+  | ReaderRefetchField
+  | ReaderMutationField;
 
 // @ts-ignore
 export type ReaderAst<TReadFromStore> = ReaderAstNode[];
@@ -92,6 +93,13 @@ export type ReaderResolverField = {
 
 export type ReaderRefetchField = {
   kind: "RefetchField";
+  alias: string;
+  resolver: IsographResolver<any, any, any>;
+  refetchQuery: number;
+};
+
+export type ReaderMutationField = {
+  kind: "MutationField";
   alias: string;
   resolver: IsographResolver<any, any, any>;
   refetchQuery: number;
@@ -405,6 +413,41 @@ function readData<TReadFromStore>(
 
           target[field.alias] = field.resolver.resolver(refetchQueryArtifact, {
             ...data.data,
+            // TODO continue from here
+            // variables need to be filtered for what we need just for the refetch query
+            ...variables,
+          });
+        }
+        break;
+      }
+      case "MutationField": {
+        const data = readData(
+          field.resolver.readerAst,
+          root,
+          variables,
+          // Refetch fields just read the id, and don't need refetch query artifacts
+          []
+        );
+        console.log("refetch field data", data, field);
+        if (data.kind === "MissingData") {
+          return {
+            kind: "MissingData",
+            reason: "Missing data for " + field.alias + " on root " + root,
+            nestedReason: data,
+          };
+        } else {
+          // TODO do we also need to call convert?
+          const refetchQueryIndex = field.refetchQuery;
+          if (refetchQueryIndex == null) {
+            throw new Error("refetchQuery is null in MutationField");
+          }
+          console.log("mutation field", data.data, variables);
+          const refetchQueryArtifact = nestedRefetchQueries[refetchQueryIndex];
+
+          target[field.alias] = field.resolver.resolver(refetchQueryArtifact, {
+            ...data.data,
+            // TODO continue from here
+            // variables need to be filtered for what we need just for the mutation query
             ...variables,
           });
         }
