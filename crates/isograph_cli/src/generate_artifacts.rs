@@ -176,20 +176,21 @@ fn get_artifact_for_mutation_field<'schema>(
 
     let parent_object = schema.schema_data.object(parent_id);
 
+    // HACK
+    // TODO pass the non-magical name
+    let mutation_field_name = magic_mutation_field_name.lookup()[2..].to_string();
+    // END HACK
+
     let query_text = generate_mutation_query_text(
         parent_object,
         schema,
         &merged_selection_set,
         variable_definitions,
         magic_mutation_field_name,
+        &mutation_field_name,
         mutation_primary_field_name,
         mutation_field_arguments,
     );
-
-    // HACK
-    // TODO pass the non-magical name
-    let mutation_field_name = magic_mutation_field_name.lookup()[2..].to_string();
-    // END HACK
 
     let selections = generate_normalization_ast(schema, &merged_selection_set, 2);
     let space_2 = "  ";
@@ -256,7 +257,8 @@ fn generate_mutation_query_text<'schema>(
     schema: &'schema ValidatedSchema,
     merged_selection_set: &MergedSelectionSet,
     mut variable_definitions: Vec<WithSpan<ValidatedVariableDefinition>>,
-    mutation_field_name: SelectableFieldName,
+    magic_mutation_field_name: SelectableFieldName,
+    mutation_field_name: &str,
     mutation_primary_field_name: SelectableFieldName,
     mutation_field_arguments: Vec<WithSpan<InputValueDefinition>>,
 ) -> QueryText {
@@ -301,18 +303,33 @@ fn generate_mutation_query_text<'schema>(
     let variable_text = write_variables_to_string(schema, &mut variable_definitions.iter());
     let mutation_field_arguments = get_serialized_arguments_for_query_text(&mutation_parameters);
 
+    let aliased_mutation_field_name =
+        get_aliased_mutation_field_name(&mutation_field_name, &mutation_parameters);
+
+    let parent_object_name = parent_object_type.name;
     query_text.push_str(&format!(
-        "mutation {}{} {} {{ {}{} {{ {} {{ \\\n",
-        parent_object_type.name,
-        mutation_field_name,
-        variable_text,
-        mutation_field_name,
-        mutation_field_arguments,
-        mutation_primary_field_name,
+        "mutation {parent_object_name}{magic_mutation_field_name} {variable_text} {{\\\n\
+        {aliased_mutation_field_name}: {mutation_field_name}{mutation_field_arguments} {{\\\n\
+        {mutation_primary_field_name} {{ \\\n",
     ));
     write_selections_for_query_text(&mut query_text, schema, &merged_selection_set, 1);
     query_text.push_str("}}}");
     QueryText(query_text)
+}
+
+fn get_aliased_mutation_field_name(
+    name: &str,
+    parameters: &[WithSpan<SelectionFieldArgument>],
+) -> String {
+    let mut s = name.to_string();
+
+    for param in parameters.iter() {
+        s.push_str(&format!(
+            "____{}___{}",
+            param.item.name.item, param.item.value.item
+        ))
+    }
+    s
 }
 
 fn get_artifact_for_resolver<'schema>(
