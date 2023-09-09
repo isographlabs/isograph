@@ -121,8 +121,6 @@ export type NormalizationScalarField = {
 export type NormalizationLinkedField = {
   kind: "Linked";
   fieldName: string;
-  // TODO consider getting rid of, and always deriving this from arguments
-  alias: string | null;
   arguments: Arguments | null;
   selections: NormalizationAst;
 };

@@ -10,13 +10,11 @@ const queryText = 'mutation UserStatus__update_user_bio ($id: ID!, $bio: String)
 const normalizationAst: NormalizationAst = [{
   kind: "Linked",
   fieldName: "update_user_bio",
-  alias: null,
   arguments: [{ argumentName: "id", variableName: "id" }],
   selections: [
     {
       kind: "Linked",
       fieldName: "user",
-      alias: null,
       arguments: null,
       selections: [
       {

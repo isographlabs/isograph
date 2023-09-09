@@ -177,7 +177,6 @@ fn get_artifact_for_mutation_field<'schema>(
     // TODO this is incorrect, fieldName and arguments are wrong, and this
     // needs to be two-layered
     let selections = generate_normalization_ast(schema, &merged_selection_set, 2);
-    // TODO include the correct arguments, and... do we need to alias this stuff?
     let arguments = "[{ argumentName: \"id\", variableName: \"id\" }]";
     let space_2 = "  ";
     let space_4 = "    ";
@@ -186,13 +185,11 @@ fn get_artifact_for_mutation_field<'schema>(
         "[{{\n\
         {space_2}kind: \"Linked\",\n\
         {space_2}fieldName: \"{mutation_field_name}\",\n\
-        {space_2}alias: null,\n\
         {space_2}arguments: {arguments},\n\
         {space_2}selections: [\n\
         {space_4}{{\n\
         {space_6}kind: \"Linked\",\n\
         {space_6}fieldName: \"{mutation_primary_field_name}\",\n\
-        {space_6}alias: null,\n\
         {space_6}arguments: null,\n\
         {space_6}selections: {selections},\n\
         {space_4}}},\n\
