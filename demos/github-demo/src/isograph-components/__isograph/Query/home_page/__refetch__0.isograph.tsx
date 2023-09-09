@@ -29,6 +29,9 @@ const queryText = 'query User_refetch ($first: Int!, $id: ID!) { node____id___id
   status {\
     id,\
     emoji,\
+    user {\
+      id,\
+    },\
   },\
 }}}';
 
@@ -174,6 +177,18 @@ const normalizationAst: NormalizationAst = [{ kind: "Linked", fieldName: "node",
         kind: "Scalar",
         fieldName: "emoji",
         arguments: null,
+      },
+      {
+        kind: "Linked",
+        fieldName: "user",
+        arguments: null,
+        selections: [
+          {
+            kind: "Scalar",
+            fieldName: "id",
+            arguments: null,
+          },
+        ],
       },
     ],
   },

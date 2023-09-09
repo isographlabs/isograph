@@ -217,7 +217,10 @@ pub fn create_merged_selection_set(
     artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
     // N.B. we call this for non-fetchable resolvers now, but that is a smell
     root_fetchable_resolver: &ValidatedSchemaResolver,
-) -> (MergedSelectionSet, Vec<PathToRefetchField>) {
+) -> (
+    MergedSelectionSet,
+    Vec<(PathToRefetchField, Vec<VariableName>)>,
+) {
     let mut merge_traversal_state = MergeTraversalState::new(root_fetchable_resolver);
     let merged_selection_set = create_merged_selection_set_with_merge_traversal_state(
         schema,
@@ -226,84 +229,86 @@ pub fn create_merged_selection_set(
         &mut merge_traversal_state,
     );
 
-    for (index, (path_to_refetch_field, refetch_field_parent_id, resolver_variant)) in
-        merge_traversal_state
-            .paths_to_refetch_fields
-            .iter()
-            .enumerate()
-    {
-        let nested_merged_selection_set =
-            find_by_path(&merged_selection_set, &path_to_refetch_field);
+    let val: Vec<_> = merge_traversal_state
+        .paths_to_refetch_fields
+        .into_iter()
+        .enumerate()
+        .map(
+            |(index, (path_to_refetch_field, refetch_field_parent_id, resolver_variant))| {
+                let nested_merged_selection_set =
+                    find_by_path(&merged_selection_set, &path_to_refetch_field);
 
-        // TODO we can pre-calculate this instead of re-iterating here
-        let reachable_variables = nested_merged_selection_set.reachable_variables();
+                // TODO we can pre-calculate this instead of re-iterating here
+                let reachable_variables = nested_merged_selection_set.reachable_variables();
 
-        let variable_definitions = reachable_variables
-            .into_iter()
-            .map(|variable_name| {
-                root_fetchable_resolver
-                    .variable_definitions
+                let definitions_of_used_variables = reachable_variables
                     .iter()
-                    .find(|definition| definition.item.name.item == variable_name)
-                    .expect(&format!(
-                        "Did not find matching variable definition. \
+                    .map(|variable_name| {
+                        root_fetchable_resolver
+                            .variable_definitions
+                            .iter()
+                            .find(|definition| definition.item.name.item == *variable_name)
+                            .expect(&format!(
+                                "Did not find matching variable definition. \
                             This might not be validated yet. For now, each resolver \
                             containing a __refetch field must re-defined all used variables. \
                             Resolver {} is missing variable definition {}",
-                        root_fetchable_resolver.name, variable_name
-                    ))
-                    .clone()
-            })
-            .collect();
+                                root_fetchable_resolver.name, variable_name
+                            ))
+                            .clone()
+                    })
+                    .collect();
 
-        match resolver_variant {
-            ResolverVariant::RefetchField => {
-                artifact_queue.push(ArtifactQueueItem::RefetchField(RefetchFieldResolverInfo {
-                    merged_selection_set: nested_merged_selection_set,
-                    refetch_field_parent_id: *refetch_field_parent_id,
-                    variable_definitions,
-                    root_parent_object: schema
-                        .schema_data
-                        .object(root_fetchable_resolver.parent_object_id)
-                        .name,
-                    root_fetchable_field: root_fetchable_resolver.name,
-                    refetch_query_index: index,
-                }));
-            }
-            ResolverVariant::MutationField((
-                mutation_name,
-                mutation_primary_field_name,
-                mutation_field_arguments,
-            )) => {
-                artifact_queue.push(ArtifactQueueItem::MutationField(
-                    MutationFieldResolverInfo {
-                        merged_selection_set: nested_merged_selection_set,
-                        refetch_field_parent_id: *refetch_field_parent_id,
-                        variable_definitions,
-                        root_parent_object: schema
-                            .schema_data
-                            .object(root_fetchable_resolver.parent_object_id)
-                            .name,
-                        root_fetchable_field: root_fetchable_resolver.name,
-                        refetch_query_index: index,
-                        mutation_field_name: *mutation_name,
-                        mutation_primary_field_name: *mutation_primary_field_name,
-                        mutation_field_arguments: mutation_field_arguments.clone(),
-                    },
-                ));
-            }
-            _ => panic!("invalid resolver variant"),
-        }
-    }
+                match resolver_variant {
+                    ResolverVariant::RefetchField => {
+                        artifact_queue.push(ArtifactQueueItem::RefetchField(
+                            RefetchFieldResolverInfo {
+                                merged_selection_set: nested_merged_selection_set,
+                                refetch_field_parent_id,
+                                variable_definitions: definitions_of_used_variables,
+                                root_parent_object: schema
+                                    .schema_data
+                                    .object(root_fetchable_resolver.parent_object_id)
+                                    .name,
+                                root_fetchable_field: root_fetchable_resolver.name,
+                                refetch_query_index: index,
+                            },
+                        ));
+                    }
+                    ResolverVariant::MutationField((
+                        mutation_name,
+                        mutation_primary_field_name,
+                        mutation_field_arguments,
+                    )) => {
+                        artifact_queue.push(ArtifactQueueItem::MutationField(
+                            MutationFieldResolverInfo {
+                                merged_selection_set: nested_merged_selection_set,
+                                refetch_field_parent_id,
+                                variable_definitions: definitions_of_used_variables,
+                                root_parent_object: schema
+                                    .schema_data
+                                    .object(root_fetchable_resolver.parent_object_id)
+                                    .name,
+                                root_fetchable_field: root_fetchable_resolver.name,
+                                refetch_query_index: index,
+                                mutation_field_name: mutation_name,
+                                mutation_primary_field_name,
+                                mutation_field_arguments: mutation_field_arguments.clone(),
+                            },
+                        ));
+                    }
+                    _ => panic!("invalid resolver variant"),
+                }
 
-    (
-        merged_selection_set,
-        merge_traversal_state
-            .paths_to_refetch_fields
-            .iter()
-            .map(|x| x.0.clone())
-            .collect(),
-    )
+                let mut reachable_variables_vec: Vec<_> = reachable_variables.into_iter().collect();
+                reachable_variables_vec.sort();
+
+                (path_to_refetch_field, reachable_variables_vec)
+            },
+        )
+        .collect();
+
+    (merged_selection_set, val)
 }
 
 fn create_merged_selection_set_with_merge_traversal_state(
@@ -491,6 +496,8 @@ fn merge_scalar_resolver_field(
             selection_set,
             merge_traversal_state,
         );
+    } else {
+        panic!("unsupported resolver without selection set");
     }
 
     // HACK... we can model this data better

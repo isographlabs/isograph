@@ -5,7 +5,7 @@ import Query__home_page_list_wrapper, { ReadOutType as Query__home_page_list_wra
 
 import refetchQuery0 from './home_page/__refetch__0.isograph';
 import refetchQuery1 from './home_page/__refetch__1.isograph';
-const nestedRefetchQueries = [refetchQuery0, refetchQuery1, ];
+const nestedRefetchQueries = [{ artifact: refetchQuery0, allowedVariables: ["first", ] }, { artifact: refetchQuery1, allowedVariables: [] }, ];
 
 const queryText = 'query home_page ($first: Int!) {\
   viewer {\
@@ -38,6 +38,9 @@ const queryText = 'query home_page ($first: Int!) {\
     status {\
       id,\
       emoji,\
+      user {\
+        id,\
+      },\
     },\
   },\
 }';
@@ -192,6 +195,18 @@ const normalizationAst: NormalizationAst = [
             kind: "Scalar",
             fieldName: "emoji",
             arguments: null,
+          },
+          {
+            kind: "Linked",
+            fieldName: "user",
+            arguments: null,
+            selections: [
+              {
+                kind: "Scalar",
+                fieldName: "id",
+                arguments: null,
+              },
+            ],
           },
         ],
       },

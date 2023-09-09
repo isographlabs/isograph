@@ -32,7 +32,7 @@ export type IsographFetchableResolver<
     resolver: (data: TResolverProps) => TResolverResult,
     data: TReadFromStore
   ) => TResolverResult; // TODO this should be a different return type
-  nestedRefetchQueries: RefetchQueryArtifact[];
+  nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
 export type IsographNonFetchableResolver<
@@ -103,6 +103,7 @@ export type ReaderMutationField = {
   alias: string;
   resolver: IsographResolver<any, any, any>;
   refetchQuery: number;
+  allowedVariables: string[];
 };
 
 export type NormalizationAstNode =
@@ -132,6 +133,12 @@ export type RefetchQueryArtifact = {
   normalizationAst: NormalizationAst;
 };
 
+// TODO rename
+export type RefetchQueryArtifactWrapper = {
+  artifact: RefetchQueryArtifact;
+  allowedVariables: string[];
+};
+
 export type Arguments = Argument[];
 export type Argument = {
   argumentName: string;
@@ -153,7 +160,7 @@ export type FragmentReference<
     resolver: (data: TResolverProps) => TResolverResult,
     data: TReadFromStore
   ) => TResolverResult;
-  nestedRefetchQueries: RefetchQueryArtifact[];
+  nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
 export function iso<TResolverParameter, TResolverReturn = TResolverParameter>(
@@ -268,7 +275,7 @@ function readData<TReadFromStore>(
   ast: ReaderAst<TReadFromStore>,
   root: DataId,
   variables: { [index: string]: string },
-  nestedRefetchQueries: RefetchQueryArtifact[]
+  nestedRefetchQueries: RefetchQueryArtifactWrapper[]
 ): ReadDataResult<TReadFromStore> {
   let storeRecord = store[root];
   if (storeRecord === undefined) {
@@ -409,13 +416,15 @@ function readData<TReadFromStore>(
           if (refetchQueryIndex == null) {
             throw new Error("refetchQuery is null in RefetchField");
           }
-          const refetchQueryArtifact = nestedRefetchQueries[refetchQueryIndex];
+          const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
+          const refetchQueryArtifact = refetchQuery.artifact;
+          const allowedVariables = refetchQuery.allowedVariables;
 
           target[field.alias] = field.resolver.resolver(refetchQueryArtifact, {
             ...data.data,
             // TODO continue from here
             // variables need to be filtered for what we need just for the refetch query
-            ...variables,
+            ...filterVariables(variables, allowedVariables),
           });
         }
         break;
@@ -441,14 +450,13 @@ function readData<TReadFromStore>(
           if (refetchQueryIndex == null) {
             throw new Error("refetchQuery is null in MutationField");
           }
-          console.log("mutation field", data.data, variables);
-          const refetchQueryArtifact = nestedRefetchQueries[refetchQueryIndex];
+          const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
+          const refetchQueryArtifact = refetchQuery.artifact;
+          const allowedVariables = refetchQuery.allowedVariables;
 
           target[field.alias] = field.resolver.resolver(refetchQueryArtifact, {
-            ...data.data,
-            // TODO continue from here
-            // variables need to be filtered for what we need just for the mutation query
-            ...variables,
+            ...data.data, // id variable
+            ...filterVariables(variables, allowedVariables),
           });
         }
         break;
@@ -608,3 +616,14 @@ export function getRefRendererForName(name: string) {
 export type IsographComponentProps<TDataType, TOtherProps = Object> = {
   data: TDataType;
 } & TOtherProps;
+
+function filterVariables(
+  variables: { [index: string]: string },
+  allowedVariables: string[]
+): { [index: string]: string } {
+  const result: { [index: string]: string } = {};
+  for (const key of allowedVariables) {
+    result[key] = variables[key];
+  }
+  return result;
+}

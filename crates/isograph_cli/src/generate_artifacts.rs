@@ -7,7 +7,7 @@ use std::{
 
 use common_lang_types::{
     HasName, IsographObjectTypeName, QueryOperationName, SelectableFieldName, Span,
-    UnvalidatedTypeName, WithSpan,
+    UnvalidatedTypeName, VariableName, WithSpan,
 };
 use graphql_lang_types::{
     InputValueDefinition, ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
@@ -169,6 +169,8 @@ fn get_artifact_for_mutation_field<'schema>(
         mutation_field_arguments,
     );
 
+    // TODO this is incorrect, fieldName and arguments are wrong, and this
+    // needs to be two-layered
     let normalization_ast = NormalizationAst(format!(
         "[{{ kind: \"Linked\", fieldName: \"node\", \
         alias: null, arguments: [{{ argumentName: \"id\", variableName: \"id\" }}], \
@@ -531,22 +533,38 @@ fn generate_query_text(
 }
 
 fn generate_refetch_query_artifact_imports(
-    root_refetched_paths: &[PathToRefetchField],
+    root_refetched_paths: &[(PathToRefetchField, Vec<VariableName>)],
     root_resolver_field_name: SelectableFieldName,
 ) -> RefetchQueryArtifactImport {
     // TODO name the refetch queries with the path, or something, instead of
     // with indexes.
     let mut output = String::new();
     let mut array_syntax = String::new();
-    for (query_index, _) in root_refetched_paths.iter().enumerate() {
+    for (query_index, (_, variable_names)) in root_refetched_paths.iter().enumerate() {
         output.push_str(&format!(
             "import refetchQuery{} from './{}/__refetch__{}.isograph';\n",
             query_index, root_resolver_field_name, query_index,
         ));
-        array_syntax.push_str(&format!("refetchQuery{}, ", query_index));
+        let variable_names_str = variable_names_to_string(&variable_names);
+        array_syntax.push_str(&format!(
+            "{{ artifact: refetchQuery{}, allowedVariables: {} }}, ",
+            query_index, variable_names_str
+        ));
     }
     output.push_str(&format!("const nestedRefetchQueries = [{}];", array_syntax));
     RefetchQueryArtifactImport(output)
+}
+
+fn variable_names_to_string(variable_names: &[VariableName]) -> String {
+    let mut s = "[".to_string();
+
+    for variable in variable_names {
+        s.push_str(&format!("\"{}\", ", variable));
+    }
+
+    s.push(']');
+
+    s
 }
 
 fn write_variables_to_string<'a>(
@@ -878,7 +896,7 @@ fn generate_reader_ast<'schema>(
     indentation_level: u8,
     nested_resolver_imports: &mut NestedResolverImports,
     // N.B. this is not root_refetched_paths when we're generating a non-fetchable resolver :(
-    root_refetched_paths: &[PathToRefetchField],
+    root_refetched_paths: &[(PathToRefetchField, Vec<VariableName>)],
 ) -> ReaderAst {
     generate_reader_ast_with_path(
         schema,
@@ -898,7 +916,7 @@ fn generate_reader_ast_with_path<'schema>(
     indentation_level: u8,
     nested_resolver_imports: &mut NestedResolverImports,
     // N.B. this is not root_refetched_paths when we're generating a non-fetchable resolver :(
-    root_refetched_paths: &[PathToRefetchField],
+    root_refetched_paths: &[(PathToRefetchField, Vec<VariableName>)],
     path: &mut Vec<NameAndArguments>,
 ) -> ReaderAst {
     let mut reader_ast = "[\n".to_string();
@@ -923,7 +941,7 @@ fn generate_reader_ast_node(
     indentation_level: u8,
     nested_resolver_imports: &mut NestedResolverImports,
     // TODO use this to generate usedRefetchQueries
-    root_refetched_paths: &[PathToRefetchField],
+    root_refetched_paths: &[(PathToRefetchField, Vec<VariableName>)],
     path: &mut Vec<NameAndArguments>,
 ) -> String {
     match &selection.item {
@@ -1211,7 +1229,7 @@ fn serialize_non_constant_value_for_js(value: &NonConstantValue) -> String {
 }
 
 fn get_nested_refetch_query_text(
-    root_refetched_paths: &[PathToRefetchField],
+    root_refetched_paths: &[(PathToRefetchField, Vec<VariableName>)],
     nested_refetch_queries: &[PathToRefetchField],
 ) -> String {
     // Assuming count is 2... TODO fix
@@ -1221,7 +1239,7 @@ fn get_nested_refetch_query_text(
             .iter()
             .enumerate()
             .find_map(|(index, root_path)| {
-                if root_path == nested_refetch_query {
+                if root_path.0 == *nested_refetch_query {
                     Some(index)
                 } else {
                     None
@@ -1309,12 +1327,15 @@ fn generate_convert_function(
     ConvertFunction("((resolver, data) => resolver(data))".to_string())
 }
 
-fn find_refetch_query_index(paths: &[PathToRefetchField], path: &[NameAndArguments]) -> usize {
+fn find_refetch_query_index(
+    paths: &[(PathToRefetchField, Vec<VariableName>)],
+    path: &[NameAndArguments],
+) -> usize {
     paths
         .iter()
         .enumerate()
         .find_map(|(index, path_to_field)| {
-            if &path_to_field.linked_fields == path {
+            if &path_to_field.0.linked_fields == path {
                 Some(index)
             } else {
                 None

@@ -21,6 +21,9 @@ export const home_page_list_wrapper = iso`
       status {
         emoji,
         __update_user_bio,
+        user {
+          id,
+        },
       },
     },
   }

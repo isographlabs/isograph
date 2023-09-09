@@ -42,6 +42,20 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
             resolver: UserStatus____update_user_bio,
             refetchQuery: 1,
           },
+          {
+            kind: "Linked",
+            fieldName: "user",
+            alias: null,
+            arguments: null,
+            selections: [
+              {
+                kind: "Scalar",
+                fieldName: "id",
+                alias: null,
+                arguments: null,
+              },
+            ],
+          },
         ],
       },
     ],
@@ -54,6 +68,9 @@ export type ResolverParameterType = {
     status: ({
       emoji: (string | null),
       __update_user_bio: UserStatus____update_user_bio__outputType,
+      user: {
+        id: string,
+      },
     } | null),
   },
 };
