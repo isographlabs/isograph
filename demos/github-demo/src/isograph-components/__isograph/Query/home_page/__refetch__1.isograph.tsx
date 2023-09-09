@@ -7,30 +7,44 @@ const queryText = 'mutation UserStatus__update_user_bio ($id: ID!, $bio: String)
   },\
 }}}';
 
-const normalizationAst: NormalizationAst = [{ kind: "Linked", fieldName: "node", alias: null, arguments: [{ argumentName: "id", variableName: "id" }], selections: [
-  {
-    kind: "Scalar",
-    fieldName: "id",
-    arguments: null,
-  },
-  {
-    kind: "Scalar",
-    fieldName: "emoji",
-    arguments: null,
-  },
-  {
-    kind: "Linked",
-    fieldName: "user",
-    arguments: null,
-    selections: [
+const normalizationAst: NormalizationAst = [{
+  kind: "Linked",
+  fieldName: "update_user_bio",
+  alias: null,
+  arguments: [{ argumentName: "id", variableName: "id" }],
+  selections: [
+    {
+      kind: "Linked",
+      fieldName: "user",
+      alias: null,
+      arguments: null,
+      selections: [
       {
         kind: "Scalar",
         fieldName: "id",
         arguments: null,
       },
+      {
+        kind: "Scalar",
+        fieldName: "emoji",
+        arguments: null,
+      },
+      {
+        kind: "Linked",
+        fieldName: "user",
+        arguments: null,
+        selections: [
+          {
+            kind: "Scalar",
+            fieldName: "id",
+            arguments: null,
+          },
+        ],
+      },
     ],
-  },
-] }];
+    },
+  ],
+}];
 const artifact: any = {
   kind: "RefetchQuery",
   queryText,

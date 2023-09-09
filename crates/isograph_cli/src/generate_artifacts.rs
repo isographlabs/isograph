@@ -13,7 +13,7 @@ use graphql_lang_types::{
     InputValueDefinition, ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
     TypeAnnotation,
 };
-use intern::string_key::Intern;
+use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     InputTypeId, NonConstantValue, ObjectId, OutputTypeId, Selection, SelectionFieldArgument,
     ServerFieldSelection, VariableDefinition,
@@ -151,7 +151,7 @@ fn get_artifact_for_mutation_field<'schema>(
         root_fetchable_field,
         root_parent_object,
         refetch_query_index,
-        mutation_field_name,
+        mutation_field_name: magic_mutation_field_name,
         mutation_primary_field_name,
         mutation_field_arguments,
         ..
@@ -164,18 +164,40 @@ fn get_artifact_for_mutation_field<'schema>(
         schema,
         &merged_selection_set,
         variable_definitions,
-        mutation_field_name,
+        magic_mutation_field_name,
         mutation_primary_field_name,
         mutation_field_arguments,
     );
 
+    // HACK
+    // TODO pass the non-magical name
+    let mutation_field_name = magic_mutation_field_name.lookup()[2..].to_string();
+    // END HACK
+
     // TODO this is incorrect, fieldName and arguments are wrong, and this
     // needs to be two-layered
+    let selections = generate_normalization_ast(schema, &merged_selection_set, 2);
+    // TODO include the correct arguments, and... do we need to alias this stuff?
+    let arguments = "[{ argumentName: \"id\", variableName: \"id\" }]";
+    let space_2 = "  ";
+    let space_4 = "    ";
+    let space_6 = "      ";
     let normalization_ast = NormalizationAst(format!(
-        "[{{ kind: \"Linked\", fieldName: \"node\", \
-        alias: null, arguments: [{{ argumentName: \"id\", variableName: \"id\" }}], \
-        selections: {} }}]",
-        generate_normalization_ast(schema, &merged_selection_set, 0).0,
+        "[{{\n\
+        {space_2}kind: \"Linked\",\n\
+        {space_2}fieldName: \"{mutation_field_name}\",\n\
+        {space_2}alias: null,\n\
+        {space_2}arguments: {arguments},\n\
+        {space_2}selections: [\n\
+        {space_4}{{\n\
+        {space_6}kind: \"Linked\",\n\
+        {space_6}fieldName: \"{mutation_primary_field_name}\",\n\
+        {space_6}alias: null,\n\
+        {space_6}arguments: null,\n\
+        {space_6}selections: {selections},\n\
+        {space_4}}},\n\
+        {space_2}],\n\
+        }}]",
     ));
 
     Artifact::RefetchQuery(RefetchQueryResolver {
