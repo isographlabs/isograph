@@ -5,7 +5,7 @@ import Query__home_page_list_wrapper, { ReadOutType as Query__home_page_list_wra
 
 import refetchQuery0 from './home_page/__refetch__0.isograph';
 import refetchQuery1 from './home_page/__refetch__1.isograph';
-const nestedRefetchQueries = [{ artifact: refetchQuery0, allowedVariables: ["first", ] }, { artifact: refetchQuery1, allowedVariables: [] }, ];
+const nestedRefetchQueries = [{ artifact: refetchQuery0, allowedVariables: ["first", ] }, { artifact: refetchQuery1, allowedVariables: ["first", ] }, ];
 
 const queryText = 'query home_page ($first: Int!) {\
   viewer {\
@@ -40,6 +40,9 @@ const queryText = 'query home_page ($first: Int!) {\
       emoji,\
       user {\
         id,\
+        repositories____last___first: repositories(last: $first) {\
+          __typename,\
+        },\
       },\
     },\
   },\
@@ -205,6 +208,23 @@ const normalizationAst: NormalizationAst = [
                 kind: "Scalar",
                 fieldName: "id",
                 arguments: null,
+              },
+              {
+                kind: "Linked",
+                fieldName: "repositories",
+                arguments: [
+                  {
+                    argumentName: "last",
+                    variableName: "first",
+                  },
+                ],
+                selections: [
+                  {
+                    kind: "Scalar",
+                    fieldName: "__typename",
+                    arguments: null,
+                  },
+                ],
               },
             ],
           },

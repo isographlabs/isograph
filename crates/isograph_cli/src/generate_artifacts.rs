@@ -157,6 +157,23 @@ fn get_artifact_for_mutation_field<'schema>(
         ..
     } = refetch_info;
 
+    let arguments = get_serialized_field_arguments(
+        &mutation_field_arguments
+            .iter()
+            .map(|input_value_definition| {
+                input_value_definition
+                    .clone()
+                    .map(|input_value_definition| SelectionFieldArgument {
+                        name: input_value_definition.name.map(|x| x.into()),
+                        value: input_value_definition
+                            .name
+                            .map(|x| NonConstantValue::Variable(x.into())),
+                    })
+            })
+            .collect::<Vec<_>>(),
+        1,
+    );
+
     let parent_object = schema.schema_data.object(parent_id);
 
     let query_text = generate_mutation_query_text(
@@ -174,10 +191,7 @@ fn get_artifact_for_mutation_field<'schema>(
     let mutation_field_name = magic_mutation_field_name.lookup()[2..].to_string();
     // END HACK
 
-    // TODO this is incorrect, fieldName and arguments are wrong, and this
-    // needs to be two-layered
     let selections = generate_normalization_ast(schema, &merged_selection_set, 2);
-    let arguments = "[{ argumentName: \"id\", variableName: \"id\" }]";
     let space_2 = "  ";
     let space_4 = "    ";
     let space_6 = "      ";

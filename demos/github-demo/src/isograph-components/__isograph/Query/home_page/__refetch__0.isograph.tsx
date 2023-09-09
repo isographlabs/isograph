@@ -31,6 +31,9 @@ const queryText = 'query User_refetch ($first: Int!, $id: ID!) { node____id___id
     emoji,\
     user {\
       id,\
+      repositories____last___first: repositories(last: $first) {\
+        __typename,\
+      },\
     },\
   },\
 }}}';
@@ -187,6 +190,23 @@ const normalizationAst: NormalizationAst = [{ kind: "Linked", fieldName: "node",
             kind: "Scalar",
             fieldName: "id",
             arguments: null,
+          },
+          {
+            kind: "Linked",
+            fieldName: "repositories",
+            arguments: [
+              {
+                argumentName: "last",
+                variableName: "first",
+              },
+            ],
+            selections: [
+              {
+                kind: "Scalar",
+                fieldName: "__typename",
+                arguments: null,
+              },
+            ],
           },
         ],
       },

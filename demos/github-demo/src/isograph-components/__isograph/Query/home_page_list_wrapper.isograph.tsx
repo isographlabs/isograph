@@ -54,6 +54,25 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
                 alias: null,
                 arguments: null,
               },
+              {
+                kind: "Linked",
+                fieldName: "repositories",
+                alias: null,
+                arguments: [
+                  {
+                    argumentName: "last",
+                    variableName: "first",
+                  },
+                ],
+                selections: [
+                  {
+                    kind: "Scalar",
+                    fieldName: "__typename",
+                    alias: null,
+                    arguments: null,
+                  },
+                ],
+              },
             ],
           },
         ],
@@ -70,6 +89,9 @@ export type ResolverParameterType = {
       __update_user_bio: UserStatus____update_user_bio__outputType,
       user: {
         id: string,
+        repositories: {
+          __typename: string,
+        },
       },
     } | null),
   },

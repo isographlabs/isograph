@@ -23,6 +23,9 @@ export const home_page_list_wrapper = iso`
         __update_user_bio,
         user {
           id,
+          repositories(last: $first) {
+            __typename,
+          },
         },
       },
     },
