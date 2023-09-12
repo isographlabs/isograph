@@ -264,9 +264,10 @@ fn generate_mutation_query_text<'schema>(
 ) -> QueryText {
     let mut query_text = String::new();
 
+    let id_variable_name = WithSpan::new("id".intern().into(), Span::new(0, 0));
     variable_definitions.push(WithSpan {
         item: VariableDefinition {
-            name: WithSpan::new("id".intern().into(), Span::new(0, 0)),
+            name: id_variable_name,
             type_: TypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
                 NamedTypeAnnotation(WithSpan {
                     item: InputTypeId::Scalar(schema.id_type_id),
@@ -277,28 +278,44 @@ fn generate_mutation_query_text<'schema>(
         span: Span::new(0, 0),
     });
 
-    let mutation_parameters: Vec<_> = mutation_field_arguments.iter().map(|argument| {
-        let variable_name = argument.item.name.map(|x| x.into());
-        variable_definitions.push(WithSpan {
-            item: VariableDefinition {
-                name: variable_name,
-                type_: argument.item.type_.clone().map(|x| {
-                    schema
-                        .schema_data
-                        .defined_types
-                        .get(&x.into())
-                        .expect("Expected type to be found, this indicates a bug in Isograph")
-                        .as_input_type_id()
-                        .expect("Expected a valid input type. Objects are not yet supported as parameters here.")
-                }),
+    let mutation_parameters: Vec<_> = mutation_field_arguments
+        .iter()
+        .map(|argument| {
+            let variable_name = argument.item.name.map(|x| x.into());
+            variable_definitions.push(WithSpan {
+                item: VariableDefinition {
+                    name: variable_name,
+                    type_: argument.item.type_.clone().map(|x| {
+                        schema
+                            .schema_data
+                            .defined_types
+                            .get(&x.into())
+                            .expect("Expected type to be found, this indicates a bug in Isograph")
+                            .as_input_type_id()
+                            .expect(
+                                "Expected a valid input type. Objects \
+                        are not yet supported as parameters here.",
+                            )
+                    }),
+                },
+                span: Span::new(0, 0),
+            });
+            WithSpan::new(
+                SelectionFieldArgument {
+                    name: argument.item.name.map(|x| x.into()),
+                    value: variable_name.map(|x| NonConstantValue::Variable(x)),
+                },
+                Span::new(0, 0),
+            )
+        })
+        .chain(std::iter::once(WithSpan::new(
+            SelectionFieldArgument {
+                name: WithSpan::new("id".intern().into(), Span::new(0, 0)),
+                value: id_variable_name.map(NonConstantValue::Variable),
             },
-            span: Span::new(0, 0),
-        });
-        WithSpan::new(SelectionFieldArgument {
-            name: argument.item.name.map(|x| x.into()),
-            value: variable_name.map(|x| NonConstantValue::Variable(x)),
-        }, Span::new(0,0))
-    }).collect();
+            Span::new(0, 0),
+        )))
+        .collect();
 
     let variable_text = write_variables_to_string(schema, &mut variable_definitions.iter());
     let mutation_field_arguments = get_serialized_arguments_for_query_text(&mutation_parameters);
@@ -324,10 +341,12 @@ fn get_aliased_mutation_field_name(
     let mut s = name.to_string();
 
     for param in parameters.iter() {
-        s.push_str(&format!(
-            "____{}___{}",
-            param.item.name.item, param.item.value.item
-        ))
+        // TODO NonConstantValue will format to a string like "$name", but we want just "name".
+        // There is probably a better way to do this.
+        let value_str = match param.item.value.item {
+            NonConstantValue::Variable(var) => format!("{}", var),
+        };
+        s.push_str(&format!("____{}___{}", param.item.name.item, value_str))
     }
     s
 }
