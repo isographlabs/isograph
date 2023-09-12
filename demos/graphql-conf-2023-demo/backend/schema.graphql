@@ -1,0 +1,51 @@
+type Query {
+  pets: [Pet!]!
+  pet(id: ID!): Pet
+}
+
+type Mutation {
+  set_pet_best_friend(id: ID!, new_best_friend_id: ID!): SetBestFriendResponse!
+}
+
+type SetBestFriendResponse {
+  # The pet whose best friend was set
+  pet: Pet!
+}
+
+type Pet {
+  id: ID!
+  name: String!
+  best_friend_relationship: BestFriendRelationship
+
+  picture: Url!
+  nickname: String
+  age: Int!
+  stats: PetStats!
+  tagline: String!
+  potential_new_best_friends: [Pet!]!
+
+  checkins: [Checkin!]!
+  favorite_phrase: String
+}
+
+scalar Url
+
+type BestFriendRelationship {
+  best_friend: Pet!
+  picture_together: Url
+}
+
+type PetStats {
+  weight: Int!
+  intelligence: Int!
+  cuteness: Int!
+  hunger: Int!
+  sociability: Int!
+  energy: Int!
+}
+
+type Checkin {
+  id: ID!
+  location: String!
+  time: String!
+}

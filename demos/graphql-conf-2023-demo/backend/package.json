@@ -1,0 +1,10 @@
+{
+  "name": "graphql-conf-2023-demo-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "graphql": "^16.6.0",
+    "graphql-yoga": "^4.0.4"
+  }
+}

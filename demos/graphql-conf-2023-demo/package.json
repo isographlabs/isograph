@@ -1,0 +1,31 @@
+{
+  "name": "graphql-conf-2023-demo",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "backend": "cd backend && node ./src/index.js"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
+    "@isograph/react": "*",
+    "@isograph/react-disposable-state": "*",
+    "@mui/material": "^5.14.8",
+    "@types/node": "20.6.0",
+    "@types/react": "18.2.21",
+    "@types/react-dom": "18.2.7",
+    "eslint": "8.49.0",
+    "eslint-config-next": "13.4.19",
+    "graphql": "^16.6.0",
+    "graphql-yoga": "^4.0.4",
+    "next": "13.4.19",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-no-ssr": "^1.1.0",
+    "typescript": "5.2.2"
+  }
+}

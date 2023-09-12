@@ -12,9 +12,8 @@ import {
 import { useLazyDisposableState } from "@isograph/react-disposable-state";
 import { type PromiseWrapper } from "./PromiseWrapper";
 import React from "react";
-import nodeQuery from "./node_query";
 
-export { setNetwork, makeNetworkRequest, subscribe } from "./cache";
+export { setNetwork, makeNetworkRequest, subscribe, DataId, Link, StoreRecord } from "./cache";
 
 // This type should be treated as an opaque type.
 export type IsographFetchableResolver<
@@ -52,10 +51,10 @@ export type IsographResolver<
 > =
   | IsographFetchableResolver<TReadFromStore, TResolverProps, TResolverResult>
   | IsographNonFetchableResolver<
-      TReadFromStore,
-      TResolverProps,
-      TResolverResult
-    >;
+    TReadFromStore,
+    TResolverProps,
+    TResolverResult
+  >;
 
 export type ReaderAstNode =
   | ReaderScalarField
@@ -260,14 +259,14 @@ export function readButDoNotEvaluate<TReadFromStore extends Object>(
 
 type ReadDataResult<TReadFromStore> =
   | {
-      kind: "Success";
-      data: TReadFromStore;
-    }
+    kind: "Success";
+    data: TReadFromStore;
+  }
   | {
-      kind: "MissingData";
-      reason: string;
-      nestedReason?: ReadDataResult<unknown>;
-    };
+    kind: "MissingData";
+    reason: string;
+    nestedReason?: ReadDataResult<unknown>;
+  };
 
 function readData<TReadFromStore>(
   ast: ReaderAst<TReadFromStore>,
@@ -351,7 +350,7 @@ function readData<TReadFromStore>(
         let link = assertLink(value);
         if (link === undefined) {
           // TODO make this configurable, and also generated and derived from the schema
-          const altLink = HACK_missingFieldHandler(
+          const altLink = missingFieldHandler(
             storeRecord,
             root,
             field.fieldName,
@@ -532,30 +531,51 @@ function readData<TReadFromStore>(
   return { kind: "Success", data: target as any };
 }
 
-function HACK_missingFieldHandler(
+
+let customMissingFieldHandler: typeof defaultMissingFieldHandler | null = null;
+
+function missingFieldHandler(
+  storeRecord: StoreRecord,
+  root: DataId,
+  fieldName: string,
+  arguments_: { [index: string]: any } | null,
+  variables: { [index: string]: any } | null,
+): Link | undefined {
+  if (customMissingFieldHandler != null) {
+    return customMissingFieldHandler(storeRecord, root, fieldName, arguments_, variables);
+  } else {
+    return defaultMissingFieldHandler(
+      storeRecord,
+      root,
+      fieldName,
+      arguments_,
+      variables
+    )
+  }
+}
+
+export function defaultMissingFieldHandler(
   storeRecord: StoreRecord,
   root: DataId,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
   variables: { [index: string]: any } | null
 ): Link | undefined {
-  console.log("missing field handler", {
-    storeRecord,
-    root,
-    fieldName,
-    arguments_,
-    variables,
-  });
   if (fieldName === "node" || fieldName === "user") {
     const variable = arguments_?.["id"];
     const value = variables?.[variable];
 
     // TODO can we handle explicit nulls here too? Probably, after wrapping in objects
     if (value != null) {
-      console.log("found node", value);
       return { __link: value };
     }
   }
+}
+
+export function setMissingFieldHandler(
+  handler: typeof defaultMissingFieldHandler
+) {
+  customMissingFieldHandler = handler;
 }
 
 function assertLink(link: DataTypeValue): Link | undefined | null {
