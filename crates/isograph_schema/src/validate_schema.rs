@@ -12,8 +12,8 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    refetched_paths::refetched_paths_with_path, DefinedField, PathToRefetchField, Schema,
-    SchemaData, SchemaIdField, SchemaObject, SchemaResolver, SchemaServerField,
+    refetched_paths::refetched_paths_with_path, DefinedField, NameAndArguments, PathToRefetchField,
+    Schema, SchemaData, SchemaIdField, SchemaObject, SchemaResolver, SchemaServerField,
     UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData, UnvalidatedSchemaField,
     UnvalidatedSchemaResolver, UnvalidatedSchemaServerField,
 };
@@ -666,9 +666,8 @@ pub enum ValidateSchemaError {
 pub fn refetched_paths_for_resolver(
     schema_resolver: &ValidatedSchemaResolver,
     schema: &ValidatedSchema,
+    path: &mut Vec<NameAndArguments>,
 ) -> Vec<PathToRefetchField> {
-    // TODO this is a smell
-    let path = &mut vec![];
     let path_set = match &schema_resolver.selection_set_and_unwraps {
         Some((selection_set, _)) => refetched_paths_with_path(&selection_set, schema, path),
         None => panic!("unexpected non-existent selection set on resolver"),

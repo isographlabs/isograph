@@ -976,7 +976,7 @@ fn generate_reader_ast_with_path<'schema>(
             schema,
             indentation_level + 1,
             nested_resolver_imports,
-            root_refetched_paths,
+            &root_refetched_paths,
             path,
         );
         reader_ast.push_str(&s);
@@ -1042,7 +1042,7 @@ fn generate_reader_ast_node(
                             .unwrap_or_else(|| "null".to_string());
 
                         let resolver_refetched_paths =
-                            refetched_paths_for_resolver(resolver_field, schema);
+                            refetched_paths_for_resolver(resolver_field, schema, path);
 
                         let nested_refetch_queries = get_nested_refetch_query_text(
                             &root_refetched_paths,
@@ -1282,7 +1282,6 @@ fn get_nested_refetch_query_text(
     root_refetched_paths: &[(PathToRefetchField, Vec<VariableName>)],
     nested_refetch_queries: &[PathToRefetchField],
 ) -> String {
-    // Assuming count is 2... TODO fix
     let mut s = "[".to_string();
     for nested_refetch_query in nested_refetch_queries.iter() {
         let index = root_refetched_paths
