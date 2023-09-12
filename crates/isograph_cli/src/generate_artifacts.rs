@@ -170,6 +170,16 @@ fn get_artifact_for_mutation_field<'schema>(
                             .map(|x| NonConstantValue::Variable(x.into())),
                     })
             })
+            .chain(std::iter::once(WithSpan::new(
+                SelectionFieldArgument {
+                    name: WithSpan::new("id".intern().into(), Span::new(0, 0)),
+                    value: WithSpan::new(
+                        NonConstantValue::Variable("id".intern().into()),
+                        Span::new(0, 0),
+                    ),
+                },
+                Span::new(0, 0),
+            )))
             .collect::<Vec<_>>(),
         1,
     );
