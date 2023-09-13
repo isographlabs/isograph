@@ -473,7 +473,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
                 .object(schema.query_type_id.expect("expect query type to exist"))
                 .into(),
             selection_set,
-            // TODO obviously a smell
+            // TODO this is obviously a smell
             &mut vec![],
             &non_fetchable_resolver,
         );
