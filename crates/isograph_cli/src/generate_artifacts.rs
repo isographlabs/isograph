@@ -630,7 +630,10 @@ fn generate_refetch_query_artifact_imports(
             query_index, variable_names_str
         ));
     }
-    output.push_str(&format!("const nestedRefetchQueries = [{}];", array_syntax));
+    output.push_str(&format!(
+        "const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [{}];",
+        array_syntax
+    ));
     RefetchQueryArtifactImport(output)
 }
 
@@ -929,7 +932,7 @@ fn generate_resolver_import_statement(
 ) -> ResolverImportStatement {
     match resolver_action_kind {
         ResolverActionKind::Identity => {
-            ResolverImportStatement("const resolver = x => x;".to_string())
+            ResolverImportStatement("const resolver = (x: any) => x;".to_string())
         }
         ResolverActionKind::NamedImport((name, path)) => ResolverImportStatement(format!(
             "import {{ {name} as resolver }} from '../../{path}';",

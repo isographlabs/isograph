@@ -31,12 +31,12 @@ impl<'schema> FetchableResolver<'schema> {
         );
 
         format!(
-            "import type {{IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst}} from '@isograph/react';\n\
+            "import type {{IsographFetchableResolver, ReaderAst, FragmentReference, \
+            NormalizationAst, RefetchQueryArtifactWrapper}} from '@isograph/react';\n\
             {resolver_import_statement}\n\
             {nested_resolver_artifact_imports}\n\
             {refetch_query_artifact_import}\n\n\
             const queryText = '{query_text}';\n\n\
-            // TODO support changing this,\n\
             export type ReadFromStoreType = ResolverParameterType;\n\n\
             const normalizationAst: NormalizationAst = {normalization_ast};\n\
             const readerAst: ReaderAst<ReadFromStoreType> = {reader_ast};\n\n\
@@ -44,7 +44,8 @@ impl<'schema> FetchableResolver<'schema> {
             // The type, when returned from the resolver\n\
             export type ResolverReturnType = {resolver_return_type};\n\n\
             {read_out_type_text}\n\n\
-            const artifact: IsographFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {{\n\
+            const artifact: IsographFetchableResolver<ReadFromStoreType, \
+            ResolverParameterType, ReadOutType> = {{\n\
             {}kind: 'FetchableResolver',\n\
             {}queryText,\n\
             {}normalizationAst,\n\
@@ -54,13 +55,7 @@ impl<'schema> FetchableResolver<'schema> {
             {}nestedRefetchQueries,\n\
             }};\n\n\
             export default artifact;\n",
-            "  ",
-            "  ",
-            "  ",
-            "  ",
-            "  ",
-            "  ",
-            "  ",
+            "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     }
 }
@@ -88,7 +83,6 @@ impl<'schema> NonFetchableResolver<'schema> {
             {resolver_import_statement}\n\
             {nested_resolver_import_statement}\n\
             {read_out_type_text}\n\n\
-            // TODO support changing this\n\
             export type ReadFromStoreType = ResolverParameterType;\n\n\
             const readerAst: ReaderAst<ReadFromStoreType> = {reader_ast};\n\n\
             export type ResolverParameterType = {resolver_parameter_type};\n\n\
