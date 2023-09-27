@@ -31,7 +31,6 @@ pub(crate) fn read_files_in_folder(
     read_dir_recursive(&canonicalized_existing_path)?
         .into_iter()
         .map(|path| {
-            eprintln!("path {:?}", path);
             // This isn't ideal. We can avoid a clone if we changed .map_err to match
             let path_2 = path.clone();
 
