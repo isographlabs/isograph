@@ -12,7 +12,6 @@
 
 * Watch mode CLI
 * Error printing
-* Proper handling of nested directories
 * Babel integration for `iso*` literals
 
 ## Feature backlog

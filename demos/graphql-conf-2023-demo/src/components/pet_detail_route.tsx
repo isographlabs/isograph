@@ -2,7 +2,7 @@ import React from "react";
 import { iso, read, useLazyReference } from "@isograph/react";
 import { Container, Stack } from "@mui/material";
 
-import petDetailRouteQuery from "./__isograph/Query/pet_detail_route.isograph";
+import petDetailRouteQuery from "../__isograph/Query/pet_detail_route.isograph";
 import { PetDetailRoute, Route } from "./router";
 
 iso`

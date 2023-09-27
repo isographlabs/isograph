@@ -1,5 +1,5 @@
 import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
-import { pet_phrase_card as resolver } from '../../pet_phrase_card.tsx';
+import { pet_summary_card as resolver } from '../../components/pet_summary_card.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
@@ -15,7 +15,19 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
   {
     kind: "Scalar",
-    fieldName: "favorite_phrase",
+    fieldName: "name",
+    alias: null,
+    arguments: null,
+  },
+  {
+    kind: "Scalar",
+    fieldName: "picture",
+    alias: null,
+    arguments: null,
+  },
+  {
+    kind: "Scalar",
+    fieldName: "tagline",
     alias: null,
     arguments: null,
   },
@@ -24,7 +36,9 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 export type ResolverParameterType = { data:
 {
   id: string,
-  favorite_phrase: (string | null),
+  name: string,
+  picture: string,
+  tagline: string,
 },
 [index: string]: any };
 

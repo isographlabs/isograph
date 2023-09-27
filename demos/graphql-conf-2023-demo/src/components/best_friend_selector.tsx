@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { iso } from "@isograph/react";
 import { MenuItem, Select } from "@mui/material";
 
-import { ResolverParameterType as BestFriendSelectorParams } from "./__isograph/Pet/best_friend_selector.isograph";
+import { ResolverParameterType as BestFriendSelectorParams } from "../__isograph/Pet/best_friend_selector.isograph";
 import { PetId } from "./router";
 
 export const best_friend_selector = iso<

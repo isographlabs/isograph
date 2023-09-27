@@ -1,5 +1,5 @@
 import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
-import { pet_stats_card as resolver } from '../../pet_stats_card.tsx';
+import { pet_stats_card as resolver } from '../../components/pet_stats_card.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);

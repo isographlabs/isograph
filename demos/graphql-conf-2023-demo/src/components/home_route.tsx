@@ -3,7 +3,7 @@ import { iso, read, useLazyReference } from "@isograph/react";
 import { Container, Stack } from "@mui/material";
 import { type Route } from "./router";
 
-import homeRouteQuery from "./__isograph/Query/home_route.isograph";
+import homeRouteQuery from "../__isograph/Query/home_route.isograph";
 
 iso`
   Query.home_route @fetchable {

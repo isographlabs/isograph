@@ -1,5 +1,5 @@
 import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
-import { pet_best_friend_card as resolver } from '../../pet_best_friend_card.tsx';
+import { pet_best_friend_card as resolver } from '../../components/pet_best_friend_card.tsx';
 import Pet__best_friend_selector, { ReadOutType as Pet__best_friend_selector__outputType } from './best_friend_selector.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)

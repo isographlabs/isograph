@@ -7,8 +7,12 @@ use std::{
 use common_lang_types::SelectableFieldName;
 use intern::{string_key::Intern, Lookup};
 
-use crate::generate_artifacts::{
-    Artifact, FetchableResolver, GenerateArtifactsError, NonFetchableResolver, RefetchQueryResolver,
+use crate::{
+    generate_artifacts::{
+        Artifact, FetchableResolver, GenerateArtifactsError, NonFetchableResolver,
+        RefetchQueryResolver,
+    },
+    isograph_literals::ISOGRAPH_FOLDER,
 };
 
 pub(crate) fn write_artifacts<'schema>(
@@ -23,7 +27,7 @@ pub(crate) fn write_artifacts<'schema>(
         }
     })?;
 
-    let generated_folder_root = project_root.join("__isograph");
+    let generated_folder_root = project_root.join(ISOGRAPH_FOLDER);
 
     if generated_folder_root.exists() {
         fs::remove_dir_all(&generated_folder_root).map_err(|e| {

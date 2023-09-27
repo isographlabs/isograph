@@ -1,4 +1,8 @@
-use std::{fs, path::PathBuf};
+use std::{
+    fs::{self, DirEntry},
+    io,
+    path::{Path, PathBuf},
+};
 
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -8,8 +12,6 @@ use crate::batch_compile::BatchCompileError;
 pub(crate) fn read_files_in_folder(
     root_js_path: &PathBuf,
 ) -> Result<Vec<(PathBuf, String)>, BatchCompileError> {
-    // current_dir is the directory from which boult was run, and we expect paths
-    // to be relative to that.
     let current_dir = std::env::current_dir().expect("current_dir should exist");
     let joined = current_dir.join(root_js_path);
     let canonicalized_existing_path =
@@ -26,42 +28,57 @@ pub(crate) fn read_files_in_folder(
         });
     }
 
-    Ok(fs::read_dir(canonicalized_existing_path)
-        .map_err(|e| BatchCompileError::UnableToTraverseDirectory { message: e })?
+    read_dir_recursive(&canonicalized_existing_path)?
         .into_iter()
-        .map(
-            move |entry| -> Result<Option<(PathBuf, String)>, BatchCompileError> {
-                let entry = entry
-                    .map_err(|e| BatchCompileError::UnableToTraverseDirectory { message: e })?;
+        .map(|path| {
+            eprintln!("path {:?}", path);
+            // This isn't ideal. We can avoid a clone if we changed .map_err to match
+            let path_2 = path.clone();
 
-                let path = entry.path();
-                if path.is_dir() {
-                    // TODO traverse into subdirectories
-                    return Ok(None);
-                }
+            // N.B. we have previously ensured that path is a file
+            let contents =
+                std::fs::read(&path).map_err(|message| BatchCompileError::UnableToReadFile {
+                    path: path_2,
+                    message,
+                })?;
 
-                let contents =
-                    std::fs::read(path).map_err(|message| BatchCompileError::UnableToReadFile {
-                        path: entry.path(),
-                        message,
-                    })?;
+            let contents = std::str::from_utf8(&contents)
+                .map_err(|message| BatchCompileError::UnableToConvertToString { message })?
+                .to_owned();
 
-                let contents = std::str::from_utf8(&contents)
-                    .map_err(|message| BatchCompileError::UnableToConvertToString { message })?
-                    .to_owned();
-
-                Ok(Some((
-                    entry.path().strip_prefix(&joined)?.to_path_buf(),
-                    contents,
-                )))
-            },
-        )
-        .collect::<Result<Vec<Option<_>>, _>>()?
-        .into_iter()
-        .filter_map(|x| x)
-        .collect())
+            Ok((path.strip_prefix(&joined)?.to_path_buf(), contents))
+        })
+        .collect()
 }
 
+fn read_dir_recursive(root_js_path: &PathBuf) -> Result<Vec<PathBuf>, BatchCompileError> {
+    let mut paths = vec![];
+
+    visit_dirs_skipping_isograph(&root_js_path, &mut |dir_entry| {
+        paths.push(dir_entry.path());
+    })
+    .map_err(|e| BatchCompileError::UnableToTraverseDirectory { message: e })?;
+
+    Ok(paths)
+}
+
+// Thanks https://doc.rust-lang.org/stable/std/fs/fn.read_dir.html
+fn visit_dirs_skipping_isograph(dir: &Path, cb: &mut dyn FnMut(&DirEntry)) -> io::Result<()> {
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_dir() {
+            if !dir.ends_with(ISOGRAPH_FOLDER) {
+                visit_dirs_skipping_isograph(&path, cb)?;
+            }
+        } else {
+            cb(&entry);
+        }
+    }
+    Ok(())
+}
+
+pub(crate) static ISOGRAPH_FOLDER: &'static str = "__isograph";
 lazy_static! {
     // This is regex is inadequate, as iso<typeof foo`...`>, and it's certainly possible
     // to want that.

@@ -7,7 +7,7 @@ import {
   Stack,
 } from "@mui/material";
 
-import { ResolverParameterType as PetBestFriendCardParams } from "./__isograph/Pet/pet_best_friend_card.isograph";
+import { ResolverParameterType as PetBestFriendCardParams } from "../__isograph/Pet/pet_best_friend_card.isograph";
 
 export const pet_best_friend_card = iso<
   PetBestFriendCardParams,

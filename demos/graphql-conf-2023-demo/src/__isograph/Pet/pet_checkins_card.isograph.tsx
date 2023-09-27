@@ -1,6 +1,5 @@
 import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
-import { best_friend_selector as resolver } from '../../best_friend_selector.tsx';
-import Pet____set_pet_best_friend, { ReadOutType as Pet____set_pet_best_friend__outputType } from './__set_pet_best_friend.isograph';
+import { pet_checkins_card as resolver } from '../../components/pet_checkins_card.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
@@ -9,14 +8,14 @@ export type ReadFromStoreType = ResolverParameterType;
 
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
-    kind: "MutationField",
-    alias: "__set_pet_best_friend",
-    resolver: Pet____set_pet_best_friend,
-    refetchQuery: 0,
+    kind: "Scalar",
+    fieldName: "id",
+    alias: null,
+    arguments: null,
   },
   {
     kind: "Linked",
-    fieldName: "potential_new_best_friends",
+    fieldName: "checkins",
     alias: null,
     arguments: null,
     selections: [
@@ -28,7 +27,13 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
       },
       {
         kind: "Scalar",
-        fieldName: "name",
+        fieldName: "location",
+        alias: null,
+        arguments: null,
+      },
+      {
+        kind: "Scalar",
+        fieldName: "time",
         alias: null,
         arguments: null,
       },
@@ -38,10 +43,11 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 
 export type ResolverParameterType = { data:
 {
-  __set_pet_best_friend: Pet____set_pet_best_friend__outputType,
-  potential_new_best_friends: ({
+  id: string,
+  checkins: ({
     id: string,
-    name: string,
+    location: string,
+    time: string,
   })[],
 },
 [index: string]: any };
