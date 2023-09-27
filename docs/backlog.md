@@ -24,8 +24,7 @@
 - The store, etc. should be stored in context.
 - Resolvers return opaque objects and cannot be selected into. They should be extended to also allow the return of IDs, which can they be selected into.
 - Stateful resolvers?
-- Mutations and subscriptions are not supported. In particular, mutations/subscriptions should be made available from within queries.
-- ID field is not automatically selected. (What field to select should be inferred from a directive on the schema.)
+- Subscriptions are not supported, and mutations are supported super inflexibly.
 - Defer, etc.
 - Refetchable queries.
 - Pagination.
@@ -98,8 +97,7 @@
 * Iso lang code mods
 * Iso lang syntax highlighting
 * Iso lang auto-format
-* Separate artifacts for fetching
-* and reading fetchable resolvers
+* Separate artifacts for fetching and reading fetchable resolvers
 * Incremental compilation
 * Saved state
 * Support strict mode?
