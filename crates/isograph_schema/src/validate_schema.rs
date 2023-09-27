@@ -514,9 +514,12 @@ fn validate_field_type_exists_and_is_linked(
             match defined_field_type {
                 DefinedField::ServerField(server_field_name) => {
                     let field_type_id = *schema_data
-                    .defined_types
-                    .get(server_field_name.inner())
-                    .expect("Expected field type to be defined, which I think was validated earlier, probably indicates a bug in Isograph");
+                        .defined_types
+                        .get(server_field_name.inner())
+                        .expect(
+                            "Expected field type to be defined, which I \
+                            think was validated earlier, probably indicates a bug in Isograph",
+                        );
                     match field_type_id {
                         DefinedTypeId::Scalar(_) => Err(
                             ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsScalar {
