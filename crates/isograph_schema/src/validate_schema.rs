@@ -620,7 +620,7 @@ pub enum ValidateSchemaError {
     },
 
     #[error(
-        "The resolver `{resolver_parent_type_name}.{resolver_field_name}` attempts to select `{field_parent_type_name}.{field_name}` as a scalar, but that field's type is `{target_type_name}`, which is {field_type}."
+        "The resolver `{resolver_parent_type_name}.{resolver_field_name}` attempts to select `{field_parent_type_name}.{field_name}` as a linked field, but that field's type is `{target_type_name}`, which is {field_type}."
     )]
     ResolverSelectionFieldIsScalar {
         resolver_parent_type_name: IsographObjectTypeName,
