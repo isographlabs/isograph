@@ -59,7 +59,7 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
 
 #[derive(Error, Debug)]
 pub(crate) enum BatchCompileError {
-    #[error("Unable to load schema file at path {path:?}.\nMessage: {message:?}")]
+    #[error("Unable to load schema file at path {path:?}.\nMessage: {message}")]
     UnableToLoadSchema {
         path: PathBuf,
         message: std::io::Error,
@@ -71,19 +71,19 @@ pub(crate) enum BatchCompileError {
     #[error("The project root at the following path: \"{path:?}\", is not a directory.")]
     ProjectRootNotADirectory { path: PathBuf },
 
-    #[error("Unable to read the file at the following path: {path:?}.\nMessage: {message:?}")]
+    #[error("Unable to read the file at the following path: {path:?}.\nMessage: {message}")]
     UnableToReadFile {
         path: PathBuf,
         message: std::io::Error,
     },
 
-    #[error("Unable to traverse directory.\nMessage: {message:?}")]
+    #[error("Unable to traverse directory.\nMessage: {message}")]
     UnableToTraverseDirectory { message: std::io::Error },
 
-    #[error("Unable to convert schema to string.\nMessage: {message:?}")]
+    #[error("Unable to convert schema to string.\nMessage: {message}")]
     UnableToConvertToString { message: std::str::Utf8Error },
 
-    #[error("Unable to parse schema.\nMessage: {message:?}")]
+    #[error("Unable to parse schema.\nMessage: {message}")]
     UnableToParseSchema {
         message: graphql_lang_parser::SchemaParseError,
     },
@@ -93,27 +93,27 @@ pub(crate) enum BatchCompileError {
         message: isograph_lang_parser::IsographLiteralParseError,
     },
 
-    #[error("Unable to create schema.\nMessage: {message:?}")]
+    #[error("Unable to create schema.\nMessage: {message}")]
     UnableToCreateSchema {
         message: isograph_schema::ProcessTypeDefinitionError,
     },
 
-    #[error("Error when processing resolver declaration.\nMessage: {message:?}")]
+    #[error("Error when processing resolver declaration.\nMessage: {message}")]
     ErrorWhenProcessingResolverDeclaration {
         message: isograph_schema::ProcessResolverDeclarationError,
     },
 
-    #[error("Unable to strip prefix.\nMessage: {message:?}")]
+    #[error("Unable to strip prefix.\nMessage: {message}")]
     UnableToStripPrefix {
         message: std::path::StripPrefixError,
     },
 
-    #[error("Unable to validate schema.\nMessage: {message:?}")]
+    #[error("Unable to validate schema.\nMessage: {message}")]
     UnableToValidateSchema {
         message: isograph_schema::ValidateSchemaError,
     },
 
-    #[error("Unable to print.\nMessage: {message:?}")]
+    #[error("Unable to print.\nMessage: {message}")]
     UnableToPrint { message: GenerateArtifactsError },
 }
 
