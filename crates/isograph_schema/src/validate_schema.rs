@@ -236,8 +236,11 @@ fn validate_resolver_fragment(
                 server_fields,
             )
             .map_err(|err| {
-                // validate_selections_error_to_validate_schema_error(err, parent_type, field)
-                panic!("encountered validate resolver fragment error {:?}", err)
+                validate_selections_error_to_validate_schema_error(
+                    err,
+                    parent_object,
+                    unvalidated_resolver.name,
+                )
             })?;
             Ok(SchemaResolver {
                 description: unvalidated_resolver.description,
@@ -303,17 +306,16 @@ fn validate_variable_definitions(
         .collect()
 }
 
-#[allow(unused)]
 fn validate_selections_error_to_validate_schema_error(
     err: ValidateSelectionsError,
     parent_object: &SchemaObject<UnvalidatedObjectFieldInfo>,
-    field: &SchemaServerField<()>,
+    resolver_field_name: SelectableFieldName,
 ) -> ValidateSchemaError {
     match err {
         ValidateSelectionsError::FieldDoesNotExist(field_parent_type_name, field_name) => {
             ValidateSchemaError::ResolverSelectionFieldDoesNotExist {
                 resolver_parent_type_name: parent_object.name,
-                resolver_field_name: field.name,
+                resolver_field_name,
                 field_parent_type_name,
                 field_name,
             }
@@ -325,7 +327,7 @@ fn validate_selections_error_to_validate_schema_error(
             target_type_name,
         } => ValidateSchemaError::ResolverSelectionFieldIsNotScalar {
             resolver_parent_type_name: parent_object.name,
-            resolver_field_name: field.name,
+            resolver_field_name,
             field_parent_type_name: parent_type_name,
             field_name,
             field_type: target_type,
@@ -338,7 +340,7 @@ fn validate_selections_error_to_validate_schema_error(
             target_type_name,
         } => ValidateSchemaError::ResolverSelectionFieldIsScalar {
             resolver_parent_type_name: parent_object.name,
-            resolver_field_name: field.name,
+            resolver_field_name,
             field_parent_type_name,
             field_name,
             field_type: target_type,
@@ -349,7 +351,7 @@ fn validate_selections_error_to_validate_schema_error(
             field_name,
         } => ValidateSchemaError::ResolverSelectionFieldIsResolver {
             resolver_parent_type_name: parent_object.name,
-            resolver_field_name: field.name,
+            resolver_field_name,
             field_parent_type_name,
             field_name,
         },
