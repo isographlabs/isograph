@@ -10,25 +10,16 @@ use regex::Regex;
 use crate::batch_compile::BatchCompileError;
 
 pub(crate) fn read_files_in_folder(
-    root_js_path: &PathBuf,
+    canonicalized_root_path: &PathBuf,
 ) -> Result<Vec<(PathBuf, String)>, BatchCompileError> {
-    let current_dir = std::env::current_dir().expect("current_dir should exist");
-    let joined = current_dir.join(root_js_path);
-    let canonicalized_existing_path =
-        joined
-            .canonicalize()
-            .map_err(|message| BatchCompileError::UnableToLoadSchema {
-                path: joined.clone(),
-                message,
-            })?;
-
-    if !canonicalized_existing_path.is_dir() {
+    if !canonicalized_root_path.is_dir() {
         return Err(BatchCompileError::ProjectRootNotADirectory {
-            path: canonicalized_existing_path,
+            // TODO avoid cloning
+            path: canonicalized_root_path.clone(),
         });
     }
 
-    read_dir_recursive(&canonicalized_existing_path)?
+    read_dir_recursive(&canonicalized_root_path)?
         .into_iter()
         .map(|path| {
             // This isn't ideal. We can avoid a clone if we changed .map_err to match
@@ -45,7 +36,10 @@ pub(crate) fn read_files_in_folder(
                 .map_err(|message| BatchCompileError::UnableToConvertToString { message })?
                 .to_owned();
 
-            Ok((path.strip_prefix(&joined)?.to_path_buf(), contents))
+            Ok((
+                path.strip_prefix(&canonicalized_root_path)?.to_path_buf(),
+                contents,
+            ))
         })
         .collect()
 }
@@ -84,11 +78,24 @@ lazy_static! {
     static ref EXTRACT_ISO: Regex = Regex::new(r"iso(<[^`]+>)?`([^`]+)`(\()?").unwrap();
 }
 
-pub(crate) fn extract_b_declare_literal_from_file_content(
-    content: &str,
-) -> impl Iterator<Item = (&str, bool)> {
+pub(crate) struct IsoLiteralExtraction<'a> {
+    pub(crate) iso_literal_text: &'a str,
+    pub(crate) iso_literal_start_index: usize,
+    pub(crate) has_associated_js_function: bool,
+}
+
+pub(crate) fn extract_iso_literal_from_file_content<'a>(
+    content: &'a str,
+) -> impl Iterator<Item = IsoLiteralExtraction<'a>> + 'a {
     EXTRACT_ISO
         .captures_iter(content)
         .into_iter()
-        .map(|x| (x.get(2).unwrap().as_str(), x.get(3).is_some()))
+        .map(|captures| {
+            let iso_literal_match = captures.get(2).unwrap();
+            IsoLiteralExtraction {
+                iso_literal_text: iso_literal_match.as_str(),
+                iso_literal_start_index: iso_literal_match.start(),
+                has_associated_js_function: captures.get(3).is_some(),
+            }
+        })
 }

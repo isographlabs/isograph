@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use common_lang_types::{SourceLocationKey, WithLocation};
 use graphql_lang_parser::parse_schema;
 use intern::string_key::Intern;
 use isograph_lang_parser::parse_iso_literal;
@@ -9,7 +10,9 @@ use thiserror::Error;
 
 use crate::{
     generate_artifacts::{generate_artifacts, GenerateArtifactsError},
-    isograph_literals::{extract_b_declare_literal_from_file_content, read_files_in_folder},
+    isograph_literals::{
+        extract_iso_literal_from_file_content, read_files_in_folder, IsoLiteralExtraction,
+    },
     schema::read_schema_file,
 };
 
@@ -33,18 +36,47 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
 
     schema.process_type_system_document(type_system_document)?;
 
+    let canonicalized_root_path = {
+        let current_dir = std::env::current_dir().expect("current_dir should exist");
+        let joined = current_dir.join(&opt.project_root);
+        joined
+            .canonicalize()
+            .map_err(|message| BatchCompileError::UnableToLoadSchema {
+                path: joined.clone(),
+                message,
+            })?
+    };
+
     // TODO return an iterator
-    let project_files = read_files_in_folder(&opt.project_root)?;
+    let project_files = read_files_in_folder(&canonicalized_root_path)?;
     for (file_path, file_content) in project_files {
         // TODO don't intern unless there's a match
         let interned_file_path = file_path.to_string_lossy().into_owned().intern().into();
 
-        let b_declare_literals = extract_b_declare_literal_from_file_content(&file_content);
-        for (b_declare_literal_text, has_associated_js_function) in b_declare_literals {
+        let file_name = canonicalized_root_path
+            .join(file_path)
+            .to_str()
+            .expect("file_path should be a valid string")
+            .intern()
+            .into();
+
+        let iso_literals = extract_iso_literal_from_file_content(&file_content);
+        for extraction in iso_literals {
+            let IsoLiteralExtraction {
+                iso_literal_text,
+                has_associated_js_function,
+                iso_literal_start_index,
+            } = extraction;
+
             let resolver_declaration = parse_iso_literal(
-                &b_declare_literal_text,
+                &iso_literal_text,
                 interned_file_path,
                 has_associated_js_function,
+                SourceLocationKey::Embedded {
+                    path: file_name,
+                    start_index: iso_literal_start_index,
+                    len: iso_literal_text.len(),
+                },
             )?;
             schema.process_resolver_declaration(resolver_declaration)?;
         }
@@ -83,14 +115,14 @@ pub(crate) enum BatchCompileError {
     #[error("Unable to convert schema to string.\nMessage: {message}")]
     UnableToConvertToString { message: std::str::Utf8Error },
 
-    #[error("Unable to parse schema.\nMessage: {message}")]
+    #[error("Unable to parse schema.\n\n{message}")]
     UnableToParseSchema {
         message: graphql_lang_parser::SchemaParseError,
     },
 
-    #[error("Unable to parse isograph literal.\nMessage: {message}")]
+    #[error("Unable to parse isograph literal.\n\n{message}")]
     UnableToParseIsographLiteral {
-        message: isograph_lang_parser::IsographLiteralParseError,
+        message: WithLocation<isograph_lang_parser::IsographLiteralParseError>,
     },
 
     #[error("Unable to create schema.\nMessage: {message}")]
@@ -123,8 +155,8 @@ impl From<graphql_lang_parser::SchemaParseError> for BatchCompileError {
     }
 }
 
-impl From<isograph_lang_parser::IsographLiteralParseError> for BatchCompileError {
-    fn from(value: isograph_lang_parser::IsographLiteralParseError) -> Self {
+impl From<WithLocation<isograph_lang_parser::IsographLiteralParseError>> for BatchCompileError {
+    fn from(value: WithLocation<isograph_lang_parser::IsographLiteralParseError>) -> Self {
         BatchCompileError::UnableToParseIsographLiteral { message: value }
     }
 }

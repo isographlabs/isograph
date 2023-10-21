@@ -109,3 +109,5 @@ string_key_newtype!(FieldArgumentName);
 
 string_key_newtype!(ServerFieldNormalizationKey);
 string_key_conversion!(from: SelectableFieldName, to: ServerFieldNormalizationKey);
+
+string_key_newtype!(SourceFileName);

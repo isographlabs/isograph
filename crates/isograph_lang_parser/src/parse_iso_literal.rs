@@ -1,8 +1,8 @@
 use std::ops::ControlFlow;
 
 use common_lang_types::{
-    ResolverDefinitionPath, SelectableFieldName, Span, StringKeyNewtype, UnvalidatedTypeName,
-    WithSpan,
+    Location, ResolverDefinitionPath, SelectableFieldName, SourceLocationKey, Span,
+    StringKeyNewtype, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation,
@@ -16,29 +16,48 @@ use isograph_lang_types::{
 
 use crate::{
     parse_optional_description, IsographLangTokenKind, IsographLiteralParseError, ParseResult,
-    PeekableLexer,
+    ParseResultWithLocation, PeekableLexer,
 };
+
+fn to_with_location<T>(item: T) -> WithLocation<T> {
+    WithLocation::new(item, Location::generated())
+}
+
+fn with_span_to_with_location<T>(
+    item: WithSpan<T>,
+    source_location: SourceLocationKey,
+) -> WithLocation<T> {
+    WithLocation {
+        location: Location {
+            source_location,
+            span: item.span,
+        },
+        item: item.item,
+    }
+}
 
 pub fn parse_iso_literal(
     b_declare_literal_text: &str,
     definition_file_path: ResolverDefinitionPath,
     has_associated_js_function: bool,
-) -> ParseResult<WithSpan<ResolverDeclaration>> {
+    source_location: SourceLocationKey,
+) -> ParseResultWithLocation<WithSpan<ResolverDeclaration>> {
     let mut tokens = PeekableLexer::new(b_declare_literal_text);
 
     let resolver_declaration = parse_resolver_declaration(
         &mut tokens,
         definition_file_path,
         has_associated_js_function,
-    )?;
+    )
+    .map_err(to_with_location)?;
 
-    if !tokens.reached_eof() {
-        return Err(IsographLiteralParseError::LeftoverTokens {
-            token: tokens.parse_token().item,
-        });
+    if let Some(span) = tokens.remaining_token_span() {
+        return Err(WithLocation::new(
+            IsographLiteralParseError::LeftoverTokens,
+            Location::new(source_location, span),
+        ));
     }
 
-    // dbg!(Ok(resolver_declaration))
     Ok(resolver_declaration)
 }
 

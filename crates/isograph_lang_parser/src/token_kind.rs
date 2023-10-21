@@ -152,7 +152,7 @@ impl fmt::Display for IsographLangTokenKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
             // IsographLangTokenKind::Ampersand => "ampersand ('&')",
-            IsographLangTokenKind::At => "at ('@')",
+            IsographLangTokenKind::At => "at symbol ('@')",
             IsographLangTokenKind::CloseBrace => "closing brace ('}')",
             IsographLangTokenKind::CloseBracket => "closing bracket (']')",
             IsographLangTokenKind::CloseParen => "closing paren (')')",

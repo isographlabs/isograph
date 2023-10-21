@@ -7,6 +7,12 @@ pub struct Span {
     pub end: u32,
 }
 
+impl fmt::Display for Span {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.start, self.end)
+    }
+}
+
 impl From<std::ops::Range<usize>> for Span {
     fn from(range: std::ops::Range<usize>) -> Self {
         Span::from_usize(range.start, range.end)

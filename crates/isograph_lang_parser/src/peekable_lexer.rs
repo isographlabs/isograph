@@ -68,6 +68,15 @@ impl<'source> PeekableLexer<'source> {
         span.with_offset(self.offset)
     }
 
+    pub fn remaining_token_span(&mut self) -> Option<Span> {
+        if self.reached_eof() {
+            None
+        } else {
+            let next_token = self.parse_token();
+            Some(Span::new(next_token.span.start, self.source.len() as u32))
+        }
+    }
+
     pub fn reached_eof(&self) -> bool {
         self.current.item == IsographLangTokenKind::EndOfFile
     }
@@ -94,7 +103,6 @@ impl<'source> PeekableLexer<'source> {
             Err(LowLevelParseError::ParseTokenKindError {
                 expected_kind,
                 found_kind,
-                rest: self.source[(self.lexer_span().end as usize)..].to_string(),
             })
         }
     }
@@ -139,7 +147,6 @@ impl<'source> PeekableLexer<'source> {
             Err(LowLevelParseError::ParseTokenKindError {
                 expected_kind: IsographLangTokenKind::Identifier,
                 found_kind: peeked.item,
-                rest: self.source[(self.lexer_span().end as usize)..].to_string(),
             })
         }
     }
@@ -156,11 +163,10 @@ impl<'source> PeekableLexer<'source> {
 /// about EOF), these would belong in a different crate than the parser itself.
 #[derive(Error, Debug)]
 pub enum LowLevelParseError {
-    #[error("Expected {expected_kind}, found {found_kind}. Rest {rest}")]
+    #[error("Expected {expected_kind}, found {found_kind}.")]
     ParseTokenKindError {
         expected_kind: IsographLangTokenKind,
         found_kind: IsographLangTokenKind,
-        rest: String,
     },
 
     #[error("Expected {expected_identifier}, found \"{found_text}\"")]
