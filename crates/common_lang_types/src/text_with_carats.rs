@@ -9,19 +9,19 @@ enum SpanState {
     After,
 }
 
-/// For a given string (e.g. "A\nB\nC\nD") and span (e.g. 2:3), return a string with
-/// the span underlined with carats and prev/next lines, e.g. "A\nB\n^\nC".
-///
-/// Intended implementation:
-/// - split the string into lines
-/// - find the line containing the start of the span
-/// - for each line overlapping the span,
-/// - create a new string with spaces or carats for each character in the line,
-///   depending on whether the carat is in the span.
-/// - interleave the new strings with the original lines
+static LINE_COUNT_BUFFER: usize = 3;
+
+/// For a given string and span, return a string with
+/// the span underlined with carats and LINE_COUNT_BUFFER previous and following
+/// lines.
 pub(crate) fn text_with_carats(text: &str, span: Span) -> String {
     let mut output_lines = vec![];
     let mut cur_index = 0;
+
+    // index of the line (in output_lines) of **source text** in which the span starts
+    let mut first_line_with_span = usize::MAX;
+    // index of the line (in output_lines) of **carat text** in which the span ends
+    let mut last_line_with_span = 0;
 
     let mut span_state = SpanState::Before;
     for line_content in text.split("\n").into_iter() {
@@ -64,6 +64,12 @@ pub(crate) fn text_with_carats(text: &str, span: Span) -> String {
             // a line may be entirely empty, due to containing only a \n. We probably want to avoid
             // printing an empty line underneath. This is weird and probably buggy!
             if start_of_carats != line_len && end_of_carats != 0 {
+                // -1 is safe, since we have just pushed to output_lines
+                first_line_with_span = std::cmp::min(first_line_with_span, output_lines.len()) - 1;
+                // add +1 because we want the index of the line containing the carats, not the
+                // source text, and because ranges are exclusive on the end
+                last_line_with_span = output_lines.len() + 1;
+
                 let mut carats = String::new();
                 for _ in 0..start_of_carats {
                     carats.push(' ');
@@ -80,5 +86,12 @@ pub(crate) fn text_with_carats(text: &str, span: Span) -> String {
         }
     }
 
-    output_lines.join("\n")
+    // Which output lines do we care about? We would like:
+    // - the source line containing the start of the span and LINE_COUNT_BUFFER earlier lines
+    // - the carat line containing the end of the span and LINE_COUNT_BUFFER later lines
+    // - everything in between
+
+    output_lines[(first_line_with_span.saturating_sub(LINE_COUNT_BUFFER))
+        ..(std::cmp::min(last_line_with_span + LINE_COUNT_BUFFER, output_lines.len()))]
+        .join("\n")
 }
