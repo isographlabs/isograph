@@ -36,7 +36,7 @@ impl UnvalidatedSchema {
                 let scalar_name = self.schema_data.scalars[scalar_id.as_usize()].name;
                 return Err(ProcessResolverDeclarationError::InvalidParentType {
                     parent_type: "scalar",
-                    parent_type_name: scalar_name.into(),
+                    parent_type_name: scalar_name.item.into(),
                 });
             }
         }

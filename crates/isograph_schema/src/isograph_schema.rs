@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use common_lang_types::{
     DescriptionValue, FieldArgumentName, HasName, InputTypeName, InterfaceTypeName,
     IsographObjectTypeName, JavascriptName, LinkedFieldName, ResolverDefinitionPath,
-    ScalarTypeName, SelectableFieldName, UnvalidatedTypeName, WithSpan,
+    ScalarTypeName, SelectableFieldName, Span, UnvalidatedTypeName, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, Directive, InputValueDefinition, InterfaceTypeDefinition, NamedTypeAnnotation,
@@ -302,14 +302,20 @@ fn add_schema_defined_scalar_type(
 ) -> ScalarId {
     let scalar_id = scalars.len().into();
 
-    let typename = field_name.intern().into();
+    // TODO this is problematic, we have no span (or really, no location) associated with this
+    // schema-defined scalar, so we will not be able to properly show error messages if users
+    // e.g. have Foo implements String
+    let typename = WithSpan::new(field_name.intern().into(), Span::todo_generated());
     scalars.push(SchemaScalar {
         description: None,
         name: typename,
         id: scalar_id,
         javascript_name,
     });
-    defined_types.insert(typename.into(), DefinedTypeId::Scalar(scalar_id.into()));
+    defined_types.insert(
+        typename.item.into(),
+        DefinedTypeId::Scalar(scalar_id.into()),
+    );
     scalar_id
 }
 
@@ -339,7 +345,7 @@ impl<'a> HasName for SchemaInputType<'a> {
 
     fn name(&self) -> Self::Name {
         match self {
-            SchemaInputType::Scalar(x) => (x.name).into(),
+            SchemaInputType::Scalar(x) => x.name.item.into(),
         }
     }
 }
@@ -602,9 +608,8 @@ impl<T> SchemaServerField<T> {
 /// A scalar type in the schema.
 #[derive(Debug)]
 pub struct SchemaScalar {
-    pub description: Option<DescriptionValue>,
-    pub name: ScalarTypeName,
+    pub description: Option<WithSpan<DescriptionValue>>,
+    pub name: WithSpan<ScalarTypeName>,
     pub id: ScalarId,
     pub javascript_name: JavascriptName,
-    // pub directives: Vec<Directive<ConstantValue>>,
 }

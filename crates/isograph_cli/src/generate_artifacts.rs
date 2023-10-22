@@ -172,13 +172,13 @@ fn get_artifact_for_mutation_field<'schema>(
             })
             .chain(std::iter::once(WithSpan::new(
                 SelectionFieldArgument {
-                    name: WithSpan::new("id".intern().into(), Span::new(0, 0)),
+                    name: WithSpan::new("id".intern().into(), Span::todo_generated()),
                     value: WithSpan::new(
                         NonConstantValue::Variable("id".intern().into()),
-                        Span::new(0, 0),
+                        Span::todo_generated(),
                     ),
                 },
-                Span::new(0, 0),
+                Span::todo_generated(),
             )))
             .collect::<Vec<_>>(),
         1,
@@ -241,15 +241,15 @@ fn generate_refetchable_query_text<'schema>(
 
     variable_definitions.push(WithSpan {
         item: VariableDefinition {
-            name: WithSpan::new("id".intern().into(), Span::new(0, 0)),
+            name: WithSpan::new("id".intern().into(), Span::todo_generated()),
             type_: TypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
                 NamedTypeAnnotation(WithSpan {
                     item: InputTypeId::Scalar(schema.id_type_id),
-                    span: Span::new(0, 0),
+                    span: Span::todo_generated(),
                 }),
             ))),
         },
-        span: Span::new(0, 0),
+        span: Span::todo_generated(),
     });
     let variable_text = write_variables_to_string(schema, variable_definitions.iter());
 
@@ -274,18 +274,18 @@ fn generate_mutation_query_text<'schema>(
 ) -> QueryText {
     let mut query_text = String::new();
 
-    let id_variable_name = WithSpan::new("id".intern().into(), Span::new(0, 0));
+    let id_variable_name = WithSpan::new("id".intern().into(), Span::todo_generated());
     variable_definitions.push(WithSpan {
         item: VariableDefinition {
             name: id_variable_name,
             type_: TypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
                 NamedTypeAnnotation(WithSpan {
                     item: InputTypeId::Scalar(schema.id_type_id),
-                    span: Span::new(0, 0),
+                    span: Span::todo_generated(),
                 }),
             ))),
         },
-        span: Span::new(0, 0),
+        span: Span::todo_generated(),
     });
 
     let mutation_parameters: Vec<_> = mutation_field_arguments
@@ -308,22 +308,22 @@ fn generate_mutation_query_text<'schema>(
                             )
                     }),
                 },
-                span: Span::new(0, 0),
+                span: Span::todo_generated(),
             });
             WithSpan::new(
                 SelectionFieldArgument {
                     name: argument.item.name.map(|x| x.into()),
                     value: variable_name.map(|x| NonConstantValue::Variable(x)),
                 },
-                Span::new(0, 0),
+                Span::todo_generated(),
             )
         })
         .chain(std::iter::once(WithSpan::new(
             SelectionFieldArgument {
-                name: WithSpan::new("id".intern().into(), Span::new(0, 0)),
+                name: WithSpan::new("id".intern().into(), Span::todo_generated()),
                 value: id_variable_name.map(NonConstantValue::Variable),
             },
-            Span::new(0, 0),
+            Span::todo_generated(),
         )))
         .collect();
 

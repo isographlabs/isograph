@@ -24,6 +24,12 @@ impl Span {
         Span { start, end }
     }
 
+    pub fn todo_generated() -> Self {
+        // Calling this indicates we have no actual span, which is indicative of
+        // poor modeling.
+        Span::new(0, 0)
+    }
+
     pub fn with_offset(self, offset: u32) -> Self {
         Self::new(self.start + offset, self.end + offset)
     }

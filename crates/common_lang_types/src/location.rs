@@ -10,6 +10,7 @@ pub enum SourceLocationKey {
     /// A source embedded within a file. The index is the starting character
     /// of the embedded source within the file.
     Embedded {
+        // TODO include a span here
         path: SourceFileName,
         start_index: usize,
         len: usize,
@@ -46,7 +47,7 @@ impl Location {
     pub fn generated() -> Self {
         Location {
             source_location: SourceLocationKey::generated(),
-            span: Span::new(0, 0),
+            span: Span::todo_generated(),
         }
     }
 

@@ -147,7 +147,7 @@ impl UnvalidatedSchema {
                     schema_fields.len(),
                     next_object_id,
                     type_def_2.name.item.into(),
-                    get_typename_type(string_type_for_typename),
+                    get_typename_type(string_type_for_typename.item),
                 )?;
 
                 let object_resolvers = get_resolvers_for_schema_object(
@@ -222,8 +222,8 @@ impl UnvalidatedSchema {
             }
             Entry::Vacant(vacant) => {
                 scalars.push(SchemaScalar {
-                    description: scalar_type_definition.description.map(|d| d.item),
-                    name: scalar_type_definition.name.item,
+                    description: scalar_type_definition.description,
+                    name: scalar_type_definition.name,
                     id: next_scalar_id,
                     javascript_name: *STRING_JAVASCRIPT_TYPE,
                 });
@@ -280,7 +280,7 @@ impl UnvalidatedSchema {
                 let id_field_selection = WithSpan::new(
                     Selection::ServerField(ServerFieldSelection::ScalarField(
                         ScalarFieldSelection {
-                            name: WithSpan::new("id".intern().into(), Span::new(0, 0)),
+                            name: WithSpan::new("id".intern().into(), Span::todo_generated()),
                             reader_alias: None,
                             normalization_alias: None,
                             associated_data: (),
@@ -288,7 +288,7 @@ impl UnvalidatedSchema {
                             arguments: vec![],
                         },
                     )),
-                    Span::new(0, 0),
+                    Span::todo_generated(),
                 );
 
                 self.resolvers.push(SchemaResolver {
@@ -302,7 +302,7 @@ impl UnvalidatedSchema {
                             mutation_response_primary_field_name,
                             mutation_field_args,
                         )),
-                        Span::new(0, 0),
+                        Span::todo_generated(),
                     )),
                     variable_definitions: vec![],
                     type_and_field: ResolverTypeAndField {
@@ -452,14 +452,14 @@ fn get_resolvers_for_schema_object(
         let next_resolver_id = schema_resolvers.len().into();
         let id_field_selection = WithSpan::new(
             Selection::ServerField(ServerFieldSelection::ScalarField(ScalarFieldSelection {
-                name: WithSpan::new("id".intern().into(), Span::new(0, 0)),
+                name: WithSpan::new("id".intern().into(), Span::todo_generated()),
                 reader_alias: None,
                 normalization_alias: None,
                 associated_data: (),
                 unwraps: vec![],
                 arguments: vec![],
             })),
-            Span::new(0, 0),
+            Span::todo_generated(),
         );
         schema_resolvers.push(SchemaResolver {
             description: Some("A refetch field for this object.".intern().into()),
@@ -468,7 +468,7 @@ fn get_resolvers_for_schema_object(
             selection_set_and_unwraps: Some((vec![id_field_selection], vec![])),
             variant: Some(WithSpan::new(
                 ResolverVariant::RefetchField,
-                Span::new(0, 0),
+                Span::todo_generated(),
             )),
             variable_definitions: vec![],
             type_and_field: ResolverTypeAndField {
@@ -498,7 +498,7 @@ fn get_typename_type(
         WithSpan::new(
             string_type_for_typename.into(),
             // TODO we probably need a generated or built-in span type
-            Span::new(0, 0),
+            Span::todo_generated(),
         ),
     ))))
 }

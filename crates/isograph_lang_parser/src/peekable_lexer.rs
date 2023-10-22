@@ -22,7 +22,7 @@ impl<'source> PeekableLexer<'source> {
         // value to construct the Parser, then immediately advance()s to move to the
         // first real token.
         let lexer = IsographLangTokenKind::lexer(source);
-        let dummy = WithSpan::new(IsographLangTokenKind::EndOfFile, Span::new(0, 0));
+        let dummy = WithSpan::new(IsographLangTokenKind::EndOfFile, Span::todo_generated());
 
         let mut parser = PeekableLexer {
             current: dummy,

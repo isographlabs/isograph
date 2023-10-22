@@ -684,13 +684,13 @@ fn select_typename_and_id_fields_in_merged_selection(
                         // major HACK alert
                         name: WithSpan::new(
                             id_field.name.lookup().intern().into(),
-                            Span::new(0, 0),
+                            Span::todo_generated(),
                         ),
                         arguments: vec![],
                         // This indicates that there should be a separate MergedServerFieldSelection variant
                         normalization_alias: None,
                     }),
-                    Span::new(0, 0),
+                    Span::todo_generated(),
                 ));
             }
         }
