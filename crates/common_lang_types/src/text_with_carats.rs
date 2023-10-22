@@ -15,6 +15,11 @@ static LINE_COUNT_BUFFER: usize = 3;
 /// the span underlined with carats and LINE_COUNT_BUFFER previous and following
 /// lines.
 pub(crate) fn text_with_carats(text: &str, span: Span) -> String {
+    // Major hack alert
+    if span.is_empty() {
+        return "".to_string();
+    }
+
     let mut output_lines = vec![];
     let mut cur_index = 0;
 

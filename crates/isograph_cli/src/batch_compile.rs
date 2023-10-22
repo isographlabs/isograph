@@ -46,7 +46,21 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
     })?;
     let mut schema = Schema::new();
 
-    schema.process_type_system_document(type_system_document)?;
+    schema
+        .process_type_system_document(type_system_document)
+        .map_err(|e| {
+            WithLocation::new(
+                e.item,
+                Location::new(
+                    SourceLocationKey::Embedded {
+                        path: opt.schema.to_str().unwrap().intern().into(),
+                        start_index: 0,
+                        len: content.len(),
+                    },
+                    e.span,
+                ),
+            )
+        })?;
 
     let canonicalized_root_path = {
         let current_dir = std::env::current_dir().expect("current_dir should exist");
@@ -139,7 +153,7 @@ pub(crate) enum BatchCompileError {
 
     #[error("Unable to create schema.\nMessage: {message}")]
     UnableToCreateSchema {
-        message: isograph_schema::ProcessTypeDefinitionError,
+        message: WithLocation<isograph_schema::ProcessTypeDefinitionError>,
     },
 
     #[error("Error when processing resolver declaration.\nMessage: {message}")]
@@ -173,8 +187,8 @@ impl From<WithLocation<IsographLiteralParseError>> for BatchCompileError {
     }
 }
 
-impl From<isograph_schema::ProcessTypeDefinitionError> for BatchCompileError {
-    fn from(value: isograph_schema::ProcessTypeDefinitionError) -> Self {
+impl From<WithLocation<isograph_schema::ProcessTypeDefinitionError>> for BatchCompileError {
+    fn from(value: WithLocation<isograph_schema::ProcessTypeDefinitionError>) -> Self {
         BatchCompileError::UnableToCreateSchema { message: value }
     }
 }

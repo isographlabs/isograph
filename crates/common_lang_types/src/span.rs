@@ -30,6 +30,10 @@ impl Span {
         Span::new(0, 0)
     }
 
+    pub fn is_empty(&self) -> bool {
+        return self.start == 0 && self.end == 0;
+    }
+
     pub fn with_offset(self, offset: u32) -> Self {
         Self::new(self.start + offset, self.end + offset)
     }

@@ -70,22 +70,37 @@ impl UnvalidatedSchema {
         }
 
         for (supertype_name, subtypes) in valid_type_refinement_map {
+            // TODO perhaps encode this in the type system
+            let first_item = subtypes
+                .first()
+                .expect("subtypes should not be empty. This indicates a bug in Isograph");
+
             // supertype, if it exists, can be refined to each subtype
             let supertype_id = self
                 .schema_data
                 .defined_types
                 .get(&supertype_name.into())
-                .ok_or(
+                .ok_or(WithSpan::new(
                     ProcessTypeDefinitionError::IsographObjectTypeNameNotDefined {
                         type_name: supertype_name,
                     },
-                )?;
+                    // TODO look up the first_item, get the matching implementing object, and
+                    // use that instead.
+                    first_item.span,
+                ))?;
 
             match supertype_id {
-                DefinedTypeId::Scalar(_) => {
-                    return Err(ProcessTypeDefinitionError::IsographObjectTypeNameIsScalar {
-                        type_name: supertype_name,
-                    })
+                DefinedTypeId::Scalar(scalar_id) => {
+                    let scalar = self.schema_data.scalar(*scalar_id);
+                    let first_implementing_object = self.schema_data.object(first_item.item);
+
+                    return Err(WithSpan::new(
+                        ProcessTypeDefinitionError::IsographObjectTypeNameIsScalar {
+                            type_name: supertype_name,
+                            implementing_object: first_implementing_object.name,
+                        },
+                        scalar.name.span,
+                    ));
                 }
                 DefinedTypeId::Object(object_id) => {
                     let supertype = self.schema_data.object_mut(*object_id);
@@ -96,9 +111,9 @@ impl UnvalidatedSchema {
                     // putting the code here.)
 
                     for subtype_id in subtypes {
-                        supertype
-                            .valid_refinements
-                            .push(ValidRefinement { target: subtype_id });
+                        supertype.valid_refinements.push(ValidRefinement {
+                            target: subtype_id.item,
+                        });
                     }
                 }
             }
@@ -114,7 +129,7 @@ impl UnvalidatedSchema {
     fn process_object_type_definition(
         &mut self,
         type_definition: IsographObjectTypeDefinition,
-        valid_type_refinement_map: &mut HashMap<IsographObjectTypeName, Vec<ObjectId>>,
+        valid_type_refinement_map: &mut HashMap<IsographObjectTypeName, Vec<WithSpan<ObjectId>>>,
     ) -> ProcessTypeDefinitionResult<Option<ObjectId>> {
         let &mut Schema {
             fields: ref mut schema_fields,
@@ -129,10 +144,13 @@ impl UnvalidatedSchema {
         let mut mutation_id = None;
         match type_names.entry(type_definition.name.item.into()) {
             Entry::Occupied(_) => {
-                return Err(ProcessTypeDefinitionError::DuplicateTypeDefinition {
-                    type_definition_type: "object",
-                    type_name: type_definition.name.item.into(),
-                });
+                return Err(WithSpan::new(
+                    ProcessTypeDefinitionError::DuplicateTypeDefinition {
+                        type_definition_type: "object",
+                        type_name: type_definition.name.item.into(),
+                    },
+                    type_definition.name.span,
+                ));
             }
             Entry::Vacant(vacant) => {
                 // TODO avoid this
@@ -196,7 +214,7 @@ impl UnvalidatedSchema {
             let definitions = valid_type_refinement_map
                 .entry(interface.item.into())
                 .or_default();
-            definitions.push(next_object_id);
+            definitions.push(WithSpan::new(next_object_id, type_definition.name.span));
         }
 
         Ok(mutation_id)
@@ -215,10 +233,13 @@ impl UnvalidatedSchema {
         let ref mut scalars = schema_data.scalars;
         match type_names.entry(scalar_type_definition.name.item.into()) {
             Entry::Occupied(_) => {
-                return Err(ProcessTypeDefinitionError::DuplicateTypeDefinition {
-                    type_definition_type: "object",
-                    type_name: scalar_type_definition.name.item.into(),
-                });
+                return Err(WithSpan::new(
+                    ProcessTypeDefinitionError::DuplicateTypeDefinition {
+                        type_definition_type: "scalar",
+                        type_name: scalar_type_definition.name.item.into(),
+                    },
+                    scalar_type_definition.name.span,
+                ));
             }
             Entry::Vacant(vacant) => {
                 scalars.push(SchemaScalar {
@@ -322,10 +343,14 @@ impl UnvalidatedSchema {
                     )
                     .is_some()
                 {
-                    return Err(ProcessTypeDefinitionError::DuplicateField {
-                        field_name: magic_mutation_field_name,
-                        parent_type: parent_object.name,
-                    });
+                    return Err(WithSpan::new(
+                        ProcessTypeDefinitionError::MutationFieldIsDuplicate {
+                            field_name: magic_mutation_field_name,
+                            parent_type: parent_object.name,
+                        },
+                        // TODO we should have a span for the original field, at least
+                        Span::todo_generated(),
+                    ));
                 }
 
                 parent_object.resolvers.push(next_resolver_id);
@@ -556,10 +581,13 @@ fn get_field_objects_ids_and_names(
                 field_ids.push(current_field_id.into());
             }
             Some(_) => {
-                return Err(ProcessTypeDefinitionError::DuplicateField {
-                    field_name: field.item.name.item,
-                    parent_type: parent_type_name,
-                });
+                return Err(WithSpan::new(
+                    ProcessTypeDefinitionError::DuplicateField {
+                        field_name: field.item.name.item,
+                        parent_type: parent_type_name,
+                    },
+                    field.item.name.span,
+                ));
             }
         }
     }
@@ -581,13 +609,18 @@ fn get_field_objects_ids_and_names(
         parent_type_id,
         arguments: vec![],
     });
+
     if encountered_fields
         .insert(typename_name, DefinedField::ServerField(typename_type))
         .is_some()
     {
-        return Err(ProcessTypeDefinitionError::TypenameCannotBeDefined {
-            parent_type: parent_type_name,
-        });
+        return Err(WithSpan::new(
+            ProcessTypeDefinitionError::TypenameCannotBeDefined {
+                parent_type: parent_type_name,
+            },
+            // TODO we should have a span for the previous field, somehow
+            Span::todo_generated(),
+        ));
     }
     // ----- END HACK -----
 
@@ -619,43 +652,68 @@ fn set_and_validate_id_field(
     match field.item.type_.inner_non_null_named_type() {
         Some(type_) => {
             if (*type_).0.item.lookup() != ID_GRAPHQL_TYPE.lookup() {
-                Err(ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {
-                    parent_type: parent_type_name,
-                })
+                Err(WithSpan::new(
+                    ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {
+                        parent_type: parent_type_name,
+                    },
+                    // TODO this shows the wrong span?
+                    field.span,
+                ))
             } else {
                 Ok(())
             }
         }
-        None => Err(ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {
-            parent_type: parent_type_name,
-        }),
+        None => Err(WithSpan::new(
+            ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {
+                parent_type: parent_type_name,
+            },
+            // TODO this shows the wrong span?
+            field.span,
+        )),
     }
 }
 
-type ProcessTypeDefinitionResult<T> = Result<T, ProcessTypeDefinitionError>;
+type ProcessTypeDefinitionResult<T> = Result<T, WithSpan<ProcessTypeDefinitionError>>;
 
 /// Errors that make semantic sense when referring to creating a GraphQL schema in-memory representation
 #[derive(Error, Debug)]
 pub enum ProcessTypeDefinitionError {
+    // TODO include info about where the type was previously defined
+    // TODO the type_definition_name refers to the second object being defined, which isn't
+    // all that helpful
     #[error("Duplicate type definition ({type_definition_type}) named \"{type_name}\"")]
     DuplicateTypeDefinition {
         type_definition_type: &'static str,
         type_name: UnvalidatedTypeName,
     },
 
+    // TODO include info about where the field was previously defined
     #[error("Duplicate field named \"{field_name}\" on type \"{parent_type}\"")]
     DuplicateField {
         field_name: SelectableFieldName,
         parent_type: IsographObjectTypeName,
     },
 
+    #[error("Due to a mutation, Isograph attempted to create a field named \"{field_name}\" on type \"{parent_type}\", but a field with that name already exists.")]
+    MutationFieldIsDuplicate {
+        field_name: SelectableFieldName,
+        parent_type: IsographObjectTypeName,
+    },
+
+    // TODO
+    // This is held in a span pointing to one place the non-existent type was referenced.
+    // We should perhaps include info about all the places it was referenced.
+    //
     // When type Foo implements Bar and Bar is not defined:
     #[error("Type \"{type_name}\" is never defined.")]
     IsographObjectTypeNameNotDefined { type_name: IsographObjectTypeName },
 
     // When type Foo implements Bar and Bar is scalar
-    #[error("Type \"{type_name}\" is a scalar, but it should be an object type.")]
-    IsographObjectTypeNameIsScalar { type_name: IsographObjectTypeName },
+    #[error("\"{implementing_object}\" attempted to implement \"{type_name}\". However, \"{type_name}\" is a scalar, but only other object types can be implemented.")]
+    IsographObjectTypeNameIsScalar {
+        type_name: IsographObjectTypeName,
+        implementing_object: IsographObjectTypeName,
+    },
 
     #[error(
         "You cannot manually defined the \"__typename\" field, which is defined in \"{parent_type}\"."

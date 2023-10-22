@@ -357,6 +357,7 @@ pub struct IsographObjectTypeDefinition {
     // maybe this should be Vec<WithSpan<IsographObjectTypeName>>>
     pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
     pub directives: Vec<Directive<ConstantValue>>,
+    // TODO the spans of these fields are wrong
     pub fields: Vec<WithSpan<OutputFieldDefinition>>,
 }
 
