@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use crate::batch_compile::BatchCompileError;
 
 /// Read schema file
-pub(crate) fn read_schema_file(path: PathBuf) -> Result<String, BatchCompileError> {
+pub(crate) fn read_schema_file(path: &PathBuf) -> Result<String, BatchCompileError> {
     let current_dir = std::env::current_dir().expect("current_dir should exist");
     let joined = current_dir.join(path);
     let canonicalized_existing_path =

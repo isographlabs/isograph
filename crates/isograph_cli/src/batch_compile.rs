@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
-use common_lang_types::{SourceLocationKey, WithLocation};
-use graphql_lang_parser::parse_schema;
+use common_lang_types::{Location, SourceLocationKey, WithLocation};
+use graphql_lang_parser::{parse_schema, SchemaParseError};
 use intern::string_key::Intern;
-use isograph_lang_parser::parse_iso_literal;
+use isograph_lang_parser::{parse_iso_literal, IsographLiteralParseError};
 use isograph_schema::Schema;
 use structopt::StructOpt;
 use thiserror::Error;
@@ -30,8 +30,20 @@ pub(crate) struct BatchCompileCliOptions {
 }
 
 pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), BatchCompileError> {
-    let content = read_schema_file(opt.schema)?;
-    let type_system_document = parse_schema(&content)?;
+    let content = read_schema_file(&opt.schema)?;
+    let type_system_document = parse_schema(&content).map_err(|e| {
+        WithLocation::new(
+            e.item,
+            Location::new(
+                SourceLocationKey::Embedded {
+                    path: opt.schema.to_str().unwrap().intern().into(),
+                    start_index: 0,
+                    len: content.len(),
+                },
+                e.span,
+            ),
+        )
+    })?;
     let mut schema = Schema::new();
 
     schema.process_type_system_document(type_system_document)?;
@@ -117,12 +129,12 @@ pub(crate) enum BatchCompileError {
 
     #[error("Unable to parse schema.\n\n{message}")]
     UnableToParseSchema {
-        message: graphql_lang_parser::SchemaParseError,
+        message: WithLocation<SchemaParseError>,
     },
 
     #[error("Unable to parse isograph literal.\n\n{message}")]
     UnableToParseIsographLiteral {
-        message: WithLocation<isograph_lang_parser::IsographLiteralParseError>,
+        message: WithLocation<IsographLiteralParseError>,
     },
 
     #[error("Unable to create schema.\nMessage: {message}")]
@@ -149,14 +161,14 @@ pub(crate) enum BatchCompileError {
     UnableToPrint { message: GenerateArtifactsError },
 }
 
-impl From<graphql_lang_parser::SchemaParseError> for BatchCompileError {
-    fn from(value: graphql_lang_parser::SchemaParseError) -> Self {
+impl From<WithLocation<SchemaParseError>> for BatchCompileError {
+    fn from(value: WithLocation<SchemaParseError>) -> Self {
         BatchCompileError::UnableToParseSchema { message: value }
     }
 }
 
-impl From<WithLocation<isograph_lang_parser::IsographLiteralParseError>> for BatchCompileError {
-    fn from(value: WithLocation<isograph_lang_parser::IsographLiteralParseError>) -> Self {
+impl From<WithLocation<IsographLiteralParseError>> for BatchCompileError {
+    fn from(value: WithLocation<IsographLiteralParseError>) -> Self {
         BatchCompileError::UnableToParseIsographLiteral { message: value }
     }
 }

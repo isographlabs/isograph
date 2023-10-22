@@ -21,7 +21,6 @@ use super::{
 pub fn parse_schema(source: &str) -> ParseResult<TypeSystemDocument> {
     let mut tokens = PeekableLexer::new(source);
 
-    // dbg!(parse_type_system_document(&mut tokens))
     parse_type_system_document(&mut tokens)
 }
 
@@ -36,7 +35,9 @@ fn parse_type_system_document(tokens: &mut PeekableLexer) -> ParseResult<TypeSys
 
 fn parse_type_system_definition(tokens: &mut PeekableLexer) -> ParseResult<TypeSystemDefinition> {
     let description = parse_optional_description(tokens);
-    let identifier = tokens.parse_token_of_kind(TokenKind::Identifier)?;
+    let identifier = tokens
+        .parse_token_of_kind(TokenKind::Identifier)
+        .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?;
     let identifier_source = tokens.source(identifier.span);
 
     match identifier_source {
@@ -47,9 +48,12 @@ fn parse_type_system_definition(tokens: &mut PeekableLexer) -> ParseResult<TypeS
         "interface" => {
             parse_interface_type_definition(tokens, description).map(TypeSystemDefinition::from)
         }
-        _ => Err(SchemaParseError::TopLevelSchemaDeclarationExpected {
-            found_text: identifier_source.to_string(),
-        }),
+        _ => Err(WithSpan::new(
+            SchemaParseError::TopLevelSchemaDeclarationExpected {
+                found_text: identifier_source.to_string(),
+            },
+            identifier.span,
+        )),
     }
 }
 
@@ -58,7 +62,9 @@ fn parse_object_type_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
 ) -> ParseResult<ObjectTypeDefinition> {
-    let name = tokens.parse_string_key_type(TokenKind::Identifier)?;
+    let name = tokens
+        .parse_string_key_type(TokenKind::Identifier)
+        .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?;
 
     let interfaces = parse_implements_interfaces_if_present(tokens)?;
     let directives = parse_constant_directives(tokens)?;
@@ -78,7 +84,9 @@ fn parse_interface_type_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
 ) -> ParseResult<InterfaceTypeDefinition> {
-    let name = tokens.parse_string_key_type(TokenKind::Identifier)?;
+    let name = tokens
+        .parse_string_key_type(TokenKind::Identifier)
+        .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?;
 
     let interfaces = parse_implements_interfaces_if_present(tokens)?;
     let directives = parse_constant_directives(tokens)?;
@@ -98,7 +106,9 @@ fn parse_scalar_type_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
 ) -> ParseResult<ScalarTypeDefinition> {
-    let name = tokens.parse_string_key_type(TokenKind::Identifier)?;
+    let name = tokens
+        .parse_string_key_type(TokenKind::Identifier)
+        .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?;
 
     let directives = parse_constant_directives(tokens)?;
 
@@ -133,12 +143,18 @@ fn parse_implements_interfaces_if_present(
 fn parse_interfaces(tokens: &mut PeekableLexer) -> ParseResult<Vec<WithSpan<InterfaceTypeName>>> {
     let _optional_ampersand = tokens.parse_token_of_kind(TokenKind::Ampersand);
 
-    let first_interface = tokens.parse_string_key_type(TokenKind::Identifier)?;
+    let first_interface = tokens
+        .parse_string_key_type(TokenKind::Identifier)
+        .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?;
 
     let mut interfaces = vec![first_interface];
 
     while tokens.parse_token_of_kind(TokenKind::Ampersand).is_ok() {
-        interfaces.push(tokens.parse_string_key_type(TokenKind::Identifier)?);
+        interfaces.push(
+            tokens
+                .parse_string_key_type(TokenKind::Identifier)
+                .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?,
+        );
     }
 
     Ok(interfaces)
@@ -150,7 +166,9 @@ fn parse_constant_directives(
     let mut directives = vec![];
     while tokens.parse_token_of_kind(TokenKind::At).is_ok() {
         directives.push(Directive {
-            name: tokens.parse_string_key_type(TokenKind::Identifier)?,
+            name: tokens
+                .parse_string_key_type(TokenKind::Identifier)
+                .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?,
             arguments: parse_optional_constant_arguments(tokens)?,
         })
     }
@@ -184,8 +202,12 @@ fn parse_constant_name_value_pair<T: From<StringKey>, TValue: ValueType>(
     tokens: &mut PeekableLexer,
     parse_value: impl Fn(&mut PeekableLexer) -> ParseResult<WithSpan<TValue>>,
 ) -> ParseResult<NameValuePair<T, TValue>> {
-    let name = tokens.parse_string_key_type(TokenKind::Identifier)?;
-    tokens.parse_token_of_kind(TokenKind::Colon)?;
+    let name = tokens
+        .parse_string_key_type(TokenKind::Identifier)
+        .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?;
+    tokens
+        .parse_token_of_kind(TokenKind::Colon)
+        .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?;
     let value = parse_value(tokens)?;
 
     Ok(NameValuePair { name, value })
@@ -196,14 +218,17 @@ fn parse_constant_value(tokens: &mut PeekableLexer) -> ParseResult<WithSpan<Cons
         to_control_flow(|| {
             tokens
                 .parse_source_of_kind(TokenKind::IntegerLiteral)
-                .map_err(|x| x.into())
+                .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))
                 .and_then(|int_literal_string| {
                     int_literal_string.and_then(|raw_int_value| {
                         match raw_int_value.parse::<i64>() {
                             Ok(value) => Ok(ConstantValue::Int(value)),
-                            Err(_) => Err(SchemaParseError::InvalidIntValue {
-                                text: raw_int_value.to_string(),
-                            }),
+                            Err(_) => Err(WithSpan::new(
+                                SchemaParseError::InvalidIntValue {
+                                    text: raw_int_value.to_string(),
+                                },
+                                int_literal_string.span,
+                            )),
                         }
                     })
                 })
@@ -212,14 +237,17 @@ fn parse_constant_value(tokens: &mut PeekableLexer) -> ParseResult<WithSpan<Cons
         to_control_flow(|| {
             tokens
                 .parse_source_of_kind(TokenKind::FloatLiteral)
-                .map_err(|x| x.into())
+                .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))
                 .and_then(|float_literal_string| {
                     float_literal_string.and_then(|raw_float_value| {
                         match raw_float_value.parse::<f64>() {
                             Ok(value) => Ok(ConstantValue::Float(value.into())),
-                            Err(_) => Err(SchemaParseError::InvalidFloatValue {
-                                text: raw_float_value.to_string(),
-                            }),
+                            Err(_) => Err(WithSpan::new(
+                                SchemaParseError::InvalidFloatValue {
+                                    text: raw_float_value.to_string(),
+                                },
+                                float_literal_string.span,
+                            )),
                         }
                     })
                 })
@@ -259,7 +287,9 @@ fn parse_constant_value(tokens: &mut PeekableLexer) -> ParseResult<WithSpan<Cons
         to_control_flow(|| {
             let x: ParseResult<_> = tokens
                 .with_span(|tokens| {
-                    tokens.parse_token_of_kind(TokenKind::OpenBracket)?;
+                    tokens
+                        .parse_token_of_kind(TokenKind::OpenBracket)
+                        .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?;
                     let mut values = vec![];
                     while tokens.parse_token_of_kind(TokenKind::CloseBracket).is_err() {
                         values.push(parse_constant_value(tokens)?);
@@ -273,11 +303,17 @@ fn parse_constant_value(tokens: &mut PeekableLexer) -> ParseResult<WithSpan<Cons
         to_control_flow(|| {
             let x: ParseResult<_> = tokens
                 .with_span(|tokens| {
-                    tokens.parse_token_of_kind(TokenKind::OpenBrace)?;
+                    tokens
+                        .parse_token_of_kind(TokenKind::OpenBrace)
+                        .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?;
                     let mut values = vec![];
                     while tokens.parse_token_of_kind(TokenKind::CloseBrace).is_err() {
-                        let name = tokens.parse_string_key_type(TokenKind::Identifier)?;
-                        tokens.parse_token_of_kind(TokenKind::Colon)?;
+                        let name = tokens
+                            .parse_string_key_type(TokenKind::Identifier)
+                            .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?;
+                        tokens
+                            .parse_token_of_kind(TokenKind::Colon)
+                            .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?;
                         let value = parse_constant_value(tokens)?;
                         values.push(NameValuePair { name, value });
                     }
@@ -287,7 +323,10 @@ fn parse_constant_value(tokens: &mut PeekableLexer) -> ParseResult<WithSpan<Cons
             x
         })?;
 
-        ControlFlow::Continue(SchemaParseError::UnableToParseConstantValue)
+        ControlFlow::Continue(WithSpan::new(
+            SchemaParseError::UnableToParseConstantValue,
+            tokens.peek().span,
+        ))
     })
 }
 
@@ -326,11 +365,15 @@ fn parse_field<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResult<WithSpan<Outpu
     tokens
         .with_span(|tokens| {
             let description = parse_optional_description(tokens);
-            let name = tokens.parse_string_key_type(TokenKind::Identifier)?;
+            let name = tokens
+                .parse_string_key_type(TokenKind::Identifier)
+                .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?;
 
             let arguments = parse_optional_argument_definitions(tokens)?;
 
-            tokens.parse_token_of_kind(TokenKind::Colon)?;
+            tokens
+                .parse_token_of_kind(TokenKind::Colon)
+                .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?;
             let type_ = parse_type_annotation(tokens)?;
 
             let directives = parse_constant_directives(tokens)?;
@@ -350,8 +393,10 @@ fn parse_type_annotation<T: From<StringKey>>(
     tokens: &mut PeekableLexer,
 ) -> ParseResult<TypeAnnotation<T>> {
     from_control_flow(|| {
-        to_control_flow::<_, SchemaParseError>(|| {
-            let type_ = tokens.parse_string_key_type(TokenKind::Identifier)?;
+        to_control_flow::<_, WithSpan<SchemaParseError>>(|| {
+            let type_ = tokens
+                .parse_string_key_type(TokenKind::Identifier)
+                .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?;
 
             let is_non_null = tokens.parse_token_of_kind(TokenKind::Exclamation).is_ok();
             if is_non_null {
@@ -363,12 +408,16 @@ fn parse_type_annotation<T: From<StringKey>>(
             }
         })?;
 
-        to_control_flow::<_, SchemaParseError>(|| {
+        to_control_flow::<_, WithSpan<SchemaParseError>>(|| {
             // TODO: atomically parse everything here:
-            tokens.parse_token_of_kind(TokenKind::OpenBracket)?;
+            tokens
+                .parse_token_of_kind(TokenKind::OpenBracket)
+                .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?;
 
             let inner_type_annotation = parse_type_annotation(tokens)?;
-            tokens.parse_token_of_kind(TokenKind::CloseBracket)?;
+            tokens
+                .parse_token_of_kind(TokenKind::CloseBracket)
+                .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?;
             let is_non_null = tokens.parse_token_of_kind(TokenKind::Exclamation).is_ok();
 
             if is_non_null {
@@ -389,7 +438,10 @@ fn parse_type_annotation<T: From<StringKey>>(
         //
         // We don't get a great error message with this current approach.
 
-        ControlFlow::Continue(SchemaParseError::ExpectedTypeAnnotation)
+        ControlFlow::Continue(WithSpan::new(
+            SchemaParseError::ExpectedTypeAnnotation,
+            tokens.peek().span,
+        ))
     })
 }
 
@@ -417,8 +469,12 @@ fn parse_argument_definition<'a>(
     tokens
         .with_span(|tokens| {
             let description = parse_optional_description(tokens);
-            let name = tokens.parse_string_key_type(TokenKind::Identifier)?;
-            tokens.parse_token_of_kind(TokenKind::Colon)?;
+            let name = tokens
+                .parse_string_key_type(TokenKind::Identifier)
+                .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?;
+            tokens
+                .parse_token_of_kind(TokenKind::Colon)
+                .map_err(|with_span| with_span.map(|e| SchemaParseError::from(e)))?;
             let type_ = parse_type_annotation(tokens)?;
             let default_value = parse_optional_constant_default_value(tokens)?;
             let directives = parse_constant_directives(tokens)?;

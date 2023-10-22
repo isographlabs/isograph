@@ -14,6 +14,8 @@ pub(crate) struct PeekableLexer<'source> {
     offset: u32,
 }
 
+type ParseResultWithSpan<T> = Result<T, WithSpan<LowLevelParseError>>;
+
 impl<'source> PeekableLexer<'source> {
     pub fn new(source: &'source str) -> Self {
         // To enable fast lookahead the parser needs to store at least the 'kind' (TokenKind)
@@ -84,15 +86,18 @@ impl<'source> PeekableLexer<'source> {
     pub fn parse_token_of_kind(
         &mut self,
         expected_kind: TokenKind,
-    ) -> Result<WithSpan<TokenKind>, LowLevelParseError> {
-        let found_kind = self.peek().item;
-        if found_kind == expected_kind {
+    ) -> ParseResultWithSpan<WithSpan<TokenKind>> {
+        let found = self.peek();
+        if found.item == expected_kind {
             Ok(self.parse_token())
         } else {
-            Err(LowLevelParseError::ParseTokenKindError {
-                expected_kind,
-                found_kind,
-            })
+            Err(WithSpan::new(
+                LowLevelParseError::ParseTokenKindError {
+                    expected_kind,
+                    found_kind: found.item,
+                },
+                found.span,
+            ))
         }
     }
 
@@ -101,7 +106,7 @@ impl<'source> PeekableLexer<'source> {
     pub fn parse_source_of_kind(
         &mut self,
         expected_kind: TokenKind,
-    ) -> Result<WithSpan<&'source str>, LowLevelParseError> {
+    ) -> ParseResultWithSpan<WithSpan<&'source str>> {
         let kind = self.parse_token_of_kind(expected_kind)?;
 
         Ok(WithSpan::new(self.source(kind.span), kind.span))
@@ -110,7 +115,7 @@ impl<'source> PeekableLexer<'source> {
     pub fn parse_string_key_type<T: From<StringKey>>(
         &mut self,
         expected_kind: TokenKind,
-    ) -> Result<WithSpan<T>, LowLevelParseError> {
+    ) -> ParseResultWithSpan<WithSpan<T>> {
         let kind = self.parse_token_of_kind(expected_kind)?;
         let source = self.source(kind.span).intern();
         Ok(WithSpan::new(source.into(), kind.span))

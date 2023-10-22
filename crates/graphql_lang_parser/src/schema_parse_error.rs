@@ -1,8 +1,9 @@
+use common_lang_types::WithSpan;
 use thiserror::Error;
 
 use super::peekable_lexer::LowLevelParseError;
 
-pub(crate) type ParseResult<T> = Result<T, SchemaParseError>;
+pub(crate) type ParseResult<T> = Result<T, WithSpan<SchemaParseError>>;
 
 /// Errors tha make semantic sense when referring to parsing a GraphQL schema file
 #[derive(Error, Debug)]
