@@ -1,8 +1,8 @@
 use std::fmt;
 
 use common_lang_types::{
-    IsographDirectiveName, IsographObjectTypeName, SelectableFieldName, UnvalidatedTypeName,
-    WithSpan,
+    IsographDirectiveName, IsographObjectTypeName, Location, SelectableFieldName,
+    SourceLocationKey, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::InputValueDefinition;
 use intern::string_key::Intern;
@@ -19,25 +19,35 @@ impl UnvalidatedSchema {
     pub fn process_resolver_declaration(
         &mut self,
         resolver_declaration: WithSpan<ResolverDeclaration>,
-    ) -> ProcessResolverDeclarationResult<()> {
+        source_location: SourceLocationKey,
+    ) -> Result<(), WithLocation<ProcessResolverDeclarationError>> {
         let parent_type_id = self
             .schema_data
             .defined_types
             .get(&resolver_declaration.item.parent_type.item.into())
-            .ok_or(ProcessResolverDeclarationError::MissingParent {
-                parent_type_name: resolver_declaration.item.parent_type.item,
-            })?;
+            .ok_or(WithLocation::new(
+                ProcessResolverDeclarationError::ParentTypeNotDefined {
+                    parent_type_name: resolver_declaration.item.parent_type.item,
+                },
+                Location::new(source_location, resolver_declaration.item.parent_type.span),
+            ))?;
 
         match parent_type_id {
             DefinedTypeId::Object(object_id) => {
-                self.add_resolver_field_to_object(*object_id, resolver_declaration)?;
+                self.add_resolver_field_to_object(*object_id, resolver_declaration)
+                    .map_err(|e| {
+                        WithLocation::new(e.item, Location::new(source_location, e.span))
+                    })?;
             }
             DefinedTypeId::Scalar(scalar_id) => {
                 let scalar_name = self.schema_data.scalars[scalar_id.as_usize()].name;
-                return Err(ProcessResolverDeclarationError::InvalidParentType {
-                    parent_type: "scalar",
-                    parent_type_name: scalar_name.item.into(),
-                });
+                return Err(WithLocation::new(
+                    ProcessResolverDeclarationError::InvalidParentType {
+                        parent_type: "scalar",
+                        parent_type_name: scalar_name.item.into(),
+                    },
+                    Location::new(source_location, resolver_declaration.item.parent_type.span),
+                ));
             }
         }
 
@@ -50,7 +60,9 @@ impl UnvalidatedSchema {
         resolver_declaration: WithSpan<ResolverDeclaration>,
     ) -> ProcessResolverDeclarationResult<()> {
         let object = &mut self.schema_data.objects[parent_object_id.as_usize()];
-        let resolver_field_name = resolver_declaration.item.resolver_field_name.item;
+        let resolver_field_name_ws = resolver_declaration.item.resolver_field_name;
+        let resolver_field_name = resolver_field_name_ws.item;
+        let resolver_field_name_span = resolver_field_name_ws.span;
 
         let next_resolver_id = self.resolvers.len().into();
 
@@ -63,10 +75,13 @@ impl UnvalidatedSchema {
             .is_some()
         {
             // Did not insert, so this object already has a field with the same name :(
-            return Err(ProcessResolverDeclarationError::ParentAlreadyHasField {
-                parent_type_name: object.name.into(),
-                resolver_field_name: resolver_field_name.into(),
-            });
+            return Err(WithSpan::new(
+                ProcessResolverDeclarationError::ParentAlreadyHasField {
+                    parent_type_name: object.name.into(),
+                    resolver_field_name: resolver_field_name.into(),
+                },
+                resolver_field_name_span,
+            ));
         }
 
         object.resolvers.push(next_resolver_id);
@@ -85,7 +100,10 @@ impl UnvalidatedSchema {
         // TODO variant should carry payloads, instead of this check
         if variant.as_ref().map(|span| &span.item) == Some(&ResolverVariant::Component) {
             if !matches!(resolver_action_kind, ResolverActionKind::NamedImport(_)) {
-                return Err(ProcessResolverDeclarationError::ComponentResolverMissingJsFunction {});
+                return Err(WithSpan::new(
+                    ProcessResolverDeclarationError::ComponentResolverMissingJsFunction,
+                    resolver_field_name_span,
+                ));
             }
         }
 
@@ -109,12 +127,12 @@ impl UnvalidatedSchema {
     }
 }
 
-type ProcessResolverDeclarationResult<T> = Result<T, ProcessResolverDeclarationError>;
+type ProcessResolverDeclarationResult<T> = Result<T, WithSpan<ProcessResolverDeclarationError>>;
 
 #[derive(Error, Debug)]
 pub enum ProcessResolverDeclarationError {
-    #[error("Missing parent type. Type: `{parent_type_name}`")]
-    MissingParent {
+    #[error("`{parent_type_name}` is not a type that has been defined.")]
+    ParentTypeNotDefined {
         parent_type_name: UnvalidatedTypeName,
     },
 
@@ -135,9 +153,8 @@ pub enum ProcessResolverDeclarationError {
     #[error(
         "Resolvers with @component must have associated javascript (i.e. iso`...` must be called as a function, as in iso`...`(MyComponent))"
     )]
-    ComponentResolverMissingJsFunction {
-        // TODO add parent type and resolver field name
-    },
+    // TODO add parent type and resolver field name
+    ComponentResolverMissingJsFunction,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
