@@ -95,15 +95,18 @@ impl<'source> PeekableLexer<'source> {
     pub fn parse_token_of_kind(
         &mut self,
         expected_kind: IsographLangTokenKind,
-    ) -> Result<WithSpan<IsographLangTokenKind>, LowLevelParseError> {
-        let found_kind = self.peek().item;
-        if found_kind == expected_kind {
+    ) -> Result<WithSpan<IsographLangTokenKind>, WithSpan<LowLevelParseError>> {
+        let found = self.peek();
+        if found.item == expected_kind {
             Ok(self.parse_token())
         } else {
-            Err(LowLevelParseError::ParseTokenKindError {
-                expected_kind,
-                found_kind,
-            })
+            Err(WithSpan::new(
+                LowLevelParseError::ParseTokenKindError {
+                    expected_kind,
+                    found_kind: found.item,
+                },
+                found.span,
+            ))
         }
     }
 
@@ -112,7 +115,7 @@ impl<'source> PeekableLexer<'source> {
     pub fn parse_source_of_kind(
         &mut self,
         expected_kind: IsographLangTokenKind,
-    ) -> Result<WithSpan<&'source str>, LowLevelParseError> {
+    ) -> Result<WithSpan<&'source str>, WithSpan<LowLevelParseError>> {
         let kind = self.parse_token_of_kind(expected_kind)?;
 
         Ok(WithSpan::new(self.source(kind.span), kind.span))
@@ -121,7 +124,7 @@ impl<'source> PeekableLexer<'source> {
     pub fn parse_string_key_type<T: From<StringKey>>(
         &mut self,
         expected_kind: IsographLangTokenKind,
-    ) -> Result<WithSpan<T>, LowLevelParseError> {
+    ) -> Result<WithSpan<T>, WithSpan<LowLevelParseError>> {
         let kind = self.parse_token_of_kind(expected_kind)?;
         let source = self.source(kind.span).intern();
         Ok(WithSpan::new(source.into(), kind.span))
