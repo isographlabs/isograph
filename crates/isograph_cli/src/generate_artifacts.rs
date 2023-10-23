@@ -695,16 +695,16 @@ fn write_variables_to_string<'a>(
 
 #[derive(Debug, Error)]
 pub enum GenerateArtifactsError {
-    #[error("Unable to write to artifact file at path {path:?}.\nMessage: {message:?}")]
+    #[error("Unable to write to artifact file at path {path:?}.\nReason: {message:?}")]
     UnableToWriteToArtifactFile { path: PathBuf, message: io::Error },
 
-    #[error("Unable to create directory at path {path:?}.\nMessage: {message:?}")]
+    #[error("Unable to create directory at path {path:?}.\nReason: {message:?}")]
     UnableToCreateDirectory { path: PathBuf, message: io::Error },
 
-    #[error("Unable to delete directory at path {path:?}.\nMessage: {message:?}")]
+    #[error("Unable to delete directory at path {path:?}.\nReason: {message:?}")]
     UnableToDeleteDirectory { path: PathBuf, message: io::Error },
 
-    #[error("Unable to canonicalize path: {path:?}.\nMessage: {message:?}")]
+    #[error("Unable to canonicalize path: {path:?}.\nReason: {message:?}")]
     UnableToCanonicalizePath { path: PathBuf, message: io::Error },
 }
 
