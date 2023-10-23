@@ -728,7 +728,8 @@ fn write_selections_for_query_text(
             MergedServerFieldSelection::LinkedField(linked_field) => {
                 query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
                 if let Some(alias) = linked_field.normalization_alias {
-                    query_text.push_str(&format!("{}: ", alias));
+                    // This is bad, alias is WithLocation
+                    query_text.push_str(&format!("{}: ", alias.item));
                 }
                 let name = linked_field.name.item;
                 let arguments = get_serialized_arguments_for_query_text(&linked_field.arguments);
@@ -1218,6 +1219,8 @@ fn generate_normalization_ast_node(
             let indent_2 = "  ".repeat((indentation_level + 1) as usize);
             let serialized_arguments =
                 get_serialized_field_arguments(arguments, indentation_level + 1);
+            // TODO this is bad, name is a WithLocation and impl's Display, we should fix
+            let name = name.item;
 
             format!(
                 "{indent}{{\n\
@@ -1241,6 +1244,9 @@ fn generate_normalization_ast_node(
 
             let selections =
                 generate_normalization_ast(schema, selection_set, indentation_level + 1);
+
+            // TODO this is bad, name is a WithLocation which impl's Display
+            let name = name.item;
 
             format!(
                 "{indent}{{\n\

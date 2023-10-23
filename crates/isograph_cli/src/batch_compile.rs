@@ -150,7 +150,7 @@ pub(crate) enum BatchCompileError {
 
     #[error("Unable to validate schema.\nMessage: {message}")]
     UnableToValidateSchema {
-        message: isograph_schema::ValidateSchemaError,
+        message: WithLocation<isograph_schema::ValidateSchemaError>,
     },
 
     #[error("Unable to print.\nMessage: {message}")]
@@ -187,8 +187,8 @@ impl From<std::path::StripPrefixError> for BatchCompileError {
     }
 }
 
-impl From<isograph_schema::ValidateSchemaError> for BatchCompileError {
-    fn from(value: isograph_schema::ValidateSchemaError) -> Self {
+impl From<WithLocation<isograph_schema::ValidateSchemaError>> for BatchCompileError {
+    fn from(value: WithLocation<isograph_schema::ValidateSchemaError>) -> Self {
         BatchCompileError::UnableToValidateSchema { message: value }
     }
 }

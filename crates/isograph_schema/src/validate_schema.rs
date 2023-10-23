@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use common_lang_types::{
     IsographObjectTypeName, ScalarFieldName, SelectableFieldName, UnvalidatedTypeName,
-    VariableName, WithSpan,
+    VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{NamedTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
@@ -192,18 +192,24 @@ fn validate_server_field_type_exists_and_is_output_type(
         Some(type_id) => server_field_type.clone().and_then(|_| {
             type_id.as_output_type_id().ok_or_else(|| {
                 let parent_type = schema_data.object(field.parent_type_id);
-                ValidateSchemaError::FieldTypenameIsInputObject {
-                    parent_type_name: parent_type.name,
-                    field_name: field.name.item,
-                    field_type: *server_field_type.inner(),
-                }
+                WithLocation::new(
+                    ValidateSchemaError::FieldTypenameIsInputObject {
+                        parent_type_name: parent_type.name,
+                        field_name: field.name.item,
+                        field_type: *server_field_type.inner(),
+                    },
+                    field.name.location,
+                )
             })
         }),
-        None => Err(ValidateSchemaError::FieldTypenameDoesNotExist {
-            parent_type_name: schema_data.object(field.parent_type_id).name,
-            field_name: field.name.item,
-            field_type: *server_field_type.inner(),
-        }),
+        None => Err(WithLocation::new(
+            ValidateSchemaError::FieldTypenameDoesNotExist {
+                parent_type_name: schema_data.object(field.parent_type_id).name,
+                field_name: field.name.item,
+                field_type: *server_field_type.inner(),
+            },
+            field.name.location,
+        )),
     }
 }
 
@@ -286,18 +292,22 @@ fn validate_variable_definitions(
                     type_: vd.type_.and_then(|type_name| {
                         match schema_data.defined_types.get(&type_name) {
                             Some(type_id) => type_id.as_input_type_id().ok_or_else(|| {
-                                ValidateSchemaError::VariableDefinitionInnerTypeIsOutputType {
-                                    variable_name: vd.name.item,
-                                    type_: type_string,
-                                }
+                                WithLocation::new(
+                                    ValidateSchemaError::VariableDefinitionInnerTypeIsOutputType {
+                                        variable_name: vd.name.item,
+                                        type_: type_string,
+                                    },
+                                    vd.name.location,
+                                )
                             }),
-                            None => Err(
+                            None => Err(WithLocation::new(
                                 ValidateSchemaError::VariableDefinitionInnerTypeDoesNotExist {
                                     variable_name: vd.name.item,
                                     type_: type_string,
                                     inner_type,
                                 },
-                            ),
+                                vd.name.location,
+                            )),
                         }
                     })?,
                 })
@@ -307,11 +317,11 @@ fn validate_variable_definitions(
 }
 
 fn validate_selections_error_to_validate_schema_error(
-    err: ValidateSelectionsError,
+    err: WithLocation<ValidateSelectionsError>,
     parent_object: &SchemaObject<UnvalidatedObjectFieldInfo>,
     resolver_field_name: SelectableFieldName,
-) -> ValidateSchemaError {
-    match err {
+) -> WithLocation<ValidateSchemaError> {
+    err.map(|item| match item {
         ValidateSelectionsError::FieldDoesNotExist(field_parent_type_name, field_name) => {
             ValidateSchemaError::ResolverSelectionFieldDoesNotExist {
                 resolver_parent_type_name: parent_object.name,
@@ -355,10 +365,10 @@ fn validate_selections_error_to_validate_schema_error(
             field_parent_type_name,
             field_name,
         },
-    }
+    })
 }
 
-type ValidateSelectionsResult<T> = Result<T, ValidateSelectionsError>;
+type ValidateSelectionsResult<T> = Result<T, WithLocation<ValidateSelectionsError>>;
 
 #[allow(unused)]
 #[derive(Debug)]
@@ -473,12 +483,15 @@ fn validate_field_type_exists_and_is_scalar(
                         arguments: scalar_field_selection.arguments,
                     }),
                     DefinedTypeId::Object(_) => Err(
-                        ValidateSelectionsError::FieldSelectedAsScalarButTypeIsNotScalar {
-                            field_parent_type_name: parent_object.name,
-                            field_name: scalar_field_name,
-                            target_type: "an object",
-                            target_type_name: *server_field_name.inner(),
-                        },
+                        WithLocation::new(
+                            ValidateSelectionsError::FieldSelectedAsScalarButTypeIsNotScalar {
+                                field_parent_type_name: parent_object.name,
+                                field_name: scalar_field_name,
+                                target_type: "an object",
+                                target_type_name: *server_field_name.inner(),
+                            },
+                            scalar_field_selection.name.location
+                        ),
                     ),
                 }
             }
@@ -494,9 +507,9 @@ fn validate_field_type_exists_and_is_scalar(
                 })
             }
         },
-        None => Err(ValidateSelectionsError::FieldDoesNotExist(
-            parent_object.name,
-            scalar_field_name,
+        None => Err(WithLocation::new(
+            ValidateSelectionsError::FieldDoesNotExist(parent_object.name, scalar_field_name),
+            scalar_field_selection.name.location,
         )),
     }
 }
@@ -523,14 +536,15 @@ fn validate_field_type_exists_and_is_linked(
                             think was validated earlier, probably indicates a bug in Isograph",
                         );
                     match field_type_id {
-                        DefinedTypeId::Scalar(_) => Err(
+                        DefinedTypeId::Scalar(_) => Err(WithLocation::new(
                             ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsScalar {
                                 field_parent_type_name: parent_object.name,
                                 field_name: linked_field_name,
                                 target_type: "a scalar",
                                 target_type_name: *server_field_name.inner(),
                             },
-                        ),
+                            linked_field_selection.name.location,
+                        )),
                         DefinedTypeId::Object(object_id) => {
                             let object = schema_data.objects.get(object_id.as_usize()).unwrap();
                             Ok(LinkedFieldSelection {
@@ -554,17 +568,18 @@ fn validate_field_type_exists_and_is_linked(
                         }
                     }
                 }
-                DefinedField::ResolverField(_) => Err(
+                DefinedField::ResolverField(_) => Err(WithLocation::new(
                     ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsResolver {
                         field_parent_type_name: parent_object.name,
                         field_name: linked_field_name,
                     },
-                ),
+                    linked_field_selection.name.location,
+                )),
             }
         }
-        None => Err(ValidateSelectionsError::FieldDoesNotExist(
-            parent_object.name,
-            linked_field_name,
+        None => Err(WithLocation::new(
+            ValidateSelectionsError::FieldDoesNotExist(parent_object.name, linked_field_name),
+            linked_field_selection.name.location,
         )),
     }
 }
@@ -584,7 +599,7 @@ fn find_server_field_id(
     })
 }
 
-type ValidateSchemaResult<T> = Result<T, ValidateSchemaError>;
+type ValidateSchemaResult<T> = Result<T, WithLocation<ValidateSchemaError>>;
 
 #[derive(Debug, Error)]
 pub enum ValidateSchemaError {
