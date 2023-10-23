@@ -68,7 +68,8 @@ fn parse_resolver_declaration<'a>(
 
             let directives = parse_directives(tokens)?;
 
-            let selection_set_and_unwraps = parse_optional_selection_set_and_unwraps(tokens)?;
+            let selection_set_and_unwraps =
+                parse_optional_selection_set_and_unwraps(tokens, text_source)?;
 
             // --------------------
             // TODO: use directives to:
@@ -93,8 +94,9 @@ fn parse_resolver_declaration<'a>(
 
 fn parse_optional_selection_set_and_unwraps<'a>(
     tokens: &mut PeekableLexer<'a>,
+    text_source: TextSource,
 ) -> ParseResultWithSpan<Option<(Vec<WithSpan<Selection<(), ()>>>, Vec<WithSpan<Unwrap>>)>> {
-    let selection_set = parse_optional_selection_set(tokens)?;
+    let selection_set = parse_optional_selection_set(tokens, text_source)?;
     match selection_set {
         Some(selection_set) => {
             let unwraps = parse_unwraps(tokens);
@@ -106,6 +108,7 @@ fn parse_optional_selection_set_and_unwraps<'a>(
 
 fn parse_optional_selection_set<'a>(
     tokens: &mut PeekableLexer<'a>,
+    text_source: TextSource,
 ) -> ParseResultWithSpan<Option<Vec<WithSpan<Selection<(), ()>>>>> {
     let open_brace = tokens.parse_token_of_kind(IsographLangTokenKind::OpenBrace);
     if open_brace.is_err() {
@@ -117,7 +120,7 @@ fn parse_optional_selection_set<'a>(
         .parse_token_of_kind(IsographLangTokenKind::CloseBrace)
         .is_err()
     {
-        selections.push(parse_selection(tokens)?);
+        selections.push(parse_selection(tokens, text_source)?);
     }
     Ok(Some(selections))
 }
@@ -147,16 +150,19 @@ fn parse_delimited_list<'a, TResult>(
 
 fn parse_selection<'a>(
     tokens: &mut PeekableLexer<'a>,
+    text_source: TextSource,
 ) -> ParseResultWithSpan<WithSpan<Selection<(), ()>>> {
     tokens
         .with_span(|tokens| {
             let (field_name, alias) = parse_optional_alias_and_field_name(tokens)?;
+            let field_name = with_span_to_with_location(field_name, text_source);
+            let alias = alias.map(|alias| with_span_to_with_location(alias, text_source));
 
             // TODO distinguish field groups
             let arguments = parse_optional_arguments(tokens)?;
 
             // If we encounter a selection set, we are parsing a linked field. Otherwise, a scalar field.
-            let selection_set = parse_optional_selection_set(tokens)?;
+            let selection_set = parse_optional_selection_set(tokens, text_source)?;
 
             let unwraps = parse_unwraps(tokens);
 
@@ -421,9 +427,9 @@ fn from_control_flow<T, E>(control_flow: impl FnOnce() -> ControlFlow<T, E>) -> 
 /// used in the alias. Once we have a normalization AST, we can remove this.
 #[allow(non_snake_case)]
 fn HACK_combine_name_and_variables_into_normalization_alias<T: StringKeyNewtype>(
-    name: WithSpan<SelectableFieldName>,
+    name: WithLocation<SelectableFieldName>,
     arguments: &[WithSpan<SelectionFieldArgument>],
-) -> Option<WithSpan<T>> {
+) -> Option<WithLocation<T>> {
     if arguments.is_empty() {
         None
     } else {

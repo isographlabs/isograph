@@ -310,7 +310,7 @@ impl UnvalidatedSchema {
                 let id_field_selection = WithSpan::new(
                     Selection::ServerField(ServerFieldSelection::ScalarField(
                         ScalarFieldSelection {
-                            name: WithSpan::new("id".intern().into(), Span::todo_generated()),
+                            name: WithLocation::new("id".intern().into(), Location::generated()),
                             reader_alias: None,
                             normalization_alias: None,
                             associated_data: (),
@@ -486,7 +486,7 @@ fn get_resolvers_for_schema_object(
         let next_resolver_id = schema_resolvers.len().into();
         let id_field_selection = WithSpan::new(
             Selection::ServerField(ServerFieldSelection::ScalarField(ScalarFieldSelection {
-                name: WithSpan::new("id".intern().into(), Span::todo_generated()),
+                name: WithLocation::new("id".intern().into(), Location::generated()),
                 reader_alias: None,
                 normalization_alias: None,
                 associated_data: (),

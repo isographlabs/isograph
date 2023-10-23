@@ -124,9 +124,9 @@ impl<TScalarField, TLinkedField> HasName for ServerFieldSelection<TScalarField, 
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct ScalarFieldSelection<TScalarField> {
-    pub name: WithSpan<ScalarFieldName>,
-    pub reader_alias: Option<WithSpan<ScalarFieldAlias>>,
-    pub normalization_alias: Option<WithSpan<ScalarFieldAlias>>,
+    pub name: WithLocation<ScalarFieldName>,
+    pub reader_alias: Option<WithLocation<ScalarFieldAlias>>,
+    pub normalization_alias: Option<WithLocation<ScalarFieldAlias>>,
     pub associated_data: TScalarField,
     pub unwraps: Vec<WithSpan<Unwrap>>,
     pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
@@ -158,7 +158,7 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
         })
     }
 
-    pub fn name_or_alias(&self) -> WithSpan<FieldNameOrAlias> {
+    pub fn name_or_alias(&self) -> WithLocation<FieldNameOrAlias> {
         self.reader_alias
             .map(|item| item.map(FieldNameOrAlias::from))
             .unwrap_or_else(|| self.name.map(FieldNameOrAlias::from))
@@ -167,9 +167,9 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
-    pub name: WithSpan<LinkedFieldName>,
-    pub reader_alias: Option<WithSpan<LinkedFieldAlias>>,
-    pub normalization_alias: Option<WithSpan<LinkedFieldAlias>>,
+    pub name: WithLocation<LinkedFieldName>,
+    pub reader_alias: Option<WithLocation<LinkedFieldAlias>>,
+    pub normalization_alias: Option<WithLocation<LinkedFieldAlias>>,
     pub associated_data: TLinkedField,
     pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
     pub unwraps: Vec<WithSpan<Unwrap>>,
@@ -177,7 +177,7 @@ pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
 }
 
 impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField> {
-    pub fn name_or_alias(&self) -> WithSpan<FieldNameOrAlias> {
+    pub fn name_or_alias(&self) -> WithLocation<FieldNameOrAlias> {
         self.reader_alias
             .map(|item| item.map(FieldNameOrAlias::from))
             .unwrap_or_else(|| self.name.map(FieldNameOrAlias::from))

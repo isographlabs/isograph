@@ -4,8 +4,9 @@ use std::collections::{
 };
 
 use common_lang_types::{
-    IsographObjectTypeName, LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName,
-    SelectableFieldName, ServerFieldNormalizationKey, Span, VariableName, WithSpan,
+    IsographObjectTypeName, LinkedFieldAlias, LinkedFieldName, Location, ScalarFieldAlias,
+    ScalarFieldName, SelectableFieldName, ServerFieldNormalizationKey, Span, VariableName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::InputValueDefinition;
 use intern::{string_key::Intern, Lookup};
@@ -57,17 +58,17 @@ pub fn get_variable_selections(
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct MergedScalarFieldSelection {
-    pub name: WithSpan<ScalarFieldName>,
+    pub name: WithLocation<ScalarFieldName>,
     // TODO calculate this when needed
-    pub normalization_alias: Option<WithSpan<ScalarFieldAlias>>,
+    pub normalization_alias: Option<WithLocation<ScalarFieldAlias>>,
     pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct MergedLinkedFieldSelection {
-    pub name: WithSpan<LinkedFieldName>,
+    pub name: WithLocation<LinkedFieldName>,
     // TODO calculate this when needed
-    pub normalization_alias: Option<WithSpan<LinkedFieldAlias>>,
+    pub normalization_alias: Option<WithLocation<LinkedFieldAlias>>,
     pub selection_set: Vec<WithSpan<MergedServerFieldSelection>>,
     pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
 }
@@ -682,9 +683,9 @@ fn select_typename_and_id_fields_in_merged_selection(
                 vacant_entry.insert(WithSpan::new(
                     MergedServerFieldSelection::ScalarField(MergedScalarFieldSelection {
                         // major HACK alert
-                        name: WithSpan::new(
+                        name: WithLocation::new(
                             id_field.name.item.lookup().intern().into(),
-                            Span::todo_generated(),
+                            Location::generated(),
                         ),
                         arguments: vec![],
                         // This indicates that there should be a separate MergedServerFieldSelection variant
