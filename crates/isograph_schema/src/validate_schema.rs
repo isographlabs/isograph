@@ -613,7 +613,7 @@ pub enum ValidateSchemaError {
     },
 
     #[error(
-        "The resolver `{resolver_parent_type_name}.{resolver_field_name}` attempts to select `{field_parent_type_name}.{field_name}`, but that field does not exist on `{field_parent_type_name}`"
+        "In the resolver `{resolver_parent_type_name}.{resolver_field_name}`, the field `{field_parent_type_name}.{field_name}` is selected, but that field does not exist on `{field_parent_type_name}`"
     )]
     ResolverSelectionFieldDoesNotExist {
         resolver_parent_type_name: IsographObjectTypeName,
@@ -623,7 +623,7 @@ pub enum ValidateSchemaError {
     },
 
     #[error(
-        "The resolver `{resolver_parent_type_name}.{resolver_field_name}` attempts to select `{field_parent_type_name}.{field_name}` as a scalar, but that field's type is `{target_type_name}`, which is {field_type}."
+        "In the resolver `{resolver_parent_type_name}.{resolver_field_name}`, the field `{field_parent_type_name}.{field_name}` is selected as a scalar, but that field's type is `{target_type_name}`, which is {field_type}."
     )]
     ResolverSelectionFieldIsNotScalar {
         resolver_parent_type_name: IsographObjectTypeName,
@@ -635,7 +635,7 @@ pub enum ValidateSchemaError {
     },
 
     #[error(
-        "The resolver `{resolver_parent_type_name}.{resolver_field_name}` attempts to select `{field_parent_type_name}.{field_name}` as a linked field, but that field's type is `{target_type_name}`, which is {field_type}."
+        "In the resolver `{resolver_parent_type_name}.{resolver_field_name}`, the field `{field_parent_type_name}.{field_name}` is selected as a linked field, but that field's type is `{target_type_name}`, which is {field_type}."
     )]
     ResolverSelectionFieldIsScalar {
         resolver_parent_type_name: IsographObjectTypeName,
@@ -647,7 +647,7 @@ pub enum ValidateSchemaError {
     },
 
     #[error(
-        "The resolver `{resolver_parent_type_name}.{resolver_field_name}` attempts to select `{field_parent_type_name}.{field_name}` as a linked field, but that field is a resolver, which can only be selected as a scalar."
+        "In the resolver `{resolver_parent_type_name}.{resolver_field_name}`, the field `{field_parent_type_name}.{field_name}` is selected as a linked field, but that field is a resolver, which can only be selected as a scalar."
     )]
     ResolverSelectionFieldIsResolver {
         resolver_parent_type_name: IsographObjectTypeName,

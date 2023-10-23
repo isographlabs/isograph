@@ -148,7 +148,7 @@ pub(crate) enum BatchCompileError {
         message: std::path::StripPrefixError,
     },
 
-    #[error("Unable to validate schema.\nReason: {message}")]
+    #[error("Error when validating schema and resolvers.\nReason: {message}")]
     UnableToValidateSchema {
         message: WithLocation<isograph_schema::ValidateSchemaError>,
     },
