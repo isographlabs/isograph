@@ -31,6 +31,7 @@ pub fn parse_iso_literal(
         &mut tokens,
         definition_file_path,
         has_associated_js_function,
+        text_source,
     )
     .map_err(|with_span| with_span_to_with_location(with_span, text_source))?;
 
@@ -48,6 +49,7 @@ fn parse_resolver_declaration<'a>(
     tokens: &mut PeekableLexer<'a>,
     definition_file_path: ResolverDefinitionPath,
     has_associated_js_function: bool,
+    text_source: TextSource,
 ) -> ParseResultWithSpan<WithSpan<ResolverDeclaration>> {
     let resolver_declaration = tokens
         .with_span(|tokens| {
@@ -62,7 +64,7 @@ fn parse_resolver_declaration<'a>(
                 .parse_string_key_type(IsographLangTokenKind::Identifier)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-            let variable_definitions = parse_variable_definitions(tokens)?;
+            let variable_definitions = parse_variable_definitions(tokens, text_source)?;
 
             let directives = parse_directives(tokens)?;
 
@@ -297,6 +299,7 @@ fn parse_non_constant_value(
 
 fn parse_variable_definitions(
     tokens: &mut PeekableLexer,
+    text_source: TextSource,
 ) -> ParseResultWithSpan<Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>> {
     if tokens
         .parse_token_of_kind(IsographLangTokenKind::OpenParen)
@@ -304,7 +307,7 @@ fn parse_variable_definitions(
     {
         let variable_definitions = parse_delimited_list(
             tokens,
-            parse_variable_definition,
+            move |item| parse_variable_definition(item, text_source),
             IsographLangTokenKind::Comma,
         )?;
         tokens
@@ -318,6 +321,7 @@ fn parse_variable_definitions(
 
 fn parse_variable_definition(
     tokens: &mut PeekableLexer<'_>,
+    text_source: TextSource,
 ) -> ParseResultWithSpan<WithSpan<VariableDefinition<UnvalidatedTypeName>>> {
     let variable_definition = tokens
         .with_span(|tokens| {
@@ -326,6 +330,7 @@ fn parse_variable_definition(
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
             let name = tokens
                 .parse_string_key_type(IsographLangTokenKind::Identifier)
+                .map(|with_span| with_span_to_with_location(with_span, text_source))
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
             tokens
                 .parse_token_of_kind(IsographLangTokenKind::Colon)

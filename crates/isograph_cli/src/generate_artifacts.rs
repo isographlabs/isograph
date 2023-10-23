@@ -6,8 +6,8 @@ use std::{
 };
 
 use common_lang_types::{
-    HasName, IsographObjectTypeName, QueryOperationName, SelectableFieldName, Span,
-    UnvalidatedTypeName, VariableName, WithSpan,
+    HasName, IsographObjectTypeName, Location, QueryOperationName, SelectableFieldName, Span,
+    UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     InputValueDefinition, ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
@@ -245,7 +245,7 @@ fn generate_refetchable_query_text<'schema>(
 
     variable_definitions.push(WithSpan {
         item: VariableDefinition {
-            name: WithSpan::new("id".intern().into(), Span::todo_generated()),
+            name: WithLocation::new("id".intern().into(), Location::generated()),
             type_: TypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
                 NamedTypeAnnotation(WithSpan {
                     item: InputTypeId::Scalar(schema.id_type_id),
@@ -278,7 +278,7 @@ fn generate_mutation_query_text<'schema>(
 ) -> QueryText {
     let mut query_text = String::new();
 
-    let id_variable_name = WithSpan::new("id".intern().into(), Span::todo_generated());
+    let id_variable_name = WithLocation::new("id".intern().into(), Location::generated());
     variable_definitions.push(WithSpan {
         item: VariableDefinition {
             name: id_variable_name,
@@ -298,7 +298,7 @@ fn generate_mutation_query_text<'schema>(
             let variable_name = argument.item.name.map(|x| x.into());
             variable_definitions.push(WithSpan {
                 item: VariableDefinition {
-                    name: variable_name.hack_to_with_span(),
+                    name: variable_name,
                     type_: argument.item.type_.clone().map(|x| {
                         schema
                             .schema_data
@@ -327,7 +327,9 @@ fn generate_mutation_query_text<'schema>(
         .chain(std::iter::once(WithSpan::new(
             SelectionFieldArgument {
                 name: WithSpan::new("id".intern().into(), Span::todo_generated()),
-                value: id_variable_name.map(NonConstantValue::Variable),
+                value: id_variable_name
+                    .map(NonConstantValue::Variable)
+                    .hack_to_with_span(),
             },
             Span::todo_generated(),
         )))
@@ -677,7 +679,10 @@ fn write_variables_to_string<'a>(
                 let schema_input_type = schema.schema_data.lookup_input_type(input_type_id);
                 schema_input_type.name().into()
             });
-        variable_text.push_str(&format!("${}: {}", variable.item.name, x));
+        // TODO this is dangerous, since variable.item.name is a WithLocation, which impl's Display.
+        // We should find a way to make WithLocation not impl display, without making error's hard
+        // to work with.
+        variable_text.push_str(&format!("${}: {}", variable.item.name.item, x));
     }
 
     if empty {

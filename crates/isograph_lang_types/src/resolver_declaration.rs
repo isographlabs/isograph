@@ -3,7 +3,7 @@ use std::fmt;
 use common_lang_types::{
     DescriptionValue, FieldArgumentName, FieldNameOrAlias, HasName, IsographDirectiveName,
     LinkedFieldAlias, LinkedFieldName, ResolverDefinitionPath, ScalarFieldAlias, ScalarFieldName,
-    SelectableFieldName, UnvalidatedTypeName, VariableName, WithSpan,
+    SelectableFieldName, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::TypeAnnotation;
 
@@ -220,7 +220,7 @@ impl fmt::Display for NonConstantValue {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct VariableDefinition<TValue> {
-    pub name: WithSpan<VariableName>,
+    pub name: WithLocation<VariableName>,
     pub type_: TypeAnnotation<TValue>,
     // pub default_value: Option<WithSpan<ConstantValue>>,
 }
