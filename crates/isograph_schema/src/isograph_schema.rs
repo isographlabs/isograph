@@ -413,6 +413,7 @@ pub struct ValidRefinement {
 #[derive(Debug, Clone)]
 pub struct SchemaServerField<TData> {
     pub description: Option<DescriptionValue>,
+    // TODO this should be WithLocation<SelectableFieldName>
     pub name: SelectableFieldName,
     pub id: ServerFieldId,
     pub associated_data: TData,

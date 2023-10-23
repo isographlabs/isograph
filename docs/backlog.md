@@ -48,6 +48,8 @@
 
 - Typegen for non-eager non-component resolvers shows the eager type. There needs to be an additional type that is generated and threaded through.
 - If a useLazyReference commits then receives new props, it does not make a new network request.
+- if mutation primary field has a non-existent type, we panic, this should be an error
+- incorrect spans for errors e.g. "Message: The id field on "Pet" must be "ID!"."
 
 ## Extended backlog
 
