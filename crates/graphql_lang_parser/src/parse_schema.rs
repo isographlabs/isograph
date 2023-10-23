@@ -1,6 +1,9 @@
 use std::ops::ControlFlow;
 
-use common_lang_types::{DescriptionValue, InterfaceTypeName, WithSpan};
+use common_lang_types::{
+    with_span_to_with_location, DescriptionValue, InterfaceTypeName, TextSource, WithLocation,
+    WithSpan,
+};
 use graphql_syntax::TokenKind;
 use intern::string_key::StringKey;
 
@@ -18,22 +21,28 @@ use super::{
     schema_parse_error::SchemaParseError,
 };
 
-pub fn parse_schema(source: &str) -> ParseResult<TypeSystemDocument> {
+pub fn parse_schema(source: &str, text_source: TextSource) -> ParseResult<TypeSystemDocument> {
     let mut tokens = PeekableLexer::new(source);
 
-    parse_type_system_document(&mut tokens)
+    parse_type_system_document(&mut tokens, text_source)
 }
 
-fn parse_type_system_document(tokens: &mut PeekableLexer) -> ParseResult<TypeSystemDocument> {
+fn parse_type_system_document(
+    tokens: &mut PeekableLexer,
+    text_source: TextSource,
+) -> ParseResult<TypeSystemDocument> {
     let mut type_system_definitions = vec![];
     while !tokens.reached_eof() {
-        let type_system_definition = parse_type_system_definition(tokens)?;
+        let type_system_definition = parse_type_system_definition(tokens, text_source)?;
         type_system_definitions.push(type_system_definition);
     }
     Ok(TypeSystemDocument(type_system_definitions))
 }
 
-fn parse_type_system_definition(tokens: &mut PeekableLexer) -> ParseResult<TypeSystemDefinition> {
+fn parse_type_system_definition(
+    tokens: &mut PeekableLexer,
+    text_source: TextSource,
+) -> ParseResult<TypeSystemDefinition> {
     let description = parse_optional_description(tokens);
     let identifier = tokens
         .parse_token_of_kind(TokenKind::Identifier)
@@ -41,13 +50,12 @@ fn parse_type_system_definition(tokens: &mut PeekableLexer) -> ParseResult<TypeS
     let identifier_source = tokens.source(identifier.span);
 
     match identifier_source {
-        "type" => parse_object_type_definition(tokens, description).map(TypeSystemDefinition::from),
-        "scalar" => {
-            parse_scalar_type_definition(tokens, description).map(TypeSystemDefinition::from)
-        }
-        "interface" => {
-            parse_interface_type_definition(tokens, description).map(TypeSystemDefinition::from)
-        }
+        "type" => parse_object_type_definition(tokens, description, text_source)
+            .map(TypeSystemDefinition::from),
+        "scalar" => parse_scalar_type_definition(tokens, description, text_source)
+            .map(TypeSystemDefinition::from),
+        "interface" => parse_interface_type_definition(tokens, description, text_source)
+            .map(TypeSystemDefinition::from),
         _ => Err(WithSpan::new(
             SchemaParseError::TopLevelSchemaDeclarationExpected {
                 found_text: identifier_source.to_string(),
@@ -61,14 +69,16 @@ fn parse_type_system_definition(tokens: &mut PeekableLexer) -> ParseResult<TypeS
 fn parse_object_type_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
+    text_source: TextSource,
 ) -> ParseResult<ObjectTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
+        .map(|with_span| with_span_to_with_location(with_span, text_source))
         .map_err(|with_span| with_span.map(SchemaParseError::from))?;
 
     let interfaces = parse_implements_interfaces_if_present(tokens)?;
     let directives = parse_constant_directives(tokens)?;
-    let fields = parse_optional_fields(tokens)?;
+    let fields = parse_optional_fields(tokens, text_source)?;
 
     Ok(ObjectTypeDefinition {
         description,
@@ -83,14 +93,16 @@ fn parse_object_type_definition(
 fn parse_interface_type_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
+    text_source: TextSource,
 ) -> ParseResult<InterfaceTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
+        .map(|with_span| with_span_to_with_location(with_span, text_source))
         .map_err(|with_span| with_span.map(SchemaParseError::from))?;
 
     let interfaces = parse_implements_interfaces_if_present(tokens)?;
     let directives = parse_constant_directives(tokens)?;
-    let fields = parse_optional_fields(tokens)?;
+    let fields = parse_optional_fields(tokens, text_source)?;
 
     Ok(InterfaceTypeDefinition {
         description,
@@ -105,9 +117,11 @@ fn parse_interface_type_definition(
 fn parse_scalar_type_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
+    text_source: TextSource,
 ) -> ParseResult<ScalarTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
+        .map(|with_span| with_span_to_with_location(with_span, text_source))
         .map_err(|with_span| with_span.map(SchemaParseError::from))?;
 
     let directives = parse_constant_directives(tokens)?;
@@ -346,30 +360,35 @@ fn from_control_flow<T, E>(control_flow: impl FnOnce() -> ControlFlow<T, E>) -> 
 
 fn parse_optional_fields<'a>(
     tokens: &mut PeekableLexer<'a>,
-) -> ParseResult<Vec<WithSpan<OutputFieldDefinition>>> {
+    text_source: TextSource,
+) -> ParseResult<Vec<WithLocation<OutputFieldDefinition>>> {
     let brace = tokens.parse_token_of_kind(TokenKind::OpenBrace);
     if brace.is_err() {
         return Ok(vec![]);
     }
 
-    let field = parse_field(tokens)?;
+    let field = parse_field(tokens, text_source)?;
     let mut fields = vec![field];
 
     while tokens.parse_token_of_kind(TokenKind::CloseBrace).is_err() {
-        fields.push(parse_field(tokens)?);
+        fields.push(parse_field(tokens, text_source)?);
     }
     Ok(fields)
 }
 
-fn parse_field<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResult<WithSpan<OutputFieldDefinition>> {
-    tokens
+fn parse_field<'a>(
+    tokens: &mut PeekableLexer<'a>,
+    text_source: TextSource,
+) -> ParseResult<WithLocation<OutputFieldDefinition>> {
+    let with_span = tokens
         .with_span(|tokens| {
             let description = parse_optional_description(tokens);
             let name = tokens
                 .parse_string_key_type(TokenKind::Identifier)
+                .map(|with_span| with_span_to_with_location(with_span, text_source))
                 .map_err(|with_span| with_span.map(SchemaParseError::from))?;
 
-            let arguments = parse_optional_argument_definitions(tokens)?;
+            let arguments = parse_optional_argument_definitions(tokens, text_source)?;
 
             tokens
                 .parse_token_of_kind(TokenKind::Colon)
@@ -386,7 +405,8 @@ fn parse_field<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResult<WithSpan<Outpu
                 directives,
             })
         })
-        .transpose()
+        .transpose()?;
+    Ok(with_span_to_with_location(with_span, text_source))
 }
 
 fn parse_type_annotation<T: From<StringKey>>(
@@ -447,15 +467,16 @@ fn parse_type_annotation<T: From<StringKey>>(
 
 fn parse_optional_argument_definitions<'a>(
     tokens: &mut PeekableLexer<'a>,
+    text_source: TextSource,
 ) -> ParseResult<Vec<WithSpan<InputValueDefinition>>> {
     let paren = tokens.parse_token_of_kind(TokenKind::OpenParen);
 
     if paren.is_ok() {
-        let argument = parse_argument_definition(tokens)?;
+        let argument = parse_argument_definition(tokens, text_source)?;
         let mut arguments = vec![argument];
 
         while tokens.parse_token_of_kind(TokenKind::CloseParen).is_err() {
-            arguments.push(parse_argument_definition(tokens)?);
+            arguments.push(parse_argument_definition(tokens, text_source)?);
         }
         Ok(arguments)
     } else {
@@ -465,12 +486,14 @@ fn parse_optional_argument_definitions<'a>(
 
 fn parse_argument_definition<'a>(
     tokens: &mut PeekableLexer<'a>,
+    text_source: TextSource,
 ) -> ParseResult<WithSpan<InputValueDefinition>> {
     tokens
         .with_span(|tokens| {
             let description = parse_optional_description(tokens);
             let name = tokens
                 .parse_string_key_type(TokenKind::Identifier)
+                .map(|with_span| with_span_to_with_location(with_span, text_source))
                 .map_err(|with_span| with_span.map(SchemaParseError::from))?;
             tokens
                 .parse_token_of_kind(TokenKind::Colon)

@@ -118,7 +118,7 @@ fn transform_object_field_ids(
         .map(|(encountered_field_name, _)| {
             for server_field_id in server_fields.iter() {
                 let field = &schema_fields[server_field_id.as_usize()];
-                if field.name == encountered_field_name {
+                if field.name.item == encountered_field_name {
                     return (encountered_field_name, DefinedField::ServerField(field.id));
                 }
             }
@@ -194,14 +194,14 @@ fn validate_server_field_type_exists_and_is_output_type(
                 let parent_type = schema_data.object(field.parent_type_id);
                 ValidateSchemaError::FieldTypenameIsInputObject {
                     parent_type_name: parent_type.name,
-                    field_name: field.name,
+                    field_name: field.name.item,
                     field_type: *server_field_type.inner(),
                 }
             })
         }),
         None => Err(ValidateSchemaError::FieldTypenameDoesNotExist {
             parent_type_name: schema_data.object(field.parent_type_id).name,
-            field_name: field.name,
+            field_name: field.name.item,
             field_type: *server_field_type.inner(),
         }),
     }
@@ -576,7 +576,7 @@ fn find_server_field_id(
 ) -> Option<ServerFieldId> {
     parent_server_fields.iter().find_map(|server_field_id| {
         let server_field = &server_fields[server_field_id.as_usize()];
-        if server_field.name == field_name.into() {
+        if server_field.name.item == field_name.into() {
             Some(*server_field_id)
         } else {
             None

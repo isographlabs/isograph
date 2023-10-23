@@ -5,7 +5,7 @@ use crate::{Directive, TypeAnnotation};
 use super::{write_arguments, write_directives, ConstantValue};
 use common_lang_types::{
     DescriptionValue, InputTypeName, InputValueName, InterfaceTypeName, ObjectTypeName,
-    ScalarTypeName, SelectableFieldName, UnvalidatedTypeName, WithSpan,
+    ScalarTypeName, SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -55,32 +55,32 @@ impl Deref for TypeSystemDocument {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct ObjectTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithSpan<ObjectTypeName>,
+    pub name: WithLocation<ObjectTypeName>,
     pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
     pub directives: Vec<Directive<ConstantValue>>,
-    pub fields: Vec<WithSpan<OutputFieldDefinition>>,
+    pub fields: Vec<WithLocation<OutputFieldDefinition>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct ScalarTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithSpan<ScalarTypeName>,
+    pub name: WithLocation<ScalarTypeName>,
     pub directives: Vec<Directive<ConstantValue>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct InterfaceTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithSpan<InterfaceTypeName>,
+    pub name: WithLocation<InterfaceTypeName>,
     pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
     pub directives: Vec<Directive<ConstantValue>>,
-    pub fields: Vec<WithSpan<OutputFieldDefinition>>,
+    pub fields: Vec<WithLocation<OutputFieldDefinition>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct OutputFieldDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithSpan<SelectableFieldName>,
+    pub name: WithLocation<SelectableFieldName>,
     pub type_: TypeAnnotation<UnvalidatedTypeName>,
     pub arguments: Vec<WithSpan<InputValueDefinition>>,
     pub directives: Vec<Directive<ConstantValue>>,
@@ -100,7 +100,7 @@ impl fmt::Display for OutputFieldDefinition {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct InputValueDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithSpan<InputValueName>,
+    pub name: WithLocation<InputValueName>,
     pub type_: TypeAnnotation<InputTypeName>,
     pub default_value: Option<WithSpan<ConstantValue>>,
     pub directives: Vec<Directive<ConstantValue>>,

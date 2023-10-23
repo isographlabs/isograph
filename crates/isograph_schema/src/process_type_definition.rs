@@ -1,8 +1,8 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    IsographObjectTypeName, ScalarTypeName, SelectableFieldName, Span, UnvalidatedTypeName,
-    WithSpan,
+    IsographObjectTypeName, Location, ScalarTypeName, SelectableFieldName, Span,
+    UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     InputValueDefinition, NamedTypeAnnotation, NonNullTypeAnnotation, OutputFieldDefinition,
@@ -27,6 +27,8 @@ lazy_static! {
     static ref QUERY_TYPE: IsographObjectTypeName = "Query".intern().into();
     static ref MUTATION_TYPE: IsographObjectTypeName = "Mutation".intern().into();
 }
+
+type TypeRefinementMap = HashMap<IsographObjectTypeName, Vec<WithLocation<ObjectId>>>;
 
 impl UnvalidatedSchema {
     pub fn process_type_system_document(
@@ -80,13 +82,13 @@ impl UnvalidatedSchema {
                 .schema_data
                 .defined_types
                 .get(&supertype_name.into())
-                .ok_or(WithSpan::new(
+                .ok_or(WithLocation::new(
                     ProcessTypeDefinitionError::IsographObjectTypeNameNotDefined {
                         type_name: supertype_name,
                     },
                     // TODO look up the first_item, get the matching implementing object, and
                     // use that instead.
-                    first_item.span,
+                    first_item.location,
                 ))?;
 
             match supertype_id {
@@ -94,12 +96,12 @@ impl UnvalidatedSchema {
                     let scalar = self.schema_data.scalar(*scalar_id);
                     let first_implementing_object = self.schema_data.object(first_item.item);
 
-                    return Err(WithSpan::new(
+                    return Err(WithLocation::new(
                         ProcessTypeDefinitionError::IsographObjectTypeNameIsScalar {
                             type_name: supertype_name,
                             implementing_object: first_implementing_object.name,
                         },
-                        scalar.name.span,
+                        scalar.name.location,
                     ));
                 }
                 DefinedTypeId::Object(object_id) => {
@@ -129,7 +131,7 @@ impl UnvalidatedSchema {
     fn process_object_type_definition(
         &mut self,
         type_definition: IsographObjectTypeDefinition,
-        valid_type_refinement_map: &mut HashMap<IsographObjectTypeName, Vec<WithSpan<ObjectId>>>,
+        valid_type_refinement_map: &mut TypeRefinementMap,
     ) -> ProcessTypeDefinitionResult<Option<ObjectId>> {
         let &mut Schema {
             fields: ref mut schema_fields,
@@ -144,12 +146,12 @@ impl UnvalidatedSchema {
         let mut mutation_id = None;
         match type_names.entry(type_definition.name.item.into()) {
             Entry::Occupied(_) => {
-                return Err(WithSpan::new(
+                return Err(WithLocation::new(
                     ProcessTypeDefinitionError::DuplicateTypeDefinition {
                         type_definition_type: "object",
                         type_name: type_definition.name.item.into(),
                     },
-                    type_definition.name.span,
+                    type_definition.name.location,
                 ));
             }
             Entry::Vacant(vacant) => {
@@ -214,7 +216,10 @@ impl UnvalidatedSchema {
             let definitions = valid_type_refinement_map
                 .entry(interface.item.into())
                 .or_default();
-            definitions.push(WithSpan::new(next_object_id, type_definition.name.span));
+            definitions.push(WithLocation::new(
+                next_object_id,
+                type_definition.name.location,
+            ));
         }
 
         Ok(mutation_id)
@@ -233,12 +238,12 @@ impl UnvalidatedSchema {
         let ref mut scalars = schema_data.scalars;
         match type_names.entry(scalar_type_definition.name.item.into()) {
             Entry::Occupied(_) => {
-                return Err(WithSpan::new(
+                return Err(WithLocation::new(
                     ProcessTypeDefinitionError::DuplicateTypeDefinition {
                         type_definition_type: "scalar",
                         type_name: scalar_type_definition.name.item.into(),
                     },
-                    scalar_type_definition.name.span,
+                    scalar_type_definition.name.location,
                 ));
             }
             Entry::Vacant(vacant) => {
@@ -281,7 +286,11 @@ impl UnvalidatedSchema {
 
         for field_id in mutation_object_fields.iter() {
             let mutation_field = self.field(*field_id);
-            let magic_mutation_field_name = format!("__{}", mutation_field.name).intern().into();
+            // TODO this is dangerous! mutation_field.name is also formattable (with carats).
+            // We should find a way to make WithLocation not impl Display, while also making
+            // errors containing WithLocation<...> easy to work with.
+            let magic_mutation_field_name =
+                format!("__{}", mutation_field.name.item).intern().into();
 
             if let Some((
                 parent_object_id,
@@ -343,13 +352,13 @@ impl UnvalidatedSchema {
                     )
                     .is_some()
                 {
-                    return Err(WithSpan::new(
+                    return Err(WithLocation::new(
                         ProcessTypeDefinitionError::MutationFieldIsDuplicate {
                             field_name: magic_mutation_field_name,
                             parent_type: parent_object.name,
                         },
-                        // TODO we should have a span for the original field, at least
-                        Span::todo_generated(),
+                        // TODO this is blatantly incorrect
+                        Location::generated(),
                     ));
                 }
 
@@ -407,7 +416,7 @@ impl UnvalidatedSchema {
                 {
                     return Some((
                         *primary_field_object_id,
-                        mutation_response_only_field.name,
+                        mutation_response_only_field.name.item,
                         arguments_without_id_arg,
                     ));
                 }
@@ -452,7 +461,7 @@ fn get_only_non_typename_field(
     for field_id in server_fields {
         let field = schema.field(*field_id);
         // TODO this is a hacky check
-        if field.name != typename_field_name {
+        if field.name.item != typename_field_name {
             if found_field.is_some() {
                 return None;
             } else {
@@ -531,6 +540,7 @@ fn get_typename_type(
 struct FieldObjectIdsEtc {
     unvalidated_schema_fields: Vec<UnvalidatedSchemaField>,
     server_fields: Vec<ServerFieldId>,
+    // TODO this should be HashMap<_, WithLocation<_>> or something
     encountered_fields: HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
     // TODO this should not be a ServerFieldId, but a special type
     id_field: Option<ServerIdFieldId>,
@@ -539,7 +549,7 @@ struct FieldObjectIdsEtc {
 /// Given a vector of fields from the schema AST all belonging to the same object/interface,
 /// return a vector of unvalidated fields and a set of field names.
 fn get_field_objects_ids_and_names(
-    new_fields: Vec<WithSpan<OutputFieldDefinition>>,
+    new_fields: Vec<WithLocation<OutputFieldDefinition>>,
     next_field_id: usize,
     parent_type_id: ObjectId,
     parent_type_name: IsographObjectTypeName,
@@ -572,7 +582,7 @@ fn get_field_objects_ids_and_names(
 
                 unvalidated_fields.push(SchemaServerField {
                     description: field.item.description.map(|d| d.item),
-                    name: field.item.name.item,
+                    name: field.item.name,
                     id: current_field_id.into(),
                     associated_data: field.item.type_,
                     parent_type_id,
@@ -581,12 +591,12 @@ fn get_field_objects_ids_and_names(
                 field_ids.push(current_field_id.into());
             }
             Some(_) => {
-                return Err(WithSpan::new(
+                return Err(WithLocation::new(
                     ProcessTypeDefinitionError::DuplicateField {
                         field_name: field.item.name.item,
                         parent_type: parent_type_name,
                     },
-                    field.item.name.span,
+                    field.item.name.location,
                 ));
             }
         }
@@ -599,7 +609,7 @@ fn get_field_objects_ids_and_names(
     // to check the name! That's a bit unfortunate. We should model these differently,
     // perhaps fields should contain an enum (IdField, TypenameField, ActualField)
     let typename_field_id = (next_field_id + field_ids.len()).into();
-    let typename_name = "__typename".intern().into();
+    let typename_name = WithLocation::new("__typename".intern().into(), Location::generated());
     field_ids.push(typename_field_id);
     unvalidated_fields.push(SchemaServerField {
         description: None,
@@ -611,15 +621,16 @@ fn get_field_objects_ids_and_names(
     });
 
     if encountered_fields
-        .insert(typename_name, DefinedField::ServerField(typename_type))
+        .insert(typename_name.item, DefinedField::ServerField(typename_type))
         .is_some()
     {
-        return Err(WithSpan::new(
+        return Err(WithLocation::new(
             ProcessTypeDefinitionError::TypenameCannotBeDefined {
                 parent_type: parent_type_name,
             },
-            // TODO we should have a span for the previous field, somehow
-            Span::todo_generated(),
+            // This is blatantly incorrect, we should have the location
+            // of the previously defined typename
+            Location::generated(),
         ));
     }
     // ----- END HACK -----
@@ -638,7 +649,7 @@ fn get_field_objects_ids_and_names(
 fn set_and_validate_id_field(
     id_field: &mut Option<ServerIdFieldId>,
     current_field_id: usize,
-    field: &WithSpan<OutputFieldDefinition>,
+    field: &WithLocation<OutputFieldDefinition>,
     parent_type_name: IsographObjectTypeName,
 ) -> ProcessTypeDefinitionResult<()> {
     // N.B. id_field is guaranteed to be None; otherwise field_names_to_type_name would
@@ -652,28 +663,28 @@ fn set_and_validate_id_field(
     match field.item.type_.inner_non_null_named_type() {
         Some(type_) => {
             if (*type_).0.item.lookup() != ID_GRAPHQL_TYPE.lookup() {
-                Err(WithSpan::new(
+                Err(WithLocation::new(
                     ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {
                         parent_type: parent_type_name,
                     },
                     // TODO this shows the wrong span?
-                    field.span,
+                    field.location,
                 ))
             } else {
                 Ok(())
             }
         }
-        None => Err(WithSpan::new(
+        None => Err(WithLocation::new(
             ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {
                 parent_type: parent_type_name,
             },
-            // TODO this shows the wrong span?
-            field.span,
+            // TODO this might show the wrong span?
+            field.location,
         )),
     }
 }
 
-type ProcessTypeDefinitionResult<T> = Result<T, WithSpan<ProcessTypeDefinitionError>>;
+type ProcessTypeDefinitionResult<T> = Result<T, WithLocation<ProcessTypeDefinitionError>>;
 
 /// Errors that make semantic sense when referring to creating a GraphQL schema in-memory representation
 #[derive(Error, Debug)]

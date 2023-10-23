@@ -164,10 +164,14 @@ fn get_artifact_for_mutation_field<'schema>(
                 input_value_definition
                     .clone()
                     .map(|input_value_definition| SelectionFieldArgument {
-                        name: input_value_definition.name.map(|x| x.into()),
+                        name: input_value_definition
+                            .name
+                            .map(|x| x.into())
+                            .hack_to_with_span(),
                         value: input_value_definition
                             .name
-                            .map(|x| NonConstantValue::Variable(x.into())),
+                            .map(|x| NonConstantValue::Variable(x.into()))
+                            .hack_to_with_span(),
                     })
             })
             .chain(std::iter::once(WithSpan::new(
@@ -294,7 +298,7 @@ fn generate_mutation_query_text<'schema>(
             let variable_name = argument.item.name.map(|x| x.into());
             variable_definitions.push(WithSpan {
                 item: VariableDefinition {
-                    name: variable_name,
+                    name: variable_name.hack_to_with_span(),
                     type_: argument.item.type_.clone().map(|x| {
                         schema
                             .schema_data
@@ -312,8 +316,10 @@ fn generate_mutation_query_text<'schema>(
             });
             WithSpan::new(
                 SelectionFieldArgument {
-                    name: argument.item.name.map(|x| x.into()),
-                    value: variable_name.map(|x| NonConstantValue::Variable(x)),
+                    name: argument.item.name.map(|x| x.into()).hack_to_with_span(),
+                    value: variable_name
+                        .map(|x| NonConstantValue::Variable(x))
+                        .hack_to_with_span(),
                 },
                 Span::todo_generated(),
             )

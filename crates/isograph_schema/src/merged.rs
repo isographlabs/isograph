@@ -683,7 +683,7 @@ fn select_typename_and_id_fields_in_merged_selection(
                     MergedServerFieldSelection::ScalarField(MergedScalarFieldSelection {
                         // major HACK alert
                         name: WithSpan::new(
-                            id_field.name.lookup().intern().into(),
+                            id_field.name.item.lookup().intern().into(),
                             Span::todo_generated(),
                         ),
                         arguments: vec![],

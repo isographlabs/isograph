@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use common_lang_types::{
     DescriptionValue, FieldArgumentName, HasName, InputTypeName, InterfaceTypeName,
-    IsographObjectTypeName, JavascriptName, LinkedFieldName, ResolverDefinitionPath,
-    ScalarTypeName, SelectableFieldName, Span, UnvalidatedTypeName, WithSpan,
+    IsographObjectTypeName, JavascriptName, LinkedFieldName, Location, ResolverDefinitionPath,
+    ScalarTypeName, SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, Directive, InputValueDefinition, InterfaceTypeDefinition, NamedTypeAnnotation,
@@ -305,7 +305,7 @@ fn add_schema_defined_scalar_type(
     // TODO this is problematic, we have no span (or really, no location) associated with this
     // schema-defined scalar, so we will not be able to properly show error messages if users
     // e.g. have Foo implements String
-    let typename = WithSpan::new(field_name.intern().into(), Span::todo_generated());
+    let typename = WithLocation::new(field_name.intern().into(), Location::generated());
     scalars.push(SchemaScalar {
         description: None,
         name: typename,
@@ -353,12 +353,12 @@ impl<'a> HasName for SchemaInputType<'a> {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct IsographObjectTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithSpan<IsographObjectTypeName>,
+    pub name: WithLocation<IsographObjectTypeName>,
     // maybe this should be Vec<WithSpan<IsographObjectTypeName>>>
     pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
     pub directives: Vec<Directive<ConstantValue>>,
     // TODO the spans of these fields are wrong
-    pub fields: Vec<WithSpan<OutputFieldDefinition>>,
+    pub fields: Vec<WithLocation<OutputFieldDefinition>>,
 }
 
 impl From<ObjectTypeDefinition> for IsographObjectTypeDefinition {
@@ -413,8 +413,10 @@ pub struct ValidRefinement {
 #[derive(Debug, Clone)]
 pub struct SchemaServerField<TData> {
     pub description: Option<DescriptionValue>,
-    // TODO this should be WithLocation<SelectableFieldName>
-    pub name: SelectableFieldName,
+    /// The name of the server field and the location where it was defined
+    /// (i.e. for resolvers, an iso literal, and for server fields, the schema
+    /// file, and for other fields, Location::Generated).
+    pub name: WithLocation<SelectableFieldName>,
     pub id: ServerFieldId,
     pub associated_data: TData,
     pub parent_type_id: ObjectId,
@@ -443,7 +445,7 @@ impl<TData> SchemaServerField<TData> {
 #[derive(Debug, Clone, Copy)]
 pub struct SchemaIdField<TData> {
     pub description: Option<DescriptionValue>,
-    pub name: SelectableFieldName,
+    pub name: WithLocation<SelectableFieldName>,
     pub id: ServerIdFieldId,
     pub associated_data: TData,
     pub parent_type_id: ObjectId,
@@ -611,7 +613,7 @@ impl<T> SchemaServerField<T> {
 #[derive(Debug)]
 pub struct SchemaScalar {
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithSpan<ScalarTypeName>,
+    pub name: WithLocation<ScalarTypeName>,
     pub id: ScalarId,
     pub javascript_name: JavascriptName,
 }

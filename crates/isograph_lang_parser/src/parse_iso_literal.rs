@@ -1,8 +1,8 @@
 use std::ops::ControlFlow;
 
 use common_lang_types::{
-    Location, ResolverDefinitionPath, SelectableFieldName, Span, StringKeyNewtype, TextSource,
-    UnvalidatedTypeName, WithLocation, WithSpan,
+    with_span_to_with_location, Location, ResolverDefinitionPath, SelectableFieldName, Span,
+    StringKeyNewtype, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation,
@@ -19,13 +19,6 @@ use crate::{
     ParseResultWithLocation, ParseResultWithSpan, PeekableLexer,
 };
 
-fn with_span_to_with_location<T>(item: WithSpan<T>, source: TextSource) -> WithLocation<T> {
-    WithLocation {
-        location: Location::new(source, item.span),
-        item: item.item,
-    }
-}
-
 pub fn parse_iso_literal(
     b_declare_literal_text: &str,
     definition_file_path: ResolverDefinitionPath,
@@ -39,7 +32,7 @@ pub fn parse_iso_literal(
         definition_file_path,
         has_associated_js_function,
     )
-    .map_err(|e| with_span_to_with_location(e, text_source))?;
+    .map_err(|with_span| with_span_to_with_location(with_span, text_source))?;
 
     if let Some(span) = tokens.remaining_token_span() {
         return Err(WithLocation::new(

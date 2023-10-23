@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use common_lang_types::{Location, Span, TextSource, WithLocation};
+use common_lang_types::{with_span_to_with_location, Span, TextSource, WithLocation};
 use graphql_lang_parser::{parse_schema, SchemaParseError};
 use intern::string_key::Intern;
 use isograph_lang_parser::{parse_iso_literal, IsographLiteralParseError};
@@ -31,34 +31,15 @@ pub(crate) struct BatchCompileCliOptions {
 
 pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), BatchCompileError> {
     let content = read_schema_file(&opt.schema)?;
-    let type_system_document = parse_schema(&content).map_err(|e| {
-        WithLocation::new(
-            e.item,
-            Location::new(
-                TextSource {
-                    path: opt.schema.to_str().unwrap().intern().into(),
-                    span: None,
-                },
-                e.span,
-            ),
-        )
-    })?;
+    let text_source = TextSource {
+        path: opt.schema.to_str().unwrap().intern().into(),
+        span: None,
+    };
+    let type_system_document = parse_schema(&content, text_source)
+        .map_err(|with_span| with_span_to_with_location(with_span, text_source))?;
     let mut schema = Schema::new();
 
-    schema
-        .process_type_system_document(type_system_document)
-        .map_err(|e| {
-            WithLocation::new(
-                e.item,
-                Location::new(
-                    TextSource {
-                        path: opt.schema.to_str().unwrap().intern().into(),
-                        span: None,
-                    },
-                    e.span,
-                ),
-            )
-        })?;
+    schema.process_type_system_document(type_system_document)?;
 
     let canonicalized_root_path = {
         let current_dir = std::env::current_dir().expect("current_dir should exist");

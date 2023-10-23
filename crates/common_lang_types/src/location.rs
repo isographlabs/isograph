@@ -2,7 +2,7 @@ use std::fmt;
 
 use intern::Lookup;
 
-use crate::{text_with_carats::text_with_carats, SourceFileName, Span};
+use crate::{text_with_carats::text_with_carats, SourceFileName, Span, WithSpan};
 
 /// A source, which consists of a filename, and an optional span
 /// indicating the subset of the file which corresponds to the
@@ -69,7 +69,7 @@ impl fmt::Display for Location {
     }
 }
 
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
 pub struct WithLocation<T> {
     pub location: Location,
     pub item: T,
@@ -93,4 +93,25 @@ impl<T> WithLocation<T> {
     pub fn and_then<U, E>(self, map: impl FnOnce(T) -> Result<U, E>) -> Result<WithLocation<U>, E> {
         Ok(WithLocation::new(map(self.item)?, self.location))
     }
+
+    /// This method should not be called. It exists because in some places,
+    /// we have locations where we want spans, which needs to be fixed with
+    /// refactoring.
+    pub fn hack_to_with_span(self) -> WithSpan<T> {
+        let span = match self.location {
+            Location::Embedded { span, .. } => span,
+            Location::Generated => Span::todo_generated(),
+        };
+        WithSpan {
+            item: self.item,
+            span,
+        }
+    }
+}
+
+pub fn with_span_to_with_location<T>(
+    with_span: WithSpan<T>,
+    text_source: TextSource,
+) -> WithLocation<T> {
+    WithLocation::new(with_span.item, Location::new(text_source, with_span.span))
 }

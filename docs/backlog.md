@@ -43,6 +43,7 @@
 - Objects which do not have IDs should be merged into their parent object in the store.
 - Remove the requirement that arguments and parameters have a terminal comma.
 - Transform should be removed.
+- IsographSchemaObject, etc. should not contain name: WithLocation<...>, but instead, be stored WithLocation<_>, and WithLocation should **not** have a span.
 
 ## Known bugs
 
