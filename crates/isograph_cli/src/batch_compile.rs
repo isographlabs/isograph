@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use common_lang_types::{Location, SourceLocationKey, WithLocation};
+use common_lang_types::{Location, Span, TextSource, WithLocation};
 use graphql_lang_parser::{parse_schema, SchemaParseError};
 use intern::string_key::Intern;
 use isograph_lang_parser::{parse_iso_literal, IsographLiteralParseError};
@@ -35,10 +35,9 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
         WithLocation::new(
             e.item,
             Location::new(
-                SourceLocationKey::Embedded {
+                TextSource {
                     path: opt.schema.to_str().unwrap().intern().into(),
-                    start_index: 0,
-                    len: content.len(),
+                    span: None,
                 },
                 e.span,
             ),
@@ -52,10 +51,9 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
             WithLocation::new(
                 e.item,
                 Location::new(
-                    SourceLocationKey::Embedded {
+                    TextSource {
                         path: opt.schema.to_str().unwrap().intern().into(),
-                        start_index: 0,
-                        len: content.len(),
+                        span: None,
                     },
                     e.span,
                 ),
@@ -94,10 +92,12 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
                 iso_literal_start_index,
             } = extraction;
 
-            let source_location = SourceLocationKey::Embedded {
+            let source_location = TextSource {
                 path: file_name,
-                start_index: iso_literal_start_index,
-                len: iso_literal_text.len(),
+                span: Some(Span::new(
+                    iso_literal_start_index as u32,
+                    (iso_literal_start_index + iso_literal_text.len()) as u32,
+                )),
             };
             let resolver_declaration = parse_iso_literal(
                 &iso_literal_text,

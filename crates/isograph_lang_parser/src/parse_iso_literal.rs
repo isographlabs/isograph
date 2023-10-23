@@ -1,8 +1,8 @@
 use std::ops::ControlFlow;
 
 use common_lang_types::{
-    Location, ResolverDefinitionPath, SelectableFieldName, SourceLocationKey, Span,
-    StringKeyNewtype, UnvalidatedTypeName, WithLocation, WithSpan,
+    Location, ResolverDefinitionPath, SelectableFieldName, Span, StringKeyNewtype, TextSource,
+    UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation,
@@ -19,15 +19,9 @@ use crate::{
     ParseResultWithLocation, ParseResultWithSpan, PeekableLexer,
 };
 
-fn with_span_to_with_location<T>(
-    item: WithSpan<T>,
-    source_location: SourceLocationKey,
-) -> WithLocation<T> {
+fn with_span_to_with_location<T>(item: WithSpan<T>, source: TextSource) -> WithLocation<T> {
     WithLocation {
-        location: Location {
-            source_location,
-            span: item.span,
-        },
+        location: Location::new(source, item.span),
         item: item.item,
     }
 }
@@ -36,7 +30,7 @@ pub fn parse_iso_literal(
     b_declare_literal_text: &str,
     definition_file_path: ResolverDefinitionPath,
     has_associated_js_function: bool,
-    source_location: SourceLocationKey,
+    text_source: TextSource,
 ) -> ParseResultWithLocation<WithSpan<ResolverDeclaration>> {
     let mut tokens = PeekableLexer::new(b_declare_literal_text);
 
@@ -45,12 +39,12 @@ pub fn parse_iso_literal(
         definition_file_path,
         has_associated_js_function,
     )
-    .map_err(|e| with_span_to_with_location(e, source_location))?;
+    .map_err(|e| with_span_to_with_location(e, text_source))?;
 
     if let Some(span) = tokens.remaining_token_span() {
         return Err(WithLocation::new(
             IsographLiteralParseError::LeftoverTokens,
-            Location::new(source_location, span),
+            Location::new(text_source, span),
         ));
     }
 

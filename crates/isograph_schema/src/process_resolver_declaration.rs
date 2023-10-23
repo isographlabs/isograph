@@ -1,8 +1,8 @@
 use std::fmt;
 
 use common_lang_types::{
-    IsographDirectiveName, IsographObjectTypeName, Location, SelectableFieldName,
-    SourceLocationKey, UnvalidatedTypeName, WithLocation, WithSpan,
+    IsographDirectiveName, IsographObjectTypeName, Location, SelectableFieldName, TextSource,
+    UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::InputValueDefinition;
 use intern::string_key::Intern;
@@ -19,7 +19,7 @@ impl UnvalidatedSchema {
     pub fn process_resolver_declaration(
         &mut self,
         resolver_declaration: WithSpan<ResolverDeclaration>,
-        source_location: SourceLocationKey,
+        text_source: TextSource,
     ) -> Result<(), WithLocation<ProcessResolverDeclarationError>> {
         let parent_type_id = self
             .schema_data
@@ -29,15 +29,13 @@ impl UnvalidatedSchema {
                 ProcessResolverDeclarationError::ParentTypeNotDefined {
                     parent_type_name: resolver_declaration.item.parent_type.item,
                 },
-                Location::new(source_location, resolver_declaration.item.parent_type.span),
+                Location::new(text_source, resolver_declaration.item.parent_type.span),
             ))?;
 
         match parent_type_id {
             DefinedTypeId::Object(object_id) => {
                 self.add_resolver_field_to_object(*object_id, resolver_declaration)
-                    .map_err(|e| {
-                        WithLocation::new(e.item, Location::new(source_location, e.span))
-                    })?;
+                    .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?;
             }
             DefinedTypeId::Scalar(scalar_id) => {
                 let scalar_name = self.schema_data.scalars[scalar_id.as_usize()].name;
@@ -46,7 +44,7 @@ impl UnvalidatedSchema {
                         parent_type: "scalar",
                         parent_type_name: scalar_name.item.into(),
                     },
-                    Location::new(source_location, resolver_declaration.item.parent_type.span),
+                    Location::new(text_source, resolver_declaration.item.parent_type.span),
                 ));
             }
         }

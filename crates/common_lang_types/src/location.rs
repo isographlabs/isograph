@@ -4,79 +4,67 @@ use intern::Lookup;
 
 use crate::{text_with_carats::text_with_carats, SourceFileName, Span};
 
-/// The location of a source.
+/// A source, which consists of a filename, and an optional span
+/// indicating the subset of the file which corresponds to the
+/// source.
+///
+/// TODO consider whether to replace the span with an index,
+/// as this will probably mean that sources are more reusable
+/// during watch mode.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum SourceLocationKey {
-    /// A source embedded within a file. The index is the starting character
-    /// of the embedded source within the file.
+pub struct TextSource {
+    pub path: SourceFileName,
+    pub span: Option<Span>,
+}
+
+impl TextSource {
+    pub fn read_to_string(&self) -> (&str, String) {
+        // TODO maybe intern these or somehow avoid reading a bajillion times.
+        // This is especially important for when we display many errors.
+        let file_path = self.path.lookup();
+        let file_contents = std::fs::read_to_string(&file_path).expect("file should exist");
+        if let Some(span) = self.span {
+            // TODO we're cloning here unnecessarily, I think!
+            (file_path, file_contents[span.as_usize_range()].to_string())
+        } else {
+            (file_path, file_contents)
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum Location {
     Embedded {
-        // TODO include a span here
-        path: SourceFileName,
-        start_index: usize,
-        len: usize,
+        text_source: TextSource,
+        /// The span is relative to the Source's span, not to the
+        /// entire source file.
+        span: Span,
     },
     Generated,
 }
 
-impl SourceLocationKey {
-    /// Returns a `SourceLocationKey` that's not backed by a real file. In most
-    /// cases it's preferred to use a related real file.
-    pub fn generated() -> Self {
-        SourceLocationKey::Generated
-    }
-
-    pub fn path(self) -> &'static str {
-        match self {
-            SourceLocationKey::Embedded { path, .. } => path.lookup(),
-            SourceLocationKey::Generated => "<generated>",
-        }
-    }
-}
-
-/// An absolute source location describing both the file and position (span)
-/// with that file.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub struct Location {
-    pub source_location: SourceLocationKey,
-
-    /// Relative position with the file
-    pub span: Span,
-}
-
 impl Location {
     pub fn generated() -> Self {
-        Location {
-            source_location: SourceLocationKey::generated(),
-            span: Span::todo_generated(),
-        }
+        Location::Generated
     }
 
-    pub fn new(source_location: SourceLocationKey, span: Span) -> Self {
-        Location {
-            source_location,
-            span,
-        }
+    pub fn new(text_source: TextSource, span: Span) -> Self {
+        Location::Embedded { text_source, span }
     }
 }
 
 impl fmt::Display for Location {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.source_location {
-            SourceLocationKey::Embedded {
-                path,
-                start_index,
-                len,
-            } => {
-                let span = self.span;
-                let file_path = path.lookup();
-                let file_contents = std::fs::read_to_string(&file_path).expect("file should exist");
-
-                let path_text = &file_contents[start_index..start_index + len];
-                let text_with_carats = text_with_carats(path_text, span);
+        match self {
+            Location::Embedded { text_source, span } => {
+                let (file_path, read_out_text) = text_source.read_to_string();
+                let text_with_carats = text_with_carats(&read_out_text, *span);
 
                 write!(f, "{}\n{}", file_path, text_with_carats)
             }
-            SourceLocationKey::Generated => write!(f, "<generated>"),
+            Location::Generated => {
+                write!(f, "<generated>")
+            }
         }
     }
 }

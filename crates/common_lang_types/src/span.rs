@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, ops::Range};
 
 // Invariant: end >= start
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -21,6 +21,7 @@ impl From<std::ops::Range<usize>> for Span {
 
 impl Span {
     pub fn new(start: u32, end: u32) -> Self {
+        debug_assert!(start <= end, "span.start should be less than span.end");
         Span { start, end }
     }
 
@@ -48,6 +49,10 @@ impl Span {
 
     pub fn join(left: Span, right: Span) -> Self {
         Span::new(left.start, right.end)
+    }
+
+    pub fn as_usize_range(&self) -> Range<usize> {
+        (self.start as usize)..(self.end as usize)
     }
 }
 
