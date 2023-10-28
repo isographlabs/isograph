@@ -4,6 +4,7 @@
 
 * get rid of @fetchable resolvers, instead have syntax like `` isoFetch`Query.foo` `` (or something else).
   * Can this be an entrypoint by default? (i.e. the generated file here only contain the query text + variables, and no normalization or reader AST)?
+  * all non-fetch resolvers now require JS function
 * Get rid of @eager. All resolvers are eager, and all resolvers require a function (no identity fn)
 * Once fetchable and eager are gone, there will only be regular resolvers (whose data is read along with parent) and components, whose data are read in a separate render. Is there a missing third option, where the data are read when we call a function?
   * Is this only a perf optimization? It can be achieved by not propagating ! too high.
@@ -11,8 +12,11 @@
 ## Top QOL priorities
 
 * Watch mode CLI
-* Error printing
 * Babel integration for `iso*` literals
+* compiler enforcement that resolvers are exported
+- Expose compiler binary as `iso`.
+
+x Error printing
 
 ## Feature backlog
 
@@ -24,15 +28,14 @@
 - The store, etc. should be stored in context.
 - Resolvers return opaque objects and cannot be selected into. They should be extended to also allow the return of IDs, which can they be selected into.
 - Stateful resolvers?
+  - This could be thought of as "realized" resolvers, which is to say there is overlap with better DevEx for components
 - Subscriptions are not supported, and mutations are supported super inflexibly.
 - Defer, etc.
 - Refetchable queries.
 - Pagination.
 - Types for variables.
 - Inferred types for iso literals via Typescript compiler plugin.
-- Lint rules (namely, enforce that the exported const matches the name of the resolver field.)
-- Non-batch mode compiler: watch mode and LSP.
-- Expose compiler binary as `iso` or something.
+- typed IDs
 
 ## Cleanup backlog
 
@@ -124,3 +127,4 @@
 * Babel integration for iso literal values
 * Typescript integration for type inference of iso literals
 * Parallelize artifact gen
+* Stuff should be wrapped with WithSource, locations should not be on individual fields
