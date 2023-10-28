@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use common_lang_types::{with_span_to_with_location, Span, TextSource, WithLocation};
 use graphql_lang_parser::{parse_schema, SchemaParseError};
 use intern::string_key::Intern;
-use isograph_lang_parser::{parse_iso_literal, IsographLiteralParseError};
+use isograph_lang_parser::{parse_iso_fetch, parse_iso_literal, IsographLiteralParseError};
 use isograph_schema::Schema;
 use structopt::StructOpt;
 use thiserror::Error;
@@ -11,7 +11,8 @@ use thiserror::Error;
 use crate::{
     generate_artifacts::{generate_artifacts, GenerateArtifactsError},
     isograph_literals::{
-        extract_iso_literal_from_file_content, read_files_in_folder, IsoLiteralExtraction,
+        extract_iso_fetch_from_file_content, extract_iso_literal_from_file_content,
+        read_files_in_folder, IsoFetchExtraction, IsoLiteralExtraction,
     },
     schema::read_schema_file,
 };
@@ -31,12 +32,12 @@ pub(crate) struct BatchCompileCliOptions {
 
 pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), BatchCompileError> {
     let content = read_schema_file(&opt.schema)?;
-    let text_source = TextSource {
+    let schema_text_source = TextSource {
         path: opt.schema.to_str().unwrap().intern().into(),
         span: None,
     };
-    let type_system_document = parse_schema(&content, text_source)
-        .map_err(|with_span| with_span_to_with_location(with_span, text_source))?;
+    let type_system_document = parse_schema(&content, schema_text_source)
+        .map_err(|with_span| with_span_to_with_location(with_span, schema_text_source))?;
     let mut schema = Schema::new();
 
     schema.process_type_system_document(type_system_document)?;
@@ -65,15 +66,14 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
             .intern()
             .into();
 
-        let iso_literals = extract_iso_literal_from_file_content(&file_content);
-        for extraction in iso_literals {
+        for iso_literal_extraction in extract_iso_literal_from_file_content(&file_content) {
             let IsoLiteralExtraction {
                 iso_literal_text,
                 has_associated_js_function,
                 iso_literal_start_index,
-            } = extraction;
+            } = iso_literal_extraction;
 
-            let source_location = TextSource {
+            let text_source = TextSource {
                 path: file_name,
                 span: Some(Span::new(
                     iso_literal_start_index as u32,
@@ -84,9 +84,25 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
                 &iso_literal_text,
                 interned_file_path,
                 has_associated_js_function,
-                source_location,
+                text_source,
             )?;
-            schema.process_resolver_declaration(resolver_declaration, source_location)?;
+            schema.process_resolver_declaration(resolver_declaration, text_source)?;
+        }
+
+        for iso_fetch_extaction in extract_iso_fetch_from_file_content(&file_content) {
+            let IsoFetchExtraction {
+                iso_fetch_text,
+                iso_fetch_start_index,
+            } = iso_fetch_extaction;
+            let text_source = TextSource {
+                path: file_name,
+                span: Some(Span::new(
+                    iso_fetch_start_index as u32,
+                    (iso_fetch_start_index + iso_fetch_text.len()) as u32,
+                )),
+            };
+
+            let _fetch_declaration = parse_iso_fetch(iso_fetch_text, text_source)?;
         }
     }
 

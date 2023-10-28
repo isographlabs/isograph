@@ -10,8 +10,8 @@ use graphql_lang_types::{
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
     FragmentDirectiveUsage, LinkedFieldSelection, NonConstantValue, ResolverDeclaration,
-    ScalarFieldSelection, Selection, SelectionFieldArgument, ServerFieldSelection, Unwrap,
-    VariableDefinition,
+    ResolverFetch, ScalarFieldSelection, Selection, SelectionFieldArgument, ServerFieldSelection,
+    Unwrap, VariableDefinition,
 };
 
 use crate::{
@@ -19,13 +19,48 @@ use crate::{
     ParseResultWithLocation, ParseResultWithSpan, PeekableLexer,
 };
 
+pub fn parse_iso_fetch(
+    iso_fetch_text: &str,
+    text_source: TextSource,
+) -> ParseResultWithLocation<WithSpan<ResolverFetch>> {
+    let mut tokens = PeekableLexer::new(iso_fetch_text);
+    let resolver_fetch = tokens
+        .with_span(|tokens| {
+            let parent_type = tokens
+                .parse_string_key_type(IsographLangTokenKind::Identifier)
+                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+            tokens
+                .parse_token_of_kind(IsographLangTokenKind::Period)
+                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+            let resolver_field_name = tokens
+                .parse_string_key_type(IsographLangTokenKind::Identifier)
+                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+
+            Ok(ResolverFetch {
+                parent_type,
+                resolver_field_name,
+            })
+        })
+        .transpose()
+        .map_err(|with_span| with_span_to_with_location(with_span, text_source))?;
+
+    if let Some(span) = tokens.remaining_token_span() {
+        return Err(WithLocation::new(
+            IsographLiteralParseError::LeftoverTokens,
+            Location::new(text_source, span),
+        ));
+    }
+
+    Ok(resolver_fetch)
+}
+
 pub fn parse_iso_literal(
-    b_declare_literal_text: &str,
+    iso_literal_text: &str,
     definition_file_path: ResolverDefinitionPath,
     has_associated_js_function: bool,
     text_source: TextSource,
 ) -> ParseResultWithLocation<WithSpan<ResolverDeclaration>> {
-    let mut tokens = PeekableLexer::new(b_declare_literal_text);
+    let mut tokens = PeekableLexer::new(iso_literal_text);
 
     let resolver_declaration = parse_resolver_declaration(
         &mut tokens,
