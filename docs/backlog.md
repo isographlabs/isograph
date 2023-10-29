@@ -128,3 +128,25 @@ x Error printing
 * Typescript integration for type inference of iso literals
 * Parallelize artifact gen
 * Stuff should be wrapped with WithSource, locations should not be on individual fields
+
+# Plan for isoFetch
+
+* Each isoFetch encountered leads to a fetchable resolver generated
+* Non-fetchable resolvers are still generated
+* These are separate files. The fetchable artifact contains normalization AST + query text + nested refetch queries; the regular artifact contains the reader + resolver
+  * convert can be gotten rid of
+* Usage
+
+```js
+// homepage.js
+
+// aka import query from '__isograph__/Query/home_component/fetch'
+const home_page_query = isoFetch`Query.home_component`;
+
+// home_component.js
+
+// generates artifact in '__isograph__/Query/home_component/reader'
+export const home_component = iso`
+  Query.home_component @component { ... }
+`(HomeComponent)
+```
