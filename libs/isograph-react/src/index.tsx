@@ -160,6 +160,8 @@ export type FragmentReference<
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
+export function isoFetch(_text: TemplateStringsArray): void {}
+
 export function iso<TResolverParameter, TResolverReturn = TResolverParameter>(
   _queryText: TemplateStringsArray
 ): (
