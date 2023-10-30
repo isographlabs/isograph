@@ -537,7 +537,7 @@ pub struct SchemaResolver<TScalarField, TLinkedField, TVariableDefinitionType> {
     )>,
 
     // TODO we should probably model this differently
-    pub variant: WithSpan<ResolverVariant>,
+    pub variant: ResolverVariant,
 
     // TODO should this be create_normalization_ast: bool?
     pub artifact_kind: ResolverArtifactKind,

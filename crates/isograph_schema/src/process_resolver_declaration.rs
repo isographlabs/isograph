@@ -96,7 +96,7 @@ impl UnvalidatedSchema {
         };
 
         // TODO variant should carry payloads, instead of this check
-        if variant.item == ResolverVariant::Component {
+        if variant == ResolverVariant::Component {
             if !matches!(resolver_action_kind, ResolverActionKind::NamedImport(_)) {
                 return Err(WithSpan::new(
                     ProcessResolverDeclarationError::ComponentResolverMissingJsFunction,
@@ -186,20 +186,13 @@ lazy_static! {
     static ref FETCHABLE: IsographDirectiveName = "fetchable".intern().into();
 }
 
-// TODO validate that the type is actually fetchable, and that we don't have both
-fn get_resolver_variant(
-    directives: &[WithSpan<FragmentDirectiveUsage>],
-) -> WithSpan<ResolverVariant> {
+fn get_resolver_variant(directives: &[WithSpan<FragmentDirectiveUsage>]) -> ResolverVariant {
     for directive in directives.iter() {
-        let span = directive.span;
-        if directive.item.name.item == *EAGER {
-            return WithSpan::new(ResolverVariant::Eager, span);
-        } else if directive.item.name.item == *COMPONENT {
-            return WithSpan::new(ResolverVariant::Component, span);
+        if directive.item.name.item == *COMPONENT {
+            return ResolverVariant::Component;
         }
     }
-    // TODO make this an error
-    panic!("Expected @eager or @component");
+    return ResolverVariant::Eager;
 }
 
 fn get_resolver_artifact_kind(

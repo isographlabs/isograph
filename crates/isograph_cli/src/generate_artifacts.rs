@@ -748,7 +748,7 @@ fn write_selections_for_query_text(
 fn generate_resolver_parameter_type(
     schema: &ValidatedSchema,
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
-    variant: &WithSpan<ResolverVariant>,
+    variant: &ResolverVariant,
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     nested_resolver_imports: &mut NestedResolverImports,
     indentation_level: u8,
@@ -764,7 +764,7 @@ fn generate_resolver_parameter_type(
             // doing it for nested selections is leads to situations where linked fields
             // show up as linkedField: { data: /* actualLinkedFields */ }
             // TODO this works, but should be cleaned up
-            &WithSpan::new(ResolverVariant::Eager, Span::todo_generated()),
+            &ResolverVariant::Eager,
             parent_type,
             nested_resolver_imports,
             indentation_level + 1,
@@ -772,7 +772,7 @@ fn generate_resolver_parameter_type(
     }
     resolver_parameter_type.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
 
-    if variant.item == ResolverVariant::Component {
+    if variant == &ResolverVariant::Component {
         resolver_parameter_type = format!(
             "{{ data:\n{}{},\n{}[index: string]: any }}",
             "  ".repeat(indentation_level as usize),
@@ -788,7 +788,7 @@ fn write_query_types_from_selection(
     schema: &ValidatedSchema,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
-    variant: &WithSpan<ResolverVariant>,
+    variant: &ResolverVariant,
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     nested_resolver_imports: &mut NestedResolverImports,
     indentation_level: u8,
@@ -1076,10 +1076,7 @@ fn generate_reader_ast_node(
                         let indent_2 = "  ".repeat((indentation_level + 1) as usize);
                         let resolver_field_string =
                             resolver_field.type_and_field.underscore_separated();
-                        let variant = resolver_field
-                            .variant
-                            .as_ref()
-                            .map(|x| format!("\"{}\"", x));
+                        let variant = format!("\"{}\"", resolver_field.variant);
 
                         let resolver_refetched_paths =
                             refetched_paths_for_resolver(resolver_field, schema, path);
@@ -1103,10 +1100,7 @@ fn generate_reader_ast_node(
 
                         // This is indicative of poor data modeling.
                         match resolver_field.variant {
-                            WithSpan {
-                                item: ResolverVariant::RefetchField,
-                                ..
-                            } => {
+                            ResolverVariant::RefetchField => {
                                 let refetch_query_index =
                                     find_refetch_query_index(root_refetched_paths, path);
                                 format!(
@@ -1118,10 +1112,7 @@ fn generate_reader_ast_node(
                                     {indent_1}}},\n",
                                 )
                             }
-                            WithSpan {
-                                item: ResolverVariant::MutationField(_),
-                                ..
-                            } => {
+                            ResolverVariant::MutationField(_) => {
                                 let refetch_query_index =
                                     find_refetch_query_index(root_refetched_paths, path);
                                 format!(
@@ -1348,7 +1339,7 @@ fn get_nested_refetch_query_text(
 
 fn generate_read_out_type(resolver_definition: &ValidatedSchemaResolver) -> ResolverReadOutType {
     match &resolver_definition.variant {
-        variant => match variant.item {
+        variant => match variant {
             ResolverVariant::Component => {
                 // The read out type of a component is a function that accepts additional
                 // (currently untyped) runtime props, and returns a component.
