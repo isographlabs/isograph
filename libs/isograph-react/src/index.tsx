@@ -474,8 +474,9 @@ function readData<TReadFromStore>(
           // const data = readData(field.resolver.readerAst, root);
           const resolver_function = field.resolver.resolver;
           target[field.alias] = (additionalRuntimeProps: any) => {
-            // TODO also incorporate field.type
+            // TODO also incorporate the typename
             const RefReaderForName = getRefReaderForName(field.alias);
+            // TODO do not create a new reference on every render?
             return (
               <RefReaderForName
                 reference={{
