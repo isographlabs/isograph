@@ -26,11 +26,6 @@ export type IsographFetchableResolver<
   normalizationAst: NormalizationAst;
   readerAst: ReaderAst<TReadFromStore>;
   resolver: (data: TResolverProps) => TResolverResult;
-  // TODO ReaderAst<TResolverProps> should contain the convert function
-  convert: (
-    resolver: (data: TResolverProps) => TResolverResult,
-    data: TReadFromStore
-  ) => TResolverResult; // TODO this should be a different return type
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
@@ -153,10 +148,6 @@ export type FragmentReference<
   resolver: (props: TResolverProps) => TResolverResult;
   variables: { [index: string]: string } | null;
   // TODO: We should instead have ReaderAst<TResolverProps>
-  convert: (
-    resolver: (data: TResolverProps) => TResolverResult,
-    data: TReadFromStore
-  ) => TResolverResult;
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
@@ -213,7 +204,6 @@ export function useLazyReference<
       kind: "FragmentReference",
       readerAst: artifact.readerAst,
       root: ROOT_ID,
-      convert: artifact.convert,
       resolver: artifact.resolver,
       variables,
       nestedRefetchQueries: artifact.nestedRefetchQueries,
@@ -238,7 +228,7 @@ export function read<
   if (response.kind === "MissingData") {
     throw onNextChange();
   } else {
-    return reference.convert(reference.resolver, response.data);
+    return reference.resolver(response.data);
   }
 }
 
@@ -410,7 +400,6 @@ function readData<TReadFromStore>(
             nestedReason: data,
           };
         } else {
-          // TODO do we also need to call convert?
           const refetchQueryIndex = field.refetchQuery;
           if (refetchQueryIndex == null) {
             throw new Error("refetchQuery is null in RefetchField");
@@ -444,7 +433,6 @@ function readData<TReadFromStore>(
             nestedReason: data,
           };
         } else {
-          // TODO do we also need to call convert?
           const refetchQueryIndex = field.refetchQuery;
           if (refetchQueryIndex == null) {
             throw new Error("refetchQuery is null in MutationField");
@@ -480,9 +468,6 @@ function readData<TReadFromStore>(
               nestedReason: data,
             };
           } else {
-            // // Does this go here??
-
-            // TODO do we also need to call convert?
             target[field.alias] = field.resolver.resolver(data.data);
           }
         } else if (field.variant === "Component") {
@@ -499,11 +484,6 @@ function readData<TReadFromStore>(
                   root,
                   resolver: resolver_function,
                   variables,
-                  convert: () => {
-                    // Change refReader props to not accept this
-                    console.log(new Error().stack);
-                    throw new Error("where did I convert 1 ");
-                  },
                   nestedRefetchQueries: resolverRefetchQueries,
                 }}
                 additionalRuntimeProps={additionalRuntimeProps}
@@ -521,7 +501,6 @@ function readData<TReadFromStore>(
             //
             // lint rules will ameliorate this
             resolver: field.resolver.resolver ?? ((x) => x),
-            convert: (resolver: any, data: any) => resolver(data),
             nestedRefetchQueries: resolverRefetchQueries,
           };
           target[field.alias] = fragmentReference;
