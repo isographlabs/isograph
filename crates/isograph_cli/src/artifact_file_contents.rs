@@ -18,7 +18,6 @@ impl<'schema> FetchableResolver<'schema> {
             resolver_read_out_type,
             reader_ast,
             nested_resolver_artifact_imports,
-            convert_function,
             parent_type,
             normalization_ast,
             refetch_query_artifact_import,
@@ -51,11 +50,10 @@ impl<'schema> FetchableResolver<'schema> {
             {}normalizationAst,\n\
             {}readerAst,\n\
             {}resolver: resolver as any,\n\
-            {}convert: {convert_function},\n\
             {}nestedRefetchQueries,\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ", "  ",
+            "  ", "  ", "  ", "  ", "  ", "  ",
         )
     }
 }

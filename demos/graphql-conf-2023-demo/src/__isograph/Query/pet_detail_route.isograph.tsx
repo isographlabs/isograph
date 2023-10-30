@@ -203,7 +203,6 @@ const artifact: IsographFetchableResolver<ReadFromStoreType, ResolverParameterTy
   normalizationAst,
   readerAst,
   resolver: resolver as any,
-  convert: ((resolver, data) => resolver(data)),
   nestedRefetchQueries,
 };
 

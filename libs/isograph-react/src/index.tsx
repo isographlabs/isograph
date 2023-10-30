@@ -591,27 +591,6 @@ export function getRefReaderForName(name: string) {
   return refReaders[name];
 }
 
-export function getRefRendererForName(name: string) {
-  // TODO name should be Type__fieldName, right now it's just fieldName.
-  // Collisions on the fieldName will cause problems.
-  if (refReaders[name] == null) {
-    function Component({
-      resolver,
-      data,
-      additionalRuntimeProps,
-    }: {
-      resolver: any;
-      additionalRuntimeProps: any;
-      data: any;
-    }) {
-      return resolver({ data, ...additionalRuntimeProps });
-    }
-    Component.displayName = `${name} @component`;
-    refReaders[name] = Component;
-  }
-  return refReaders[name];
-}
-
 export type IsographComponentProps<TDataType, TOtherProps = Object> = {
   data: TDataType;
 } & TOtherProps;

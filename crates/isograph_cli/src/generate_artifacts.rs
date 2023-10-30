@@ -437,8 +437,6 @@ fn generate_fetchable_resolver_artifact<'schema>(
             &mut nested_resolver_artifact_imports,
             &root_refetched_paths,
         );
-        let convert_function =
-            generate_convert_function(&fetchable_resolver.variant, fetchable_resolver.name);
 
         let normalization_ast = generate_normalization_ast(schema, &merged_selection_set, 0);
 
@@ -452,7 +450,6 @@ fn generate_fetchable_resolver_artifact<'schema>(
             resolver_read_out_type,
             reader_ast,
             nested_resolver_artifact_imports,
-            convert_function,
             normalization_ast,
             refetch_query_artifact_import: refetch_query_artifact_imports,
         }
@@ -576,7 +573,6 @@ pub(crate) struct FetchableResolver<'schema> {
     pub resolver_read_out_type: ResolverReadOutType,
     pub reader_ast: ReaderAst,
     pub nested_resolver_artifact_imports: NestedResolverImports,
-    pub convert_function: ConvertFunction,
     pub normalization_ast: NormalizationAst,
     pub refetch_query_artifact_import: RefetchQueryArtifactImport,
 }
@@ -1386,43 +1382,6 @@ fn generate_resolver_return_type_declaration(
         // TODO what should this be
         ResolverActionKind::MutationField => ResolverReturnType("any".to_string()),
     }
-}
-
-fn generate_convert_function(
-    variant: &Option<WithSpan<ResolverVariant>>,
-    field_name: SelectableFieldName,
-) -> ConvertFunction {
-    match variant {
-        Some(variant) => {
-            if let ResolverVariant::Component = variant.item {
-                return ConvertFunction(format!(
-                    "(() => {{\n\
-                    {}const RefRendererForName = getRefRendererForName('{field_name}');\n\
-                    {}return ((resolver, data) => additionalRuntimeProps => \n\
-                    {}{{\n\
-                    {}return <RefRendererForName \n\
-                    {}resolver={{resolver}}\n\
-                    {}data={{data}}\n\
-                    {}additionalRuntimeProps={{additionalRuntimeProps}}\n\
-                    {}/>;\n\
-                    {}}})\n\
-                    {}}})()",
-                    "  ".repeat(2),
-                    "  ".repeat(2),
-                    "  ".repeat(3),
-                    "  ".repeat(4),
-                    "  ".repeat(5),
-                    "  ".repeat(5),
-                    "  ".repeat(5),
-                    "  ".repeat(4),
-                    "  ".repeat(3),
-                    "  ".repeat(2),
-                ));
-            }
-        }
-        None => {}
-    }
-    ConvertFunction("((resolver, data) => resolver(data))".to_string())
 }
 
 fn find_refetch_query_index(
