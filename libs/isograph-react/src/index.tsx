@@ -80,7 +80,7 @@ export type ReaderResolverField = {
   kind: "Resolver";
   alias: string;
   resolver: IsographResolver<any, any, any>;
-  variant: ReaderResolverVariant | null;
+  variant: ReaderResolverVariant;
   arguments: Arguments | null;
   usedRefetchQueries: number[];
 };
@@ -491,20 +491,6 @@ function readData<TReadFromStore>(
               />
             );
           };
-        } else {
-          const fragmentReference = {
-            kind: "FragmentReference",
-            readerAst: field.resolver.readerAst,
-            root,
-            // This is a footgun, I should really figure out a better way to handle this.
-            // If you misspell a resolver export (it should be the field name), then this
-            // will fall back to x => x, when the app developer intended something else.
-            //
-            // lint rules will ameliorate this
-            resolver: field.resolver.resolver ?? ((x) => x),
-            nestedRefetchQueries: resolverRefetchQueries,
-          };
-          target[field.alias] = fragmentReference;
         }
         break;
       }

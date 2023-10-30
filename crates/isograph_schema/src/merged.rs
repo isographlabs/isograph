@@ -502,20 +502,16 @@ fn merge_scalar_resolver_field(
     }
 
     // HACK... we can model this data better
-    if let Some(WithSpan {
-        item: ResolverVariant::RefetchField,
-        ..
-    }) = resolver_field.variant
-    {
+    if resolver_field.variant.item == ResolverVariant::RefetchField {
         merge_traversal_state.paths_to_refetch_fields.push((
             merge_traversal_state.current_path.clone(),
             parent_type.id,
             ResolverVariant::RefetchField,
         ));
-    } else if let Some(WithSpan {
+    } else if let WithSpan {
         item: ResolverVariant::MutationField((_parent_field_name, primary_field_name, args)),
         ..
-    }) = &resolver_field.variant
+    } = &resolver_field.variant
     {
         merge_traversal_state.paths_to_refetch_fields.push((
             merge_traversal_state.current_path.clone(),

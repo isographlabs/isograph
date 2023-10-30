@@ -418,7 +418,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
         let resolver_parameter_type = generate_resolver_parameter_type(
             schema,
             &selection_set,
-            fetchable_resolver.variant.as_ref(),
+            &fetchable_resolver.variant,
             query_object.into(),
             &mut nested_resolver_artifact_imports,
             0,
@@ -494,7 +494,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
         let resolver_parameter_type = generate_resolver_parameter_type(
             schema,
             &selection_set,
-            non_fetchable_resolver.variant.as_ref(),
+            &non_fetchable_resolver.variant,
             parent_type.into(),
             &mut nested_resolver_artifact_imports,
             0,
@@ -748,7 +748,7 @@ fn write_selections_for_query_text(
 fn generate_resolver_parameter_type(
     schema: &ValidatedSchema,
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
-    variant: Option<&WithSpan<ResolverVariant>>,
+    variant: &WithSpan<ResolverVariant>,
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     nested_resolver_imports: &mut NestedResolverImports,
     indentation_level: u8,
@@ -763,7 +763,8 @@ fn generate_resolver_parameter_type(
             // Variant "unwrapping" only matters for the top-level parameter type,
             // doing it for nested selections is leads to situations where linked fields
             // show up as linkedField: { data: /* actualLinkedFields */ }
-            None,
+            // TODO this works, but should be cleaned up
+            &WithSpan::new(ResolverVariant::Eager, Span::todo_generated()),
             parent_type,
             nested_resolver_imports,
             indentation_level + 1,
@@ -771,7 +772,7 @@ fn generate_resolver_parameter_type(
     }
     resolver_parameter_type.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
 
-    if let Some(&ResolverVariant::Component) = variant.as_ref().map(|v| &v.item) {
+    if variant.item == ResolverVariant::Component {
         resolver_parameter_type = format!(
             "{{ data:\n{}{},\n{}[index: string]: any }}",
             "  ".repeat(indentation_level as usize),
@@ -787,7 +788,7 @@ fn write_query_types_from_selection(
     schema: &ValidatedSchema,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
-    variant: Option<&WithSpan<ResolverVariant>>,
+    variant: &WithSpan<ResolverVariant>,
     parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
     nested_resolver_imports: &mut NestedResolverImports,
     indentation_level: u8,
@@ -879,7 +880,7 @@ fn write_query_types_from_selection(
                     let inner = generate_resolver_parameter_type(
                         schema,
                         &linked_field.selection_set,
-                        variant,
+                        &variant,
                         object.into(),
                         nested_resolver_imports,
                         indentation_level,
@@ -1078,8 +1079,7 @@ fn generate_reader_ast_node(
                         let variant = resolver_field
                             .variant
                             .as_ref()
-                            .map(|x| format!("\"{}\"", x))
-                            .unwrap_or_else(|| "null".to_string());
+                            .map(|x| format!("\"{}\"", x));
 
                         let resolver_refetched_paths =
                             refetched_paths_for_resolver(resolver_field, schema, path);
@@ -1103,10 +1103,10 @@ fn generate_reader_ast_node(
 
                         // This is indicative of poor data modeling.
                         match resolver_field.variant {
-                            Some(WithSpan {
+                            WithSpan {
                                 item: ResolverVariant::RefetchField,
                                 ..
-                            }) => {
+                            } => {
                                 let refetch_query_index =
                                     find_refetch_query_index(root_refetched_paths, path);
                                 format!(
@@ -1118,10 +1118,10 @@ fn generate_reader_ast_node(
                                     {indent_1}}},\n",
                                 )
                             }
-                            Some(WithSpan {
+                            WithSpan {
                                 item: ResolverVariant::MutationField(_),
                                 ..
-                            }) => {
+                            } => {
                                 let refetch_query_index =
                                     find_refetch_query_index(root_refetched_paths, path);
                                 format!(
@@ -1348,7 +1348,7 @@ fn get_nested_refetch_query_text(
 
 fn generate_read_out_type(resolver_definition: &ValidatedSchemaResolver) -> ResolverReadOutType {
     match &resolver_definition.variant {
-        Some(variant) => match variant.item {
+        variant => match variant.item {
             ResolverVariant::Component => {
                 // The read out type of a component is a function that accepts additional
                 // (currently untyped) runtime props, and returns a component.
@@ -1361,13 +1361,6 @@ fn generate_read_out_type(resolver_definition: &ValidatedSchemaResolver) -> Reso
             ResolverVariant::RefetchField => ResolverReadOutType("any".to_string()),
             ResolverVariant::MutationField(_) => ResolverReadOutType("any".to_string()),
         },
-        None => ResolverReadOutType(
-            // This is correct:
-            // "FragmentReference<ReadFromStoreType, ResolverParameterType, ResolverReturnType>"
-            //     .to_string(),
-            // This is not correct, but has the correct behavior for now:
-            "ResolverReturnType".to_string(),
-        ),
     }
 }
 

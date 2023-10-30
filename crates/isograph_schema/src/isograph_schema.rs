@@ -535,7 +535,9 @@ pub struct SchemaResolver<TScalarField, TLinkedField, TVariableDefinitionType> {
         Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
         Vec<WithSpan<Unwrap>>,
     )>,
-    pub variant: Option<WithSpan<ResolverVariant>>,
+
+    // TODO we should probably model this differently
+    pub variant: WithSpan<ResolverVariant>,
 
     // TODO should this be create_normalization_ast: bool?
     pub artifact_kind: ResolverArtifactKind,

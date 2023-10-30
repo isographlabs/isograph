@@ -96,7 +96,7 @@ impl UnvalidatedSchema {
         };
 
         // TODO variant should carry payloads, instead of this check
-        if variant.as_ref().map(|span| &span.item) == Some(&ResolverVariant::Component) {
+        if variant.item == ResolverVariant::Component {
             if !matches!(resolver_action_kind, ResolverActionKind::NamedImport(_)) {
                 return Err(WithSpan::new(
                     ProcessResolverDeclarationError::ComponentResolverMissingJsFunction,
@@ -189,16 +189,17 @@ lazy_static! {
 // TODO validate that the type is actually fetchable, and that we don't have both
 fn get_resolver_variant(
     directives: &[WithSpan<FragmentDirectiveUsage>],
-) -> Option<WithSpan<ResolverVariant>> {
+) -> WithSpan<ResolverVariant> {
     for directive in directives.iter() {
         let span = directive.span;
         if directive.item.name.item == *EAGER {
-            return Some(WithSpan::new(ResolverVariant::Eager, span));
+            return WithSpan::new(ResolverVariant::Eager, span);
         } else if directive.item.name.item == *COMPONENT {
-            return Some(WithSpan::new(ResolverVariant::Component, span));
+            return WithSpan::new(ResolverVariant::Component, span);
         }
     }
-    None
+    // TODO make this an error
+    panic!("Expected @eager or @component");
 }
 
 fn get_resolver_artifact_kind(

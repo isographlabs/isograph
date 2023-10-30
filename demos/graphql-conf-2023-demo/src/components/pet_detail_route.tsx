@@ -6,7 +6,7 @@ import petDetailRouteQuery from "../__isograph/Query/pet_detail_route.isograph";
 import { PetDetailRoute, Route } from "./router";
 
 iso`
-  Query.pet_detail_route($id: ID!) @fetchable {
+  Query.pet_detail_route($id: ID!) @fetchable @eager {
     pet(id: $id) {
       name,
       pet_checkins_card,

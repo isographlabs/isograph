@@ -326,14 +326,14 @@ impl UnvalidatedSchema {
                     name: magic_mutation_field_name,
                     id: next_resolver_id,
                     selection_set_and_unwraps: Some((vec![id_field_selection], vec![])),
-                    variant: Some(WithSpan::new(
+                    variant: WithSpan::new(
                         ResolverVariant::MutationField((
                             magic_mutation_field_name,
                             mutation_response_primary_field_name,
                             mutation_field_args,
                         )),
                         Span::todo_generated(),
-                    )),
+                    ),
                     variable_definitions: vec![],
                     type_and_field: ResolverTypeAndField {
                         type_name: parent_object.name,
@@ -500,10 +500,7 @@ fn get_resolvers_for_schema_object(
             name: "__refetch".intern().into(),
             id: next_resolver_id,
             selection_set_and_unwraps: Some((vec![id_field_selection], vec![])),
-            variant: Some(WithSpan::new(
-                ResolverVariant::RefetchField,
-                Span::todo_generated(),
-            )),
+            variant: WithSpan::new(ResolverVariant::RefetchField, Span::todo_generated()),
             variable_definitions: vec![],
             type_and_field: ResolverTypeAndField {
                 type_name: type_definition.name.item,
