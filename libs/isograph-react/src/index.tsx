@@ -472,7 +472,7 @@ function readData<TReadFromStore>(
           }
         } else if (field.variant === "Component") {
           // const data = readData(field.resolver.readerAst, root);
-          const resolver_function = field.resolver.resolver;
+          const resolverFunction = field.resolver.resolver;
           target[field.alias] = (additionalRuntimeProps: any) => {
             // TODO also incorporate the typename
             const RefReaderForName = getRefReaderForName(field.alias);
@@ -483,7 +483,7 @@ function readData<TReadFromStore>(
                   kind: "FragmentReference",
                   readerAst: field.resolver.readerAst,
                   root,
-                  resolver: resolver_function,
+                  resolver: resolverFunction,
                   variables,
                   nestedRefetchQueries: resolverRefetchQueries,
                 }}
