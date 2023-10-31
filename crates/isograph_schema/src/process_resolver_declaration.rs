@@ -181,7 +181,6 @@ impl fmt::Display for ResolverVariant {
 }
 
 lazy_static! {
-    static ref EAGER: IsographDirectiveName = "eager".intern().into();
     static ref COMPONENT: IsographDirectiveName = "component".intern().into();
     static ref FETCHABLE: IsographDirectiveName = "fetchable".intern().into();
 }

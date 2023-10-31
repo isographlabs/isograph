@@ -6,7 +6,7 @@ import { type Route } from "./router";
 import homeRouteQuery from "../__isograph/Query/home_route.isograph";
 
 iso`
-  Query.home_route @fetchable @eager {
+  Query.home_route @fetchable {
     pets {
       id,
       pet_summary_card,
