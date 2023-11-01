@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use common_lang_types::{
     DescriptionValue, FieldArgumentName, HasName, InputTypeName, InterfaceTypeName,
@@ -56,6 +56,7 @@ pub struct Schema<
 > {
     pub fields: Vec<SchemaServerField<TypeAnnotation<TFieldAssociatedType>>>,
     pub resolvers: Vec<SchemaResolver<TScalarField, TLinkedField, TVariableType>>,
+    pub fetchable_resolvers: HashSet<(ObjectId, ResolverFieldId)>,
     pub schema_data: SchemaData<TEncounteredField>,
 
     // Well known types
@@ -229,6 +230,7 @@ impl UnvalidatedSchema {
         Self {
             fields,
             resolvers,
+            fetchable_resolvers: Default::default(),
             schema_data: SchemaData {
                 objects,
                 scalars,

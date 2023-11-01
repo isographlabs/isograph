@@ -55,6 +55,7 @@ impl ValidatedSchema {
         let Schema {
             fields,
             resolvers,
+            fetchable_resolvers,
             schema_data,
             id_type_id: id_type,
             string_type_id: string_type,
@@ -82,6 +83,7 @@ impl ValidatedSchema {
         Ok(Self {
             fields: updated_fields,
             resolvers: updated_resolvers,
+            fetchable_resolvers,
             schema_data: SchemaData {
                 objects,
                 scalars,
