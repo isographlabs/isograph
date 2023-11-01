@@ -1,6 +1,6 @@
 import type {IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryArtifactWrapper} from '@isograph/react';
 const resolver = (x: any) => x;
-import Pet__pet_summary_card, { ReadOutType as Pet__pet_summary_card__outputType } from '../Pet/pet_summary_card.isograph';
+import Pet__pet_summary_card, { ReadOutType as Pet__pet_summary_card__outputType } from '../../Pet/pet_summary_card/reader.isograph';
 
 const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [];
 

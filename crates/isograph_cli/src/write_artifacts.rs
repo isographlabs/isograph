@@ -6,6 +6,7 @@ use std::{
 
 use common_lang_types::SelectableFieldName;
 use intern::{string_key::Intern, Lookup};
+use isograph_schema::READER;
 
 use crate::{
     generate_artifacts::{
@@ -52,10 +53,10 @@ pub(crate) fn write_artifacts<'schema>(
                     ..
                 } = &fetchable_resolver;
 
-                let generated_file_name = generated_file_name((*query_name).into());
+                let generated_file_name = generated_file_name(READER.intern().into());
                 let intermediate_folder = generated_intermediate_folder(
                     &generated_folder_root,
-                    &[parent_type.name.lookup()],
+                    &[parent_type.name.lookup(), query_name.lookup()],
                 );
                 let generated_file_path = intermediate_folder.join(generated_file_name);
 
@@ -89,10 +90,10 @@ pub(crate) fn write_artifacts<'schema>(
                     ..
                 } = &non_fetchable_resolver;
 
-                let generated_file_name = generated_file_name(*resolver_field_name);
+                let generated_file_name = generated_file_name(READER.intern().into());
                 let intermediate_folder = generated_intermediate_folder(
                     &generated_folder_root,
-                    &[parent_type.name.lookup()],
+                    &[parent_type.name.lookup(), resolver_field_name.lookup()],
                 );
                 let generated_file_path = intermediate_folder.join(generated_file_name);
 

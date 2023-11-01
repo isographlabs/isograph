@@ -424,7 +424,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
             0,
         );
         let refetch_query_artifact_imports =
-            generate_refetch_query_artifact_imports(&root_refetched_paths, fetchable_resolver.name);
+            generate_refetch_query_artifact_imports(&root_refetched_paths);
         let resolver_import_statement =
             generate_resolver_import_statement(fetchable_resolver.action_kind);
         let resolver_return_type =
@@ -617,7 +617,6 @@ fn generate_query_text(
 
 fn generate_refetch_query_artifact_imports(
     root_refetched_paths: &[(PathToRefetchField, Vec<VariableName>)],
-    root_resolver_field_name: SelectableFieldName,
 ) -> RefetchQueryArtifactImport {
     // TODO name the refetch queries with the path, or something, instead of
     // with indexes.
@@ -625,8 +624,8 @@ fn generate_refetch_query_artifact_imports(
     let mut array_syntax = String::new();
     for (query_index, (_, variable_names)) in root_refetched_paths.iter().enumerate() {
         output.push_str(&format!(
-            "import refetchQuery{} from './{}/__refetch__{}.isograph';\n",
-            query_index, root_resolver_field_name, query_index,
+            "import refetchQuery{} from './__refetch__{}.isograph';\n",
+            query_index, query_index,
         ));
         let variable_names_str = variable_names_to_string(&variable_names);
         array_syntax.push_str(&format!(
@@ -944,7 +943,7 @@ fn generate_resolver_import_statement(
             ResolverImportStatement("const resolver = (x: any) => x;".to_string())
         }
         ResolverActionKind::NamedImport((name, path)) => ResolverImportStatement(format!(
-            "import {{ {name} as resolver }} from '../../{path}';",
+            "import {{ {name} as resolver }} from '../../../{path}';",
         )),
         ResolverActionKind::RefetchField => ResolverImportStatement(
             "import { makeNetworkRequest } from '@isograph/react';\n\

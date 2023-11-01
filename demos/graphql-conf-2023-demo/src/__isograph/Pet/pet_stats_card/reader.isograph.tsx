@@ -1,5 +1,5 @@
 import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
-import { pet_checkins_card as resolver } from '../../components/pet_checkins_card.tsx';
+import { pet_stats_card as resolver } from '../../../components/pet_stats_card.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
@@ -14,26 +14,56 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     arguments: null,
   },
   {
+    kind: "Scalar",
+    fieldName: "nickname",
+    alias: null,
+    arguments: null,
+  },
+  {
+    kind: "Scalar",
+    fieldName: "age",
+    alias: null,
+    arguments: null,
+  },
+  {
     kind: "Linked",
-    fieldName: "checkins",
+    fieldName: "stats",
     alias: null,
     arguments: null,
     selections: [
       {
         kind: "Scalar",
-        fieldName: "id",
+        fieldName: "weight",
         alias: null,
         arguments: null,
       },
       {
         kind: "Scalar",
-        fieldName: "location",
+        fieldName: "intelligence",
         alias: null,
         arguments: null,
       },
       {
         kind: "Scalar",
-        fieldName: "time",
+        fieldName: "cuteness",
+        alias: null,
+        arguments: null,
+      },
+      {
+        kind: "Scalar",
+        fieldName: "hunger",
+        alias: null,
+        arguments: null,
+      },
+      {
+        kind: "Scalar",
+        fieldName: "sociability",
+        alias: null,
+        arguments: null,
+      },
+      {
+        kind: "Scalar",
+        fieldName: "energy",
         alias: null,
         arguments: null,
       },
@@ -44,11 +74,16 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 export type ResolverParameterType = { data:
 {
   id: string,
-  checkins: ({
-    id: string,
-    location: string,
-    time: string,
-  })[],
+  nickname: (string | null),
+  age: number,
+  stats: {
+    weight: number,
+    intelligence: number,
+    cuteness: number,
+    hunger: number,
+    sociability: number,
+    energy: number,
+  },
 },
 [index: string]: any };
 

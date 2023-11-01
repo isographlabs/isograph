@@ -1,10 +1,10 @@
 import type {IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryArtifactWrapper} from '@isograph/react';
 const resolver = (x: any) => x;
-import Pet__pet_best_friend_card, { ReadOutType as Pet__pet_best_friend_card__outputType } from '../Pet/pet_best_friend_card.isograph';
-import Pet__pet_checkins_card, { ReadOutType as Pet__pet_checkins_card__outputType } from '../Pet/pet_checkins_card.isograph';
-import Pet__pet_phrase_card, { ReadOutType as Pet__pet_phrase_card__outputType } from '../Pet/pet_phrase_card.isograph';
+import Pet__pet_best_friend_card, { ReadOutType as Pet__pet_best_friend_card__outputType } from '../../Pet/pet_best_friend_card/reader.isograph';
+import Pet__pet_checkins_card, { ReadOutType as Pet__pet_checkins_card__outputType } from '../../Pet/pet_checkins_card/reader.isograph';
+import Pet__pet_phrase_card, { ReadOutType as Pet__pet_phrase_card__outputType } from '../../Pet/pet_phrase_card/reader.isograph';
 
-import refetchQuery0 from './pet_detail_route/__refetch__0.isograph';
+import refetchQuery0 from './__refetch__0.isograph';
 const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [{ artifact: refetchQuery0, allowedVariables: [] }, ];
 
 const queryText = 'query pet_detail_route ($id: ID!) {\

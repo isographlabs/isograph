@@ -24,6 +24,8 @@ lazy_static! {
     pub static ref ID_GRAPHQL_TYPE: ScalarTypeName = "ID".intern().into();
 }
 
+pub static READER: &'static str = "reader";
+
 /// The in-memory representation of a schema.
 ///
 /// The generics with which the Schema type is instantiated vary based on
@@ -494,9 +496,9 @@ impl ResolverTypeAndField {
             field_name,
         } = *self;
         if type_name != current_file_type_name {
-            format!("../{type_name}/{field_name}.isograph")
+            format!("../../{type_name}/{field_name}/{READER}.isograph")
         } else {
-            format!("./{field_name}.isograph")
+            format!("../{field_name}/{READER}.isograph")
         }
     }
 }
