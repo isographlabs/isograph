@@ -1,9 +1,9 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use common_lang_types::{
     DescriptionValue, FieldArgumentName, HasName, InputTypeName, InterfaceTypeName,
     IsographObjectTypeName, JavascriptName, LinkedFieldName, Location, ResolverDefinitionPath,
-    ScalarTypeName, SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
+    ScalarTypeName, SelectableFieldName, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, Directive, InputValueDefinition, InterfaceTypeDefinition, NamedTypeAnnotation,
@@ -12,7 +12,7 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     DefinedTypeId, InputTypeId, LinkedFieldSelection, NonConstantValue, ObjectId, OutputTypeId,
-    ResolverFieldId, ScalarId, Selection, ServerFieldId, ServerIdFieldId, Unwrap,
+    ResolverFetch, ResolverFieldId, ScalarId, Selection, ServerFieldId, ServerIdFieldId, Unwrap,
     VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -53,10 +53,14 @@ pub struct Schema<
     // On objects, what does the HashMap of encountered types contain
     // Validated: ValidatedDefinedField, Unvalidated: UnvalidatedObjectFieldInfo
     TEncounteredField,
+    // What we store in fetchable_resolvers
+    // Validated: (ObjectId, ResolverFieldId)
+    // Unvalidated: ResolverFetch
+    TFetchableResolver,
 > {
     pub fields: Vec<SchemaServerField<TypeAnnotation<TFieldAssociatedType>>>,
     pub resolvers: Vec<SchemaResolver<TScalarField, TLinkedField, TVariableType>>,
-    pub fetchable_resolvers: HashSet<(ObjectId, ResolverFieldId)>,
+    pub fetchable_resolvers: Vec<TFetchableResolver>,
     pub schema_data: SchemaData<TEncounteredField>,
 
     // Well known types
@@ -73,8 +77,14 @@ pub struct Schema<
     // Mutation
 }
 
-pub(crate) type UnvalidatedSchema =
-    Schema<UnvalidatedTypeName, (), (), UnvalidatedTypeName, UnvalidatedObjectFieldInfo>;
+pub(crate) type UnvalidatedSchema = Schema<
+    UnvalidatedTypeName,
+    (),
+    (),
+    UnvalidatedTypeName,
+    UnvalidatedObjectFieldInfo,
+    (TextSource, WithSpan<ResolverFetch>),
+>;
 
 /// Distinguishes between server fields and locally-defined resolver fields.
 /// TFieldAssociatedType can be a ScalarFieldName in an unvalidated schema, or a
@@ -125,8 +135,22 @@ pub struct SchemaData<TEncounteredField> {
     pub defined_types: HashMap<UnvalidatedTypeName, DefinedTypeId>,
 }
 
-impl<TFieldAssociatedType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
-    Schema<TFieldAssociatedType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
+impl<
+        TFieldAssociatedType,
+        TScalarField,
+        TLinkedField,
+        TVariableType,
+        TEncounteredField,
+        TFetchableResolver,
+    >
+    Schema<
+        TFieldAssociatedType,
+        TScalarField,
+        TLinkedField,
+        TVariableType,
+        TEncounteredField,
+        TFetchableResolver,
+    >
 {
     /// Get a reference to a given field by its id.
     pub fn field(
@@ -152,8 +176,22 @@ impl<TFieldAssociatedType, TScalarField, TLinkedField, TVariableType, TEncounter
     }
 }
 
-impl<TFieldAssociatedType: Clone, TScalarField, TLinkedField, TVariableType, TEncounteredField>
-    Schema<TFieldAssociatedType, TScalarField, TLinkedField, TVariableType, TEncounteredField>
+impl<
+        TFieldAssociatedType: Clone,
+        TScalarField,
+        TLinkedField,
+        TVariableType,
+        TEncounteredField,
+        TFetchableResolver,
+    >
+    Schema<
+        TFieldAssociatedType,
+        TScalarField,
+        TLinkedField,
+        TVariableType,
+        TEncounteredField,
+        TFetchableResolver,
+    >
 {
     /// Get a reference to a given id field by its id.
     pub fn id_field<TIdFieldAssociatedType: TryFrom<TFieldAssociatedType> + Copy>(

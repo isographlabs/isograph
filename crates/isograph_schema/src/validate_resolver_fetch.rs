@@ -8,11 +8,12 @@ use thiserror::Error;
 use crate::{DefinedField, UnvalidatedSchema};
 
 impl UnvalidatedSchema {
-    pub fn process_resolver_fetch(
-        &mut self,
-        resolver_fetch: WithSpan<ResolverFetch>,
+    pub fn validate_resolver_fetch(
+        &self,
         text_source: TextSource,
-    ) -> Result<(), WithLocation<ProcessResolverFetchDeclarationError>> {
+        resolver_fetch: WithSpan<ResolverFetch>,
+    ) -> Result<(ObjectId, ResolverFieldId), WithLocation<ValidateResolverFetchDeclarationError>>
+    {
         let parent_object_id =
             self.validate_parent_object_id(resolver_fetch.item.parent_type, text_source)?;
         let resolver_id = self.validate_resolver_field(
@@ -21,25 +22,20 @@ impl UnvalidatedSchema {
             parent_object_id,
         )?;
 
-        // N.B. we explicitly do not error out on duplicate isoFetch's, since that is
-        // something you could validly want to do.
-        self.fetchable_resolvers
-            .insert((parent_object_id, resolver_id));
-
-        Ok(())
+        Ok((parent_object_id, resolver_id))
     }
 
     fn validate_parent_object_id(
         &self,
         parent_type: WithSpan<UnvalidatedTypeName>,
         text_source: TextSource,
-    ) -> Result<ObjectId, WithLocation<ProcessResolverFetchDeclarationError>> {
+    ) -> Result<ObjectId, WithLocation<ValidateResolverFetchDeclarationError>> {
         let parent_type_id = self
             .schema_data
             .defined_types
             .get(&parent_type.item.into())
             .ok_or(WithLocation::new(
-                ProcessResolverFetchDeclarationError::ParentTypeNotDefined {
+                ValidateResolverFetchDeclarationError::ParentTypeNotDefined {
                     parent_type_name: parent_type.item,
                 },
                 Location::new(text_source, parent_type.span),
@@ -54,13 +50,13 @@ impl UnvalidatedSchema {
                 // know how to fetch (e.g. viewer, an item implementing Node, etc.)
                 // should be fetchable.
                 let query_id = self.query_type_id.ok_or(WithLocation::new(
-                    ProcessResolverFetchDeclarationError::QueryMustExist,
+                    ValidateResolverFetchDeclarationError::QueryMustExist,
                     Location::generated(),
                 ))?;
 
                 if query_id != *object_id {
                     Err(WithLocation::new(
-                        ProcessResolverFetchDeclarationError::NonFetchableParentType {
+                        ValidateResolverFetchDeclarationError::NonFetchableParentType {
                             parent_type_name: parent_type.item,
                         },
                         Location::new(text_source, parent_type.span),
@@ -72,7 +68,7 @@ impl UnvalidatedSchema {
             DefinedTypeId::Scalar(scalar_id) => {
                 let scalar_name = self.schema_data.scalars[scalar_id.as_usize()].name;
                 Err(WithLocation::new(
-                    ProcessResolverFetchDeclarationError::InvalidParentType {
+                    ValidateResolverFetchDeclarationError::InvalidParentType {
                         parent_type: "scalar",
                         parent_type_name: scalar_name.item.into(),
                     },
@@ -87,7 +83,7 @@ impl UnvalidatedSchema {
         field_name: WithSpan<ScalarFieldName>,
         text_source: TextSource,
         parent_object_id: ObjectId,
-    ) -> Result<ResolverFieldId, WithLocation<ProcessResolverFetchDeclarationError>> {
+    ) -> Result<ResolverFieldId, WithLocation<ValidateResolverFetchDeclarationError>> {
         let parent_object = self.schema_data.object(parent_object_id);
 
         match parent_object
@@ -96,7 +92,7 @@ impl UnvalidatedSchema {
         {
             Some(defined_field) => match defined_field {
                 DefinedField::ServerField(_) => Err(WithLocation::new(
-                    ProcessResolverFetchDeclarationError::FieldMustBeResolverField {
+                    ValidateResolverFetchDeclarationError::FieldMustBeResolverField {
                         parent_type_name: parent_object.name,
                         resolver_field_name: field_name.item,
                     },
@@ -105,7 +101,7 @@ impl UnvalidatedSchema {
                 DefinedField::ResolverField(resolver_field_id) => Ok(*resolver_field_id),
             },
             None => Err(WithLocation::new(
-                ProcessResolverFetchDeclarationError::ResolverFieldMustExist {
+                ValidateResolverFetchDeclarationError::ResolverFieldMustExist {
                     parent_type_name: parent_object.name,
                     resolver_field_name: field_name.item,
                 },
@@ -116,7 +112,7 @@ impl UnvalidatedSchema {
 }
 
 #[derive(Error, Debug)]
-pub enum ProcessResolverFetchDeclarationError {
+pub enum ValidateResolverFetchDeclarationError {
     #[error("`{parent_type_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {
         parent_type_name: UnvalidatedTypeName,

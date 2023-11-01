@@ -15,7 +15,7 @@ use crate::{
     refetched_paths::refetched_paths_with_path, DefinedField, NameAndArguments, PathToRefetchField,
     Schema, SchemaData, SchemaIdField, SchemaObject, SchemaResolver, SchemaServerField,
     UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData, UnvalidatedSchemaField,
-    UnvalidatedSchemaResolver, UnvalidatedSchemaServerField,
+    UnvalidatedSchemaResolver, UnvalidatedSchemaServerField, ValidateResolverFetchDeclarationError,
 };
 
 pub type ValidatedSchemaField = SchemaServerField<TypeAnnotation<OutputTypeId>>;
@@ -46,16 +46,33 @@ pub type ValidatedSchema = Schema<
     InputTypeId,
     // On objects, what does the HashMap of encountered types contain
     ValidatedEncounteredDefinedField,
+    // fetchable resolvers:
+    (ObjectId, ResolverFieldId),
 >;
 
 impl ValidatedSchema {
     pub fn validate_and_construct(
         unvalidated_schema: UnvalidatedSchema,
     ) -> ValidateSchemaResult<Self> {
+        let updated_fetchable_resolvers = unvalidated_schema
+            .fetchable_resolvers
+            .iter()
+            .map(|(text_source, fetchable_resolver)| {
+                unvalidated_schema
+                    .validate_resolver_fetch(*text_source, *fetchable_resolver)
+                    .map_err(|e| {
+                        WithLocation::new(
+                            ValidateSchemaError::ErrorValidatingResolverFetch { message: e.item },
+                            e.location,
+                        )
+                    })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
         let Schema {
             fields,
             resolvers,
-            fetchable_resolvers,
+            fetchable_resolvers: _,
             schema_data,
             id_type_id: id_type,
             string_type_id: string_type,
@@ -83,7 +100,7 @@ impl ValidatedSchema {
         Ok(Self {
             fields: updated_fields,
             resolvers: updated_resolvers,
-            fetchable_resolvers,
+            fetchable_resolvers: updated_fetchable_resolvers,
             schema_data: SchemaData {
                 objects,
                 scalars,
@@ -682,6 +699,11 @@ pub enum ValidateSchemaError {
         variable_name: VariableName,
         type_: String,
         inner_type: UnvalidatedTypeName,
+    },
+
+    #[error("Error when validating isoFetch calls.\nMessage: {message}")]
+    ErrorValidatingResolverFetch {
+        message: ValidateResolverFetchDeclarationError,
     },
 }
 

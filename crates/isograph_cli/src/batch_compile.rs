@@ -103,7 +103,9 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
             };
 
             let fetch_declaration = parse_iso_fetch(iso_fetch_text, text_source)?;
-            schema.process_resolver_fetch(fetch_declaration, text_source)?;
+            schema
+                .fetchable_resolvers
+                .push((text_source, fetch_declaration));
         }
     }
 
@@ -162,7 +164,7 @@ pub(crate) enum BatchCompileError {
 
     #[error("Error when processing a resolver fetch declaration.\nReason: {message}")]
     ErrorWhenProcessingResolverFetchDeclaration {
-        message: WithLocation<isograph_schema::ProcessResolverFetchDeclarationError>,
+        message: WithLocation<isograph_schema::ValidateResolverFetchDeclarationError>,
     },
 
     #[error("Unable to strip prefix.\nReason: {message}")]
@@ -170,7 +172,7 @@ pub(crate) enum BatchCompileError {
         message: std::path::StripPrefixError,
     },
 
-    #[error("Error when validating schema and resolvers.\nReason: {message}")]
+    #[error("Error when validating schema, resolvers and fetch declarations.\nReason: {message}")]
     UnableToValidateSchema {
         message: WithLocation<isograph_schema::ValidateSchemaError>,
     },
@@ -203,10 +205,10 @@ impl From<WithLocation<isograph_schema::ProcessResolverDeclarationError>> for Ba
     }
 }
 
-impl From<WithLocation<isograph_schema::ProcessResolverFetchDeclarationError>>
+impl From<WithLocation<isograph_schema::ValidateResolverFetchDeclarationError>>
     for BatchCompileError
 {
-    fn from(value: WithLocation<isograph_schema::ProcessResolverFetchDeclarationError>) -> Self {
+    fn from(value: WithLocation<isograph_schema::ValidateResolverFetchDeclarationError>) -> Self {
         BatchCompileError::ErrorWhenProcessingResolverFetchDeclaration { message: value }
     }
 }
