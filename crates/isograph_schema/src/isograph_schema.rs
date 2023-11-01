@@ -60,6 +60,7 @@ pub struct Schema<
 > {
     pub fields: Vec<SchemaServerField<TypeAnnotation<TFieldAssociatedType>>>,
     pub resolvers: Vec<SchemaResolver<TScalarField, TLinkedField, TVariableType>>,
+    // TODO consider whether this belongs here. It could just be a free variable.
     pub fetchable_resolvers: Vec<TFetchableResolver>,
     pub schema_data: SchemaData<TEncounteredField>,
 
