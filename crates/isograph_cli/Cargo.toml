@@ -15,3 +15,4 @@ isograph_lang_types = { path = "../isograph_lang_types" }
 common_lang_types = { path = "../common_lang_types" }
 lazy_static = "1.4"
 regex = "1.6.0"
+colored = "2.0.4"

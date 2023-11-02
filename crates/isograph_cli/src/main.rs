@@ -6,6 +6,7 @@ mod schema;
 mod write_artifacts;
 
 use batch_compile::{handle_compile_command, BatchCompileCliOptions};
+use colored::Colorize;
 use structopt::StructOpt;
 
 fn main() {
@@ -13,9 +14,9 @@ fn main() {
     let result = handle_compile_command(opt);
 
     match result {
-        Ok(_) => eprintln!("Done."),
+        Ok(_) => eprintln!("{}", "Successfully compiled.\n".bright_green()),
         Err(err) => {
-            eprintln!("{}", err);
+            eprintln!("{}\n{}", "Error when compiling.\n".bright_red(), err);
             std::process::exit(1);
         }
     }
