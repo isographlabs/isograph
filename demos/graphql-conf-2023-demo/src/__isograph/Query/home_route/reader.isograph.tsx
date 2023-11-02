@@ -1,49 +1,12 @@
-import type {IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryArtifactWrapper} from '@isograph/react';
+import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
 const resolver = (x: any) => x;
 import Pet__pet_summary_card, { ReadOutType as Pet__pet_summary_card__outputType } from '../../Pet/pet_summary_card/reader.isograph';
 
-const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [];
-
-const queryText = 'query home_route  {\
-  pets {\
-    id,\
-    name,\
-    picture,\
-    tagline,\
-  },\
-}';
+// the type, when read out (either via useLazyReference or via graph)
+export type ReadOutType = ResolverReturnType;
 
 export type ReadFromStoreType = ResolverParameterType;
 
-const normalizationAst: NormalizationAst = [
-  {
-    kind: "Linked",
-    fieldName: "pets",
-    arguments: null,
-    selections: [
-      {
-        kind: "Scalar",
-        fieldName: "id",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "name",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "picture",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "tagline",
-        arguments: null,
-      },
-    ],
-  },
-];
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Linked",
@@ -79,16 +42,10 @@ export type ResolverParameterType = {
 // The type, when returned from the resolver
 export type ResolverReturnType = ResolverParameterType;
 
-// the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = ResolverReturnType;
-
-const artifact: IsographFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
-  kind: 'FetchableResolver',
-  queryText,
-  normalizationAst,
-  readerAst,
+const artifact: IsographNonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
+  kind: 'NonFetchableResolver',
   resolver: resolver as any,
-  nestedRefetchQueries,
+  readerAst,
 };
 
 export default artifact;

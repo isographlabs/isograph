@@ -146,7 +146,8 @@ enum NormalizationKey {
 
 #[derive(Debug)]
 pub enum ArtifactQueueItem<'schema> {
-    Resolver(&'schema ValidatedSchemaResolver),
+    Reader(&'schema ValidatedSchemaResolver),
+    Entrypoint(&'schema ValidatedSchemaResolver),
     RefetchField(RefetchFieldResolverInfo),
     MutationField(MutationFieldResolverInfo),
 }

@@ -4,53 +4,33 @@ use common_lang_types::IsographObjectTypeName;
 use isograph_schema::ResolverTypeAndField;
 
 use crate::generate_artifacts::{
-    FetchableResolver, NonFetchableResolver, RefetchQueryResolver, ResolverImport,
-    ResolverReadOutType,
+    EntrypointArtifact, ReaderArtifact, RefetchArtifact, ResolverImport, ResolverReadOutType,
 };
 
-impl<'schema> FetchableResolver<'schema> {
+impl<'schema> EntrypointArtifact<'schema> {
     pub(crate) fn file_contents(self) -> String {
-        let FetchableResolver {
+        let EntrypointArtifact {
             query_text,
-            resolver_import_statement,
-            resolver_parameter_type,
-            resolver_return_type,
-            resolver_read_out_type,
-            reader_ast,
-            nested_resolver_artifact_imports,
-            parent_type,
             normalization_ast,
             refetch_query_artifact_import,
             ..
         } = self;
-        let read_out_type_text = get_read_out_type_text(resolver_read_out_type);
-        let nested_resolver_artifact_imports = nested_resolver_names_to_import_statement(
-            nested_resolver_artifact_imports,
-            parent_type.name,
-        );
 
         format!(
-            "import type {{IsographFetchableResolver, ReaderAst, FragmentReference, \
+            "import type {{IsographFetchableResolver, FragmentReference, \
             NormalizationAst, RefetchQueryArtifactWrapper}} from '@isograph/react';\n\
-            {resolver_import_statement}\n\
-            {nested_resolver_artifact_imports}\n\
+            import type {{ReadFromStoreType, ResolverParameterType, ReadOutType}} from './reader.isograph';\n\
+            import readerResolver from './reader.isograph';\n\
             {refetch_query_artifact_import}\n\n\
             const queryText = '{query_text}';\n\n\
-            export type ReadFromStoreType = ResolverParameterType;\n\n\
             const normalizationAst: NormalizationAst = {normalization_ast};\n\
-            const readerAst: ReaderAst<ReadFromStoreType> = {reader_ast};\n\n\
-            export type ResolverParameterType = {resolver_parameter_type};\n\n\
-            // The type, when returned from the resolver\n\
-            export type ResolverReturnType = {resolver_return_type};\n\n\
-            {read_out_type_text}\n\n\
-            const artifact: IsographFetchableResolver<ReadFromStoreType, \
-            ResolverParameterType, ReadOutType> = {{\n\
+            const artifact: IsographFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {{\n\
             {}kind: 'FetchableResolver',\n\
             {}queryText,\n\
             {}normalizationAst,\n\
-            {}readerAst,\n\
-            {}resolver: resolver as any,\n\
             {}nestedRefetchQueries,\n\
+            {}readerAst: readerResolver.readerAst,\n\
+            {}resolver: readerResolver.resolver,\n\
             }};\n\n\
             export default artifact;\n",
             "  ", "  ", "  ", "  ", "  ", "  ",
@@ -58,9 +38,9 @@ impl<'schema> FetchableResolver<'schema> {
     }
 }
 
-impl<'schema> NonFetchableResolver<'schema> {
+impl<'schema> ReaderArtifact<'schema> {
     pub(crate) fn file_contents(self) -> String {
-        let NonFetchableResolver {
+        let ReaderArtifact {
             resolver_import_statement,
             resolver_parameter_type,
             resolver_return_type,
@@ -99,9 +79,9 @@ impl<'schema> NonFetchableResolver<'schema> {
     }
 }
 
-impl RefetchQueryResolver {
+impl RefetchArtifact {
     pub(crate) fn file_contents(self) -> String {
-        let RefetchQueryResolver {
+        let RefetchArtifact {
             normalization_ast,
             query_text,
             ..

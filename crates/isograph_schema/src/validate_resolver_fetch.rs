@@ -12,17 +12,16 @@ impl UnvalidatedSchema {
         &self,
         text_source: TextSource,
         resolver_fetch: WithSpan<ResolverFetch>,
-    ) -> Result<(ObjectId, ResolverFieldId), WithLocation<ValidateResolverFetchDeclarationError>>
-    {
+    ) -> Result<ResolverFieldId, WithLocation<ValidateResolverFetchDeclarationError>> {
         let parent_object_id =
             self.validate_parent_object_id(resolver_fetch.item.parent_type, text_source)?;
-        let resolver_id = self.validate_resolver_field(
+        let resolver_field_id = self.validate_resolver_field(
             resolver_fetch.item.resolver_field_name,
             text_source,
             parent_object_id,
         )?;
 
-        Ok((parent_object_id, resolver_id))
+        Ok(resolver_field_id)
     }
 
     fn validate_parent_object_id(

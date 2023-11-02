@@ -23,10 +23,6 @@ export const pet_stats_card = iso<
   }
 `(PetStatsCard);
 
-isoFetch`
-  Query.pet_detail_route
-`
-
 function PetStatsCard(props: PetStatsCardParams) {
   return (
     <Card

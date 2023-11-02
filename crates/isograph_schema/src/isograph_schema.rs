@@ -22,9 +22,11 @@ use crate::ResolverVariant;
 lazy_static! {
     pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
     pub static ref ID_GRAPHQL_TYPE: ScalarTypeName = "ID".intern().into();
+    // TODO these don't belong here, and neither does the relative path stuff
+    // TODO these shouldn't be SelectableFieldName's
+    pub static ref READER: SelectableFieldName = "reader".intern().into();
+    pub static ref ENTRYPOINT: SelectableFieldName = "entrypoint".intern().into();
 }
-
-pub static READER: &'static str = "reader";
 
 /// The in-memory representation of a schema.
 ///
@@ -537,9 +539,9 @@ impl ResolverTypeAndField {
             field_name,
         } = *self;
         if type_name != current_file_type_name {
-            format!("../../{type_name}/{field_name}/{READER}.isograph")
+            format!("../../{type_name}/{field_name}/{}.isograph", *READER)
         } else {
-            format!("../{field_name}/{READER}.isograph")
+            format!("../{field_name}/{}.isograph", *READER)
         }
     }
 }

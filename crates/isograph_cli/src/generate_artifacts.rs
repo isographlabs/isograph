@@ -22,10 +22,10 @@ use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_resolver,
     ArtifactQueueItem, DefinedField, MergedLinkedFieldSelection, MergedScalarFieldSelection,
     MergedSelectionSet, MergedServerFieldSelection, MutationFieldResolverInfo, NameAndArguments,
-    PathToRefetchField, RefetchFieldResolverInfo, ResolverActionKind, ResolverArtifactKind,
-    ResolverTypeAndField, ResolverVariant, SchemaObject, ValidatedEncounteredDefinedField,
-    ValidatedScalarDefinedField, ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver,
-    ValidatedSelection, ValidatedVariableDefinition,
+    PathToRefetchField, RefetchFieldResolverInfo, ResolverActionKind, ResolverTypeAndField,
+    ResolverVariant, SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField,
+    ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
+    ValidatedVariableDefinition,
 };
 use thiserror::Error;
 
@@ -64,7 +64,10 @@ fn get_all_artifacts<'schema>(schema: &'schema ValidatedSchema) -> Vec<Artifact<
     let mut artifact_queue: Vec<_> = schema
         .resolvers
         .iter()
-        .map(ArtifactQueueItem::Resolver)
+        .map(ArtifactQueueItem::Reader)
+        .chain(schema.fetchable_resolvers.iter().map(|resolver_field_id| {
+            ArtifactQueueItem::Entrypoint(schema.resolver(*resolver_field_id))
+        }))
         .collect();
 
     let mut artifacts = vec![];
@@ -78,12 +81,17 @@ fn get_all_artifacts<'schema>(schema: &'schema ValidatedSchema) -> Vec<Artifact<
 fn generate_artifact<'schema>(
     queue_item: ArtifactQueueItem<'schema>,
     schema: &'schema ValidatedSchema,
+    // As we process reader artifacts, we can also encounter refetch and mutation
+    // fields. If so, we add them to the artifact queue.
     artifact_queue: &mut Vec<ArtifactQueueItem<'schema>>,
 ) -> Artifact<'schema> {
     match queue_item {
-        ArtifactQueueItem::Resolver(resolver) => {
-            get_artifact_for_resolver(resolver, schema, artifact_queue)
+        ArtifactQueueItem::Reader(resolver) => {
+            Artifact::Reader(generate_non_fetchable_resolver_artifact(schema, resolver))
         }
+        ArtifactQueueItem::Entrypoint(fetchable_resolver) => Artifact::Entrypoint(
+            generate_fetchable_resolver_artifact(schema, fetchable_resolver, artifact_queue),
+        ),
         ArtifactQueueItem::RefetchField(refetch_info) => {
             get_artifact_for_refetch_field(schema, refetch_info)
         }
@@ -131,7 +139,7 @@ fn get_artifact_for_refetch_field<'schema>(
     ));
     // ------- END HACK -------
 
-    Artifact::RefetchQuery(RefetchQueryResolver {
+    Artifact::RefetchQuery(RefetchArtifact {
         normalization_ast,
         query_text,
         root_fetchable_field,
@@ -226,7 +234,7 @@ fn get_artifact_for_mutation_field<'schema>(
         }}]",
     ));
 
-    Artifact::RefetchQuery(RefetchQueryResolver {
+    Artifact::RefetchQuery(RefetchArtifact {
         normalization_ast,
         query_text,
         root_fetchable_field,
@@ -369,26 +377,11 @@ fn get_aliased_mutation_field_name(
     s
 }
 
-fn get_artifact_for_resolver<'schema>(
-    resolver: &'schema ValidatedSchemaResolver,
-    schema: &'schema ValidatedSchema,
-    artifact_queue: &mut Vec<ArtifactQueueItem<'schema>>,
-) -> Artifact<'schema> {
-    match resolver.artifact_kind {
-        ResolverArtifactKind::FetchableOnQuery => Artifact::FetchableResolver(
-            generate_fetchable_resolver_artifact(schema, resolver, artifact_queue),
-        ),
-        ResolverArtifactKind::NonFetchable => Artifact::NonFetchableResolver(
-            generate_non_fetchable_resolver_artifact(schema, resolver),
-        ),
-    }
-}
-
 fn generate_fetchable_resolver_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     fetchable_resolver: &ValidatedSchemaResolver,
     artifact_queue: &mut Vec<ArtifactQueueItem<'schema>>,
-) -> FetchableResolver<'schema> {
+) -> EntrypointArtifact<'schema> {
     if let Some((ref selection_set, _)) = fetchable_resolver.selection_set_and_unwraps {
         let query_name = fetchable_resolver.name.into();
 
@@ -414,42 +407,15 @@ fn generate_fetchable_resolver_artifact<'schema>(
             &merged_selection_set,
             &fetchable_resolver.variable_definitions,
         );
-        let mut nested_resolver_artifact_imports = HashMap::new();
-        let resolver_parameter_type = generate_resolver_parameter_type(
-            schema,
-            &selection_set,
-            &fetchable_resolver.variant,
-            query_object.into(),
-            &mut nested_resolver_artifact_imports,
-            0,
-        );
         let refetch_query_artifact_imports =
             generate_refetch_query_artifact_imports(&root_refetched_paths);
-        let resolver_import_statement =
-            generate_resolver_import_statement(fetchable_resolver.action_kind);
-        let resolver_return_type =
-            generate_resolver_return_type_declaration(fetchable_resolver.action_kind);
-        let resolver_read_out_type = generate_read_out_type(fetchable_resolver);
-        let reader_ast = generate_reader_ast(
-            schema,
-            selection_set,
-            0,
-            &mut nested_resolver_artifact_imports,
-            &root_refetched_paths,
-        );
 
         let normalization_ast = generate_normalization_ast(schema, &merged_selection_set, 0);
 
-        FetchableResolver {
+        EntrypointArtifact {
             query_text,
             query_name,
             parent_type: query_object.into(),
-            resolver_parameter_type,
-            resolver_import_statement,
-            resolver_return_type,
-            resolver_read_out_type,
-            reader_ast,
-            nested_resolver_artifact_imports,
             normalization_ast,
             refetch_query_artifact_import: refetch_query_artifact_imports,
         }
@@ -462,7 +428,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
 fn generate_non_fetchable_resolver_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     non_fetchable_resolver: &ValidatedSchemaResolver,
-) -> NonFetchableResolver<'schema> {
+) -> ReaderArtifact<'schema> {
     if let Some((selection_set, _)) = &non_fetchable_resolver.selection_set_and_unwraps {
         let parent_type = schema
             .schema_data
@@ -504,7 +470,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
         let resolver_read_out_type = generate_read_out_type(non_fetchable_resolver);
         let resolver_import_statement =
             generate_resolver_import_statement(non_fetchable_resolver.action_kind);
-        NonFetchableResolver {
+        ReaderArtifact {
             parent_type: parent_type.into(),
             resolver_field_name: non_fetchable_resolver.name,
             reader_ast,
@@ -521,9 +487,9 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
 
 #[derive(Debug)]
 pub(crate) enum Artifact<'schema> {
-    FetchableResolver(FetchableResolver<'schema>),
-    NonFetchableResolver(NonFetchableResolver<'schema>),
-    RefetchQuery(RefetchQueryResolver),
+    Entrypoint(EntrypointArtifact<'schema>),
+    Reader(ReaderArtifact<'schema>),
+    RefetchQuery(RefetchArtifact),
 }
 
 #[derive(Debug)]
@@ -563,22 +529,16 @@ pub(crate) struct RefetchQueryArtifactImport(pub String);
 derive_display!(RefetchQueryArtifactImport);
 
 #[derive(Debug)]
-pub(crate) struct FetchableResolver<'schema> {
+pub(crate) struct EntrypointArtifact<'schema> {
     pub(crate) query_name: QueryOperationName,
     pub parent_type: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
     pub query_text: QueryText,
-    pub resolver_import_statement: ResolverImportStatement,
-    pub resolver_parameter_type: ResolverParameterType,
-    pub resolver_return_type: ResolverReturnType,
-    pub resolver_read_out_type: ResolverReadOutType,
-    pub reader_ast: ReaderAst,
-    pub nested_resolver_artifact_imports: NestedResolverImports,
     pub normalization_ast: NormalizationAst,
     pub refetch_query_artifact_import: RefetchQueryArtifactImport,
 }
 
 #[derive(Debug)]
-pub(crate) struct NonFetchableResolver<'schema> {
+pub(crate) struct ReaderArtifact<'schema> {
     pub parent_type: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
     pub(crate) resolver_field_name: SelectableFieldName,
     pub nested_resolver_artifact_imports: NestedResolverImports,
@@ -590,7 +550,7 @@ pub(crate) struct NonFetchableResolver<'schema> {
 }
 
 #[derive(Debug)]
-pub(crate) struct RefetchQueryResolver {
+pub(crate) struct RefetchArtifact {
     pub normalization_ast: NormalizationAst,
     pub query_text: QueryText,
     pub root_fetchable_field: SelectableFieldName,

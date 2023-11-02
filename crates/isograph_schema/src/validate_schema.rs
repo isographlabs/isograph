@@ -47,7 +47,7 @@ pub type ValidatedSchema = Schema<
     // On objects, what does the HashMap of encountered types contain
     ValidatedEncounteredDefinedField,
     // fetchable resolvers:
-    (ObjectId, ResolverFieldId),
+    ResolverFieldId,
 >;
 
 impl ValidatedSchema {

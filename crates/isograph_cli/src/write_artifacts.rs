@@ -6,12 +6,11 @@ use std::{
 
 use common_lang_types::SelectableFieldName;
 use intern::{string_key::Intern, Lookup};
-use isograph_schema::READER;
+use isograph_schema::{ENTRYPOINT, READER};
 
 use crate::{
     generate_artifacts::{
-        Artifact, FetchableResolver, GenerateArtifactsError, NonFetchableResolver,
-        RefetchQueryResolver,
+        Artifact, EntrypointArtifact, GenerateArtifactsError, ReaderArtifact, RefetchArtifact,
     },
     isograph_literals::ISOGRAPH_FOLDER,
 };
@@ -46,14 +45,14 @@ pub(crate) fn write_artifacts<'schema>(
     })?;
     for artifact in artifacts {
         match artifact {
-            Artifact::FetchableResolver(fetchable_resolver) => {
-                let FetchableResolver {
+            Artifact::Entrypoint(fetchable_resolver) => {
+                let EntrypointArtifact {
                     query_name,
                     parent_type,
                     ..
                 } = &fetchable_resolver;
 
-                let generated_file_name = generated_file_name(READER.intern().into());
+                let generated_file_name = generated_file_name(*ENTRYPOINT);
                 let intermediate_folder = generated_intermediate_folder(
                     &generated_folder_root,
                     &[parent_type.name.lookup(), query_name.lookup()],
@@ -83,14 +82,14 @@ pub(crate) fn write_artifacts<'schema>(
                     }
                 })?;
             }
-            Artifact::NonFetchableResolver(non_fetchable_resolver) => {
-                let NonFetchableResolver {
+            Artifact::Reader(non_fetchable_resolver) => {
+                let ReaderArtifact {
                     parent_type,
                     resolver_field_name,
                     ..
                 } = &non_fetchable_resolver;
 
-                let generated_file_name = generated_file_name(READER.intern().into());
+                let generated_file_name = generated_file_name(*READER);
                 let intermediate_folder = generated_intermediate_folder(
                     &generated_folder_root,
                     &[parent_type.name.lookup(), resolver_field_name.lookup()],
@@ -121,7 +120,7 @@ pub(crate) fn write_artifacts<'schema>(
                 })?;
             }
             Artifact::RefetchQuery(refetch_query_resolver) => {
-                let RefetchQueryResolver {
+                let RefetchArtifact {
                     root_fetchable_field,
                     root_fetchable_field_parent_object,
                     refetch_query_index,
