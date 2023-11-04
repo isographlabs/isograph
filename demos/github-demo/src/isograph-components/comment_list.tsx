@@ -2,8 +2,8 @@ import React from "react";
 
 import { iso } from "@isograph/react";
 
-import { ResolverParameterType as CommentListProps } from "./__isograph/PullRequest/comment_list.isograph";
-import { ResolverParameterType as IssueCommentProps } from "./__isograph/IssueComment/formatted_comment_creation_date.isograph";
+import { ResolverParameterType as CommentListProps } from "./__isograph/PullRequest/comment_list/reader.isograph";
+import { ResolverParameterType as IssueCommentProps } from "./__isograph/IssueComment/formatted_comment_creation_date/reader.isograph";
 
 import { Card, CardContent } from "@mui/material";
 

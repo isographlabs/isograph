@@ -2,7 +2,7 @@ import React from "react";
 import { iso, read, useLazyReference } from "@isograph/react";
 import { Container } from "@mui/material";
 
-import repositoryPageQuery from "./__isograph/Query/repository_page.isograph";
+import repositoryPageQuery from "./__isograph/Query/repository_page/reader.isograph";
 import { FullPageLoading, Route, RepositoryRoute } from "./github_demo";
 
 iso`

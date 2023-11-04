@@ -1,9 +1,19 @@
 import type {IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst} from '@isograph/react';
 const queryText = 'query User_refetch ($first: Int!, $id: ID!) { node____id___id: node(id: $id) { ... on User { \
   avatarUrl,\
-  id,\
-  login,\
   name,\
+  login,\
+  id,\
+  status {\
+    id,\
+    emoji,\
+    user {\
+      id,\
+      repositories____last___first: repositories(last: $first) {\
+        __typename,\
+      },\
+    },\
+  },\
   repositories____last___first: repositories(last: $first) {\
     edges {\
       node {\
@@ -26,16 +36,6 @@ const queryText = 'query User_refetch ($first: Int!, $id: ID!) { node____id___id
       },\
     },\
   },\
-  status {\
-    id,\
-    emoji,\
-    user {\
-      id,\
-      repositories____last___first: repositories(last: $first) {\
-        __typename,\
-      },\
-    },\
-  },\
 }}}';
 
 const normalizationAst: NormalizationAst = [{ kind: "Linked", fieldName: "node", alias: null, arguments: [{ argumentName: "id", variableName: "id" }], selections: [
@@ -46,7 +46,7 @@ const normalizationAst: NormalizationAst = [{ kind: "Linked", fieldName: "node",
   },
   {
     kind: "Scalar",
-    fieldName: "id",
+    fieldName: "name",
     arguments: null,
   },
   {
@@ -56,8 +56,54 @@ const normalizationAst: NormalizationAst = [{ kind: "Linked", fieldName: "node",
   },
   {
     kind: "Scalar",
-    fieldName: "name",
+    fieldName: "id",
     arguments: null,
+  },
+  {
+    kind: "Linked",
+    fieldName: "status",
+    arguments: null,
+    selections: [
+      {
+        kind: "Scalar",
+        fieldName: "id",
+        arguments: null,
+      },
+      {
+        kind: "Scalar",
+        fieldName: "emoji",
+        arguments: null,
+      },
+      {
+        kind: "Linked",
+        fieldName: "user",
+        arguments: null,
+        selections: [
+          {
+            kind: "Scalar",
+            fieldName: "id",
+            arguments: null,
+          },
+          {
+            kind: "Linked",
+            fieldName: "repositories",
+            arguments: [
+              {
+                argumentName: "last",
+                variableName: "first",
+              },
+            ],
+            selections: [
+              {
+                kind: "Scalar",
+                fieldName: "__typename",
+                arguments: null,
+              },
+            ],
+          },
+        ],
+      },
+    ],
   },
   {
     kind: "Linked",
@@ -159,52 +205,6 @@ const normalizationAst: NormalizationAst = [{ kind: "Linked", fieldName: "node",
                     arguments: null,
                   },
                 ],
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  },
-  {
-    kind: "Linked",
-    fieldName: "status",
-    arguments: null,
-    selections: [
-      {
-        kind: "Scalar",
-        fieldName: "id",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "emoji",
-        arguments: null,
-      },
-      {
-        kind: "Linked",
-        fieldName: "user",
-        arguments: null,
-        selections: [
-          {
-            kind: "Scalar",
-            fieldName: "id",
-            arguments: null,
-          },
-          {
-            kind: "Linked",
-            fieldName: "repositories",
-            arguments: [
-              {
-                argumentName: "last",
-                variableName: "first",
-              },
-            ],
-            selections: [
-              {
-                kind: "Scalar",
-                fieldName: "__typename",
-                arguments: null,
               },
             ],
           },

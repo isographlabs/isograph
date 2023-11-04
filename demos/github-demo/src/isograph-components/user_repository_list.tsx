@@ -1,5 +1,5 @@
 import { iso } from "@isograph/react";
-import type { ResolverParameterType as UserRepositoryListParams } from "./__isograph/User/repository_list.isograph";
+import type { ResolverParameterType as UserRepositoryListParams } from "./__isograph/User/repository_list/reader.isograph";
 
 import {
   Table,
