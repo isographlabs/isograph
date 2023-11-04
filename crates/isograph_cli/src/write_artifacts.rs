@@ -18,26 +18,19 @@ use crate::{
 pub(crate) fn write_artifacts<'schema>(
     artifacts: Vec<Artifact<'schema>>,
     project_root: &PathBuf,
+    artifact_directory: &PathBuf,
 ) -> Result<(), GenerateArtifactsError> {
-    let current_dir = std::env::current_dir().expect("current_dir should exist");
-    let project_root = current_dir.join(project_root).canonicalize().map_err(|e| {
-        GenerateArtifactsError::UnableToCanonicalizePath {
-            path: project_root.clone(),
-            message: e,
-        }
-    })?;
+    let artifact_directory = artifact_directory.join(ISOGRAPH_FOLDER);
 
-    let generated_folder_root = project_root.join(ISOGRAPH_FOLDER);
-
-    if generated_folder_root.exists() {
-        fs::remove_dir_all(&generated_folder_root).map_err(|e| {
+    if artifact_directory.exists() {
+        fs::remove_dir_all(&artifact_directory).map_err(|e| {
             GenerateArtifactsError::UnableToDeleteDirectory {
                 path: project_root.clone(),
                 message: e,
             }
         })?;
     }
-    fs::create_dir_all(&generated_folder_root).map_err(|e| {
+    fs::create_dir_all(&artifact_directory).map_err(|e| {
         GenerateArtifactsError::UnableToCreateDirectory {
             path: project_root.clone(),
             message: e,
@@ -54,7 +47,7 @@ pub(crate) fn write_artifacts<'schema>(
 
                 let generated_file_name = generated_file_name(*ENTRYPOINT);
                 let intermediate_folder = generated_intermediate_folder(
-                    &generated_folder_root,
+                    &artifact_directory,
                     &[parent_type.name.lookup(), query_name.lookup()],
                 );
                 let generated_file_path = intermediate_folder.join(generated_file_name);
@@ -91,7 +84,7 @@ pub(crate) fn write_artifacts<'schema>(
 
                 let generated_file_name = generated_file_name(*READER);
                 let intermediate_folder = generated_intermediate_folder(
-                    &generated_folder_root,
+                    &artifact_directory,
                     &[parent_type.name.lookup(), resolver_field_name.lookup()],
                 );
                 let generated_file_path = intermediate_folder.join(generated_file_name);
@@ -135,7 +128,7 @@ pub(crate) fn write_artifacts<'schema>(
                         .into(),
                 );
                 let intermediate_folder = generated_intermediate_folder(
-                    &generated_folder_root,
+                    &artifact_directory,
                     &[
                         root_fetchable_field_parent_object.lookup(),
                         root_fetchable_field.lookup(),

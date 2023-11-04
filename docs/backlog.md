@@ -129,6 +129,7 @@ x Error printing
 * Parallelize artifact gen
 * Stuff should be wrapped with WithSource, locations should not be on individual fields
 * Display multiple errors, parse etc. in parallel
+* Do not look in artifact_directory, if project_root contains artifact_directory
 
 # Plan for isoFetch
 

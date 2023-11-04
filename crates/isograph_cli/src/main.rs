@@ -1,5 +1,6 @@
 mod artifact_file_contents;
 mod batch_compile;
+mod config;
 mod generate_artifacts;
 mod isograph_literals;
 mod schema;

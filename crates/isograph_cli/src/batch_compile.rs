@@ -9,6 +9,7 @@ use structopt::StructOpt;
 use thiserror::Error;
 
 use crate::{
+    config::CompilerConfig,
     generate_artifacts::{generate_artifacts, GenerateArtifactsError},
     isograph_literals::{
         extract_iso_fetch_from_file_content, extract_iso_literal_from_file_content,
@@ -20,20 +21,18 @@ use crate::{
 /// Options if we're doing a batch compilation
 #[derive(Debug, StructOpt)]
 pub(crate) struct BatchCompileCliOptions {
-    /// Source schema file
+    /// Compile using this config file. If not provided, searches for a config in
+    /// package.json under the `isograph` key.
     #[structopt(long)]
-    schema: PathBuf,
-
-    /// Source JS directory
-    #[structopt(long)]
-    #[allow(unused)]
-    project_root: PathBuf,
+    config: Option<PathBuf>,
 }
 
 pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), BatchCompileError> {
-    let content = read_schema_file(&opt.schema)?;
+    let config = CompilerConfig::create(opt.config);
+
+    let content = read_schema_file(&config.schema)?;
     let schema_text_source = TextSource {
-        path: opt.schema.to_str().unwrap().intern().into(),
+        path: config.schema.to_str().unwrap().intern().into(),
         span: None,
     };
     let type_system_document = parse_schema(&content, schema_text_source)
@@ -44,7 +43,7 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
 
     let canonicalized_root_path = {
         let current_dir = std::env::current_dir().expect("current_dir should exist");
-        let joined = current_dir.join(&opt.project_root);
+        let joined = current_dir.join(&config.project_root);
         joined
             .canonicalize()
             .map_err(|message| BatchCompileError::UnableToLoadSchema {
@@ -111,7 +110,11 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
 
     let validated_schema = Schema::validate_and_construct(schema)?;
 
-    generate_artifacts(&validated_schema, &opt.project_root)?;
+    generate_artifacts(
+        &validated_schema,
+        &config.project_root,
+        &config.artifact_directory,
+    )?;
 
     Ok(())
 }

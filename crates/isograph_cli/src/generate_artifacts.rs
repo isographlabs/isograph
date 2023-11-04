@@ -3,6 +3,7 @@ use std::{
     fmt::{self, Debug, Display},
     io,
     path::PathBuf,
+    str::FromStr,
 };
 
 use common_lang_types::{
@@ -47,8 +48,13 @@ macro_rules! derive_display {
 pub(crate) fn generate_artifacts(
     schema: &ValidatedSchema,
     project_root: &PathBuf,
+    artifact_directory: &PathBuf,
 ) -> Result<(), GenerateArtifactsError> {
-    write_artifacts(get_all_artifacts(schema), project_root)?;
+    write_artifacts(
+        get_all_artifacts(schema, project_root, artifact_directory),
+        project_root,
+        artifact_directory,
+    )?;
 
     Ok(())
 }
@@ -60,7 +66,11 @@ pub(crate) fn generate_artifacts(
 ///
 /// We do this by keeping a queue of artifacts to generate, and adding to the queue
 /// as we process fetchable resolvers.
-fn get_all_artifacts<'schema>(schema: &'schema ValidatedSchema) -> Vec<Artifact<'schema>> {
+fn get_all_artifacts<'schema>(
+    schema: &'schema ValidatedSchema,
+    project_root: &PathBuf,
+    artifact_directory: &PathBuf,
+) -> Vec<Artifact<'schema>> {
     let mut artifact_queue: Vec<_> = schema
         .resolvers
         .iter()
@@ -72,7 +82,13 @@ fn get_all_artifacts<'schema>(schema: &'schema ValidatedSchema) -> Vec<Artifact<
 
     let mut artifacts = vec![];
     while let Some(queue_item) = artifact_queue.pop() {
-        artifacts.push(generate_artifact(queue_item, schema, &mut artifact_queue));
+        artifacts.push(generate_artifact(
+            queue_item,
+            schema,
+            &mut artifact_queue,
+            project_root,
+            artifact_directory,
+        ));
     }
 
     artifacts
@@ -84,10 +100,17 @@ fn generate_artifact<'schema>(
     // As we process reader artifacts, we can also encounter refetch and mutation
     // fields. If so, we add them to the artifact queue.
     artifact_queue: &mut Vec<ArtifactQueueItem<'schema>>,
+    project_root: &PathBuf,
+    artifact_directory: &PathBuf,
 ) -> Artifact<'schema> {
     match queue_item {
         ArtifactQueueItem::Reader(resolver) => {
-            Artifact::Reader(generate_non_fetchable_resolver_artifact(schema, resolver))
+            Artifact::Reader(generate_non_fetchable_resolver_artifact(
+                schema,
+                resolver,
+                project_root,
+                artifact_directory,
+            ))
         }
         ArtifactQueueItem::Entrypoint(fetchable_resolver) => Artifact::Entrypoint(
             generate_fetchable_resolver_artifact(schema, fetchable_resolver, artifact_queue),
@@ -428,6 +451,8 @@ fn generate_fetchable_resolver_artifact<'schema>(
 fn generate_non_fetchable_resolver_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     non_fetchable_resolver: &ValidatedSchemaResolver,
+    project_root: &PathBuf,
+    artifact_directory: &PathBuf,
 ) -> ReaderArtifact<'schema> {
     if let Some((selection_set, _)) = &non_fetchable_resolver.selection_set_and_unwraps {
         let parent_type = schema
@@ -468,8 +493,11 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
         let resolver_return_type =
             generate_resolver_return_type_declaration(non_fetchable_resolver.action_kind);
         let resolver_read_out_type = generate_read_out_type(non_fetchable_resolver);
-        let resolver_import_statement =
-            generate_resolver_import_statement(non_fetchable_resolver.action_kind);
+        let resolver_import_statement = generate_resolver_import_statement(
+            non_fetchable_resolver.action_kind,
+            project_root,
+            artifact_directory,
+        );
         ReaderArtifact {
             parent_type: parent_type.into(),
             resolver_field_name: non_fetchable_resolver.name,
@@ -658,9 +686,6 @@ pub enum GenerateArtifactsError {
 
     #[error("Unable to delete directory at path {path:?}.\nReason: {message:?}")]
     UnableToDeleteDirectory { path: PathBuf, message: io::Error },
-
-    #[error("Unable to canonicalize path: {path:?}.\nReason: {message:?}")]
-    UnableToCanonicalizePath { path: PathBuf, message: io::Error },
 }
 
 fn write_selections_for_query_text(
@@ -897,14 +922,26 @@ fn print_non_null_type_annotation<T: Display>(non_null: &NonNullTypeAnnotation<T
 
 fn generate_resolver_import_statement(
     resolver_action_kind: ResolverActionKind,
+    project_root: &PathBuf,
+    artifact_directory: &PathBuf,
 ) -> ResolverImportStatement {
     match resolver_action_kind {
         ResolverActionKind::Identity => {
             ResolverImportStatement("const resolver = (x: any) => x;".to_string())
         }
-        ResolverActionKind::NamedImport((name, path)) => ResolverImportStatement(format!(
-            "import {{ {name} as resolver }} from '../../../{path}';",
-        )),
+        ResolverActionKind::NamedImport((name, path)) => {
+            let path_to_artifact = project_root
+                .join(PathBuf::from_str(path.lookup()).expect(
+                    "paths should be legal here. This is indicative of a bug in Isograph.",
+                ));
+            let relative_path =
+                pathdiff::diff_paths(path_to_artifact, artifact_directory.join("a/b/c"))
+                    .expect("Relative path should work");
+            ResolverImportStatement(format!(
+                "import {{ {name} as resolver }} from '{}';",
+                relative_path.to_str().expect("This path should be stringifiable. This probably is indicative of a bug in Relay.")
+            ))
+        }
         ResolverActionKind::RefetchField => ResolverImportStatement(
             "import { makeNetworkRequest } from '@isograph/react';\n\
             const resolver = (artifact, variables) => () => \
