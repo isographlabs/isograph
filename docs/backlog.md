@@ -128,6 +128,7 @@ x Error printing
 * Typescript integration for type inference of iso literals
 * Parallelize artifact gen
 * Stuff should be wrapped with WithSource, locations should not be on individual fields
+* Display multiple errors, parse etc. in parallel
 
 # Plan for isoFetch
 
