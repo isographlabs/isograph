@@ -7,7 +7,7 @@ import homeRouteQuery from "../__isograph/Query/home_route/entrypoint.isograph";
 console.log({homeRouteQuery})
 
 iso`
-  Query.home_route @fetchable {
+  Query.home_route {
     pets {
       id,
       pet_summary_card,
@@ -18,7 +18,6 @@ iso`
 isoFetch`
   Query.home_route
 `
-
 
 export function HomeRoute({ navigateTo }: { navigateTo: (path: Route) => void }) {
   const { queryReference } = useLazyReference(homeRouteQuery, {});
