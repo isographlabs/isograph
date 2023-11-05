@@ -2,9 +2,7 @@ import React from "react";
 import { iso, read, useLazyReference, isoFetch } from "@isograph/react";
 import { Container, Stack } from "@mui/material";
 import { type Route } from "./router";
-
-import homeRouteQuery from "../__isograph/Query/home_route/entrypoint.isograph";
-console.log({homeRouteQuery})
+import HomeRouteEntrypoint from '../__isograph/Query/home_route/entrypoint.isograph'
 
 iso`
   Query.home_route {
@@ -15,12 +13,15 @@ iso`
   }
 `;
 
-isoFetch`
-  Query.home_route
-`
+export function HomeRouteComponent({
+  navigateTo,
+}: {
+  navigateTo: (path: Route) => void;
+}) {
+  const { queryReference } = useLazyReference(isoFetch<typeof HomeRouteEntrypoint>`
+    Query.home_route
+  `, {});
 
-export function HomeRouteComponent({ navigateTo }: { navigateTo: (path: Route) => void }) {
-  const { queryReference } = useLazyReference(homeRouteQuery, {});
   const data = read(queryReference);
 
   return (

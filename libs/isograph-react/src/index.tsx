@@ -151,7 +151,9 @@ export type FragmentReference<
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
-export function isoFetch(_text: TemplateStringsArray): void {}
+export function isoFetch<T extends IsographFetchableResolver<any, any, any>>(_text: TemplateStringsArray): T {
+  return (void 0 as any)
+}
 
 export function iso<TResolverParameter, TResolverReturn = TResolverParameter>(
   _queryText: TemplateStringsArray
