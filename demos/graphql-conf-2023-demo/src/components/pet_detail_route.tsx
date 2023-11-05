@@ -20,7 +20,7 @@ isoFetch`
   Query.pet_detail_route
 `
 
-export function PetDetailRoute({
+export function PetDetailRouteComponent({
   route,
   navigateTo,
 }: {

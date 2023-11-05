@@ -1,8 +1,8 @@
 import React from "react";
 import NoSSR from "react-no-ssr";
 import { Container } from "@mui/material";
-import { HomeRoute } from "./home_route";
-import { PetDetailRoute } from "./pet_detail_route";
+import { HomeRouteComponent } from "./home_route";
+import { PetDetailRouteComponent } from "./pet_detail_route";
 import { subscribe } from "@isograph/react";
 
 export type PetId = string;
@@ -56,10 +56,10 @@ function Router({
   console.log({ route });
   switch (route.kind) {
     case "Home":
-      return <HomeRoute navigateTo={setRoute} />;
+      return <HomeRouteComponent navigateTo={setRoute} />;
     case "PetDetail":
       return (
-        <PetDetailRoute navigateTo={setRoute} route={route} key={route.id} />
+        <PetDetailRouteComponent navigateTo={setRoute} route={route} key={route.id} />
       );
     default:
       const exhaustiveCheck: never = route;

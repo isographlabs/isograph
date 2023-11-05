@@ -19,7 +19,7 @@ isoFetch`
   Query.home_route
 `
 
-export function HomeRoute({ navigateTo }: { navigateTo: (path: Route) => void }) {
+export function HomeRouteComponent({ navigateTo }: { navigateTo: (path: Route) => void }) {
   const { queryReference } = useLazyReference(homeRouteQuery, {});
   const data = read(queryReference);
 
