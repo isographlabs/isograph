@@ -2,7 +2,7 @@ import React from "react";
 import { iso } from "@isograph/react";
 import { Card, CardContent } from "@mui/material";
 
-import { ResolverParameterType as PetCheckinsCardParams } from "../__isograph/Pet/pet_checkins_card.isograph";
+import { ResolverParameterType as PetCheckinsCardParams } from "../__isograph/Pet/pet_checkins_card/reader.isograph";
 
 export const pet_checkins_card = iso<
   PetCheckinsCardParams,
@@ -19,12 +19,9 @@ export const pet_checkins_card = iso<
 `(PetCheckinsCard);
 
 function PetCheckinsCard(props: PetCheckinsCardParams) {
-  console.log('check ins', { props })
+  console.log("check ins", { props });
   return (
-    <Card
-      variant="outlined"
-      sx={{ width: 450, boxShadow: 3 }}
-    >
+    <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
       <CardContent>
         <h2>Check-ins</h2>
         <ul>
