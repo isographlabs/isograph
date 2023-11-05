@@ -165,7 +165,7 @@ pub(crate) fn write_artifacts<'schema>(
 }
 
 fn generated_file_name(field_name: SelectableFieldName) -> PathBuf {
-    PathBuf::from(format!("{}.isograph.tsx", field_name))
+    PathBuf::from(format!("{}.isograph.ts", field_name))
 }
 
 fn generated_intermediate_folder(project_root: &PathBuf, items: &[&'static str]) -> PathBuf {
