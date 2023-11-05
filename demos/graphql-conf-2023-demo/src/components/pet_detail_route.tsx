@@ -1,5 +1,5 @@
 import React from "react";
-import { iso, read, useLazyReference , isoFetch } from "@isograph/react";
+import { iso, read, useLazyReference, isoFetch } from "@isograph/react";
 import { Container, Stack } from "@mui/material";
 
 import petDetailRouteQuery from "../__isograph/Query/pet_detail_route/entrypoint.isograph";
@@ -18,7 +18,7 @@ iso`
 
 isoFetch`
   Query.pet_detail_route
-`
+`;
 
 export function PetDetailRouteComponent({
   route,
