@@ -186,7 +186,7 @@ export function useLazyReference<
   TResolverProps,
   TResolverResult
 >(
-  artifact: IsographFetchableResolver<
+  fetchableResolverArtifact: IsographFetchableResolver<
     TReadFromStore,
     TResolverProps,
     TResolverResult
@@ -200,7 +200,10 @@ export function useLazyReference<
   >;
 } {
   // Typechecking fails here... TODO investigate
-  const cache = getOrCreateCacheForArtifact(artifact, variables);
+  const cache = getOrCreateCacheForArtifact(
+    fetchableResolverArtifact,
+    variables
+  );
 
   // TODO add comment explaining why we never use this value
   // @ts-ignore
@@ -210,10 +213,10 @@ export function useLazyReference<
   return {
     queryReference: {
       kind: "FragmentReference",
-      readerArtifact: artifact.readerArtifact,
+      readerArtifact: fetchableResolverArtifact.readerArtifact,
       root: ROOT_ID,
       variables,
-      nestedRefetchQueries: artifact.nestedRefetchQueries,
+      nestedRefetchQueries: fetchableResolverArtifact.nestedRefetchQueries,
     },
   };
 }
