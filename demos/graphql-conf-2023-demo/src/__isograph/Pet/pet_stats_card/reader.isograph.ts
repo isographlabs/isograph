@@ -1,5 +1,6 @@
 import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
 import { pet_stats_card as resolver } from '../../../components/pet_stats_card.tsx';
+import Pet____refetch, { ReadOutType as Pet____refetch__outputType } from '../__refetch/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
@@ -18,6 +19,12 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     fieldName: "nickname",
     alias: null,
     arguments: null,
+  },
+  {
+    kind: "RefetchField",
+    alias: "__refetch",
+    readerArtifact: Pet____refetch,
+    refetchQuery: 0,
   },
   {
     kind: "Scalar",
@@ -75,6 +82,7 @@ export type ResolverParameterType = { data:
 {
   id: string,
   nickname: (string | null),
+  __refetch: Pet____refetch__outputType,
   age: number,
   stats: {
     weight: number,

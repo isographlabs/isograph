@@ -18,7 +18,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     kind: "Resolver",
     alias: "best_friend_selector",
     arguments: null,
-    resolver: Pet__best_friend_selector,
+    readerArtifact: Pet__best_friend_selector,
     variant: "Component",
     usedRefetchQueries: [0, ],
   },

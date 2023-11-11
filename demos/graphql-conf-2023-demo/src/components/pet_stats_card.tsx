@@ -11,6 +11,7 @@ export const pet_stats_card = iso<
   Pet.pet_stats_card @component {
     id,
     nickname,
+    __refetch,
     age,
     stats {
       weight,

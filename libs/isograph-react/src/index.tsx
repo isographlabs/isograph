@@ -13,7 +13,14 @@ import { useLazyDisposableState } from "@isograph/react-disposable-state";
 import { type PromiseWrapper } from "./PromiseWrapper";
 import React from "react";
 
-export { setNetwork, makeNetworkRequest, subscribe, DataId, Link, StoreRecord } from "./cache";
+export {
+  setNetwork,
+  makeNetworkRequest,
+  subscribe,
+  DataId,
+  Link,
+  StoreRecord,
+} from "./cache";
 
 // This type should be treated as an opaque type.
 export type IsographFetchableResolver<
@@ -46,10 +53,10 @@ export type IsographResolver<
 > =
   | IsographFetchableResolver<TReadFromStore, TResolverProps, TResolverResult>
   | IsographNonFetchableResolver<
-    TReadFromStore,
-    TResolverProps,
-    TResolverResult
-  >;
+      TReadFromStore,
+      TResolverProps,
+      TResolverResult
+    >;
 
 export type ReaderAstNode =
   | ReaderScalarField
@@ -79,7 +86,7 @@ export type ReaderResolverVariant = "Eager" | "Component";
 export type ReaderResolverField = {
   kind: "Resolver";
   alias: string;
-  resolver: IsographResolver<any, any, any>;
+  readerArtifact: IsographResolver<any, any, any>;
   variant: ReaderResolverVariant;
   arguments: Arguments | null;
   usedRefetchQueries: number[];
@@ -88,14 +95,14 @@ export type ReaderResolverField = {
 export type ReaderRefetchField = {
   kind: "RefetchField";
   alias: string;
-  resolver: IsographResolver<any, any, any>;
+  readerArtifact: IsographResolver<any, any, any>;
   refetchQuery: number;
 };
 
 export type ReaderMutationField = {
   kind: "MutationField";
   alias: string;
-  resolver: IsographResolver<any, any, any>;
+  readerArtifact: IsographResolver<any, any, any>;
   refetchQuery: number;
   allowedVariables: string[];
 };
@@ -151,8 +158,10 @@ export type FragmentReference<
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
-export function isoFetch<T extends IsographFetchableResolver<any, any, any>>(_text: TemplateStringsArray): T {
-  return (void 0 as any)
+export function isoFetch<T extends IsographFetchableResolver<any, any, any>>(
+  _text: TemplateStringsArray
+): T {
+  return void 0 as any;
 }
 
 export function iso<TResolverParameter, TResolverReturn = TResolverParameter>(
@@ -253,14 +262,14 @@ export function readButDoNotEvaluate<TReadFromStore extends Object>(
 
 type ReadDataResult<TReadFromStore> =
   | {
-    kind: "Success";
-    data: TReadFromStore;
-  }
+      kind: "Success";
+      data: TReadFromStore;
+    }
   | {
-    kind: "MissingData";
-    reason: string;
-    nestedReason?: ReadDataResult<unknown>;
-  };
+      kind: "MissingData";
+      reason: string;
+      nestedReason?: ReadDataResult<unknown>;
+    };
 
 function readData<TReadFromStore>(
   ast: ReaderAst<TReadFromStore>,
@@ -388,7 +397,7 @@ function readData<TReadFromStore>(
       }
       case "RefetchField": {
         const data = readData(
-          field.resolver.readerAst,
+          field.readerArtifact.readerAst,
           root,
           variables,
           // Refetch fields just read the id, and don't need refetch query artifacts
@@ -410,18 +419,21 @@ function readData<TReadFromStore>(
           const refetchQueryArtifact = refetchQuery.artifact;
           const allowedVariables = refetchQuery.allowedVariables;
 
-          target[field.alias] = field.resolver.resolver(refetchQueryArtifact, {
-            ...data.data,
-            // TODO continue from here
-            // variables need to be filtered for what we need just for the refetch query
-            ...filterVariables(variables, allowedVariables),
-          });
+          target[field.alias] = field.readerArtifact.resolver(
+            refetchQueryArtifact,
+            {
+              ...data.data,
+              // TODO continue from here
+              // variables need to be filtered for what we need just for the refetch query
+              ...filterVariables(variables, allowedVariables),
+            }
+          );
         }
         break;
       }
       case "MutationField": {
         const data = readData(
-          field.resolver.readerAst,
+          field.readerArtifact.readerAst,
           root,
           variables,
           // Refetch fields just read the id, and don't need refetch query artifacts
@@ -443,10 +455,13 @@ function readData<TReadFromStore>(
           const refetchQueryArtifact = refetchQuery.artifact;
           const allowedVariables = refetchQuery.allowedVariables;
 
-          target[field.alias] = field.resolver.resolver(refetchQueryArtifact, {
-            ...data.data, // id variable
-            ...filterVariables(variables, allowedVariables),
-          });
+          target[field.alias] = field.readerArtifact.resolver(
+            refetchQueryArtifact,
+            {
+              ...data.data, // id variable
+              ...filterVariables(variables, allowedVariables),
+            }
+          );
         }
         break;
       }
@@ -458,7 +473,7 @@ function readData<TReadFromStore>(
 
         if (field.variant === "Eager") {
           const data = readData(
-            field.resolver.readerAst,
+            field.readerArtifact.readerAst,
             root,
             variables,
             resolverRefetchQueries
@@ -470,11 +485,11 @@ function readData<TReadFromStore>(
               nestedReason: data,
             };
           } else {
-            target[field.alias] = field.resolver.resolver(data.data);
+            target[field.alias] = field.readerArtifact.resolver(data.data);
           }
         } else if (field.variant === "Component") {
           // const data = readData(field.resolver.readerAst, root);
-          const resolverFunction = field.resolver.resolver;
+          const resolverFunction = field.readerArtifact.resolver;
           target[field.alias] = (additionalRuntimeProps: any) => {
             // TODO also incorporate the typename
             const RefReaderForName = getRefReaderForName(field.alias);
@@ -483,7 +498,7 @@ function readData<TReadFromStore>(
               <RefReaderForName
                 reference={{
                   kind: "FragmentReference",
-                  readerAst: field.resolver.readerAst,
+                  readerAst: field.readerArtifact.readerAst,
                   root,
                   resolver: resolverFunction,
                   variables,
@@ -501,7 +516,6 @@ function readData<TReadFromStore>(
   return { kind: "Success", data: target as any };
 }
 
-
 let customMissingFieldHandler: typeof defaultMissingFieldHandler | null = null;
 
 function missingFieldHandler(
@@ -509,10 +523,16 @@ function missingFieldHandler(
   root: DataId,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
-  variables: { [index: string]: any } | null,
+  variables: { [index: string]: any } | null
 ): Link | undefined {
   if (customMissingFieldHandler != null) {
-    return customMissingFieldHandler(storeRecord, root, fieldName, arguments_, variables);
+    return customMissingFieldHandler(
+      storeRecord,
+      root,
+      fieldName,
+      arguments_,
+      variables
+    );
   } else {
     return defaultMissingFieldHandler(
       storeRecord,
@@ -520,7 +540,7 @@ function missingFieldHandler(
       fieldName,
       arguments_,
       variables
-    )
+    );
   }
 }
 

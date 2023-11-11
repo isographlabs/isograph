@@ -11,7 +11,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "MutationField",
     alias: "__set_pet_best_friend",
-    resolver: Pet____set_pet_best_friend,
+    readerArtifact: Pet____set_pet_best_friend,
     refetchQuery: 0,
   },
   {

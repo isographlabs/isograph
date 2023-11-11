@@ -24,7 +24,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
         kind: "Resolver",
         alias: "pet_summary_card",
         arguments: null,
-        resolver: Pet__pet_summary_card,
+        readerArtifact: Pet__pet_summary_card,
         variant: "Component",
         usedRefetchQueries: [],
       },

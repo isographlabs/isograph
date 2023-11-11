@@ -1103,7 +1103,7 @@ fn generate_reader_ast_node(
                                     "{indent_1}{{\n\
                                     {indent_2}kind: \"RefetchField\",\n\
                                     {indent_2}alias: \"{alias}\",\n\
-                                    {indent_2}resolver: {resolver_field_string},\n\
+                                    {indent_2}readerArtifact: {resolver_field_string},\n\
                                     {indent_2}refetchQuery: {refetch_query_index},\n\
                                     {indent_1}}},\n",
                                 )
@@ -1115,7 +1115,7 @@ fn generate_reader_ast_node(
                                     "{indent_1}{{\n\
                                     {indent_2}kind: \"MutationField\",\n\
                                     {indent_2}alias: \"{alias}\",\n\
-                                    {indent_2}resolver: {resolver_field_string},\n\
+                                    {indent_2}readerArtifact: {resolver_field_string},\n\
                                     {indent_2}refetchQuery: {refetch_query_index},\n\
                                     {indent_1}}},\n",
                                 )
@@ -1126,7 +1126,7 @@ fn generate_reader_ast_node(
                                     {indent_2}kind: \"Resolver\",\n\
                                     {indent_2}alias: \"{alias}\",\n\
                                     {indent_2}arguments: {arguments},\n\
-                                    {indent_2}resolver: {resolver_field_string},\n\
+                                    {indent_2}readerArtifact: {resolver_field_string},\n\
                                     {indent_2}variant: {variant},\n\
                                     {indent_2}usedRefetchQueries: {nested_refetch_queries},\n\
                                     {indent_1}}},\n",
