@@ -42,12 +42,11 @@ const normalizationAst: NormalizationAst = [
   },
 ];
 const artifact: IsographFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
-  kind: 'FetchableResolver',
+  kind: "FetchableResolver",
   queryText,
   normalizationAst,
   nestedRefetchQueries,
-  readerAst: readerResolver.readerAst,
-  resolver: readerResolver.resolver,
+  readerArtifact: readerResolver,
 };
 
 export default artifact;

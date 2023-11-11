@@ -31,8 +31,11 @@ export type IsographFetchableResolver<
   kind: "FetchableResolver";
   queryText: string;
   normalizationAst: NormalizationAst;
-  readerAst: ReaderAst<TReadFromStore>;
-  resolver: (data: TResolverProps) => TResolverResult;
+  readerArtifact: IsographNonFetchableResolver<
+    TReadFromStore,
+    TResolverProps,
+    TResolverResult
+  >;
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
@@ -201,9 +204,9 @@ export function useLazyReference<
   return {
     queryReference: {
       kind: "FragmentReference",
-      readerAst: artifact.readerAst,
+      readerAst: artifact.readerArtifact.readerAst,
       root: ROOT_ID,
-      resolver: artifact.resolver,
+      resolver: artifact.readerArtifact.resolver,
       variables,
       nestedRefetchQueries: artifact.nestedRefetchQueries,
     },

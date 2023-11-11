@@ -25,15 +25,18 @@ impl<'schema> EntrypointArtifact<'schema> {
             const queryText = '{query_text}';\n\n\
             const normalizationAst: NormalizationAst = {normalization_ast};\n\
             const artifact: IsographFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {{\n\
-            {}kind: 'FetchableResolver',\n\
+            {}kind: \"FetchableResolver\",\n\
             {}queryText,\n\
             {}normalizationAst,\n\
             {}nestedRefetchQueries,\n\
-            {}readerAst: readerResolver.readerAst,\n\
-            {}resolver: readerResolver.resolver,\n\
+            {}readerArtifact: readerResolver,\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ",
+            "  ",
+            "  ",
+            "  ",
+            "  ",
+            "  ",
         )
     }
 }
