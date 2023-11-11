@@ -74,7 +74,12 @@ export type ReaderLinkedField = {
   arguments: Arguments | null;
 };
 
-export type ReaderResolverVariant = "Eager" | "Component";
+export type ReaderResolverVariant =
+  | { kind: "Eager" }
+  // componentName is the component's cacheKey for getRefReaderByName
+  // and is the type + field concatenated
+  | { kind: "Component"; componentName: string };
+
 export type ReaderResolverField = {
   kind: "Resolver";
   alias: string;
@@ -233,7 +238,8 @@ export function read<
     TResolverResult
   >
 ): TResolverResult {
-  if (fragmentReference.readerArtifact.variant === "Eager") {
+  const variant = fragmentReference.readerArtifact.variant;
+  if (variant.kind === "Eager") {
     const data = readData(
       fragmentReference.readerArtifact.readerAst,
       fragmentReference.root,
@@ -245,10 +251,10 @@ export function read<
     } else {
       return fragmentReference.readerArtifact.resolver(data.data);
     }
-  } else if (fragmentReference.readerArtifact.variant === "Component") {
+  } else if (variant.kind === "Component") {
     return (additionalRuntimeProps: any) => {
       // TODO also incorporate the typename
-      const RefReaderForName = getRefReaderForName("home_route");
+      const RefReaderForName = getRefReaderForName(variant.componentName);
       // TODO do not create a new reference on every render?
       return (
         <RefReaderForName
@@ -496,7 +502,8 @@ function readData<TReadFromStore>(
           (index) => nestedRefetchQueries[index]
         );
 
-        if (field.readerArtifact.variant === "Eager") {
+        const variant = field.readerArtifact.variant;
+        if (variant.kind === "Eager") {
           const data = readData(
             field.readerArtifact.readerAst,
             root,
@@ -512,10 +519,10 @@ function readData<TReadFromStore>(
           } else {
             target[field.alias] = field.readerArtifact.resolver(data.data);
           }
-        } else if (field.readerArtifact.variant === "Component") {
+        } else if (variant.kind === "Component") {
           target[field.alias] = (additionalRuntimeProps: any) => {
             // TODO also incorporate the typename
-            const RefReaderForName = getRefReaderForName(field.alias);
+            const RefReaderForName = getRefReaderForName(variant.componentName);
             // TODO do not create a new reference on every render?
             return (
               <RefReaderForName

@@ -47,7 +47,7 @@ const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOut
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
-  variant: "Component",
+  variant: { kind: "Component", componentName: "Query.home_route" },
 };
 
 export default artifact;

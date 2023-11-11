@@ -52,6 +52,7 @@ impl<'schema> ReaderArtifact<'schema> {
             nested_resolver_artifact_imports,
             parent_type,
             resolver_variant,
+            resolver_field_name,
             ..
         } = self;
         let nested_resolver_import_statement = nested_resolver_names_to_import_statement(
@@ -62,8 +63,11 @@ impl<'schema> ReaderArtifact<'schema> {
 
         // We are not modeling this well, I think.
         let variant = match resolver_variant {
-            ResolverVariant::Component => "\"Component\"",
-            _ => "\"Eager\"",
+            ResolverVariant::Component => {
+                let parent_name = parent_type.name;
+                format!("{{ kind: \"Component\", componentName: \"{parent_name}.{resolver_field_name}\" }}")
+            }
+            _ => "{ kind: \"Eager\" }".to_string(),
         };
 
         format!(

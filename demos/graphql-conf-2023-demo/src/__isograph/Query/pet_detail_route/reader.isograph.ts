@@ -68,7 +68,7 @@ const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOut
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
-  variant: "Eager",
+  variant: { kind: "Eager" },
 };
 
 export default artifact;

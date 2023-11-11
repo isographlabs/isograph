@@ -53,7 +53,7 @@ const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOut
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
-  variant: "Component",
+  variant: { kind: "Component", componentName: "Pet.best_friend_selector" },
 };
 
 export default artifact;
