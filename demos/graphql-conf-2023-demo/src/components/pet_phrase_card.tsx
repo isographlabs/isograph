@@ -15,17 +15,11 @@ Pet.pet_phrase_card @component {
 `(PetCheckinsCard);
 
 function PetCheckinsCard(props: PetCheckinsCardParams) {
-  console.log('check ins', { props })
   return (
-    <Card
-      variant="outlined"
-      sx={{ width: 450, boxShadow: 3 }}
-    >
+    <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
       <CardContent>
         <h2>Likes to say</h2>
-        <p>
-          "{props.data.favorite_phrase}"
-        </p>
+        <p>"{props.data.favorite_phrase}"</p>
       </CardContent>
     </Card>
   );

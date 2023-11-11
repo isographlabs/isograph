@@ -19,7 +19,6 @@ export const pet_checkins_card = iso<
 `(PetCheckinsCard);
 
 function PetCheckinsCard(props: PetCheckinsCardParams) {
-  console.log("check ins", { props });
   return (
     <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
       <CardContent>

@@ -53,7 +53,6 @@ function Router({
   route: Route;
   setRoute: (route: Route) => void;
 }) {
-  console.log({ route });
   switch (route.kind) {
     case "Home":
       return <HomeRouteComponent navigateTo={setRoute} />;
