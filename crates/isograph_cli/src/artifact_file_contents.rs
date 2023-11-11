@@ -67,7 +67,7 @@ impl<'schema> ReaderArtifact<'schema> {
         };
 
         format!(
-            "import type {{IsographNonFetchableResolver, ReaderAst}} from '@isograph/react';\n\
+            "import type {{ReaderArtifact, ReaderAst}} from '@isograph/react';\n\
             {resolver_import_statement}\n\
             {nested_resolver_import_statement}\n\
             {read_out_type_text}\n\n\
@@ -76,8 +76,8 @@ impl<'schema> ReaderArtifact<'schema> {
             export type ResolverParameterType = {resolver_parameter_type};\n\n\
             // The type, when returned from the resolver\n\
             export type ResolverReturnType = {resolver_return_type};\n\n\
-            const artifact: IsographNonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {{\n\
-            {}kind: \"NonFetchableResolver\",\n\
+            const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOutType> = {{\n\
+            {}kind: \"ReaderArtifact\",\n\
             {}resolver: resolver as any,\n\
             {}readerAst,\n\
             {}variant: {variant},\n\

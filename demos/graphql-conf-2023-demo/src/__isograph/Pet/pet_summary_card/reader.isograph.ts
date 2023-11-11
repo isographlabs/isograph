@@ -1,4 +1,4 @@
-import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
 import { pet_summary_card as resolver } from '../../../components/pet_summary_card.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
@@ -45,8 +45,8 @@ export type ResolverParameterType = { data:
 // The type, when returned from the resolver
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
-const artifact: IsographNonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
-  kind: "NonFetchableResolver",
+const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
+  kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
   variant: "Component",

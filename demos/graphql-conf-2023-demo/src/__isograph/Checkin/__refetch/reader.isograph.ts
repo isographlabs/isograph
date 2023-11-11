@@ -1,4 +1,4 @@
-import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
 import { makeNetworkRequest } from '@isograph/react';
 const resolver = (artifact, variables) => () => makeNetworkRequest(artifact, variables);
 
@@ -23,8 +23,8 @@ export type ResolverParameterType = {
 // The type, when returned from the resolver
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
-const artifact: IsographNonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
-  kind: "NonFetchableResolver",
+const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
+  kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
   variant: "Eager",

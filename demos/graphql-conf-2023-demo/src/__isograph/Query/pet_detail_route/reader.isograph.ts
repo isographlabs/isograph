@@ -1,4 +1,4 @@
-import type {IsographNonFetchableResolver, ReaderAst} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
 const resolver = (x: any) => x;
 import Pet__pet_best_friend_card, { ReadOutType as Pet__pet_best_friend_card__outputType } from '../../Pet/pet_best_friend_card/reader.isograph';
 import Pet__pet_checkins_card, { ReadOutType as Pet__pet_checkins_card__outputType } from '../../Pet/pet_checkins_card/reader.isograph';
@@ -64,8 +64,8 @@ export type ResolverParameterType = {
 // The type, when returned from the resolver
 export type ResolverReturnType = ResolverParameterType;
 
-const artifact: IsographNonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
-  kind: "NonFetchableResolver",
+const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
+  kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
   variant: "Eager",

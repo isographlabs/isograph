@@ -31,7 +31,7 @@ export type IsographFetchableResolver<
   kind: "FetchableResolver";
   queryText: string;
   normalizationAst: NormalizationAst;
-  readerArtifact: IsographNonFetchableResolver<
+  readerArtifact: ReaderArtifact<
     TReadFromStore,
     TResolverProps,
     TResolverResult
@@ -39,12 +39,12 @@ export type IsographFetchableResolver<
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
-export type IsographNonFetchableResolver<
+export type ReaderArtifact<
   TReadFromStore extends Object,
   TResolverProps,
   TResolverResult
 > = {
-  kind: "NonFetchableResolver";
+  kind: "ReaderArtifact";
   readerAst: ReaderAst<TReadFromStore>;
   resolver: (data: TResolverProps) => TResolverResult;
   variant: ReaderResolverVariant;
@@ -78,7 +78,7 @@ export type ReaderResolverVariant = "Eager" | "Component";
 export type ReaderResolverField = {
   kind: "Resolver";
   alias: string;
-  readerArtifact: IsographNonFetchableResolver<any, any, any>;
+  readerArtifact: ReaderArtifact<any, any, any>;
   arguments: Arguments | null;
   usedRefetchQueries: number[];
 };
@@ -86,14 +86,14 @@ export type ReaderResolverField = {
 export type ReaderRefetchField = {
   kind: "RefetchField";
   alias: string;
-  readerArtifact: IsographNonFetchableResolver<any, any, any>;
+  readerArtifact: ReaderArtifact<any, any, any>;
   refetchQuery: number;
 };
 
 export type ReaderMutationField = {
   kind: "MutationField";
   alias: string;
-  readerArtifact: IsographNonFetchableResolver<any, any, any>;
+  readerArtifact: ReaderArtifact<any, any, any>;
   refetchQuery: number;
   allowedVariables: string[];
 };
