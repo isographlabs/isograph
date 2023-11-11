@@ -3,9 +3,6 @@
 > The best way to build React apps backed by GraphQL data
 
 - Watch the [talk at GraphQL Conf](https://www.youtube.com/watch?v=gO65JJRqjuc).
-
-![Robert Balicki presenting at GraphQL Conf about Isograph](./docs/graphqlconf-image.png)
-
 - Join the discord: https://discord.gg/Q2c5tM5T8A (#isograph channel on the GraphQL discord.)
 - [Follow the official twitter account](https://twitter.com/isographlabs)
 
