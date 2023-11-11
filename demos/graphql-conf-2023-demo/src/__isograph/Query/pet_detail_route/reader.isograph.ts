@@ -1,11 +1,11 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-const resolver = (x: any) => x;
+import { pet_detail_route as resolver } from '../../../components/pet_detail_route.tsx';
 import Pet__pet_best_friend_card, { ReadOutType as Pet__pet_best_friend_card__outputType } from '../../Pet/pet_best_friend_card/reader.isograph';
 import Pet__pet_checkins_card, { ReadOutType as Pet__pet_checkins_card__outputType } from '../../Pet/pet_checkins_card/reader.isograph';
 import Pet__pet_phrase_card, { ReadOutType as Pet__pet_phrase_card__outputType } from '../../Pet/pet_phrase_card/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = ResolverReturnType;
+export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
 
 export type ReadFromStoreType = ResolverParameterType;
 
@@ -52,23 +52,25 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
 ];
 
-export type ResolverParameterType = {
+export type ResolverParameterType = { data:
+{
   pet: ({
     name: string,
     pet_checkins_card: Pet__pet_checkins_card__outputType,
     pet_best_friend_card: Pet__pet_best_friend_card__outputType,
     pet_phrase_card: Pet__pet_phrase_card__outputType,
   } | null),
-};
+},
+[index: string]: any };
 
 // The type, when returned from the resolver
-export type ResolverReturnType = ResolverParameterType;
+export type ResolverReturnType = ReturnType<typeof resolver>;
 
 const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
-  variant: { kind: "Eager" },
+  variant: { kind: "Component", componentName: "Query.pet_detail_route" },
 };
 
 export default artifact;

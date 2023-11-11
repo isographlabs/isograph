@@ -1,12 +1,15 @@
 import React from "react";
 import { iso, read, useLazyReference, isoFetch } from "@isograph/react";
 import { Container, Stack } from "@mui/material";
+import { ResolverParameterType as PetDetailRouteParams } from "../__isograph/Query/pet_detail_route/reader.isograph";
 
-import petDetailRouteQuery from "../__isograph/Query/pet_detail_route/entrypoint.isograph";
 import { PetDetailRoute, Route } from "./router";
 
-iso`
-  Query.pet_detail_route($id: ID!) @fetchable {
+export const pet_detail_route = iso<
+  PetDetailRouteParams,
+  ReturnType<typeof PetDetailRouteComponent>
+>`
+  Query.pet_detail_route($id: ID!) @component {
     pet(id: $id) {
       name,
       pet_checkins_card,
@@ -14,24 +17,12 @@ iso`
       pet_phrase_card,
     },
   }
-`;
-
-isoFetch`
-  Query.pet_detail_route
-`;
+`(PetDetailRouteComponent);
 
 export function PetDetailRouteComponent({
-  route,
+  data,
   navigateTo,
-}: {
-  route: PetDetailRoute;
-  navigateTo: (route: Route) => void;
-}) {
-  const { queryReference } = useLazyReference(petDetailRouteQuery, {
-    id: route.id,
-  });
-  const data = read(queryReference);
-
+}: PetDetailRouteParams) {
   return (
     <Container maxWidth="md">
       <h1>Pet Detail for {data.pet?.name}</h1>
