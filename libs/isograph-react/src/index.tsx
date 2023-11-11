@@ -86,6 +86,7 @@ export type ReaderResolverField = {
 export type ReaderRefetchField = {
   kind: "RefetchField";
   alias: string;
+  // TODO this bad modeling. A refetch field cannot have variant: "Component" (I think)
   readerArtifact: ReaderArtifact<any, any, any>;
   refetchQuery: number;
 };
@@ -93,6 +94,7 @@ export type ReaderRefetchField = {
 export type ReaderMutationField = {
   kind: "MutationField";
   alias: string;
+  // TODO this bad modeling. A mutation field cannot have variant: "Component" (I think)
   readerArtifact: ReaderArtifact<any, any, any>;
   refetchQuery: number;
   allowedVariables: string[];
