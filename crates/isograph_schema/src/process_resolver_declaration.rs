@@ -85,14 +85,10 @@ impl UnvalidatedSchema {
 
         let name = resolver_declaration.item.resolver_field_name.item.into();
         let variant = get_resolver_variant(&resolver_declaration.item.directives);
-        let resolver_action_kind = if resolver_declaration.item.has_associated_js_function {
-            ResolverActionKind::NamedImport((
-                resolver_field_name.into(),
-                resolver_declaration.item.resolver_definition_path,
-            ))
-        } else {
-            ResolverActionKind::Identity
-        };
+        let resolver_action_kind = ResolverActionKind::NamedImport((
+            resolver_field_name.into(),
+            resolver_declaration.item.resolver_definition_path,
+        ));
 
         // TODO variant should carry payloads, instead of this check
         if variant == ResolverVariant::Component {

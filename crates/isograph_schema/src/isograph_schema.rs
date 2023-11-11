@@ -548,8 +548,6 @@ impl ResolverTypeAndField {
 
 #[derive(Debug, Clone, Copy)]
 pub enum ResolverActionKind {
-    /// No associated js function
-    Identity,
     /// Associated js function
     /// TODO the first element should have a type of JavascriptName
     NamedImport((SelectableFieldName, ResolverDefinitionPath)),

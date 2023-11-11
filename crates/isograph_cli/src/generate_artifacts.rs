@@ -928,9 +928,6 @@ fn generate_resolver_import_statement(
     artifact_directory: &PathBuf,
 ) -> ResolverImportStatement {
     match resolver_action_kind {
-        ResolverActionKind::Identity => {
-            ResolverImportStatement("const resolver = (x: any) => x;".to_string())
-        }
         ResolverActionKind::NamedImport((name, path)) => {
             let path_to_artifact = project_root
                 .join(PathBuf::from_str(path.lookup()).expect(
@@ -1355,7 +1352,6 @@ fn generate_resolver_return_type_declaration(
     action_kind: ResolverActionKind,
 ) -> ResolverReturnType {
     match action_kind {
-        ResolverActionKind::Identity => ResolverReturnType("ResolverParameterType".to_string()),
         ResolverActionKind::NamedImport(_) | ResolverActionKind::RefetchField => {
             ResolverReturnType("ReturnType<typeof resolver>".to_string())
         }

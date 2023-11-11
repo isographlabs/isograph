@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use common_lang_types::{with_span_to_with_location, Span, TextSource, WithLocation};
+use common_lang_types::{with_span_to_with_location, Location, Span, TextSource, WithLocation};
 use graphql_lang_parser::{parse_schema, SchemaParseError};
 use intern::string_key::Intern;
 use isograph_lang_parser::{parse_iso_fetch, parse_iso_literal, IsographLiteralParseError};
@@ -68,8 +68,8 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
         for iso_literal_extraction in extract_iso_literal_from_file_content(&file_content) {
             let IsoLiteralExtraction {
                 iso_literal_text,
-                has_associated_js_function,
                 iso_literal_start_index,
+                has_associated_js_function,
             } = iso_literal_extraction;
 
             let text_source = TextSource {
@@ -79,12 +79,18 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
                     (iso_literal_start_index + iso_literal_text.len()) as u32,
                 )),
             };
-            let resolver_declaration = parse_iso_literal(
-                &iso_literal_text,
-                interned_file_path,
-                has_associated_js_function,
-                text_source,
-            )?;
+
+            if !has_associated_js_function {
+                return Err(BatchCompileError::UnableToParseIsographLiteral {
+                    message: WithLocation::new(
+                        IsographLiteralParseError::ExpectedAssociatedJsFunction,
+                        Location::new(text_source, Span::todo_generated()),
+                    ),
+                });
+            }
+
+            let resolver_declaration =
+                parse_iso_literal(&iso_literal_text, interned_file_path, text_source)?;
             schema.process_resolver_declaration(resolver_declaration, text_source)?;
         }
 

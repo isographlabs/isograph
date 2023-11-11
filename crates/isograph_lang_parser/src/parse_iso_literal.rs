@@ -57,18 +57,13 @@ pub fn parse_iso_fetch(
 pub fn parse_iso_literal(
     iso_literal_text: &str,
     definition_file_path: ResolverDefinitionPath,
-    has_associated_js_function: bool,
     text_source: TextSource,
 ) -> ParseResultWithLocation<WithSpan<ResolverDeclaration>> {
     let mut tokens = PeekableLexer::new(iso_literal_text);
 
-    let resolver_declaration = parse_resolver_declaration(
-        &mut tokens,
-        definition_file_path,
-        has_associated_js_function,
-        text_source,
-    )
-    .map_err(|with_span| with_span_to_with_location(with_span, text_source))?;
+    let resolver_declaration =
+        parse_resolver_declaration(&mut tokens, definition_file_path, text_source)
+            .map_err(|with_span| with_span_to_with_location(with_span, text_source))?;
 
     if let Some(span) = tokens.remaining_token_span() {
         return Err(WithLocation::new(
@@ -83,7 +78,6 @@ pub fn parse_iso_literal(
 fn parse_resolver_declaration<'a>(
     tokens: &mut PeekableLexer<'a>,
     definition_file_path: ResolverDefinitionPath,
-    has_associated_js_function: bool,
     text_source: TextSource,
 ) -> ParseResultWithSpan<WithSpan<ResolverDeclaration>> {
     let resolver_declaration = tokens
@@ -120,7 +114,6 @@ fn parse_resolver_declaration<'a>(
                 resolver_definition_path: definition_file_path,
                 directives,
                 variable_definitions,
-                has_associated_js_function,
             })
         })
         .transpose();
