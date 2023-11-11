@@ -11,8 +11,7 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    DefinedField, ResolverActionKind, ResolverArtifactKind, ResolverTypeAndField, SchemaResolver,
-    UnvalidatedSchema,
+    DefinedField, ResolverActionKind, ResolverTypeAndField, SchemaResolver, UnvalidatedSchema,
 };
 
 impl UnvalidatedSchema {
@@ -111,7 +110,6 @@ impl UnvalidatedSchema {
             id: next_resolver_id,
             selection_set_and_unwraps: resolver_declaration.item.selection_set_and_unwraps,
             variant,
-            artifact_kind: get_resolver_artifact_kind(&resolver_declaration.item.directives),
             variable_definitions: resolver_declaration.item.variable_definitions,
             type_and_field: ResolverTypeAndField {
                 type_name: object.name,
@@ -182,7 +180,6 @@ impl fmt::Display for ResolverVariant {
 
 lazy_static! {
     static ref COMPONENT: IsographDirectiveName = "component".intern().into();
-    static ref FETCHABLE: IsographDirectiveName = "fetchable".intern().into();
 }
 
 fn get_resolver_variant(directives: &[WithSpan<FragmentDirectiveUsage>]) -> ResolverVariant {
@@ -192,15 +189,4 @@ fn get_resolver_variant(directives: &[WithSpan<FragmentDirectiveUsage>]) -> Reso
         }
     }
     return ResolverVariant::Eager;
-}
-
-fn get_resolver_artifact_kind(
-    directives: &[WithSpan<FragmentDirectiveUsage>],
-) -> ResolverArtifactKind {
-    for directive in directives.iter() {
-        if directive.item.name.item == *FETCHABLE {
-            return ResolverArtifactKind::FetchableOnQuery;
-        }
-    }
-    ResolverArtifactKind::NonFetchable
 }

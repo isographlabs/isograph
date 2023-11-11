@@ -546,12 +546,6 @@ impl ResolverTypeAndField {
     }
 }
 
-#[derive(Debug)]
-pub enum ResolverArtifactKind {
-    FetchableOnQuery,
-    NonFetchable,
-}
-
 #[derive(Debug, Clone, Copy)]
 pub enum ResolverActionKind {
     /// No associated js function
@@ -584,8 +578,6 @@ pub struct SchemaResolver<TScalarField, TLinkedField, TVariableDefinitionType> {
     // TODO we should probably model this differently
     pub variant: ResolverVariant,
 
-    // TODO should this be create_normalization_ast: bool?
-    pub artifact_kind: ResolverArtifactKind,
     pub action_kind: ResolverActionKind,
 
     pub variable_definitions: Vec<WithSpan<VariableDefinition<TVariableDefinitionType>>>,

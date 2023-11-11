@@ -17,9 +17,9 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    DefinedField, IsographObjectTypeDefinition, ResolverActionKind, ResolverArtifactKind,
-    ResolverTypeAndField, ResolverVariant, Schema, SchemaObject, SchemaResolver, SchemaScalar,
-    SchemaServerField, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
+    DefinedField, IsographObjectTypeDefinition, ResolverActionKind, ResolverTypeAndField,
+    ResolverVariant, Schema, SchemaObject, SchemaResolver, SchemaScalar, SchemaServerField,
+    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
     UnvalidatedSchemaResolver, ValidRefinement, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
 };
 
@@ -337,7 +337,6 @@ impl UnvalidatedSchema {
                         field_name: magic_mutation_field_name,
                     },
                     parent_object_id,
-                    artifact_kind: ResolverArtifactKind::NonFetchable,
                     action_kind: ResolverActionKind::MutationField,
                 });
 
@@ -506,7 +505,6 @@ fn get_resolvers_for_schema_object(
             parent_object_id,
             // N.B. __refetch fields are non-fetchable, but they do execute queries which
             // have fetchable artifacts (i.e. normalization ASTs).
-            artifact_kind: ResolverArtifactKind::NonFetchable,
             action_kind: ResolverActionKind::RefetchField,
         });
         encountered_fields.insert(
