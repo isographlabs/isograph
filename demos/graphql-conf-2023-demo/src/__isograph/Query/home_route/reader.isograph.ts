@@ -25,7 +25,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
         alias: "pet_summary_card",
         arguments: null,
         readerArtifact: Pet__pet_summary_card,
-        variant: "Component",
         usedRefetchQueries: [],
       },
     ],
@@ -43,9 +42,10 @@ export type ResolverParameterType = {
 export type ResolverReturnType = ResolverParameterType;
 
 const artifact: IsographNonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
-  kind: 'NonFetchableResolver',
+  kind: "NonFetchableResolver",
   resolver: resolver as any,
   readerAst,
+  variant: "Eager",
 };
 
 export default artifact;

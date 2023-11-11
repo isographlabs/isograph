@@ -44,19 +44,8 @@ export type IsographNonFetchableResolver<
   kind: "NonFetchableResolver";
   readerAst: ReaderAst<TReadFromStore>;
   resolver: (data: TResolverProps) => TResolverResult;
+  variant: ReaderResolverVariant;
 };
-
-export type IsographResolver<
-  TReadFromStore extends Object,
-  TResolverProps,
-  TResolverResult
-> =
-  | IsographFetchableResolver<TReadFromStore, TResolverProps, TResolverResult>
-  | IsographNonFetchableResolver<
-      TReadFromStore,
-      TResolverProps,
-      TResolverResult
-    >;
 
 export type ReaderAstNode =
   | ReaderScalarField
@@ -86,8 +75,7 @@ export type ReaderResolverVariant = "Eager" | "Component";
 export type ReaderResolverField = {
   kind: "Resolver";
   alias: string;
-  readerArtifact: IsographResolver<any, any, any>;
-  variant: ReaderResolverVariant;
+  readerArtifact: IsographNonFetchableResolver<any, any, any>;
   arguments: Arguments | null;
   usedRefetchQueries: number[];
 };
@@ -95,14 +83,14 @@ export type ReaderResolverField = {
 export type ReaderRefetchField = {
   kind: "RefetchField";
   alias: string;
-  readerArtifact: IsographResolver<any, any, any>;
+  readerArtifact: IsographNonFetchableResolver<any, any, any>;
   refetchQuery: number;
 };
 
 export type ReaderMutationField = {
   kind: "MutationField";
   alias: string;
-  readerArtifact: IsographResolver<any, any, any>;
+  readerArtifact: IsographNonFetchableResolver<any, any, any>;
   refetchQuery: number;
   allowedVariables: string[];
 };
@@ -471,7 +459,7 @@ function readData<TReadFromStore>(
           (index) => nestedRefetchQueries[index]
         );
 
-        if (field.variant === "Eager") {
+        if (field.readerArtifact.variant === "Eager") {
           const data = readData(
             field.readerArtifact.readerAst,
             root,
@@ -487,7 +475,7 @@ function readData<TReadFromStore>(
           } else {
             target[field.alias] = field.readerArtifact.resolver(data.data);
           }
-        } else if (field.variant === "Component") {
+        } else if (field.readerArtifact.variant === "Component") {
           // const data = readData(field.resolver.readerAst, root);
           const resolverFunction = field.readerArtifact.resolver;
           target[field.alias] = (additionalRuntimeProps: any) => {

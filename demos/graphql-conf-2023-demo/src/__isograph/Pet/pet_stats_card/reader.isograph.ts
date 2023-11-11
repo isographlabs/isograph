@@ -99,9 +99,10 @@ export type ResolverParameterType = { data:
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
 const artifact: IsographNonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
-  kind: 'NonFetchableResolver',
+  kind: "NonFetchableResolver",
   resolver: resolver as any,
   readerAst,
+  variant: "Component",
 };
 
 export default artifact;

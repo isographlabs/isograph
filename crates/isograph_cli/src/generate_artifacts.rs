@@ -507,6 +507,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
             resolver_read_out_type,
             resolver_parameter_type,
             resolver_return_type,
+            resolver_variant: non_fetchable_resolver.variant.clone(),
         }
     } else {
         panic!("Unsupported: resolvers not on query with no selection set")
@@ -575,6 +576,7 @@ pub(crate) struct ReaderArtifact<'schema> {
     pub resolver_parameter_type: ResolverParameterType,
     pub resolver_return_type: ResolverReturnType,
     pub resolver_import_statement: ResolverImportStatement,
+    pub resolver_variant: ResolverVariant,
 }
 
 #[derive(Debug)]
@@ -1072,7 +1074,6 @@ fn generate_reader_ast_node(
                         let indent_2 = "  ".repeat((indentation_level + 1) as usize);
                         let resolver_field_string =
                             resolver_field.type_and_field.underscore_separated();
-                        let variant = format!("\"{}\"", resolver_field.variant);
 
                         let resolver_refetched_paths =
                             refetched_paths_for_resolver(resolver_field, schema, path);
@@ -1127,7 +1128,6 @@ fn generate_reader_ast_node(
                                     {indent_2}alias: \"{alias}\",\n\
                                     {indent_2}arguments: {arguments},\n\
                                     {indent_2}readerArtifact: {resolver_field_string},\n\
-                                    {indent_2}variant: {variant},\n\
                                     {indent_2}usedRefetchQueries: {nested_refetch_queries},\n\
                                     {indent_1}}},\n",
                                 )

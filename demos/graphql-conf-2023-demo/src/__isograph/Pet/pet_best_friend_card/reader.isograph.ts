@@ -19,7 +19,6 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     alias: "best_friend_selector",
     arguments: null,
     readerArtifact: Pet__best_friend_selector,
-    variant: "Component",
     usedRefetchQueries: [0, ],
   },
   {
@@ -83,9 +82,10 @@ export type ResolverParameterType = { data:
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
 const artifact: IsographNonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
-  kind: 'NonFetchableResolver',
+  kind: "NonFetchableResolver",
   resolver: resolver as any,
   readerAst,
+  variant: "Component",
 };
 
 export default artifact;
