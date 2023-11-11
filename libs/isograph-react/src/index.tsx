@@ -119,6 +119,7 @@ export type NormalizationLinkedField = {
   selections: NormalizationAst;
 };
 
+// This is more like an entrypoint, but one specifically for a refetch query/mutation
 export type RefetchQueryArtifact = {
   kind: "RefetchQuery";
   queryText: string;
