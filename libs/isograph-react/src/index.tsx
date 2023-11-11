@@ -210,6 +210,7 @@ export function useLazyReference<
   const data =
     // @ts-ignore
     useLazyDisposableState<PromiseWrapper<TResolverResult>>(cache).state;
+
   return {
     queryReference: {
       kind: "FragmentReference",
@@ -226,20 +227,45 @@ export function read<
   TResolverProps,
   TResolverResult
 >(
-  reference: FragmentReference<TReadFromStore, TResolverProps, TResolverResult>
+  fragmentReference: FragmentReference<
+    TReadFromStore,
+    TResolverProps,
+    TResolverResult
+  >
 ): TResolverResult {
-  const response = readData(
-    reference.readerArtifact.readerAst,
-    reference.root,
-    reference.variables ?? {},
-    reference.nestedRefetchQueries
-  );
-  console.log("done reading", { response });
-  if (response.kind === "MissingData") {
-    throw onNextChange();
-  } else {
-    return reference.readerArtifact.resolver(response.data);
+  if (fragmentReference.readerArtifact.variant === "Eager") {
+    const data = readData(
+      fragmentReference.readerArtifact.readerAst,
+      fragmentReference.root,
+      fragmentReference.variables ?? {},
+      fragmentReference.nestedRefetchQueries
+    );
+    if (data.kind === "MissingData") {
+      throw onNextChange();
+    } else {
+      return fragmentReference.readerArtifact.resolver(data.data);
+    }
+  } else if (fragmentReference.readerArtifact.variant === "Component") {
+    return (additionalRuntimeProps: any) => {
+      // TODO also incorporate the typename
+      const RefReaderForName = getRefReaderForName("home_route");
+      // TODO do not create a new reference on every render?
+      return (
+        <RefReaderForName
+          reference={{
+            kind: "FragmentReference",
+            readerArtifact: fragmentReference.readerArtifact,
+            root: fragmentReference.root,
+            variables: fragmentReference.variables,
+            nestedRefetchQueries: fragmentReference.nestedRefetchQueries,
+          }}
+          additionalRuntimeProps={additionalRuntimeProps}
+        />
+      );
+    };
   }
+  // Why can't Typescript realize that this is unreachable??
+  throw new Error("This is unreachable");
 }
 
 export function readButDoNotEvaluate<TReadFromStore extends Object>(

@@ -1,9 +1,9 @@
 import React from "react";
 import NoSSR from "react-no-ssr";
 import { Container } from "@mui/material";
-import { HomeRouteComponent } from "./home_route";
 import { PetDetailRouteComponent } from "./pet_detail_route";
-import { subscribe } from "@isograph/react";
+import { subscribe, isoFetch, useLazyReference, read } from "@isograph/react";
+import HomeRouteEntrypoint from "../__isograph/Query/home_route/entrypoint.isograph";
 
 export type PetId = string;
 
@@ -59,7 +59,11 @@ function Router({
       return <HomeRouteComponent navigateTo={setRoute} />;
     case "PetDetail":
       return (
-        <PetDetailRouteComponent navigateTo={setRoute} route={route} key={route.id} />
+        <PetDetailRouteComponent
+          navigateTo={setRoute}
+          route={route}
+          key={route.id}
+        />
       );
     default:
       const exhaustiveCheck: never = route;
@@ -68,4 +72,19 @@ function Router({
 
 export function FullPageLoading() {
   return <h1 className="mt-5">Loading...</h1>;
+}
+
+export function HomeRouteComponent({
+  navigateTo,
+}: {
+  navigateTo: (path: Route) => void;
+}) {
+  const { queryReference } = useLazyReference(
+    isoFetch<typeof HomeRouteEntrypoint>`
+      Query.home_route
+    `,
+    {}
+  );
+
+  return read(queryReference)({ navigateTo });
 }
