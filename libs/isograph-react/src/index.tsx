@@ -144,9 +144,12 @@ export type FragmentReference<
   TResolverResult
 > = {
   kind: "FragmentReference";
-  readerAst: ReaderAst<TReadFromStore>;
+  readerArtifact: ReaderArtifact<
+    TReadFromStore,
+    TResolverProps,
+    TResolverResult
+  >;
   root: DataId;
-  resolver: (props: TResolverProps) => TResolverResult;
   variables: { [index: string]: string } | null;
   // TODO: We should instead have ReaderAst<TResolverProps>
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
@@ -207,9 +210,8 @@ export function useLazyReference<
   return {
     queryReference: {
       kind: "FragmentReference",
-      readerAst: artifact.readerArtifact.readerAst,
+      readerArtifact: artifact.readerArtifact,
       root: ROOT_ID,
-      resolver: artifact.readerArtifact.resolver,
       variables,
       nestedRefetchQueries: artifact.nestedRefetchQueries,
     },
@@ -224,7 +226,7 @@ export function read<
   reference: FragmentReference<TReadFromStore, TResolverProps, TResolverResult>
 ): TResolverResult {
   const response = readData(
-    reference.readerAst,
+    reference.readerArtifact.readerAst,
     reference.root,
     reference.variables ?? {},
     reference.nestedRefetchQueries
@@ -233,7 +235,7 @@ export function read<
   if (response.kind === "MissingData") {
     throw onNextChange();
   } else {
-    return reference.resolver(response.data);
+    return reference.readerArtifact.resolver(response.data);
   }
 }
 
@@ -241,7 +243,7 @@ export function readButDoNotEvaluate<TReadFromStore extends Object>(
   reference: FragmentReference<TReadFromStore, unknown, unknown>
 ): TReadFromStore {
   const response = readData(
-    reference.readerAst,
+    reference.readerArtifact.readerAst,
     reference.root,
     reference.variables ?? {},
     reference.nestedRefetchQueries
@@ -482,8 +484,6 @@ function readData<TReadFromStore>(
             target[field.alias] = field.readerArtifact.resolver(data.data);
           }
         } else if (field.readerArtifact.variant === "Component") {
-          // const data = readData(field.resolver.readerAst, root);
-          const resolverFunction = field.readerArtifact.resolver;
           target[field.alias] = (additionalRuntimeProps: any) => {
             // TODO also incorporate the typename
             const RefReaderForName = getRefReaderForName(field.alias);
@@ -492,9 +492,8 @@ function readData<TReadFromStore>(
               <RefReaderForName
                 reference={{
                   kind: "FragmentReference",
-                  readerAst: field.readerArtifact.readerAst,
+                  readerArtifact: field.readerArtifact,
                   root,
-                  resolver: resolverFunction,
                   variables,
                   nestedRefetchQueries: resolverRefetchQueries,
                 }}
@@ -586,7 +585,11 @@ export function getRefReaderForName(name: string) {
       additionalRuntimeProps: any;
     }) {
       const data = readButDoNotEvaluate(reference);
-      return reference.resolver({ data, ...additionalRuntimeProps });
+
+      return reference.readerArtifact.resolver({
+        data,
+        ...additionalRuntimeProps,
+      });
     }
     Component.displayName = `${name} @component`;
     refReaders[name] = Component;
