@@ -4,6 +4,8 @@
 
 - Publish binary, release npm package that executes it
 - Support schema extensions
+- Schema extension support in parser
+- Specify main mutation object
 
 ## Top QOL priorities
 
