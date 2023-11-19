@@ -1,10 +1,13 @@
 use std::path::PathBuf;
 
-use common_lang_types::{with_span_to_with_location, Location, Span, TextSource, WithLocation};
+use common_lang_types::{
+    with_span_to_with_location, Location, ResolverDefinitionPath, SourceFileName, Span, TextSource,
+    WithLocation,
+};
 use graphql_lang_parser::{parse_schema, SchemaParseError};
 use intern::string_key::Intern;
 use isograph_lang_parser::{parse_iso_fetch, parse_iso_literal, IsographLiteralParseError};
-use isograph_schema::Schema;
+use isograph_schema::{Schema, UnvalidatedSchema};
 use structopt::StructOpt;
 use thiserror::Error;
 
@@ -54,6 +57,7 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
 
     // TODO return an iterator
     let project_files = read_files_in_folder(&canonicalized_root_path)?;
+
     for (file_path, file_content) in project_files {
         // TODO don't intern unless there's a match
         let interned_file_path = file_path.to_string_lossy().into_owned().intern().into();
@@ -66,51 +70,16 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
             .into();
 
         for iso_literal_extraction in extract_iso_literal_from_file_content(&file_content) {
-            let IsoLiteralExtraction {
-                iso_literal_text,
-                iso_literal_start_index,
-                has_associated_js_function,
-            } = iso_literal_extraction;
-
-            let text_source = TextSource {
-                path: file_name,
-                span: Some(Span::new(
-                    iso_literal_start_index as u32,
-                    (iso_literal_start_index + iso_literal_text.len()) as u32,
-                )),
-            };
-
-            if !has_associated_js_function {
-                return Err(BatchCompileError::UnableToParseIsographLiteral {
-                    message: WithLocation::new(
-                        IsographLiteralParseError::ExpectedAssociatedJsFunction,
-                        Location::new(text_source, Span::todo_generated()),
-                    ),
-                });
-            }
-
-            let resolver_declaration =
-                parse_iso_literal(&iso_literal_text, interned_file_path, text_source)?;
-            schema.process_resolver_declaration(resolver_declaration, text_source)?;
+            process_iso_literal_extraction(
+                iso_literal_extraction,
+                file_name,
+                interned_file_path,
+                &mut schema,
+            )?;
         }
 
         for iso_fetch_extaction in extract_iso_fetch_from_file_content(&file_content) {
-            let IsoFetchExtraction {
-                iso_fetch_text,
-                iso_fetch_start_index,
-            } = iso_fetch_extaction;
-            let text_source = TextSource {
-                path: file_name,
-                span: Some(Span::new(
-                    iso_fetch_start_index as u32,
-                    (iso_fetch_start_index + iso_fetch_text.len()) as u32,
-                )),
-            };
-
-            let fetch_declaration = parse_iso_fetch(iso_fetch_text, text_source)?;
-            schema
-                .fetchable_resolvers
-                .push((text_source, fetch_declaration));
+            process_iso_fetch_extraction(iso_fetch_extaction, file_name, &mut schema)?;
         }
     }
 
@@ -123,6 +92,65 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
     )?;
 
     Ok(())
+}
+
+fn process_iso_fetch_extraction(
+    iso_fetch_extaction: IsoFetchExtraction<'_>,
+    file_name: SourceFileName,
+    schema: &mut UnvalidatedSchema,
+) -> Result<(), BatchCompileError> {
+    let IsoFetchExtraction {
+        iso_fetch_text,
+        iso_fetch_start_index,
+    } = iso_fetch_extaction;
+    let text_source = TextSource {
+        path: file_name,
+        span: Some(Span::new(
+            iso_fetch_start_index as u32,
+            (iso_fetch_start_index + iso_fetch_text.len()) as u32,
+        )),
+    };
+    let fetch_declaration = parse_iso_fetch(iso_fetch_text, text_source)?;
+    schema
+        .fetchable_resolvers
+        .push((text_source, fetch_declaration));
+    Ok(())
+}
+
+fn process_iso_literal_extraction(
+    iso_literal_extraction: IsoLiteralExtraction<'_>,
+    file_name: SourceFileName,
+    interned_file_path: ResolverDefinitionPath,
+    schema: &mut UnvalidatedSchema,
+) -> Result<(), BatchCompileError> {
+    let IsoLiteralExtraction {
+        iso_literal_text,
+        iso_literal_start_index,
+        has_associated_js_function,
+    } = iso_literal_extraction;
+    let text_source = TextSource {
+        path: file_name,
+        span: Some(Span::new(
+            iso_literal_start_index as u32,
+            (iso_literal_start_index + iso_literal_text.len()) as u32,
+        )),
+    };
+
+    if !has_associated_js_function {
+        return Err(BatchCompileError::UnableToParseIsographLiteral {
+            message: WithLocation::new(
+                IsographLiteralParseError::ExpectedAssociatedJsFunction,
+                Location::new(text_source, Span::todo_generated()),
+            ),
+        });
+    }
+
+    let resolver_declaration =
+        parse_iso_literal(&iso_literal_text, interned_file_path, text_source)?;
+
+    schema
+        .process_resolver_declaration(resolver_declaration, text_source)
+        .map_err(BatchCompileError::from)
 }
 
 #[derive(Error, Debug)]

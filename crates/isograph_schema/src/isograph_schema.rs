@@ -80,7 +80,7 @@ pub struct Schema<
     // Mutation
 }
 
-pub(crate) type UnvalidatedSchema = Schema<
+pub type UnvalidatedSchema = Schema<
     UnvalidatedTypeName,
     (),
     (),
