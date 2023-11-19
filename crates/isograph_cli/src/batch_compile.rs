@@ -2,11 +2,12 @@ use std::path::PathBuf;
 
 use common_lang_types::{
     with_span_to_with_location, Location, ResolverDefinitionPath, SourceFileName, Span, TextSource,
-    WithLocation,
+    WithLocation, WithSpan,
 };
 use graphql_lang_parser::{parse_schema, SchemaParseError};
 use intern::string_key::Intern;
 use isograph_lang_parser::{parse_iso_fetch, parse_iso_literal, IsographLiteralParseError};
+use isograph_lang_types::ResolverDeclaration;
 use isograph_schema::{Schema, UnvalidatedSchema};
 use structopt::StructOpt;
 use thiserror::Error;
@@ -58,6 +59,8 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
     // TODO return an iterator
     let project_files = read_files_in_folder(&canonicalized_root_path)?;
 
+    let mut isograph_literal_parse_errors = vec![];
+
     for (file_path, file_content) in project_files {
         // TODO don't intern unless there's a match
         let interned_file_path = file_path.to_string_lossy().into_owned().intern().into();
@@ -70,17 +73,32 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
             .into();
 
         for iso_literal_extraction in extract_iso_literal_from_file_content(&file_content) {
-            process_iso_literal_extraction(
+            match process_iso_literal_extraction(
                 iso_literal_extraction,
                 file_name,
                 interned_file_path,
-                &mut schema,
-            )?;
+            ) {
+                Ok((resolver_declaration, text_source)) => {
+                    // TODO do not do this until after we have attempted to parse all isograph literals?
+                    schema.process_resolver_declaration(resolver_declaration, text_source)?;
+                }
+                Err(e) => isograph_literal_parse_errors.push(e),
+            }
         }
 
         for iso_fetch_extaction in extract_iso_fetch_from_file_content(&file_content) {
-            process_iso_fetch_extraction(iso_fetch_extaction, file_name, &mut schema)?;
+            if let Err(e) =
+                process_iso_fetch_extraction(iso_fetch_extaction, file_name, &mut schema)
+            {
+                isograph_literal_parse_errors.push(e)
+            }
         }
+    }
+
+    if !isograph_literal_parse_errors.is_empty() {
+        return Err(BatchCompileError::UnableToParseIsographLiterals {
+            messages: isograph_literal_parse_errors,
+        });
     }
 
     let validated_schema = Schema::validate_and_construct(schema)?;
@@ -98,7 +116,7 @@ fn process_iso_fetch_extraction(
     iso_fetch_extaction: IsoFetchExtraction<'_>,
     file_name: SourceFileName,
     schema: &mut UnvalidatedSchema,
-) -> Result<(), BatchCompileError> {
+) -> Result<(), WithLocation<IsographLiteralParseError>> {
     let IsoFetchExtraction {
         iso_fetch_text,
         iso_fetch_start_index,
@@ -121,8 +139,7 @@ fn process_iso_literal_extraction(
     iso_literal_extraction: IsoLiteralExtraction<'_>,
     file_name: SourceFileName,
     interned_file_path: ResolverDefinitionPath,
-    schema: &mut UnvalidatedSchema,
-) -> Result<(), BatchCompileError> {
+) -> Result<(WithSpan<ResolverDeclaration>, TextSource), WithLocation<IsographLiteralParseError>> {
     let IsoLiteralExtraction {
         iso_literal_text,
         iso_literal_start_index,
@@ -137,20 +154,16 @@ fn process_iso_literal_extraction(
     };
 
     if !has_associated_js_function {
-        return Err(BatchCompileError::UnableToParseIsographLiteral {
-            message: WithLocation::new(
-                IsographLiteralParseError::ExpectedAssociatedJsFunction,
-                Location::new(text_source, Span::todo_generated()),
-            ),
-        });
+        return Err(WithLocation::new(
+            IsographLiteralParseError::ExpectedAssociatedJsFunction,
+            Location::new(text_source, Span::todo_generated()),
+        ));
     }
 
     let resolver_declaration =
         parse_iso_literal(&iso_literal_text, interned_file_path, text_source)?;
 
-    schema
-        .process_resolver_declaration(resolver_declaration, text_source)
-        .map_err(BatchCompileError::from)
+    Ok((resolver_declaration, text_source))
 }
 
 #[derive(Error, Debug)]
@@ -184,9 +197,13 @@ pub(crate) enum BatchCompileError {
         message: WithLocation<SchemaParseError>,
     },
 
-    #[error("Unable to parse isograph literal.\n\n{message}")]
-    UnableToParseIsographLiteral {
-        message: WithLocation<IsographLiteralParseError>,
+    #[error(
+        "{}{}",
+        if messages.len() == 1 { "Unable to parse Isograph literal:" } else { "Unable to parse Isograph literals:" },
+        messages.into_iter().map(|x| format!("\n\n{x}")).collect::<String>()
+    )]
+    UnableToParseIsographLiterals {
+        messages: Vec<WithLocation<IsographLiteralParseError>>,
     },
 
     #[error("Unable to create schema.\nReason: {message}")]
@@ -226,7 +243,9 @@ impl From<WithLocation<SchemaParseError>> for BatchCompileError {
 
 impl From<WithLocation<IsographLiteralParseError>> for BatchCompileError {
     fn from(value: WithLocation<IsographLiteralParseError>) -> Self {
-        BatchCompileError::UnableToParseIsographLiteral { message: value }
+        BatchCompileError::UnableToParseIsographLiterals {
+            messages: vec![value],
+        }
     }
 }
 
