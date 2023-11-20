@@ -80,9 +80,12 @@ fn process_parsed_literals_and_fetches(
     schema: &mut UnvalidatedSchema,
     literals: Vec<(WithSpan<ResolverDeclaration>, TextSource)>,
     fetches: Vec<(WithSpan<ResolverFetch>, TextSource)>,
-) -> Result<(), WithLocation<ProcessResolverDeclarationError>> {
+) -> Result<(), Vec<WithLocation<ProcessResolverDeclarationError>>> {
+    let mut errors = vec![];
     for (resolver_declaration, text_source) in literals {
-        schema.process_resolver_declaration(resolver_declaration, text_source)?;
+        if let Err(e) = schema.process_resolver_declaration(resolver_declaration, text_source) {
+            errors.push(e);
+        }
     }
     for (resolver_fetch, text_source) in fetches {
         schema
@@ -90,7 +93,11 @@ fn process_parsed_literals_and_fetches(
             .push((text_source, resolver_fetch))
     }
 
-    Ok(())
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
 }
 
 fn extract_iso_literals(
@@ -246,9 +253,17 @@ pub(crate) enum BatchCompileError {
         message: WithLocation<isograph_schema::ProcessTypeDefinitionError>,
     },
 
-    #[error("Error when processing a resolver declaration.\nReason: {message}")]
+    #[error(
+        "{}{}",
+        if messages.len() == 1 {
+            "Error when processing a resolver declaration:"
+        } else {
+            "Errors when processing resolver declarations:"
+        },
+        messages.into_iter().map(|x| format!("\n\n{x}")).collect::<String>()
+    )]
     ErrorWhenProcessingResolverDeclaration {
-        message: WithLocation<isograph_schema::ProcessResolverDeclarationError>,
+        messages: Vec<WithLocation<isograph_schema::ProcessResolverDeclarationError>>,
     },
 
     #[error("Error when processing a resolver fetch declaration.\nReason: {message}")]
@@ -288,9 +303,11 @@ impl From<WithLocation<isograph_schema::ProcessTypeDefinitionError>> for BatchCo
     }
 }
 
-impl From<WithLocation<isograph_schema::ProcessResolverDeclarationError>> for BatchCompileError {
-    fn from(message: WithLocation<isograph_schema::ProcessResolverDeclarationError>) -> Self {
-        BatchCompileError::ErrorWhenProcessingResolverDeclaration { message }
+impl From<Vec<WithLocation<isograph_schema::ProcessResolverDeclarationError>>>
+    for BatchCompileError
+{
+    fn from(messages: Vec<WithLocation<isograph_schema::ProcessResolverDeclarationError>>) -> Self {
+        BatchCompileError::ErrorWhenProcessingResolverDeclaration { messages }
     }
 }
 
