@@ -61,7 +61,37 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
 
     let mut isograph_literal_parse_errors = vec![];
 
-    for (file_path, file_content) in project_files {
+    extract_iso_literals(
+        project_files,
+        canonicalized_root_path,
+        &mut schema,
+        &mut isograph_literal_parse_errors,
+    )?;
+
+    if !isograph_literal_parse_errors.is_empty() {
+        return Err(BatchCompileError::UnableToParseIsographLiterals {
+            messages: isograph_literal_parse_errors,
+        });
+    }
+
+    let validated_schema = Schema::validate_and_construct(schema)?;
+
+    generate_artifacts(
+        &validated_schema,
+        &config.project_root,
+        &config.artifact_directory,
+    )?;
+
+    Ok(())
+}
+
+fn extract_iso_literals(
+    project_files: Vec<(PathBuf, String)>,
+    canonicalized_root_path: PathBuf,
+    schema: &mut UnvalidatedSchema,
+    isograph_literal_parse_errors: &mut Vec<WithLocation<IsographLiteralParseError>>,
+) -> Result<(), BatchCompileError> {
+    Ok(for (file_path, file_content) in project_files {
         // TODO don't intern unless there's a match
         let interned_file_path = file_path.to_string_lossy().into_owned().intern().into();
 
@@ -87,29 +117,11 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
         }
 
         for iso_fetch_extaction in extract_iso_fetch_from_file_content(&file_content) {
-            if let Err(e) =
-                process_iso_fetch_extraction(iso_fetch_extaction, file_name, &mut schema)
-            {
+            if let Err(e) = process_iso_fetch_extraction(iso_fetch_extaction, file_name, schema) {
                 isograph_literal_parse_errors.push(e)
             }
         }
-    }
-
-    if !isograph_literal_parse_errors.is_empty() {
-        return Err(BatchCompileError::UnableToParseIsographLiterals {
-            messages: isograph_literal_parse_errors,
-        });
-    }
-
-    let validated_schema = Schema::validate_and_construct(schema)?;
-
-    generate_artifacts(
-        &validated_schema,
-        &config.project_root,
-        &config.artifact_directory,
-    )?;
-
-    Ok(())
+    })
 }
 
 fn process_iso_fetch_extraction(
