@@ -7,8 +7,8 @@ use common_lang_types::{
 use graphql_lang_parser::{parse_schema, SchemaParseError};
 use intern::string_key::Intern;
 use isograph_lang_parser::{parse_iso_fetch, parse_iso_literal, IsographLiteralParseError};
-use isograph_lang_types::ResolverDeclaration;
-use isograph_schema::{Schema, UnvalidatedSchema};
+use isograph_lang_types::{ResolverDeclaration, ResolverFetch};
+use isograph_schema::{ProcessResolverDeclarationError, Schema, UnvalidatedSchema};
 use structopt::StructOpt;
 use thiserror::Error;
 
@@ -59,20 +59,11 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
     // TODO return an iterator
     let project_files = read_files_in_folder(&canonicalized_root_path)?;
 
-    let mut isograph_literal_parse_errors = vec![];
+    let (parsed_literals, parsed_fetches) =
+        extract_iso_literals(project_files, canonicalized_root_path)
+            .map_err(BatchCompileError::from)?;
 
-    extract_iso_literals(
-        project_files,
-        canonicalized_root_path,
-        &mut schema,
-        &mut isograph_literal_parse_errors,
-    )?;
-
-    if !isograph_literal_parse_errors.is_empty() {
-        return Err(BatchCompileError::UnableToParseIsographLiterals {
-            messages: isograph_literal_parse_errors,
-        });
-    }
+    process_parsed_literals_and_fetches(&mut schema, parsed_literals, parsed_fetches)?;
 
     let validated_schema = Schema::validate_and_construct(schema)?;
 
@@ -85,13 +76,38 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
     Ok(())
 }
 
+fn process_parsed_literals_and_fetches(
+    schema: &mut UnvalidatedSchema,
+    literals: Vec<(WithSpan<ResolverDeclaration>, TextSource)>,
+    fetches: Vec<(WithSpan<ResolverFetch>, TextSource)>,
+) -> Result<(), WithLocation<ProcessResolverDeclarationError>> {
+    for (resolver_declaration, text_source) in literals {
+        schema.process_resolver_declaration(resolver_declaration, text_source)?;
+    }
+    for (resolver_fetch, text_source) in fetches {
+        schema
+            .fetchable_resolvers
+            .push((text_source, resolver_fetch))
+    }
+
+    Ok(())
+}
+
 fn extract_iso_literals(
     project_files: Vec<(PathBuf, String)>,
     canonicalized_root_path: PathBuf,
-    schema: &mut UnvalidatedSchema,
-    isograph_literal_parse_errors: &mut Vec<WithLocation<IsographLiteralParseError>>,
-) -> Result<(), BatchCompileError> {
-    Ok(for (file_path, file_content) in project_files {
+) -> Result<
+    (
+        Vec<(WithSpan<ResolverDeclaration>, TextSource)>,
+        Vec<(WithSpan<ResolverFetch>, TextSource)>,
+    ),
+    Vec<WithLocation<IsographLiteralParseError>>,
+> {
+    let mut isograph_literal_parse_errors = vec![];
+    let mut resolver_declarations_and_text_sources = vec![];
+    let mut resolver_fetch_and_text_sources = vec![];
+
+    for (file_path, file_content) in project_files {
         // TODO don't intern unless there's a match
         let interned_file_path = file_path.to_string_lossy().into_owned().intern().into();
 
@@ -109,26 +125,36 @@ fn extract_iso_literals(
                 interned_file_path,
             ) {
                 Ok((resolver_declaration, text_source)) => {
-                    // TODO do not do this until after we have attempted to parse all isograph literals?
-                    schema.process_resolver_declaration(resolver_declaration, text_source)?;
+                    resolver_declarations_and_text_sources.push((resolver_declaration, text_source))
                 }
                 Err(e) => isograph_literal_parse_errors.push(e),
             }
         }
 
         for iso_fetch_extaction in extract_iso_fetch_from_file_content(&file_content) {
-            if let Err(e) = process_iso_fetch_extraction(iso_fetch_extaction, file_name, schema) {
-                isograph_literal_parse_errors.push(e)
+            match process_iso_fetch_extraction(iso_fetch_extaction, file_name) {
+                Ok((fetch_declaration, text_source)) => {
+                    resolver_fetch_and_text_sources.push((fetch_declaration, text_source))
+                }
+                Err(e) => isograph_literal_parse_errors.push(e),
             }
         }
-    })
+    }
+
+    if isograph_literal_parse_errors.is_empty() {
+        Ok((
+            resolver_declarations_and_text_sources,
+            resolver_fetch_and_text_sources,
+        ))
+    } else {
+        Err(isograph_literal_parse_errors)
+    }
 }
 
 fn process_iso_fetch_extraction(
     iso_fetch_extaction: IsoFetchExtraction<'_>,
     file_name: SourceFileName,
-    schema: &mut UnvalidatedSchema,
-) -> Result<(), WithLocation<IsographLiteralParseError>> {
+) -> Result<(WithSpan<ResolverFetch>, TextSource), WithLocation<IsographLiteralParseError>> {
     let IsoFetchExtraction {
         iso_fetch_text,
         iso_fetch_start_index,
@@ -141,10 +167,7 @@ fn process_iso_fetch_extraction(
         )),
     };
     let fetch_declaration = parse_iso_fetch(iso_fetch_text, text_source)?;
-    schema
-        .fetchable_resolvers
-        .push((text_source, fetch_declaration));
-    Ok(())
+    Ok((fetch_declaration, text_source))
 }
 
 fn process_iso_literal_extraction(
@@ -248,53 +271,51 @@ pub(crate) enum BatchCompileError {
 }
 
 impl From<WithLocation<SchemaParseError>> for BatchCompileError {
-    fn from(value: WithLocation<SchemaParseError>) -> Self {
-        BatchCompileError::UnableToParseSchema { message: value }
+    fn from(message: WithLocation<SchemaParseError>) -> Self {
+        BatchCompileError::UnableToParseSchema { message }
     }
 }
 
-impl From<WithLocation<IsographLiteralParseError>> for BatchCompileError {
-    fn from(value: WithLocation<IsographLiteralParseError>) -> Self {
-        BatchCompileError::UnableToParseIsographLiterals {
-            messages: vec![value],
-        }
+impl From<Vec<WithLocation<IsographLiteralParseError>>> for BatchCompileError {
+    fn from(messages: Vec<WithLocation<IsographLiteralParseError>>) -> Self {
+        BatchCompileError::UnableToParseIsographLiterals { messages }
     }
 }
 
 impl From<WithLocation<isograph_schema::ProcessTypeDefinitionError>> for BatchCompileError {
-    fn from(value: WithLocation<isograph_schema::ProcessTypeDefinitionError>) -> Self {
-        BatchCompileError::UnableToCreateSchema { message: value }
+    fn from(message: WithLocation<isograph_schema::ProcessTypeDefinitionError>) -> Self {
+        BatchCompileError::UnableToCreateSchema { message }
     }
 }
 
 impl From<WithLocation<isograph_schema::ProcessResolverDeclarationError>> for BatchCompileError {
-    fn from(value: WithLocation<isograph_schema::ProcessResolverDeclarationError>) -> Self {
-        BatchCompileError::ErrorWhenProcessingResolverDeclaration { message: value }
+    fn from(message: WithLocation<isograph_schema::ProcessResolverDeclarationError>) -> Self {
+        BatchCompileError::ErrorWhenProcessingResolverDeclaration { message }
     }
 }
 
 impl From<WithLocation<isograph_schema::ValidateResolverFetchDeclarationError>>
     for BatchCompileError
 {
-    fn from(value: WithLocation<isograph_schema::ValidateResolverFetchDeclarationError>) -> Self {
-        BatchCompileError::ErrorWhenProcessingResolverFetchDeclaration { message: value }
+    fn from(message: WithLocation<isograph_schema::ValidateResolverFetchDeclarationError>) -> Self {
+        BatchCompileError::ErrorWhenProcessingResolverFetchDeclaration { message }
     }
 }
 
 impl From<std::path::StripPrefixError> for BatchCompileError {
-    fn from(value: std::path::StripPrefixError) -> Self {
-        BatchCompileError::UnableToStripPrefix { message: value }
+    fn from(message: std::path::StripPrefixError) -> Self {
+        BatchCompileError::UnableToStripPrefix { message }
     }
 }
 
 impl From<WithLocation<isograph_schema::ValidateSchemaError>> for BatchCompileError {
-    fn from(value: WithLocation<isograph_schema::ValidateSchemaError>) -> Self {
-        BatchCompileError::UnableToValidateSchema { message: value }
+    fn from(message: WithLocation<isograph_schema::ValidateSchemaError>) -> Self {
+        BatchCompileError::UnableToValidateSchema { message }
     }
 }
 
 impl From<GenerateArtifactsError> for BatchCompileError {
-    fn from(value: GenerateArtifactsError) -> Self {
-        BatchCompileError::UnableToPrint { message: value }
+    fn from(message: GenerateArtifactsError) -> Self {
+        BatchCompileError::UnableToPrint { message }
     }
 }
