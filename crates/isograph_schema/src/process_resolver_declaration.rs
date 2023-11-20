@@ -40,7 +40,6 @@ impl UnvalidatedSchema {
                 let scalar_name = self.schema_data.scalars[scalar_id.as_usize()].name;
                 return Err(WithLocation::new(
                     ProcessResolverDeclarationError::InvalidParentType {
-                        parent_type: "scalar",
                         parent_type_name: scalar_name.item.into(),
                     },
                     Location::new(text_source, resolver_declaration.item.parent_type.span),
@@ -128,9 +127,9 @@ pub enum ProcessResolverDeclarationError {
         parent_type_name: UnvalidatedTypeName,
     },
 
-    #[error("Invalid parent type. `{parent_type_name}` is a {parent_type}, but it should be an object or interface.")]
+    #[error("Invalid parent type. `{parent_type_name}` is a scalar. You are attempting to define a field on it. \
+        In order to do so, the parent object must be an object, interface or union.")]
     InvalidParentType {
-        parent_type: &'static str,
         parent_type_name: UnvalidatedTypeName,
     },
 
