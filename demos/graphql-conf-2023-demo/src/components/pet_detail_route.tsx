@@ -1,9 +1,7 @@
 import React from "react";
-import { iso, read, useLazyReference, isoFetch } from "@isograph/react";
+import { iso } from "@isograph/react";
 import { Container, Stack } from "@mui/material";
-import { ResolverParameterType as PetDetailRouteParams } from "../__isograph/Query/pet_detail_route/reader.isograph";
-
-import { PetDetailRoute, Route } from "./router";
+import { ResolverParameterType as PetDetailRouteParams } from "@iso/Query/pet_detail_route/reader.isograph";
 
 export const pet_detail_route = iso<
   PetDetailRouteParams,

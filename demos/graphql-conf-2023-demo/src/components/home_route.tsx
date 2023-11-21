@@ -1,7 +1,7 @@
 import React from "react";
 import { iso } from "@isograph/react";
 import { Container, Stack } from "@mui/material";
-import { ResolverParameterType as HomeRouteParams } from "../__isograph/Query/home_route/reader.isograph";
+import { ResolverParameterType as HomeRouteParams } from "@iso/Query/home_route/reader.isograph";
 
 export const home_route = iso<HomeRouteParams, ReturnType<typeof HomeRoute>>`
   Query.home_route @component {

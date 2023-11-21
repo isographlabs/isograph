@@ -1,10 +1,9 @@
 import React from "react";
 import NoSSR from "react-no-ssr";
 import { Container } from "@mui/material";
-import { PetDetailRouteComponent } from "./pet_detail_route";
 import { subscribe, isoFetch, useLazyReference, read } from "@isograph/react";
-import HomeRouteEntrypoint from "../__isograph/Query/home_route/entrypoint.isograph";
-import PetDetailRouteEntrypoint from "../__isograph/Query/pet_detail_route/entrypoint.isograph";
+import HomeRouteEntrypoint from "@iso/Query/home_route/entrypoint.isograph";
+import PetDetailRouteEntrypoint from "@iso/Query/pet_detail_route/entrypoint.isograph";
 
 export type PetId = string;
 
