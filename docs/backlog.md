@@ -12,7 +12,17 @@
 - Watch mode CLI
 - eslint enforcement that resolvers are exported
 - Expose compiler binary as `iso`.
-- multiple errors printed
+- multiple errors printed (when validating resolvers)
+
+## V2 release
+
+- components and "realized" resolvers, as well as ways to invalidate them
+  - they could also be lazily calculated
+  - may require garbage collection
+- iso overload in files
+- cleanup types
+- watch mode
+- rethink iso syntax
 
 ## Feature backlog
 
