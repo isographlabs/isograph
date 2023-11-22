@@ -53,21 +53,23 @@ pub type ValidatedSchema = Schema<
 impl ValidatedSchema {
     pub fn validate_and_construct(
         unvalidated_schema: UnvalidatedSchema,
-    ) -> ValidateSchemaResult<Self> {
-        let updated_fetchable_resolvers = unvalidated_schema
-            .fetchable_resolvers
-            .iter()
-            .map(|(text_source, fetchable_resolver)| {
-                unvalidated_schema
-                    .validate_resolver_fetch(*text_source, *fetchable_resolver)
-                    .map_err(|e| {
-                        WithLocation::new(
-                            ValidateSchemaError::ErrorValidatingResolverFetch { message: e.item },
-                            e.location,
-                        )
-                    })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+    ) -> Result<Self, Vec<WithLocation<ValidateSchemaError>>> {
+        let mut errors = vec![];
+
+        let mut updated_fetchable_resolvers = vec![];
+        for (text_source, fetchable_resolver) in unvalidated_schema.fetchable_resolvers.iter() {
+            match unvalidated_schema
+                .validate_resolver_fetch(*text_source, *fetchable_resolver)
+                .map_err(|e| {
+                    WithLocation::new(
+                        ValidateSchemaError::ErrorValidatingResolverFetch { message: e.item },
+                        e.location,
+                    )
+                }) {
+                Ok(resolver_id) => updated_fetchable_resolvers.push(resolver_id),
+                Err(e) => errors.push(e),
+            }
+        }
 
         let Schema {
             fields,
@@ -82,9 +84,22 @@ impl ValidatedSchema {
             int_type_id,
         } = unvalidated_schema;
 
-        let updated_fields = validate_and_transform_fields(fields, &schema_data)?;
+        let updated_fields = match validate_and_transform_fields(fields, &schema_data) {
+            Ok(fields) => fields,
+            Err(new_errors) => {
+                errors.extend(new_errors);
+                vec![]
+            }
+        };
+
         let updated_resolvers =
-            validate_and_transform_resolvers(resolvers, &schema_data, &updated_fields)?;
+            match validate_and_transform_resolvers(resolvers, &schema_data, &updated_fields) {
+                Ok(resolvers) => resolvers,
+                Err(new_errors) => {
+                    errors.extend(new_errors);
+                    vec![]
+                }
+            };
 
         let SchemaData {
             objects,
@@ -92,27 +107,33 @@ impl ValidatedSchema {
             defined_types,
         } = schema_data;
 
-        let objects = objects
-            .into_iter()
-            .map(|object| transform_object_field_ids(&updated_fields, &updated_resolvers, object))
-            .collect();
+        if errors.is_empty() {
+            let objects = objects
+                .into_iter()
+                .map(|object| {
+                    transform_object_field_ids(&updated_fields, &updated_resolvers, object)
+                })
+                .collect();
 
-        Ok(Self {
-            fields: updated_fields,
-            resolvers: updated_resolvers,
-            fetchable_resolvers: updated_fetchable_resolvers,
-            schema_data: SchemaData {
-                objects,
-                scalars,
-                defined_types,
-            },
-            id_type_id: id_type,
-            string_type_id: string_type,
-            query_type_id,
-            float_type_id,
-            boolean_type_id,
-            int_type_id,
-        })
+            Ok(Self {
+                fields: updated_fields,
+                resolvers: updated_resolvers,
+                fetchable_resolvers: updated_fetchable_resolvers,
+                schema_data: SchemaData {
+                    objects,
+                    scalars,
+                    defined_types,
+                },
+                id_type_id: id_type,
+                string_type_id: string_type,
+                query_type_id,
+                float_type_id,
+                boolean_type_id,
+                int_type_id,
+            })
+        } else {
+            Err(errors)
+        }
     }
 }
 
@@ -172,11 +193,32 @@ fn transform_object_field_ids(
 fn validate_and_transform_fields(
     fields: Vec<UnvalidatedSchemaField>,
     schema_data: &UnvalidatedSchemaData,
-) -> ValidateSchemaResult<Vec<ValidatedSchemaField>> {
-    fields
-        .into_iter()
-        .map(|field| validate_and_transform_field(field, schema_data))
-        .collect()
+) -> Result<Vec<ValidatedSchemaField>, Vec<WithLocation<ValidateSchemaError>>> {
+    get_all_errors_or_all_ok(
+        fields
+            .into_iter()
+            .map(|field| validate_and_transform_field(field, schema_data)),
+    )
+}
+
+fn get_all_errors_or_all_ok<T, E>(
+    items: impl Iterator<Item = Result<T, E>>,
+) -> Result<Vec<T>, Vec<E>> {
+    let mut oks = vec![];
+    let mut errors = vec![];
+
+    for item in items {
+        match item {
+            Ok(ok) => oks.push(ok),
+            Err(e) => errors.push(e),
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(oks)
+    } else {
+        Err(errors)
+    }
 }
 
 fn validate_and_transform_field(
@@ -232,15 +274,18 @@ fn validate_server_field_type_exists_and_is_output_type(
     }
 }
 
+// TODO this returns a single error for a given resolver, but a resolver
+// can handle multiple errors. We should emit all of them.
 fn validate_and_transform_resolvers(
     resolvers: Vec<UnvalidatedSchemaResolver>,
     schema_data: &UnvalidatedSchemaData,
     server_fields: &Vec<UnvalidatedSchemaServerField>,
-) -> ValidateSchemaResult<Vec<ValidatedSchemaResolver>> {
-    resolvers
-        .into_iter()
-        .map(|resolver| validate_resolver_fragment(schema_data, resolver, server_fields))
-        .collect()
+) -> Result<Vec<ValidatedSchemaResolver>, Vec<WithLocation<ValidateSchemaError>>> {
+    get_all_errors_or_all_ok(
+        resolvers
+            .into_iter()
+            .map(|resolver| validate_resolver_fragment(schema_data, resolver, server_fields)),
+    )
 }
 
 fn validate_resolver_fragment(
@@ -630,7 +675,9 @@ pub enum ValidateSchemaError {
     },
 
     #[error(
-        "In the resolver `{resolver_parent_type_name}.{resolver_field_name}`, the field `{field_parent_type_name}.{field_name}` is selected, but that field does not exist on `{field_parent_type_name}`"
+        "In the resolver `{resolver_parent_type_name}.{resolver_field_name}`, \
+        the field `{field_parent_type_name}.{field_name}` is selected, but that \
+        field does not exist on `{field_parent_type_name}`"
     )]
     ResolverSelectionFieldDoesNotExist {
         resolver_parent_type_name: IsographObjectTypeName,
@@ -640,7 +687,9 @@ pub enum ValidateSchemaError {
     },
 
     #[error(
-        "In the resolver `{resolver_parent_type_name}.{resolver_field_name}`, the field `{field_parent_type_name}.{field_name}` is selected as a scalar, but that field's type is `{target_type_name}`, which is {field_type}."
+        "In the resolver `{resolver_parent_type_name}.{resolver_field_name}`, \
+        the field `{field_parent_type_name}.{field_name}` is selected as a scalar, \
+        but that field's type is `{target_type_name}`, which is {field_type}."
     )]
     ResolverSelectionFieldIsNotScalar {
         resolver_parent_type_name: IsographObjectTypeName,
@@ -652,7 +701,9 @@ pub enum ValidateSchemaError {
     },
 
     #[error(
-        "In the resolver `{resolver_parent_type_name}.{resolver_field_name}`, the field `{field_parent_type_name}.{field_name}` is selected as a linked field, but that field's type is `{target_type_name}`, which is {field_type}."
+        "In the resolver `{resolver_parent_type_name}.{resolver_field_name}`, \
+        the field `{field_parent_type_name}.{field_name}` is selected as a linked field, \
+        but that field's type is `{target_type_name}`, which is {field_type}."
     )]
     ResolverSelectionFieldIsScalar {
         resolver_parent_type_name: IsographObjectTypeName,
@@ -664,7 +715,9 @@ pub enum ValidateSchemaError {
     },
 
     #[error(
-        "In the resolver `{resolver_parent_type_name}.{resolver_field_name}`, the field `{field_parent_type_name}.{field_name}` is selected as a linked field, but that field is a resolver, which can only be selected as a scalar."
+        "In the resolver `{resolver_parent_type_name}.{resolver_field_name}`, the \
+        field `{field_parent_type_name}.{field_name}` is selected as a linked field, \
+        but that field is a resolver, which can only be selected as a scalar."
     )]
     ResolverSelectionFieldIsResolver {
         resolver_parent_type_name: IsographObjectTypeName,
@@ -674,7 +727,8 @@ pub enum ValidateSchemaError {
     },
 
     #[error(
-        "The field `{parent_type_name}.{field_name}` has type `{field_type}`, which is an InputObject. It should be an output type."
+        "The field `{parent_type_name}.{field_name}` has type `{field_type}`, \
+        which is an InputObject. It should be an output type."
     )]
     FieldTypenameIsInputObject {
         parent_type_name: IsographObjectTypeName,
@@ -683,7 +737,8 @@ pub enum ValidateSchemaError {
     },
 
     #[error(
-        "The variable `{variable_name}` has type `{type_}`, which is an output type. It should be an input type."
+        "The variable `{variable_name}` has type `{type_}`, which is an output type. \
+        It should be an input type."
     )]
     VariableDefinitionInnerTypeIsOutputType {
         variable_name: VariableName,
@@ -691,7 +746,8 @@ pub enum ValidateSchemaError {
     },
 
     #[error(
-        "The variable `{variable_name}` has type `{type_}`, but the inner type `{inner_type}` does not exist."
+        "The variable `{variable_name}` has type `{type_}`, but the inner type \
+        `{inner_type}` does not exist."
     )]
     VariableDefinitionInnerTypeDoesNotExist {
         variable_name: VariableName,

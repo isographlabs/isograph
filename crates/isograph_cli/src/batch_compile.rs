@@ -44,6 +44,7 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
             .into(),
         span: None,
     };
+
     let type_system_document = parse_schema(&content, schema_text_source)
         .map_err(|with_span| with_span_to_with_location(with_span, schema_text_source))?;
     let mut schema = Schema::new();
@@ -281,9 +282,13 @@ pub(crate) enum BatchCompileError {
         message: std::path::StripPrefixError,
     },
 
-    #[error("Error when validating schema, resolvers and fetch declarations.\nReason: {message}")]
+    #[error(
+        "{} when validating schema, resolvers and fetch declarations.\n{}",
+        if messages.len() == 1 { "Error" } else { "Errors" },
+        messages.into_iter().map(|x| format!("\n\n{x}")).collect::<String>()
+    )]
     UnableToValidateSchema {
-        message: WithLocation<isograph_schema::ValidateSchemaError>,
+        messages: Vec<WithLocation<isograph_schema::ValidateSchemaError>>,
     },
 
     #[error("Unable to print.\nReason: {message}")]
@@ -330,9 +335,9 @@ impl From<std::path::StripPrefixError> for BatchCompileError {
     }
 }
 
-impl From<WithLocation<isograph_schema::ValidateSchemaError>> for BatchCompileError {
-    fn from(message: WithLocation<isograph_schema::ValidateSchemaError>) -> Self {
-        BatchCompileError::UnableToValidateSchema { message }
+impl From<Vec<WithLocation<isograph_schema::ValidateSchemaError>>> for BatchCompileError {
+    fn from(messages: Vec<WithLocation<isograph_schema::ValidateSchemaError>>) -> Self {
+        BatchCompileError::UnableToValidateSchema { messages }
     }
 }
 
