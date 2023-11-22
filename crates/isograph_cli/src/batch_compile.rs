@@ -36,7 +36,12 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
 
     let content = read_schema_file(&config.schema)?;
     let schema_text_source = TextSource {
-        path: config.schema.to_str().unwrap().intern().into(),
+        path: config
+            .schema
+            .to_str()
+            .expect("Expected schema to be valid string")
+            .intern()
+            .into(),
         span: None,
     };
     let type_system_document = parse_schema(&content, schema_text_source)
