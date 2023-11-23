@@ -8,8 +8,10 @@ pub(crate) struct CompilerConfig {
     pub project_root: PathBuf,
     /// The folder where the compiler should create artifacts
     pub artifact_directory: PathBuf,
-    /// The path to the GraphQL schema
+    /// The absolute path to the GraphQL schema
     pub schema: PathBuf,
+    /// The absolute path to the schema extensions
+    pub schema_extensions: Option<PathBuf>,
 }
 
 #[derive(Deserialize)]
@@ -20,6 +22,8 @@ pub(crate) struct ConfigFile {
     pub artifact_directory: PathBuf,
     /// The relative path to the GraphQL schema
     pub schema: PathBuf,
+    /// The relative path to schema extensions
+    pub schema_extensions: Option<PathBuf>,
 }
 
 impl CompilerConfig {
@@ -42,7 +46,7 @@ impl CompilerConfig {
             project_root: config_dir
                 .join(&config_parsed.project_root)
                 .canonicalize()
-                .expect("Unable to canonicalize project root"),
+                .expect("Unable to canonicalize project root."),
             artifact_directory: config_dir
                 .join(&config_parsed.artifact_directory)
                 .canonicalize()
@@ -50,7 +54,16 @@ impl CompilerConfig {
             schema: config_dir
                 .join(&config_parsed.schema)
                 .canonicalize()
-                .expect("Unable to canonicalize schema"),
+                .expect("Unable to canonicalize schema path."),
+            schema_extensions: config_parsed
+                .schema_extensions
+                .as_ref()
+                .map(|schema_extension| {
+                    config_dir
+                        .join(schema_extension)
+                        .canonicalize()
+                        .expect("Unable to canonicalize schema extension path.")
+                }),
         }
     }
 }

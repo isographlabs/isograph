@@ -34,7 +34,12 @@ pub(crate) struct BatchCompileCliOptions {
 pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), BatchCompileError> {
     let config = CompilerConfig::create(opt.config);
 
-    let content = read_schema_file(&config.schema)?;
+    let mut content = read_schema_file(&config.schema)?;
+    if let Some(schema_extension) = &config.schema_extensions {
+        let extension_content = read_schema_file(schema_extension)?;
+        content.push_str("\n");
+        content.push_str(&extension_content);
+    }
     let schema_text_source = TextSource {
         path: config
             .schema
