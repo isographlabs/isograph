@@ -7,7 +7,8 @@ type Mutation {
   set_pet_best_friend(id: ID!, new_best_friend_id: ID!): SetBestFriendResponse!
 }
 
-type SetBestFriendResponse {
+type SetBestFriendResponse
+  @primary(path: "pet", field_map: [{ from: "id", to: "id" }]) {
   # The pet whose best friend was set
   pet: Pet!
 }
