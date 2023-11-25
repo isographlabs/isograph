@@ -4,7 +4,7 @@ use common_lang_types::{
     IsographDirectiveName, IsographObjectTypeName, Location, SelectableFieldName, TextSource,
     UnvalidatedTypeName, WithLocation, WithSpan,
 };
-use graphql_lang_types::InputValueDefinition;
+use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::string_key::Intern;
 use isograph_lang_types::{DefinedTypeId, FragmentDirectiveUsage, ObjectId, ResolverDeclaration};
 use lazy_static::lazy_static;
@@ -157,7 +157,7 @@ pub enum ResolverVariant {
         (
             SelectableFieldName,
             SelectableFieldName,
-            Vec<WithSpan<InputValueDefinition>>,
+            Vec<WithSpan<GraphQLInputValueDefinition>>,
         ),
     ),
 }

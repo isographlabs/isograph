@@ -11,7 +11,7 @@ use common_lang_types::{
     UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    InputValueDefinition, ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
+    GraphQLInputValueDefinition, ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
     TypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
@@ -305,7 +305,7 @@ fn generate_mutation_query_text<'schema>(
     magic_mutation_field_name: SelectableFieldName,
     mutation_field_name: &str,
     mutation_primary_field_name: SelectableFieldName,
-    mutation_field_arguments: Vec<WithSpan<InputValueDefinition>>,
+    mutation_field_arguments: Vec<WithSpan<GraphQLInputValueDefinition>>,
 ) -> QueryText {
     let mut query_text = String::new();
 

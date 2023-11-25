@@ -5,8 +5,9 @@ use common_lang_types::{
     UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    InputValueDefinition, NamedTypeAnnotation, NonNullTypeAnnotation, OutputFieldDefinition,
-    ScalarTypeDefinition, TypeAnnotation, TypeSystemDefinition, TypeSystemDocument,
+    GraphQLInputValueDefinition, GraphQLOutputFieldDefinition, GraphQLScalarTypeDefinition,
+    GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument, NamedTypeAnnotation,
+    NonNullTypeAnnotation, TypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -31,9 +32,9 @@ lazy_static! {
 type TypeRefinementMap = HashMap<IsographObjectTypeName, Vec<WithLocation<ObjectId>>>;
 
 impl UnvalidatedSchema {
-    pub fn process_type_system_document(
+    pub fn process_graphql_type_system_document(
         &mut self,
-        type_system_document: TypeSystemDocument,
+        type_system_document: GraphQLTypeSystemDocument,
     ) -> ProcessTypeDefinitionResult<()> {
         // In the schema, interfaces, unions and objects are the same type of object (SchemaType),
         // with e.g. interfaces "simply" being objects that can be refined to other
@@ -48,7 +49,7 @@ impl UnvalidatedSchema {
         let mut mutation_type_id = None;
         for type_system_definition in type_system_document.0 {
             match type_system_definition {
-                TypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
+                GraphQLTypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
                     let mutation_id = self.process_object_type_definition(
                         object_type_definition.into(),
                         &mut valid_type_refinement_map,
@@ -57,11 +58,11 @@ impl UnvalidatedSchema {
                         mutation_type_id = Some(mutation_id);
                     }
                 }
-                TypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
+                GraphQLTypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
                     self.process_scalar_definition(scalar_type_definition)?;
                     // N.B. we assume that Mutation will be an object, not a scalar
                 }
-                TypeSystemDefinition::InterfaceTypeDefinition(interface_type_definition) => {
+                GraphQLTypeSystemDefinition::InterfaceTypeDefinition(interface_type_definition) => {
                     self.process_object_type_definition(
                         interface_type_definition.into(),
                         &mut valid_type_refinement_map,
@@ -227,7 +228,7 @@ impl UnvalidatedSchema {
 
     fn process_scalar_definition(
         &mut self,
-        scalar_type_definition: ScalarTypeDefinition,
+        scalar_type_definition: GraphQLScalarTypeDefinition,
     ) -> ProcessTypeDefinitionResult<()> {
         let &mut Schema {
             ref mut schema_data,
@@ -369,11 +370,11 @@ impl UnvalidatedSchema {
         &self,
         // From the top level field, e.g. create_user
         type_: TypeAnnotation<UnvalidatedTypeName>,
-        arguments: &[WithSpan<InputValueDefinition>],
+        arguments: &[WithSpan<GraphQLInputValueDefinition>],
     ) -> Option<(
         ObjectId,
         SelectableFieldName,
-        Vec<WithSpan<InputValueDefinition>>,
+        Vec<WithSpan<GraphQLInputValueDefinition>>,
     )> {
         // Is the mutation_field's type a non-nullable type?
         let mutation_response_inner_non_nullable_named_type = type_.inner_non_null_named_type()?;
@@ -424,8 +425,8 @@ impl UnvalidatedSchema {
 }
 
 fn arguments_without_id_arg(
-    arguments: &[WithSpan<InputValueDefinition>],
-) -> Option<Vec<WithSpan<InputValueDefinition>>> {
+    arguments: &[WithSpan<GraphQLInputValueDefinition>],
+) -> Option<Vec<WithSpan<GraphQLInputValueDefinition>>> {
     let mut found_id = false;
     let new_arguments = arguments
         .iter()
@@ -541,7 +542,7 @@ struct FieldObjectIdsEtc {
 /// Given a vector of fields from the schema AST all belonging to the same object/interface,
 /// return a vector of unvalidated fields and a set of field names.
 fn get_field_objects_ids_and_names(
-    new_fields: Vec<WithLocation<OutputFieldDefinition>>,
+    new_fields: Vec<WithLocation<GraphQLOutputFieldDefinition>>,
     next_field_id: usize,
     parent_type_id: ObjectId,
     parent_type_name: IsographObjectTypeName,
@@ -641,7 +642,7 @@ fn get_field_objects_ids_and_names(
 fn set_and_validate_id_field(
     id_field: &mut Option<ServerIdFieldId>,
     current_field_id: usize,
-    field: &WithLocation<OutputFieldDefinition>,
+    field: &WithLocation<GraphQLOutputFieldDefinition>,
     parent_type_name: IsographObjectTypeName,
 ) -> ProcessTypeDefinitionResult<()> {
     // N.B. id_field is guaranteed to be None; otherwise field_names_to_type_name would

@@ -6,8 +6,8 @@ use common_lang_types::{
     ScalarTypeName, SelectableFieldName, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    ConstantValue, Directive, InputValueDefinition, InterfaceTypeDefinition, NamedTypeAnnotation,
-    ObjectTypeDefinition, OutputFieldDefinition, TypeAnnotation,
+    ConstantValue, Directive, GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition,
+    GraphQLObjectTypeDefinition, GraphQLOutputFieldDefinition, NamedTypeAnnotation, TypeAnnotation,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -401,13 +401,15 @@ pub struct IsographObjectTypeDefinition {
     pub name: WithLocation<IsographObjectTypeName>,
     // maybe this should be Vec<WithSpan<IsographObjectTypeName>>>
     pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
+    /// Directives that we don't know about. Maybe this should be validated to be
+    /// empty.
     pub directives: Vec<Directive<ConstantValue>>,
     // TODO the spans of these fields are wrong
-    pub fields: Vec<WithLocation<OutputFieldDefinition>>,
+    pub fields: Vec<WithLocation<GraphQLOutputFieldDefinition>>,
 }
 
-impl From<ObjectTypeDefinition> for IsographObjectTypeDefinition {
-    fn from(value: ObjectTypeDefinition) -> Self {
+impl From<GraphQLObjectTypeDefinition> for IsographObjectTypeDefinition {
+    fn from(value: GraphQLObjectTypeDefinition) -> Self {
         Self {
             description: value.description,
             name: value.name.map(|x| x.into()),
@@ -418,8 +420,8 @@ impl From<ObjectTypeDefinition> for IsographObjectTypeDefinition {
     }
 }
 
-impl From<InterfaceTypeDefinition> for IsographObjectTypeDefinition {
-    fn from(value: InterfaceTypeDefinition) -> Self {
+impl From<GraphQLInterfaceTypeDefinition> for IsographObjectTypeDefinition {
+    fn from(value: GraphQLInterfaceTypeDefinition) -> Self {
         Self {
             description: value.description,
             name: value.name.map(|x| x.into()),
@@ -466,7 +468,7 @@ pub struct SchemaServerField<TData> {
     pub associated_data: TData,
     pub parent_type_id: ObjectId,
     // pub directives: Vec<Directive<ConstantValue>>,
-    pub arguments: Vec<WithSpan<InputValueDefinition>>,
+    pub arguments: Vec<WithSpan<GraphQLInputValueDefinition>>,
 }
 
 impl<TData> SchemaServerField<TData> {

@@ -9,10 +9,10 @@ use common_lang_types::{
 };
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub enum TypeSystemDefinition {
-    ObjectTypeDefinition(ObjectTypeDefinition),
-    ScalarTypeDefinition(ScalarTypeDefinition),
-    InterfaceTypeDefinition(InterfaceTypeDefinition),
+pub enum GraphQLTypeSystemDefinition {
+    ObjectTypeDefinition(GraphQLObjectTypeDefinition),
+    ScalarTypeDefinition(GraphQLScalarTypeDefinition),
+    InterfaceTypeDefinition(GraphQLInterfaceTypeDefinition),
     // Union
     // Enum
     // InputObject
@@ -21,29 +21,29 @@ pub enum TypeSystemDefinition {
     // Directive
 }
 
-impl From<ObjectTypeDefinition> for TypeSystemDefinition {
-    fn from(type_definition: ObjectTypeDefinition) -> Self {
+impl From<GraphQLObjectTypeDefinition> for GraphQLTypeSystemDefinition {
+    fn from(type_definition: GraphQLObjectTypeDefinition) -> Self {
         Self::ObjectTypeDefinition(type_definition)
     }
 }
 
-impl From<InterfaceTypeDefinition> for TypeSystemDefinition {
-    fn from(type_definition: InterfaceTypeDefinition) -> Self {
+impl From<GraphQLInterfaceTypeDefinition> for GraphQLTypeSystemDefinition {
+    fn from(type_definition: GraphQLInterfaceTypeDefinition) -> Self {
         Self::InterfaceTypeDefinition(type_definition)
     }
 }
 
-impl From<ScalarTypeDefinition> for TypeSystemDefinition {
-    fn from(type_definition: ScalarTypeDefinition) -> Self {
+impl From<GraphQLScalarTypeDefinition> for GraphQLTypeSystemDefinition {
+    fn from(type_definition: GraphQLScalarTypeDefinition) -> Self {
         Self::ScalarTypeDefinition(type_definition)
     }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct TypeSystemDocument(pub Vec<TypeSystemDefinition>);
+pub struct GraphQLTypeSystemDocument(pub Vec<GraphQLTypeSystemDefinition>);
 
-impl Deref for TypeSystemDocument {
-    type Target = Vec<TypeSystemDefinition>;
+impl Deref for GraphQLTypeSystemDocument {
+    type Target = Vec<GraphQLTypeSystemDefinition>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -53,40 +53,40 @@ impl Deref for TypeSystemDocument {
 // TypeSystemDefinition: SchemaDef, TypeDef, DirectiveDef
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct ObjectTypeDefinition {
+pub struct GraphQLObjectTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<ObjectTypeName>,
     pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
     pub directives: Vec<Directive<ConstantValue>>,
-    pub fields: Vec<WithLocation<OutputFieldDefinition>>,
+    pub fields: Vec<WithLocation<GraphQLOutputFieldDefinition>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct ScalarTypeDefinition {
+pub struct GraphQLScalarTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<ScalarTypeName>,
     pub directives: Vec<Directive<ConstantValue>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct InterfaceTypeDefinition {
+pub struct GraphQLInterfaceTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<InterfaceTypeName>,
     pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
     pub directives: Vec<Directive<ConstantValue>>,
-    pub fields: Vec<WithLocation<OutputFieldDefinition>>,
+    pub fields: Vec<WithLocation<GraphQLOutputFieldDefinition>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct OutputFieldDefinition {
+pub struct GraphQLOutputFieldDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<SelectableFieldName>,
     pub type_: TypeAnnotation<UnvalidatedTypeName>,
-    pub arguments: Vec<WithSpan<InputValueDefinition>>,
+    pub arguments: Vec<WithSpan<GraphQLInputValueDefinition>>,
     pub directives: Vec<Directive<ConstantValue>>,
 }
 
-impl fmt::Display for OutputFieldDefinition {
+impl fmt::Display for GraphQLOutputFieldDefinition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name)?;
         write_arguments(f, &self.arguments)?;
@@ -98,7 +98,7 @@ impl fmt::Display for OutputFieldDefinition {
 
 /// This is an argument definition, but we're using the GraphQL spec lingo here.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct InputValueDefinition {
+pub struct GraphQLInputValueDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<InputValueName>,
     pub type_: TypeAnnotation<InputTypeName>,
@@ -106,7 +106,7 @@ pub struct InputValueDefinition {
     pub directives: Vec<Directive<ConstantValue>>,
 }
 
-impl fmt::Display for InputValueDefinition {
+impl fmt::Display for GraphQLInputValueDefinition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}: {}", self.name, self.type_)?;
         if let Some(v) = &self.default_value {

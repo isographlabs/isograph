@@ -8,7 +8,7 @@ use common_lang_types::{
     ScalarFieldName, SelectableFieldName, ServerFieldNormalizationKey, Span, VariableName,
     WithLocation, WithSpan,
 };
-use graphql_lang_types::InputValueDefinition;
+use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     InputTypeId, LinkedFieldSelection, ObjectId, ResolverFieldId, ScalarFieldSelection, Selection,
@@ -179,7 +179,7 @@ pub struct MutationFieldResolverInfo {
     // Mutation name
     pub mutation_field_name: SelectableFieldName,
     pub mutation_primary_field_name: SelectableFieldName,
-    pub mutation_field_arguments: Vec<WithSpan<InputValueDefinition>>,
+    pub mutation_field_arguments: Vec<WithSpan<GraphQLInputValueDefinition>>,
 }
 
 /// This struct contains everything that is available when we start
