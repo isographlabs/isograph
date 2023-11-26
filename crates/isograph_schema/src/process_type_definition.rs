@@ -327,6 +327,11 @@ impl UnvalidatedSchema {
                     .find(|item| item.object_id == *mutation_field_object_id)
                 {
                     // We found a matching mutation field info
+                    let MagicMutationFieldInfo {
+                        path,
+                        field_map_items,
+                        object_id: _,
+                    } = magic_mutation_field_info;
 
                     // TODO don't skip id, skip using field_map
                     let mutation_field_args_without_id =
@@ -353,55 +358,60 @@ impl UnvalidatedSchema {
 
                     // TODO make this zero cost
                     // TODO split path on .
-                    let path_selectable_field_name =
-                        magic_mutation_field_info.path.lookup().intern().into();
+                    let path_selectable_field_name = path.lookup().intern().into();
 
                     // field here is the pet field
-                    let field = payload_object
+                    let primary_field = payload_object
                         .encountered_fields
                         .get(&path_selectable_field_name);
 
-                    let (next_resolver_id, resolver_parent_object_id) = match field {
+                    let (next_resolver_id, resolver_parent_object_id) = match primary_field {
                         Some(DefinedField::ServerField(server_field)) => {
                             // This is the parent type name (Pet)
                             let inner = server_field.inner();
 
                             // TODO validate that the payload object has no plural fields in between
 
-                            let item_on_payload = self.schema_data.defined_types.get(inner).clone();
+                            let primary_type = self.schema_data.defined_types.get(inner).clone();
 
-                            if let Some(DefinedTypeId::Object(resolver_parent_object_id)) =
-                                item_on_payload
-                            {
+                            if let Some(DefinedTypeId::Object(primary_object_type)) = primary_type {
                                 let next_resolver_id = self.resolvers.len().into();
 
-                                // TODO use field_maps to define id and variant stuff
-                                let id_field_selection = WithSpan::new(
-                                    Selection::ServerField(ServerFieldSelection::ScalarField(
-                                        ScalarFieldSelection {
+                                let fields = field_map_items
+                                    .iter()
+                                    .map(|field_map_item| {
+                                        let scalar_field_selection = ScalarFieldSelection {
                                             name: WithLocation::new(
-                                                "id".intern().into(),
+                                                // TODO make this no-op
+                                                // TODO split on . here; we should be able to have from: "best_friend.id" or whatnot.
+                                                field_map_item.from.lookup().intern().into(),
                                                 Location::generated(),
                                             ),
                                             reader_alias: None,
                                             normalization_alias: None,
                                             associated_data: (),
                                             unwraps: vec![],
+                                            // TODO what about arguments? How would we handle them?
                                             arguments: vec![],
-                                        },
-                                    )),
-                                    Span::todo_generated(),
-                                );
+                                        };
+
+                                        WithSpan::new(
+                                            Selection::ServerField(
+                                                ServerFieldSelection::ScalarField(
+                                                    scalar_field_selection,
+                                                ),
+                                            ),
+                                            Span::todo_generated(),
+                                        )
+                                    })
+                                    .collect();
 
                                 self.resolvers.push(SchemaResolver {
                                     description,
                                     // __set_pet_best_friend
                                     name: magic_mutation_field_name,
                                     id: next_resolver_id,
-                                    selection_set_and_unwraps: Some((
-                                        vec![id_field_selection],
-                                        vec![],
-                                    )),
+                                    selection_set_and_unwraps: Some((fields, vec![])),
                                     variant: ResolverVariant::MutationField((
                                         magic_mutation_field_name,
                                         path_selectable_field_name,
@@ -413,11 +423,11 @@ impl UnvalidatedSchema {
                                         type_name: inner.lookup().intern().into(), // e.g. Pet
                                         field_name: magic_mutation_field_name, // __set_pet_best_friend
                                     },
-                                    parent_object_id: *resolver_parent_object_id,
+                                    parent_object_id: *primary_object_type,
                                     action_kind: ResolverActionKind::MutationField,
                                 });
 
-                                Ok((next_resolver_id, resolver_parent_object_id))
+                                Ok((next_resolver_id, primary_object_type))
                             } else {
                                 Err(WithLocation::new(
                                     ProcessTypeDefinitionError::InvalidMutationField,
