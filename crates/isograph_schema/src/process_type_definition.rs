@@ -459,63 +459,6 @@ impl UnvalidatedSchema {
 
         Ok(())
     }
-
-    fn get_valid_mutation_field_target_type(
-        &self,
-        // From the top level field, e.g. create_user
-        type_: TypeAnnotation<UnvalidatedTypeName>,
-        arguments: &[WithSpan<GraphQLInputValueDefinition>],
-    ) -> Option<(
-        ObjectId,
-        SelectableFieldName,
-        Vec<WithSpan<GraphQLInputValueDefinition>>,
-    )> {
-        // Is the mutation_field's type a non-nullable type?
-        let mutation_response_inner_non_nullable_named_type = type_.inner_non_null_named_type()?;
-
-        // Is the mutation_field's type an object type?
-        if let DefinedTypeId::Object(mutation_response_object_id) = self
-            .schema_data
-            .defined_types
-            .get(&mutation_response_inner_non_nullable_named_type.0.item)
-            .expect("object type should exist. This indicates a bug in Isograph")
-        {
-            // Does the mutation field have an argument named "id"
-            // (TODO validate it has type ID!)
-            let arguments_without_id_arg = arguments_without_id_arg(arguments)?;
-
-            // This is the mutation response object, in other words something like CreateUserResponse
-            let mutation_response_object = self.schema_data.object(*mutation_response_object_id);
-
-            // Does the mutation response object have exactly one field?
-            // TODO handle the @primary directive
-            let mutation_response_only_field = self.field(get_only_non_typename_field(
-                self,
-                &mutation_response_object.server_fields,
-            )?);
-
-            // Does the mutation response object's only field have no arguments?
-            if mutation_response_only_field.arguments.is_empty() {
-                let primary_field_type = mutation_response_only_field
-                    .associated_data
-                    .inner_non_null_named_type()?;
-                if let DefinedTypeId::Object(primary_field_object_id) = self
-                    .schema_data
-                    .defined_types
-                    .get(&primary_field_type.0.item)
-                    .expect("object type should exist. This indicates a bug in Isograph.")
-                {
-                    return Some((
-                        *primary_field_object_id,
-                        mutation_response_only_field.name.item,
-                        arguments_without_id_arg,
-                    ));
-                }
-            }
-        }
-
-        None
-    }
 }
 
 pub struct MagicMutationFieldInfo {
@@ -738,27 +681,6 @@ fn arguments_without_id_arg(
     } else {
         None
     }
-}
-
-fn get_only_non_typename_field(
-    schema: &UnvalidatedSchema,
-    server_fields: &[ServerFieldId],
-) -> Option<ServerFieldId> {
-    let mut found_field = None;
-    let typename_field_name = "__typename".intern().into();
-
-    for field_id in server_fields {
-        let field = schema.field(*field_id);
-        // TODO this is a hacky check
-        if field.name.item != typename_field_name {
-            if found_field.is_some() {
-                return None;
-            } else {
-                found_field = Some(*field_id);
-            }
-        }
-    }
-    found_field
 }
 
 /// Returns the resolvers for a schema object that we know up-front (before processing
