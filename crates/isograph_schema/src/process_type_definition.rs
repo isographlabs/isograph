@@ -334,14 +334,10 @@ impl UnvalidatedSchema {
                     } = magic_mutation_field_info;
 
                     // TODO don't skip id, skip using field_map
-                    let mutation_field_args_without_id =
-                        arguments_without_id_arg(&mutation_field.arguments).ok_or_else(|| {
-                            WithLocation::new(
-                                ProcessTypeDefinitionError::InvalidMutationField,
-                                // TODO this is blatantly incorrect
-                                Location::generated(),
-                            )
-                        })?;
+                    let mutation_field_args_without_id = skip_arguments_contained_in_field_map(
+                        &mutation_field.arguments,
+                        field_map_items,
+                    )?;
 
                     // TODO this is dangerous! mutation_field.name is also formattable (with carats).
                     // We should find a way to make WithLocation not impl Display, while also making
@@ -669,16 +665,26 @@ pub fn convert_and_extract_mutation_field_info(
     ))
 }
 
-fn arguments_without_id_arg(
+fn skip_arguments_contained_in_field_map(
     arguments: &[WithSpan<GraphQLInputValueDefinition>],
-) -> Option<Vec<WithSpan<GraphQLInputValueDefinition>>> {
-    let mut found_id = false;
+    field_map_items: &[FieldMapItem],
+) -> ProcessTypeDefinitionResult<Vec<WithSpan<GraphQLInputValueDefinition>>> {
+    let mut found_count = 0;
+
     let new_arguments = arguments
         .iter()
         .filter_map(|arg| {
             // TODO also confirm stuff like that the type is ID!
-            if arg.item.name.item == "id".intern().into() {
-                found_id = true;
+            let arg_name = arg.item.name.item.lookup();
+            if field_map_items
+                .iter()
+                .find(|field_map_item| {
+                    // TODO split on .
+                    field_map_item.to.lookup() == arg_name
+                })
+                .is_some()
+            {
+                found_count += 1;
                 None
             } else {
                 Some(arg.clone())
@@ -686,10 +692,13 @@ fn arguments_without_id_arg(
         })
         .collect();
 
-    if found_id {
-        Some(new_arguments)
+    if found_count == field_map_items.len() {
+        Ok(new_arguments)
     } else {
-        None
+        Err(WithLocation::new(
+            ProcessTypeDefinitionError::NotAllToFieldsUsed,
+            Location::generated(),
+        ))
     }
 }
 
@@ -968,4 +977,8 @@ pub enum ProcessTypeDefinitionError {
 
     #[error("Invalid mutation field")]
     InvalidMutationField,
+
+    // TODO include which fields were unused
+    #[error("Not all fields specified as 'to' fields in the field_map were found on the mutation field.")]
+    NotAllToFieldsUsed,
 }
