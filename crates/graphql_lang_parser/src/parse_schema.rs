@@ -1,11 +1,14 @@
 use std::ops::ControlFlow;
 
 use common_lang_types::{
-    with_span_to_with_location, DescriptionValue, InterfaceTypeName, TextSource, WithLocation,
-    WithSpan,
+    with_span_to_with_location, DescriptionValue, InterfaceTypeName, StringLiteralValue,
+    TextSource, WithLocation, WithSpan,
 };
 use graphql_syntax::TokenKind;
-use intern::string_key::StringKey;
+use intern::{
+    string_key::{Intern, StringKey},
+    Lookup,
+};
 
 use graphql_lang_types::{
     ConstantValue, Directive, GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition,
@@ -271,9 +274,18 @@ fn parse_constant_value(tokens: &mut PeekableLexer) -> ParseResult<WithSpan<Cons
         })?;
 
         to_control_flow(|| {
-            tokens
-                .parse_string_key_type(TokenKind::StringLiteral)
-                .map(|x| x.map(ConstantValue::String))
+            tokens.parse_string_key_type(TokenKind::StringLiteral).map(
+                |with_quotes: WithSpan<StringLiteralValue>| {
+                    // This seems very hacky
+                    let without_quotes = with_quotes.map(|string_literal| {
+                        let inner_str = &string_literal.lookup();
+                        let len = inner_str.len();
+                        let without_quotes = (&inner_str[1..(len - 1)]).intern().into();
+                        without_quotes
+                    });
+                    without_quotes.map(ConstantValue::String)
+                },
+            )
         })?;
 
         to_control_flow(|| {

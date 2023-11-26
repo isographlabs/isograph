@@ -53,15 +53,22 @@ impl UnvalidatedSchema {
         //   to the found interface.
         let mut valid_type_refinement_map = HashMap::new();
 
+        let mut mutation_field_infos = vec![];
         let mut mutation_type_id = None;
         for type_system_definition in type_system_document.0 {
             match type_system_definition {
                 GraphQLTypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
-                    let (object_type_definition, _mutation_field_info) =
+                    let next_object_id = self.schema_data.objects.len().into();
+                    let (object_type_definition, mutation_field_info) =
                         convert_and_extract_mutation_field_info(
                             object_type_definition,
                             text_source,
+                            next_object_id,
                         )?;
+
+                    if let Some(mutation_field_info) = mutation_field_info {
+                        mutation_field_infos.push(mutation_field_info);
+                    }
 
                     let mutation_id = self.process_object_type_definition(
                         object_type_definition,
@@ -136,7 +143,7 @@ impl UnvalidatedSchema {
         }
 
         if let Some(mutation_id) = mutation_type_id {
-            self.add_mutation_fields(mutation_id)?;
+            self.add_mutation_fields(mutation_id, mutation_field_infos)?;
         }
 
         Ok(())
@@ -296,85 +303,158 @@ impl UnvalidatedSchema {
     ///   selected in the merged selection set.
     ///
     /// There is lots of cloning going on here! Not ideal.
-    fn add_mutation_fields(&mut self, mutation_id: ObjectId) -> ProcessTypeDefinitionResult<()> {
+    fn add_mutation_fields(
+        &mut self,
+        mutation_id: ObjectId,
+        mutation_field_infos: Vec<MagicMutationFieldInfo>,
+    ) -> ProcessTypeDefinitionResult<()> {
+        // TODO don't clone if possible
         let mutation_object_fields = self.schema_data.object(mutation_id).server_fields.clone();
 
         for field_id in mutation_object_fields.iter() {
             let mutation_field = self.field(*field_id);
-            // TODO this is dangerous! mutation_field.name is also formattable (with carats).
-            // We should find a way to make WithLocation not impl Display, while also making
-            // errors containing WithLocation<...> easy to work with.
-            let magic_mutation_field_name =
-                format!("__{}", mutation_field.name.item).intern().into();
 
-            if let Some((
-                parent_object_id,
-                mutation_response_primary_field_name,
-                mutation_field_args,
-            )) = self.get_valid_mutation_field_target_type(
-                mutation_field.associated_data.clone(),
-                &mutation_field.arguments,
-            ) {
-                // Woohoo! We found a valid object type onto which we can add a magic mutation field.
-                // TODO continue from here
-                let description = mutation_field.description.clone();
-                let parent_object = self.schema_data.object_mut(parent_object_id);
+            let mutation_field_payload_type_name = mutation_field.associated_data.inner();
 
-                let next_resolver_id = self.resolvers.len().into();
-
-                let id_field_selection = WithSpan::new(
-                    Selection::ServerField(ServerFieldSelection::ScalarField(
-                        ScalarFieldSelection {
-                            name: WithLocation::new("id".intern().into(), Location::generated()),
-                            reader_alias: None,
-                            normalization_alias: None,
-                            associated_data: (),
-                            unwraps: vec![],
-                            arguments: vec![],
-                        },
-                    )),
-                    Span::todo_generated(),
-                );
-
-                self.resolvers.push(SchemaResolver {
-                    description,
-                    name: magic_mutation_field_name,
-                    id: next_resolver_id,
-                    selection_set_and_unwraps: Some((vec![id_field_selection], vec![])),
-                    variant: ResolverVariant::MutationField((
-                        magic_mutation_field_name,
-                        mutation_response_primary_field_name,
-                        mutation_field_args,
-                    )),
-                    variable_definitions: vec![],
-                    type_and_field: ResolverTypeAndField {
-                        type_name: parent_object.name,
-                        field_name: magic_mutation_field_name,
-                    },
-                    parent_object_id,
-                    action_kind: ResolverActionKind::MutationField,
-                });
-
-                if parent_object
-                    .encountered_fields
-                    .insert(
-                        magic_mutation_field_name,
-                        DefinedField::ResolverField(next_resolver_id),
-                    )
-                    .is_some()
+            let payload_id = self
+                .schema_data
+                .defined_types
+                .get(mutation_field_payload_type_name);
+            if let Some(DefinedTypeId::Object(mutation_field_object_id)) = payload_id {
+                // TODO use a hash map instead of a linear search through a vec here
+                if let Some(magic_mutation_field_info) = mutation_field_infos
+                    .iter()
+                    .find(|item| item.object_id == *mutation_field_object_id)
                 {
-                    return Err(WithLocation::new(
-                        ProcessTypeDefinitionError::MutationFieldIsDuplicate {
-                            field_name: magic_mutation_field_name,
-                            parent_type: parent_object.name,
-                        },
-                        // TODO this is blatantly incorrect
-                        Location::generated(),
-                    ));
-                }
+                    // We found a matching mutation field info
 
-                parent_object.resolvers.push(next_resolver_id);
-            }
+                    // TODO don't skip id, skip using field_map
+                    let mutation_field_args_without_id =
+                        arguments_without_id_arg(&mutation_field.arguments).ok_or_else(|| {
+                            WithLocation::new(
+                                ProcessTypeDefinitionError::InvalidMutationField,
+                                // TODO this is blatantly incorrect
+                                Location::generated(),
+                            )
+                        })?;
+
+                    // TODO this is dangerous! mutation_field.name is also formattable (with carats).
+                    // We should find a way to make WithLocation not impl Display, while also making
+                    // errors containing WithLocation<...> easy to work with.
+                    // TODO "expose as" optional field
+                    let magic_mutation_field_name =
+                        format!("__{}", mutation_field.name.item).intern().into();
+
+                    let description = mutation_field.description.clone();
+
+                    // payload object is the object type of the mutation field, e.g. SetBestFriendResponse
+                    let payload_object = self.schema_data.object(*mutation_field_object_id);
+                    let payload_object_name = payload_object.name;
+
+                    // TODO make this zero cost
+                    // TODO split path on .
+                    let path_selectable_field_name =
+                        magic_mutation_field_info.path.lookup().intern().into();
+
+                    // field here is the pet field
+                    let field = payload_object
+                        .encountered_fields
+                        .get(&path_selectable_field_name);
+
+                    let (next_resolver_id, resolver_parent_object_id) = match field {
+                        Some(DefinedField::ServerField(server_field)) => {
+                            // This is the parent type name (Pet)
+                            let inner = server_field.inner();
+
+                            // TODO validate that the payload object has no plural fields in between
+
+                            let item_on_payload = self.schema_data.defined_types.get(inner).clone();
+
+                            if let Some(DefinedTypeId::Object(resolver_parent_object_id)) =
+                                item_on_payload
+                            {
+                                let next_resolver_id = self.resolvers.len().into();
+
+                                // TODO use field_maps to define id and variant stuff
+                                let id_field_selection = WithSpan::new(
+                                    Selection::ServerField(ServerFieldSelection::ScalarField(
+                                        ScalarFieldSelection {
+                                            name: WithLocation::new(
+                                                "id".intern().into(),
+                                                Location::generated(),
+                                            ),
+                                            reader_alias: None,
+                                            normalization_alias: None,
+                                            associated_data: (),
+                                            unwraps: vec![],
+                                            arguments: vec![],
+                                        },
+                                    )),
+                                    Span::todo_generated(),
+                                );
+
+                                self.resolvers.push(SchemaResolver {
+                                    description,
+                                    // __set_pet_best_friend
+                                    name: magic_mutation_field_name,
+                                    id: next_resolver_id,
+                                    selection_set_and_unwraps: Some((
+                                        vec![id_field_selection],
+                                        vec![],
+                                    )),
+                                    variant: ResolverVariant::MutationField((
+                                        magic_mutation_field_name,
+                                        path_selectable_field_name,
+                                        mutation_field_args_without_id,
+                                    )),
+                                    variable_definitions: vec![],
+                                    type_and_field: ResolverTypeAndField {
+                                        // TODO make this zero cost?
+                                        type_name: inner.lookup().intern().into(), // e.g. Pet
+                                        field_name: magic_mutation_field_name, // __set_pet_best_friend
+                                    },
+                                    parent_object_id: *resolver_parent_object_id,
+                                    action_kind: ResolverActionKind::MutationField,
+                                });
+
+                                Ok((next_resolver_id, resolver_parent_object_id))
+                            } else {
+                                Err(WithLocation::new(
+                                    ProcessTypeDefinitionError::InvalidMutationField,
+                                    Location::generated(),
+                                ))
+                            }
+                        }
+                        _ => Err(WithLocation::new(
+                            ProcessTypeDefinitionError::InvalidMutationField,
+                            Location::generated(),
+                        )),
+                    }?;
+
+                    // This is the "Pet" object
+                    let resolver_parent = self.schema_data.object_mut(*resolver_parent_object_id);
+
+                    if resolver_parent
+                        .encountered_fields
+                        .insert(
+                            magic_mutation_field_name,
+                            DefinedField::ResolverField(next_resolver_id),
+                        )
+                        .is_some()
+                    {
+                        return Err(WithLocation::new(
+                            ProcessTypeDefinitionError::MutationFieldIsDuplicate {
+                                field_name: magic_mutation_field_name,
+                                parent_type: payload_object_name,
+                            },
+                            // TODO this is blatantly incorrect
+                            Location::generated(),
+                        ));
+                    }
+
+                    resolver_parent.resolvers.push(next_resolver_id);
+                }
+            };
         }
 
         Ok(())
@@ -441,6 +521,7 @@ impl UnvalidatedSchema {
 pub struct MagicMutationFieldInfo {
     path: StringLiteralValue,
     field_map_items: Vec<FieldMapItem>,
+    object_id: ObjectId,
 }
 
 enum MagicMutationFieldOrDirective {
@@ -451,11 +532,13 @@ enum MagicMutationFieldOrDirective {
 fn extract_magic_mutation_field_info(
     d: Directive<ConstantValue>,
     text_source: TextSource,
+    object_id: ObjectId,
 ) -> MagicMutationFieldOrDirective {
     if d.name.item == *PRIMARY_DIRECTIVE {
         MagicMutationFieldOrDirective::MagicMutationField(validate_magic_mutation_directive(
             &d,
             text_source,
+            object_id,
         ))
     } else {
         MagicMutationFieldOrDirective::Directive(d)
@@ -465,6 +548,7 @@ fn extract_magic_mutation_field_info(
 fn validate_magic_mutation_directive(
     d: &Directive<ConstantValue>,
     text_source: TextSource,
+    object_id: ObjectId,
 ) -> ProcessTypeDefinitionResult<MagicMutationFieldInfo> {
     if d.arguments.len() != 2 {
         return Err(WithLocation::new(
@@ -511,6 +595,7 @@ fn validate_magic_mutation_directive(
     Ok(MagicMutationFieldInfo {
         path: path_val,
         field_map_items,
+        object_id,
     })
 }
 
@@ -599,13 +684,14 @@ fn parse_field_map_val(
 pub fn convert_and_extract_mutation_field_info(
     value: GraphQLObjectTypeDefinition,
     text_source: TextSource,
+    object_id: ObjectId,
 ) -> ProcessTypeDefinitionResult<(IsographObjectTypeDefinition, Option<MagicMutationFieldInfo>)> {
     let mut magic_mutation_field_info = None;
     let directives = value
         .directives
         .into_iter()
         .flat_map(
-            |d| match extract_magic_mutation_field_info(d, text_source) {
+            |d| match extract_magic_mutation_field_info(d, text_source, object_id) {
                 MagicMutationFieldOrDirective::MagicMutationField(m) => {
                     // TODO emit an error if this is already Some
                     magic_mutation_field_info = Some(m);
@@ -947,4 +1033,7 @@ pub enum ProcessTypeDefinitionError {
 
     #[error("Invalid field_map in @primary directive")]
     InvalidFieldMap,
+
+    #[error("Invalid mutation field")]
+    InvalidMutationField,
 }
