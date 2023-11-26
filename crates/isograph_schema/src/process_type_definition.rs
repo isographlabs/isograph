@@ -1,13 +1,14 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    IsographObjectTypeName, Location, ScalarTypeName, SelectableFieldName, Span,
-    UnvalidatedTypeName, WithLocation, WithSpan,
+    DirectiveArgumentName, DirectiveName, IsographObjectTypeName, Location, ScalarTypeName,
+    SelectableFieldName, Span, StringLiteralValue, TextSource, UnvalidatedTypeName, ValueKeyName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    GraphQLInputValueDefinition, GraphQLOutputFieldDefinition, GraphQLScalarTypeDefinition,
-    GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument, NamedTypeAnnotation,
-    NonNullTypeAnnotation, TypeAnnotation,
+    ConstantValue, Directive, GraphQLInputValueDefinition, GraphQLObjectTypeDefinition,
+    GraphQLOutputFieldDefinition, GraphQLScalarTypeDefinition, GraphQLTypeSystemDefinition,
+    GraphQLTypeSystemDocument, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -27,6 +28,11 @@ use crate::{
 lazy_static! {
     static ref QUERY_TYPE: IsographObjectTypeName = "Query".intern().into();
     static ref MUTATION_TYPE: IsographObjectTypeName = "Mutation".intern().into();
+    static ref PRIMARY_DIRECTIVE: DirectiveName = "primary".intern().into();
+    static ref PATH_DIRECTIVE_ARGUMENT: DirectiveArgumentName = "path".intern().into();
+    static ref FIELD_MAP_DIRECTIVE_ARGUMENT: DirectiveArgumentName = "field_map".intern().into();
+    static ref FROM_VALUE_KEY_NAME: ValueKeyName = "from".intern().into();
+    static ref TO_VALUE_KEY_NAME: ValueKeyName = "to".intern().into();
 }
 
 type TypeRefinementMap = HashMap<IsographObjectTypeName, Vec<WithLocation<ObjectId>>>;
@@ -35,6 +41,7 @@ impl UnvalidatedSchema {
     pub fn process_graphql_type_system_document(
         &mut self,
         type_system_document: GraphQLTypeSystemDocument,
+        text_source: TextSource,
     ) -> ProcessTypeDefinitionResult<()> {
         // In the schema, interfaces, unions and objects are the same type of object (SchemaType),
         // with e.g. interfaces "simply" being objects that can be refined to other
@@ -50,8 +57,14 @@ impl UnvalidatedSchema {
         for type_system_definition in type_system_document.0 {
             match type_system_definition {
                 GraphQLTypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
+                    let (object_type_definition, _mutation_field_info) =
+                        convert_and_extract_mutation_field_info(
+                            object_type_definition,
+                            text_source,
+                        )?;
+
                     let mutation_id = self.process_object_type_definition(
-                        object_type_definition.into(),
+                        object_type_definition,
                         &mut valid_type_refinement_map,
                     )?;
                     if let Some(mutation_id) = mutation_id {
@@ -131,7 +144,7 @@ impl UnvalidatedSchema {
 
     fn process_object_type_definition(
         &mut self,
-        type_definition: IsographObjectTypeDefinition,
+        object_type_definition: IsographObjectTypeDefinition,
         valid_type_refinement_map: &mut TypeRefinementMap,
     ) -> ProcessTypeDefinitionResult<Option<ObjectId>> {
         let &mut Schema {
@@ -145,19 +158,19 @@ impl UnvalidatedSchema {
         let ref mut type_names = schema_data.defined_types;
         let ref mut objects = schema_data.objects;
         let mut mutation_id = None;
-        match type_names.entry(type_definition.name.item.into()) {
+        match type_names.entry(object_type_definition.name.item.into()) {
             Entry::Occupied(_) => {
                 return Err(WithLocation::new(
                     ProcessTypeDefinitionError::DuplicateTypeDefinition {
                         type_definition_type: "object",
-                        type_name: type_definition.name.item.into(),
+                        type_name: object_type_definition.name.item.into(),
                     },
-                    type_definition.name.location,
+                    object_type_definition.name.location,
                 ));
             }
             Entry::Vacant(vacant) => {
                 // TODO avoid this
-                let type_def_2 = type_definition.clone();
+                let type_def_2 = object_type_definition.clone();
                 let FieldObjectIdsEtc {
                     unvalidated_schema_fields,
                     server_fields,
@@ -176,12 +189,12 @@ impl UnvalidatedSchema {
                     &mut encountered_fields,
                     schema_resolvers,
                     next_object_id,
-                    &type_definition,
+                    &object_type_definition,
                 );
 
                 objects.push(SchemaObject {
-                    description: type_definition.description.map(|d| d.item),
-                    name: type_definition.name.item,
+                    description: object_type_definition.description.map(|d| d.item),
+                    name: object_type_definition.name.item,
                     id: next_object_id,
                     server_fields,
                     resolvers: object_resolvers,
@@ -195,14 +208,14 @@ impl UnvalidatedSchema {
                 // encountered should we use the default query object.
                 //
                 // Also, this is a GraphQL concept, but it's leaking into Isograph land :/ (is it?)
-                if type_definition.name.item == *QUERY_TYPE {
+                if object_type_definition.name.item == *QUERY_TYPE {
                     self.query_type_id = Some(next_object_id);
                 }
                 // --- END HACK ---
 
                 // ----- HACK -----
                 // It's unclear to me that this is the best way to add magic mutation fields.
-                if type_definition.name.item == *MUTATION_TYPE {
+                if object_type_definition.name.item == *MUTATION_TYPE {
                     mutation_id = Some(next_object_id)
                 }
                 // --- END HACK ---
@@ -212,20 +225,21 @@ impl UnvalidatedSchema {
             }
         }
 
-        for interface in type_definition.interfaces {
+        for interface in object_type_definition.interfaces {
             // type_definition implements interface
             let definitions = valid_type_refinement_map
                 .entry(interface.item.into())
                 .or_default();
             definitions.push(WithLocation::new(
                 next_object_id,
-                type_definition.name.location,
+                object_type_definition.name.location,
             ));
         }
 
         Ok(mutation_id)
     }
 
+    // TODO this should accept an IsographScalarTypeDefinition
     fn process_scalar_definition(
         &mut self,
         scalar_type_definition: GraphQLScalarTypeDefinition,
@@ -422,6 +436,198 @@ impl UnvalidatedSchema {
 
         None
     }
+}
+
+pub struct MagicMutationFieldInfo {
+    path: StringLiteralValue,
+    field_map_items: Vec<FieldMapItem>,
+}
+
+enum MagicMutationFieldOrDirective {
+    MagicMutationField(ProcessTypeDefinitionResult<MagicMutationFieldInfo>),
+    Directive(Directive<ConstantValue>),
+}
+
+fn extract_magic_mutation_field_info(
+    d: Directive<ConstantValue>,
+    text_source: TextSource,
+) -> MagicMutationFieldOrDirective {
+    if d.name.item == *PRIMARY_DIRECTIVE {
+        MagicMutationFieldOrDirective::MagicMutationField(validate_magic_mutation_directive(
+            &d,
+            text_source,
+        ))
+    } else {
+        MagicMutationFieldOrDirective::Directive(d)
+    }
+}
+
+fn validate_magic_mutation_directive(
+    d: &Directive<ConstantValue>,
+    text_source: TextSource,
+) -> ProcessTypeDefinitionResult<MagicMutationFieldInfo> {
+    if d.arguments.len() != 2 {
+        return Err(WithLocation::new(
+            ProcessTypeDefinitionError::InvalidPrimaryDirectiveArgumentCount,
+            // This is wrong, the arguments should have a span, or the whole thing should have a span
+            Location::new(text_source, d.name.span),
+        ));
+    }
+
+    let path = d
+        .arguments
+        .iter()
+        .find(|d| d.name.item == *PATH_DIRECTIVE_ARGUMENT)
+        .ok_or_else(|| {
+            WithLocation::new(
+                ProcessTypeDefinitionError::MissingPathArg,
+                // This is wrong, the arguments should have a span, or the whole thing should have a span
+                Location::new(text_source, d.name.span),
+            )
+        })?;
+    let path_val = match path.value.item {
+        ConstantValue::String(s) => Ok(s),
+        _ => Err(WithLocation::new(
+            ProcessTypeDefinitionError::PathValueShouldBeString,
+            // This is wrong, the arguments should have a span, or the whole thing should have a span
+            Location::new(text_source, d.name.span),
+        )),
+    }?;
+
+    let field_map = d
+        .arguments
+        .iter()
+        .find(|d| d.name.item == *FIELD_MAP_DIRECTIVE_ARGUMENT)
+        .ok_or_else(|| {
+            WithLocation::new(
+                ProcessTypeDefinitionError::MissingFieldMapArg,
+                // This is wrong, the arguments should have a span, or the whole thing should have a span
+                Location::new(text_source, d.name.span),
+            )
+        })?;
+
+    let field_map_items = parse_field_map_val(&field_map.value, text_source)?;
+
+    Ok(MagicMutationFieldInfo {
+        path: path_val,
+        field_map_items,
+    })
+}
+
+struct FieldMapItem {
+    from: StringLiteralValue,
+    to: StringLiteralValue,
+}
+
+fn parse_field_map_val(
+    value: &WithSpan<ConstantValue>,
+    text_source: TextSource,
+) -> ProcessTypeDefinitionResult<Vec<FieldMapItem>> {
+    let list = match &value.item {
+        ConstantValue::List(l) => Ok(l),
+        _ => Err(WithLocation::new(
+            ProcessTypeDefinitionError::InvalidFieldMap,
+            // This is wrong, the arguments should have a span, or the whole thing should have a span
+            Location::new(text_source, value.span),
+        )),
+    }?;
+
+    list.iter()
+        .map(|argument_value| {
+            let object = match &argument_value.item {
+                ConstantValue::Object(o) => Ok(o),
+                _ => Err(WithLocation::new(
+                    ProcessTypeDefinitionError::InvalidFieldMap,
+                    Location::new(text_source, argument_value.span),
+                )),
+            }?;
+
+            if object.len() != 2 {
+                return Err(WithLocation::new(
+                    ProcessTypeDefinitionError::InvalidFieldMap,
+                    Location::new(text_source, argument_value.span),
+                ));
+            }
+
+            let from = object
+                .iter()
+                .find(|d| d.name.item == *FROM_VALUE_KEY_NAME)
+                .ok_or_else(|| {
+                    WithLocation::new(
+                        ProcessTypeDefinitionError::InvalidFieldMap,
+                        // This is wrong, the arguments should have a span, or the whole thing should have a span
+                        Location::new(text_source, argument_value.span),
+                    )
+                })?;
+
+            let from_arg = match from.value.item {
+                ConstantValue::String(s) => Ok(s),
+                _ => Err(WithLocation::new(
+                    ProcessTypeDefinitionError::InvalidFieldMap,
+                    Location::new(text_source, argument_value.span),
+                )),
+            }?;
+
+            let to = object
+                .iter()
+                .find(|d| d.name.item == *TO_VALUE_KEY_NAME)
+                .ok_or_else(|| {
+                    WithLocation::new(
+                        ProcessTypeDefinitionError::InvalidFieldMap,
+                        // This is wrong, the arguments should have a span, or the whole thing should have a span
+                        Location::new(text_source, argument_value.span),
+                    )
+                })?;
+
+            let to_arg = match to.value.item {
+                ConstantValue::String(s) => Ok(s),
+                _ => Err(WithLocation::new(
+                    ProcessTypeDefinitionError::InvalidFieldMap,
+                    Location::new(text_source, argument_value.span),
+                )),
+            }?;
+
+            Ok(FieldMapItem {
+                from: from_arg,
+                to: to_arg,
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()
+}
+
+// TODO this belongs in graphql_sdl
+pub fn convert_and_extract_mutation_field_info(
+    value: GraphQLObjectTypeDefinition,
+    text_source: TextSource,
+) -> ProcessTypeDefinitionResult<(IsographObjectTypeDefinition, Option<MagicMutationFieldInfo>)> {
+    let mut magic_mutation_field_info = None;
+    let directives = value
+        .directives
+        .into_iter()
+        .flat_map(
+            |d| match extract_magic_mutation_field_info(d, text_source) {
+                MagicMutationFieldOrDirective::MagicMutationField(m) => {
+                    // TODO emit an error if this is already Some
+                    magic_mutation_field_info = Some(m);
+                    None
+                }
+                MagicMutationFieldOrDirective::Directive(d) => Some(d),
+            },
+        )
+        .collect();
+
+    let magic_mutation_field_info = magic_mutation_field_info.transpose()?;
+
+    Ok((
+        IsographObjectTypeDefinition {
+            description: value.description,
+            name: value.name.map(|x| x.into()),
+            interfaces: value.interfaces,
+            directives,
+            fields: value.fields,
+        },
+        magic_mutation_field_info,
+    ))
 }
 
 fn arguments_without_id_arg(
@@ -726,4 +932,19 @@ pub enum ProcessTypeDefinitionError {
 
     #[error("The id field on \"{parent_type}\" must be \"ID!\".")]
     IdFieldMustBeNonNullIdType { parent_type: IsographObjectTypeName },
+
+    #[error("The @primary directive should have two arguments")]
+    InvalidPrimaryDirectiveArgumentCount,
+
+    #[error("The @primary directive requires a path argument")]
+    MissingPathArg,
+
+    #[error("The @primary directive requires a field_map argument")]
+    MissingFieldMapArg,
+
+    #[error("The @primary directive path argument value should be a string")]
+    PathValueShouldBeString,
+
+    #[error("Invalid field_map in @primary directive")]
+    InvalidFieldMap,
 }

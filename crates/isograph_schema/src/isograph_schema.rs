@@ -7,7 +7,7 @@ use common_lang_types::{
 };
 use graphql_lang_types::{
     ConstantValue, Directive, GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition,
-    GraphQLObjectTypeDefinition, GraphQLOutputFieldDefinition, NamedTypeAnnotation, TypeAnnotation,
+    GraphQLOutputFieldDefinition, NamedTypeAnnotation, TypeAnnotation,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -402,22 +402,10 @@ pub struct IsographObjectTypeDefinition {
     // maybe this should be Vec<WithSpan<IsographObjectTypeName>>>
     pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
     /// Directives that we don't know about. Maybe this should be validated to be
-    /// empty.
+    /// empty, or not exist.
     pub directives: Vec<Directive<ConstantValue>>,
     // TODO the spans of these fields are wrong
     pub fields: Vec<WithLocation<GraphQLOutputFieldDefinition>>,
-}
-
-impl From<GraphQLObjectTypeDefinition> for IsographObjectTypeDefinition {
-    fn from(value: GraphQLObjectTypeDefinition) -> Self {
-        Self {
-            description: value.description,
-            name: value.name.map(|x| x.into()),
-            interfaces: value.interfaces,
-            directives: value.directives,
-            fields: value.fields,
-        }
-    }
 }
 
 impl From<GraphQLInterfaceTypeDefinition> for IsographObjectTypeDefinition {

@@ -54,7 +54,7 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
         .map_err(|with_span| with_span_to_with_location(with_span, schema_text_source))?;
     let mut schema = Schema::new();
 
-    schema.process_graphql_type_system_document(type_system_document)?;
+    schema.process_graphql_type_system_document(type_system_document, schema_text_source)?;
 
     let canonicalized_root_path = {
         let current_dir = std::env::current_dir().expect("current_dir should exist");
