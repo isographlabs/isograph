@@ -48,7 +48,7 @@ impl MergedServerFieldSelection {
 }
 
 pub fn get_variable_selections(
-    arguments: &[WithSpan<SelectionFieldArgument>],
+    arguments: &[WithLocation<SelectionFieldArgument>],
 ) -> HashSet<VariableName> {
     arguments
         .iter()
@@ -61,7 +61,7 @@ pub struct MergedScalarFieldSelection {
     pub name: WithLocation<ScalarFieldName>,
     // TODO calculate this when needed
     pub normalization_alias: Option<WithLocation<ScalarFieldAlias>>,
-    pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
+    pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -70,7 +70,7 @@ pub struct MergedLinkedFieldSelection {
     // TODO calculate this when needed
     pub normalization_alias: Option<WithLocation<LinkedFieldAlias>>,
     pub selection_set: Vec<WithSpan<MergedServerFieldSelection>>,
-    pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
+    pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
 }
 
 /// A merged selection set is an input for generating:
@@ -179,7 +179,7 @@ pub struct MutationFieldResolverInfo {
     // Mutation name
     pub mutation_field_name: SelectableFieldName,
     pub mutation_primary_field_name: SelectableFieldName,
-    pub mutation_field_arguments: Vec<WithSpan<GraphQLInputValueDefinition>>,
+    pub mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
 }
 
 /// This struct contains everything that is available when we start
@@ -564,7 +564,7 @@ fn merge_scalar_server_field(
 #[allow(non_snake_case)]
 fn HACK_combine_name_and_variables_into_normalization_alias(
     name: SelectableFieldName,
-    arguments: &[WithSpan<SelectionFieldArgument>],
+    arguments: &[WithLocation<SelectionFieldArgument>],
 ) -> ServerFieldNormalizationKey {
     if arguments.is_empty() {
         name.into()

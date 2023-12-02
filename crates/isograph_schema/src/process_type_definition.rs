@@ -674,9 +674,9 @@ pub fn convert_and_extract_mutation_field_info(
 }
 
 fn skip_arguments_contained_in_field_map(
-    arguments: &[WithSpan<GraphQLInputValueDefinition>],
+    arguments: &[WithLocation<GraphQLInputValueDefinition>],
     field_map_items: &[FieldMapItem],
-) -> ProcessTypeDefinitionResult<Vec<WithSpan<GraphQLInputValueDefinition>>> {
+) -> ProcessTypeDefinitionResult<Vec<WithLocation<GraphQLInputValueDefinition>>> {
     let mut found_count = 0;
 
     let new_arguments = arguments

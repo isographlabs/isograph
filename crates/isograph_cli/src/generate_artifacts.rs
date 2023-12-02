@@ -205,7 +205,7 @@ fn get_artifact_for_mutation_field<'schema>(
                             .hack_to_with_span(),
                     })
             })
-            .chain(std::iter::once(WithSpan::new(
+            .chain(std::iter::once(WithLocation::new(
                 SelectionFieldArgument {
                     name: WithSpan::new("id".intern().into(), Span::todo_generated()),
                     value: WithSpan::new(
@@ -213,7 +213,7 @@ fn get_artifact_for_mutation_field<'schema>(
                         Span::todo_generated(),
                     ),
                 },
-                Span::todo_generated(),
+                Location::generated(),
             )))
             .collect::<Vec<_>>(),
         1,
@@ -305,7 +305,7 @@ fn generate_mutation_query_text<'schema>(
     magic_mutation_field_name: SelectableFieldName,
     mutation_field_name: &str,
     mutation_primary_field_name: SelectableFieldName,
-    mutation_field_arguments: Vec<WithSpan<GraphQLInputValueDefinition>>,
+    mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
 ) -> QueryText {
     let mut query_text = String::new();
 
@@ -345,24 +345,24 @@ fn generate_mutation_query_text<'schema>(
                 },
                 span: Span::todo_generated(),
             });
-            WithSpan::new(
+            WithLocation::new(
                 SelectionFieldArgument {
                     name: argument.item.name.map(|x| x.into()).hack_to_with_span(),
                     value: variable_name
                         .map(|x| NonConstantValue::Variable(x))
                         .hack_to_with_span(),
                 },
-                Span::todo_generated(),
+                Location::generated(),
             )
         })
-        .chain(std::iter::once(WithSpan::new(
+        .chain(std::iter::once(WithLocation::new(
             SelectionFieldArgument {
                 name: WithSpan::new("id".intern().into(), Span::todo_generated()),
                 value: id_variable_name
                     .map(NonConstantValue::Variable)
                     .hack_to_with_span(),
             },
-            Span::todo_generated(),
+            Location::generated(),
         )))
         .collect();
 
@@ -385,7 +385,7 @@ fn generate_mutation_query_text<'schema>(
 
 fn get_aliased_mutation_field_name(
     name: &str,
-    parameters: &[WithSpan<SelectionFieldArgument>],
+    parameters: &[WithLocation<SelectionFieldArgument>],
 ) -> String {
     let mut s = name.to_string();
 
@@ -1241,7 +1241,7 @@ fn generate_normalization_ast_node(
 }
 
 fn get_serialized_arguments_for_query_text(
-    arguments: &[WithSpan<SelectionFieldArgument>],
+    arguments: &[WithLocation<SelectionFieldArgument>],
 ) -> String {
     if arguments.is_empty() {
         return "".to_string();
@@ -1266,7 +1266,7 @@ fn get_serialized_arguments_for_query_text(
 }
 
 fn get_serialized_field_arguments(
-    arguments: &[WithSpan<SelectionFieldArgument>],
+    arguments: &[WithLocation<SelectionFieldArgument>],
     indentation_level: u8,
 ) -> String {
     if arguments.is_empty() {

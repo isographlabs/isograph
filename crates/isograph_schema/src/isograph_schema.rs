@@ -470,7 +470,7 @@ pub struct SchemaServerField<TData> {
     pub associated_data: TData,
     pub parent_type_id: ObjectId,
     // pub directives: Vec<Directive<ConstantValue>>,
-    pub arguments: Vec<WithSpan<GraphQLInputValueDefinition>>,
+    pub arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
 }
 
 impl<TData> SchemaServerField<TData> {

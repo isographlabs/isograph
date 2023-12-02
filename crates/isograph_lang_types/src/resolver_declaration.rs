@@ -126,7 +126,7 @@ pub struct ScalarFieldSelection<TScalarField> {
     pub normalization_alias: Option<WithLocation<ScalarFieldAlias>>,
     pub associated_data: TScalarField,
     pub unwraps: Vec<WithSpan<Unwrap>>,
-    pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
+    pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
 }
 
 impl<TScalarField> ScalarFieldSelection<TScalarField> {
@@ -170,7 +170,7 @@ pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
     pub associated_data: TLinkedField,
     pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
     pub unwraps: Vec<WithSpan<Unwrap>>,
-    pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
+    pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
 }
 
 impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField> {

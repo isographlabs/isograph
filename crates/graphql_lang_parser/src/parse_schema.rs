@@ -519,15 +519,21 @@ fn parse_optional_argument_definitions<'a>(
     text_source: TextSource,
     open_token: TokenKind,
     close_token: TokenKind,
-) -> ParseResult<Vec<WithSpan<GraphQLInputValueDefinition>>> {
+) -> ParseResult<Vec<WithLocation<GraphQLInputValueDefinition>>> {
     let paren = tokens.parse_token_of_kind(open_token);
 
     if paren.is_ok() {
-        let argument = parse_argument_definition(tokens, text_source)?;
+        let argument = with_span_to_with_location(
+            parse_argument_definition(tokens, text_source)?,
+            text_source,
+        );
         let mut arguments = vec![argument];
 
         while tokens.parse_token_of_kind(close_token).is_err() {
-            arguments.push(parse_argument_definition(tokens, text_source)?);
+            arguments.push(with_span_to_with_location(
+                parse_argument_definition(tokens, text_source)?,
+                text_source,
+            ));
         }
         Ok(arguments)
     } else {

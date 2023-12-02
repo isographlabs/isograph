@@ -87,7 +87,7 @@ pub struct GraphQLInputObjectTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<InterfaceTypeName>,
     pub directives: Vec<Directive<ConstantValue>>,
-    pub fields: Vec<WithSpan<GraphQLInputValueDefinition>>,
+    pub fields: Vec<WithLocation<GraphQLInputValueDefinition>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -95,7 +95,7 @@ pub struct GraphQLOutputFieldDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<SelectableFieldName>,
     pub type_: TypeAnnotation<UnvalidatedTypeName>,
-    pub arguments: Vec<WithSpan<GraphQLInputValueDefinition>>,
+    pub arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
     pub directives: Vec<Directive<ConstantValue>>,
 }
 

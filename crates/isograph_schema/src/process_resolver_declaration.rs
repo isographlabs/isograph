@@ -157,7 +157,7 @@ pub enum ResolverVariant {
         (
             SelectableFieldName,
             SelectableFieldName,
-            Vec<WithSpan<GraphQLInputValueDefinition>>,
+            Vec<WithLocation<GraphQLInputValueDefinition>>,
         ),
     ),
 }
