@@ -89,6 +89,14 @@ impl UnvalidatedSchema {
                     )?;
                     // N.B. we assume that Mutation will be an object, not an interface
                 }
+                GraphQLTypeSystemDefinition::InputObjectTypeDefinition(
+                    input_object_type_definition,
+                ) => {
+                    self.process_object_type_definition(
+                        input_object_type_definition.into(),
+                        &mut valid_type_refinement_map,
+                    )?;
+                }
             }
         }
 
@@ -169,6 +177,7 @@ impl UnvalidatedSchema {
             Entry::Occupied(_) => {
                 return Err(WithLocation::new(
                     ProcessTypeDefinitionError::DuplicateTypeDefinition {
+                        // BUG: this could be an interface, actually
                         type_definition_type: "object",
                         type_name: object_type_definition.name.item.into(),
                     },

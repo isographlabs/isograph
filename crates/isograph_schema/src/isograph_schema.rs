@@ -6,8 +6,9 @@ use common_lang_types::{
     ScalarTypeName, SelectableFieldName, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    ConstantValue, Directive, GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition,
-    GraphQLOutputFieldDefinition, NamedTypeAnnotation, TypeAnnotation,
+    ConstantValue, Directive, GraphQLInputObjectTypeDefinition, GraphQLInputValueDefinition,
+    GraphQLInterfaceTypeDefinition, GraphQLOutputFieldDefinition, NamedTypeAnnotation,
+    TypeAnnotation,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -417,6 +418,19 @@ impl From<GraphQLInterfaceTypeDefinition> for IsographObjectTypeDefinition {
             directives: value.directives,
             fields: value.fields,
         }
+    }
+}
+
+impl From<GraphQLInputObjectTypeDefinition> for IsographObjectTypeDefinition {
+    fn from(value: GraphQLInputObjectTypeDefinition) -> Self {
+        todo!("impl From<GraphQLInputObjectTypeDefinition> for IsographObjectTypeDefinition")
+        // Self {
+        //     description: value.description,
+        //     name: value.name.map(|x| x.into()),
+        //     interfaces: vec![],
+        //     directives: value.directives,
+        //     fields: value.fields,
+        // }
     }
 }
 

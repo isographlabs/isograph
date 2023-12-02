@@ -13,10 +13,9 @@ pub enum GraphQLTypeSystemDefinition {
     ObjectTypeDefinition(GraphQLObjectTypeDefinition),
     ScalarTypeDefinition(GraphQLScalarTypeDefinition),
     InterfaceTypeDefinition(GraphQLInterfaceTypeDefinition),
+    InputObjectTypeDefinition(GraphQLInputObjectTypeDefinition),
     // Union
     // Enum
-    // InputObject
-
     // Schema
     // Directive
 }
@@ -36,6 +35,12 @@ impl From<GraphQLInterfaceTypeDefinition> for GraphQLTypeSystemDefinition {
 impl From<GraphQLScalarTypeDefinition> for GraphQLTypeSystemDefinition {
     fn from(type_definition: GraphQLScalarTypeDefinition) -> Self {
         Self::ScalarTypeDefinition(type_definition)
+    }
+}
+
+impl From<GraphQLInputObjectTypeDefinition> for GraphQLTypeSystemDefinition {
+    fn from(type_definition: GraphQLInputObjectTypeDefinition) -> Self {
+        Self::InputObjectTypeDefinition(type_definition)
     }
 }
 
@@ -75,6 +80,14 @@ pub struct GraphQLInterfaceTypeDefinition {
     pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
     pub directives: Vec<Directive<ConstantValue>>,
     pub fields: Vec<WithLocation<GraphQLOutputFieldDefinition>>,
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub struct GraphQLInputObjectTypeDefinition {
+    pub description: Option<WithSpan<DescriptionValue>>,
+    pub name: WithLocation<InterfaceTypeName>,
+    pub directives: Vec<Directive<ConstantValue>>,
+    pub fields: Vec<WithSpan<GraphQLInputValueDefinition>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]

@@ -11,10 +11,11 @@ use intern::{
 };
 
 use graphql_lang_types::{
-    ConstantValue, Directive, GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition,
-    GraphQLObjectTypeDefinition, GraphQLOutputFieldDefinition, GraphQLScalarTypeDefinition,
-    GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument, ListTypeAnnotation, NameValuePair,
-    NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation, ValueType,
+    ConstantValue, Directive, GraphQLInputObjectTypeDefinition, GraphQLInputValueDefinition,
+    GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition, GraphQLOutputFieldDefinition,
+    GraphQLScalarTypeDefinition, GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument,
+    ListTypeAnnotation, NameValuePair, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation,
+    ValueType,
 };
 
 use crate::ParseResult;
@@ -61,6 +62,8 @@ fn parse_type_system_definition(
         "scalar" => parse_scalar_type_definition(tokens, description, text_source)
             .map(GraphQLTypeSystemDefinition::from),
         "interface" => parse_interface_type_definition(tokens, description, text_source)
+            .map(GraphQLTypeSystemDefinition::from),
+        "input" => parse_input_object_type_definition(tokens, description, text_source)
             .map(GraphQLTypeSystemDefinition::from),
         _ => Err(WithSpan::new(
             SchemaParseError::TopLevelSchemaDeclarationExpected {
@@ -114,6 +117,32 @@ fn parse_interface_type_definition(
         description,
         name,
         interfaces,
+        directives,
+        fields,
+    })
+}
+
+fn parse_input_object_type_definition(
+    tokens: &mut PeekableLexer,
+    description: Option<WithSpan<DescriptionValue>>,
+    text_source: TextSource,
+) -> ParseResult<GraphQLInputObjectTypeDefinition> {
+    let name = tokens
+        .parse_string_key_type(TokenKind::Identifier)
+        .map(|with_span| with_span_to_with_location(with_span, text_source))
+        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+
+    let directives = parse_constant_directives(tokens)?;
+    let fields = parse_optional_argument_definitions(
+        tokens,
+        text_source,
+        TokenKind::OpenBrace,
+        TokenKind::CloseBrace,
+    )?;
+
+    Ok(GraphQLInputObjectTypeDefinition {
+        description,
+        name,
         directives,
         fields,
     })
@@ -403,7 +432,12 @@ fn parse_field<'a>(
                 .map(|with_span| with_span_to_with_location(with_span, text_source))
                 .map_err(|with_span| with_span.map(SchemaParseError::from))?;
 
-            let arguments = parse_optional_argument_definitions(tokens, text_source)?;
+            let arguments = parse_optional_argument_definitions(
+                tokens,
+                text_source,
+                TokenKind::OpenParen,
+                TokenKind::CloseParen,
+            )?;
 
             tokens
                 .parse_token_of_kind(TokenKind::Colon)
@@ -483,14 +517,16 @@ fn parse_type_annotation<T: From<StringKey>>(
 fn parse_optional_argument_definitions<'a>(
     tokens: &mut PeekableLexer<'a>,
     text_source: TextSource,
+    open_token: TokenKind,
+    close_token: TokenKind,
 ) -> ParseResult<Vec<WithSpan<GraphQLInputValueDefinition>>> {
-    let paren = tokens.parse_token_of_kind(TokenKind::OpenParen);
+    let paren = tokens.parse_token_of_kind(open_token);
 
     if paren.is_ok() {
         let argument = parse_argument_definition(tokens, text_source)?;
         let mut arguments = vec![argument];
 
-        while tokens.parse_token_of_kind(TokenKind::CloseParen).is_err() {
+        while tokens.parse_token_of_kind(close_token).is_err() {
             arguments.push(parse_argument_definition(tokens, text_source)?);
         }
         Ok(arguments)
