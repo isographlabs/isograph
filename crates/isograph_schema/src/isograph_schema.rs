@@ -406,6 +406,7 @@ pub struct IsographObjectTypeDefinition {
     /// empty, or not exist.
     pub directives: Vec<Directive<ConstantValue>>,
     // TODO the spans of these fields are wrong
+    // TODO use a shared field type
     pub fields: Vec<WithLocation<GraphQLOutputFieldDefinition>>,
 }
 
@@ -421,16 +422,21 @@ impl From<GraphQLInterfaceTypeDefinition> for IsographObjectTypeDefinition {
     }
 }
 
+// TODO this is bad. We should instead convert both GraphQL types to a common
+// Isograph type
 impl From<GraphQLInputObjectTypeDefinition> for IsographObjectTypeDefinition {
     fn from(value: GraphQLInputObjectTypeDefinition) -> Self {
-        todo!("impl From<GraphQLInputObjectTypeDefinition> for IsographObjectTypeDefinition")
-        // Self {
-        //     description: value.description,
-        //     name: value.name.map(|x| x.into()),
-        //     interfaces: vec![],
-        //     directives: value.directives,
-        //     fields: value.fields,
-        // }
+        Self {
+            description: value.description,
+            name: value.name.map(|x| x.into()),
+            interfaces: vec![],
+            directives: value.directives,
+            fields: value
+                .fields
+                .into_iter()
+                .map(|with_location| with_location.map(From::from))
+                .collect(),
+        }
     }
 }
 

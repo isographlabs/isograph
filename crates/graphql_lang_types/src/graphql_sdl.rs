@@ -7,6 +7,7 @@ use common_lang_types::{
     DescriptionValue, InputTypeName, InputValueName, InterfaceTypeName, ObjectTypeName,
     ScalarTypeName, SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
+use intern::{string_key::Intern, Lookup};
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum GraphQLTypeSystemDefinition {
@@ -88,6 +89,20 @@ pub struct GraphQLInputObjectTypeDefinition {
     pub name: WithLocation<InterfaceTypeName>,
     pub directives: Vec<Directive<ConstantValue>>,
     pub fields: Vec<WithLocation<GraphQLInputValueDefinition>>,
+}
+
+impl From<GraphQLInputValueDefinition> for GraphQLOutputFieldDefinition {
+    fn from(value: GraphQLInputValueDefinition) -> Self {
+        Self {
+            description: value.description,
+            // TODO make this zero cost?
+            name: value.name.map(|x| x.lookup().intern().into()),
+            type_: value.type_.map(|x| x.lookup().intern().into()),
+            // Input object fields do not take arguments
+            arguments: vec![],
+            directives: value.directives,
+        }
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
