@@ -333,7 +333,6 @@ impl UnvalidatedSchema {
                         object_id: _,
                     } = magic_mutation_field_info;
 
-                    // TODO don't skip id, skip using field_map
                     let mutation_field_args_without_id = skip_arguments_contained_in_field_map(
                         &mutation_field.arguments,
                         field_map_items,
