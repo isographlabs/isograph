@@ -315,7 +315,7 @@ impl UnvalidatedSchema {
     fn add_mutation_fields(
         &mut self,
         mutation_id: ObjectId,
-        mutation_field_infos: Vec<MagicMutationFieldInfo>,
+        mut mutation_field_infos: Vec<MagicMutationFieldInfo>,
     ) -> ProcessTypeDefinitionResult<()> {
         // TODO don't clone if possible
         let mutation_object_fields = self.schema_data.object(mutation_id).server_fields.clone();
@@ -330,22 +330,24 @@ impl UnvalidatedSchema {
                 .defined_types
                 .get(mutation_field_payload_type_name);
             if let Some(DefinedTypeId::Object(mutation_field_object_id)) = payload_id {
-                // TODO use a hash map instead of a linear search through a vec here
-                if let Some(magic_mutation_field_info) = mutation_field_infos
+                if let Some(magic_mutation_field) = mutation_field_infos
                     .iter()
-                    .find(|item| item.object_id == *mutation_field_object_id)
+                    .position(|x| x.object_id == *mutation_field_object_id)
+                    .map(|index_of_matching_item| {
+                        mutation_field_infos.swap_remove(index_of_matching_item)
+                    })
                 {
-                    // We found a matching mutation field info
                     let MagicMutationFieldInfo {
                         path,
                         field_map_items,
                         object_id: _,
-                    } = magic_mutation_field_info;
+                    } = magic_mutation_field;
 
-                    let mutation_field_args_without_id = skip_arguments_contained_in_field_map(
-                        &mutation_field.arguments,
-                        field_map_items,
-                    )?;
+                    let (mutation_field_args_without_id, processed_field_map_items) =
+                        skip_arguments_contained_in_field_map(
+                            &mutation_field.arguments,
+                            field_map_items,
+                        )?;
 
                     // TODO this is dangerous! mutation_field.name is also formattable (with carats).
                     // We should find a way to make WithLocation not impl Display, while also making
@@ -381,7 +383,7 @@ impl UnvalidatedSchema {
                             if let Some(DefinedTypeId::Object(primary_object_type)) = primary_type {
                                 let next_resolver_id = self.resolvers.len().into();
 
-                                let fields = field_map_items
+                                let fields = processed_field_map_items
                                     .iter()
                                     .map(|field_map_item| {
                                         let scalar_field_selection = ScalarFieldSelection {
@@ -556,7 +558,8 @@ fn validate_magic_mutation_directive(
     })
 }
 
-struct FieldMapItem {
+#[derive(Clone, Copy, Debug)]
+pub struct FieldMapItem {
     from: StringLiteralValue,
     to: StringLiteralValue,
 }
@@ -675,24 +678,24 @@ pub fn convert_and_extract_mutation_field_info(
 
 fn skip_arguments_contained_in_field_map(
     arguments: &[WithLocation<GraphQLInputValueDefinition>],
-    field_map_items: &[FieldMapItem],
-) -> ProcessTypeDefinitionResult<Vec<WithLocation<GraphQLInputValueDefinition>>> {
-    let mut found_count = 0;
-
+    mut field_map_items: Vec<FieldMapItem>,
+) -> ProcessTypeDefinitionResult<(
+    Vec<WithLocation<GraphQLInputValueDefinition>>,
+    Vec<FieldMapItem>,
+)> {
+    let mut processed_field_map_items = vec![];
     let new_arguments = arguments
         .iter()
         .filter_map(|arg| {
             // TODO also confirm stuff like that the type is ID!
             let arg_name = arg.item.name.item.lookup();
-            if field_map_items
+
+            if let Some(processed_field_map_item) = field_map_items
                 .iter()
-                .find(|field_map_item| {
-                    // TODO split on .
-                    field_map_item.to.lookup() == arg_name
-                })
-                .is_some()
+                .position(|field_map_item| field_map_item.to.lookup() == arg_name)
+                .map(|index| field_map_items.swap_remove(index))
             {
-                found_count += 1;
+                processed_field_map_items.push(processed_field_map_item);
                 None
             } else {
                 Some(arg.clone())
@@ -700,11 +703,13 @@ fn skip_arguments_contained_in_field_map(
         })
         .collect();
 
-    if found_count == field_map_items.len() {
-        Ok(new_arguments)
+    if field_map_items.is_empty() {
+        Ok((new_arguments, processed_field_map_items))
     } else {
         Err(WithLocation::new(
-            ProcessTypeDefinitionError::NotAllToFieldsUsed,
+            ProcessTypeDefinitionError::NotAllToFieldsUsed {
+                unused_field_map_items: field_map_items,
+            },
             Location::generated(),
         ))
     }
@@ -987,6 +992,11 @@ pub enum ProcessTypeDefinitionError {
     InvalidMutationField,
 
     // TODO include which fields were unused
-    #[error("Not all fields specified as 'to' fields in the field_map were found on the mutation field.")]
-    NotAllToFieldsUsed,
+    #[error("Not all fields specified as 'to' fields in the @primary directive field_map were found \
+        on the mutation field. Unused fields: {}",
+        unused_field_map_items.iter().map(|x| format!("{}", x.to)).collect::<Vec<_>>().join(", ")
+    )]
+    NotAllToFieldsUsed {
+        unused_field_map_items: Vec<FieldMapItem>,
+    },
 }
