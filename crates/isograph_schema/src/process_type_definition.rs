@@ -683,7 +683,7 @@ fn skip_arguments_contained_in_field_map(
     Vec<WithLocation<GraphQLInputValueDefinition>>,
     Vec<FieldMapItem>,
 )> {
-    let mut processed_field_map_items = vec![];
+    let mut processed_field_map_items = Vec::with_capacity(field_map_items.len());
     let new_arguments = arguments
         .iter()
         .filter_map(|arg| {
