@@ -250,6 +250,7 @@ pub fn create_merged_selection_set(
                             .variable_definitions
                             .iter()
                             .find(|definition| definition.item.name.item == *variable_name)
+                            // TODO make this an error, don't panic
                             .expect(&format!(
                                 "Did not find matching variable definition. \
                             This might not be validated yet. For now, each resolver \
