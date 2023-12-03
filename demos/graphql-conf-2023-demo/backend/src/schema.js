@@ -110,8 +110,20 @@ export const schema = createSchema({
           id: params.id,
         };
       },
+      set_pet_tagline: (_obj, params) => {
+        const modifiedPet = pets[params.id];
+        modifiedPet.tagline = params.tagline;
+        return {
+          id: params.id,
+        };
+      },
     },
     SetBestFriendResponse: {
+      pet: (object) => {
+        return getPet(object.id);
+      },
+    },
+    SetPetTaglineResponse: {
       pet: (object) => {
         return getPet(object.id);
       },
