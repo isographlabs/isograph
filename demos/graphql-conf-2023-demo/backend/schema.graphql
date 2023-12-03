@@ -8,8 +8,8 @@ type Mutation {
   set_pet_tagline(input: SetPetTaglineParams!): SetPetTaglineResponse!
 }
 
-type SetBestFriendResponse
-  @primary(path: "pet", field_map: [{ from: "id", to: "id" }]) {
+type SetBestFriendResponse {
+  # @primary(path: "pet", field_map: [{ from: "id", to: "id" }]) {
   # The pet whose best friend was set
   pet: Pet!
 }
@@ -19,8 +19,8 @@ input SetPetTaglineParams {
   tagline: String!
 }
 
-type SetPetTaglineResponse
-  @primary(path: "pet", field_map: [{ from: "id", to: "input.id" }]) {
+type SetPetTaglineResponse {
+  # @primary(path: "pet", field_map: [{ from: "id", to: "input.id" }]) {
   pet: Pet!
 }
 

@@ -10,7 +10,7 @@ export const best_friend_selector = iso<
   ReturnType<typeof BestFriendSelector>
 >`
   Pet.best_friend_selector @component {
-    __set_pet_best_friend,
+    # __set_pet_best_friend,
     potential_new_best_friends {
       id,
       name,
