@@ -558,10 +558,13 @@ fn validate_magic_mutation_directive(
     })
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct FieldMapItem {
     from: StringLiteralValue,
+    /// Everything that is before the first . in the to field
     to_argument_name: StringLiteralValue,
+    /// Everything after the first ., split on .
+    to_field_names: Vec<StringLiteralValue>,
 }
 
 fn parse_field_map_val(
@@ -631,10 +634,19 @@ fn parse_field_map_val(
                     Location::new(text_source, argument_value.span),
                 )),
             }?;
+            let mut split = to_arg.lookup().split('.');
+            let to_argument_name = split.next().expect(
+                "Expected at least one item returned \
+                by split. This is indicative of a bug in Isograph.",
+            );
 
             Ok(FieldMapItem {
                 from: from_arg,
-                to_argument_name: to_arg,
+                to_argument_name: to_argument_name.intern().into(),
+                to_field_names: split
+                    .into_iter()
+                    .map(|split_item| split_item.intern().into())
+                    .collect(),
             })
         })
         .collect::<Result<Vec<_>, _>>()
@@ -994,9 +1006,12 @@ pub enum ProcessTypeDefinitionError {
     // TODO include which fields were unused
     #[error("Not all fields specified as 'to' fields in the @primary directive field_map were found \
         on the mutation field. Unused fields: {}",
-        unused_field_map_items.iter().map(|x| format!("{}", x.to_argument_name)).collect::<Vec<_>>().join(", ")
+        unused_field_map_items.iter().map(|x| format!("'{}'", x.to_argument_name)).collect::<Vec<_>>().join(", ")
     )]
     NotAllToFieldsUsed {
         unused_field_map_items: Vec<FieldMapItem>,
     },
+
+    #[error("In a @primary directive's field_map, the to field cannot be just a dot.")]
+    FieldMapToCannotJustBeADot,
 }
