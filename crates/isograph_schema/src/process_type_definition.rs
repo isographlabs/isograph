@@ -1,9 +1,9 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    DirectiveArgumentName, DirectiveName, InputValueName, IsographObjectTypeName, Location,
-    ScalarTypeName, SelectableFieldName, Span, StringLiteralValue, TextSource, UnvalidatedTypeName,
-    ValueKeyName, WithLocation, WithSpan,
+    DescriptionValue, DirectiveArgumentName, DirectiveName, InputValueName, IsographObjectTypeName,
+    Location, ScalarTypeName, SelectableFieldName, Span, StringLiteralValue, TextSource,
+    UnvalidatedTypeName, ValueKeyName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, Directive, GraphQLInputValueDefinition, GraphQLObjectTypeDefinition,
@@ -727,21 +727,93 @@ struct ProcessedFieldMapItem {
     to_field_names: Vec<StringLiteralValue>,
 }
 
+#[derive(Debug)]
 struct ModifiedArgument {
+    description: Option<WithSpan<DescriptionValue>>,
     name: WithLocation<InputValueName>,
+    object: TypeAnnotation<ModifiedObject>,
+    default_value: Option<WithSpan<ConstantValue>>,
+    directives: Vec<Directive<ConstantValue>>,
 }
 
+/// An object which has fields that are unmodified, deleted,
+/// or modified (indicating that a new object should be created
+/// for them to point to.) Scalar fields cannot be modified,
+/// only deleted.
+#[derive(Debug)]
+struct ModifiedObject {
+    object_id: ObjectId,
+    fields: Vec<PotentiallyModifiedField>,
+}
+
+#[derive(Debug)]
+enum PotentiallyModifiedField {
+    Unmodified(ServerFieldId),
+    Modified(ModifiedField),
+}
+
+#[derive(Debug)]
+struct ModifiedField {}
+
 impl ModifiedArgument {
-    pub fn from_unmodified(unmodified: &GraphQLInputValueDefinition) -> Self {
+    /// N.B. this kinda-sorta creates a ModifiedArgument in an invalid state,
+    /// in that if we didn't immediately call remove_to_field, we would have
+    /// a modified argument with a modified object containing no modified fields.
+    ///
+    /// Thus, we would unnecessarily create a new object that is identical to
+    /// an existing object.
+    pub fn from_unmodified(
+        unmodified: &GraphQLInputValueDefinition,
+        schema: &UnvalidatedSchema,
+    ) -> Self {
+        // TODO I think we have validated that the item exists already.
+        // But we should double check that, and return an error if necessary
+        let object = unmodified.type_.clone().map(|x| {
+            let defined_type_id = *schema.schema_data.defined_types.get(&x.into()).expect(
+                "Expected type to be defined by now. This is indicative of a bug in Isograph.",
+            );
+            match defined_type_id {
+                DefinedTypeId::Object(object_id) => {
+                    let object = schema.schema_data.object(object_id);
+
+                    ModifiedObject {
+                        object_id,
+                        fields: object
+                            .server_fields
+                            .iter()
+                            .map(|x| PotentiallyModifiedField::Unmodified(*x))
+                            .collect(),
+                    }
+                }
+                DefinedTypeId::Scalar(_scalar_id) => {
+                    // TODO don't be lazy, return an error
+                    panic!("Cannot modify a scalar")
+                }
+            }
+        });
+
+        // TODO We can probably avoid cloning here
         Self {
             name: unmodified.name,
+            description: unmodified.description,
+            default_value: unmodified.default_value.clone(),
+            directives: unmodified.directives.clone(),
+            object,
         }
     }
 
-    pub fn remove_field_map_item(
+    pub fn remove_to_field(
         &mut self,
-        field_map_item: FieldMapItem,
+        to_field_names: &[WithSpan<StringLiteralValue>],
     ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem> {
+        // TODO:
+        // iterate to_field_names, and get to the last one. Replace
+        // the field with a modified object (which may contain other objects).
+        // Proceed back to the root, replacing unmodified objects with
+        // modified objects.
+        // If an object contains no fields (except __typename), remove that field
+        // from the parent.
+        eprintln!("self {:#?}", self);
         todo!()
     }
 }
@@ -774,6 +846,7 @@ impl ArgumentMap {
         mutation_object_name: IsographObjectTypeName,
         mutation_field_name: SelectableFieldName,
         text_source: TextSource,
+        schema: &mut UnvalidatedSchema,
     ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem> {
         let (index_of_argument, argument) = self
             .arguments
@@ -800,23 +873,47 @@ impl ArgumentMap {
                 )
             })?;
 
-        // TODO avoid matching twice
+        // TODO avoid matching twice?
         let location = argument.location;
+
+        let to_field_names = &field_map_item.to_field_names;
+        let to_argument_name = &field_map_item.to_argument_name;
+
         let processed_field_map_item = match &mut argument.item {
             PotentiallyModifiedArgument::Unmodified(unmodified_argument) => {
-                let mut arg = ModifiedArgument::from_unmodified(unmodified_argument);
+                if to_field_names.is_empty() {
+                    // TODO ensure it is a scalar
 
-                let processed_field_map_item = arg.remove_field_map_item(field_map_item)?;
+                    self.arguments.swap_remove(index_of_argument);
+                    let processed_field_map_item: ProcessedFieldMapItem = todo!();
+                    processed_field_map_item
+                } else {
+                    let mut arg = ModifiedArgument::from_unmodified(unmodified_argument, schema);
 
-                let item = self
-                    .arguments
-                    .get_mut(index_of_argument)
-                    .expect("Expected argument to exist");
-                *item = WithLocation::new(PotentiallyModifiedArgument::Modified(arg), location);
-                processed_field_map_item
+                    let processed_field_map_item =
+                        arg.remove_to_field(&field_map_item.to_field_names)?;
+
+                    *argument =
+                        WithLocation::new(PotentiallyModifiedArgument::Modified(arg), location);
+                    processed_field_map_item
+                }
             }
             PotentiallyModifiedArgument::Modified(modified) => {
-                modified.remove_field_map_item(field_map_item)?
+                let to_field_names = &field_map_item.to_field_names;
+                if to_field_names.is_empty() {
+                    // TODO encode this in the type system.
+                    // A modified argument will always have an object type, and cannot be remapped
+                    // at the object level.
+                    return Err(WithLocation::new(
+                        ProcessTypeDefinitionError::PrimaryDirectiveCannotRemapObject {
+                            primary_type_name,
+                            field_name: to_argument_name.item.to_string(),
+                        },
+                        Location::new(text_source, field_map_item.to_argument_name.span),
+                    ));
+                } else {
+                    modified.remove_to_field(&field_map_item.to_field_names)?
+                }
             }
         };
 
@@ -857,6 +954,7 @@ fn skip_arguments_contained_in_field_map(
             mutation_object_name,
             mutation_field_name,
             text_source,
+            schema,
         )?);
     }
 
@@ -1156,12 +1254,21 @@ pub enum ProcessTypeDefinitionError {
 
     #[error(
         "Error when processing @primary directive on type `{primary_type_name}`. \
-    The field `{mutation_object_name}.{mutation_field_name}` does not have argument `{field_name}`."
+        The field `{mutation_object_name}.{mutation_field_name}` does not have argument `{field_name}`."
     )]
     PrimaryDirectiveArgumentDoesNotExistOnField {
         primary_type_name: IsographObjectTypeName,
         mutation_object_name: IsographObjectTypeName,
         mutation_field_name: SelectableFieldName,
+        field_name: String,
+    },
+
+    #[error(
+        "Error when processing @primary directive on type `{primary_type_name}`. \
+        The field `{field_name}` is an object, and cannot be remapped. Remap scalars only."
+    )]
+    PrimaryDirectiveCannotRemapObject {
+        primary_type_name: IsographObjectTypeName,
         field_name: String,
     },
 }
