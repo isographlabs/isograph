@@ -151,7 +151,7 @@ impl UnvalidatedSchema {
         }
 
         if let Some(mutation_id) = mutation_type_id {
-            self.add_mutation_fields(mutation_id, mutation_field_infos)?;
+            self.add_mutation_fields(mutation_id, mutation_field_infos, text_source)?;
         }
 
         Ok(())
@@ -316,9 +316,12 @@ impl UnvalidatedSchema {
         &mut self,
         mutation_id: ObjectId,
         mut mutation_field_infos: Vec<MagicMutationFieldInfo>,
+        text_source: TextSource,
     ) -> ProcessTypeDefinitionResult<()> {
         // TODO don't clone if possible
-        let mutation_object_fields = self.schema_data.object(mutation_id).server_fields.clone();
+        let mutation_object = self.schema_data.object(mutation_id);
+        let mutation_object_fields = mutation_object.server_fields.clone();
+        let mutation_object_name = mutation_object.name;
 
         for field_id in mutation_object_fields.iter() {
             let mutation_field = self.field(*field_id);
@@ -345,8 +348,13 @@ impl UnvalidatedSchema {
 
                     let (mutation_field_args_without_id, processed_field_map_items) =
                         skip_arguments_contained_in_field_map(
-                            &mutation_field.arguments,
+                            mutation_field.arguments.clone(),
+                            mutation_object_name,
+                            mutation_field.name.item,
+                            // TODO make this a no-op
+                            mutation_field_payload_type_name.lookup().intern().into(),
                             field_map_items,
+                            text_source,
                         )?;
 
                     // TODO this is dangerous! mutation_field.name is also formattable (with carats).
@@ -560,11 +568,12 @@ fn validate_magic_mutation_directive(
 
 #[derive(Clone, Debug)]
 pub struct FieldMapItem {
+    // TODO eventually, we want to support . syntax here, too
     from: StringLiteralValue,
     /// Everything that is before the first . in the to field
-    to_argument_name: StringLiteralValue,
+    to_argument_name: WithSpan<StringLiteralValue>,
     /// Everything after the first ., split on .
-    to_field_names: Vec<StringLiteralValue>,
+    to_field_names: Vec<WithSpan<StringLiteralValue>>,
 }
 
 fn parse_field_map_val(
@@ -627,6 +636,8 @@ fn parse_field_map_val(
                     )
                 })?;
 
+            // This is weirdly low-level!
+            let span = to.value.span;
             let to_arg = match to.value.item {
                 ConstantValue::String(s) => Ok(s),
                 _ => Err(WithLocation::new(
@@ -639,13 +650,30 @@ fn parse_field_map_val(
                 "Expected at least one item returned \
                 by split. This is indicative of a bug in Isograph.",
             );
+            let account_for_quote = 1;
+            let mut offset: u32 = to_argument_name.len() as u32 + account_for_quote;
+            let to_argument_name = WithSpan::new(
+                to_argument_name.intern().into(),
+                Span::new(
+                    span.start + account_for_quote,
+                    span.start + account_for_quote + to_argument_name.len() as u32,
+                ),
+            );
 
             Ok(FieldMapItem {
                 from: from_arg,
-                to_argument_name: to_argument_name.intern().into(),
+                to_argument_name,
                 to_field_names: split
                     .into_iter()
-                    .map(|split_item| split_item.intern().into())
+                    .map(|split_item| {
+                        let len = split_item.len() as u32;
+                        let old_offset = offset;
+                        offset = old_offset + len + 1;
+                        WithSpan::new(
+                            split_item.intern().into(),
+                            Span::new(span.start + old_offset, span.start + old_offset + len),
+                        )
+                    })
                     .collect(),
             })
         })
@@ -688,46 +716,92 @@ pub fn convert_and_extract_mutation_field_info(
     ))
 }
 
+struct ProcessedFieldMapItem {
+    from: StringLiteralValue,
+    /// Everything that is before the first . in the to field
+    to_argument_name: StringLiteralValue,
+    /// Everything after the first ., split on .
+    to_field_names: Vec<StringLiteralValue>,
+}
+
 fn skip_arguments_contained_in_field_map(
-    arguments: &[WithLocation<GraphQLInputValueDefinition>],
-    mut field_map_items: Vec<FieldMapItem>,
+    mut arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+    mutation_object_name: IsographObjectTypeName,
+    mutation_field_name: SelectableFieldName,
+    primary_type_name: IsographObjectTypeName,
+    field_map_items: Vec<FieldMapItem>,
+    text_source: TextSource,
 ) -> ProcessTypeDefinitionResult<(
     Vec<WithLocation<GraphQLInputValueDefinition>>,
-    Vec<FieldMapItem>,
+    Vec<ProcessedFieldMapItem>,
 )> {
     let mut processed_field_map_items = Vec::with_capacity(field_map_items.len());
     // TODO
     // We need to create entirely new arguments, which are the existing arguments minus
     // any paths that are in the field map.
-    let new_arguments = arguments
-        .iter()
-        .filter_map(|arg| {
-            // TODO also confirm stuff like that the type is ID!
-            let arg_name = arg.item.name.item.lookup();
 
-            if let Some(processed_field_map_item) = field_map_items
-                .iter()
-                .position(|field_map_item| field_map_item.to_argument_name.lookup() == arg_name)
-                .map(|index| field_map_items.swap_remove(index))
-            {
-                processed_field_map_items.push(processed_field_map_item);
-                None
-            } else {
-                Some(arg.clone())
-            }
-        })
-        .collect();
-
-    if field_map_items.is_empty() {
-        Ok((new_arguments, processed_field_map_items))
-    } else {
-        Err(WithLocation::new(
-            ProcessTypeDefinitionError::NotAllToFieldsUsed {
-                unused_field_map_items: field_map_items,
-            },
-            Location::generated(),
-        ))
+    for field_map_item in field_map_items {
+        let processed_field_map_item = remove_field_map_item(
+            &mut arguments,
+            mutation_object_name,
+            mutation_field_name,
+            primary_type_name,
+            field_map_item,
+            text_source,
+        )?;
+        processed_field_map_items.push(processed_field_map_item);
     }
+
+    // let new_arguments = arguments
+    //     .iter()
+    //     .filter_map(|arg| {
+    //         // TODO also confirm stuff like that the type is ID!
+    //         let arg_name = arg.item.name.item.lookup();
+
+    //         if let Some(processed_field_map_item) = field_map_items
+    //             .iter()
+    //             .position(|field_map_item| field_map_item.to_argument_name.lookup() == arg_name)
+    //             .map(|index| field_map_items.swap_remove(index))
+    //         {
+    //             processed_field_map_items.push(processed_field_map_item);
+    //             None
+    //         } else {
+    //             Some(arg.clone())
+    //         }
+    //     })
+    //     .collect();
+
+    Ok((arguments, processed_field_map_items))
+}
+
+fn remove_field_map_item(
+    arguments: &mut Vec<WithLocation<GraphQLInputValueDefinition>>,
+    mutation_object_name: IsographObjectTypeName,
+    mutation_field_name: SelectableFieldName,
+    // e.g. SetPetTaglingResponse
+    primary_type_name: IsographObjectTypeName,
+    field_map_item: FieldMapItem,
+    text_source: TextSource,
+) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem> {
+    let (index_of_argument, argument) = arguments
+        .iter_mut()
+        .enumerate()
+        .find(|(_, argument)| {
+            argument.item.name.item.lookup() == field_map_item.to_argument_name.item.lookup()
+        })
+        .ok_or_else(|| {
+            WithLocation::new(
+                ProcessTypeDefinitionError::PrimaryDirectiveFieldNameDoesNotExistOnType {
+                    primary_type_name,
+                    field_name: field_map_item.to_argument_name.item.lookup().to_string(),
+                    mutation_field_name,
+                    mutation_object_name,
+                },
+                Location::new(text_source, field_map_item.to_argument_name.span),
+            )
+        })?;
+
+    todo!();
 }
 
 /// Returns the resolvers for a schema object that we know up-front (before processing
@@ -1017,4 +1091,15 @@ pub enum ProcessTypeDefinitionError {
 
     #[error("In a @primary directive's field_map, the to field cannot be just a dot.")]
     FieldMapToCannotJustBeADot,
+
+    #[error(
+        "Error when processing @primary directive on type `{primary_type_name}`. \
+    The field `{mutation_object_name}.{mutation_field_name}` does not have parameter `{field_name}`."
+    )]
+    PrimaryDirectiveFieldNameDoesNotExistOnType {
+        primary_type_name: IsographObjectTypeName,
+        field_name: String,
+        mutation_field_name: SelectableFieldName,
+        mutation_object_name: IsographObjectTypeName,
+    },
 }
