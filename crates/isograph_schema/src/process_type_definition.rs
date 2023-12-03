@@ -1,9 +1,9 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    DirectiveArgumentName, DirectiveName, IsographObjectTypeName, Location, ScalarTypeName,
-    SelectableFieldName, Span, StringLiteralValue, TextSource, UnvalidatedTypeName, ValueKeyName,
-    WithLocation, WithSpan,
+    DirectiveArgumentName, DirectiveName, InputValueName, IsographObjectTypeName, Location,
+    ScalarTypeName, SelectableFieldName, Span, StringLiteralValue, TextSource, UnvalidatedTypeName,
+    ValueKeyName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, Directive, GraphQLInputValueDefinition, GraphQLObjectTypeDefinition,
@@ -326,16 +326,20 @@ impl UnvalidatedSchema {
         for field_id in mutation_object_fields.iter() {
             let mutation_field = self.field(*field_id);
 
-            let mutation_field_payload_type_name = mutation_field.associated_data.inner();
+            let mutation_field_payload_type_name = *mutation_field.associated_data.inner();
+            let mutation_field_name = mutation_field.name.item;
+            let mutation_field_arguments = mutation_field.arguments.clone();
+            let description = mutation_field.description.clone();
 
             let payload_id = self
                 .schema_data
                 .defined_types
-                .get(mutation_field_payload_type_name);
+                .get(&mutation_field_payload_type_name)
+                .map(|x| *x);
             if let Some(DefinedTypeId::Object(mutation_field_object_id)) = payload_id {
                 if let Some(magic_mutation_field) = mutation_field_infos
                     .iter()
-                    .position(|x| x.object_id == *mutation_field_object_id)
+                    .position(|x| x.object_id == mutation_field_object_id)
                     .map(|index_of_matching_item| {
                         mutation_field_infos.swap_remove(index_of_matching_item)
                     })
@@ -348,11 +352,12 @@ impl UnvalidatedSchema {
 
                     let (mutation_field_args_without_id, processed_field_map_items) =
                         skip_arguments_contained_in_field_map(
-                            mutation_field.arguments.clone(),
-                            mutation_object_name,
-                            mutation_field.name.item,
+                            self,
+                            mutation_field_arguments,
                             // TODO make this a no-op
                             mutation_field_payload_type_name.lookup().intern().into(),
+                            mutation_object_name,
+                            mutation_field_name,
                             field_map_items,
                             text_source,
                         )?;
@@ -362,12 +367,10 @@ impl UnvalidatedSchema {
                     // errors containing WithLocation<...> easy to work with.
                     // TODO "expose as" optional field
                     let magic_mutation_field_name =
-                        format!("__{}", mutation_field.name.item).intern().into();
-
-                    let description = mutation_field.description.clone();
+                        format!("__{}", mutation_field_name).intern().into();
 
                     // payload object is the object type of the mutation field, e.g. SetBestFriendResponse
-                    let payload_object = self.schema_data.object(*mutation_field_object_id);
+                    let payload_object = self.schema_data.object(mutation_field_object_id);
                     let payload_object_name = payload_object.name;
 
                     // TODO make this zero cost
@@ -724,11 +727,117 @@ struct ProcessedFieldMapItem {
     to_field_names: Vec<StringLiteralValue>,
 }
 
+struct ModifiedArgument {
+    name: WithLocation<InputValueName>,
+}
+
+impl ModifiedArgument {
+    pub fn from_unmodified(unmodified: &GraphQLInputValueDefinition) -> Self {
+        Self {
+            name: unmodified.name,
+        }
+    }
+
+    pub fn remove_field_map_item(
+        &mut self,
+        field_map_item: FieldMapItem,
+    ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem> {
+        todo!()
+    }
+}
+
+enum PotentiallyModifiedArgument {
+    Unmodified(GraphQLInputValueDefinition),
+    Modified(ModifiedArgument),
+}
+
+struct ArgumentMap {
+    arguments: Vec<WithLocation<PotentiallyModifiedArgument>>,
+}
+
+impl ArgumentMap {
+    fn new(arguments: Vec<WithLocation<GraphQLInputValueDefinition>>) -> Self {
+        Self {
+            arguments: arguments
+                .into_iter()
+                .map(|with_location| {
+                    with_location.map(|argument| PotentiallyModifiedArgument::Unmodified(argument))
+                })
+                .collect(),
+        }
+    }
+
+    fn remove_field_map_item(
+        &mut self,
+        field_map_item: FieldMapItem,
+        primary_type_name: IsographObjectTypeName,
+        mutation_object_name: IsographObjectTypeName,
+        mutation_field_name: SelectableFieldName,
+        text_source: TextSource,
+    ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem> {
+        let (index_of_argument, argument) = self
+            .arguments
+            .iter_mut()
+            .enumerate()
+            .find(|(_, argument)| {
+                let name = match &argument.item {
+                    PotentiallyModifiedArgument::Unmodified(argument) => argument.name.item,
+                    PotentiallyModifiedArgument::Modified(modified_argument) => {
+                        modified_argument.name.item
+                    }
+                };
+                name.lookup() == field_map_item.to_argument_name.item.lookup()
+            })
+            .ok_or_else(|| {
+                WithLocation::new(
+                    ProcessTypeDefinitionError::PrimaryDirectiveArgumentDoesNotExistOnField {
+                        primary_type_name,
+                        mutation_object_name,
+                        mutation_field_name,
+                        field_name: field_map_item.to_argument_name.item.lookup().to_string(),
+                    },
+                    Location::new(text_source, field_map_item.to_argument_name.span),
+                )
+            })?;
+
+        // TODO avoid matching twice
+        let location = argument.location;
+        let processed_field_map_item = match &mut argument.item {
+            PotentiallyModifiedArgument::Unmodified(unmodified_argument) => {
+                let mut arg = ModifiedArgument::from_unmodified(unmodified_argument);
+
+                let processed_field_map_item = arg.remove_field_map_item(field_map_item)?;
+
+                let item = self
+                    .arguments
+                    .get_mut(index_of_argument)
+                    .expect("Expected argument to exist");
+                *item = WithLocation::new(PotentiallyModifiedArgument::Modified(arg), location);
+                processed_field_map_item
+            }
+            PotentiallyModifiedArgument::Modified(modified) => {
+                modified.remove_field_map_item(field_map_item)?
+            }
+        };
+
+        Ok(processed_field_map_item)
+    }
+
+    fn into_arguments(
+        self,
+        schema: &mut UnvalidatedSchema,
+    ) -> Vec<WithLocation<GraphQLInputValueDefinition>> {
+        todo!()
+    }
+}
+
 fn skip_arguments_contained_in_field_map(
-    mut arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+    // TODO move this to impl Schema
+    schema: &mut UnvalidatedSchema,
+    arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+    primary_type_name: IsographObjectTypeName,
     mutation_object_name: IsographObjectTypeName,
     mutation_field_name: SelectableFieldName,
-    primary_type_name: IsographObjectTypeName,
     field_map_items: Vec<FieldMapItem>,
     text_source: TextSource,
 ) -> ProcessTypeDefinitionResult<(
@@ -739,69 +848,22 @@ fn skip_arguments_contained_in_field_map(
     // TODO
     // We need to create entirely new arguments, which are the existing arguments minus
     // any paths that are in the field map.
+    let mut argument_map = ArgumentMap::new(arguments);
 
     for field_map_item in field_map_items {
-        let processed_field_map_item = remove_field_map_item(
-            &mut arguments,
+        processed_field_map_items.push(argument_map.remove_field_map_item(
+            field_map_item,
+            primary_type_name,
             mutation_object_name,
             mutation_field_name,
-            primary_type_name,
-            field_map_item,
             text_source,
-        )?;
-        processed_field_map_items.push(processed_field_map_item);
+        )?);
     }
 
-    // let new_arguments = arguments
-    //     .iter()
-    //     .filter_map(|arg| {
-    //         // TODO also confirm stuff like that the type is ID!
-    //         let arg_name = arg.item.name.item.lookup();
-
-    //         if let Some(processed_field_map_item) = field_map_items
-    //             .iter()
-    //             .position(|field_map_item| field_map_item.to_argument_name.lookup() == arg_name)
-    //             .map(|index| field_map_items.swap_remove(index))
-    //         {
-    //             processed_field_map_items.push(processed_field_map_item);
-    //             None
-    //         } else {
-    //             Some(arg.clone())
-    //         }
-    //     })
-    //     .collect();
-
-    Ok((arguments, processed_field_map_items))
-}
-
-fn remove_field_map_item(
-    arguments: &mut Vec<WithLocation<GraphQLInputValueDefinition>>,
-    mutation_object_name: IsographObjectTypeName,
-    mutation_field_name: SelectableFieldName,
-    // e.g. SetPetTaglingResponse
-    primary_type_name: IsographObjectTypeName,
-    field_map_item: FieldMapItem,
-    text_source: TextSource,
-) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem> {
-    let (index_of_argument, argument) = arguments
-        .iter_mut()
-        .enumerate()
-        .find(|(_, argument)| {
-            argument.item.name.item.lookup() == field_map_item.to_argument_name.item.lookup()
-        })
-        .ok_or_else(|| {
-            WithLocation::new(
-                ProcessTypeDefinitionError::PrimaryDirectiveFieldNameDoesNotExistOnType {
-                    primary_type_name,
-                    field_name: field_map_item.to_argument_name.item.lookup().to_string(),
-                    mutation_field_name,
-                    mutation_object_name,
-                },
-                Location::new(text_source, field_map_item.to_argument_name.span),
-            )
-        })?;
-
-    todo!();
+    Ok((
+        argument_map.into_arguments(schema),
+        processed_field_map_items,
+    ))
 }
 
 /// Returns the resolvers for a schema object that we know up-front (before processing
@@ -1094,12 +1156,12 @@ pub enum ProcessTypeDefinitionError {
 
     #[error(
         "Error when processing @primary directive on type `{primary_type_name}`. \
-    The field `{mutation_object_name}.{mutation_field_name}` does not have parameter `{field_name}`."
+    The field `{mutation_object_name}.{mutation_field_name}` does not have argument `{field_name}`."
     )]
-    PrimaryDirectiveFieldNameDoesNotExistOnType {
+    PrimaryDirectiveArgumentDoesNotExistOnField {
         primary_type_name: IsographObjectTypeName,
-        field_name: String,
-        mutation_field_name: SelectableFieldName,
         mutation_object_name: IsographObjectTypeName,
+        mutation_field_name: SelectableFieldName,
+        field_name: String,
     },
 }
