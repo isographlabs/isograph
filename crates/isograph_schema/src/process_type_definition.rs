@@ -561,7 +561,7 @@ fn validate_magic_mutation_directive(
 #[derive(Clone, Copy, Debug)]
 pub struct FieldMapItem {
     from: StringLiteralValue,
-    to: StringLiteralValue,
+    to_argument_name: StringLiteralValue,
 }
 
 fn parse_field_map_val(
@@ -634,7 +634,7 @@ fn parse_field_map_val(
 
             Ok(FieldMapItem {
                 from: from_arg,
-                to: to_arg,
+                to_argument_name: to_arg,
             })
         })
         .collect::<Result<Vec<_>, _>>()
@@ -692,7 +692,7 @@ fn skip_arguments_contained_in_field_map(
 
             if let Some(processed_field_map_item) = field_map_items
                 .iter()
-                .position(|field_map_item| field_map_item.to.lookup() == arg_name)
+                .position(|field_map_item| field_map_item.to_argument_name.lookup() == arg_name)
                 .map(|index| field_map_items.swap_remove(index))
             {
                 processed_field_map_items.push(processed_field_map_item);
@@ -994,7 +994,7 @@ pub enum ProcessTypeDefinitionError {
     // TODO include which fields were unused
     #[error("Not all fields specified as 'to' fields in the @primary directive field_map were found \
         on the mutation field. Unused fields: {}",
-        unused_field_map_items.iter().map(|x| format!("{}", x.to)).collect::<Vec<_>>().join(", ")
+        unused_field_map_items.iter().map(|x| format!("{}", x.to_argument_name)).collect::<Vec<_>>().join(", ")
     )]
     NotAllToFieldsUsed {
         unused_field_map_items: Vec<FieldMapItem>,
