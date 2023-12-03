@@ -696,6 +696,9 @@ fn skip_arguments_contained_in_field_map(
     Vec<FieldMapItem>,
 )> {
     let mut processed_field_map_items = Vec::with_capacity(field_map_items.len());
+    // TODO
+    // We need to create entirely new arguments, which are the existing arguments minus
+    // any paths that are in the field map.
     let new_arguments = arguments
         .iter()
         .filter_map(|arg| {
