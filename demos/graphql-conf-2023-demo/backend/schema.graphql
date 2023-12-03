@@ -20,7 +20,7 @@ input SetPetTaglineParams {
 }
 
 type SetPetTaglineResponse
-  @primary(path: "pet", field_map: [{ from: "id", to: "input" }]) {
+  @primary(path: "pet", field_map: [{ from: "id", to: "input.id" }]) {
   pet: Pet!
 }
 
