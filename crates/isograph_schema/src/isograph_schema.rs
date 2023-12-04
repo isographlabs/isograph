@@ -453,6 +453,7 @@ pub struct SchemaObject<TEncounteredField> {
     pub server_fields: Vec<ServerFieldId>,
     pub resolvers: Vec<ResolverFieldId>,
     pub encountered_fields: HashMap<SelectableFieldName, TEncounteredField>,
+    /// This is an unused field right now, I think.
     pub valid_refinements: Vec<ValidRefinement>,
 }
 // TODO iterator of fields that includes id_field?
