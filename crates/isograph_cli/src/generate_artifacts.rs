@@ -339,7 +339,7 @@ fn generate_mutation_query_text<'schema>(
                             .as_input_type_id()
                             .expect(
                                 "Expected a valid input type. Objects \
-                        are not yet supported as parameters here.",
+                                are not yet supported as parameters here.",
                             )
                     }),
                 },

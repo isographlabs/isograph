@@ -1,9 +1,9 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    DescriptionValue, DirectiveArgumentName, DirectiveName, InputTypeName, InputValueName,
-    IsographObjectTypeName, Location, ScalarTypeName, SelectableFieldName, Span,
-    StringLiteralValue, TextSource, UnvalidatedTypeName, ValueKeyName, WithLocation, WithSpan,
+    DescriptionValue, DirectiveArgumentName, DirectiveName, InputValueName, IsographObjectTypeName,
+    Location, ScalarTypeName, SelectableFieldName, Span, StringLiteralValue, TextSource,
+    UnvalidatedTypeName, ValueKeyName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, Directive, GraphQLInputValueDefinition, GraphQLObjectTypeDefinition,
@@ -12,8 +12,8 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    DefinedTypeId, InputTypeId, ObjectId, ResolverFieldId, ScalarFieldSelection, Selection,
-    ServerFieldId, ServerFieldSelection, ServerIdFieldId,
+    DefinedTypeId, ObjectId, ResolverFieldId, ScalarFieldSelection, Selection, ServerFieldId,
+    ServerFieldSelection, ServerIdFieldId,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
@@ -821,6 +821,7 @@ enum PotentiallyModifiedField {
     Modified(ModifiedField),
 }
 
+#[allow(dead_code)]
 enum IsEmpty {
     IsEmpty,
     NotEmpty,
@@ -840,6 +841,7 @@ impl PotentiallyModifiedField {
 /// is modified is just removed.
 #[derive(Debug)]
 struct ModifiedField {
+    #[allow(dead_code)]
     modified_object: ModifiedObject,
 }
 
@@ -908,7 +910,7 @@ impl ModifiedArgument {
         let argument_object = self.object.inner_mut();
 
         let key = first.item.lookup().intern().into();
-        let x = match argument_object
+        let _ = match argument_object
             .field_map
             // TODO make this a no-op
             .get_mut(&key)
