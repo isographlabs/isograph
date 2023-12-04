@@ -6,7 +6,7 @@ use common_lang_types::{
 };
 use graphql_lang_types::{NamedTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
-    DefinedTypeId, InputTypeId, LinkedFieldSelection, ObjectId, OutputTypeId, ResolverFieldId,
+    DefinedTypeId, LinkedFieldSelection, ObjectId, OutputTypeId, ResolverFieldId,
     ScalarFieldSelection, ScalarId, Selection, ServerFieldId, VariableDefinition,
 };
 use thiserror::Error;
@@ -22,9 +22,9 @@ pub type ValidatedSchemaField = SchemaServerField<TypeAnnotation<OutputTypeId>>;
 
 pub type ValidatedSelection = Selection<ValidatedScalarDefinedField, ObjectId>;
 
-pub type ValidatedVariableDefinition = VariableDefinition<InputTypeId>;
+pub type ValidatedVariableDefinition = VariableDefinition<DefinedTypeId>;
 pub type ValidatedSchemaResolver =
-    SchemaResolver<ValidatedScalarDefinedField, ObjectId, InputTypeId>;
+    SchemaResolver<ValidatedScalarDefinedField, ObjectId, DefinedTypeId>;
 
 /// The validated defined field that shows up in the encountered field generic.
 pub type ValidatedEncounteredDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;
@@ -43,7 +43,7 @@ pub type ValidatedSchema = Schema<
     // The associated data type of linked fields in resolvers' selection sets and unwraps
     ObjectId,
     // The associated data type of resolvers' variable definitions
-    InputTypeId,
+    DefinedTypeId,
     // On objects, what does the HashMap of encountered types contain
     ValidatedEncounteredDefinedField,
     // fetchable resolvers:
@@ -353,15 +353,7 @@ fn validate_variable_definitions(
                     name: vd.name,
                     type_: vd.type_.and_then(|type_name| {
                         match schema_data.defined_types.get(&type_name) {
-                            Some(type_id) => type_id.as_input_type_id().ok_or_else(|| {
-                                WithLocation::new(
-                                    ValidateSchemaError::VariableDefinitionInnerTypeIsOutputType {
-                                        variable_name: vd.name.item,
-                                        type_: type_string,
-                                    },
-                                    vd.name.location,
-                                )
-                            }),
+                            Some(type_id) => Ok(*type_id),
                             None => Err(WithLocation::new(
                                 ValidateSchemaError::VariableDefinitionInnerTypeDoesNotExist {
                                     variable_name: vd.name.item,
@@ -734,15 +726,6 @@ pub enum ValidateSchemaError {
         parent_type_name: IsographObjectTypeName,
         field_name: SelectableFieldName,
         field_type: UnvalidatedTypeName,
-    },
-
-    #[error(
-        "The variable `{variable_name}` has type `{type_}`, which is an output type. \
-        It should be an input type."
-    )]
-    VariableDefinitionInnerTypeIsOutputType {
-        variable_name: VariableName,
-        type_: String,
     },
 
     #[error(

@@ -12,8 +12,8 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    DefinedTypeId, InputTypeId, LinkedFieldSelection, NonConstantValue, ObjectId, OutputTypeId,
-    ResolverFetch, ResolverFieldId, ScalarId, Selection, ServerFieldId, ServerIdFieldId, Unwrap,
+    DefinedTypeId, LinkedFieldSelection, NonConstantValue, ObjectId, OutputTypeId, ResolverFetch,
+    ResolverFieldId, ScalarId, Selection, ServerFieldId, ServerIdFieldId, Unwrap,
     VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -321,14 +321,6 @@ impl<TEncounteredField> SchemaData<TEncounteredField> {
         }
     }
 
-    pub fn lookup_input_type(&self, input_type_id: InputTypeId) -> SchemaInputType {
-        match input_type_id {
-            InputTypeId::Scalar(id) => {
-                SchemaInputType::Scalar(self.scalars.get(id.as_usize()).unwrap())
-            }
-        }
-    }
-
     /// Get a reference to a given object type by its id.
     pub fn object(&self, object_id: ObjectId) -> &SchemaObject<TEncounteredField> {
         &self.objects[object_id.as_usize()]
@@ -369,7 +361,17 @@ fn add_schema_defined_scalar_type(
 pub enum SchemaType<'a, TEncounteredField> {
     Object(&'a SchemaObject<TEncounteredField>),
     Scalar(&'a SchemaScalar),
-    // Includes input object
+}
+
+impl<'a, TEncounteredField> HasName for SchemaType<'a, TEncounteredField> {
+    type Name = UnvalidatedTypeName;
+
+    fn name(&self) -> Self::Name {
+        match self {
+            SchemaType::Object(object) => object.name.into(),
+            SchemaType::Scalar(scalar) => scalar.name.item.into(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]

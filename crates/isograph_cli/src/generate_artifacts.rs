@@ -16,7 +16,7 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    InputTypeId, NonConstantValue, ObjectId, OutputTypeId, Selection, SelectionFieldArgument,
+    DefinedTypeId, NonConstantValue, ObjectId, OutputTypeId, Selection, SelectionFieldArgument,
     ServerFieldSelection, VariableDefinition,
 };
 use isograph_schema::{
@@ -279,7 +279,7 @@ fn generate_refetchable_query_text<'schema>(
             name: WithLocation::new("id".intern().into(), Location::generated()),
             type_: TypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
                 NamedTypeAnnotation(WithSpan {
-                    item: InputTypeId::Scalar(schema.id_type_id),
+                    item: DefinedTypeId::Scalar(schema.id_type_id),
                     span: Span::todo_generated(),
                 }),
             ))),
@@ -315,7 +315,7 @@ fn generate_mutation_query_text<'schema>(
             name: id_variable_name,
             type_: TypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
                 NamedTypeAnnotation(WithSpan {
-                    item: InputTypeId::Scalar(schema.id_type_id),
+                    item: DefinedTypeId::Scalar(schema.id_type_id),
                     span: Span::todo_generated(),
                 }),
             ))),
@@ -326,21 +326,16 @@ fn generate_mutation_query_text<'schema>(
     let mutation_parameters: Vec<_> = mutation_field_arguments
         .iter()
         .map(|argument| {
-            let variable_name = argument.item.name.map(|x| x.into());
+            let variable_name = argument.item.name.map(|value_name| value_name.into());
             variable_definitions.push(WithSpan {
                 item: VariableDefinition {
                     name: variable_name,
-                    type_: argument.item.type_.clone().map(|x| {
-                        schema
+                    type_: argument.item.type_.clone().map(|type_name| {
+                        *schema
                             .schema_data
                             .defined_types
-                            .get(&x.into())
+                            .get(&type_name.into())
                             .expect("Expected type to be found, this indicates a bug in Isograph")
-                            .as_input_type_id()
-                            .expect(
-                                "Expected a valid input type. Objects \
-                                are not yet supported as parameters here.",
-                            )
                     }),
                 },
                 span: Span::todo_generated(),
@@ -349,7 +344,7 @@ fn generate_mutation_query_text<'schema>(
                 SelectionFieldArgument {
                     name: argument.item.name.map(|x| x.into()).hack_to_with_span(),
                     value: variable_name
-                        .map(|x| NonConstantValue::Variable(x))
+                        .map(|variable_name| NonConstantValue::Variable(variable_name))
                         .hack_to_with_span(),
                 },
                 Location::generated(),
@@ -660,8 +655,7 @@ fn write_variables_to_string<'a>(
         // TODO can we consume the variables here?
         let x: TypeAnnotation<UnvalidatedTypeName> =
             variable.item.type_.clone().map(|input_type_id| {
-                // schema.
-                let schema_input_type = schema.schema_data.lookup_input_type(input_type_id);
+                let schema_input_type = schema.schema_data.lookup_unvalidated_type(input_type_id);
                 schema_input_type.name().into()
             });
         // TODO this is dangerous, since variable.item.name is a WithLocation, which impl's Display.

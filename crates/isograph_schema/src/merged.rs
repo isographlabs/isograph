@@ -11,8 +11,8 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    InputTypeId, LinkedFieldSelection, ObjectId, ResolverFieldId, ScalarFieldSelection, Selection,
-    SelectionFieldArgument, ServerFieldSelection, VariableDefinition,
+    DefinedTypeId, LinkedFieldSelection, ObjectId, ResolverFieldId, ScalarFieldSelection,
+    Selection, SelectionFieldArgument, ServerFieldSelection, VariableDefinition,
 };
 
 use crate::{
@@ -158,7 +158,7 @@ pub struct RefetchFieldResolverInfo {
     /// Used to look up what type to narrow on in the generated refetch query,
     /// among other things.
     pub refetch_field_parent_id: ObjectId,
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<InputTypeId>>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<DefinedTypeId>>>,
     pub root_parent_object: IsographObjectTypeName,
     pub root_fetchable_field: SelectableFieldName,
     // TODO wrap in a newtype
@@ -171,7 +171,7 @@ pub struct MutationFieldResolverInfo {
     /// Used to look up what type to narrow on in the generated refetch query,
     /// among other things.
     pub refetch_field_parent_id: ObjectId,
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<InputTypeId>>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<DefinedTypeId>>>,
     pub root_parent_object: IsographObjectTypeName,
     pub root_fetchable_field: SelectableFieldName,
     // TODO wrap in a newtype
