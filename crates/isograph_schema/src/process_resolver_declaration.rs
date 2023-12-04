@@ -149,17 +149,19 @@ pub enum ProcessResolverDeclarationError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct MutationFieldResolverVariant {
+    pub mutation_name: SelectableFieldName,
+    pub mutation_primary_field_name: SelectableFieldName,
+    pub mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+    pub filtered_mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ResolverVariant {
     Component,
     Eager,
     RefetchField,
-    MutationField(
-        (
-            SelectableFieldName,
-            SelectableFieldName,
-            Vec<WithLocation<GraphQLInputValueDefinition>>,
-        ),
-    ),
+    MutationField(MutationFieldResolverVariant),
 }
 
 impl fmt::Display for ResolverVariant {

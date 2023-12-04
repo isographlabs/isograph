@@ -19,9 +19,9 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    DefinedField, IsographObjectTypeDefinition, ResolverActionKind, ResolverTypeAndField,
-    ResolverVariant, Schema, SchemaObject, SchemaResolver, SchemaScalar, SchemaServerField,
-    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
+    DefinedField, IsographObjectTypeDefinition, MutationFieldResolverVariant, ResolverActionKind,
+    ResolverTypeAndField, ResolverVariant, Schema, SchemaObject, SchemaResolver, SchemaScalar,
+    SchemaServerField, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
     UnvalidatedSchemaResolver, ValidRefinement, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
 };
 
@@ -430,11 +430,16 @@ impl UnvalidatedSchema {
                                     name: magic_mutation_field_name,
                                     id: next_resolver_id,
                                     selection_set_and_unwraps: Some((fields, vec![])),
-                                    variant: ResolverVariant::MutationField((
-                                        magic_mutation_field_name,
-                                        path_selectable_field_name,
-                                        mutation_field_args_without_id,
-                                    )),
+                                    variant: ResolverVariant::MutationField(
+                                        MutationFieldResolverVariant {
+                                            mutation_name: magic_mutation_field_name,
+                                            mutation_primary_field_name: path_selectable_field_name,
+                                            mutation_field_arguments:
+                                                mutation_field_args_without_id.clone(),
+                                            filtered_mutation_field_arguments:
+                                                mutation_field_args_without_id,
+                                        },
+                                    ),
                                     variable_definitions: vec![],
                                     type_and_field: ResolverTypeAndField {
                                         // TODO make this zero cost?

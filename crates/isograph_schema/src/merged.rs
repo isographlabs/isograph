@@ -16,9 +16,10 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ArgumentKeyAndValue, DefinedField, NameAndArguments, PathToRefetchField, ResolverVariant,
-    SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
-    ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
+    ArgumentKeyAndValue, DefinedField, MutationFieldResolverVariant, NameAndArguments,
+    PathToRefetchField, ResolverVariant, SchemaObject, ValidatedEncounteredDefinedField,
+    ValidatedScalarDefinedField, ValidatedSchema, ValidatedSchemaIdField, ValidatedSchemaObject,
+    ValidatedSchemaResolver, ValidatedSelection,
 };
 
 type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSelection>>;
@@ -278,11 +279,12 @@ pub fn create_merged_selection_set(
                             },
                         ));
                     }
-                    ResolverVariant::MutationField((
+                    ResolverVariant::MutationField(MutationFieldResolverVariant {
                         mutation_name,
                         mutation_primary_field_name,
                         mutation_field_arguments,
-                    )) => {
+                        filtered_mutation_field_arguments: _,
+                    }) => {
                         artifact_queue.push(ArtifactQueueItem::MutationField(
                             MutationFieldResolverInfo {
                                 merged_selection_set: nested_merged_selection_set,
@@ -510,17 +512,22 @@ fn merge_scalar_resolver_field(
             parent_type.id,
             ResolverVariant::RefetchField,
         ));
-    } else if let ResolverVariant::MutationField((_parent_field_name, primary_field_name, args)) =
-        &resolver_field.variant
+    } else if let ResolverVariant::MutationField(MutationFieldResolverVariant {
+        mutation_primary_field_name,
+        mutation_field_arguments,
+        filtered_mutation_field_arguments,
+        ..
+    }) = &resolver_field.variant
     {
         merge_traversal_state.paths_to_refetch_fields.push((
             merge_traversal_state.current_path.clone(),
             parent_type.id,
-            ResolverVariant::MutationField((
-                resolver_field.name,
-                *primary_field_name,
-                args.clone(),
-            )),
+            ResolverVariant::MutationField(MutationFieldResolverVariant {
+                mutation_name: resolver_field.name,
+                mutation_primary_field_name: *mutation_primary_field_name,
+                mutation_field_arguments: mutation_field_arguments.clone(),
+                filtered_mutation_field_arguments: filtered_mutation_field_arguments.clone(),
+            }),
         ));
     }
 }
