@@ -1,45 +1,49 @@
-import type {IsographFetchableResolver, FragmentReference, NormalizationAst, RefetchQueryArtifactWrapper} from '@isograph/react';
-import type {ReadFromStoreType, ResolverParameterType, ReadOutType} from './reader.isograph';
-import readerResolver from './reader.isograph';
-import refetchQuery0 from './__refetch__0.isograph';
-const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [{ artifact: refetchQuery0, allowedVariables: [] }, ];
-
-const queryText = 'query pet_detail_route ($id: ID!) {\
-  pet____id___id: pet(id: $id) {\
-    id,\
-    best_friend_relationship {\
-      best_friend {\
-        id,\
-        name,\
-        picture,\
-      },\
-      picture_together,\
-    },\
-    checkins {\
-      id,\
-      location,\
-      time,\
-    },\
-    favorite_phrase,\
-    name,\
-    potential_new_best_friends {\
+import type {IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst} from '@isograph/react';
+const queryText = 'mutation Pet__set_pet_best_friend ($id: ID!, $new_best_friend_id: ID!) {\
+set_pet_best_friend____new_best_friend_id___new_best_friend_id____id___id: set_pet_best_friend(new_best_friend_id: $new_best_friend_id, id: $id) {\
+pet { \
+  id,\
+  best_friend_relationship {\
+    best_friend {\
       id,\
       name,\
+      picture,\
     },\
+    picture_together,\
   },\
-}';
+  checkins {\
+    id,\
+    location,\
+    time,\
+  },\
+  favorite_phrase,\
+  name,\
+  potential_new_best_friends {\
+    id,\
+    name,\
+  },\
+}}}';
 
-const normalizationAst: NormalizationAst = [
-  {
-    kind: "Linked",
-    fieldName: "pet",
-    arguments: [
-      {
-        argumentName: "id",
-        variableName: "id",
-      },
-    ],
-    selections: [
+const normalizationAst: NormalizationAst = [{
+  kind: "Linked",
+  fieldName: "set_pet_best_friend",
+  arguments: [
+    {
+      argumentName: "new_best_friend_id",
+      variableName: "new_best_friend_id",
+    },
+
+    {
+      argumentName: "id",
+      variableName: "id",
+    },
+  ],
+  selections: [
+    {
+      kind: "Linked",
+      fieldName: "pet",
+      arguments: null,
+      selections: [
       {
         kind: "Scalar",
         fieldName: "id",
@@ -129,14 +133,13 @@ const normalizationAst: NormalizationAst = [
         ],
       },
     ],
-  },
-];
-const artifact: IsographFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
-  kind: "FetchableResolver",
+    },
+  ],
+}];
+const artifact: any = {
+  kind: "RefetchQuery",
   queryText,
   normalizationAst,
-  nestedRefetchQueries,
-  readerArtifact: readerResolver,
 };
 
 export default artifact;

@@ -39,7 +39,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
         alias: "pet_best_friend_card",
         arguments: null,
         readerArtifact: Pet__pet_best_friend_card,
-        usedRefetchQueries: [],
+        usedRefetchQueries: [0, ],
       },
       {
         kind: "Resolver",

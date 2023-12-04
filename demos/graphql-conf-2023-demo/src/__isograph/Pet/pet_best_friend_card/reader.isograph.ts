@@ -19,7 +19,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     alias: "best_friend_selector",
     arguments: null,
     readerArtifact: Pet__best_friend_selector,
-    usedRefetchQueries: [],
+    usedRefetchQueries: [0, ],
   },
   {
     kind: "Linked",
