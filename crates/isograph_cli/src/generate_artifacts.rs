@@ -21,12 +21,13 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_resolver,
-    ArtifactQueueItem, DefinedField, MergedLinkedFieldSelection, MergedScalarFieldSelection,
-    MergedSelectionSet, MergedServerFieldSelection, MutationFieldResolverInfo, NameAndArguments,
-    PathToRefetchField, RefetchFieldResolverInfo, ResolverActionKind, ResolverTypeAndField,
-    ResolverVariant, RootRefetchedPath, SchemaObject, ValidatedEncounteredDefinedField,
-    ValidatedScalarDefinedField, ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver,
-    ValidatedSelection, ValidatedVariableDefinition,
+    ArtifactQueueItem, DefinedField, FieldMapItem, MergedLinkedFieldSelection,
+    MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection,
+    MutationFieldResolverInfo, NameAndArguments, PathToRefetchField, RefetchFieldResolverInfo,
+    ResolverActionKind, ResolverTypeAndField, ResolverVariant, RootRefetchedPath, SchemaObject,
+    ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
+    ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
+    ValidatedVariableDefinition,
 };
 use thiserror::Error;
 
@@ -453,10 +454,10 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
             0,
         );
         let resolver_return_type =
-            generate_resolver_return_type_declaration(non_fetchable_resolver.action_kind);
+            generate_resolver_return_type_declaration(&non_fetchable_resolver.action_kind);
         let resolver_read_out_type = generate_read_out_type(non_fetchable_resolver);
         let resolver_import_statement = generate_resolver_import_statement(
-            non_fetchable_resolver.action_kind,
+            &non_fetchable_resolver.action_kind,
             project_root,
             artifact_directory,
         );
@@ -886,7 +887,7 @@ fn print_non_null_type_annotation<T: Display>(non_null: &NonNullTypeAnnotation<T
 }
 
 fn generate_resolver_import_statement(
-    resolver_action_kind: ResolverActionKind,
+    resolver_action_kind: &ResolverActionKind,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
 ) -> ResolverImportStatement {
@@ -910,26 +911,58 @@ fn generate_resolver_import_statement(
             makeNetworkRequest(artifact, variables);"
                 .to_string(),
         ),
-        ResolverActionKind::MutationField => {
+        ResolverActionKind::MutationField(ref m) => {
             let spaces = "  ";
-            let include_read_out_data = format!(
-                "const includeReadOutData = (variables, readOutData) => {{\n\
-                {spaces}variables.input = variables.input ?? {{}};\n\
-                {spaces}variables.input.id = readOutData.id;\n\
-                {spaces}return variables;\n\
-                }};\n"
-            );
-            ResolverImportStatement(
-                    format!("{include_read_out_data}\n\
-            import {{ makeNetworkRequest }} from '@isograph/react';\n\
-            const resolver = (artifact, readOutData, filteredVariables) => (mutationParams) => {{\n\
-            {spaces}const variables = includeReadOutData({{...filteredVariables, ...mutationParams}}, readOutData);\n\
-            {spaces}makeNetworkRequest(artifact, variables);\n\
+            let include_read_out_data = get_read_out_data(&m.field_map);
+            ResolverImportStatement(format!(
+                "{include_read_out_data}\n\
+                import {{ makeNetworkRequest }} from '@isograph/react';\n\
+                const resolver = (artifact, readOutData, filteredVariables) => (mutationParams) => {{\n\
+                {spaces}const variables = includeReadOutData({{...filteredVariables, \
+                ...mutationParams}}, readOutData);\n\
+                {spaces}makeNetworkRequest(artifact, variables);\n\
             }};\n\
-            ")
-                )
+            "
+            ))
         }
     }
+}
+
+fn get_read_out_data(field_map: &[FieldMapItem]) -> String {
+    let spaces = "  ";
+    let mut s = "const includeReadOutData = (variables, readOutData) => {\n".to_string();
+
+    for item in field_map.iter() {
+        // This is super hacky and due to the fact that argument names and field names are
+        // treated differently, because that's how it is in the GraphQL spec.
+        let mut path_segments = Vec::with_capacity(1 + item.to_field_names.len());
+        path_segments.push(&item.to_argument_name);
+        path_segments.extend(item.to_field_names.iter());
+
+        let last_index = path_segments.len() - 1;
+        let mut path_so_far = "".to_string();
+        for (index, path_segment) in path_segments.into_iter().enumerate() {
+            let is_last = last_index == index;
+            let path_segment_item = path_segment.item;
+
+            if is_last {
+                let from_value = item.from;
+                s.push_str(&format!(
+                    "{spaces}variables.{path_so_far}{path_segment_item} = \
+                    readOutData.{from_value};\n"
+                ));
+            } else {
+                s.push_str(&format!(
+                    "{spaces}variables.{path_so_far}{path_segment_item} = \
+                    variables.{path_so_far}{path_segment_item} ?? {{}};\n"
+                ));
+                path_so_far.push_str(&format!("{path_segment_item}."));
+            }
+        }
+    }
+
+    s.push_str(&format!("{spaces}return variables;\n}};\n"));
+    s
 }
 
 #[derive(Debug)]
@@ -1336,14 +1369,14 @@ fn generate_read_out_type(resolver_definition: &ValidatedSchemaResolver) -> Reso
 }
 
 fn generate_resolver_return_type_declaration(
-    action_kind: ResolverActionKind,
+    action_kind: &ResolverActionKind,
 ) -> ResolverReturnType {
     match action_kind {
         ResolverActionKind::NamedImport(_) | ResolverActionKind::RefetchField => {
             ResolverReturnType("ReturnType<typeof resolver>".to_string())
         }
         // TODO what should this be
-        ResolverActionKind::MutationField => ResolverReturnType("any".to_string()),
+        ResolverActionKind::MutationField(_) => ResolverReturnType("any".to_string()),
     }
 }
 

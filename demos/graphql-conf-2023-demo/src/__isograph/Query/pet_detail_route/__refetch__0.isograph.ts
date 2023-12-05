@@ -18,7 +18,6 @@ pet { \
   },\
   favorite_phrase,\
   name,\
-  nickname,\
   potential_new_best_friends {\
     id,\
     name,\
@@ -115,11 +114,6 @@ const normalizationAst: NormalizationAst = [{
       {
         kind: "Scalar",
         fieldName: "name",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "nickname",
         arguments: null,
       },
       {

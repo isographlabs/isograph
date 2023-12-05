@@ -1,7 +1,6 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
 const includeReadOutData = (variables, readOutData) => {
-  variables.input = variables.input ?? {};
-  variables.input.id = readOutData.id;
+  variables.id = readOutData.id;
   return variables;
 };
 
@@ -24,17 +23,10 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     alias: null,
     arguments: null,
   },
-  {
-    kind: "Scalar",
-    fieldName: "nickname",
-    alias: null,
-    arguments: null,
-  },
 ];
 
 export type ResolverParameterType = {
   id: string,
-  nickname: (string | null),
 };
 
 // The type, when returned from the resolver

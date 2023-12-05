@@ -18,7 +18,7 @@ use isograph_lang_types::{
 };
 use lazy_static::lazy_static;
 
-use crate::ResolverVariant;
+use crate::{FieldMapItem, ResolverVariant};
 
 lazy_static! {
     pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
@@ -559,7 +559,7 @@ impl ResolverTypeAndField {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum ResolverActionKind {
     /// Associated js function
     /// TODO the first element should have a type of JavascriptName
@@ -567,7 +567,12 @@ pub enum ResolverActionKind {
     /// Refetch fields
     RefetchField,
     /// Mutation field
-    MutationField,
+    MutationField(MutationFieldResolverActionKindInfo),
+}
+
+#[derive(Debug, Clone)]
+pub struct MutationFieldResolverActionKindInfo {
+    pub field_map: Vec<FieldMapItem>,
 }
 
 #[derive(Debug)]

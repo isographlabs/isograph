@@ -19,9 +19,10 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    DefinedField, IsographObjectTypeDefinition, MutationFieldResolverVariant, ResolverActionKind,
-    ResolverTypeAndField, ResolverVariant, Schema, SchemaObject, SchemaResolver, SchemaScalar,
-    SchemaServerField, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
+    DefinedField, IsographObjectTypeDefinition, MutationFieldResolverActionKindInfo,
+    MutationFieldResolverVariant, ResolverActionKind, ResolverTypeAndField, ResolverVariant,
+    Schema, SchemaObject, SchemaResolver, SchemaScalar, SchemaServerField,
+    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
     UnvalidatedSchemaResolver, ValidRefinement, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
 };
 
@@ -348,7 +349,8 @@ impl UnvalidatedSchema {
                             mutation_field_payload_type_name.lookup().intern().into(),
                             mutation_object_name,
                             mutation_field_name,
-                            field_map_items,
+                            // TODO don't clone
+                            field_map_items.clone(),
                             text_source,
                         )?;
 
@@ -435,7 +437,12 @@ impl UnvalidatedSchema {
                                         field_name: magic_mutation_field_name, // __set_pet_best_friend
                                     },
                                     parent_object_id: *primary_object_type,
-                                    action_kind: ResolverActionKind::MutationField,
+                                    action_kind: ResolverActionKind::MutationField(
+                                        MutationFieldResolverActionKindInfo {
+                                            // TODO don't clone
+                                            field_map: field_map_items,
+                                        },
+                                    ),
                                 });
 
                                 Ok((next_resolver_id, primary_object_type))
@@ -566,11 +573,11 @@ fn validate_magic_mutation_directive(
 #[derive(Clone, Debug)]
 pub struct FieldMapItem {
     // TODO eventually, we want to support . syntax here, too
-    from: StringLiteralValue,
+    pub from: StringLiteralValue,
     /// Everything that is before the first . in the to field
-    to_argument_name: WithSpan<StringLiteralValue>,
+    pub to_argument_name: WithSpan<StringLiteralValue>,
     /// Everything after the first ., split on .
-    to_field_names: Vec<WithSpan<StringLiteralValue>>,
+    pub to_field_names: Vec<WithSpan<StringLiteralValue>>,
 }
 
 fn parse_field_map_val(

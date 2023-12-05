@@ -9,13 +9,7 @@ type Mutation {
 }
 
 type SetBestFriendResponse
-  @primary(
-    path: "pet"
-    field_map: [
-      { from: "id", to: "id" }
-      { from: "nickname", to: "new_best_friend_id" }
-    ]
-  ) {
+  @primary(path: "pet", field_map: [{ from: "id", to: "id" }]) {
   # The pet whose best friend was set
   pet: Pet!
 }
