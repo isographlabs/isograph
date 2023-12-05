@@ -5,7 +5,7 @@ type Query {
 
 type Mutation {
   set_pet_best_friend(id: ID!, new_best_friend_id: ID!): SetBestFriendResponse!
-  set_pet_tagline(input: SetPetTaglineParams!, id: ID!): SetPetTaglineResponse!
+  set_pet_tagline(input: SetPetTaglineParams!): SetPetTaglineResponse!
 }
 
 type SetBestFriendResponse
