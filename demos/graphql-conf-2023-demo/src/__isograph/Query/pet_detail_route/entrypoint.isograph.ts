@@ -2,7 +2,8 @@ import type {IsographFetchableResolver, FragmentReference, NormalizationAst, Ref
 import type {ReadFromStoreType, ResolverParameterType, ReadOutType} from './reader.isograph';
 import readerResolver from './reader.isograph';
 import refetchQuery0 from './__refetch__0.isograph';
-const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [{ artifact: refetchQuery0, allowedVariables: [] }, ];
+import refetchQuery1 from './__refetch__1.isograph';
+const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [{ artifact: refetchQuery0, allowedVariables: [] }, { artifact: refetchQuery1, allowedVariables: [] }, ];
 
 const queryText = 'query pet_detail_route ($id: ID!) {\
   pet____id___id: pet(id: $id) {\
@@ -22,10 +23,12 @@ const queryText = 'query pet_detail_route ($id: ID!) {\
     },\
     favorite_phrase,\
     name,\
+    nickname,\
     potential_new_best_friends {\
       id,\
       name,\
     },\
+    tagline,\
   },\
 }';
 
@@ -112,6 +115,11 @@ const normalizationAst: NormalizationAst = [
         arguments: null,
       },
       {
+        kind: "Scalar",
+        fieldName: "nickname",
+        arguments: null,
+      },
+      {
         kind: "Linked",
         fieldName: "potential_new_best_friends",
         arguments: null,
@@ -127,6 +135,11 @@ const normalizationAst: NormalizationAst = [
             arguments: null,
           },
         ],
+      },
+      {
+        kind: "Scalar",
+        fieldName: "tagline",
+        arguments: null,
       },
     ],
   },

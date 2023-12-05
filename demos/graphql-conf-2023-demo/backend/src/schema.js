@@ -111,10 +111,10 @@ export const schema = createSchema({
         };
       },
       set_pet_tagline: (_obj, params) => {
-        const modifiedPet = pets[params.id];
-        modifiedPet.tagline = params.tagline;
+        const modifiedPet = pets[params.input.id];
+        modifiedPet.tagline = params.input.tagline;
         return {
-          id: params.id,
+          id: params.input.id,
         };
       },
     },

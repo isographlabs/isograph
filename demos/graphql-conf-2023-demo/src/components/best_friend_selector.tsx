@@ -11,40 +11,52 @@ export const best_friend_selector = iso<
 >`
   Pet.best_friend_selector @component {
     __set_pet_best_friend,
+    __set_pet_tagline,
     potential_new_best_friends {
       id,
       name,
     },
+    tagline,
   }
 `(BestFriendSelector);
 
 function BestFriendSelector(props: BestFriendSelectorParams) {
   const [selected, setSelected] = useState<PetId | "NONE">("NONE");
   return (
-    <Select
-      value={selected}
-      onChange={(e) => {
-        const value = e.target.value;
-        if (typeof value === "string") {
-          setSelected("NONE");
-          if (value === "NONE") {
-            return;
+    <>
+      <Select
+        value={selected}
+        onChange={(e) => {
+          const value = e.target.value;
+          if (typeof value === "string") {
+            setSelected("NONE");
+            if (value === "NONE") {
+              return;
+            }
+            props.data.__set_pet_best_friend({
+              new_best_friend_id: value,
+            });
           }
-          props.data.__set_pet_best_friend({
-            new_best_friend_id: value,
-          });
+        }}
+      >
+        <MenuItem value="NONE">Select new best friend</MenuItem>
+        {props.data.potential_new_best_friends.map((potentialNewBestFriend) => (
+          <MenuItem
+            value={potentialNewBestFriend.id}
+            key={potentialNewBestFriend.id}
+          >
+            {potentialNewBestFriend.name}
+          </MenuItem>
+        ))}
+      </Select>
+      <button
+        onClick={() =>
+          props.data.__set_pet_tagline({ input: { tagline: "asdf" } })
         }
-      }}
-    >
-      <MenuItem value="NONE">Select new best friend</MenuItem>
-      {props.data.potential_new_best_friends.map((potentialNewBestFriend) => (
-        <MenuItem
-          value={potentialNewBestFriend.id}
-          key={potentialNewBestFriend.id}
-        >
-          {potentialNewBestFriend.name}
-        </MenuItem>
-      ))}
-    </Select>
+      >
+        Set tagline
+      </button>
+      {props.data.tagline}
+    </>
   );
 }

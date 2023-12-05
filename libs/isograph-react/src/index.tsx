@@ -488,10 +488,8 @@ function readData<TReadFromStore>(
 
           target[field.alias] = field.readerArtifact.resolver(
             refetchQueryArtifact,
-            {
-              ...data.data, // id variable
-              ...filterVariables(variables, allowedVariables),
-            }
+            data.data,
+            filterVariables(variables, allowedVariables)
           );
         }
         break;

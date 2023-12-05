@@ -1,6 +1,16 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+const includeReadOutData = (variables, readOutData) => {
+  variables.input = variables.input ?? {};
+  variables.input.id = readOutData.id;
+  return variables;
+};
+
 import { makeNetworkRequest } from '@isograph/react';
-const resolver = (artifact, variables) => (mutationParams) => makeNetworkRequest(artifact, {...variables, ...mutationParams});
+const resolver = (artifact, readOutData, filteredVariables) => (mutationParams) => {
+  const variables = includeReadOutData({...filteredVariables, ...mutationParams}, readOutData);
+  makeNetworkRequest(artifact, variables);
+};
+
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = any;
@@ -14,10 +24,17 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     alias: null,
     arguments: null,
   },
+  {
+    kind: "Scalar",
+    fieldName: "nickname",
+    alias: null,
+    arguments: null,
+  },
 ];
 
 export type ResolverParameterType = {
   id: string,
+  nickname: (string | null),
 };
 
 // The type, when returned from the resolver

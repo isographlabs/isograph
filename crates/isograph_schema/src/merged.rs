@@ -24,6 +24,14 @@ use crate::{
 
 type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSelection>>;
 
+#[derive(Debug)]
+pub struct RootRefetchedPath {
+    pub path: PathToRefetchField,
+    pub variables: Vec<VariableName>,
+    // TODO This should not be an option
+    pub field_name: SelectableFieldName,
+}
+
 // TODO add id and typename variants, impl Ord, and get rid of the NormalizationKey enum
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum MergedServerFieldSelection {
@@ -220,10 +228,7 @@ pub fn create_merged_selection_set(
     artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
     // N.B. we call this for non-fetchable resolvers now, but that is a smell
     root_fetchable_resolver: &ValidatedSchemaResolver,
-) -> (
-    MergedSelectionSet,
-    Vec<(PathToRefetchField, Vec<VariableName>)>,
-) {
+) -> (MergedSelectionSet, Vec<RootRefetchedPath>) {
     let mut merge_traversal_state = MergeTraversalState::new(root_fetchable_resolver);
     let merged_selection_set = create_merged_selection_set_with_merge_traversal_state(
         schema,
@@ -263,8 +268,11 @@ pub fn create_merged_selection_set(
                     })
                     .collect();
 
+                // This is just horrible
+                let field_name;
                 match resolver_variant {
                     ResolverVariant::RefetchField => {
+                        field_name = "__refetch".intern().into();
                         artifact_queue.push(ArtifactQueueItem::RefetchField(
                             RefetchFieldResolverInfo {
                                 merged_selection_set: nested_merged_selection_set,
@@ -285,6 +293,7 @@ pub fn create_merged_selection_set(
                         mutation_field_arguments,
                         filtered_mutation_field_arguments: _,
                     }) => {
+                        field_name = mutation_name;
                         artifact_queue.push(ArtifactQueueItem::MutationField(
                             MutationFieldResolverInfo {
                                 merged_selection_set: nested_merged_selection_set,
@@ -308,7 +317,11 @@ pub fn create_merged_selection_set(
                 let mut reachable_variables_vec: Vec<_> = reachable_variables.into_iter().collect();
                 reachable_variables_vec.sort();
 
-                (path_to_refetch_field, reachable_variables_vec)
+                RootRefetchedPath {
+                    path: path_to_refetch_field,
+                    variables: reachable_variables_vec,
+                    field_name,
+                }
             },
         )
         .collect();

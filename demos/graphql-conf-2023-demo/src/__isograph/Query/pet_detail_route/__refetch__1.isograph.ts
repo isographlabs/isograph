@@ -1,6 +1,6 @@
 import type {IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst} from '@isograph/react';
-const queryText = 'mutation Pet__set_pet_best_friend ($id: ID!, $new_best_friend_id: ID!) {\
-set_pet_best_friend____id___id____new_best_friend_id___new_best_friend_id: set_pet_best_friend(id: $id, new_best_friend_id: $new_best_friend_id) {\
+const queryText = 'mutation Pet__set_pet_tagline ($input: SetPetTaglineParams!) {\
+set_pet_tagline____input___input: set_pet_tagline(input: $input) {\
 pet { \
   id,\
   best_friend_relationship {\
@@ -28,16 +28,11 @@ pet { \
 
 const normalizationAst: NormalizationAst = [{
   kind: "Linked",
-  fieldName: "set_pet_best_friend",
+  fieldName: "set_pet_tagline",
   arguments: [
     {
-      argumentName: "id",
-      variableName: "id",
-    },
-
-    {
-      argumentName: "new_best_friend_id",
-      variableName: "new_best_friend_id",
+      argumentName: "input",
+      variableName: "input",
     },
   ],
   selections: [
