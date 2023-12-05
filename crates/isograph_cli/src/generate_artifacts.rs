@@ -205,16 +205,6 @@ fn get_artifact_for_mutation_field<'schema>(
                             .hack_to_with_span(),
                     })
             })
-            .chain(std::iter::once(WithLocation::new(
-                SelectionFieldArgument {
-                    name: WithSpan::new("id".intern().into(), Span::todo_generated()),
-                    value: WithSpan::new(
-                        NonConstantValue::Variable("id".intern().into()),
-                        Span::todo_generated(),
-                    ),
-                },
-                Location::generated(),
-            )))
             .collect::<Vec<_>>(),
         1,
     );
@@ -309,20 +299,6 @@ fn generate_mutation_query_text<'schema>(
 ) -> QueryText {
     let mut query_text = String::new();
 
-    let id_variable_name = WithLocation::new("id".intern().into(), Location::generated());
-    variable_definitions.push(WithSpan {
-        item: VariableDefinition {
-            name: id_variable_name,
-            type_: TypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
-                NamedTypeAnnotation(WithSpan {
-                    item: DefinedTypeId::Scalar(schema.id_type_id),
-                    span: Span::todo_generated(),
-                }),
-            ))),
-        },
-        span: Span::todo_generated(),
-    });
-
     let mutation_parameters: Vec<_> = mutation_field_arguments
         .iter()
         .map(|argument| {
@@ -350,15 +326,6 @@ fn generate_mutation_query_text<'schema>(
                 Location::generated(),
             )
         })
-        .chain(std::iter::once(WithLocation::new(
-            SelectionFieldArgument {
-                name: WithSpan::new("id".intern().into(), Span::todo_generated()),
-                value: id_variable_name
-                    .map(NonConstantValue::Variable)
-                    .hack_to_with_span(),
-            },
-            Location::generated(),
-        )))
         .collect();
 
     let variable_text = write_variables_to_string(schema, &mut variable_definitions.iter());

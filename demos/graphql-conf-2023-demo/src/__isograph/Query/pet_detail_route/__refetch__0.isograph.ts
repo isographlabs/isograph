@@ -1,6 +1,6 @@
 import type {IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst} from '@isograph/react';
 const queryText = 'mutation Pet__set_pet_best_friend ($id: ID!, $new_best_friend_id: ID!) {\
-set_pet_best_friend____new_best_friend_id___new_best_friend_id____id___id: set_pet_best_friend(new_best_friend_id: $new_best_friend_id, id: $id) {\
+set_pet_best_friend____id___id____new_best_friend_id___new_best_friend_id: set_pet_best_friend(id: $id, new_best_friend_id: $new_best_friend_id) {\
 pet { \
   id,\
   best_friend_relationship {\
@@ -29,13 +29,13 @@ const normalizationAst: NormalizationAst = [{
   fieldName: "set_pet_best_friend",
   arguments: [
     {
-      argumentName: "new_best_friend_id",
-      variableName: "new_best_friend_id",
+      argumentName: "id",
+      variableName: "id",
     },
 
     {
-      argumentName: "id",
-      variableName: "id",
+      argumentName: "new_best_friend_id",
+      variableName: "new_best_friend_id",
     },
   ],
   selections: [

@@ -354,7 +354,7 @@ impl UnvalidatedSchema {
                     let (mutation_field_args_without_id, processed_field_map_items) =
                         skip_arguments_contained_in_field_map(
                             self,
-                            mutation_field_arguments,
+                            mutation_field_arguments.clone(),
                             // TODO make this a no-op
                             mutation_field_payload_type_name.lookup().intern().into(),
                             mutation_object_name,
@@ -434,8 +434,7 @@ impl UnvalidatedSchema {
                                         MutationFieldResolverVariant {
                                             mutation_name: magic_mutation_field_name,
                                             mutation_primary_field_name: path_selectable_field_name,
-                                            mutation_field_arguments:
-                                                mutation_field_args_without_id.clone(),
+                                            mutation_field_arguments,
                                             filtered_mutation_field_arguments:
                                                 mutation_field_args_without_id,
                                         },
