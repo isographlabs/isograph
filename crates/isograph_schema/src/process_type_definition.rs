@@ -294,21 +294,10 @@ impl UnvalidatedSchema {
 
     /// Add magical mutation fields.
     ///
-    /// > This is a bit hacky! It should be controlled more by directives. Instead, lots of behavior
-    /// > is hard-coded now.
-    ///
-    /// For each field on a mutation object, if:
-    /// - that field's type is a non-nullable object and **exactly one** of that object's fields:
-    ///   - either
-    ///     - has directive "@primary", or
-    ///     - is the only field
-    ///   - has no arguments, and
-    ///   - is an object type (call it TargetType)
-    /// - and that field's arguments contain an argument named "id" of type "ID!"
-    ///
-    /// then, add a magical field to TargetType whose name is __ + mutation_name, which:
+    /// Using the MagicMutationFieldInfo (derived from @primary directives),
+    /// add a magical field to TargetType whose name is __ + mutation_name, which:
     /// - executes the mutation
-    /// - has the mutation's arguments (except an id)
+    /// - has the mutation's arguments (except those from field_map)
     /// - then acts as a __refetch field on that TargetType, i.e. refetches all the fields
     ///   selected in the merged selection set.
     ///
