@@ -1496,7 +1496,8 @@ pub enum ProcessTypeDefinitionError {
 
     #[error(
         "Error when processing @primary directive on type `{primary_type_name}`. \
-        The field `{mutation_object_name}.{mutation_field_name}` does not have argument `{field_name}`."
+        The field `{mutation_object_name}.{mutation_field_name}` does not have argument `{field_name}`, \
+        or it was previously processed by another field_map item."
     )]
     PrimaryDirectiveArgumentDoesNotExistOnField {
         primary_type_name: IsographObjectTypeName,
