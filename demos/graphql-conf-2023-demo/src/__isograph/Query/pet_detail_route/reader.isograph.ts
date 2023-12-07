@@ -3,6 +3,7 @@ import { pet_detail_route as resolver } from '../../../components/pet_detail_rou
 import Pet__pet_best_friend_card, { ReadOutType as Pet__pet_best_friend_card__outputType } from '../../Pet/pet_best_friend_card/reader.isograph';
 import Pet__pet_checkins_card, { ReadOutType as Pet__pet_checkins_card__outputType } from '../../Pet/pet_checkins_card/reader.isograph';
 import Pet__pet_phrase_card, { ReadOutType as Pet__pet_phrase_card__outputType } from '../../Pet/pet_phrase_card/reader.isograph';
+import Pet__pet_tagline_card, { ReadOutType as Pet__pet_tagline_card__outputType } from '../../Pet/pet_tagline_card/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
@@ -48,6 +49,13 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
         readerArtifact: Pet__pet_phrase_card,
         usedRefetchQueries: [],
       },
+      {
+        kind: "Resolver",
+        alias: "pet_tagline_card",
+        arguments: null,
+        readerArtifact: Pet__pet_tagline_card,
+        usedRefetchQueries: [],
+      },
     ],
   },
 ];
@@ -59,6 +67,7 @@ export type ResolverParameterType = { data:
     pet_checkins_card: Pet__pet_checkins_card__outputType,
     pet_best_friend_card: Pet__pet_best_friend_card__outputType,
     pet_phrase_card: Pet__pet_phrase_card__outputType,
+    pet_tagline_card: Pet__pet_tagline_card__outputType,
   } | null),
 },
 [index: string]: any };

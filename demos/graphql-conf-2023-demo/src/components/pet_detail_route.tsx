@@ -13,6 +13,7 @@ export const pet_detail_route = iso<
       pet_checkins_card,
       pet_best_friend_card,
       pet_phrase_card,
+      pet_tagline_card,
     },
   }
 `(PetDetailRouteComponent);
@@ -36,6 +37,7 @@ export function PetDetailRouteComponent({
           <Stack direction="column" spacing={4}>
             {data.pet?.pet_best_friend_card({})}
             {data.pet?.pet_phrase_card({})}
+            {data.pet?.pet_tagline_card({})}
           </Stack>
         </Stack>
       </React.Suspense>

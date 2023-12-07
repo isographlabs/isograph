@@ -1,6 +1,6 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
 import { pet_best_friend_card as resolver } from '../../../components/pet_best_friend_card.tsx';
-import Pet__best_friend_selector, { ReadOutType as Pet__best_friend_selector__outputType } from '../best_friend_selector/reader.isograph';
+import Pet__pet_updater, { ReadOutType as Pet__pet_updater__outputType } from '../pet_updater/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
@@ -16,9 +16,9 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
   {
     kind: "Resolver",
-    alias: "best_friend_selector",
+    alias: "pet_updater",
     arguments: null,
-    readerArtifact: Pet__best_friend_selector,
+    readerArtifact: Pet__pet_updater,
     usedRefetchQueries: [0, 1, ],
   },
   {
@@ -66,7 +66,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 export type ResolverParameterType = { data:
 {
   id: string,
-  best_friend_selector: Pet__best_friend_selector__outputType,
+  pet_updater: Pet__pet_updater__outputType,
   best_friend_relationship: ({
     picture_together: (string | null),
     best_friend: {
