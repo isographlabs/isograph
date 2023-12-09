@@ -1,2 +1,5 @@
+[package]
+license = "MIT"
+
 [workspace]
 members = ["./crates/*"]

@@ -2,6 +2,7 @@
 name = "isograph_lang_types"
 version = "0.0.4"
 edition = "2021"
+license = "MIT"
 
 [dependencies]
 common_lang_types = { path = "../common_lang_types" }

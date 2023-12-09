@@ -7,6 +7,7 @@
 - [Follow the official twitter account](https://twitter.com/isographlabs)
 
 ## About Isograph
+ 
 
 ### What is Isograph, and what are resolvers?
 
@@ -105,3 +106,7 @@ At the root of a page, you will define a fetchable literal. For any given fetcha
 
 - Join the discord: https://discord.gg/Q2c5tM5T8A (#isograph channel on the GraphQL discord.)
 - [Follow the official twitter account](https://twitter.com/isographlabs)
+
+## Licensing
+
+Isograph is an open source software project and licensed under the terms of the MIT license.

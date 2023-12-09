@@ -6,5 +6,6 @@
   "scripts": {
     "watch-rs": "cargo watch -x build -d 0.1 -w ./crates/",
     "watch-proj": "cargo watch -w ./demos/graphql-conf-2023-demo/src/components -s 'echo && ./target/debug/isograph_cli --project-root ./demos/graphql-conf-2023-demo/src/ --schema ./demos/graphql-conf-2023-demo/backend/schema.graphql'"
-  }
+  },
+  "license":"MIT" 
 }
