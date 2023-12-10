@@ -1,13 +1,8 @@
 import React from "react";
 import { iso } from "@isograph/react";
-import {
-  Avatar,
-  Card,
-  CardContent,
-  Stack,
-} from "@mui/material";
+import { Avatar, Card, CardContent, Stack } from "@mui/material";
 
-import { ResolverParameterType as PetBestFriendCardParams } from "../__isograph/Pet/pet_best_friend_card.isograph";
+import { ResolverParameterType as PetBestFriendCardParams } from "@iso/Pet/pet_best_friend_card/reader.isograph";
 
 export const pet_best_friend_card = iso<
   PetBestFriendCardParams,
@@ -15,7 +10,7 @@ export const pet_best_friend_card = iso<
 >`
   Pet.pet_best_friend_card @component {
     id,
-    best_friend_selector,
+    pet_updater,
     best_friend_relationship {
       picture_together,
       best_friend {
@@ -33,7 +28,7 @@ function PetBestFriendCard(props: PetBestFriendCardParams) {
     return (
       <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
         <CardContent>
-          {props.data.best_friend_selector({ parentId: props.data.id })}
+          {props.data.pet_updater({ parentId: props.data.id })}
         </CardContent>
       </Card>
     );
@@ -52,7 +47,7 @@ function PetBestFriendCard(props: PetBestFriendCardParams) {
               <h2>Best friend: {bestFriendRelationship.best_friend.name}</h2>
             </div>
           </Stack>
-          {props.data.best_friend_selector({ parentId: props.data.id })}
+          {props.data.pet_updater({ parentId: props.data.id })}
           <img
             src={bestFriendRelationship.picture_together ?? undefined}
             style={{ maxWidth: 400 }}

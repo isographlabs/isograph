@@ -73,8 +73,8 @@ fn visit_dirs_skipping_isograph(dir: &Path, cb: &mut dyn FnMut(&DirEntry)) -> io
 
 pub(crate) static ISOGRAPH_FOLDER: &'static str = "__isograph";
 lazy_static! {
-    // This is regex is inadequate, as iso<typeof foo`...`>, and it's certainly possible
-    // to want that.
+    // This is regex is inadequate, as iso<typeof foo`...`> is invalid, and
+    // it's certainly possible to want that.
     static ref EXTRACT_ISO_LITERAL: Regex = Regex::new(r"iso(<[^`]+>)?`([^`]+)`(\()?").unwrap();
     static ref EXTRACT_ISO_FETCH: Regex = Regex::new(r"isoFetch(<[^`]+>)?`([^`]+)`").unwrap();
 }

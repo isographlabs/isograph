@@ -3,6 +3,7 @@ use std::{
     fmt::{self, Debug, Display},
     io,
     path::PathBuf,
+    str::FromStr,
 };
 
 use common_lang_types::{
@@ -10,21 +11,22 @@ use common_lang_types::{
     UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    InputValueDefinition, ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
+    GraphQLInputValueDefinition, ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
     TypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    InputTypeId, NonConstantValue, ObjectId, OutputTypeId, Selection, SelectionFieldArgument,
+    DefinedTypeId, NonConstantValue, ObjectId, OutputTypeId, Selection, SelectionFieldArgument,
     ServerFieldSelection, VariableDefinition,
 };
 use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_resolver,
-    ArtifactQueueItem, DefinedField, MergedLinkedFieldSelection, MergedScalarFieldSelection,
-    MergedSelectionSet, MergedServerFieldSelection, MutationFieldResolverInfo, NameAndArguments,
-    PathToRefetchField, RefetchFieldResolverInfo, ResolverActionKind, ResolverTypeAndField,
-    ResolverVariant, SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField,
-    ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
+    ArtifactQueueItem, DefinedField, FieldMapItem, MergedLinkedFieldSelection,
+    MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection,
+    MutationFieldResolverInfo, NameAndArguments, PathToRefetchField, RefetchFieldResolverInfo,
+    ResolverActionKind, ResolverTypeAndField, ResolverVariant, RootRefetchedPath, SchemaObject,
+    ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
+    ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
     ValidatedVariableDefinition,
 };
 use thiserror::Error;
@@ -47,8 +49,13 @@ macro_rules! derive_display {
 pub(crate) fn generate_artifacts(
     schema: &ValidatedSchema,
     project_root: &PathBuf,
+    artifact_directory: &PathBuf,
 ) -> Result<(), GenerateArtifactsError> {
-    write_artifacts(get_all_artifacts(schema), project_root)?;
+    write_artifacts(
+        get_all_artifacts(schema, project_root, artifact_directory),
+        project_root,
+        artifact_directory,
+    )?;
 
     Ok(())
 }
@@ -60,7 +67,11 @@ pub(crate) fn generate_artifacts(
 ///
 /// We do this by keeping a queue of artifacts to generate, and adding to the queue
 /// as we process fetchable resolvers.
-fn get_all_artifacts<'schema>(schema: &'schema ValidatedSchema) -> Vec<Artifact<'schema>> {
+fn get_all_artifacts<'schema>(
+    schema: &'schema ValidatedSchema,
+    project_root: &PathBuf,
+    artifact_directory: &PathBuf,
+) -> Vec<Artifact<'schema>> {
     let mut artifact_queue: Vec<_> = schema
         .resolvers
         .iter()
@@ -72,7 +83,13 @@ fn get_all_artifacts<'schema>(schema: &'schema ValidatedSchema) -> Vec<Artifact<
 
     let mut artifacts = vec![];
     while let Some(queue_item) = artifact_queue.pop() {
-        artifacts.push(generate_artifact(queue_item, schema, &mut artifact_queue));
+        artifacts.push(generate_artifact(
+            queue_item,
+            schema,
+            &mut artifact_queue,
+            project_root,
+            artifact_directory,
+        ));
     }
 
     artifacts
@@ -84,10 +101,17 @@ fn generate_artifact<'schema>(
     // As we process reader artifacts, we can also encounter refetch and mutation
     // fields. If so, we add them to the artifact queue.
     artifact_queue: &mut Vec<ArtifactQueueItem<'schema>>,
+    project_root: &PathBuf,
+    artifact_directory: &PathBuf,
 ) -> Artifact<'schema> {
     match queue_item {
         ArtifactQueueItem::Reader(resolver) => {
-            Artifact::Reader(generate_non_fetchable_resolver_artifact(schema, resolver))
+            Artifact::Reader(generate_non_fetchable_resolver_artifact(
+                schema,
+                resolver,
+                project_root,
+                artifact_directory,
+            ))
         }
         ArtifactQueueItem::Entrypoint(fetchable_resolver) => Artifact::Entrypoint(
             generate_fetchable_resolver_artifact(schema, fetchable_resolver, artifact_queue),
@@ -182,16 +206,6 @@ fn get_artifact_for_mutation_field<'schema>(
                             .hack_to_with_span(),
                     })
             })
-            .chain(std::iter::once(WithSpan::new(
-                SelectionFieldArgument {
-                    name: WithSpan::new("id".intern().into(), Span::todo_generated()),
-                    value: WithSpan::new(
-                        NonConstantValue::Variable("id".intern().into()),
-                        Span::todo_generated(),
-                    ),
-                },
-                Span::todo_generated(),
-            )))
             .collect::<Vec<_>>(),
         1,
     );
@@ -256,7 +270,7 @@ fn generate_refetchable_query_text<'schema>(
             name: WithLocation::new("id".intern().into(), Location::generated()),
             type_: TypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
                 NamedTypeAnnotation(WithSpan {
-                    item: InputTypeId::Scalar(schema.id_type_id),
+                    item: DefinedTypeId::Scalar(schema.id_type_id),
                     span: Span::todo_generated(),
                 }),
             ))),
@@ -282,65 +296,37 @@ fn generate_mutation_query_text<'schema>(
     magic_mutation_field_name: SelectableFieldName,
     mutation_field_name: &str,
     mutation_primary_field_name: SelectableFieldName,
-    mutation_field_arguments: Vec<WithSpan<InputValueDefinition>>,
+    mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
 ) -> QueryText {
     let mut query_text = String::new();
-
-    let id_variable_name = WithLocation::new("id".intern().into(), Location::generated());
-    variable_definitions.push(WithSpan {
-        item: VariableDefinition {
-            name: id_variable_name,
-            type_: TypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
-                NamedTypeAnnotation(WithSpan {
-                    item: InputTypeId::Scalar(schema.id_type_id),
-                    span: Span::todo_generated(),
-                }),
-            ))),
-        },
-        span: Span::todo_generated(),
-    });
 
     let mutation_parameters: Vec<_> = mutation_field_arguments
         .iter()
         .map(|argument| {
-            let variable_name = argument.item.name.map(|x| x.into());
+            let variable_name = argument.item.name.map(|value_name| value_name.into());
             variable_definitions.push(WithSpan {
                 item: VariableDefinition {
                     name: variable_name,
-                    type_: argument.item.type_.clone().map(|x| {
-                        schema
+                    type_: argument.item.type_.clone().map(|type_name| {
+                        *schema
                             .schema_data
                             .defined_types
-                            .get(&x.into())
+                            .get(&type_name.into())
                             .expect("Expected type to be found, this indicates a bug in Isograph")
-                            .as_input_type_id()
-                            .expect(
-                                "Expected a valid input type. Objects \
-                        are not yet supported as parameters here.",
-                            )
                     }),
                 },
                 span: Span::todo_generated(),
             });
-            WithSpan::new(
+            WithLocation::new(
                 SelectionFieldArgument {
                     name: argument.item.name.map(|x| x.into()).hack_to_with_span(),
                     value: variable_name
-                        .map(|x| NonConstantValue::Variable(x))
+                        .map(|variable_name| NonConstantValue::Variable(variable_name))
                         .hack_to_with_span(),
                 },
-                Span::todo_generated(),
+                Location::generated(),
             )
         })
-        .chain(std::iter::once(WithSpan::new(
-            SelectionFieldArgument {
-                name: WithSpan::new("id".intern().into(), Span::todo_generated()),
-                value: id_variable_name
-                    .map(NonConstantValue::Variable)
-                    .hack_to_with_span(),
-            },
-            Span::todo_generated(),
-        )))
         .collect();
 
     let variable_text = write_variables_to_string(schema, &mut variable_definitions.iter());
@@ -362,7 +348,7 @@ fn generate_mutation_query_text<'schema>(
 
 fn get_aliased_mutation_field_name(
     name: &str,
-    parameters: &[WithSpan<SelectionFieldArgument>],
+    parameters: &[WithLocation<SelectionFieldArgument>],
 ) -> String {
     let mut s = name.to_string();
 
@@ -428,6 +414,8 @@ fn generate_fetchable_resolver_artifact<'schema>(
 fn generate_non_fetchable_resolver_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     non_fetchable_resolver: &ValidatedSchemaResolver,
+    project_root: &PathBuf,
+    artifact_directory: &PathBuf,
 ) -> ReaderArtifact<'schema> {
     if let Some((selection_set, _)) = &non_fetchable_resolver.selection_set_and_unwraps {
         let parent_type = schema
@@ -466,10 +454,13 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
             0,
         );
         let resolver_return_type =
-            generate_resolver_return_type_declaration(non_fetchable_resolver.action_kind);
+            generate_resolver_return_type_declaration(&non_fetchable_resolver.action_kind);
         let resolver_read_out_type = generate_read_out_type(non_fetchable_resolver);
-        let resolver_import_statement =
-            generate_resolver_import_statement(non_fetchable_resolver.action_kind);
+        let resolver_import_statement = generate_resolver_import_statement(
+            &non_fetchable_resolver.action_kind,
+            project_root,
+            artifact_directory,
+        );
         ReaderArtifact {
             parent_type: parent_type.into(),
             resolver_field_name: non_fetchable_resolver.name,
@@ -479,6 +470,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
             resolver_read_out_type,
             resolver_parameter_type,
             resolver_return_type,
+            resolver_variant: non_fetchable_resolver.variant.clone(),
         }
     } else {
         panic!("Unsupported: resolvers not on query with no selection set")
@@ -547,6 +539,7 @@ pub(crate) struct ReaderArtifact<'schema> {
     pub resolver_parameter_type: ResolverParameterType,
     pub resolver_return_type: ResolverReturnType,
     pub resolver_import_statement: ResolverImportStatement,
+    pub resolver_variant: ResolverVariant,
 }
 
 #[derive(Debug)]
@@ -576,18 +569,20 @@ fn generate_query_text(
 }
 
 fn generate_refetch_query_artifact_imports(
-    root_refetched_paths: &[(PathToRefetchField, Vec<VariableName>)],
+    root_refetched_paths: &[RootRefetchedPath],
 ) -> RefetchQueryArtifactImport {
     // TODO name the refetch queries with the path, or something, instead of
     // with indexes.
     let mut output = String::new();
     let mut array_syntax = String::new();
-    for (query_index, (_, variable_names)) in root_refetched_paths.iter().enumerate() {
+    for (query_index, RootRefetchedPath { variables, .. }) in
+        root_refetched_paths.iter().enumerate()
+    {
         output.push_str(&format!(
             "import refetchQuery{} from './__refetch__{}.isograph';\n",
             query_index, query_index,
         ));
-        let variable_names_str = variable_names_to_string(&variable_names);
+        let variable_names_str = variable_names_to_string(&variables);
         array_syntax.push_str(&format!(
             "{{ artifact: refetchQuery{}, allowedVariables: {} }}, ",
             query_index, variable_names_str
@@ -630,8 +625,7 @@ fn write_variables_to_string<'a>(
         // TODO can we consume the variables here?
         let x: TypeAnnotation<UnvalidatedTypeName> =
             variable.item.type_.clone().map(|input_type_id| {
-                // schema.
-                let schema_input_type = schema.schema_data.lookup_input_type(input_type_id);
+                let schema_input_type = schema.schema_data.lookup_unvalidated_type(input_type_id);
                 schema_input_type.name().into()
             });
         // TODO this is dangerous, since variable.item.name is a WithLocation, which impl's Display.
@@ -658,9 +652,6 @@ pub enum GenerateArtifactsError {
 
     #[error("Unable to delete directory at path {path:?}.\nReason: {message:?}")]
     UnableToDeleteDirectory { path: PathBuf, message: io::Error },
-
-    #[error("Unable to canonicalize path: {path:?}.\nReason: {message:?}")]
-    UnableToCanonicalizePath { path: PathBuf, message: io::Error },
 }
 
 fn write_selections_for_query_text(
@@ -896,29 +887,82 @@ fn print_non_null_type_annotation<T: Display>(non_null: &NonNullTypeAnnotation<T
 }
 
 fn generate_resolver_import_statement(
-    resolver_action_kind: ResolverActionKind,
+    resolver_action_kind: &ResolverActionKind,
+    project_root: &PathBuf,
+    artifact_directory: &PathBuf,
 ) -> ResolverImportStatement {
     match resolver_action_kind {
-        ResolverActionKind::Identity => {
-            ResolverImportStatement("const resolver = (x: any) => x;".to_string())
+        ResolverActionKind::NamedImport((name, path)) => {
+            let path_to_artifact = project_root
+                .join(PathBuf::from_str(path.lookup()).expect(
+                    "paths should be legal here. This is indicative of a bug in Isograph.",
+                ));
+            let relative_path =
+                pathdiff::diff_paths(path_to_artifact, artifact_directory.join("a/b/c"))
+                    .expect("Relative path should work");
+            ResolverImportStatement(format!(
+                "import {{ {name} as resolver }} from '{}';",
+                relative_path.to_str().expect("This path should be stringifiable. This probably is indicative of a bug in Relay.")
+            ))
         }
-        ResolverActionKind::NamedImport((name, path)) => ResolverImportStatement(format!(
-            "import {{ {name} as resolver }} from '../../../{path}';",
-        )),
         ResolverActionKind::RefetchField => ResolverImportStatement(
             "import { makeNetworkRequest } from '@isograph/react';\n\
             const resolver = (artifact, variables) => () => \
             makeNetworkRequest(artifact, variables);"
                 .to_string(),
         ),
-        ResolverActionKind::MutationField => ResolverImportStatement(
-            "import { makeNetworkRequest } from '@isograph/react';\n\
-            const resolver = (artifact, variables) => (mutationParams) => \
-            makeNetworkRequest(artifact, \
-            {...variables, ...mutationParams});"
-                .to_string(),
-        ),
+        ResolverActionKind::MutationField(ref m) => {
+            let spaces = "  ";
+            let include_read_out_data = get_read_out_data(&m.field_map);
+            ResolverImportStatement(format!(
+                "{include_read_out_data}\n\
+                import {{ makeNetworkRequest }} from '@isograph/react';\n\
+                const resolver = (artifact, readOutData, filteredVariables) => (mutationParams) => {{\n\
+                {spaces}const variables = includeReadOutData({{...filteredVariables, \
+                ...mutationParams}}, readOutData);\n\
+                {spaces}makeNetworkRequest(artifact, variables);\n\
+            }};\n\
+            "
+            ))
+        }
     }
+}
+
+fn get_read_out_data(field_map: &[FieldMapItem]) -> String {
+    let spaces = "  ";
+    let mut s = "const includeReadOutData = (variables, readOutData) => {\n".to_string();
+
+    for item in field_map.iter() {
+        // This is super hacky and due to the fact that argument names and field names are
+        // treated differently, because that's how it is in the GraphQL spec.
+        let mut path_segments = Vec::with_capacity(1 + item.to_field_names.len());
+        path_segments.push(&item.to_argument_name);
+        path_segments.extend(item.to_field_names.iter());
+
+        let last_index = path_segments.len() - 1;
+        let mut path_so_far = "".to_string();
+        for (index, path_segment) in path_segments.into_iter().enumerate() {
+            let is_last = last_index == index;
+            let path_segment_item = path_segment.item;
+
+            if is_last {
+                let from_value = item.from;
+                s.push_str(&format!(
+                    "{spaces}variables.{path_so_far}{path_segment_item} = \
+                    readOutData.{from_value};\n"
+                ));
+            } else {
+                s.push_str(&format!(
+                    "{spaces}variables.{path_so_far}{path_segment_item} = \
+                    variables.{path_so_far}{path_segment_item} ?? {{}};\n"
+                ));
+                path_so_far.push_str(&format!("{path_segment_item}."));
+            }
+        }
+    }
+
+    s.push_str(&format!("{spaces}return variables;\n}};\n"));
+    s
 }
 
 #[derive(Debug)]
@@ -946,7 +990,7 @@ fn generate_reader_ast<'schema>(
     indentation_level: u8,
     nested_resolver_imports: &mut NestedResolverImports,
     // N.B. this is not root_refetched_paths when we're generating a non-fetchable resolver :(
-    root_refetched_paths: &[(PathToRefetchField, Vec<VariableName>)],
+    root_refetched_paths: &[RootRefetchedPath],
 ) -> ReaderAst {
     generate_reader_ast_with_path(
         schema,
@@ -966,7 +1010,7 @@ fn generate_reader_ast_with_path<'schema>(
     indentation_level: u8,
     nested_resolver_imports: &mut NestedResolverImports,
     // N.B. this is not root_refetched_paths when we're generating a non-fetchable resolver :(
-    root_refetched_paths: &[(PathToRefetchField, Vec<VariableName>)],
+    root_refetched_paths: &[RootRefetchedPath],
     path: &mut Vec<NameAndArguments>,
 ) -> ReaderAst {
     let mut reader_ast = "[\n".to_string();
@@ -991,7 +1035,7 @@ fn generate_reader_ast_node(
     indentation_level: u8,
     nested_resolver_imports: &mut NestedResolverImports,
     // TODO use this to generate usedRefetchQueries
-    root_refetched_paths: &[(PathToRefetchField, Vec<VariableName>)],
+    root_refetched_paths: &[RootRefetchedPath],
     path: &mut Vec<NameAndArguments>,
 ) -> String {
     match &selection.item {
@@ -1035,7 +1079,6 @@ fn generate_reader_ast_node(
                         let indent_2 = "  ".repeat((indentation_level + 1) as usize);
                         let resolver_field_string =
                             resolver_field.type_and_field.underscore_separated();
-                        let variant = format!("\"{}\"", resolver_field.variant);
 
                         let resolver_refetched_paths =
                             refetched_paths_for_resolver(resolver_field, schema, path);
@@ -1066,19 +1109,22 @@ fn generate_reader_ast_node(
                                     "{indent_1}{{\n\
                                     {indent_2}kind: \"RefetchField\",\n\
                                     {indent_2}alias: \"{alias}\",\n\
-                                    {indent_2}resolver: {resolver_field_string},\n\
+                                    {indent_2}readerArtifact: {resolver_field_string},\n\
                                     {indent_2}refetchQuery: {refetch_query_index},\n\
                                     {indent_1}}},\n",
                                 )
                             }
-                            ResolverVariant::MutationField(_) => {
-                                let refetch_query_index =
-                                    find_refetch_query_index(root_refetched_paths, path);
+                            ResolverVariant::MutationField(ref s) => {
+                                let refetch_query_index = find_mutation_query_index(
+                                    root_refetched_paths,
+                                    path,
+                                    s.mutation_name,
+                                );
                                 format!(
                                     "{indent_1}{{\n\
                                     {indent_2}kind: \"MutationField\",\n\
                                     {indent_2}alias: \"{alias}\",\n\
-                                    {indent_2}resolver: {resolver_field_string},\n\
+                                    {indent_2}readerArtifact: {resolver_field_string},\n\
                                     {indent_2}refetchQuery: {refetch_query_index},\n\
                                     {indent_1}}},\n",
                                 )
@@ -1089,8 +1135,7 @@ fn generate_reader_ast_node(
                                     {indent_2}kind: \"Resolver\",\n\
                                     {indent_2}alias: \"{alias}\",\n\
                                     {indent_2}arguments: {arguments},\n\
-                                    {indent_2}resolver: {resolver_field_string},\n\
-                                    {indent_2}variant: {variant},\n\
+                                    {indent_2}readerArtifact: {resolver_field_string},\n\
                                     {indent_2}usedRefetchQueries: {nested_refetch_queries},\n\
                                     {indent_1}}},\n",
                                 )
@@ -1207,7 +1252,7 @@ fn generate_normalization_ast_node(
 }
 
 fn get_serialized_arguments_for_query_text(
-    arguments: &[WithSpan<SelectionFieldArgument>],
+    arguments: &[WithLocation<SelectionFieldArgument>],
 ) -> String {
     if arguments.is_empty() {
         return "".to_string();
@@ -1232,7 +1277,7 @@ fn get_serialized_arguments_for_query_text(
 }
 
 fn get_serialized_field_arguments(
-    arguments: &[WithSpan<SelectionFieldArgument>],
+    arguments: &[WithLocation<SelectionFieldArgument>],
     indentation_level: u8,
 ) -> String {
     if arguments.is_empty() {
@@ -1274,23 +1319,32 @@ fn serialize_non_constant_value_for_js(value: &NonConstantValue) -> String {
 }
 
 fn get_nested_refetch_query_text(
-    root_refetched_paths: &[(PathToRefetchField, Vec<VariableName>)],
+    root_refetched_paths: &[RootRefetchedPath],
     nested_refetch_queries: &[PathToRefetchField],
 ) -> String {
     let mut s = "[".to_string();
     for nested_refetch_query in nested_refetch_queries.iter() {
-        let index = root_refetched_paths
+        let mut found_at_least_one = false;
+        for index in root_refetched_paths
             .iter()
             .enumerate()
-            .find_map(|(index, root_path)| {
-                if root_path.0 == *nested_refetch_query {
+            .filter_map(|(index, root_path)| {
+                if root_path.path == *nested_refetch_query {
                     Some(index)
                 } else {
                     None
                 }
             })
-            .expect("nested refetch query should be in root refetched paths");
-        s.push_str(&format!("{}, ", index));
+        {
+            found_at_least_one = true;
+            s.push_str(&format!("{}, ", index));
+        }
+
+        assert!(
+            found_at_least_one,
+            "nested refetch query should be in root refetched paths. \
+            This is indicative of a bug in Isograph."
+        );
     }
     s.push_str("]");
     s
@@ -1315,27 +1369,45 @@ fn generate_read_out_type(resolver_definition: &ValidatedSchemaResolver) -> Reso
 }
 
 fn generate_resolver_return_type_declaration(
-    action_kind: ResolverActionKind,
+    action_kind: &ResolverActionKind,
 ) -> ResolverReturnType {
     match action_kind {
-        ResolverActionKind::Identity => ResolverReturnType("ResolverParameterType".to_string()),
         ResolverActionKind::NamedImport(_) | ResolverActionKind::RefetchField => {
             ResolverReturnType("ReturnType<typeof resolver>".to_string())
         }
         // TODO what should this be
-        ResolverActionKind::MutationField => ResolverReturnType("any".to_string()),
+        ResolverActionKind::MutationField(_) => ResolverReturnType("any".to_string()),
     }
 }
 
-fn find_refetch_query_index(
-    paths: &[(PathToRefetchField, Vec<VariableName>)],
+fn find_refetch_query_index(paths: &[RootRefetchedPath], path: &[NameAndArguments]) -> usize {
+    paths
+        .iter()
+        .enumerate()
+        .find_map(|(index, path_to_field)| {
+            if &path_to_field.path.linked_fields == path
+                && path_to_field.field_name == "__refetch".intern().into()
+            {
+                Some(index)
+            } else {
+                None
+            }
+        })
+        .expect("Expected refetch query to be found")
+}
+
+fn find_mutation_query_index(
+    paths: &[RootRefetchedPath],
     path: &[NameAndArguments],
+    mutation_name: SelectableFieldName,
 ) -> usize {
     paths
         .iter()
         .enumerate()
         .find_map(|(index, path_to_field)| {
-            if &path_to_field.0.linked_fields == path {
+            if &path_to_field.path.linked_fields == path
+                && path_to_field.field_name == mutation_name
+            {
                 Some(index)
             } else {
                 None

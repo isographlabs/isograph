@@ -8,20 +8,29 @@ use common_lang_types::{
     ScalarFieldName, SelectableFieldName, ServerFieldNormalizationKey, Span, VariableName,
     WithLocation, WithSpan,
 };
-use graphql_lang_types::InputValueDefinition;
+use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    InputTypeId, LinkedFieldSelection, ObjectId, ResolverFieldId, ScalarFieldSelection, Selection,
-    SelectionFieldArgument, ServerFieldSelection, VariableDefinition,
+    DefinedTypeId, LinkedFieldSelection, ObjectId, ResolverFieldId, ScalarFieldSelection,
+    Selection, SelectionFieldArgument, ServerFieldSelection, VariableDefinition,
 };
 
 use crate::{
-    ArgumentKeyAndValue, DefinedField, NameAndArguments, PathToRefetchField, ResolverVariant,
-    SchemaObject, ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
-    ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
+    ArgumentKeyAndValue, DefinedField, MutationFieldResolverVariant, NameAndArguments,
+    PathToRefetchField, ResolverVariant, SchemaObject, ValidatedEncounteredDefinedField,
+    ValidatedScalarDefinedField, ValidatedSchema, ValidatedSchemaIdField, ValidatedSchemaObject,
+    ValidatedSchemaResolver, ValidatedSelection,
 };
 
 type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSelection>>;
+
+#[derive(Debug)]
+pub struct RootRefetchedPath {
+    pub path: PathToRefetchField,
+    pub variables: Vec<VariableName>,
+    // TODO This should not be an option
+    pub field_name: SelectableFieldName,
+}
 
 // TODO add id and typename variants, impl Ord, and get rid of the NormalizationKey enum
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -48,7 +57,7 @@ impl MergedServerFieldSelection {
 }
 
 pub fn get_variable_selections(
-    arguments: &[WithSpan<SelectionFieldArgument>],
+    arguments: &[WithLocation<SelectionFieldArgument>],
 ) -> HashSet<VariableName> {
     arguments
         .iter()
@@ -61,7 +70,7 @@ pub struct MergedScalarFieldSelection {
     pub name: WithLocation<ScalarFieldName>,
     // TODO calculate this when needed
     pub normalization_alias: Option<WithLocation<ScalarFieldAlias>>,
-    pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
+    pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -70,7 +79,7 @@ pub struct MergedLinkedFieldSelection {
     // TODO calculate this when needed
     pub normalization_alias: Option<WithLocation<LinkedFieldAlias>>,
     pub selection_set: Vec<WithSpan<MergedServerFieldSelection>>,
-    pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
+    pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
 }
 
 /// A merged selection set is an input for generating:
@@ -158,7 +167,7 @@ pub struct RefetchFieldResolverInfo {
     /// Used to look up what type to narrow on in the generated refetch query,
     /// among other things.
     pub refetch_field_parent_id: ObjectId,
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<InputTypeId>>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<DefinedTypeId>>>,
     pub root_parent_object: IsographObjectTypeName,
     pub root_fetchable_field: SelectableFieldName,
     // TODO wrap in a newtype
@@ -171,7 +180,7 @@ pub struct MutationFieldResolverInfo {
     /// Used to look up what type to narrow on in the generated refetch query,
     /// among other things.
     pub refetch_field_parent_id: ObjectId,
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<InputTypeId>>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<DefinedTypeId>>>,
     pub root_parent_object: IsographObjectTypeName,
     pub root_fetchable_field: SelectableFieldName,
     // TODO wrap in a newtype
@@ -179,7 +188,7 @@ pub struct MutationFieldResolverInfo {
     // Mutation name
     pub mutation_field_name: SelectableFieldName,
     pub mutation_primary_field_name: SelectableFieldName,
-    pub mutation_field_arguments: Vec<WithSpan<InputValueDefinition>>,
+    pub mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
 }
 
 /// This struct contains everything that is available when we start
@@ -219,10 +228,7 @@ pub fn create_merged_selection_set(
     artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
     // N.B. we call this for non-fetchable resolvers now, but that is a smell
     root_fetchable_resolver: &ValidatedSchemaResolver,
-) -> (
-    MergedSelectionSet,
-    Vec<(PathToRefetchField, Vec<VariableName>)>,
-) {
+) -> (MergedSelectionSet, Vec<RootRefetchedPath>) {
     let mut merge_traversal_state = MergeTraversalState::new(root_fetchable_resolver);
     let merged_selection_set = create_merged_selection_set_with_merge_traversal_state(
         schema,
@@ -250,6 +256,7 @@ pub fn create_merged_selection_set(
                             .variable_definitions
                             .iter()
                             .find(|definition| definition.item.name.item == *variable_name)
+                            // TODO make this an error, don't panic
                             .expect(&format!(
                                 "Did not find matching variable definition. \
                             This might not be validated yet. For now, each resolver \
@@ -261,8 +268,11 @@ pub fn create_merged_selection_set(
                     })
                     .collect();
 
+                // This is just horrible
+                let field_name;
                 match resolver_variant {
                     ResolverVariant::RefetchField => {
+                        field_name = "__refetch".intern().into();
                         artifact_queue.push(ArtifactQueueItem::RefetchField(
                             RefetchFieldResolverInfo {
                                 merged_selection_set: nested_merged_selection_set,
@@ -277,11 +287,13 @@ pub fn create_merged_selection_set(
                             },
                         ));
                     }
-                    ResolverVariant::MutationField((
+                    ResolverVariant::MutationField(MutationFieldResolverVariant {
                         mutation_name,
                         mutation_primary_field_name,
                         mutation_field_arguments,
-                    )) => {
+                        filtered_mutation_field_arguments: _,
+                    }) => {
+                        field_name = mutation_name;
                         artifact_queue.push(ArtifactQueueItem::MutationField(
                             MutationFieldResolverInfo {
                                 merged_selection_set: nested_merged_selection_set,
@@ -305,7 +317,11 @@ pub fn create_merged_selection_set(
                 let mut reachable_variables_vec: Vec<_> = reachable_variables.into_iter().collect();
                 reachable_variables_vec.sort();
 
-                (path_to_refetch_field, reachable_variables_vec)
+                RootRefetchedPath {
+                    path: path_to_refetch_field,
+                    variables: reachable_variables_vec,
+                    field_name,
+                }
             },
         )
         .collect();
@@ -509,17 +525,22 @@ fn merge_scalar_resolver_field(
             parent_type.id,
             ResolverVariant::RefetchField,
         ));
-    } else if let ResolverVariant::MutationField((_parent_field_name, primary_field_name, args)) =
-        &resolver_field.variant
+    } else if let ResolverVariant::MutationField(MutationFieldResolverVariant {
+        mutation_primary_field_name,
+        mutation_field_arguments,
+        filtered_mutation_field_arguments,
+        ..
+    }) = &resolver_field.variant
     {
         merge_traversal_state.paths_to_refetch_fields.push((
             merge_traversal_state.current_path.clone(),
             parent_type.id,
-            ResolverVariant::MutationField((
-                resolver_field.name,
-                *primary_field_name,
-                args.clone(),
-            )),
+            ResolverVariant::MutationField(MutationFieldResolverVariant {
+                mutation_name: resolver_field.name,
+                mutation_primary_field_name: *mutation_primary_field_name,
+                mutation_field_arguments: mutation_field_arguments.clone(),
+                filtered_mutation_field_arguments: filtered_mutation_field_arguments.clone(),
+            }),
         ));
     }
 }
@@ -564,7 +585,7 @@ fn merge_scalar_server_field(
 #[allow(non_snake_case)]
 fn HACK_combine_name_and_variables_into_normalization_alias(
     name: SelectableFieldName,
-    arguments: &[WithSpan<SelectionFieldArgument>],
+    arguments: &[WithLocation<SelectionFieldArgument>],
 ) -> ServerFieldNormalizationKey {
     if arguments.is_empty() {
         name.into()

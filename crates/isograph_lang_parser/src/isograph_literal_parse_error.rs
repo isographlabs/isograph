@@ -17,6 +17,9 @@ pub enum IsographLiteralParseError {
 
     #[error("Unparsed tokens remaining")]
     LeftoverTokens,
+
+    #[error("isograph literals must be immediately called, and passed a function")]
+    ExpectedAssociatedJsFunction,
 }
 
 impl From<LowLevelParseError> for IsographLiteralParseError {

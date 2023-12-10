@@ -16,9 +16,6 @@ pub struct ResolverDeclaration {
         Option<(Vec<WithSpan<Selection<(), ()>>>, Vec<WithSpan<Unwrap>>)>,
     pub directives: Vec<WithSpan<FragmentDirectiveUsage>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
-
-    // TODO convert these to ResolverActionKind
-    pub has_associated_js_function: bool,
     pub resolver_definition_path: ResolverDefinitionPath,
 }
 
@@ -129,7 +126,7 @@ pub struct ScalarFieldSelection<TScalarField> {
     pub normalization_alias: Option<WithLocation<ScalarFieldAlias>>,
     pub associated_data: TScalarField,
     pub unwraps: Vec<WithSpan<Unwrap>>,
-    pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
+    pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
 }
 
 impl<TScalarField> ScalarFieldSelection<TScalarField> {
@@ -173,7 +170,7 @@ pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
     pub associated_data: TLinkedField,
     pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
     pub unwraps: Vec<WithSpan<Unwrap>>,
-    pub arguments: Vec<WithSpan<SelectionFieldArgument>>,
+    pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
 }
 
 impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField> {

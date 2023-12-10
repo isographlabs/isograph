@@ -18,6 +18,14 @@ impl<TValue> TypeAnnotation<TValue> {
         }
     }
 
+    pub fn inner_mut(&mut self) -> &mut TValue {
+        match self {
+            TypeAnnotation::Named(named) => &mut named.0.item,
+            TypeAnnotation::List(list) => list.0.inner_mut(),
+            TypeAnnotation::NonNull(non_null) => non_null.inner_mut(),
+        }
+    }
+
     pub fn map<F, TNewValue>(self, f: F) -> TypeAnnotation<TNewValue>
     where
         F: FnOnce(TValue) -> TNewValue,
@@ -81,6 +89,13 @@ impl<TValue> NonNullTypeAnnotation<TValue> {
         match self {
             NonNullTypeAnnotation::Named(named) => &named.0.item,
             NonNullTypeAnnotation::List(list) => list.0.inner(),
+        }
+    }
+
+    pub fn inner_mut(&mut self) -> &mut TValue {
+        match self {
+            NonNullTypeAnnotation::Named(named) => &mut named.0.item,
+            NonNullTypeAnnotation::List(list) => list.0.inner_mut(),
         }
     }
 

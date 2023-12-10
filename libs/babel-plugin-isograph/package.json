@@ -1,0 +1,27 @@
+{
+  "name": "babel-plugin-isograph",
+  "description": "A Babel Plugin for use with Isograph applications.",
+  "version": "0.0.4",
+  "keywords": [
+    "graphql",
+    "isograph",
+    "babel",
+    "babel-plugin"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/isographlabs/isograph",
+    "directory": "libs/babel-plugin-isograph"
+  },
+  "dependencies": {
+    "babel-plugin-macros": "^2.0.0",
+    "cosmiconfig": "^5.0.5",
+    "graphql": "15.3.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "prettier": "2.8.8",
+    "prettier-plugin-hermes-parser": "0.16.0"
+  }
+}

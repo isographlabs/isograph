@@ -31,12 +31,6 @@ impl TryFrom<OutputTypeId> for ScalarId {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
-pub enum InputTypeId {
-    Scalar(ScalarId),
-    // InputObject
-}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 pub enum DefinedTypeId {
     Object(ObjectId),
     Scalar(ScalarId),
@@ -49,13 +43,4 @@ impl DefinedTypeId {
             DefinedTypeId::Scalar(id) => Some(OutputTypeId::Scalar(id)),
         }
     }
-
-    pub fn as_input_type_id(self) -> Option<InputTypeId> {
-        match self {
-            DefinedTypeId::Scalar(id) => Some(InputTypeId::Scalar(id)),
-            _ => None,
-        }
-    }
-
-    // as_scalar_id
 }

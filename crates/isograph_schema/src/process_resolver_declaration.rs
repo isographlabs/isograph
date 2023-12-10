@@ -4,15 +4,14 @@ use common_lang_types::{
     IsographDirectiveName, IsographObjectTypeName, Location, SelectableFieldName, TextSource,
     UnvalidatedTypeName, WithLocation, WithSpan,
 };
-use graphql_lang_types::InputValueDefinition;
+use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::string_key::Intern;
 use isograph_lang_types::{DefinedTypeId, FragmentDirectiveUsage, ObjectId, ResolverDeclaration};
 use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    DefinedField, ResolverActionKind, ResolverArtifactKind, ResolverTypeAndField, SchemaResolver,
-    UnvalidatedSchema,
+    DefinedField, ResolverActionKind, ResolverTypeAndField, SchemaResolver, UnvalidatedSchema,
 };
 
 impl UnvalidatedSchema {
@@ -41,7 +40,6 @@ impl UnvalidatedSchema {
                 let scalar_name = self.schema_data.scalars[scalar_id.as_usize()].name;
                 return Err(WithLocation::new(
                     ProcessResolverDeclarationError::InvalidParentType {
-                        parent_type: "scalar",
                         parent_type_name: scalar_name.item.into(),
                     },
                     Location::new(text_source, resolver_declaration.item.parent_type.span),
@@ -86,14 +84,10 @@ impl UnvalidatedSchema {
 
         let name = resolver_declaration.item.resolver_field_name.item.into();
         let variant = get_resolver_variant(&resolver_declaration.item.directives);
-        let resolver_action_kind = if resolver_declaration.item.has_associated_js_function {
-            ResolverActionKind::NamedImport((
-                resolver_field_name.into(),
-                resolver_declaration.item.resolver_definition_path,
-            ))
-        } else {
-            ResolverActionKind::Identity
-        };
+        let resolver_action_kind = ResolverActionKind::NamedImport((
+            resolver_field_name.into(),
+            resolver_declaration.item.resolver_definition_path,
+        ));
 
         // TODO variant should carry payloads, instead of this check
         if variant == ResolverVariant::Component {
@@ -111,7 +105,6 @@ impl UnvalidatedSchema {
             id: next_resolver_id,
             selection_set_and_unwraps: resolver_declaration.item.selection_set_and_unwraps,
             variant,
-            artifact_kind: get_resolver_artifact_kind(&resolver_declaration.item.directives),
             variable_definitions: resolver_declaration.item.variable_definitions,
             type_and_field: ResolverTypeAndField {
                 type_name: object.name,
@@ -134,9 +127,9 @@ pub enum ProcessResolverDeclarationError {
         parent_type_name: UnvalidatedTypeName,
     },
 
-    #[error("Invalid parent type. `{parent_type_name}` is a {parent_type}, but it should be an object or interface.")]
+    #[error("Invalid parent type. `{parent_type_name}` is a scalar. You are attempting to define a field on it. \
+        In order to do so, the parent object must be an object, interface or union.")]
     InvalidParentType {
-        parent_type: &'static str,
         parent_type_name: UnvalidatedTypeName,
     },
 
@@ -156,17 +149,19 @@ pub enum ProcessResolverDeclarationError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct MutationFieldResolverVariant {
+    pub mutation_name: SelectableFieldName,
+    pub mutation_primary_field_name: SelectableFieldName,
+    pub mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+    pub filtered_mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ResolverVariant {
     Component,
     Eager,
     RefetchField,
-    MutationField(
-        (
-            SelectableFieldName,
-            SelectableFieldName,
-            Vec<WithSpan<InputValueDefinition>>,
-        ),
-    ),
+    MutationField(MutationFieldResolverVariant),
 }
 
 impl fmt::Display for ResolverVariant {
@@ -182,7 +177,6 @@ impl fmt::Display for ResolverVariant {
 
 lazy_static! {
     static ref COMPONENT: IsographDirectiveName = "component".intern().into();
-    static ref FETCHABLE: IsographDirectiveName = "fetchable".intern().into();
 }
 
 fn get_resolver_variant(directives: &[WithSpan<FragmentDirectiveUsage>]) -> ResolverVariant {
@@ -192,15 +186,4 @@ fn get_resolver_variant(directives: &[WithSpan<FragmentDirectiveUsage>]) -> Reso
         }
     }
     return ResolverVariant::Eager;
-}
-
-fn get_resolver_artifact_kind(
-    directives: &[WithSpan<FragmentDirectiveUsage>],
-) -> ResolverArtifactKind {
-    for directive in directives.iter() {
-        if directive.item.name.item == *FETCHABLE {
-            return ResolverArtifactKind::FetchableOnQuery;
-        }
-    }
-    ResolverArtifactKind::NonFetchable
 }

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use common_lang_types::IsographObjectTypeName;
-use isograph_schema::ResolverTypeAndField;
+use isograph_schema::{ResolverTypeAndField, ResolverVariant};
 
 use crate::generate_artifacts::{
     EntrypointArtifact, ReaderArtifact, RefetchArtifact, ResolverImport, ResolverReadOutType,
@@ -25,15 +25,18 @@ impl<'schema> EntrypointArtifact<'schema> {
             const queryText = '{query_text}';\n\n\
             const normalizationAst: NormalizationAst = {normalization_ast};\n\
             const artifact: IsographFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {{\n\
-            {}kind: 'FetchableResolver',\n\
+            {}kind: \"FetchableResolver\",\n\
             {}queryText,\n\
             {}normalizationAst,\n\
             {}nestedRefetchQueries,\n\
-            {}readerAst: readerResolver.readerAst,\n\
-            {}resolver: readerResolver.resolver,\n\
+            {}readerArtifact: readerResolver,\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ",
+            "  ",
+            "  ",
+            "  ",
+            "  ",
+            "  ",
         )
     }
 }
@@ -48,6 +51,8 @@ impl<'schema> ReaderArtifact<'schema> {
             reader_ast,
             nested_resolver_artifact_imports,
             parent_type,
+            resolver_variant,
+            resolver_field_name,
             ..
         } = self;
         let nested_resolver_import_statement = nested_resolver_names_to_import_statement(
@@ -56,8 +61,17 @@ impl<'schema> ReaderArtifact<'schema> {
         );
         let read_out_type_text = get_read_out_type_text(resolver_read_out_type);
 
+        // We are not modeling this well, I think.
+        let variant = match resolver_variant {
+            ResolverVariant::Component => {
+                let parent_name = parent_type.name;
+                format!("{{ kind: \"Component\", componentName: \"{parent_name}.{resolver_field_name}\" }}")
+            }
+            _ => "{ kind: \"Eager\" }".to_string(),
+        };
+
         format!(
-            "import type {{IsographNonFetchableResolver, ReaderAst}} from '@isograph/react';\n\
+            "import type {{ReaderArtifact, ReaderAst}} from '@isograph/react';\n\
             {resolver_import_statement}\n\
             {nested_resolver_import_statement}\n\
             {read_out_type_text}\n\n\
@@ -66,12 +80,14 @@ impl<'schema> ReaderArtifact<'schema> {
             export type ResolverParameterType = {resolver_parameter_type};\n\n\
             // The type, when returned from the resolver\n\
             export type ResolverReturnType = {resolver_return_type};\n\n\
-            const artifact: IsographNonFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {{\n\
-            {}kind: 'NonFetchableResolver',\n\
+            const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOutType> = {{\n\
+            {}kind: \"ReaderArtifact\",\n\
             {}resolver: resolver as any,\n\
             {}readerAst,\n\
+            {}variant: {variant},\n\
             }};\n\n\
             export default artifact;\n",
+            "  ",
             "  ",
             "  ",
             "  ",

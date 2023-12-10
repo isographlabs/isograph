@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { iso, read, useLazyReference, subscribe } from "@isograph/react";
+import { iso, read, useLazyReference, subscribe, isoFetch } from "@isograph/react";
 import { Container } from "@mui/material";
 
-import homePageQuery from "./__isograph/Query/home_page.isograph";
+import homePageQuery from "./__isograph/Query/home_page/entrypoint.isograph";
 import { FullPageLoading, Route } from "./github_demo";
 import { RepoLink } from "./RepoLink";
 
@@ -12,6 +12,10 @@ iso`
     home_page_list_wrapper,
   }
 `;
+
+isoFetch`
+  Query.home_page
+`
 
 // home_page_list_wrapper exists solely to test some __refetch things.
 export const home_page_list_wrapper = iso`

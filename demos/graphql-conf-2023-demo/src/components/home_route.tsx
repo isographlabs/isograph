@@ -1,37 +1,26 @@
 import React from "react";
-import { iso, read, useLazyReference, isoFetch } from "@isograph/react";
+import { iso } from "@isograph/react";
 import { Container, Stack } from "@mui/material";
-import { type Route } from "./router";
+import { ResolverParameterType as HomeRouteParams } from "@iso/Query/home_route/reader.isograph";
 
-import homeRouteQuery from "../__isograph/Query/home_route/entrypoint.isograph";
-console.log({homeRouteQuery})
-
-iso`
-  Query.home_route @fetchable {
+export const home_route = iso<HomeRouteParams, ReturnType<typeof HomeRoute>>`
+  Query.home_route @component {
     pets {
       id,
       pet_summary_card,
     },
   }
-`;
+`(HomeRoute);
 
-isoFetch`
-  Query.home_route
-`
-
-
-export function HomeRoute({ navigateTo }: { navigateTo: (path: Route) => void }) {
-  const { queryReference } = useLazyReference(homeRouteQuery, {});
-  const data = read(queryReference);
-
+function HomeRoute(props: HomeRouteParams) {
   return (
     <Container maxWidth="md">
       <h1>Robert's Pet List 3000</h1>
       <Stack direction="column" spacing={4}>
-        {data.pets.map((pet) => (
+        {props.data.pets.map((pet) => (
           <React.Fragment key={pet.id}>
             {pet.pet_summary_card({
-              navigateTo,
+              navigateTo: props.navigateTo,
             })}
           </React.Fragment>
         ))}

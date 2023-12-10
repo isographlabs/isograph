@@ -3,3 +3,4 @@ license = "MIT"
 
 [workspace]
 members = ["./crates/*"]
+resolver = "2"

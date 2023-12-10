@@ -57,18 +57,13 @@ pub fn parse_iso_fetch(
 pub fn parse_iso_literal(
     iso_literal_text: &str,
     definition_file_path: ResolverDefinitionPath,
-    has_associated_js_function: bool,
     text_source: TextSource,
 ) -> ParseResultWithLocation<WithSpan<ResolverDeclaration>> {
     let mut tokens = PeekableLexer::new(iso_literal_text);
 
-    let resolver_declaration = parse_resolver_declaration(
-        &mut tokens,
-        definition_file_path,
-        has_associated_js_function,
-        text_source,
-    )
-    .map_err(|with_span| with_span_to_with_location(with_span, text_source))?;
+    let resolver_declaration =
+        parse_resolver_declaration(&mut tokens, definition_file_path, text_source)
+            .map_err(|with_span| with_span_to_with_location(with_span, text_source))?;
 
     if let Some(span) = tokens.remaining_token_span() {
         return Err(WithLocation::new(
@@ -83,7 +78,6 @@ pub fn parse_iso_literal(
 fn parse_resolver_declaration<'a>(
     tokens: &mut PeekableLexer<'a>,
     definition_file_path: ResolverDefinitionPath,
-    has_associated_js_function: bool,
     text_source: TextSource,
 ) -> ParseResultWithSpan<WithSpan<ResolverDeclaration>> {
     let resolver_declaration = tokens
@@ -120,7 +114,6 @@ fn parse_resolver_declaration<'a>(
                 resolver_definition_path: definition_file_path,
                 directives,
                 variable_definitions,
-                has_associated_js_function,
             })
         })
         .transpose();
@@ -194,7 +187,7 @@ fn parse_selection<'a>(
             let alias = alias.map(|alias| with_span_to_with_location(alias, text_source));
 
             // TODO distinguish field groups
-            let arguments = parse_optional_arguments(tokens)?;
+            let arguments = parse_optional_arguments(tokens, text_source)?;
 
             // If we encounter a selection set, we are parsing a linked field. Otherwise, a scalar field.
             let selection_set = parse_optional_selection_set(tokens, text_source)?;
@@ -292,12 +285,17 @@ fn parse_directives(
 
 fn parse_optional_arguments(
     tokens: &mut PeekableLexer,
-) -> ParseResultWithSpan<Vec<WithSpan<SelectionFieldArgument>>> {
+    text_source: TextSource,
+) -> ParseResultWithSpan<Vec<WithLocation<SelectionFieldArgument>>> {
     if tokens
         .parse_token_of_kind(IsographLangTokenKind::OpenParen)
         .is_ok()
     {
-        let arguments = parse_delimited_list(tokens, parse_argument, IsographLangTokenKind::Comma)?;
+        let arguments = parse_delimited_list(
+            tokens,
+            move |tokens| parse_argument(tokens, text_source),
+            IsographLangTokenKind::Comma,
+        )?;
         tokens
             .parse_token_of_kind(IsographLangTokenKind::CloseParen)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
@@ -309,7 +307,8 @@ fn parse_optional_arguments(
 
 fn parse_argument(
     tokens: &mut PeekableLexer<'_>,
-) -> ParseResultWithSpan<WithSpan<SelectionFieldArgument>> {
+    text_source: TextSource,
+) -> ParseResultWithSpan<WithLocation<SelectionFieldArgument>> {
     let argument = tokens
         .with_span(|tokens| {
             let name = tokens
@@ -322,7 +321,7 @@ fn parse_argument(
             Ok::<_, WithSpan<IsographLiteralParseError>>(SelectionFieldArgument { name, value })
         })
         .transpose()?;
-    Ok(argument)
+    Ok(with_span_to_with_location(argument, text_source))
 }
 
 fn parse_non_constant_value(
@@ -463,7 +462,7 @@ fn from_control_flow<T, E>(control_flow: impl FnOnce() -> ControlFlow<T, E>) -> 
 #[allow(non_snake_case)]
 fn HACK_combine_name_and_variables_into_normalization_alias<T: StringKeyNewtype>(
     name: WithLocation<SelectableFieldName>,
-    arguments: &[WithSpan<SelectionFieldArgument>],
+    arguments: &[WithLocation<SelectionFieldArgument>],
 ) -> Option<WithLocation<T>> {
     if arguments.is_empty() {
         None

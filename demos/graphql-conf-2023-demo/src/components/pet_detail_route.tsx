@@ -1,37 +1,27 @@
 import React from "react";
-import { iso, read, useLazyReference , isoFetch } from "@isograph/react";
+import { iso } from "@isograph/react";
 import { Container, Stack } from "@mui/material";
+import { ResolverParameterType as PetDetailRouteParams } from "@iso/Query/pet_detail_route/reader.isograph";
 
-import petDetailRouteQuery from "../__isograph/Query/pet_detail_route/entrypoint.isograph";
-import { PetDetailRoute, Route } from "./router";
-
-iso`
-  Query.pet_detail_route($id: ID!) @fetchable {
+export const pet_detail_route = iso<
+  PetDetailRouteParams,
+  ReturnType<typeof PetDetailRouteComponent>
+>`
+  Query.pet_detail_route($id: ID!) @component {
     pet(id: $id) {
       name,
       pet_checkins_card,
       pet_best_friend_card,
       pet_phrase_card,
+      pet_tagline_card,
     },
   }
-`;
+`(PetDetailRouteComponent);
 
-isoFetch`
-  Query.pet_detail_route
-`
-
-export function PetDetailRoute({
-  route,
+export function PetDetailRouteComponent({
+  data,
   navigateTo,
-}: {
-  route: PetDetailRoute;
-  navigateTo: (route: Route) => void;
-}) {
-  const { queryReference } = useLazyReference(petDetailRouteQuery, {
-    id: route.id,
-  });
-  const data = read(queryReference);
-
+}: PetDetailRouteParams) {
   return (
     <Container maxWidth="md">
       <h1>Pet Detail for {data.pet?.name}</h1>
@@ -47,6 +37,7 @@ export function PetDetailRoute({
           <Stack direction="column" spacing={4}>
             {data.pet?.pet_best_friend_card({})}
             {data.pet?.pet_phrase_card({})}
+            {data.pet?.pet_tagline_card({})}
           </Stack>
         </Stack>
       </React.Suspense>

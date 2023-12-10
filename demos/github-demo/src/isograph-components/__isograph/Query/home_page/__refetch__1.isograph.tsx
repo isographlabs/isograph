@@ -1,6 +1,6 @@
 import type {IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst} from '@isograph/react';
 const queryText = 'mutation UserStatus__update_user_bio ($first: Int!, $id: ID!, $bio: String) {\
-update_user_bio____bio___$bio: update_user_bio(bio: $bio) {\
+update_user_bio____bio___bio____id___id: update_user_bio(bio: $bio, id: $id) {\
 user { \
   id,\
   emoji,\
@@ -19,6 +19,11 @@ const normalizationAst: NormalizationAst = [{
     {
       argumentName: "bio",
       variableName: "bio",
+    },
+
+    {
+      argumentName: "id",
+      variableName: "id",
     },
   ],
   selections: [

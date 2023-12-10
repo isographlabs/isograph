@@ -2,7 +2,7 @@ import React from "react";
 import { iso } from "@isograph/react";
 import { Avatar, Card, CardContent, Stack } from "@mui/material";
 
-import { ResolverParameterType as PetSummaryCardParams } from "../__isograph/Pet/pet_summary_card.isograph";
+import { ResolverParameterType as PetSummaryCardParams } from "@iso/Pet/pet_summary_card/reader.isograph";
 
 export const pet_summary_card = iso<
   PetSummaryCardParams,

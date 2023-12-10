@@ -2,7 +2,7 @@
 
 > The best way to build React apps backed by GraphQL data
 
-- See [the developer experience of using Isograph](https://www.youtube.com/watch?v=f1nfXc3VeTk).
+- Watch the [talk at GraphQL Conf](https://www.youtube.com/watch?v=gO65JJRqjuc).
 - Join the discord: https://discord.gg/Q2c5tM5T8A (#isograph channel on the GraphQL discord.)
 - [Follow the official twitter account](https://twitter.com/isographlabs)
 
@@ -106,6 +106,11 @@ At the root of a page, you will define a fetchable literal. For any given fetcha
 
 - Join the discord: https://discord.gg/Q2c5tM5T8A (#isograph channel on the GraphQL discord.)
 - [Follow the official twitter account](https://twitter.com/isographlabs)
+
+## Other, older resources
+
+- See [the developer experience of using Isograph](https://www.youtube.com/watch?v=f1nfXc3VeTk).
+- Read [the substack article](https://isograph.substack.com/p/introducing-isograph).
 
 ## Licensing
 

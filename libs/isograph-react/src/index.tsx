@@ -13,7 +13,14 @@ import { useLazyDisposableState } from "@isograph/react-disposable-state";
 import { type PromiseWrapper } from "./PromiseWrapper";
 import React from "react";
 
-export { setNetwork, makeNetworkRequest, subscribe, DataId, Link, StoreRecord } from "./cache";
+export {
+  setNetwork,
+  makeNetworkRequest,
+  subscribe,
+  DataId,
+  Link,
+  StoreRecord,
+} from "./cache";
 
 // This type should be treated as an opaque type.
 export type IsographFetchableResolver<
@@ -24,32 +31,24 @@ export type IsographFetchableResolver<
   kind: "FetchableResolver";
   queryText: string;
   normalizationAst: NormalizationAst;
-  readerAst: ReaderAst<TReadFromStore>;
-  resolver: (data: TResolverProps) => TResolverResult;
-  nestedRefetchQueries: RefetchQueryArtifactWrapper[];
-};
-
-export type IsographNonFetchableResolver<
-  TReadFromStore extends Object,
-  TResolverProps,
-  TResolverResult
-> = {
-  kind: "NonFetchableResolver";
-  readerAst: ReaderAst<TReadFromStore>;
-  resolver: (data: TResolverProps) => TResolverResult;
-};
-
-export type IsographResolver<
-  TReadFromStore extends Object,
-  TResolverProps,
-  TResolverResult
-> =
-  | IsographFetchableResolver<TReadFromStore, TResolverProps, TResolverResult>
-  | IsographNonFetchableResolver<
+  readerArtifact: ReaderArtifact<
     TReadFromStore,
     TResolverProps,
     TResolverResult
   >;
+  nestedRefetchQueries: RefetchQueryArtifactWrapper[];
+};
+
+export type ReaderArtifact<
+  TReadFromStore extends Object,
+  TResolverProps,
+  TResolverResult
+> = {
+  kind: "ReaderArtifact";
+  readerAst: ReaderAst<TReadFromStore>;
+  resolver: (data: TResolverProps) => TResolverResult;
+  variant: ReaderResolverVariant;
+};
 
 export type ReaderAstNode =
   | ReaderScalarField
@@ -75,12 +74,16 @@ export type ReaderLinkedField = {
   arguments: Arguments | null;
 };
 
-export type ReaderResolverVariant = "Eager" | "Component";
+export type ReaderResolverVariant =
+  | { kind: "Eager" }
+  // componentName is the component's cacheKey for getRefReaderByName
+  // and is the type + field concatenated
+  | { kind: "Component"; componentName: string };
+
 export type ReaderResolverField = {
   kind: "Resolver";
   alias: string;
-  resolver: IsographResolver<any, any, any>;
-  variant: ReaderResolverVariant;
+  readerArtifact: ReaderArtifact<any, any, any>;
   arguments: Arguments | null;
   usedRefetchQueries: number[];
 };
@@ -88,14 +91,16 @@ export type ReaderResolverField = {
 export type ReaderRefetchField = {
   kind: "RefetchField";
   alias: string;
-  resolver: IsographResolver<any, any, any>;
+  // TODO this bad modeling. A refetch field cannot have variant: "Component" (I think)
+  readerArtifact: ReaderArtifact<any, any, any>;
   refetchQuery: number;
 };
 
 export type ReaderMutationField = {
   kind: "MutationField";
   alias: string;
-  resolver: IsographResolver<any, any, any>;
+  // TODO this bad modeling. A mutation field cannot have variant: "Component" (I think)
+  readerArtifact: ReaderArtifact<any, any, any>;
   refetchQuery: number;
   allowedVariables: string[];
 };
@@ -119,6 +124,7 @@ export type NormalizationLinkedField = {
   selections: NormalizationAst;
 };
 
+// This is more like an entrypoint, but one specifically for a refetch query/mutation
 export type RefetchQueryArtifact = {
   kind: "RefetchQuery";
   queryText: string;
@@ -143,15 +149,22 @@ export type FragmentReference<
   TResolverResult
 > = {
   kind: "FragmentReference";
-  readerAst: ReaderAst<TReadFromStore>;
+  readerArtifact: ReaderArtifact<
+    TReadFromStore,
+    TResolverProps,
+    TResolverResult
+  >;
   root: DataId;
-  resolver: (props: TResolverProps) => TResolverResult;
   variables: { [index: string]: string } | null;
   // TODO: We should instead have ReaderAst<TResolverProps>
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
-export function isoFetch(_text: TemplateStringsArray): void {}
+export function isoFetch<T extends IsographFetchableResolver<any, any, any>>(
+  _text: TemplateStringsArray
+): T {
+  return void 0 as any;
+}
 
 export function iso<TResolverParameter, TResolverReturn = TResolverParameter>(
   _queryText: TemplateStringsArray
@@ -178,7 +191,7 @@ export function useLazyReference<
   TResolverProps,
   TResolverResult
 >(
-  artifact: IsographFetchableResolver<
+  fetchableResolverArtifact: IsographFetchableResolver<
     TReadFromStore,
     TResolverProps,
     TResolverResult
@@ -192,21 +205,24 @@ export function useLazyReference<
   >;
 } {
   // Typechecking fails here... TODO investigate
-  const cache = getOrCreateCacheForArtifact(artifact, variables);
+  const cache = getOrCreateCacheForArtifact(
+    fetchableResolverArtifact,
+    variables
+  );
 
   // TODO add comment explaining why we never use this value
   // @ts-ignore
   const data =
     // @ts-ignore
     useLazyDisposableState<PromiseWrapper<TResolverResult>>(cache).state;
+
   return {
     queryReference: {
       kind: "FragmentReference",
-      readerAst: artifact.readerAst,
+      readerArtifact: fetchableResolverArtifact.readerArtifact,
       root: ROOT_ID,
-      resolver: artifact.resolver,
       variables,
-      nestedRefetchQueries: artifact.nestedRefetchQueries,
+      nestedRefetchQueries: fetchableResolverArtifact.nestedRefetchQueries,
     },
   };
 }
@@ -216,27 +232,53 @@ export function read<
   TResolverProps,
   TResolverResult
 >(
-  reference: FragmentReference<TReadFromStore, TResolverProps, TResolverResult>
+  fragmentReference: FragmentReference<
+    TReadFromStore,
+    TResolverProps,
+    TResolverResult
+  >
 ): TResolverResult {
-  const response = readData(
-    reference.readerAst,
-    reference.root,
-    reference.variables ?? {},
-    reference.nestedRefetchQueries
-  );
-  console.log("done reading", { response });
-  if (response.kind === "MissingData") {
-    throw onNextChange();
-  } else {
-    return reference.resolver(response.data);
+  const variant = fragmentReference.readerArtifact.variant;
+  if (variant.kind === "Eager") {
+    const data = readData(
+      fragmentReference.readerArtifact.readerAst,
+      fragmentReference.root,
+      fragmentReference.variables ?? {},
+      fragmentReference.nestedRefetchQueries
+    );
+    if (data.kind === "MissingData") {
+      throw onNextChange();
+    } else {
+      return fragmentReference.readerArtifact.resolver(data.data);
+    }
+  } else if (variant.kind === "Component") {
+    return (additionalRuntimeProps: any) => {
+      // TODO also incorporate the typename
+      const RefReaderForName = getRefReaderForName(variant.componentName);
+      // TODO do not create a new reference on every render?
+      return (
+        <RefReaderForName
+          reference={{
+            kind: "FragmentReference",
+            readerArtifact: fragmentReference.readerArtifact,
+            root: fragmentReference.root,
+            variables: fragmentReference.variables,
+            nestedRefetchQueries: fragmentReference.nestedRefetchQueries,
+          }}
+          additionalRuntimeProps={additionalRuntimeProps}
+        />
+      );
+    };
   }
+  // Why can't Typescript realize that this is unreachable??
+  throw new Error("This is unreachable");
 }
 
 export function readButDoNotEvaluate<TReadFromStore extends Object>(
   reference: FragmentReference<TReadFromStore, unknown, unknown>
 ): TReadFromStore {
   const response = readData(
-    reference.readerAst,
+    reference.readerArtifact.readerAst,
     reference.root,
     reference.variables ?? {},
     reference.nestedRefetchQueries
@@ -251,14 +293,14 @@ export function readButDoNotEvaluate<TReadFromStore extends Object>(
 
 type ReadDataResult<TReadFromStore> =
   | {
-    kind: "Success";
-    data: TReadFromStore;
-  }
+      kind: "Success";
+      data: TReadFromStore;
+    }
   | {
-    kind: "MissingData";
-    reason: string;
-    nestedReason?: ReadDataResult<unknown>;
-  };
+      kind: "MissingData";
+      reason: string;
+      nestedReason?: ReadDataResult<unknown>;
+    };
 
 function readData<TReadFromStore>(
   ast: ReaderAst<TReadFromStore>,
@@ -386,7 +428,7 @@ function readData<TReadFromStore>(
       }
       case "RefetchField": {
         const data = readData(
-          field.resolver.readerAst,
+          field.readerArtifact.readerAst,
           root,
           variables,
           // Refetch fields just read the id, and don't need refetch query artifacts
@@ -408,18 +450,21 @@ function readData<TReadFromStore>(
           const refetchQueryArtifact = refetchQuery.artifact;
           const allowedVariables = refetchQuery.allowedVariables;
 
-          target[field.alias] = field.resolver.resolver(refetchQueryArtifact, {
-            ...data.data,
-            // TODO continue from here
-            // variables need to be filtered for what we need just for the refetch query
-            ...filterVariables(variables, allowedVariables),
-          });
+          target[field.alias] = field.readerArtifact.resolver(
+            refetchQueryArtifact,
+            {
+              ...data.data,
+              // TODO continue from here
+              // variables need to be filtered for what we need just for the refetch query
+              ...filterVariables(variables, allowedVariables),
+            }
+          );
         }
         break;
       }
       case "MutationField": {
         const data = readData(
-          field.resolver.readerAst,
+          field.readerArtifact.readerAst,
           root,
           variables,
           // Refetch fields just read the id, and don't need refetch query artifacts
@@ -441,10 +486,11 @@ function readData<TReadFromStore>(
           const refetchQueryArtifact = refetchQuery.artifact;
           const allowedVariables = refetchQuery.allowedVariables;
 
-          target[field.alias] = field.resolver.resolver(refetchQueryArtifact, {
-            ...data.data, // id variable
-            ...filterVariables(variables, allowedVariables),
-          });
+          target[field.alias] = field.readerArtifact.resolver(
+            refetchQueryArtifact,
+            data.data,
+            filterVariables(variables, allowedVariables)
+          );
         }
         break;
       }
@@ -454,9 +500,10 @@ function readData<TReadFromStore>(
           (index) => nestedRefetchQueries[index]
         );
 
-        if (field.variant === "Eager") {
+        const variant = field.readerArtifact.variant;
+        if (variant.kind === "Eager") {
           const data = readData(
-            field.resolver.readerAst,
+            field.readerArtifact.readerAst,
             root,
             variables,
             resolverRefetchQueries
@@ -468,22 +515,19 @@ function readData<TReadFromStore>(
               nestedReason: data,
             };
           } else {
-            target[field.alias] = field.resolver.resolver(data.data);
+            target[field.alias] = field.readerArtifact.resolver(data.data);
           }
-        } else if (field.variant === "Component") {
-          // const data = readData(field.resolver.readerAst, root);
-          const resolverFunction = field.resolver.resolver;
+        } else if (variant.kind === "Component") {
           target[field.alias] = (additionalRuntimeProps: any) => {
             // TODO also incorporate the typename
-            const RefReaderForName = getRefReaderForName(field.alias);
+            const RefReaderForName = getRefReaderForName(variant.componentName);
             // TODO do not create a new reference on every render?
             return (
               <RefReaderForName
                 reference={{
                   kind: "FragmentReference",
-                  readerAst: field.resolver.readerAst,
+                  readerArtifact: field.readerArtifact,
                   root,
-                  resolver: resolverFunction,
                   variables,
                   nestedRefetchQueries: resolverRefetchQueries,
                 }}
@@ -499,7 +543,6 @@ function readData<TReadFromStore>(
   return { kind: "Success", data: target as any };
 }
 
-
 let customMissingFieldHandler: typeof defaultMissingFieldHandler | null = null;
 
 function missingFieldHandler(
@@ -507,10 +550,16 @@ function missingFieldHandler(
   root: DataId,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
-  variables: { [index: string]: any } | null,
+  variables: { [index: string]: any } | null
 ): Link | undefined {
   if (customMissingFieldHandler != null) {
-    return customMissingFieldHandler(storeRecord, root, fieldName, arguments_, variables);
+    return customMissingFieldHandler(
+      storeRecord,
+      root,
+      fieldName,
+      arguments_,
+      variables
+    );
   } else {
     return defaultMissingFieldHandler(
       storeRecord,
@@ -518,7 +567,7 @@ function missingFieldHandler(
       fieldName,
       arguments_,
       variables
-    )
+    );
   }
 }
 
@@ -570,7 +619,11 @@ export function getRefReaderForName(name: string) {
       additionalRuntimeProps: any;
     }) {
       const data = readButDoNotEvaluate(reference);
-      return reference.resolver({ data, ...additionalRuntimeProps });
+
+      return reference.readerArtifact.resolver({
+        data,
+        ...additionalRuntimeProps,
+      });
     }
     Component.displayName = `${name} @component`;
     refReaders[name] = Component;

@@ -1,12 +1,14 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    IsographObjectTypeName, Location, ScalarTypeName, SelectableFieldName, Span,
-    UnvalidatedTypeName, WithLocation, WithSpan,
+    DescriptionValue, DirectiveArgumentName, DirectiveName, InputValueName, IsographObjectTypeName,
+    Location, ScalarTypeName, SelectableFieldName, Span, StringLiteralValue, TextSource,
+    UnvalidatedTypeName, ValueKeyName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    InputValueDefinition, NamedTypeAnnotation, NonNullTypeAnnotation, OutputFieldDefinition,
-    ScalarTypeDefinition, TypeAnnotation, TypeSystemDefinition, TypeSystemDocument,
+    ConstantValue, Directive, GraphQLInputValueDefinition, GraphQLObjectTypeDefinition,
+    GraphQLOutputFieldDefinition, GraphQLScalarTypeDefinition, GraphQLTypeSystemDefinition,
+    GraphQLTypeSystemDocument, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -17,23 +19,30 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    DefinedField, IsographObjectTypeDefinition, ResolverActionKind, ResolverArtifactKind,
-    ResolverTypeAndField, ResolverVariant, Schema, SchemaObject, SchemaResolver, SchemaScalar,
-    SchemaServerField, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
+    DefinedField, IsographObjectTypeDefinition, MutationFieldResolverActionKindInfo,
+    MutationFieldResolverVariant, ResolverActionKind, ResolverTypeAndField, ResolverVariant,
+    Schema, SchemaObject, SchemaResolver, SchemaScalar, SchemaServerField,
+    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
     UnvalidatedSchemaResolver, ValidRefinement, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
 };
 
 lazy_static! {
     static ref QUERY_TYPE: IsographObjectTypeName = "Query".intern().into();
     static ref MUTATION_TYPE: IsographObjectTypeName = "Mutation".intern().into();
+    static ref PRIMARY_DIRECTIVE: DirectiveName = "primary".intern().into();
+    static ref PATH_DIRECTIVE_ARGUMENT: DirectiveArgumentName = "path".intern().into();
+    static ref FIELD_MAP_DIRECTIVE_ARGUMENT: DirectiveArgumentName = "field_map".intern().into();
+    static ref FROM_VALUE_KEY_NAME: ValueKeyName = "from".intern().into();
+    static ref TO_VALUE_KEY_NAME: ValueKeyName = "to".intern().into();
 }
 
 type TypeRefinementMap = HashMap<IsographObjectTypeName, Vec<WithLocation<ObjectId>>>;
 
 impl UnvalidatedSchema {
-    pub fn process_type_system_document(
+    pub fn process_graphql_type_system_document(
         &mut self,
-        type_system_document: TypeSystemDocument,
+        type_system_document: GraphQLTypeSystemDocument,
+        text_source: TextSource,
     ) -> ProcessTypeDefinitionResult<()> {
         // In the schema, interfaces, unions and objects are the same type of object (SchemaType),
         // with e.g. interfaces "simply" being objects that can be refined to other
@@ -45,28 +54,49 @@ impl UnvalidatedSchema {
         //   to the found interface.
         let mut valid_type_refinement_map = HashMap::new();
 
+        let mut mutation_field_infos = vec![];
         let mut mutation_type_id = None;
         for type_system_definition in type_system_document.0 {
             match type_system_definition {
-                TypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
-                    let mutation_id = self.process_object_type_definition(
-                        object_type_definition.into(),
+                GraphQLTypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
+                    let next_object_id = self.schema_data.objects.len().into();
+                    let (object_type_definition, mutation_field_info) =
+                        convert_and_extract_mutation_field_info(
+                            object_type_definition,
+                            text_source,
+                            next_object_id,
+                        )?;
+
+                    if let Some(mutation_field_info) = mutation_field_info {
+                        mutation_field_infos.push(mutation_field_info);
+                    }
+
+                    let (_new_object_id, mutation_id) = self.process_object_type_definition(
+                        object_type_definition,
                         &mut valid_type_refinement_map,
                     )?;
                     if let Some(mutation_id) = mutation_id {
                         mutation_type_id = Some(mutation_id);
                     }
                 }
-                TypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
+                GraphQLTypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
                     self.process_scalar_definition(scalar_type_definition)?;
                     // N.B. we assume that Mutation will be an object, not a scalar
                 }
-                TypeSystemDefinition::InterfaceTypeDefinition(interface_type_definition) => {
+                GraphQLTypeSystemDefinition::InterfaceTypeDefinition(interface_type_definition) => {
                     self.process_object_type_definition(
                         interface_type_definition.into(),
                         &mut valid_type_refinement_map,
                     )?;
                     // N.B. we assume that Mutation will be an object, not an interface
+                }
+                GraphQLTypeSystemDefinition::InputObjectTypeDefinition(
+                    input_object_type_definition,
+                ) => {
+                    self.process_object_type_definition(
+                        input_object_type_definition.into(),
+                        &mut valid_type_refinement_map,
+                    )?;
                 }
             }
         }
@@ -122,7 +152,7 @@ impl UnvalidatedSchema {
         }
 
         if let Some(mutation_id) = mutation_type_id {
-            self.add_mutation_fields(mutation_id)?;
+            self.add_mutation_fields(mutation_id, mutation_field_infos, text_source)?;
         }
 
         Ok(())
@@ -130,9 +160,10 @@ impl UnvalidatedSchema {
 
     fn process_object_type_definition(
         &mut self,
-        type_definition: IsographObjectTypeDefinition,
+        object_type_definition: IsographObjectTypeDefinition,
         valid_type_refinement_map: &mut TypeRefinementMap,
-    ) -> ProcessTypeDefinitionResult<Option<ObjectId>> {
+        // TODO don't return a tuple, but a struct with named fields
+    ) -> ProcessTypeDefinitionResult<(ObjectId, Option<ObjectId>)> {
         let &mut Schema {
             fields: ref mut schema_fields,
             ref mut schema_data,
@@ -144,19 +175,20 @@ impl UnvalidatedSchema {
         let ref mut type_names = schema_data.defined_types;
         let ref mut objects = schema_data.objects;
         let mut mutation_id = None;
-        match type_names.entry(type_definition.name.item.into()) {
+        match type_names.entry(object_type_definition.name.item.into()) {
             Entry::Occupied(_) => {
                 return Err(WithLocation::new(
                     ProcessTypeDefinitionError::DuplicateTypeDefinition {
+                        // BUG: this could be an interface, actually
                         type_definition_type: "object",
-                        type_name: type_definition.name.item.into(),
+                        type_name: object_type_definition.name.item.into(),
                     },
-                    type_definition.name.location,
+                    object_type_definition.name.location,
                 ));
             }
             Entry::Vacant(vacant) => {
                 // TODO avoid this
-                let type_def_2 = type_definition.clone();
+                let type_def_2 = object_type_definition.clone();
                 let FieldObjectIdsEtc {
                     unvalidated_schema_fields,
                     server_fields,
@@ -175,12 +207,12 @@ impl UnvalidatedSchema {
                     &mut encountered_fields,
                     schema_resolvers,
                     next_object_id,
-                    &type_definition,
+                    &object_type_definition,
                 );
 
                 objects.push(SchemaObject {
-                    description: type_definition.description.map(|d| d.item),
-                    name: type_definition.name.item,
+                    description: object_type_definition.description.map(|d| d.item),
+                    name: object_type_definition.name.item,
                     id: next_object_id,
                     server_fields,
                     resolvers: object_resolvers,
@@ -194,14 +226,14 @@ impl UnvalidatedSchema {
                 // encountered should we use the default query object.
                 //
                 // Also, this is a GraphQL concept, but it's leaking into Isograph land :/ (is it?)
-                if type_definition.name.item == *QUERY_TYPE {
+                if object_type_definition.name.item == *QUERY_TYPE {
                     self.query_type_id = Some(next_object_id);
                 }
                 // --- END HACK ---
 
                 // ----- HACK -----
                 // It's unclear to me that this is the best way to add magic mutation fields.
-                if type_definition.name.item == *MUTATION_TYPE {
+                if object_type_definition.name.item == *MUTATION_TYPE {
                     mutation_id = Some(next_object_id)
                 }
                 // --- END HACK ---
@@ -211,23 +243,24 @@ impl UnvalidatedSchema {
             }
         }
 
-        for interface in type_definition.interfaces {
+        for interface in object_type_definition.interfaces {
             // type_definition implements interface
             let definitions = valid_type_refinement_map
                 .entry(interface.item.into())
                 .or_default();
             definitions.push(WithLocation::new(
                 next_object_id,
-                type_definition.name.location,
+                object_type_definition.name.location,
             ));
         }
 
-        Ok(mutation_id)
+        Ok((next_object_id, mutation_id))
     }
 
+    // TODO this should accept an IsographScalarTypeDefinition
     fn process_scalar_definition(
         &mut self,
-        scalar_type_definition: ScalarTypeDefinition,
+        scalar_type_definition: GraphQLScalarTypeDefinition,
     ) -> ProcessTypeDefinitionResult<()> {
         let &mut Schema {
             ref mut schema_data,
@@ -262,211 +295,922 @@ impl UnvalidatedSchema {
 
     /// Add magical mutation fields.
     ///
-    /// > This is a bit hacky! It should be controlled more by directives. Instead, lots of behavior
-    /// > is hard-coded now.
-    ///
-    /// For each field on a mutation object, if:
-    /// - that field's type is a non-nullable object and **exactly one** of that object's fields:
-    ///   - either
-    ///     - has directive "@primary", or
-    ///     - is the only field
-    ///   - has no arguments, and
-    ///   - is an object type (call it TargetType)
-    /// - and that field's arguments contain an argument named "id" of type "ID!"
-    ///
-    /// then, add a magical field to TargetType whose name is __ + mutation_name, which:
+    /// Using the MagicMutationFieldInfo (derived from @primary directives),
+    /// add a magical field to TargetType whose name is __ + mutation_name, which:
     /// - executes the mutation
-    /// - has the mutation's arguments (except an id)
+    /// - has the mutation's arguments (except those from field_map)
     /// - then acts as a __refetch field on that TargetType, i.e. refetches all the fields
     ///   selected in the merged selection set.
     ///
     /// There is lots of cloning going on here! Not ideal.
-    fn add_mutation_fields(&mut self, mutation_id: ObjectId) -> ProcessTypeDefinitionResult<()> {
-        let mutation_object_fields = self.schema_data.object(mutation_id).server_fields.clone();
+    fn add_mutation_fields(
+        &mut self,
+        mutation_id: ObjectId,
+        mut mutation_field_infos: Vec<MagicMutationFieldInfo>,
+        text_source: TextSource,
+    ) -> ProcessTypeDefinitionResult<()> {
+        // TODO don't clone if possible
+        let mutation_object = self.schema_data.object(mutation_id);
+        let mutation_object_fields = mutation_object.server_fields.clone();
+        let mutation_object_name = mutation_object.name;
 
         for field_id in mutation_object_fields.iter() {
             let mutation_field = self.field(*field_id);
-            // TODO this is dangerous! mutation_field.name is also formattable (with carats).
-            // We should find a way to make WithLocation not impl Display, while also making
-            // errors containing WithLocation<...> easy to work with.
-            let magic_mutation_field_name =
-                format!("__{}", mutation_field.name.item).intern().into();
 
-            if let Some((
-                parent_object_id,
-                mutation_response_primary_field_name,
-                mutation_field_args,
-            )) = self.get_valid_mutation_field_target_type(
-                mutation_field.associated_data.clone(),
-                &mutation_field.arguments,
-            ) {
-                // Woohoo! We found a valid object type onto which we can add a magic mutation field.
-                // TODO continue from here
-                let description = mutation_field.description.clone();
-                let parent_object = self.schema_data.object_mut(parent_object_id);
+            let mutation_field_payload_type_name = *mutation_field.associated_data.inner();
+            let mutation_field_name = mutation_field.name.item;
+            let mutation_field_arguments = mutation_field.arguments.clone();
+            let description = mutation_field.description.clone();
 
-                let next_resolver_id = self.resolvers.len().into();
-
-                let id_field_selection = WithSpan::new(
-                    Selection::ServerField(ServerFieldSelection::ScalarField(
-                        ScalarFieldSelection {
-                            name: WithLocation::new("id".intern().into(), Location::generated()),
-                            reader_alias: None,
-                            normalization_alias: None,
-                            associated_data: (),
-                            unwraps: vec![],
-                            arguments: vec![],
-                        },
-                    )),
-                    Span::todo_generated(),
-                );
-
-                self.resolvers.push(SchemaResolver {
-                    description,
-                    name: magic_mutation_field_name,
-                    id: next_resolver_id,
-                    selection_set_and_unwraps: Some((vec![id_field_selection], vec![])),
-                    variant: ResolverVariant::MutationField((
-                        magic_mutation_field_name,
-                        mutation_response_primary_field_name,
-                        mutation_field_args,
-                    )),
-                    variable_definitions: vec![],
-                    type_and_field: ResolverTypeAndField {
-                        type_name: parent_object.name,
-                        field_name: magic_mutation_field_name,
-                    },
-                    parent_object_id,
-                    artifact_kind: ResolverArtifactKind::NonFetchable,
-                    action_kind: ResolverActionKind::MutationField,
-                });
-
-                if parent_object
-                    .encountered_fields
-                    .insert(
-                        magic_mutation_field_name,
-                        DefinedField::ResolverField(next_resolver_id),
-                    )
-                    .is_some()
+            let payload_id = self
+                .schema_data
+                .defined_types
+                .get(&mutation_field_payload_type_name)
+                .map(|x| *x);
+            if let Some(DefinedTypeId::Object(mutation_field_object_id)) = payload_id {
+                if let Some(magic_mutation_field) = mutation_field_infos
+                    .iter()
+                    .position(|x| x.object_id == mutation_field_object_id)
+                    .map(|index_of_matching_item| {
+                        mutation_field_infos.swap_remove(index_of_matching_item)
+                    })
                 {
-                    return Err(WithLocation::new(
-                        ProcessTypeDefinitionError::MutationFieldIsDuplicate {
-                            field_name: magic_mutation_field_name,
-                            parent_type: parent_object.name,
-                        },
-                        // TODO this is blatantly incorrect
-                        Location::generated(),
-                    ));
-                }
+                    let MagicMutationFieldInfo {
+                        path,
+                        field_map_items,
+                        object_id: _,
+                    } = magic_mutation_field;
 
-                parent_object.resolvers.push(next_resolver_id);
-            }
+                    let (mutation_field_args_without_id, processed_field_map_items) =
+                        skip_arguments_contained_in_field_map(
+                            self,
+                            mutation_field_arguments.clone(),
+                            // TODO make this a no-op
+                            mutation_field_payload_type_name.lookup().intern().into(),
+                            mutation_object_name,
+                            mutation_field_name,
+                            // TODO don't clone
+                            field_map_items.clone(),
+                            text_source,
+                        )?;
+
+                    // TODO this is dangerous! mutation_field.name is also formattable (with carats).
+                    // We should find a way to make WithLocation not impl Display, while also making
+                    // errors containing WithLocation<...> easy to work with.
+                    // TODO "expose as" optional field
+                    let magic_mutation_field_name =
+                        format!("__{}", mutation_field_name).intern().into();
+
+                    // payload object is the object type of the mutation field, e.g. SetBestFriendResponse
+                    let payload_object = self.schema_data.object(mutation_field_object_id);
+                    let payload_object_name = payload_object.name;
+
+                    // TODO make this zero cost
+                    // TODO split path on .
+                    let path_selectable_field_name = path.lookup().intern().into();
+
+                    // field here is the pet field
+                    let primary_field = payload_object
+                        .encountered_fields
+                        .get(&path_selectable_field_name);
+
+                    let (next_resolver_id, resolver_parent_object_id) = match primary_field {
+                        Some(DefinedField::ServerField(server_field)) => {
+                            // This is the parent type name (Pet)
+                            let inner = server_field.inner();
+
+                            // TODO validate that the payload object has no plural fields in between
+
+                            let primary_type = self.schema_data.defined_types.get(inner).clone();
+
+                            if let Some(DefinedTypeId::Object(primary_object_type)) = primary_type {
+                                let next_resolver_id = self.resolvers.len().into();
+
+                                let fields = processed_field_map_items
+                                    .iter()
+                                    .map(|field_map_item| {
+                                        let scalar_field_selection = ScalarFieldSelection {
+                                            name: WithLocation::new(
+                                                // TODO make this no-op
+                                                // TODO split on . here; we should be able to have from: "best_friend.id" or whatnot.
+                                                field_map_item.from.lookup().intern().into(),
+                                                Location::generated(),
+                                            ),
+                                            reader_alias: None,
+                                            normalization_alias: None,
+                                            associated_data: (),
+                                            unwraps: vec![],
+                                            // TODO what about arguments? How would we handle them?
+                                            arguments: vec![],
+                                        };
+
+                                        WithSpan::new(
+                                            Selection::ServerField(
+                                                ServerFieldSelection::ScalarField(
+                                                    scalar_field_selection,
+                                                ),
+                                            ),
+                                            Span::todo_generated(),
+                                        )
+                                    })
+                                    .collect();
+
+                                self.resolvers.push(SchemaResolver {
+                                    description,
+                                    // __set_pet_best_friend
+                                    name: magic_mutation_field_name,
+                                    id: next_resolver_id,
+                                    selection_set_and_unwraps: Some((fields, vec![])),
+                                    variant: ResolverVariant::MutationField(
+                                        MutationFieldResolverVariant {
+                                            mutation_name: magic_mutation_field_name,
+                                            mutation_primary_field_name: path_selectable_field_name,
+                                            mutation_field_arguments,
+                                            filtered_mutation_field_arguments:
+                                                mutation_field_args_without_id,
+                                        },
+                                    ),
+                                    variable_definitions: vec![],
+                                    type_and_field: ResolverTypeAndField {
+                                        // TODO make this zero cost?
+                                        type_name: inner.lookup().intern().into(), // e.g. Pet
+                                        field_name: magic_mutation_field_name, // __set_pet_best_friend
+                                    },
+                                    parent_object_id: *primary_object_type,
+                                    action_kind: ResolverActionKind::MutationField(
+                                        MutationFieldResolverActionKindInfo {
+                                            // TODO don't clone
+                                            field_map: field_map_items,
+                                        },
+                                    ),
+                                });
+
+                                Ok((next_resolver_id, primary_object_type))
+                            } else {
+                                Err(WithLocation::new(
+                                    ProcessTypeDefinitionError::InvalidMutationField,
+                                    Location::generated(),
+                                ))
+                            }
+                        }
+                        _ => Err(WithLocation::new(
+                            ProcessTypeDefinitionError::InvalidMutationField,
+                            Location::generated(),
+                        )),
+                    }?;
+
+                    // This is the "Pet" object
+                    let resolver_parent = self.schema_data.object_mut(*resolver_parent_object_id);
+
+                    if resolver_parent
+                        .encountered_fields
+                        .insert(
+                            magic_mutation_field_name,
+                            DefinedField::ResolverField(next_resolver_id),
+                        )
+                        .is_some()
+                    {
+                        return Err(WithLocation::new(
+                            ProcessTypeDefinitionError::MutationFieldIsDuplicate {
+                                field_name: magic_mutation_field_name,
+                                parent_type: payload_object_name,
+                            },
+                            // TODO this is blatantly incorrect
+                            Location::generated(),
+                        ));
+                    }
+
+                    resolver_parent.resolvers.push(next_resolver_id);
+                }
+            };
         }
 
         Ok(())
     }
+}
 
-    fn get_valid_mutation_field_target_type(
-        &self,
-        // From the top level field, e.g. create_user
-        type_: TypeAnnotation<UnvalidatedTypeName>,
-        arguments: &[WithSpan<InputValueDefinition>],
-    ) -> Option<(
-        ObjectId,
-        SelectableFieldName,
-        Vec<WithSpan<InputValueDefinition>>,
-    )> {
-        // Is the mutation_field's type a non-nullable type?
-        let mutation_response_inner_non_nullable_named_type = type_.inner_non_null_named_type()?;
+pub struct MagicMutationFieldInfo {
+    path: StringLiteralValue,
+    field_map_items: Vec<FieldMapItem>,
+    object_id: ObjectId,
+}
 
-        // Is the mutation_field's type an object type?
-        if let DefinedTypeId::Object(mutation_response_object_id) = self
-            .schema_data
-            .defined_types
-            .get(&mutation_response_inner_non_nullable_named_type.0.item)
-            .expect("object type should exist. This indicates a bug in Isograph")
-        {
-            // Does the mutation field have an argument named "id"
-            // (TODO validate it has type ID!)
-            let arguments_without_id_arg = arguments_without_id_arg(arguments)?;
+enum MagicMutationFieldOrDirective {
+    MagicMutationField(ProcessTypeDefinitionResult<MagicMutationFieldInfo>),
+    Directive(Directive<ConstantValue>),
+}
 
-            // This is the mutation response object, in other words something like CreateUserResponse
-            let mutation_response_object = self.schema_data.object(*mutation_response_object_id);
-
-            // Does the mutation response object have exactly one field?
-            // TODO handle the @primary directive
-            let mutation_response_only_field = self.field(get_only_non_typename_field(
-                self,
-                &mutation_response_object.server_fields,
-            )?);
-
-            // Does the mutation response object's only field have no arguments?
-            if mutation_response_only_field.arguments.is_empty() {
-                let primary_field_type = mutation_response_only_field
-                    .associated_data
-                    .inner_non_null_named_type()?;
-                if let DefinedTypeId::Object(primary_field_object_id) = self
-                    .schema_data
-                    .defined_types
-                    .get(&primary_field_type.0.item)
-                    .expect("object type should exist. This indicates a bug in Isograph.")
-                {
-                    return Some((
-                        *primary_field_object_id,
-                        mutation_response_only_field.name.item,
-                        arguments_without_id_arg,
-                    ));
-                }
-            }
-        }
-
-        None
+fn extract_magic_mutation_field_info(
+    d: Directive<ConstantValue>,
+    text_source: TextSource,
+    object_id: ObjectId,
+) -> MagicMutationFieldOrDirective {
+    if d.name.item == *PRIMARY_DIRECTIVE {
+        MagicMutationFieldOrDirective::MagicMutationField(validate_magic_mutation_directive(
+            &d,
+            text_source,
+            object_id,
+        ))
+    } else {
+        MagicMutationFieldOrDirective::Directive(d)
     }
 }
 
-fn arguments_without_id_arg(
-    arguments: &[WithSpan<InputValueDefinition>],
-) -> Option<Vec<WithSpan<InputValueDefinition>>> {
-    let mut found_id = false;
-    let new_arguments = arguments
+fn validate_magic_mutation_directive(
+    d: &Directive<ConstantValue>,
+    text_source: TextSource,
+    object_id: ObjectId,
+) -> ProcessTypeDefinitionResult<MagicMutationFieldInfo> {
+    if d.arguments.len() != 2 {
+        return Err(WithLocation::new(
+            ProcessTypeDefinitionError::InvalidPrimaryDirectiveArgumentCount,
+            // This is wrong, the arguments should have a span, or the whole thing should have a span
+            Location::new(text_source, d.name.span),
+        ));
+    }
+
+    let path = d
+        .arguments
         .iter()
-        .filter_map(|arg| {
-            // TODO also confirm stuff like that the type is ID!
-            if arg.item.name.item == "id".intern().into() {
-                found_id = true;
-                None
-            } else {
-                Some(arg.clone())
+        .find(|d| d.name.item == *PATH_DIRECTIVE_ARGUMENT)
+        .ok_or_else(|| {
+            WithLocation::new(
+                ProcessTypeDefinitionError::MissingPathArg,
+                // This is wrong, the arguments should have a span, or the whole thing should have a span
+                Location::new(text_source, d.name.span),
+            )
+        })?;
+    let path_val = match path.value.item {
+        ConstantValue::String(s) => Ok(s),
+        _ => Err(WithLocation::new(
+            ProcessTypeDefinitionError::PathValueShouldBeString,
+            // This is wrong, the arguments should have a span, or the whole thing should have a span
+            Location::new(text_source, d.name.span),
+        )),
+    }?;
+
+    let field_map = d
+        .arguments
+        .iter()
+        .find(|d| d.name.item == *FIELD_MAP_DIRECTIVE_ARGUMENT)
+        .ok_or_else(|| {
+            WithLocation::new(
+                ProcessTypeDefinitionError::MissingFieldMapArg,
+                // This is wrong, the arguments should have a span, or the whole thing should have a span
+                Location::new(text_source, d.name.span),
+            )
+        })?;
+
+    let field_map_items = parse_field_map_val(&field_map.value, text_source)?;
+
+    Ok(MagicMutationFieldInfo {
+        path: path_val,
+        field_map_items,
+        object_id,
+    })
+}
+
+#[derive(Clone, Debug)]
+pub struct FieldMapItem {
+    // TODO eventually, we want to support . syntax here, too
+    pub from: StringLiteralValue,
+    /// Everything that is before the first . in the to field
+    pub to_argument_name: WithSpan<StringLiteralValue>,
+    /// Everything after the first ., split on .
+    pub to_field_names: Vec<WithSpan<StringLiteralValue>>,
+}
+
+fn parse_field_map_val(
+    value: &WithSpan<ConstantValue>,
+    text_source: TextSource,
+) -> ProcessTypeDefinitionResult<Vec<FieldMapItem>> {
+    let list = match &value.item {
+        ConstantValue::List(l) => Ok(l),
+        _ => Err(WithLocation::new(
+            ProcessTypeDefinitionError::InvalidFieldMap,
+            // This is wrong, the arguments should have a span, or the whole thing should have a span
+            Location::new(text_source, value.span),
+        )),
+    }?;
+
+    list.iter()
+        .map(|argument_value| {
+            let object = match &argument_value.item {
+                ConstantValue::Object(o) => Ok(o),
+                _ => Err(WithLocation::new(
+                    ProcessTypeDefinitionError::InvalidFieldMap,
+                    Location::new(text_source, argument_value.span),
+                )),
+            }?;
+
+            if object.len() != 2 {
+                return Err(WithLocation::new(
+                    ProcessTypeDefinitionError::InvalidFieldMap,
+                    Location::new(text_source, argument_value.span),
+                ));
             }
+
+            let from = object
+                .iter()
+                .find(|d| d.name.item == *FROM_VALUE_KEY_NAME)
+                .ok_or_else(|| {
+                    WithLocation::new(
+                        ProcessTypeDefinitionError::InvalidFieldMap,
+                        // This is wrong, the arguments should have a span, or the whole thing should have a span
+                        Location::new(text_source, argument_value.span),
+                    )
+                })?;
+
+            let from_arg = match from.value.item {
+                ConstantValue::String(s) => Ok(s),
+                _ => Err(WithLocation::new(
+                    ProcessTypeDefinitionError::InvalidFieldMap,
+                    Location::new(text_source, argument_value.span),
+                )),
+            }?;
+
+            let to = object
+                .iter()
+                .find(|d| d.name.item == *TO_VALUE_KEY_NAME)
+                .ok_or_else(|| {
+                    WithLocation::new(
+                        ProcessTypeDefinitionError::InvalidFieldMap,
+                        // This is wrong, the arguments should have a span, or the whole thing should have a span
+                        Location::new(text_source, argument_value.span),
+                    )
+                })?;
+
+            // This is weirdly low-level!
+            let span = to.value.span;
+            let to_arg = match to.value.item {
+                ConstantValue::String(s) => Ok(s),
+                _ => Err(WithLocation::new(
+                    ProcessTypeDefinitionError::InvalidFieldMap,
+                    Location::new(text_source, argument_value.span),
+                )),
+            }?;
+            let mut split = to_arg.lookup().split('.');
+            let to_argument_name = split.next().expect(
+                "Expected at least one item returned \
+                by split. This is indicative of a bug in Isograph.",
+            );
+            let account_for_quote = 1;
+            let account_for_period = 1;
+
+            let mut offset: u32 =
+                to_argument_name.len() as u32 + account_for_quote + account_for_period;
+            let to_argument_name = WithSpan::new(
+                to_argument_name.intern().into(),
+                Span::new(
+                    span.start + account_for_quote,
+                    span.start + account_for_quote + to_argument_name.len() as u32,
+                ),
+            );
+
+            Ok(FieldMapItem {
+                from: from_arg,
+                to_argument_name,
+                to_field_names: split
+                    .into_iter()
+                    .map(|split_item| {
+                        let len = split_item.len() as u32;
+                        let old_offset = offset;
+                        offset = old_offset + len + account_for_period;
+                        WithSpan::new(
+                            split_item.intern().into(),
+                            Span::new(span.start + old_offset, span.start + old_offset + len),
+                        )
+                    })
+                    .collect(),
+            })
         })
+        .collect::<Result<Vec<_>, _>>()
+}
+
+// TODO this belongs in graphql_sdl
+pub fn convert_and_extract_mutation_field_info(
+    value: GraphQLObjectTypeDefinition,
+    text_source: TextSource,
+    object_id: ObjectId,
+) -> ProcessTypeDefinitionResult<(IsographObjectTypeDefinition, Option<MagicMutationFieldInfo>)> {
+    let mut magic_mutation_field_info = None;
+    let directives = value
+        .directives
+        .into_iter()
+        .flat_map(
+            |d| match extract_magic_mutation_field_info(d, text_source, object_id) {
+                MagicMutationFieldOrDirective::MagicMutationField(m) => {
+                    // TODO emit an error if this is already Some
+                    magic_mutation_field_info = Some(m);
+                    None
+                }
+                MagicMutationFieldOrDirective::Directive(d) => Some(d),
+            },
+        )
         .collect();
 
-    if found_id {
-        Some(new_arguments)
-    } else {
-        None
+    let magic_mutation_field_info = magic_mutation_field_info.transpose()?;
+
+    Ok((
+        IsographObjectTypeDefinition {
+            description: value.description,
+            name: value.name.map(|x| x.into()),
+            interfaces: value.interfaces,
+            directives,
+            fields: value.fields,
+        },
+        magic_mutation_field_info,
+    ))
+}
+
+// TODO this should be a different type.
+type ProcessedFieldMapItem = FieldMapItem;
+
+#[derive(Debug)]
+struct ModifiedArgument {
+    description: Option<WithSpan<DescriptionValue>>,
+    name: WithLocation<InputValueName>,
+    object: TypeAnnotation<ModifiedObject>,
+    default_value: Option<WithSpan<ConstantValue>>,
+    directives: Vec<Directive<ConstantValue>>,
+}
+
+/// An object which has fields that are unmodified, deleted,
+/// or modified (indicating that a new object should be created
+/// for them to point to.) Scalar fields cannot be modified,
+/// only deleted.
+#[derive(Debug)]
+struct ModifiedObject {
+    object_id: ObjectId,
+    field_map: HashMap<SelectableFieldName, PotentiallyModifiedField>,
+}
+
+impl ModifiedObject {
+    fn create_and_get_name(self, schema: &mut UnvalidatedSchema) -> IsographObjectTypeName {
+        let original_object = schema.schema_data.object(self.object_id);
+
+        let fields = original_object
+            .server_fields
+            .iter()
+            .flat_map(|field_id| {
+                let field = schema.field(*field_id);
+
+                // HACK alert
+                if field.name.item == "__typename".intern().into() {
+                    return None;
+                }
+
+                let potentially_modified_field = self.field_map.get(&field.name.item)?;
+
+                let new_field = match potentially_modified_field {
+                    PotentiallyModifiedField::Unmodified(_) => WithLocation::new(
+                        GraphQLOutputFieldDefinition {
+                            description: field.description.map(|description| {
+                                WithSpan::new(description, Span::todo_generated())
+                            }),
+                            name: field.name,
+                            type_: field.associated_data.clone(),
+                            arguments: field.arguments.clone(),
+                            directives: vec![],
+                        },
+                        Location::generated(),
+                    ),
+                    PotentiallyModifiedField::Modified(_) => todo!("modified"),
+                };
+
+                Some(new_field)
+            })
+            .collect();
+
+        let item = IsographObjectTypeDefinition {
+            // TODO it looks like we throw away span info for descriptions, which makes sense?
+            description: original_object
+                .description
+                .clone()
+                .map(|description| WithSpan::new(description, Span::todo_generated())),
+            // TODO confirm that names don't have to be unique
+            name: WithLocation::new(
+                format!("{}__generated", original_object.name.lookup())
+                    .intern()
+                    .into(),
+                Location::generated(),
+            ),
+            // Very unclear what to do here
+            interfaces: vec![],
+            directives: vec![],
+            fields,
+        };
+
+        let (object_id, _) = schema
+            .process_object_type_definition(item, &mut HashMap::new())
+            .expect(
+                "Expected object creation to work. This is \
+                indicative of a bug in Isograph.",
+            );
+
+        schema.schema_data.object(object_id).name
     }
 }
 
-fn get_only_non_typename_field(
-    schema: &UnvalidatedSchema,
-    server_fields: &[ServerFieldId],
-) -> Option<ServerFieldId> {
-    let mut found_field = None;
-    let typename_field_name = "__typename".intern().into();
+#[derive(Debug)]
+enum PotentiallyModifiedField {
+    Unmodified(ServerFieldId),
+    // This is exercised in the case of 3+ segments, e.g. input.foo.id.
+    // For now, we support only up to two segments.
+    #[allow(dead_code)]
+    Modified(ModifiedField),
+}
 
-    for field_id in server_fields {
-        let field = schema.field(*field_id);
-        // TODO this is a hacky check
-        if field.name.item != typename_field_name {
-            if found_field.is_some() {
-                return None;
-            } else {
-                found_field = Some(*field_id);
+#[allow(dead_code)]
+enum IsEmpty {
+    IsEmpty,
+    NotEmpty,
+}
+
+impl PotentiallyModifiedField {
+    fn remove_to_field(
+        &mut self,
+        _first: &WithSpan<StringLiteralValue>,
+        _rest: &[WithSpan<StringLiteralValue>],
+    ) -> ProcessTypeDefinitionResult<IsEmpty> {
+        unimplemented!("Removing to fields from PotentiallyModifiedField")
+    }
+}
+
+/// A modified field's type must be an object. A scalar field that
+/// is modified is just removed.
+#[derive(Debug)]
+struct ModifiedField {
+    #[allow(dead_code)]
+    modified_object: ModifiedObject,
+}
+
+impl ModifiedArgument {
+    /// N.B. this kinda-sorta creates a ModifiedArgument in an invalid state,
+    /// in that if we didn't immediately call remove_to_field, we would have
+    /// a modified argument with a modified object containing no modified fields.
+    ///
+    /// Thus, we would unnecessarily create a new object that is identical to
+    /// an existing object.
+    ///
+    /// This panics if unmodified's type is a scalar.
+    pub fn from_unmodified(
+        unmodified: &GraphQLInputValueDefinition,
+        schema: &UnvalidatedSchema,
+    ) -> Self {
+        // TODO I think we have validated that the item exists already.
+        // But we should double check that, and return an error if necessary
+        let object = unmodified.type_.clone().map(|x| {
+            let defined_type_id = *schema.schema_data.defined_types.get(&x.into()).expect(
+                "Expected type to be defined by now. This is indicative of a bug in Isograph.",
+            );
+            match defined_type_id {
+                DefinedTypeId::Object(object_id) => {
+                    let object = schema.schema_data.object(object_id);
+
+                    ModifiedObject {
+                        object_id,
+                        field_map: object
+                            .server_fields
+                            .iter()
+                            .map(|server_field_id| {
+                                (
+                                    schema.field(*server_field_id).name.item,
+                                    PotentiallyModifiedField::Unmodified(*server_field_id),
+                                )
+                            })
+                            .collect(),
+                    }
+                }
+                DefinedTypeId::Scalar(_scalar_id) => {
+                    // TODO don't be lazy, return an error
+                    panic!("Cannot modify a scalar")
+                }
             }
+        });
+
+        // TODO We can probably avoid cloning here
+        Self {
+            name: unmodified.name,
+            description: unmodified.description,
+            default_value: unmodified.default_value.clone(),
+            directives: unmodified.directives.clone(),
+            object,
         }
     }
-    found_field
+
+    pub fn remove_to_field(
+        &mut self,
+        schema: &UnvalidatedSchema,
+        first: &WithSpan<StringLiteralValue>,
+        rest: &[WithSpan<StringLiteralValue>],
+        primary_type_name: IsographObjectTypeName,
+        text_source: TextSource,
+    ) -> ProcessTypeDefinitionResult<()> {
+        let argument_object = self.object.inner_mut();
+
+        let key = first.item.lookup().intern().into();
+        let _ = match argument_object
+            .field_map
+            // TODO make this a no-op
+            .get_mut(&key)
+        {
+            Some(field) => {
+                match rest.split_first() {
+                    Some((first, rest)) => {
+                        match field.remove_to_field(first, rest)? {
+                            IsEmpty::IsEmpty => {
+                                // The field's object has no remaining fields (except for __typename),
+                                // so we remove the item from the parent.
+                                argument_object.field_map.remove(&key).expect(
+                                    "Expected to be able to remove item. \
+                                    This is indicative of a bug in Isograph",
+                                );
+                            }
+                            IsEmpty::NotEmpty => {}
+                        }
+                    }
+                    None => {
+                        // We ran out of path segments, so we remove this item.
+                        // It must have a scalar type.
+
+                        match field {
+                            PotentiallyModifiedField::Unmodified(field_id) => {
+                                let field_object = schema.field(*field_id);
+                                let field_object_type = field_object.associated_data.inner();
+
+                                // N.B. this should be done via a validation pass.
+                                match schema.schema_data.defined_types.get(field_object_type) {
+                                    Some(type_) => match type_ {
+                                        DefinedTypeId::Object(_) => {
+                                            // Otherwise, formatting breaks :(
+                                            use ProcessTypeDefinitionError::PrimaryDirectiveCannotRemapObject;
+                                            return Err(WithLocation::new(
+                                                PrimaryDirectiveCannotRemapObject {
+                                                    primary_type_name,
+                                                    field_name: key.to_string(),
+                                                },
+                                                Location::new(text_source, first.span),
+                                            ));
+                                        }
+                                        DefinedTypeId::Scalar(_scalar_id) => {
+                                            // Cool! We found a scalar, we can remove it.
+                                            argument_object.field_map.remove(&key).expect(
+                                                "Expected to be able to remove item. \
+                                                This is indicative of a bug in Isograph.",
+                                            );
+                                        }
+                                    },
+
+                                    None => panic!("Encountered a non-existent type."),
+                                }
+                            }
+                            PotentiallyModifiedField::Modified(_) => {
+                                // A field can only be modified if it has an object type
+                                return Err(WithLocation::new(
+                                    ProcessTypeDefinitionError::PrimaryDirectiveCannotRemapObject {
+                                        primary_type_name,
+                                        field_name: key.to_string(),
+                                    },
+                                    Location::new(text_source, first.span),
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+            None => {
+                return Err(WithLocation::new(
+                    ProcessTypeDefinitionError::PrimaryDirectiveFieldNotFound {
+                        primary_type_name,
+                        field_name: first.item,
+                    },
+                    Location::new(text_source, first.span),
+                ))
+            }
+        };
+        Ok(())
+    }
+}
+
+enum PotentiallyModifiedArgument {
+    Unmodified(GraphQLInputValueDefinition),
+    Modified(ModifiedArgument),
+}
+
+struct ArgumentMap {
+    arguments: Vec<WithLocation<PotentiallyModifiedArgument>>,
+}
+
+impl ArgumentMap {
+    fn new(arguments: Vec<WithLocation<GraphQLInputValueDefinition>>) -> Self {
+        Self {
+            arguments: arguments
+                .into_iter()
+                .map(|with_location| {
+                    with_location.map(|argument| PotentiallyModifiedArgument::Unmodified(argument))
+                })
+                .collect(),
+        }
+    }
+
+    fn remove_field_map_item(
+        &mut self,
+        field_map_item: FieldMapItem,
+        primary_type_name: IsographObjectTypeName,
+        mutation_object_name: IsographObjectTypeName,
+        mutation_field_name: SelectableFieldName,
+        text_source: TextSource,
+        schema: &mut UnvalidatedSchema,
+    ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem> {
+        let (index_of_argument, argument) = self
+            .arguments
+            .iter_mut()
+            .enumerate()
+            .find(|(_, argument)| {
+                let name = match &argument.item {
+                    PotentiallyModifiedArgument::Unmodified(argument) => argument.name.item,
+                    PotentiallyModifiedArgument::Modified(modified_argument) => {
+                        modified_argument.name.item
+                    }
+                };
+                name.lookup() == field_map_item.to_argument_name.item.lookup()
+            })
+            .ok_or_else(|| {
+                WithLocation::new(
+                    ProcessTypeDefinitionError::PrimaryDirectiveArgumentDoesNotExistOnField {
+                        primary_type_name,
+                        mutation_object_name,
+                        mutation_field_name,
+                        field_name: field_map_item.to_argument_name.item.lookup().to_string(),
+                    },
+                    Location::new(text_source, field_map_item.to_argument_name.span),
+                )
+            })?;
+
+        // TODO avoid matching twice?
+        let location = argument.location;
+
+        let to_field_names = &field_map_item.to_field_names;
+        let to_argument_name = &field_map_item.to_argument_name;
+
+        let processed_field_map_item = match &mut argument.item {
+            PotentiallyModifiedArgument::Unmodified(unmodified_argument) => {
+                match to_field_names.split_first() {
+                    None => {
+                        match schema
+                            .schema_data
+                            .defined_types
+                            .get(&unmodified_argument.type_.inner().lookup().intern().into())
+                        {
+                            Some(defined_type) => match defined_type {
+                                DefinedTypeId::Object(_) => return Err(WithLocation::new(
+                                    ProcessTypeDefinitionError::PrimaryDirectiveCannotRemapObject {
+                                        primary_type_name,
+                                        field_name: to_argument_name.item.lookup().to_string(),
+                                    },
+                                    Location::new(text_source, to_argument_name.span),
+                                )),
+                                DefinedTypeId::Scalar(_) => {}
+                            },
+                            None => panic!(
+                                "Type is not found. This is indicative \
+                                of a bug in Isograph, and will be solved by validating first."
+                            ),
+                        }
+
+                        self.arguments.swap_remove(index_of_argument);
+                        let processed_field_map_item: ProcessedFieldMapItem =
+                            field_map_item.clone();
+                        processed_field_map_item
+                    }
+                    Some((first, rest)) => {
+                        let mut arg =
+                            ModifiedArgument::from_unmodified(unmodified_argument, schema);
+
+                        let _processed_field_map_item = arg.remove_to_field(
+                            schema,
+                            first,
+                            rest,
+                            primary_type_name,
+                            text_source,
+                        )?;
+
+                        *argument =
+                            WithLocation::new(PotentiallyModifiedArgument::Modified(arg), location);
+                        // processed_field_map_item
+                        // TODO wat
+                        field_map_item.clone()
+                    }
+                }
+            }
+            PotentiallyModifiedArgument::Modified(modified) => {
+                let to_field_names = &field_map_item.to_field_names;
+                match to_field_names.split_first() {
+                    None => {
+                        // TODO encode this in the type system.
+                        // A modified argument will always have an object type, and cannot be remapped
+                        // at the object level.
+                        return Err(WithLocation::new(
+                            ProcessTypeDefinitionError::PrimaryDirectiveCannotRemapObject {
+                                primary_type_name,
+                                field_name: to_argument_name.item.to_string(),
+                            },
+                            Location::new(text_source, field_map_item.to_argument_name.span),
+                        ));
+                    }
+                    Some((first, rest)) => {
+                        modified.remove_to_field(
+                            schema,
+                            first,
+                            rest,
+                            primary_type_name,
+                            text_source,
+                        )?;
+                        // TODO WAT
+                        field_map_item.clone()
+                    }
+                }
+            }
+        };
+
+        Ok(processed_field_map_item)
+    }
+
+    fn into_arguments(
+        self,
+        schema: &mut UnvalidatedSchema,
+    ) -> Vec<WithLocation<GraphQLInputValueDefinition>> {
+        self.arguments
+            .into_iter()
+            .map(|with_location| {
+                with_location.map(|potentially_modified_argument| {
+                    match potentially_modified_argument {
+                        PotentiallyModifiedArgument::Unmodified(unmodified) => unmodified,
+                        PotentiallyModifiedArgument::Modified(modified) => {
+                            let ModifiedArgument {
+                                description,
+                                name,
+                                object,
+                                default_value,
+                                directives,
+                            } = modified;
+
+                            GraphQLInputValueDefinition {
+                                description,
+                                name,
+                                type_: object.map(|modified_object| {
+                                    modified_object
+                                        .create_and_get_name(schema)
+                                        .lookup()
+                                        .intern()
+                                        .into()
+                                }),
+                                default_value,
+                                directives,
+                            }
+                        }
+                    }
+                })
+            })
+            .collect()
+    }
+}
+
+fn skip_arguments_contained_in_field_map(
+    // TODO move this to impl Schema
+    schema: &mut UnvalidatedSchema,
+    arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+    primary_type_name: IsographObjectTypeName,
+    mutation_object_name: IsographObjectTypeName,
+    mutation_field_name: SelectableFieldName,
+    field_map_items: Vec<FieldMapItem>,
+    text_source: TextSource,
+) -> ProcessTypeDefinitionResult<(
+    Vec<WithLocation<GraphQLInputValueDefinition>>,
+    Vec<ProcessedFieldMapItem>,
+)> {
+    let mut processed_field_map_items = Vec::with_capacity(field_map_items.len());
+    // TODO
+    // We need to create entirely new arguments, which are the existing arguments minus
+    // any paths that are in the field map.
+    let mut argument_map = ArgumentMap::new(arguments);
+
+    for field_map_item in field_map_items {
+        processed_field_map_items.push(argument_map.remove_field_map_item(
+            field_map_item,
+            primary_type_name,
+            mutation_object_name,
+            mutation_field_name,
+            text_source,
+            schema,
+        )?);
+    }
+
+    Ok((
+        argument_map.into_arguments(schema),
+        processed_field_map_items,
+    ))
 }
 
 /// Returns the resolvers for a schema object that we know up-front (before processing
@@ -506,7 +1250,6 @@ fn get_resolvers_for_schema_object(
             parent_object_id,
             // N.B. __refetch fields are non-fetchable, but they do execute queries which
             // have fetchable artifacts (i.e. normalization ASTs).
-            artifact_kind: ResolverArtifactKind::NonFetchable,
             action_kind: ResolverActionKind::RefetchField,
         });
         encountered_fields.insert(
@@ -543,7 +1286,7 @@ struct FieldObjectIdsEtc {
 /// Given a vector of fields from the schema AST all belonging to the same object/interface,
 /// return a vector of unvalidated fields and a set of field names.
 fn get_field_objects_ids_and_names(
-    new_fields: Vec<WithLocation<OutputFieldDefinition>>,
+    new_fields: Vec<WithLocation<GraphQLOutputFieldDefinition>>,
     next_field_id: usize,
     parent_type_id: ObjectId,
     parent_type_name: IsographObjectTypeName,
@@ -643,7 +1386,7 @@ fn get_field_objects_ids_and_names(
 fn set_and_validate_id_field(
     id_field: &mut Option<ServerIdFieldId>,
     current_field_id: usize,
-    field: &WithLocation<OutputFieldDefinition>,
+    field: &WithLocation<GraphQLOutputFieldDefinition>,
     parent_type_name: IsographObjectTypeName,
 ) -> ProcessTypeDefinitionResult<()> {
     // N.B. id_field is guaranteed to be None; otherwise field_names_to_type_name would
@@ -727,4 +1470,64 @@ pub enum ProcessTypeDefinitionError {
 
     #[error("The id field on \"{parent_type}\" must be \"ID!\".")]
     IdFieldMustBeNonNullIdType { parent_type: IsographObjectTypeName },
+
+    #[error("The @primary directive should have two arguments")]
+    InvalidPrimaryDirectiveArgumentCount,
+
+    #[error("The @primary directive requires a path argument")]
+    MissingPathArg,
+
+    #[error("The @primary directive requires a field_map argument")]
+    MissingFieldMapArg,
+
+    #[error("The @primary directive path argument value should be a string")]
+    PathValueShouldBeString,
+
+    #[error("Invalid field_map in @primary directive")]
+    InvalidFieldMap,
+
+    #[error("Invalid mutation field")]
+    InvalidMutationField,
+
+    // TODO include which fields were unused
+    #[error("Not all fields specified as 'to' fields in the @primary directive field_map were found \
+        on the mutation field. Unused fields: {}",
+        unused_field_map_items.iter().map(|x| format!("'{}'", x.to_argument_name)).collect::<Vec<_>>().join(", ")
+    )]
+    NotAllToFieldsUsed {
+        unused_field_map_items: Vec<FieldMapItem>,
+    },
+
+    #[error("In a @primary directive's field_map, the to field cannot be just a dot.")]
+    FieldMapToCannotJustBeADot,
+
+    #[error(
+        "Error when processing @primary directive on type `{primary_type_name}`. \
+        The field `{mutation_object_name}.{mutation_field_name}` does not have argument `{field_name}`, \
+        or it was previously processed by another field_map item."
+    )]
+    PrimaryDirectiveArgumentDoesNotExistOnField {
+        primary_type_name: IsographObjectTypeName,
+        mutation_object_name: IsographObjectTypeName,
+        mutation_field_name: SelectableFieldName,
+        field_name: String,
+    },
+
+    #[error(
+        "Error when processing @primary directive on type `{primary_type_name}`. \
+        The field `{field_name}` is an object, and cannot be remapped. Remap scalars only."
+    )]
+    PrimaryDirectiveCannotRemapObject {
+        primary_type_name: IsographObjectTypeName,
+        field_name: String,
+    },
+
+    #[error(
+        "Error when processing @primary directive on type `{primary_type_name}`. \
+        The field `{field_name}` is not found."
+    )]
+    PrimaryDirectiveFieldNotFound {
+        primary_type_name: IsographObjectTypeName,
+        field_name: StringLiteralValue,
+    },
 }

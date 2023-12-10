@@ -6,18 +6,19 @@ use common_lang_types::{
     ScalarTypeName, SelectableFieldName, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    ConstantValue, Directive, InputValueDefinition, InterfaceTypeDefinition, NamedTypeAnnotation,
-    ObjectTypeDefinition, OutputFieldDefinition, TypeAnnotation,
+    ConstantValue, Directive, GraphQLInputObjectTypeDefinition, GraphQLInputValueDefinition,
+    GraphQLInterfaceTypeDefinition, GraphQLOutputFieldDefinition, NamedTypeAnnotation,
+    TypeAnnotation,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    DefinedTypeId, InputTypeId, LinkedFieldSelection, NonConstantValue, ObjectId, OutputTypeId,
-    ResolverFetch, ResolverFieldId, ScalarId, Selection, ServerFieldId, ServerIdFieldId, Unwrap,
+    DefinedTypeId, LinkedFieldSelection, NonConstantValue, ObjectId, OutputTypeId, ResolverFetch,
+    ResolverFieldId, ScalarId, Selection, ServerFieldId, ServerIdFieldId, Unwrap,
     VariableDefinition,
 };
 use lazy_static::lazy_static;
 
-use crate::ResolverVariant;
+use crate::{FieldMapItem, ResolverVariant};
 
 lazy_static! {
     pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
@@ -80,7 +81,7 @@ pub struct Schema<
     // Mutation
 }
 
-pub(crate) type UnvalidatedSchema = Schema<
+pub type UnvalidatedSchema = Schema<
     UnvalidatedTypeName,
     (),
     (),
@@ -320,14 +321,6 @@ impl<TEncounteredField> SchemaData<TEncounteredField> {
         }
     }
 
-    pub fn lookup_input_type(&self, input_type_id: InputTypeId) -> SchemaInputType {
-        match input_type_id {
-            InputTypeId::Scalar(id) => {
-                SchemaInputType::Scalar(self.scalars.get(id.as_usize()).unwrap())
-            }
-        }
-    }
-
     /// Get a reference to a given object type by its id.
     pub fn object(&self, object_id: ObjectId) -> &SchemaObject<TEncounteredField> {
         &self.objects[object_id.as_usize()]
@@ -368,7 +361,17 @@ fn add_schema_defined_scalar_type(
 pub enum SchemaType<'a, TEncounteredField> {
     Object(&'a SchemaObject<TEncounteredField>),
     Scalar(&'a SchemaScalar),
-    // Includes input object
+}
+
+impl<'a, TEncounteredField> HasName for SchemaType<'a, TEncounteredField> {
+    type Name = UnvalidatedTypeName;
+
+    fn name(&self) -> Self::Name {
+        match self {
+            SchemaType::Object(object) => object.name.into(),
+            SchemaType::Scalar(scalar) => scalar.name.item.into(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -401,13 +404,16 @@ pub struct IsographObjectTypeDefinition {
     pub name: WithLocation<IsographObjectTypeName>,
     // maybe this should be Vec<WithSpan<IsographObjectTypeName>>>
     pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
+    /// Directives that we don't know about. Maybe this should be validated to be
+    /// empty, or not exist.
     pub directives: Vec<Directive<ConstantValue>>,
     // TODO the spans of these fields are wrong
-    pub fields: Vec<WithLocation<OutputFieldDefinition>>,
+    // TODO use a shared field type
+    pub fields: Vec<WithLocation<GraphQLOutputFieldDefinition>>,
 }
 
-impl From<ObjectTypeDefinition> for IsographObjectTypeDefinition {
-    fn from(value: ObjectTypeDefinition) -> Self {
+impl From<GraphQLInterfaceTypeDefinition> for IsographObjectTypeDefinition {
+    fn from(value: GraphQLInterfaceTypeDefinition) -> Self {
         Self {
             description: value.description,
             name: value.name.map(|x| x.into()),
@@ -418,14 +424,20 @@ impl From<ObjectTypeDefinition> for IsographObjectTypeDefinition {
     }
 }
 
-impl From<InterfaceTypeDefinition> for IsographObjectTypeDefinition {
-    fn from(value: InterfaceTypeDefinition) -> Self {
+// TODO this is bad. We should instead convert both GraphQL types to a common
+// Isograph type
+impl From<GraphQLInputObjectTypeDefinition> for IsographObjectTypeDefinition {
+    fn from(value: GraphQLInputObjectTypeDefinition) -> Self {
         Self {
             description: value.description,
             name: value.name.map(|x| x.into()),
-            interfaces: value.interfaces,
+            interfaces: vec![],
             directives: value.directives,
-            fields: value.fields,
+            fields: value
+                .fields
+                .into_iter()
+                .map(|with_location| with_location.map(From::from))
+                .collect(),
         }
     }
 }
@@ -443,6 +455,7 @@ pub struct SchemaObject<TEncounteredField> {
     pub server_fields: Vec<ServerFieldId>,
     pub resolvers: Vec<ResolverFieldId>,
     pub encountered_fields: HashMap<SelectableFieldName, TEncounteredField>,
+    /// This is an unused field right now, I think.
     pub valid_refinements: Vec<ValidRefinement>,
 }
 // TODO iterator of fields that includes id_field?
@@ -466,7 +479,7 @@ pub struct SchemaServerField<TData> {
     pub associated_data: TData,
     pub parent_type_id: ObjectId,
     // pub directives: Vec<Directive<ConstantValue>>,
-    pub arguments: Vec<WithSpan<InputValueDefinition>>,
+    pub arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
 }
 
 impl<TData> SchemaServerField<TData> {
@@ -546,23 +559,20 @@ impl ResolverTypeAndField {
     }
 }
 
-#[derive(Debug)]
-pub enum ResolverArtifactKind {
-    FetchableOnQuery,
-    NonFetchable,
-}
-
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum ResolverActionKind {
-    /// No associated js function
-    Identity,
     /// Associated js function
     /// TODO the first element should have a type of JavascriptName
     NamedImport((SelectableFieldName, ResolverDefinitionPath)),
     /// Refetch fields
     RefetchField,
     /// Mutation field
-    MutationField,
+    MutationField(MutationFieldResolverActionKindInfo),
+}
+
+#[derive(Debug, Clone)]
+pub struct MutationFieldResolverActionKindInfo {
+    pub field_map: Vec<FieldMapItem>,
 }
 
 #[derive(Debug)]
@@ -584,8 +594,6 @@ pub struct SchemaResolver<TScalarField, TLinkedField, TVariableDefinitionType> {
     // TODO we should probably model this differently
     pub variant: ResolverVariant,
 
-    // TODO should this be create_normalization_ast: bool?
-    pub artifact_kind: ResolverArtifactKind,
     pub action_kind: ResolverActionKind,
 
     pub variable_definitions: Vec<WithSpan<VariableDefinition<TVariableDefinitionType>>>,
