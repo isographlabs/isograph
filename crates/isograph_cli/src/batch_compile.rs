@@ -8,7 +8,9 @@ use graphql_lang_parser::{parse_schema, parse_schema_extensions, SchemaParseErro
 use intern::string_key::Intern;
 use isograph_lang_parser::{parse_iso_fetch, parse_iso_literal, IsographLiteralParseError};
 use isograph_lang_types::{ResolverDeclaration, ResolverFetch};
-use isograph_schema::{ProcessResolverDeclarationError, Schema, UnvalidatedSchema};
+use isograph_schema::{
+    ProcessGraphQLDocumentOutcome, ProcessResolverDeclarationError, Schema, UnvalidatedSchema,
+};
 use structopt::StructOpt;
 use thiserror::Error;
 
@@ -70,15 +72,34 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
 
     let mut schema = Schema::new();
 
-    let mutation_id =
+    let mut process_graphql_outcome =
         schema.process_graphql_type_system_document(type_system_document, schema_text_source)?;
 
     for (extension_document, text_source) in type_extension_document {
-        schema.process_graphql_type_extension_document(
-            extension_document,
-            text_source,
+        let ProcessGraphQLDocumentOutcome {
             mutation_id,
-        )?;
+            mutation_field_infos,
+        } = schema.process_graphql_type_extension_document(extension_document, text_source)?;
+
+        match (mutation_id, process_graphql_outcome.mutation_id) {
+            (None, _) => {}
+            (Some(mutation_id), None) => process_graphql_outcome.mutation_id = Some(mutation_id),
+            (Some(_), Some(_)) => return Err(BatchCompileError::MutationObjectDefinedTwice),
+        }
+
+        process_graphql_outcome
+            .mutation_field_infos
+            .extend(mutation_field_infos.into_iter());
+    }
+
+    // TODO the ordering should be:
+    // - process schema
+    // - validate
+    // - add mutation fields
+    // - process parsed literals
+    // - validate resolvers
+    if let Some(mutation_id) = process_graphql_outcome.mutation_id {
+        schema.add_mutation_fields(mutation_id, process_graphql_outcome.mutation_field_infos)?;
     }
 
     let canonicalized_root_path = {
@@ -323,6 +344,9 @@ pub(crate) enum BatchCompileError {
 
     #[error("Unable to print.\nReason: {message}")]
     UnableToPrint { message: GenerateArtifactsError },
+
+    #[error("Mutation object defined twice")]
+    MutationObjectDefinedTwice,
 }
 
 impl From<WithLocation<SchemaParseError>> for BatchCompileError {

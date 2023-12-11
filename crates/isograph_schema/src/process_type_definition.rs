@@ -40,12 +40,17 @@ lazy_static! {
 
 type TypeRefinementMap = HashMap<IsographObjectTypeName, Vec<WithLocation<ObjectId>>>;
 
+pub struct ProcessGraphQLDocumentOutcome {
+    pub mutation_id: Option<ObjectId>,
+    pub mutation_field_infos: Vec<MagicMutationFieldInfo>,
+}
+
 impl UnvalidatedSchema {
     pub fn process_graphql_type_system_document(
         &mut self,
         type_system_document: GraphQLTypeSystemDocument,
         text_source: TextSource,
-    ) -> ProcessTypeDefinitionResult<Option<ObjectId>> {
+    ) -> ProcessTypeDefinitionResult<ProcessGraphQLDocumentOutcome> {
         // In the schema, interfaces, unions and objects are the same type of object (SchemaType),
         // with e.g. interfaces "simply" being objects that can be refined to other
         // concrete objects.
@@ -153,19 +158,17 @@ impl UnvalidatedSchema {
             }
         }
 
-        if let Some(mutation_id) = mutation_type_id {
-            self.add_mutation_fields(mutation_id, mutation_field_infos, text_source)?;
-        }
-
-        Ok(mutation_type_id)
+        Ok(ProcessGraphQLDocumentOutcome {
+            mutation_id: mutation_type_id,
+            mutation_field_infos,
+        })
     }
 
     pub fn process_graphql_type_extension_document(
         &mut self,
         extension_document: GraphQLTypeSystemExtensionDocument,
         text_source: TextSource,
-        mutation_id: Option<ObjectId>,
-    ) -> ProcessTypeDefinitionResult<()> {
+    ) -> ProcessTypeDefinitionResult<ProcessGraphQLDocumentOutcome> {
         let mut definitions = Vec::with_capacity(extension_document.0.len());
         let mut extensions = Vec::with_capacity(extension_document.0.len());
 
@@ -196,11 +199,11 @@ impl UnvalidatedSchema {
             }
         }
 
-        if let Some(mutation_id) = mutation_id {
-            self.add_mutation_fields(mutation_id, mutation_field_infos, text_source)?;
-        }
-
-        Ok(())
+        Ok(ProcessGraphQLDocumentOutcome {
+            // TODO process schema and return mutation id
+            mutation_id: None,
+            mutation_field_infos,
+        })
     }
 
     fn process_graphql_type_system_extension(
@@ -394,11 +397,10 @@ impl UnvalidatedSchema {
     ///   selected in the merged selection set.
     ///
     /// There is lots of cloning going on here! Not ideal.
-    fn add_mutation_fields(
+    pub fn add_mutation_fields(
         &mut self,
         mutation_id: ObjectId,
         mut mutation_field_infos: Vec<MagicMutationFieldInfo>,
-        text_source: TextSource,
     ) -> ProcessTypeDefinitionResult<()> {
         // TODO don't clone if possible
         let mutation_object = self.schema_data.object(mutation_id);
@@ -430,6 +432,7 @@ impl UnvalidatedSchema {
                         path,
                         field_map_items,
                         object_id: _,
+                        text_source,
                     } = magic_mutation_field;
 
                     let (mutation_field_args_without_id, processed_field_map_items) =
@@ -584,6 +587,7 @@ pub struct MagicMutationFieldInfo {
     path: StringLiteralValue,
     field_map_items: Vec<FieldMapItem>,
     object_id: ObjectId,
+    text_source: TextSource,
 }
 
 enum MagicMutationFieldOrDirective {
@@ -658,6 +662,7 @@ fn validate_magic_mutation_directive(
         path: path_val,
         field_map_items,
         object_id,
+        text_source,
     })
 }
 
