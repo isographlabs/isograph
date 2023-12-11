@@ -56,11 +56,43 @@ impl Deref for GraphQLTypeSystemDocument {
     }
 }
 
-// TypeSystemDefinition: SchemaDef, TypeDef, DirectiveDef
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub struct GraphQLTypeSystemExtensionDocument(pub Vec<GraphQLTypeSystemExtensionOrDefinition>);
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub enum GraphQLTypeSystemExtensionOrDefinition {
+    Definition(GraphQLTypeSystemDefinition),
+    Extension(GraphQLTypeSystemExtension),
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub enum GraphQLTypeSystemExtension {
+    ObjectTypeExtension(GraphQLObjectTypeExtension),
+    // ScalarTypeExtension
+    // InterfaceTypeExtension
+    // UnionTypeExtension
+    // EnumTypeExtension
+    // InputObjectTypeExtension
+    // SchemaExtension
+}
+
+impl From<GraphQLObjectTypeExtension> for GraphQLTypeSystemExtension {
+    fn from(object_type_extension: GraphQLObjectTypeExtension) -> Self {
+        Self::ObjectTypeExtension(object_type_extension)
+    }
+}
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct GraphQLObjectTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
+    pub name: WithLocation<ObjectTypeName>,
+    pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
+    pub directives: Vec<Directive<ConstantValue>>,
+    pub fields: Vec<WithLocation<GraphQLOutputFieldDefinition>>,
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub struct GraphQLObjectTypeExtension {
     pub name: WithLocation<ObjectTypeName>,
     pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
     pub directives: Vec<Directive<ConstantValue>>,

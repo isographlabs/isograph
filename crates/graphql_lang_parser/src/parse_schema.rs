@@ -12,10 +12,11 @@ use intern::{
 
 use graphql_lang_types::{
     ConstantValue, Directive, GraphQLInputObjectTypeDefinition, GraphQLInputValueDefinition,
-    GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition, GraphQLOutputFieldDefinition,
-    GraphQLScalarTypeDefinition, GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument,
-    ListTypeAnnotation, NameValuePair, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation,
-    ValueType,
+    GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition, GraphQLObjectTypeExtension,
+    GraphQLOutputFieldDefinition, GraphQLScalarTypeDefinition, GraphQLTypeSystemDefinition,
+    GraphQLTypeSystemDocument, GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
+    GraphQLTypeSystemExtensionOrDefinition, ListTypeAnnotation, NameValuePair, NamedTypeAnnotation,
+    NonNullTypeAnnotation, TypeAnnotation, ValueType,
 };
 
 use crate::ParseResult;
@@ -44,6 +45,77 @@ fn parse_type_system_document(
         type_system_definitions.push(type_system_definition);
     }
     Ok(GraphQLTypeSystemDocument(type_system_definitions))
+}
+
+pub fn parse_schema_extension(
+    source: &str,
+    text_source: TextSource,
+) -> ParseResult<GraphQLTypeSystemExtensionDocument> {
+    let mut tokens = PeekableLexer::new(source);
+
+    parse_type_system_extension_document(&mut tokens, text_source)
+}
+
+fn parse_type_system_extension_document(
+    tokens: &mut PeekableLexer,
+    text_source: TextSource,
+) -> ParseResult<GraphQLTypeSystemExtensionDocument> {
+    let mut definitions_or_extensions = vec![];
+    while !tokens.reached_eof() {
+        let definition_or_extension = match peek_type_system_doc_type(tokens) {
+            Ok(type_system_document_kind) => match type_system_document_kind {
+                TypeSystemDocType::Definition => {
+                    Ok(GraphQLTypeSystemExtensionOrDefinition::Definition(
+                        parse_type_system_definition(tokens, text_source)?,
+                    ))
+                }
+                TypeSystemDocType::Extension => {
+                    Ok(GraphQLTypeSystemExtensionOrDefinition::Extension(
+                        parse_type_system_extension(tokens, text_source)?,
+                    ))
+                }
+            },
+            Err(unexpected_token) => Err(WithSpan::new(
+                SchemaParseError::TopLevelSchemaDeclarationOrExtensionExpected {
+                    found_text: unexpected_token.item.to_string(),
+                },
+                unexpected_token.span,
+            )),
+        }?;
+        definitions_or_extensions.push(definition_or_extension);
+    }
+    Ok(GraphQLTypeSystemExtensionDocument(
+        definitions_or_extensions,
+    ))
+}
+
+fn parse_type_system_extension(
+    tokens: &mut PeekableLexer,
+    text_source: TextSource,
+) -> ParseResult<GraphQLTypeSystemExtension> {
+    let identifier = tokens
+        .parse_token_of_kind(TokenKind::Identifier)
+        .expect("Expected identifier extend. This is indicative of a bug in Isograph.");
+    assert!(
+        tokens.source(identifier.span) == "extend",
+        "Expected identifier extend. This is indicative of a bug in Isograph."
+    );
+
+    let identifier = tokens
+        .parse_token_of_kind(TokenKind::Identifier)
+        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+    let identifier_source = tokens.source(identifier.span);
+    match identifier_source {
+        "type" => {
+            parse_object_type_extension(tokens, text_source).map(GraphQLTypeSystemExtension::from)
+        }
+        _ => Err(WithSpan::new(
+            SchemaParseError::TopLevelSchemaDeclarationExpected {
+                found_text: identifier_source.to_string(),
+            },
+            identifier.span,
+        )),
+    }
 }
 
 fn parse_type_system_definition(
@@ -91,6 +163,28 @@ fn parse_object_type_definition(
 
     Ok(GraphQLObjectTypeDefinition {
         description,
+        name,
+        interfaces,
+        directives,
+        fields,
+    })
+}
+
+/// The state of the PeekableLexer is that it has processed the "type" keyword
+fn parse_object_type_extension(
+    tokens: &mut PeekableLexer,
+    text_source: TextSource,
+) -> ParseResult<GraphQLObjectTypeExtension> {
+    let name = tokens
+        .parse_string_key_type(TokenKind::Identifier)
+        .map(|with_span| with_span_to_with_location(with_span, text_source))
+        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+
+    let interfaces = parse_implements_interfaces_if_present(tokens)?;
+    let directives = parse_constant_directives(tokens)?;
+    let fields = parse_optional_fields(tokens, text_source)?;
+
+    Ok(GraphQLObjectTypeExtension {
         name,
         interfaces,
         directives,
@@ -580,4 +674,27 @@ fn parse_optional_constant_default_value<'a>(
 
     let constant_value = parse_constant_value(tokens)?;
     Ok(Some(constant_value))
+}
+
+enum TypeSystemDocType {
+    Definition,
+    Extension,
+}
+
+fn peek_type_system_doc_type(
+    tokens: &PeekableLexer,
+) -> Result<TypeSystemDocType, WithSpan<TokenKind>> {
+    let peeked = tokens.peek();
+    match peeked.item {
+        TokenKind::StringLiteral => Ok(TypeSystemDocType::Definition),
+        TokenKind::BlockStringLiteral => Ok(TypeSystemDocType::Definition),
+        TokenKind::Identifier => {
+            let text = tokens.source(peeked.span);
+            match text {
+                "extend" => Ok(TypeSystemDocType::Extension),
+                _ => Ok(TypeSystemDocType::Definition),
+            }
+        }
+        _ => Err(peeked),
+    }
 }

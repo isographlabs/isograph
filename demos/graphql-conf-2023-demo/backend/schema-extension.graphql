@@ -1,0 +1,2 @@
+extend type SetPetBestFriend2Response
+  @primary(path: "pet", field_map: [{ from: "id", to: "input.id" }])

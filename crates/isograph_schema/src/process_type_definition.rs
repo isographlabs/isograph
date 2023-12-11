@@ -8,7 +8,9 @@ use common_lang_types::{
 use graphql_lang_types::{
     ConstantValue, Directive, GraphQLInputValueDefinition, GraphQLObjectTypeDefinition,
     GraphQLOutputFieldDefinition, GraphQLScalarTypeDefinition, GraphQLTypeSystemDefinition,
-    GraphQLTypeSystemDocument, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation,
+    GraphQLTypeSystemDocument, GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
+    GraphQLTypeSystemExtensionOrDefinition, NamedTypeAnnotation, NonNullTypeAnnotation,
+    TypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -155,6 +157,84 @@ impl UnvalidatedSchema {
             self.add_mutation_fields(mutation_id, mutation_field_infos, text_source)?;
         }
 
+        Ok(())
+    }
+
+    pub fn process_graphql_type_extension_document(
+        &mut self,
+        extension_document: GraphQLTypeSystemExtensionDocument,
+        text_source: TextSource,
+    ) -> ProcessTypeDefinitionResult<()> {
+        let mut definitions = Vec::with_capacity(extension_document.0.len());
+        let mut extensions = Vec::with_capacity(extension_document.0.len());
+
+        for extension_or_definition in extension_document.0 {
+            match extension_or_definition {
+                GraphQLTypeSystemExtensionOrDefinition::Definition(definition) => {
+                    definitions.push(definition);
+                }
+                GraphQLTypeSystemExtensionOrDefinition::Extension(extension) => {
+                    extensions.push(extension)
+                }
+            }
+        }
+
+        // N.B. we should probably restructure this...?
+        self.process_graphql_type_system_document(
+            GraphQLTypeSystemDocument(definitions),
+            text_source,
+        )?;
+
+        for extension in extensions.into_iter() {
+            self.process_graphql_type_system_extension(extension, text_source)?;
+        }
+
+        Ok(())
+    }
+
+    fn process_graphql_type_system_extension(
+        &mut self,
+        extension: GraphQLTypeSystemExtension,
+        _text_source: TextSource,
+    ) -> ProcessTypeDefinitionResult<()> {
+        match extension {
+            GraphQLTypeSystemExtension::ObjectTypeExtension(object_extension) => {
+                let name = object_extension.name.item;
+
+                let id = self
+                    .schema_data
+                    .defined_types
+                    .get(&name.into())
+                    .ok_or_else(|| todo!())?;
+
+                match id {
+                    DefinedTypeId::Object(object_id) => {
+                        let _schema_object = self.schema_data.object_mut(*object_id);
+
+                        if !object_extension.fields.is_empty() {
+                            panic!("Adding fields in schema extensions is not allowed, yet.");
+                        }
+                        if !object_extension.interfaces.is_empty() {
+                            panic!("Adding interfaces in schema extensions is not allowed, yet.");
+                        }
+
+                        for _directive in object_extension.directives {
+                            // TODO do something with this directive
+                        }
+                    }
+                    DefinedTypeId::Scalar(_) => {
+                        return Err(WithLocation::new(
+                            ProcessTypeDefinitionError::TypeExtensionMismatch {
+                                type_name: name.into(),
+                                is_type: "a scalar",
+                                extended_as_type: "an object",
+                            },
+                            object_extension.name.location,
+                        ))
+                    }
+                }
+            }
+        };
         Ok(())
     }
 
@@ -803,6 +883,10 @@ impl ModifiedObject {
 
         let (object_id, _) = schema
             .process_object_type_definition(item, &mut HashMap::new())
+            // This is not (yet) true. If you reference a non-existent type in
+            // a @primary directive, the compiler panics here. The solution is to
+            // process these directives after the definitions have been validated,
+            // but before resolvers hvae been validated.
             .expect(
                 "Expected object creation to work. This is \
                 indicative of a bug in Isograph.",
@@ -1529,5 +1613,14 @@ pub enum ProcessTypeDefinitionError {
     PrimaryDirectiveFieldNotFound {
         primary_type_name: IsographObjectTypeName,
         field_name: StringLiteralValue,
+    },
+
+    #[error(
+        "The type `{type_name}` is {is_type}, but it is being extended as {extended_as_type}."
+    )]
+    TypeExtensionMismatch {
+        type_name: UnvalidatedTypeName,
+        is_type: &'static str,
+        extended_as_type: &'static str,
     },
 }
