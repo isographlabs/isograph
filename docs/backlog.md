@@ -54,6 +54,7 @@
   - or weak types are scalars
 - Remove the requirement that arguments and parameters have a terminal comma.
 - IsographSchemaObject, etc. should not contain name: WithLocation<...>, but instead, be stored `WithLocation<T>`, and WithLocation should **not** have a span.
+- There should be a cleaner separation between GraphQL and Isograph. In particular, we should load the GraphQL schema, but turn it into Isograph concepts, and only deal with Isograph concepts.
 
 ## Known bugs
 
