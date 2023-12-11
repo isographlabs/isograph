@@ -1,0 +1,9 @@
+extend type SetPetTaglineResponse
+  @primary(path: "pet", field_map: [{ from: "id", to: "input.id" }])
+
+extend type Mutation
+  @expose_mutation_field(
+    field: "set_pet_tagline"
+    path: "pet"
+    field_map: [{ from: "id", to: "input.id" }]
+  )

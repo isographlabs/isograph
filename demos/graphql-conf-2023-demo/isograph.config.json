@@ -1,5 +1,6 @@
 {
     "project_root": "./src/components",
     "artifact_directory": "./src",
-    "schema": "./backend/schema.graphql"
+    "schema": "./backend/schema.graphql",
+    "schema_extensions": ["./backend/schema-extension.graphql"]
 }

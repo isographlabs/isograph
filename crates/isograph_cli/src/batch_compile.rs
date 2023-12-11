@@ -4,11 +4,13 @@ use common_lang_types::{
     with_span_to_with_location, Location, ResolverDefinitionPath, SourceFileName, Span, TextSource,
     WithLocation, WithSpan,
 };
-use graphql_lang_parser::{parse_schema, SchemaParseError};
+use graphql_lang_parser::{parse_schema, parse_schema_extensions, SchemaParseError};
 use intern::string_key::Intern;
 use isograph_lang_parser::{parse_iso_fetch, parse_iso_literal, IsographLiteralParseError};
 use isograph_lang_types::{ResolverDeclaration, ResolverFetch};
-use isograph_schema::{ProcessResolverDeclarationError, Schema, UnvalidatedSchema};
+use isograph_schema::{
+    ProcessGraphQLDocumentOutcome, ProcessResolverDeclarationError, Schema, UnvalidatedSchema,
+};
 use structopt::StructOpt;
 use thiserror::Error;
 
@@ -34,12 +36,7 @@ pub(crate) struct BatchCompileCliOptions {
 pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), BatchCompileError> {
     let config = CompilerConfig::create(opt.config);
 
-    let mut content = read_schema_file(&config.schema)?;
-    if let Some(schema_extension) = &config.schema_extensions {
-        let extension_content = read_schema_file(schema_extension)?;
-        content.push_str("\n");
-        content.push_str(&extension_content);
-    }
+    let content = read_schema_file(&config.schema)?;
     let schema_text_source = TextSource {
         path: config
             .schema
@@ -49,12 +46,61 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
             .into(),
         span: None,
     };
-
     let type_system_document = parse_schema(&content, schema_text_source)
         .map_err(|with_span| with_span_to_with_location(with_span, schema_text_source))?;
+
+    let type_extension_document = config
+        .schema_extensions
+        .iter()
+        .map(|schema_extension_path| {
+            let extension_text_source = TextSource {
+                path: schema_extension_path
+                    .to_str()
+                    .expect("Expected schema extension to be valid string")
+                    .intern()
+                    .into(),
+                span: None,
+            };
+            let extension_content = read_schema_file(schema_extension_path)?;
+            let extension = parse_schema_extensions(&extension_content, extension_text_source)
+                .map_err(|with_span| {
+                    with_span_to_with_location(with_span, extension_text_source)
+                })?;
+            Ok((extension, extension_text_source))
+        })
+        .collect::<Result<Vec<_>, BatchCompileError>>()?;
+
     let mut schema = Schema::new();
 
-    schema.process_graphql_type_system_document(type_system_document, schema_text_source)?;
+    let mut process_graphql_outcome =
+        schema.process_graphql_type_system_document(type_system_document, schema_text_source)?;
+
+    for (extension_document, text_source) in type_extension_document {
+        let ProcessGraphQLDocumentOutcome {
+            mutation_id,
+            mutation_field_infos,
+        } = schema.process_graphql_type_extension_document(extension_document, text_source)?;
+
+        match (mutation_id, process_graphql_outcome.mutation_id) {
+            (None, _) => {}
+            (Some(mutation_id), None) => process_graphql_outcome.mutation_id = Some(mutation_id),
+            (Some(_), Some(_)) => return Err(BatchCompileError::MutationObjectDefinedTwice),
+        }
+
+        process_graphql_outcome
+            .mutation_field_infos
+            .extend(mutation_field_infos.into_iter());
+    }
+
+    // TODO the ordering should be:
+    // - process schema
+    // - validate
+    // - add mutation fields
+    // - process parsed literals
+    // - validate resolvers
+    if let Some(mutation_id) = process_graphql_outcome.mutation_id {
+        schema.add_mutation_fields(mutation_id, process_graphql_outcome.mutation_field_infos)?;
+    }
 
     let canonicalized_root_path = {
         let current_dir = std::env::current_dir().expect("current_dir should exist");
@@ -298,6 +344,9 @@ pub(crate) enum BatchCompileError {
 
     #[error("Unable to print.\nReason: {message}")]
     UnableToPrint { message: GenerateArtifactsError },
+
+    #[error("Mutation object defined twice")]
+    MutationObjectDefinedTwice,
 }
 
 impl From<WithLocation<SchemaParseError>> for BatchCompileError {

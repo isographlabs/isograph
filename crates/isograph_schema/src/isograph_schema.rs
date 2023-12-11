@@ -458,7 +458,6 @@ pub struct SchemaObject<TEncounteredField> {
     /// This is an unused field right now, I think.
     pub valid_refinements: Vec<ValidRefinement>,
 }
-// TODO iterator of fields that includes id_field?
 
 /// In GraphQL, ValidRefinement's are essentially the concrete types that an interface or
 /// union can be narrowed to. valid_refinements should be empty for concrete types.

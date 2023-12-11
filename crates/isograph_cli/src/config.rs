@@ -11,7 +11,7 @@ pub(crate) struct CompilerConfig {
     /// The absolute path to the GraphQL schema
     pub schema: PathBuf,
     /// The absolute path to the schema extensions
-    pub schema_extensions: Option<PathBuf>,
+    pub schema_extensions: Vec<PathBuf>,
 }
 
 #[derive(Deserialize)]
@@ -23,7 +23,7 @@ pub(crate) struct ConfigFile {
     /// The relative path to the GraphQL schema
     pub schema: PathBuf,
     /// The relative path to schema extensions
-    pub schema_extensions: Option<PathBuf>,
+    pub schema_extensions: Vec<PathBuf>,
 }
 
 impl CompilerConfig {
@@ -57,13 +57,14 @@ impl CompilerConfig {
                 .expect("Unable to canonicalize schema path."),
             schema_extensions: config_parsed
                 .schema_extensions
-                .as_ref()
-                .map(|schema_extension| {
+                .into_iter()
+                .map(|schema_extensions| {
                     config_dir
-                        .join(schema_extension)
+                        .join(schema_extensions)
                         .canonicalize()
                         .expect("Unable to canonicalize schema extension path.")
-                }),
+                })
+                .collect(),
         }
     }
 }

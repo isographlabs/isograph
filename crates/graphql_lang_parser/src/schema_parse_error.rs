@@ -14,6 +14,9 @@ pub enum SchemaParseError {
     #[error("Expected scalar, type, interface, union, enum, input object, schema or directive, found \"{found_text}\"")]
     TopLevelSchemaDeclarationExpected { found_text: String },
 
+    #[error("Expected extend, scalar, type, interface, union, enum, input object, schema or directive, found \"{found_text}\"")]
+    TopLevelSchemaDeclarationOrExtensionExpected { found_text: String },
+
     #[error("Unable to parse constant value")]
     UnableToParseConstantValue,
 

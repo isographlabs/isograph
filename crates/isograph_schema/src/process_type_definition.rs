@@ -8,7 +8,9 @@ use common_lang_types::{
 use graphql_lang_types::{
     ConstantValue, Directive, GraphQLInputValueDefinition, GraphQLObjectTypeDefinition,
     GraphQLOutputFieldDefinition, GraphQLScalarTypeDefinition, GraphQLTypeSystemDefinition,
-    GraphQLTypeSystemDocument, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation,
+    GraphQLTypeSystemDocument, GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
+    GraphQLTypeSystemExtensionOrDefinition, NamedTypeAnnotation, NonNullTypeAnnotation,
+    TypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -38,12 +40,17 @@ lazy_static! {
 
 type TypeRefinementMap = HashMap<IsographObjectTypeName, Vec<WithLocation<ObjectId>>>;
 
+pub struct ProcessGraphQLDocumentOutcome {
+    pub mutation_id: Option<ObjectId>,
+    pub mutation_field_infos: Vec<MagicMutationFieldInfo>,
+}
+
 impl UnvalidatedSchema {
     pub fn process_graphql_type_system_document(
         &mut self,
         type_system_document: GraphQLTypeSystemDocument,
         text_source: TextSource,
-    ) -> ProcessTypeDefinitionResult<()> {
+    ) -> ProcessTypeDefinitionResult<ProcessGraphQLDocumentOutcome> {
         // In the schema, interfaces, unions and objects are the same type of object (SchemaType),
         // with e.g. interfaces "simply" being objects that can be refined to other
         // concrete objects.
@@ -151,11 +158,98 @@ impl UnvalidatedSchema {
             }
         }
 
-        if let Some(mutation_id) = mutation_type_id {
-            self.add_mutation_fields(mutation_id, mutation_field_infos, text_source)?;
+        Ok(ProcessGraphQLDocumentOutcome {
+            mutation_id: mutation_type_id,
+            mutation_field_infos,
+        })
+    }
+
+    pub fn process_graphql_type_extension_document(
+        &mut self,
+        extension_document: GraphQLTypeSystemExtensionDocument,
+        text_source: TextSource,
+    ) -> ProcessTypeDefinitionResult<ProcessGraphQLDocumentOutcome> {
+        let mut definitions = Vec::with_capacity(extension_document.0.len());
+        let mut extensions = Vec::with_capacity(extension_document.0.len());
+
+        for extension_or_definition in extension_document.0 {
+            match extension_or_definition {
+                GraphQLTypeSystemExtensionOrDefinition::Definition(definition) => {
+                    definitions.push(definition);
+                }
+                GraphQLTypeSystemExtensionOrDefinition::Extension(extension) => {
+                    extensions.push(extension)
+                }
+            }
         }
 
-        Ok(())
+        // N.B. we should probably restructure this...?
+        // Like, we could discover the mutation type right now!
+        self.process_graphql_type_system_document(
+            GraphQLTypeSystemDocument(definitions),
+            text_source,
+        )?;
+
+        let mut mutation_field_infos = vec![];
+        for extension in extensions.into_iter() {
+            if let Some(magic_mutation_field_info) =
+                self.process_graphql_type_system_extension(extension, text_source)?
+            {
+                mutation_field_infos.push(magic_mutation_field_info);
+            }
+        }
+
+        Ok(ProcessGraphQLDocumentOutcome {
+            // TODO process schema and return mutation id
+            mutation_id: None,
+            mutation_field_infos,
+        })
+    }
+
+    fn process_graphql_type_system_extension(
+        &mut self,
+        extension: GraphQLTypeSystemExtension,
+        text_source: TextSource,
+    ) -> ProcessTypeDefinitionResult<Option<MagicMutationFieldInfo>> {
+        match extension {
+            GraphQLTypeSystemExtension::ObjectTypeExtension(object_extension) => {
+                let name = object_extension.name.item;
+
+                let id = self
+                    .schema_data
+                    .defined_types
+                    .get(&name.into())
+                    .ok_or_else(|| todo!())?;
+
+                match *id {
+                    DefinedTypeId::Object(object_id) => {
+                        let _schema_object = self.schema_data.object_mut(object_id);
+
+                        if !object_extension.fields.is_empty() {
+                            panic!("Adding fields in schema extensions is not allowed, yet.");
+                        }
+                        if !object_extension.interfaces.is_empty() {
+                            panic!("Adding interfaces in schema extensions is not allowed, yet.");
+                        }
+
+                        let (_directives, magic_mutation_field_info) = extract_primary_directive(
+                            object_extension.directives,
+                            text_source,
+                            object_id,
+                        )?;
+                        Ok(magic_mutation_field_info)
+                    }
+                    DefinedTypeId::Scalar(_) => Err(WithLocation::new(
+                        ProcessTypeDefinitionError::TypeExtensionMismatch {
+                            type_name: name.into(),
+                            is_type: "a scalar",
+                            extended_as_type: "an object",
+                        },
+                        object_extension.name.location,
+                    )),
+                }
+            }
+        }
     }
 
     fn process_object_type_definition(
@@ -303,11 +397,10 @@ impl UnvalidatedSchema {
     ///   selected in the merged selection set.
     ///
     /// There is lots of cloning going on here! Not ideal.
-    fn add_mutation_fields(
+    pub fn add_mutation_fields(
         &mut self,
         mutation_id: ObjectId,
         mut mutation_field_infos: Vec<MagicMutationFieldInfo>,
-        text_source: TextSource,
     ) -> ProcessTypeDefinitionResult<()> {
         // TODO don't clone if possible
         let mutation_object = self.schema_data.object(mutation_id);
@@ -339,6 +432,7 @@ impl UnvalidatedSchema {
                         path,
                         field_map_items,
                         object_id: _,
+                        text_source,
                     } = magic_mutation_field;
 
                     let (mutation_field_args_without_id, processed_field_map_items) =
@@ -493,6 +587,7 @@ pub struct MagicMutationFieldInfo {
     path: StringLiteralValue,
     field_map_items: Vec<FieldMapItem>,
     object_id: ObjectId,
+    text_source: TextSource,
 }
 
 enum MagicMutationFieldOrDirective {
@@ -567,6 +662,7 @@ fn validate_magic_mutation_directive(
         path: path_val,
         field_map_items,
         object_id,
+        text_source,
     })
 }
 
@@ -689,13 +785,35 @@ fn parse_field_map_val(
 
 // TODO this belongs in graphql_sdl
 pub fn convert_and_extract_mutation_field_info(
-    value: GraphQLObjectTypeDefinition,
+    object_type_definition: GraphQLObjectTypeDefinition,
     text_source: TextSource,
     object_id: ObjectId,
 ) -> ProcessTypeDefinitionResult<(IsographObjectTypeDefinition, Option<MagicMutationFieldInfo>)> {
+    let (directives, magic_mutation_field_info) =
+        extract_primary_directive(object_type_definition.directives, text_source, object_id)?;
+
+    Ok((
+        IsographObjectTypeDefinition {
+            description: object_type_definition.description,
+            name: object_type_definition.name.map(|x| x.into()),
+            interfaces: object_type_definition.interfaces,
+            directives,
+            fields: object_type_definition.fields,
+        },
+        magic_mutation_field_info,
+    ))
+}
+
+fn extract_primary_directive(
+    directives: Vec<Directive<ConstantValue>>,
+    text_source: TextSource,
+    object_id: ObjectId,
+) -> ProcessTypeDefinitionResult<(
+    Vec<Directive<ConstantValue>>,
+    Option<MagicMutationFieldInfo>,
+)> {
     let mut magic_mutation_field_info = None;
-    let directives = value
-        .directives
+    let directives = directives
         .into_iter()
         .flat_map(
             |d| match extract_magic_mutation_field_info(d, text_source, object_id) {
@@ -708,19 +826,8 @@ pub fn convert_and_extract_mutation_field_info(
             },
         )
         .collect();
-
     let magic_mutation_field_info = magic_mutation_field_info.transpose()?;
-
-    Ok((
-        IsographObjectTypeDefinition {
-            description: value.description,
-            name: value.name.map(|x| x.into()),
-            interfaces: value.interfaces,
-            directives,
-            fields: value.fields,
-        },
-        magic_mutation_field_info,
-    ))
+    Ok((directives, magic_mutation_field_info))
 }
 
 // TODO this should be a different type.
@@ -803,6 +910,10 @@ impl ModifiedObject {
 
         let (object_id, _) = schema
             .process_object_type_definition(item, &mut HashMap::new())
+            // This is not (yet) true. If you reference a non-existent type in
+            // a @primary directive, the compiler panics here. The solution is to
+            // process these directives after the definitions have been validated,
+            // but before resolvers hvae been validated.
             .expect(
                 "Expected object creation to work. This is \
                 indicative of a bug in Isograph.",
@@ -1529,5 +1640,14 @@ pub enum ProcessTypeDefinitionError {
     PrimaryDirectiveFieldNotFound {
         primary_type_name: IsographObjectTypeName,
         field_name: StringLiteralValue,
+    },
+
+    #[error(
+        "The type `{type_name}` is {is_type}, but it is being extended as {extended_as_type}."
+    )]
+    TypeExtensionMismatch {
+        type_name: UnvalidatedTypeName,
+        is_type: &'static str,
+        extended_as_type: &'static str,
     },
 }
