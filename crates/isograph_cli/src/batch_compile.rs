@@ -66,10 +66,15 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
 
     let mut schema = Schema::new();
 
-    schema.process_graphql_type_system_document(type_system_document, schema_text_source)?;
+    let mutation_id =
+        schema.process_graphql_type_system_document(type_system_document, schema_text_source)?;
 
     if let Some((extension_document, text_source)) = type_extension_document {
-        schema.process_graphql_type_extension_document(extension_document, text_source)?;
+        schema.process_graphql_type_extension_document(
+            extension_document,
+            text_source,
+            mutation_id,
+        )?;
     }
 
     let canonicalized_root_path = {

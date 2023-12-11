@@ -45,7 +45,7 @@ impl UnvalidatedSchema {
         &mut self,
         type_system_document: GraphQLTypeSystemDocument,
         text_source: TextSource,
-    ) -> ProcessTypeDefinitionResult<()> {
+    ) -> ProcessTypeDefinitionResult<Option<ObjectId>> {
         // In the schema, interfaces, unions and objects are the same type of object (SchemaType),
         // with e.g. interfaces "simply" being objects that can be refined to other
         // concrete objects.
@@ -157,13 +157,14 @@ impl UnvalidatedSchema {
             self.add_mutation_fields(mutation_id, mutation_field_infos, text_source)?;
         }
 
-        Ok(())
+        Ok(mutation_type_id)
     }
 
     pub fn process_graphql_type_extension_document(
         &mut self,
         extension_document: GraphQLTypeSystemExtensionDocument,
         text_source: TextSource,
+        mutation_id: Option<ObjectId>,
     ) -> ProcessTypeDefinitionResult<()> {
         let mut definitions = Vec::with_capacity(extension_document.0.len());
         let mut extensions = Vec::with_capacity(extension_document.0.len());
@@ -180,13 +181,23 @@ impl UnvalidatedSchema {
         }
 
         // N.B. we should probably restructure this...?
+        // Like, we could discover the mutation type right now!
         self.process_graphql_type_system_document(
             GraphQLTypeSystemDocument(definitions),
             text_source,
         )?;
 
+        let mut mutation_field_infos = vec![];
         for extension in extensions.into_iter() {
-            self.process_graphql_type_system_extension(extension, text_source)?;
+            if let Some(magic_mutation_field_info) =
+                self.process_graphql_type_system_extension(extension, text_source)?
+            {
+                mutation_field_infos.push(magic_mutation_field_info);
+            }
+        }
+
+        if let Some(mutation_id) = mutation_id {
+            self.add_mutation_fields(mutation_id, mutation_field_infos, text_source)?;
         }
 
         Ok(())
@@ -195,8 +206,8 @@ impl UnvalidatedSchema {
     fn process_graphql_type_system_extension(
         &mut self,
         extension: GraphQLTypeSystemExtension,
-        _text_source: TextSource,
-    ) -> ProcessTypeDefinitionResult<()> {
+        text_source: TextSource,
+    ) -> ProcessTypeDefinitionResult<Option<MagicMutationFieldInfo>> {
         match extension {
             GraphQLTypeSystemExtension::ObjectTypeExtension(object_extension) => {
                 let name = object_extension.name.item;
@@ -207,9 +218,9 @@ impl UnvalidatedSchema {
                     .get(&name.into())
                     .ok_or_else(|| todo!())?;
 
-                match id {
+                match *id {
                     DefinedTypeId::Object(object_id) => {
-                        let _schema_object = self.schema_data.object_mut(*object_id);
+                        let _schema_object = self.schema_data.object_mut(object_id);
 
                         if !object_extension.fields.is_empty() {
                             panic!("Adding fields in schema extensions is not allowed, yet.");
@@ -218,24 +229,24 @@ impl UnvalidatedSchema {
                             panic!("Adding interfaces in schema extensions is not allowed, yet.");
                         }
 
-                        for _directive in object_extension.directives {
-                            // TODO do something with this directive
-                        }
+                        let (_directives, magic_mutation_field_info) = extract_primary_directive(
+                            object_extension.directives,
+                            text_source,
+                            object_id,
+                        )?;
+                        Ok(magic_mutation_field_info)
                     }
-                    DefinedTypeId::Scalar(_) => {
-                        return Err(WithLocation::new(
-                            ProcessTypeDefinitionError::TypeExtensionMismatch {
-                                type_name: name.into(),
-                                is_type: "a scalar",
-                                extended_as_type: "an object",
-                            },
-                            object_extension.name.location,
-                        ))
-                    }
+                    DefinedTypeId::Scalar(_) => Err(WithLocation::new(
+                        ProcessTypeDefinitionError::TypeExtensionMismatch {
+                            type_name: name.into(),
+                            is_type: "a scalar",
+                            extended_as_type: "an object",
+                        },
+                        object_extension.name.location,
+                    )),
                 }
             }
-        };
-        Ok(())
+        }
     }
 
     fn process_object_type_definition(
