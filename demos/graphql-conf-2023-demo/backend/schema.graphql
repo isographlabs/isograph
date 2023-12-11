@@ -6,9 +6,6 @@ type Query {
 type Mutation {
   set_pet_best_friend(id: ID!, new_best_friend_id: ID!): SetBestFriendResponse!
   set_pet_tagline(input: SetPetTaglineParams!): SetPetTaglineResponse!
-  set_pet_best_friend_2(
-    input: SetPetBestFriend2Params!
-  ): SetPetBestFriend2Response!
 }
 
 type SetBestFriendResponse
@@ -22,17 +19,8 @@ input SetPetTaglineParams {
   tagline: String!
 }
 
-type SetPetTaglineResponse
-  @primary(path: "pet", field_map: [{ from: "id", to: "input.id" }]) {
-  pet: Pet!
-}
-
-type SetPetBestFriend2Params {
-  id: ID!
-  best_friend_id: ID!
-}
-
-type SetPetBestFriend2Response {
+type SetPetTaglineResponse {
+  # @primary(path: "pet", field_map: [{ from: "id", to: "input.id" }]) {
   pet: Pet!
 }
 
