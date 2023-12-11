@@ -769,13 +769,35 @@ fn parse_field_map_val(
 
 // TODO this belongs in graphql_sdl
 pub fn convert_and_extract_mutation_field_info(
-    value: GraphQLObjectTypeDefinition,
+    object_type_definition: GraphQLObjectTypeDefinition,
     text_source: TextSource,
     object_id: ObjectId,
 ) -> ProcessTypeDefinitionResult<(IsographObjectTypeDefinition, Option<MagicMutationFieldInfo>)> {
+    let (directives, magic_mutation_field_info) =
+        extract_primary_directive(object_type_definition.directives, text_source, object_id)?;
+
+    Ok((
+        IsographObjectTypeDefinition {
+            description: object_type_definition.description,
+            name: object_type_definition.name.map(|x| x.into()),
+            interfaces: object_type_definition.interfaces,
+            directives,
+            fields: object_type_definition.fields,
+        },
+        magic_mutation_field_info,
+    ))
+}
+
+fn extract_primary_directive(
+    directives: Vec<Directive<ConstantValue>>,
+    text_source: TextSource,
+    object_id: ObjectId,
+) -> ProcessTypeDefinitionResult<(
+    Vec<Directive<ConstantValue>>,
+    Option<MagicMutationFieldInfo>,
+)> {
     let mut magic_mutation_field_info = None;
-    let directives = value
-        .directives
+    let directives = directives
         .into_iter()
         .flat_map(
             |d| match extract_magic_mutation_field_info(d, text_source, object_id) {
@@ -788,19 +810,8 @@ pub fn convert_and_extract_mutation_field_info(
             },
         )
         .collect();
-
     let magic_mutation_field_info = magic_mutation_field_info.transpose()?;
-
-    Ok((
-        IsographObjectTypeDefinition {
-            description: value.description,
-            name: value.name.map(|x| x.into()),
-            interfaces: value.interfaces,
-            directives,
-            fields: value.fields,
-        },
-        magic_mutation_field_info,
-    ))
+    Ok((directives, magic_mutation_field_info))
 }
 
 // TODO this should be a different type.
