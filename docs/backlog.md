@@ -62,6 +62,7 @@
 - if mutation primary field has a non-existent type, we panic, this should be an error
   - this is because we add the fields before we call Schema::validate_and_construct, where the error would naturally be found.
 - incorrect spans for errors e.g. "Message: The id field on "Pet" must be "ID!"."
+- error parsing config should not panic, but be a diagnostic
 
 ## Extended backlog
 

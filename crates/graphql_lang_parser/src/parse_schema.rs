@@ -47,7 +47,7 @@ fn parse_type_system_document(
     Ok(GraphQLTypeSystemDocument(type_system_definitions))
 }
 
-pub fn parse_schema_extension(
+pub fn parse_schema_extensions(
     source: &str,
     text_source: TextSource,
 ) -> ParseResult<GraphQLTypeSystemExtensionDocument> {
