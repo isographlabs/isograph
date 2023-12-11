@@ -3,16 +3,13 @@
 ## TODO before release
 
 - Publish binary, release npm package that executes it
-- Support schema extensions
-- Schema extension support in parser
-- Specify main mutation object
+- @magic_mutation_field instead of @primary
 
 ## Top QOL priorities
 
 - Watch mode CLI
 - eslint enforcement that resolvers are exported
 - Expose compiler binary as `iso`.
-- multiple errors printed (when validating resolvers)
 
 ## V2 release
 
@@ -23,6 +20,10 @@
 - cleanup types
 - watch mode
 - rethink iso syntax
+  - Consider combining isoFetch and iso, as in `` iso`entrypoint Query.home_page`  `` or the like
+- full support for GraphQL schema syntax
+- error handling
+- validate no unknown directives left over
 
 ## Feature backlog
 
@@ -50,9 +51,9 @@
 - JS code needs structure, etc.
 - `HACK__merge_linked_fields` is indicative of the fact that merged linked fields should contain hashmaps of key => merged item, instead of vectors of merged items.
 - Objects which do not have IDs should be merged into their parent object in the store.
+  - or weak types are scalars
 - Remove the requirement that arguments and parameters have a terminal comma.
 - IsographSchemaObject, etc. should not contain name: WithLocation<...>, but instead, be stored `WithLocation<T>`, and WithLocation should **not** have a span.
-- Consider combining isoFetch and iso, as in `` iso`entrypoint Query.home_page`  `` or the like
 
 ## Known bugs
 
@@ -124,7 +125,7 @@
 - Compile compiler to Wasm
 - IR explorer
 - Code sandbox example
-- Non-fetchable fragments (???)
+  x Non-fetchable fragments (???)
 - Topological sort in compiler
 - Validate no infinite recursion
 - Statically prune inaccessible branches
