@@ -78,13 +78,12 @@ impl UnvalidatedSchema {
                         mutation_field_infos.push(mutation_field_info);
                     }
 
-                    let (_new_object_id, mutation_id) = self.process_object_type_definition(
+                    if let (_, Some(mutation_id)) = self.process_object_type_definition(
                         object_type_definition,
                         &mut valid_type_refinement_map,
-                    )?;
-                    if let Some(mutation_id) = mutation_id {
+                    )? {
                         mutation_type_id = Some(mutation_id);
-                    }
+                    };
                 }
                 GraphQLTypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
                     self.process_scalar_definition(scalar_type_definition)?;
