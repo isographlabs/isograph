@@ -7,8 +7,8 @@ use common_lang_types::{
 };
 use graphql_lang_types::{
     ConstantValue, Directive, GraphQLInputObjectTypeDefinition, GraphQLInputValueDefinition,
-    GraphQLInterfaceTypeDefinition, GraphQLOutputFieldDefinition, NamedTypeAnnotation,
-    TypeAnnotation,
+    GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition, GraphQLOutputFieldDefinition,
+    NamedTypeAnnotation, TypeAnnotation,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -412,6 +412,18 @@ pub struct IsographObjectTypeDefinition {
     pub fields: Vec<WithLocation<GraphQLOutputFieldDefinition>>,
 }
 
+impl From<GraphQLObjectTypeDefinition> for IsographObjectTypeDefinition {
+    fn from(object_type_definition: GraphQLObjectTypeDefinition) -> Self {
+        IsographObjectTypeDefinition {
+            description: object_type_definition.description,
+            name: object_type_definition.name.map(|x| x.into()),
+            interfaces: object_type_definition.interfaces,
+            directives: object_type_definition.directives,
+            fields: object_type_definition.fields,
+        }
+    }
+}
+
 impl From<GraphQLInterfaceTypeDefinition> for IsographObjectTypeDefinition {
     fn from(value: GraphQLInterfaceTypeDefinition) -> Self {
         Self {
@@ -448,7 +460,8 @@ pub struct SchemaObject<TEncounteredField> {
     pub description: Option<DescriptionValue>,
     pub name: IsographObjectTypeName,
     pub id: ObjectId,
-    // pub directives: Vec<Directive<ConstantValue>>,
+    // We probably don't want this
+    pub directives: Vec<Directive<ConstantValue>>,
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
     pub id_field: Option<ServerIdFieldId>,

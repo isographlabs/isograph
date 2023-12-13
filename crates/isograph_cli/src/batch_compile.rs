@@ -66,30 +66,24 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
                 .map_err(|with_span| {
                     with_span_to_with_location(with_span, extension_text_source)
                 })?;
-            Ok((extension, extension_text_source))
+            Ok(extension)
         })
         .collect::<Result<Vec<_>, BatchCompileError>>()?;
 
     let mut schema = Schema::new();
 
     let mut process_graphql_outcome =
-        schema.process_graphql_type_system_document(type_system_document, schema_text_source)?;
+        schema.process_graphql_type_system_document(type_system_document)?;
 
-    for (extension_document, text_source) in type_extension_document {
-        let ProcessGraphQLDocumentOutcome {
-            mutation_id,
-            mutation_field_infos,
-        } = schema.process_graphql_type_extension_document(extension_document, text_source)?;
+    for extension_document in type_extension_document {
+        let ProcessGraphQLDocumentOutcome { mutation_id } =
+            schema.process_graphql_type_extension_document(extension_document)?;
 
         match (mutation_id, process_graphql_outcome.mutation_id) {
             (None, _) => {}
             (Some(mutation_id), None) => process_graphql_outcome.mutation_id = Some(mutation_id),
             (Some(_), Some(_)) => return Err(BatchCompileError::MutationObjectDefinedTwice),
         }
-
-        process_graphql_outcome
-            .mutation_field_infos
-            .extend(mutation_field_infos.into_iter());
     }
 
     // TODO the ordering should be:
@@ -99,7 +93,7 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
     // - process parsed literals
     // - validate resolvers
     if let Some(mutation_id) = process_graphql_outcome.mutation_id {
-        schema.add_mutation_fields(mutation_id, process_graphql_outcome.mutation_field_infos)?;
+        schema.create_magic_mutation_fields(mutation_id)?;
     }
 
     let canonicalized_root_path = {

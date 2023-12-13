@@ -151,6 +151,7 @@ fn transform_object_field_ids(
         resolvers,
         valid_refinements,
         id_field,
+        directives,
     } = object;
 
     let validated_encountered_fields = unvalidated_encountered_fields
@@ -187,6 +188,7 @@ fn transform_object_field_ids(
         resolvers,
         valid_refinements,
         id_field,
+        directives,
     }
 }
 

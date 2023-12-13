@@ -1,6 +1,6 @@
 use std::fmt;
 
-use intern::Lookup;
+use intern::{string_key::Intern, Lookup};
 
 use crate::{text_with_carats::text_with_carats, SourceFileName, Span, WithSpan};
 
@@ -15,6 +15,15 @@ use crate::{text_with_carats::text_with_carats, SourceFileName, Span, WithSpan};
 pub struct TextSource {
     pub path: SourceFileName,
     pub span: Option<Span>,
+}
+
+impl TextSource {
+    pub fn todo_generated() -> TextSource {
+        TextSource {
+            path: "generated-file".intern().into(),
+            span: None,
+        }
+    }
 }
 
 impl TextSource {
