@@ -7,6 +7,7 @@
 - [Follow the official twitter account](https://twitter.com/isographlabs)
 
 ## About Isograph
+ 
 
 ### What is Isograph, and what are resolvers?
 
@@ -110,3 +111,7 @@ At the root of a page, you will define a fetchable literal. For any given fetcha
 
 - See [the developer experience of using Isograph](https://www.youtube.com/watch?v=f1nfXc3VeTk).
 - Read [the substack article](https://isograph.substack.com/p/introducing-isograph).
+
+## Licensing
+
+Isograph is an open source software project and licensed under the terms of the MIT license.

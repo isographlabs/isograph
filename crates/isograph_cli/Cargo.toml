@@ -2,6 +2,7 @@
 name = "isograph_cli"
 version = "0.0.4"
 edition = "2021"
+license = "MIT"
 
 [dependencies]
 structopt = "0.3.26"
