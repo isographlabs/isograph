@@ -219,7 +219,7 @@ impl fmt::Display for NonConstantValue {
 pub struct VariableDefinition<TValue> {
     pub name: WithLocation<VariableName>,
     pub type_: TypeAnnotation<TValue>,
-    // pub default_value: Option<WithSpan<ConstantValue>>,
+    // pub default_value: Option<WithLocation<ConstantValue>>,
 }
 
 impl<TValue> VariableDefinition<TValue> {

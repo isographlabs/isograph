@@ -1,5 +1,7 @@
 use std::{fmt, ops::Range};
 
+use crate::{Location, TextSource, WithLocation};
+
 // Invariant: end >= start
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct Span {
@@ -80,6 +82,10 @@ impl<T> WithSpan<T> {
             item: &self.item,
             span: self.span,
         }
+    }
+
+    pub fn to_with_location(self, text_source: TextSource) -> WithLocation<T> {
+        WithLocation::new(self.item, Location::new(text_source, self.span))
     }
 }
 

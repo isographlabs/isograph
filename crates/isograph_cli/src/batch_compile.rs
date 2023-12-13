@@ -1,8 +1,7 @@
 use std::path::PathBuf;
 
 use common_lang_types::{
-    with_span_to_with_location, Location, ResolverDefinitionPath, SourceFileName, Span, TextSource,
-    WithLocation, WithSpan,
+    Location, ResolverDefinitionPath, SourceFileName, Span, TextSource, WithLocation, WithSpan,
 };
 use graphql_lang_parser::{parse_schema, parse_schema_extensions, SchemaParseError};
 use intern::string_key::Intern;
@@ -47,7 +46,7 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
         span: None,
     };
     let type_system_document = parse_schema(&content, schema_text_source)
-        .map_err(|with_span| with_span_to_with_location(with_span, schema_text_source))?;
+        .map_err(|with_span| with_span.to_with_location(schema_text_source))?;
 
     let type_extension_document = config
         .schema_extensions
@@ -63,9 +62,7 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
             };
             let extension_content = read_schema_file(schema_extension_path)?;
             let extension = parse_schema_extensions(&extension_content, extension_text_source)
-                .map_err(|with_span| {
-                    with_span_to_with_location(with_span, extension_text_source)
-                })?;
+                .map_err(|with_span| with_span.to_with_location(extension_text_source))?;
             Ok(extension)
         })
         .collect::<Result<Vec<_>, BatchCompileError>>()?;

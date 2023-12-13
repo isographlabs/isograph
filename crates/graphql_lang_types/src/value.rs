@@ -1,7 +1,7 @@
 use std::fmt;
 
 use common_lang_types::{
-    EnumLiteralValue, StringLiteralValue, ValueKeyName, VariableName, WithSpan,
+    EnumLiteralValue, StringLiteralValue, ValueKeyName, VariableName, WithLocation, WithSpan,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -13,7 +13,7 @@ pub enum ConstantValue {
     Null,
     Enum(EnumLiteralValue),
     // This is weird! We can be more consistent vis-a-vis where the WithSpan appears.
-    List(Vec<WithSpan<ConstantValue>>),
+    List(Vec<WithLocation<ConstantValue>>),
     Object(Vec<NameValuePair<ValueKeyName, ConstantValue>>),
 }
 
@@ -115,8 +115,8 @@ impl std::convert::From<i64> for FloatValue {
 // TODO get rid of this WithSpan and move it to the generic
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct NameValuePair<TName, TValue: ValueType> {
-    pub name: WithSpan<TName>,
-    pub value: WithSpan<TValue>,
+    pub name: WithLocation<TName>,
+    pub value: WithLocation<TValue>,
 }
 
 impl<TName, TValue: ValueType> NameValuePair<TName, TValue> {

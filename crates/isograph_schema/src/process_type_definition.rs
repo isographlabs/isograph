@@ -597,7 +597,7 @@ impl UnvalidatedSchema {
             return Err(WithLocation::new(
                 ProcessTypeDefinitionError::InvalidPrimaryDirectiveArgumentCount,
                 // This is wrong, the arguments should have a span, or the whole thing should have a span
-                Location::new(text_source, d.name.span),
+                d.name.location,
             ));
         }
 
@@ -609,7 +609,7 @@ impl UnvalidatedSchema {
                 WithLocation::new(
                     ProcessTypeDefinitionError::MissingPathArg,
                     // This is wrong, the arguments should have a span, or the whole thing should have a span
-                    Location::new(text_source, d.name.span),
+                    d.name.location,
                 )
             })?;
         let path_val = match path.value.item {
@@ -617,7 +617,7 @@ impl UnvalidatedSchema {
             _ => Err(WithLocation::new(
                 ProcessTypeDefinitionError::PathValueShouldBeString,
                 // This is wrong, the arguments should have a span, or the whole thing should have a span
-                Location::new(text_source, d.name.span),
+                d.name.location,
             )),
         }?;
 
@@ -629,11 +629,11 @@ impl UnvalidatedSchema {
                 WithLocation::new(
                     ProcessTypeDefinitionError::MissingFieldMapArg,
                     // This is wrong, the arguments should have a span, or the whole thing should have a span
-                    Location::new(text_source, d.name.span),
+                    d.name.location,
                 )
             })?;
 
-        let field_map_items = parse_field_map_val(&field_map.value, text_source)?;
+        let field_map_items = parse_field_map_val(&field_map.value)?;
 
         let field = d
             .arguments
@@ -643,7 +643,7 @@ impl UnvalidatedSchema {
                 WithLocation::new(
                     ProcessTypeDefinitionError::MissingFieldMapArg,
                     // This is wrong, the arguments should have a span, or the whole thing should have a span
-                    Location::new(text_source, d.name.span),
+                    d.name.location,
                 )
             })?;
 
@@ -659,7 +659,7 @@ impl UnvalidatedSchema {
 
     fn parse_field(
         &self,
-        field_arg: &WithSpan<ConstantValue>,
+        field_arg: &WithLocation<ConstantValue>,
         mutation_id: ObjectId,
     ) -> ProcessTypeDefinitionResult<ServerFieldId> {
         let mutation = self.schema_data.object(mutation_id);
@@ -709,15 +709,14 @@ pub struct FieldMapItem {
 }
 
 fn parse_field_map_val(
-    value: &WithSpan<ConstantValue>,
-    text_source: TextSource,
+    value: &WithLocation<ConstantValue>,
 ) -> ProcessTypeDefinitionResult<Vec<FieldMapItem>> {
     let list = match &value.item {
         ConstantValue::List(l) => Ok(l),
         _ => Err(WithLocation::new(
             ProcessTypeDefinitionError::InvalidFieldMap,
             // This is wrong, the arguments should have a span, or the whole thing should have a span
-            Location::new(text_source, value.span),
+            value.location,
         )),
     }?;
 
@@ -727,14 +726,14 @@ fn parse_field_map_val(
                 ConstantValue::Object(o) => Ok(o),
                 _ => Err(WithLocation::new(
                     ProcessTypeDefinitionError::InvalidFieldMap,
-                    Location::new(text_source, argument_value.span),
+                    argument_value.location,
                 )),
             }?;
 
             if object.len() != 2 {
                 return Err(WithLocation::new(
                     ProcessTypeDefinitionError::InvalidFieldMap,
-                    Location::new(text_source, argument_value.span),
+                    argument_value.location,
                 ));
             }
 
@@ -745,7 +744,7 @@ fn parse_field_map_val(
                     WithLocation::new(
                         ProcessTypeDefinitionError::InvalidFieldMap,
                         // This is wrong, the arguments should have a span, or the whole thing should have a span
-                        Location::new(text_source, argument_value.span),
+                        argument_value.location,
                     )
                 })?;
 
@@ -753,7 +752,7 @@ fn parse_field_map_val(
                 ConstantValue::String(s) => Ok(s),
                 _ => Err(WithLocation::new(
                     ProcessTypeDefinitionError::InvalidFieldMap,
-                    Location::new(text_source, argument_value.span),
+                    argument_value.location,
                 )),
             }?;
 
@@ -764,17 +763,25 @@ fn parse_field_map_val(
                     WithLocation::new(
                         ProcessTypeDefinitionError::InvalidFieldMap,
                         // This is wrong, the arguments should have a span, or the whole thing should have a span
-                        Location::new(text_source, argument_value.span),
+                        argument_value.location,
                     )
                 })?;
 
             // This is weirdly low-level!
-            let span = to.value.span;
+            let span = match to.value.location {
+                Location::Embedded {
+                    text_source: _,
+                    span,
+                } => span,
+                Location::Generated => {
+                    panic!("TODO make this an error; location should not be generated here.")
+                }
+            };
             let to_arg = match to.value.item {
                 ConstantValue::String(s) => Ok(s),
                 _ => Err(WithLocation::new(
                     ProcessTypeDefinitionError::InvalidFieldMap,
-                    Location::new(text_source, argument_value.span),
+                    argument_value.location,
                 )),
             }?;
             let mut split = to_arg.lookup().split('.');
@@ -823,7 +830,7 @@ struct ModifiedArgument {
     description: Option<WithSpan<DescriptionValue>>,
     name: WithLocation<InputValueName>,
     object: TypeAnnotation<ModifiedObject>,
-    default_value: Option<WithSpan<ConstantValue>>,
+    default_value: Option<WithLocation<ConstantValue>>,
     directives: Vec<Directive<ConstantValue>>,
 }
 

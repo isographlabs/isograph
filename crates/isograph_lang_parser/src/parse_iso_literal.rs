@@ -1,8 +1,8 @@
 use std::ops::ControlFlow;
 
 use common_lang_types::{
-    with_span_to_with_location, Location, ResolverDefinitionPath, SelectableFieldName, Span,
-    StringKeyNewtype, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
+    Location, ResolverDefinitionPath, SelectableFieldName, Span, StringKeyNewtype, TextSource,
+    UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation,
@@ -42,7 +42,7 @@ pub fn parse_iso_fetch(
             })
         })
         .transpose()
-        .map_err(|with_span| with_span_to_with_location(with_span, text_source))?;
+        .map_err(|with_span: WithSpan<_>| with_span.to_with_location(text_source))?;
 
     if let Some(span) = tokens.remaining_token_span() {
         return Err(WithLocation::new(
@@ -63,7 +63,7 @@ pub fn parse_iso_literal(
 
     let resolver_declaration =
         parse_resolver_declaration(&mut tokens, definition_file_path, text_source)
-            .map_err(|with_span| with_span_to_with_location(with_span, text_source))?;
+            .map_err(|with_span| with_span.to_with_location(text_source))?;
 
     if let Some(span) = tokens.remaining_token_span() {
         return Err(WithLocation::new(
@@ -183,8 +183,8 @@ fn parse_selection<'a>(
     tokens
         .with_span(|tokens| {
             let (field_name, alias) = parse_optional_alias_and_field_name(tokens)?;
-            let field_name = with_span_to_with_location(field_name, text_source);
-            let alias = alias.map(|alias| with_span_to_with_location(alias, text_source));
+            let field_name = field_name.to_with_location(text_source);
+            let alias = alias.map(|alias| alias.to_with_location(text_source));
 
             // TODO distinguish field groups
             let arguments = parse_optional_arguments(tokens, text_source)?;
@@ -321,7 +321,7 @@ fn parse_argument(
             Ok::<_, WithSpan<IsographLiteralParseError>>(SelectionFieldArgument { name, value })
         })
         .transpose()?;
-    Ok(with_span_to_with_location(argument, text_source))
+    Ok(argument.to_with_location(text_source))
 }
 
 fn parse_non_constant_value(
@@ -370,8 +370,8 @@ fn parse_variable_definition(
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
             let name = tokens
                 .parse_string_key_type(IsographLangTokenKind::Identifier)
-                .map(|with_span| with_span_to_with_location(with_span, text_source))
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?
+                .to_with_location(text_source);
             tokens
                 .parse_token_of_kind(IsographLangTokenKind::Colon)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;

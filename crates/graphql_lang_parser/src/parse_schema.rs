@@ -1,8 +1,7 @@
 use std::ops::ControlFlow;
 
 use common_lang_types::{
-    with_span_to_with_location, DescriptionValue, InterfaceTypeName, StringLiteralValue,
-    TextSource, WithLocation, WithSpan,
+    DescriptionValue, InterfaceTypeName, StringLiteralValue, TextSource, WithLocation, WithSpan,
 };
 use graphql_syntax::TokenKind;
 use intern::{
@@ -154,11 +153,11 @@ fn parse_object_type_definition(
 ) -> ParseResult<GraphQLObjectTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
-        .map(|with_span| with_span_to_with_location(with_span, text_source))
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+        .map_err(|with_span| with_span.map(SchemaParseError::from))?
+        .to_with_location(text_source);
 
     let interfaces = parse_implements_interfaces_if_present(tokens)?;
-    let directives = parse_constant_directives(tokens)?;
+    let directives = parse_constant_directives(tokens, text_source)?;
     let fields = parse_optional_fields(tokens, text_source)?;
 
     Ok(GraphQLObjectTypeDefinition {
@@ -177,11 +176,11 @@ fn parse_object_type_extension(
 ) -> ParseResult<GraphQLObjectTypeExtension> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
-        .map(|with_span| with_span_to_with_location(with_span, text_source))
+        .map(|with_span| with_span.to_with_location(text_source))
         .map_err(|with_span| with_span.map(SchemaParseError::from))?;
 
     let interfaces = parse_implements_interfaces_if_present(tokens)?;
-    let directives = parse_constant_directives(tokens)?;
+    let directives = parse_constant_directives(tokens, text_source)?;
     let fields = parse_optional_fields(tokens, text_source)?;
 
     Ok(GraphQLObjectTypeExtension {
@@ -200,11 +199,11 @@ fn parse_interface_type_definition(
 ) -> ParseResult<GraphQLInterfaceTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
-        .map(|with_span| with_span_to_with_location(with_span, text_source))
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+        .map_err(|with_span| with_span.map(SchemaParseError::from))?
+        .to_with_location(text_source);
 
     let interfaces = parse_implements_interfaces_if_present(tokens)?;
-    let directives = parse_constant_directives(tokens)?;
+    let directives = parse_constant_directives(tokens, text_source)?;
     let fields = parse_optional_fields(tokens, text_source)?;
 
     Ok(GraphQLInterfaceTypeDefinition {
@@ -223,10 +222,10 @@ fn parse_input_object_type_definition(
 ) -> ParseResult<GraphQLInputObjectTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
-        .map(|with_span| with_span_to_with_location(with_span, text_source))
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+        .map_err(|with_span| with_span.map(SchemaParseError::from))?
+        .to_with_location(text_source);
 
-    let directives = parse_constant_directives(tokens)?;
+    let directives = parse_constant_directives(tokens, text_source)?;
     let fields = parse_optional_argument_definitions(
         tokens,
         text_source,
@@ -250,10 +249,10 @@ fn parse_scalar_type_definition(
 ) -> ParseResult<GraphQLScalarTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
-        .map(|with_span| with_span_to_with_location(with_span, text_source))
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+        .map_err(|with_span| with_span.map(SchemaParseError::from))?
+        .to_with_location(text_source);
 
-    let directives = parse_constant_directives(tokens)?;
+    let directives = parse_constant_directives(tokens, text_source)?;
 
     Ok(GraphQLScalarTypeDefinition {
         description,
@@ -305,14 +304,16 @@ fn parse_interfaces(tokens: &mut PeekableLexer) -> ParseResult<Vec<WithSpan<Inte
 
 fn parse_constant_directives(
     tokens: &mut PeekableLexer,
+    text_source: TextSource,
 ) -> ParseResult<Vec<Directive<ConstantValue>>> {
     let mut directives = vec![];
     while tokens.parse_token_of_kind(TokenKind::At).is_ok() {
         directives.push(Directive {
             name: tokens
                 .parse_string_key_type(TokenKind::Identifier)
-                .map_err(|with_span| with_span.map(SchemaParseError::from))?,
-            arguments: parse_optional_constant_arguments(tokens)?,
+                .map_err(|with_span| with_span.map(SchemaParseError::from))?
+                .to_with_location(text_source),
+            arguments: parse_optional_constant_arguments(tokens, text_source)?,
         })
     }
     Ok(directives)
@@ -321,16 +322,22 @@ fn parse_constant_directives(
 // Parse constant arguments passed to a directive used in a schema definition.
 fn parse_optional_constant_arguments<T: From<StringKey>>(
     tokens: &mut PeekableLexer,
+    text_source: TextSource,
 ) -> ParseResult<Vec<NameValuePair<T, ConstantValue>>> {
     if tokens.parse_token_of_kind(TokenKind::OpenParen).is_ok() {
-        let first_name_value_pair = parse_constant_name_value_pair(tokens, parse_constant_value)?;
+        let first_name_value_pair = parse_constant_name_value_pair(
+            tokens,
+            |tokens| parse_constant_value(tokens, text_source),
+            text_source,
+        )?;
 
         let mut arguments = vec![first_name_value_pair];
 
         while tokens.parse_token_of_kind(TokenKind::CloseParen).is_err() {
             arguments.push(parse_constant_name_value_pair(
                 tokens,
-                parse_constant_value,
+                |value| parse_constant_value(value, text_source),
+                text_source,
             )?);
         }
 
@@ -343,11 +350,13 @@ fn parse_optional_constant_arguments<T: From<StringKey>>(
 /// The state of the PeekableLexer is that it is about to parse the "foo" in "foo: bar"
 fn parse_constant_name_value_pair<T: From<StringKey>, TValue: ValueType>(
     tokens: &mut PeekableLexer,
-    parse_value: impl Fn(&mut PeekableLexer) -> ParseResult<WithSpan<TValue>>,
+    parse_value: impl Fn(&mut PeekableLexer) -> ParseResult<WithLocation<TValue>>,
+    text_source: TextSource,
 ) -> ParseResult<NameValuePair<T, TValue>> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+        .map_err(|with_span| with_span.map(SchemaParseError::from))?
+        .to_with_location(text_source);
     tokens
         .parse_token_of_kind(TokenKind::Colon)
         .map_err(|with_span| with_span.map(SchemaParseError::from))?;
@@ -356,7 +365,10 @@ fn parse_constant_name_value_pair<T: From<StringKey>, TValue: ValueType>(
     Ok(NameValuePair { name, value })
 }
 
-fn parse_constant_value(tokens: &mut PeekableLexer) -> ParseResult<WithSpan<ConstantValue>> {
+fn parse_constant_value(
+    tokens: &mut PeekableLexer,
+    text_source: TextSource,
+) -> ParseResult<WithLocation<ConstantValue>> {
     from_control_flow(|| {
         to_control_flow(|| {
             tokens
@@ -375,6 +387,7 @@ fn parse_constant_value(tokens: &mut PeekableLexer) -> ParseResult<WithSpan<Cons
                         }
                     })
                 })
+                .map(|x| x.to_with_location(text_source))
         })?;
 
         to_control_flow(|| {
@@ -394,11 +407,13 @@ fn parse_constant_value(tokens: &mut PeekableLexer) -> ParseResult<WithSpan<Cons
                         }
                     })
                 })
+                .map(|x| x.to_with_location(text_source))
         })?;
 
         to_control_flow(|| {
-            tokens.parse_string_key_type(TokenKind::StringLiteral).map(
-                |with_quotes: WithSpan<StringLiteralValue>| {
+            tokens
+                .parse_string_key_type(TokenKind::StringLiteral)
+                .map(|with_quotes: WithSpan<StringLiteralValue>| {
                     // This seems very hacky
                     let without_quotes = with_quotes.map(|string_literal| {
                         let inner_str = &string_literal.lookup();
@@ -407,25 +422,28 @@ fn parse_constant_value(tokens: &mut PeekableLexer) -> ParseResult<WithSpan<Cons
                         without_quotes
                     });
                     without_quotes.map(ConstantValue::String)
-                },
-            )
+                })
+                .map(|x| x.to_with_location(text_source))
         })?;
 
         to_control_flow(|| {
             tokens
                 .parse_matching_identifier("true")
                 .map(|x| x.map(|_| ConstantValue::Boolean(true)))
+                .map(|x| x.to_with_location(text_source))
         })?;
         to_control_flow(|| {
             tokens
                 .parse_matching_identifier("false")
                 .map(|x| x.map(|_| ConstantValue::Boolean(false)))
+                .map(|x| x.to_with_location(text_source))
         })?;
 
         to_control_flow(|| {
             tokens
                 .parse_matching_identifier("null")
                 .map(|x| x.map(|_| ConstantValue::Null))
+                .map(|x| x.to_with_location(text_source))
         })?;
 
         // All remaining identifiers are treated as enums. It is recommended, but not enforced,
@@ -434,6 +452,7 @@ fn parse_constant_value(tokens: &mut PeekableLexer) -> ParseResult<WithSpan<Cons
             tokens
                 .parse_string_key_type(TokenKind::Identifier)
                 .map(|x| x.map(|s| ConstantValue::Enum(s)))
+                .map(|x| x.to_with_location(text_source))
         })?;
 
         to_control_flow(|| {
@@ -444,11 +463,12 @@ fn parse_constant_value(tokens: &mut PeekableLexer) -> ParseResult<WithSpan<Cons
                         .map_err(|with_span| with_span.map(SchemaParseError::from))?;
                     let mut values = vec![];
                     while tokens.parse_token_of_kind(TokenKind::CloseBracket).is_err() {
-                        values.push(parse_constant_value(tokens)?);
+                        values.push(parse_constant_value(tokens, text_source)?);
                     }
                     Ok(ConstantValue::List(values))
                 })
-                .transpose();
+                .transpose()
+                .map(|x| x.to_with_location(text_source));
             x
         })?;
 
@@ -462,16 +482,19 @@ fn parse_constant_value(tokens: &mut PeekableLexer) -> ParseResult<WithSpan<Cons
                     while tokens.parse_token_of_kind(TokenKind::CloseBrace).is_err() {
                         let name = tokens
                             .parse_string_key_type(TokenKind::Identifier)
-                            .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+                            .map_err(|with_span| with_span.map(SchemaParseError::from))?
+                            .to_with_location(text_source);
                         tokens
                             .parse_token_of_kind(TokenKind::Colon)
-                            .map_err(|with_span| with_span.map(SchemaParseError::from))?;
-                        let value = parse_constant_value(tokens)?;
+                            .map_err(|with_span| with_span.map(SchemaParseError::from))?
+                            .to_with_location(text_source);
+                        let value = parse_constant_value(tokens, text_source)?;
                         values.push(NameValuePair { name, value });
                     }
                     Ok(ConstantValue::Object(values))
                 })
-                .transpose();
+                .transpose()
+                .map(|x| x.to_with_location(text_source));
             x
         })?;
 
@@ -523,8 +546,8 @@ fn parse_field<'a>(
             let description = parse_optional_description(tokens);
             let name = tokens
                 .parse_string_key_type(TokenKind::Identifier)
-                .map(|with_span| with_span_to_with_location(with_span, text_source))
-                .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+                .map_err(|with_span| with_span.map(SchemaParseError::from))?
+                .to_with_location(text_source);
 
             let arguments = parse_optional_argument_definitions(
                 tokens,
@@ -538,7 +561,7 @@ fn parse_field<'a>(
                 .map_err(|with_span| with_span.map(SchemaParseError::from))?;
             let type_ = parse_type_annotation(tokens)?;
 
-            let directives = parse_constant_directives(tokens)?;
+            let directives = parse_constant_directives(tokens, text_source)?;
 
             Ok(GraphQLOutputFieldDefinition {
                 name,
@@ -549,7 +572,7 @@ fn parse_field<'a>(
             })
         })
         .transpose()?;
-    Ok(with_span_to_with_location(with_span, text_source))
+    Ok(with_span.to_with_location(text_source))
 }
 
 fn parse_type_annotation<T: From<StringKey>>(
@@ -617,17 +640,14 @@ fn parse_optional_argument_definitions<'a>(
     let paren = tokens.parse_token_of_kind(open_token);
 
     if paren.is_ok() {
-        let argument = with_span_to_with_location(
-            parse_argument_definition(tokens, text_source)?,
-            text_source,
-        );
+        let argument =
+            parse_argument_definition(tokens, text_source)?.to_with_location(text_source);
         let mut arguments = vec![argument];
 
         while tokens.parse_token_of_kind(close_token).is_err() {
-            arguments.push(with_span_to_with_location(
-                parse_argument_definition(tokens, text_source)?,
-                text_source,
-            ));
+            arguments.push(
+                parse_argument_definition(tokens, text_source)?.to_with_location(text_source),
+            );
         }
         Ok(arguments)
     } else {
@@ -644,14 +664,14 @@ fn parse_argument_definition<'a>(
             let description = parse_optional_description(tokens);
             let name = tokens
                 .parse_string_key_type(TokenKind::Identifier)
-                .map(|with_span| with_span_to_with_location(with_span, text_source))
-                .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+                .map_err(|with_span| with_span.map(SchemaParseError::from))?
+                .to_with_location(text_source);
             tokens
                 .parse_token_of_kind(TokenKind::Colon)
                 .map_err(|with_span| with_span.map(SchemaParseError::from))?;
             let type_ = parse_type_annotation(tokens)?;
-            let default_value = parse_optional_constant_default_value(tokens)?;
-            let directives = parse_constant_directives(tokens)?;
+            let default_value = parse_optional_constant_default_value(tokens, text_source)?;
+            let directives = parse_constant_directives(tokens, text_source)?;
 
             Ok(GraphQLInputValueDefinition {
                 description,
@@ -666,13 +686,14 @@ fn parse_argument_definition<'a>(
 
 fn parse_optional_constant_default_value<'a>(
     tokens: &mut PeekableLexer<'a>,
-) -> ParseResult<Option<WithSpan<ConstantValue>>> {
+    text_source: TextSource,
+) -> ParseResult<Option<WithLocation<ConstantValue>>> {
     let equal = tokens.parse_token_of_kind(TokenKind::Equals);
     if equal.is_err() {
         return Ok(None);
     }
 
-    let constant_value = parse_constant_value(tokens)?;
+    let constant_value = parse_constant_value(tokens, text_source)?;
     Ok(Some(constant_value))
 }
 

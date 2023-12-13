@@ -162,7 +162,7 @@ pub struct GraphQLInputValueDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<InputValueName>,
     pub type_: TypeAnnotation<InputTypeName>,
-    pub default_value: Option<WithSpan<ConstantValue>>,
+    pub default_value: Option<WithLocation<ConstantValue>>,
     pub directives: Vec<Directive<ConstantValue>>,
 }
 

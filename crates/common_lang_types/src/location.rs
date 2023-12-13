@@ -117,10 +117,3 @@ impl<T> WithLocation<T> {
         }
     }
 }
-
-pub fn with_span_to_with_location<T>(
-    with_span: WithSpan<T>,
-    text_source: TextSource,
-) -> WithLocation<T> {
-    WithLocation::new(with_span.item, Location::new(text_source, with_span.span))
-}
