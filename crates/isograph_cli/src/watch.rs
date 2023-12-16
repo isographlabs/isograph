@@ -1,71 +1,75 @@
 use colored::Colorize;
-use futures::{
-    channel::mpsc::{channel, Receiver},
-    SinkExt, StreamExt,
+use notify::{Error, FsEventWatcher, RecursiveMode, Watcher};
+use notify_debouncer_full::{
+    new_debouncer, DebounceEventResult, DebouncedEvent, Debouncer, FileIdMap,
 };
-use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
-use std::path::Path;
+use std::time::Duration;
+use tokio::{runtime::Handle, sync::mpsc::Receiver, task::JoinError};
 
-use crate::{
-    batch_compile::handle_compile_command, config::CompilerConfig, opt::BatchCompileCliOptions,
-};
+use crate::{batch_compile::handle_compile_command, config::CompilerConfig};
 
-pub(crate) fn handle_watch_command(opt: BatchCompileCliOptions) {
-    let config = CompilerConfig::create(opt.config.as_ref());
+fn compile_and_print(config: &CompilerConfig) {
+    eprintln!("{}", "Starting to compile.".cyan());
 
-    match handle_compile_command(&opt) {
+    match handle_compile_command(config) {
         Ok(_) => eprintln!("{}", "Successfully compiled.\n".bright_green()),
         Err(err) => {
             eprintln!("{}\n{}", "Error when compiling.\n".bright_red(), err);
         }
     };
-
-    futures::executor::block_on(async {
-        if let Err(e) = async_watch(config.project_root, &opt).await {
-            println!("error: {:?}", e);
-        }
-    });
 }
 
-fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Result<Event>>)> {
-    let (mut tx, rx) = channel(1);
+pub(crate) async fn handle_watch_command(
+    config: CompilerConfig,
+) -> Result<Result<(), Vec<Error>>, JoinError> {
+    compile_and_print(&config);
 
-    // Automatically select the best implementation for your platform.
-    // You can also access each implementation directly e.g. INotifyWatcher.
-    let watcher = RecommendedWatcher::new(
-        move |res| {
-            futures::executor::block_on(async {
-                tx.send(res).await.unwrap();
-            })
-        },
-        Config::default(),
-    )?;
+    let (mut rx, mut watcher) = create_debounced_file_watcher();
 
-    Ok((watcher, rx))
-}
+    watcher
+        .watcher()
+        .watch(&config.project_root, RecursiveMode::Recursive)
+        .expect("watcher failure");
 
-async fn async_watch<P: AsRef<Path>>(path: P, opt: &BatchCompileCliOptions) -> notify::Result<()> {
-    let (mut watcher, mut rx) = async_watcher()?;
-
-    // Add a path to be watched. All files and directories at that path and
-    // below will be monitored for changes.
-    watcher.watch(path.as_ref(), RecursiveMode::Recursive)?;
-
-    while let Some(res) = rx.next().await {
-        match res {
-            Ok(_) => {
-                println!("{}\n", "Detected file event, recompiling.".bright_green());
-
-                match handle_compile_command(&opt) {
-                    Ok(_) => eprintln!("{}", "Successfully compiled.\n".bright_green()),
-                    Err(err) => {
-                        eprintln!("{}\n{}", "Error when compiling.\n".bright_red(), err);
-                    }
-                };
+    tokio::spawn(async move {
+        while let Some(res) = rx.recv().await {
+            match res {
+                Ok(_events) => {
+                    eprintln!("{}", "File changes detected.".cyan());
+                    compile_and_print(&config);
+                }
+                Err(errors) => return Err(errors),
             }
-            Err(e) => println!("watch error: {:?}", e),
         }
-    }
+        Ok(())
+    })
+    .await
+}
 
-    Ok(())
+fn create_debounced_file_watcher() -> (
+    Receiver<Result<Vec<DebouncedEvent>, Vec<Error>>>,
+    Debouncer<FsEventWatcher, FileIdMap>,
+) {
+    let (tx, rx) = tokio::sync::mpsc::channel(1);
+    let rt = Handle::current();
+
+    let debounced_watcher = new_debouncer(
+        // TODO control this with config
+        Duration::from_millis(500),
+        None,
+        move |result: DebounceEventResult| {
+            let tx = tx.clone();
+
+            rt.spawn(async move {
+                if let Err(e) = tx.send(result).await {
+                    println!("Error sending event result: {:?}", e);
+                }
+            });
+        },
+    );
+
+    (
+        rx,
+        debounced_watcher.expect("Expected to be able to create debouncer"),
+    )
 }

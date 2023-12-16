@@ -10,17 +10,42 @@ mod write_artifacts;
 
 use batch_compile::handle_compile_command;
 use colored::Colorize;
+use config::CompilerConfig;
 use opt::CliOptions;
 use structopt::StructOpt;
 use watch::handle_watch_command;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let opt = CliOptions::from_args();
+    let config = CompilerConfig::create(opt.config.as_ref());
 
     if opt.watch {
-        handle_watch_command(opt.compile_options);
+        match handle_watch_command(config).await {
+            Ok(res) => match res {
+                Ok(_) => {
+                    eprintln!("{}", "Successfully watched. Exiting.\n".bright_green())
+                }
+                Err(err) => {
+                    eprintln!(
+                        "{}\n{:?}",
+                        "Error in watch process of some sort.\n".bright_red(),
+                        err
+                    );
+                    std::process::exit(1);
+                }
+            },
+            Err(err) => {
+                eprintln!(
+                    "{}\n{}",
+                    "Error in watch process of some sort.\n".bright_red(),
+                    err
+                );
+                std::process::exit(1);
+            }
+        };
     } else {
-        match handle_compile_command(&opt.compile_options) {
+        match handle_compile_command(&config) {
             Ok(_) => eprintln!("{}", "Successfully compiled.\n".bright_green()),
             Err(err) => {
                 eprintln!("{}\n{}", "Error when compiling.\n".bright_red(), err);

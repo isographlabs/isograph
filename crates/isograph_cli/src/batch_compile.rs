@@ -19,15 +19,10 @@ use crate::{
         extract_iso_fetch_from_file_content, extract_iso_literal_from_file_content,
         read_files_in_folder, IsoFetchExtraction, IsoLiteralExtraction,
     },
-    opt::BatchCompileCliOptions,
     schema::read_schema_file,
 };
 
-pub(crate) fn handle_compile_command(
-    opt: &BatchCompileCliOptions,
-) -> Result<(), BatchCompileError> {
-    let config = CompilerConfig::create(opt.config.as_ref());
-
+pub(crate) fn handle_compile_command(config: &CompilerConfig) -> Result<(), BatchCompileError> {
     let content = read_schema_file(&config.schema)?;
     let schema_text_source = TextSource {
         path: config
@@ -318,7 +313,7 @@ pub(crate) enum BatchCompileError {
     },
 
     #[error(
-        "{} when validating schema, resolvers and fetch declarations.\n{}",
+        "{} when validating schema, resolvers and fetch declarations.{}",
         if messages.len() == 1 { "Error" } else { "Errors" },
         messages.into_iter().map(|x| format!("\n\n{x}")).collect::<String>()
     )]
