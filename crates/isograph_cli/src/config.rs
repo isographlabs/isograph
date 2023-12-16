@@ -28,8 +28,10 @@ pub(crate) struct ConfigFile {
 
 impl CompilerConfig {
     // TODO this should return a Result
-    pub(crate) fn create(config_location: Option<PathBuf>) -> Self {
-        let mut config_location = config_location.expect("--config must be provided for now.");
+    pub(crate) fn create(config_location: Option<&PathBuf>) -> Self {
+        let mut config_location = config_location
+            .expect("--config must be provided for now.")
+            .clone();
         let config_contents =
             std::fs::read_to_string(&config_location).expect("Expected config to be found");
 

@@ -23,8 +23,10 @@ use crate::{
     schema::read_schema_file,
 };
 
-pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), BatchCompileError> {
-    let config = CompilerConfig::create(opt.config);
+pub(crate) fn handle_compile_command(
+    opt: &BatchCompileCliOptions,
+) -> Result<(), BatchCompileError> {
+    let config = CompilerConfig::create(opt.config.as_ref());
 
     let content = read_schema_file(&config.schema)?;
     let schema_text_source = TextSource {

@@ -20,9 +20,7 @@ fn main() {
     if opt.watch {
         handle_watch_command(opt.compile_options);
     } else {
-        let result = handle_compile_command(opt.compile_options);
-
-        match result {
+        match handle_compile_command(&opt.compile_options) {
             Ok(_) => eprintln!("{}", "Successfully compiled.\n".bright_green()),
             Err(err) => {
                 eprintln!("{}\n{}", "Error when compiling.\n".bright_red(), err);
