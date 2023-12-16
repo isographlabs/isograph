@@ -3,12 +3,16 @@ mod batch_compile;
 mod config;
 mod generate_artifacts;
 mod isograph_literals;
+mod opt;
 mod schema;
+mod watch;
 mod write_artifacts;
 
-use batch_compile::{handle_compile_command, handle_watch_command, CliOptions};
+use batch_compile::handle_compile_command;
 use colored::Colorize;
+use opt::CliOptions;
 use structopt::StructOpt;
+use watch::handle_watch_command;
 
 fn main() {
     let opt = CliOptions::from_args();

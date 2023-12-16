@@ -10,7 +10,6 @@ use isograph_lang_types::{ResolverDeclaration, ResolverFetch};
 use isograph_schema::{
     ProcessGraphQLDocumentOutcome, ProcessResolverDeclarationError, Schema, UnvalidatedSchema,
 };
-use structopt::StructOpt;
 use thiserror::Error;
 
 use crate::{
@@ -20,27 +19,9 @@ use crate::{
         extract_iso_fetch_from_file_content, extract_iso_literal_from_file_content,
         read_files_in_folder, IsoFetchExtraction, IsoLiteralExtraction,
     },
+    opt::BatchCompileCliOptions,
     schema::read_schema_file,
 };
-
-/// Options if we're doing a batch compilation
-#[derive(Debug, StructOpt)]
-pub(crate) struct CliOptions {
-    #[structopt(long)]
-    pub watch: bool,
-
-    #[structopt(flatten)]
-    pub compile_options: BatchCompileCliOptions,
-}
-
-/// Options if we're doing a batch compilation
-#[derive(Debug, StructOpt)]
-pub(crate) struct BatchCompileCliOptions {
-    /// Compile using this config file. If not provided, searches for a config in
-    /// package.json under the `isograph` key.
-    #[structopt(long)]
-    config: Option<PathBuf>,
-}
 
 pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), BatchCompileError> {
     let config = CompilerConfig::create(opt.config);
@@ -132,10 +113,6 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
     )?;
 
     Ok(())
-}
-
-pub(crate) fn handle_watch_command(_opt: BatchCompileCliOptions) {
-    eprintln!("Watching");
 }
 
 fn process_parsed_literals_and_fetches(
