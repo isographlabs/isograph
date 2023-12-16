@@ -25,6 +25,16 @@ use crate::{
 
 /// Options if we're doing a batch compilation
 #[derive(Debug, StructOpt)]
+pub(crate) struct CliOptions {
+    #[structopt(long)]
+    pub watch: bool,
+
+    #[structopt(flatten)]
+    pub compile_options: BatchCompileCliOptions,
+}
+
+/// Options if we're doing a batch compilation
+#[derive(Debug, StructOpt)]
 pub(crate) struct BatchCompileCliOptions {
     /// Compile using this config file. If not provided, searches for a config in
     /// package.json under the `isograph` key.
@@ -122,6 +132,10 @@ pub(crate) fn handle_compile_command(opt: BatchCompileCliOptions) -> Result<(), 
     )?;
 
     Ok(())
+}
+
+pub(crate) fn handle_watch_command(_opt: BatchCompileCliOptions) {
+    eprintln!("Watching");
 }
 
 fn process_parsed_literals_and_fetches(

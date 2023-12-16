@@ -6,19 +6,24 @@ mod isograph_literals;
 mod schema;
 mod write_artifacts;
 
-use batch_compile::{handle_compile_command, BatchCompileCliOptions};
+use batch_compile::{handle_compile_command, handle_watch_command, CliOptions};
 use colored::Colorize;
 use structopt::StructOpt;
 
 fn main() {
-    let opt = BatchCompileCliOptions::from_args();
-    let result = handle_compile_command(opt);
+    let opt = CliOptions::from_args();
 
-    match result {
-        Ok(_) => eprintln!("{}", "Successfully compiled.\n".bright_green()),
-        Err(err) => {
-            eprintln!("{}\n{}", "Error when compiling.\n".bright_red(), err);
-            std::process::exit(1);
+    if opt.watch {
+        handle_watch_command(opt.compile_options);
+    } else {
+        let result = handle_compile_command(opt.compile_options);
+
+        match result {
+            Ok(_) => eprintln!("{}", "Successfully compiled.\n".bright_green()),
+            Err(err) => {
+                eprintln!("{}\n{}", "Error when compiling.\n".bright_red(), err);
+                std::process::exit(1);
+            }
         }
     }
 }
