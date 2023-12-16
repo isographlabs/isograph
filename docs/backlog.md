@@ -3,11 +3,9 @@
 ## TODO before release
 
 - Publish binary, release npm package that executes it
-- watch mode
 
 ## Top QOL priorities
 
-- Watch mode CLI
 - eslint enforcement that resolvers are exported
 - Expose compiler binary as `iso`.
 

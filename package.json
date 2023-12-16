@@ -5,8 +5,7 @@
   },
   "scripts": {
     "watch-rs": "cargo watch -x build -d 0.1 -w ./crates/",
-    "watch-proj": "cargo watch -w ./demos/graphql-conf-2023-demo/src/components -w ./demos/graphql-conf-2023-demo/backend/schema.graphql -w ./demos/graphql-conf-2023-demo/backend/schema-extension.graphql -s 'echo && ./target/debug/isograph_cli --config ./demos/graphql-conf-2023-demo/isograph.config.json'",
-    "watch-proj-cli": "./target/debug/isograph_cli --config ./demos/graphql-conf-2023-demo/isograph.config.json --watch"
+    "watch-graphql-conf-demo": "./target/debug/isograph_cli --config ./demos/graphql-conf-2023-demo/isograph.config.json --watch"
   },
   "license": "MIT"
 }
