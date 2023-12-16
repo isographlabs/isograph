@@ -1,6 +1,6 @@
 # Isograph
 
-> Select your components like you select your fields, with GraphQL!
+> Select your components like you select your fields — with GraphQL!
 
 - Watch the [talk at GraphQL Conf](https://www.youtube.com/watch?v=gO65JJRqjuc).
 - Join the discord: https://discord.gg/Q2c5tM5T8A (#isograph channel on the GraphQL discord.)

@@ -3,7 +3,7 @@
 ## TODO before release
 
 - Publish binary, release npm package that executes it
-- @magic_mutation_field instead of @primary
+- watch mode
 
 ## Top QOL priorities
 
@@ -24,6 +24,8 @@
 - full support for GraphQL schema syntax
 - error handling
 - validate no unknown directives left over
+- exposeAs as param
+  - use serde for this?
 
 ## Feature backlog
 
