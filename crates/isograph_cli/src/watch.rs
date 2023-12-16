@@ -26,10 +26,21 @@ pub(crate) async fn handle_watch_command(
 
     let (mut rx, mut watcher) = create_debounced_file_watcher();
 
+    // We need to watch a few things: the schema, extensions, and project root
     watcher
         .watcher()
         .watch(&config.project_root, RecursiveMode::Recursive)
-        .expect("watcher failure");
+        .expect("Failure when watching project root");
+    watcher
+        .watcher()
+        .watch(&config.schema, RecursiveMode::Recursive)
+        .expect("Failing when watching schema");
+    for extension in &config.schema_extensions {
+        watcher
+            .watcher()
+            .watch(&extension, RecursiveMode::Recursive)
+            .expect("Failing when watching schema extension");
+    }
 
     tokio::spawn(async move {
         while let Some(res) = rx.recv().await {
