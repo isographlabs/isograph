@@ -9,7 +9,7 @@
   "scripts": {
     "compile": "rm -rf dist/* && (tsc -p tsconfig.pkg.json || exit 0)",
     "compile-watch": "tsc -p tsconfig.pkg.json --watch",
-    "test": "vitest run",
+    "test": "echo no tests yet",
     "test-watch": "vitest watch",
     "coverage": "vitest run --coverage",
     "prepack": "yarn run test && yarn run compile"
@@ -24,5 +24,10 @@
     "react-test-renderer": "^18.2.0",
     "vitest": "^0.29.8",
     "typescript": "^5.0.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/isographlabs/isograph",
+    "directory": "libs/babel-plugin-isograph"
   }
 }

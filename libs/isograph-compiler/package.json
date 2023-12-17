@@ -1,0 +1,16 @@
+{
+    "name": "@isograph/compiler",
+    "version": "0.0.4",
+    "description": "Isograph compiler",
+    "main": "index.js",
+    "bin": "cli.js",
+    "author": "Isograph Labs",
+    "license": "MIT",
+    "scripts": {},
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/isographlabs/isograph",
+      "directory": "libs/babel-plugin-isograph"
+    }
+  }
+  

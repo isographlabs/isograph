@@ -18,7 +18,9 @@
   "devDependencies": {
     "typescript": "^5.0.3"
   },
-  "publishConfig": {
-    "access": "public"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/isographlabs/isograph",
+    "directory": "libs/babel-plugin-isograph"
   }
 }

@@ -6,19 +6,47 @@ jobs:
   # TODO build for all platforms
   build-cli:
     name: Build compiler
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        target:
+          # - target: x86_64-unknown-linux-musl
+          #   os: ubuntu-latest
+          #   build-name: relay
+          #   artifact-name: relay-bin-linux-x64
+          #   packages: musl-tools
+          #   features: vendored
+          # - target: aarch64-unknown-linux-musl
+          #   os: ubuntu-latest
+          #   build-name: relay
+          #   artifact-name: relay-bin-linux-arm64
+          #   features: vendored
+          #   cross: true
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            build-name: isograph_cli
+            artifact-name: isograph_cli-macos-x64
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            build-name: isograph_cli
+            artifact-name: isograph_cli-macos-arm64
+          # - target: x86_64-pc-windows-msvc
+          #   os: windows-latest
+          #   build-name: relay.exe
+          #   artifact-name: relay-bin-win-x64
+    runs-on: ${{ matrix.target.os }}
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: 1.72.0
           override: true
-      - name: "Build Isograph with cargo"
-        run: cargo build --target x86_64-apple-darwin --release
+          target: ${{ matrix.target.target }}
+      - name: "Build isograph_cli with cargo (${{matrix.target.target}})"
+        run: cargo build --target ${{ matrix.target.target }} --release
       - uses: actions/upload-artifact@v2
         with:
-          name: isograph_cli-macos-x64
-          path: target/x86_64-apple-darwin/release/isograph_cli
+          name: ${{ matrix.target.artifact-name }}
+          path: target/${{ matrix.target.target }}/release/${{ matrix.target.build-name }}
           if-no-files-found: error
 
   # TODO build all demos
@@ -32,6 +60,7 @@ jobs:
         with:
           toolchain: 1.72.0
           override: true
+          target: x86_64-apple-darwin
       - name: "Download cli binary"
         uses: actions/download-artifact@v2
         with:
@@ -58,6 +87,56 @@ jobs:
           node-version: 16
           cache: "pnpm"
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Build
         run: pnpm -r compile
+
+  main-release:
+    name: Release packages to NPM
+    runs-on: macos-latest
+    if: github.event_name == 'push' && github.repository == 'isographlabs/isograph'
+    needs: [build-js-packages, build-cli]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - uses: actions/setup-node@v2
+        with:
+          node-version: 16
+          registry-url: https://registry.npmjs.org/
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Change package versions to commit
+        run: yarn gulp setMainVersion
+        env:
+          RELEASE_COMMIT_SHA: ${{ github.sha }}
+      # TODO reuse this somehow?
+      - name: Build
+        run: pnpm -r compile
+      - name: Download artifact isograph_cli-macos-arm64
+        uses: actions/download-artifact@v2
+        with:
+          name: isograph_cli-macos-arm64
+          path: libs/isograph-compiler/artifacts/macos-arm64
+      - name: Download artifact isograph_cli-macos-x64
+        uses: actions/download-artifact@v2
+        with:
+          name: isograph_cli-macos-x64
+          path: libs/isograph-compiler/artifacts/macos-x64
+      - name: Mark binaries as executable
+        run: |
+          chmod +x libs/isograph-compiler/artifacts/macos-arm64/isograph_cli
+          chmod +x libs/isograph-compiler/artifacts/macos-x64/isograph_cli
+      - name: Publish to NPM
+        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+        run: |
+          for pkg in libs/*; do
+            echo PUBLISHING $pkg
+            cd $pkg
+            npm publish --tag main
+            cd ../..
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
