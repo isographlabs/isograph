@@ -6,18 +6,7 @@ use notify_debouncer_full::{
 use std::time::Duration;
 use tokio::{runtime::Handle, sync::mpsc::Receiver, task::JoinError};
 
-use crate::{batch_compile::handle_compile_command, config::CompilerConfig};
-
-fn compile_and_print(config: &CompilerConfig) {
-    eprintln!("{}", "Starting to compile.".cyan());
-
-    match handle_compile_command(config) {
-        Ok(_) => eprintln!("{}", "Successfully compiled.\n".bright_green()),
-        Err(err) => {
-            eprintln!("{}\n{}", "Error when compiling.\n".bright_red(), err);
-        }
-    };
-}
+use crate::{batch_compile::compile_and_print, config::CompilerConfig};
 
 pub(crate) async fn handle_watch_command(
     config: CompilerConfig,

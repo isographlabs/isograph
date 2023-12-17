@@ -1,5 +1,9 @@
-use std::path::PathBuf;
+use std::{
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
+use colored::Colorize;
 use common_lang_types::{
     Location, ResolverDefinitionPath, SourceFileName, Span, TextSource, WithLocation, WithSpan,
 };
@@ -10,6 +14,7 @@ use isograph_lang_types::{ResolverDeclaration, ResolverFetch};
 use isograph_schema::{
     ProcessGraphQLDocumentOutcome, ProcessResolverDeclarationError, Schema, UnvalidatedSchema,
 };
+use pretty_duration::pretty_duration;
 use thiserror::Error;
 
 use crate::{
@@ -22,7 +27,37 @@ use crate::{
     schema::read_schema_file,
 };
 
-pub(crate) fn handle_compile_command(config: &CompilerConfig) -> Result<(), BatchCompileError> {
+pub(crate) struct CompilationStats {
+    pub elapsed_time: Duration,
+    pub resolver_count: usize,
+    pub entrypoint_count: usize,
+}
+
+pub(crate) fn compile_and_print(config: &CompilerConfig) {
+    eprintln!("{}", "Starting to compile.".cyan());
+
+    match handle_compile_command(config) {
+        Ok(stats) => eprintln!(
+            "{}",
+            format!(
+                "Successfully compiled {} resolvers and {} entrypoints in {}.\n",
+                stats.resolver_count,
+                stats.entrypoint_count,
+                pretty_duration(&stats.elapsed_time, None)
+            )
+            .bright_green()
+        ),
+        Err(err) => {
+            eprintln!("{}\n{}", "Error when compiling.\n".bright_red(), err);
+        }
+    };
+}
+
+pub(crate) fn handle_compile_command(
+    config: &CompilerConfig,
+) -> Result<CompilationStats, BatchCompileError> {
+    let start = Instant::now();
+
     let content = read_schema_file(&config.schema)?;
     let schema_text_source = TextSource {
         path: config
@@ -95,11 +130,13 @@ pub(crate) fn handle_compile_command(config: &CompilerConfig) -> Result<(), Batc
     // TODO return an iterator
     let project_files = read_files_in_folder(&canonicalized_root_path)?;
 
-    let (parsed_literals, parsed_fetches) =
+    let (parsed_resolvers, parsed_entrypoints) =
         extract_iso_literals(project_files, canonicalized_root_path)
             .map_err(BatchCompileError::from)?;
+    let resolver_count = parsed_resolvers.len();
+    let entrypoint_count = parsed_entrypoints.len();
 
-    process_parsed_literals_and_fetches(&mut schema, parsed_literals, parsed_fetches)?;
+    process_parsed_resolvers_and_entrypoints(&mut schema, parsed_resolvers, parsed_entrypoints)?;
 
     let validated_schema = Schema::validate_and_construct(schema)?;
 
@@ -109,21 +146,25 @@ pub(crate) fn handle_compile_command(config: &CompilerConfig) -> Result<(), Batc
         &config.artifact_directory,
     )?;
 
-    Ok(())
+    Ok(CompilationStats {
+        elapsed_time: start.elapsed(),
+        resolver_count,
+        entrypoint_count,
+    })
 }
 
-fn process_parsed_literals_and_fetches(
+fn process_parsed_resolvers_and_entrypoints(
     schema: &mut UnvalidatedSchema,
-    literals: Vec<(WithSpan<ResolverDeclaration>, TextSource)>,
-    fetches: Vec<(WithSpan<ResolverFetch>, TextSource)>,
+    resolvers: Vec<(WithSpan<ResolverDeclaration>, TextSource)>,
+    entrypoints: Vec<(WithSpan<ResolverFetch>, TextSource)>,
 ) -> Result<(), Vec<WithLocation<ProcessResolverDeclarationError>>> {
     let mut errors = vec![];
-    for (resolver_declaration, text_source) in literals {
+    for (resolver_declaration, text_source) in resolvers {
         if let Err(e) = schema.process_resolver_declaration(resolver_declaration, text_source) {
             errors.push(e);
         }
     }
-    for (resolver_fetch, text_source) in fetches {
+    for (resolver_fetch, text_source) in entrypoints {
         schema
             .fetchable_resolvers
             .push((text_source, resolver_fetch))

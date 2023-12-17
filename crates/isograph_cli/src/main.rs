@@ -8,7 +8,7 @@ mod schema;
 mod watch;
 mod write_artifacts;
 
-use batch_compile::handle_compile_command;
+use batch_compile::compile_and_print;
 use colored::Colorize;
 use config::CompilerConfig;
 use opt::CliOptions;
@@ -45,12 +45,6 @@ async fn main() {
             }
         };
     } else {
-        match handle_compile_command(&config) {
-            Ok(_) => eprintln!("{}", "Successfully compiled.\n".bright_green()),
-            Err(err) => {
-                eprintln!("{}\n{}", "Error when compiling.\n".bright_red(), err);
-                std::process::exit(1);
-            }
-        }
+        compile_and_print(&config)
     }
 }

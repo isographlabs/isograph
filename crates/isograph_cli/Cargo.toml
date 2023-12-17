@@ -23,3 +23,4 @@ pathdiff = "0.2.1"
 notify = "6.1.1"
 tokio = { version="1.35.0", features=["full"] }
 notify-debouncer-full = "0.3.1"
+pretty-duration = "0.1.1"
