@@ -11,7 +11,7 @@ use crate::{batch_compile::compile_and_print, config::CompilerConfig};
 pub(crate) async fn handle_watch_command(
     config: CompilerConfig,
 ) -> Result<Result<(), Vec<Error>>, JoinError> {
-    compile_and_print(&config);
+    let _ = compile_and_print(&config);
 
     let (mut rx, mut watcher) = create_debounced_file_watcher();
 
@@ -36,7 +36,7 @@ pub(crate) async fn handle_watch_command(
             match res {
                 Ok(_events) => {
                     eprintln!("{}", "File changes detected.".cyan());
-                    compile_and_print(&config);
+                    let _ = compile_and_print(&config);
                 }
                 Err(errors) => return Err(errors),
             }

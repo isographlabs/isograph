@@ -33,24 +33,30 @@ pub(crate) struct CompilationStats {
     pub entrypoint_count: usize,
 }
 
-pub(crate) fn compile_and_print(config: &CompilerConfig) {
+pub(crate) fn compile_and_print(
+    config: &CompilerConfig,
+) -> Result<CompilationStats, BatchCompileError> {
     eprintln!("{}", "Starting to compile.".cyan());
 
     match handle_compile_command(config) {
-        Ok(stats) => eprintln!(
-            "{}",
-            format!(
-                "Successfully compiled {} resolvers and {} entrypoints in {}.\n",
-                stats.resolver_count,
-                stats.entrypoint_count,
-                pretty_duration(&stats.elapsed_time, None)
-            )
-            .bright_green()
-        ),
+        Ok(stats) => {
+            eprintln!(
+                "{}",
+                format!(
+                    "Successfully compiled {} resolvers and {} entrypoints in {}.\n",
+                    stats.resolver_count,
+                    stats.entrypoint_count,
+                    pretty_duration(&stats.elapsed_time, None)
+                )
+                .bright_green()
+            );
+            Ok(stats)
+        }
         Err(err) => {
             eprintln!("{}\n{}", "Error when compiling.\n".bright_red(), err);
+            Err(err)
         }
-    };
+    }
 }
 
 pub(crate) fn handle_compile_command(

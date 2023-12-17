@@ -45,6 +45,8 @@ async fn main() {
             }
         };
     } else {
-        compile_and_print(&config)
+        if let Err(_) = compile_and_print(&config) {
+            std::process::exit(1);
+        }
     }
 }
