@@ -3,7 +3,7 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  build-compiler:
+  build-cli:
     name: Build compiler
     runs-on: macos-latest
     steps:
@@ -13,18 +13,31 @@ jobs:
           toolchain: 1.72.0
           override: true
       - name: "Build Isograph with cargo"
-        run: cargo build
+        run: cargo build --target x86_64-apple-darwin --release
+      - uses: actions/upload-artifact@v2
+        with:
+          name: isograph_cli-macos-x64
+          path: target/x86_64-apple-darwin/release/isograph_cli
+          if-no-files-found: error
 
   build-projects:
     name: Build projects
     runs-on: macos-latest
+    needs: [build-cli]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: 1.72.0
           override: true
+      - name: "Download cli binary"
+        uses: actions/download-artifact@v2
+        with:
+          name: isograph_cli-macos-x64
+          path: artifacts/macos-x64
+      - name: Make artifact executable
+        run: chmod +x ./artifacts/macos-x64/isograph_cli
       - name: "Build project"
-        run: cargo run --bin isograph_cli -- --config ./demos/graphql-conf-2023-demo/isograph.config.json
+        run: ./artifacts/macos-x64/isograph_cli --config ./demos/graphql-conf-2023-demo/isograph.config.json
       - name: "Check working directory status"
         run: "./scripts/check-git-status.sh"
