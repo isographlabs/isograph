@@ -1,5 +1,5 @@
 use colored::Colorize;
-use notify::{Error, FsEventWatcher, RecursiveMode, Watcher};
+use notify::{Error, RecommendedWatcher, RecursiveMode, Watcher};
 use notify_debouncer_full::{
     new_debouncer, DebounceEventResult, DebouncedEvent, Debouncer, FileIdMap,
 };
@@ -48,7 +48,7 @@ pub(crate) async fn handle_watch_command(
 
 fn create_debounced_file_watcher() -> (
     Receiver<Result<Vec<DebouncedEvent>, Vec<Error>>>,
-    Debouncer<FsEventWatcher, FileIdMap>,
+    Debouncer<RecommendedWatcher, FileIdMap>,
 ) {
     let (tx, rx) = tokio::sync::mpsc::channel(1);
     let rt = Handle::current();
