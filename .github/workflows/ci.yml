@@ -18,7 +18,6 @@ jobs:
   build-projects:
     name: Build projects
     runs-on: macos-latest
-    needs: [build-compiler]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
