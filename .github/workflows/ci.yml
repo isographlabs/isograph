@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   build-compiler:
     name: Build compiler
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -17,10 +17,15 @@ jobs:
 
   build-projects:
     name: Build projects
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     needs: [build-compiler]
     steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.72.0
+          override: true
       - name: "Build project"
-        run: ./target/debug/isograph_cli --config ./demos/graphql-conf-2023-demo/isograph.config.json
+        run: cargo run --bin isograph_cli -- --config ./demos/graphql-conf-2023-demo/isograph.config.json
       - name: "Check working directory status"
         run: "./scripts/check-git-status.sh"
