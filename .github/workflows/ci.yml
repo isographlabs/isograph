@@ -3,6 +3,7 @@ name: CI
 on: [push, pull_request]
 
 jobs:
+  # TODO build for all platforms
   build-cli:
     name: Build compiler
     runs-on: macos-latest
@@ -20,8 +21,9 @@ jobs:
           path: target/x86_64-apple-darwin/release/isograph_cli
           if-no-files-found: error
 
-  build-projects:
-    name: Build projects
+  # TODO build all demos
+  build-demos:
+    name: Build demos
     runs-on: macos-latest
     needs: [build-cli]
     steps:
@@ -41,3 +43,21 @@ jobs:
         run: ./artifacts/macos-x64/isograph_cli --config ./demos/graphql-conf-2023-demo/isograph.config.json
       - name: "Check working directory status"
         run: "./scripts/check-git-status.sh"
+
+  build-js-packages:
+    name: Build js packages
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - name: Use Node.js 16
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install
+      - name: Build
+        run: pnpm -r compile
