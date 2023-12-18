@@ -6,6 +6,7 @@ jobs:
   # TODO build for all platforms
   build-cli:
     name: Build compiler
+    timeout-minutes: 10
     strategy:
       matrix:
         target:
