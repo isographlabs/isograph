@@ -95,7 +95,7 @@ jobs:
     name: Release packages to NPM
     runs-on: macos-latest
     if: github.event_name == 'push' && github.repository == 'isographlabs/isograph'
-    needs: [build-js-packages, build-cli]
+    needs: [build-js-packages, build-cli, build-demos]
     steps:
       - uses: actions/checkout@v2
       - uses: pnpm/action-setup@v2
