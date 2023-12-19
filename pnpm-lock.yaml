@@ -69,9 +69,6 @@ importers:
       '@isograph/react':
         specifier: '*'
         version: link:../../libs/isograph-react
-      '@isograph/react-disposable-state':
-        specifier: '*'
-        version: link:../../libs/isograph-react-disposable-state
       '@mui/icons-material':
         specifier: ^5.11.16
         version: 5.11.16(@mui/material@5.13.5)(@types/react@18.2.0)(react@18.2.0)
@@ -136,9 +133,6 @@ importers:
       '@isograph/react':
         specifier: '*'
         version: link:../../libs/isograph-react
-      '@isograph/react-disposable-state':
-        specifier: '*'
-        version: link:../../libs/isograph-react-disposable-state
       '@mui/material':
         specifier: ^5.14.8
         version: 5.14.8(@emotion/react@11.11.1)(@emotion/styled@11.11.0)(@types/react@18.2.21)(react-dom@18.2.0)(react@18.2.0)

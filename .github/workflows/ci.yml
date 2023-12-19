@@ -12,14 +12,14 @@ jobs:
         target:
           # - target: x86_64-unknown-linux-musl
           #   os: ubuntu-latest
-          #   build-name: relay
-          #   artifact-name: relay-bin-linux-x64
+          #   build-name:isograph_cli
+          #   artifact-name: isograph_cli-bin-linux-x64
           #   packages: musl-tools
           #   features: vendored
           # - target: aarch64-unknown-linux-musl
           #   os: ubuntu-latest
-          #   build-name: relay
-          #   artifact-name: relay-bin-linux-arm64
+          #   build-name:isograph_cli
+          #   artifact-name: isograph_cli-bin-linux-arm64
           #   features: vendored
           #   cross: true
           - target: x86_64-apple-darwin
@@ -32,8 +32,8 @@ jobs:
             artifact-name: isograph_cli-macos-arm64
           # - target: x86_64-pc-windows-msvc
           #   os: windows-latest
-          #   build-name: relay.exe
-          #   artifact-name: relay-bin-win-x64
+          #   build-name: isograph_cli.exe
+          #   artifact-name: isograph_cli-bin-win-x64
     runs-on: ${{ matrix.target.os }}
     steps:
       - uses: actions/checkout@v2
