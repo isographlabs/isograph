@@ -1,6 +1,14 @@
+---
+sidebar_position: 3
+---
+
 # FAQ
 
 ## Why do `@component` resolvers need to be interpolated into the parent, and not rendered?
+
+:::warning
+This answer will soon be out-of-date. Proper component support is coming at some point.
+:::
 
 Consider a parent component that fetches a child component. The child component should be interpolated into the returned JSX:
 

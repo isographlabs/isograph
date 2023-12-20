@@ -1,13 +1,16 @@
+---
+sidebar_position: 999
+---
+
 # Backlog
-
-## TODO before release
-
-- Publish binary, release npm package that executes it
 
 ## Top QOL priorities
 
 - eslint enforcement that resolvers are exported
 - Expose compiler binary as `iso`.
+- rethink iso syntax
+  - Consider combining isoFetch and iso, as in `` iso`entrypoint Query.home_page`  `` or the like
+- full support for GraphQL schema syntax
 
 ## V2 release
 
@@ -16,10 +19,6 @@
   - may require garbage collection
 - iso overload in files
 - cleanup types
-- watch mode
-- rethink iso syntax
-  - Consider combining isoFetch and iso, as in `` iso`entrypoint Query.home_page`  `` or the like
-- full support for GraphQL schema syntax
 - error handling
 - validate no unknown directives left over
 - exposeAs as param
@@ -43,7 +42,7 @@
 - Types for variables.
 - Inferred types for iso literals via Typescript compiler plugin.
 - typed IDs
-- consider resolvers that return functions only read data when called, i.e. do not eagerly read. Consider whether this can be achieved with omitting a !, i.e. foo_resolver! returns TReadFromStore, foo_resolver returns a `ReadDataResult<TReadFromStore>`
+- consider resolvers that return functions only read data when called, i.e. do not eagerly read. Consider whether this can be achieved with omitting a !, i.e. foo_resolver! returns TReadFromStore, foo_resolver returns a `ReadDataResult TReadFromStore`
 
 ## Cleanup backlog
 
@@ -53,7 +52,7 @@
 - Objects which do not have IDs should be merged into their parent object in the store.
   - or weak types are scalars
 - Remove the requirement that arguments and parameters have a terminal comma.
-- IsographSchemaObject, etc. should not contain name: WithLocation<...>, but instead, be stored `WithLocation<T>`, and WithLocation should **not** have a span.
+- IsographSchemaObject, etc. should not contain name: `WithLocation<...>`, but instead, be stored `WithLocation T`, and WithLocation should **not** have a span.
 - There should be a cleaner separation between GraphQL and Isograph. In particular, we should load the GraphQL schema, but turn it into Isograph concepts, and only deal with Isograph concepts.
 
 ## Known bugs
