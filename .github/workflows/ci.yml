@@ -10,18 +10,14 @@ jobs:
     strategy:
       matrix:
         target:
-          # - target: x86_64-unknown-linux-musl
-          #   os: ubuntu-latest
-          #   build-name:isograph_cli
-          #   artifact-name: isograph_cli-bin-linux-x64
-          #   packages: musl-tools
-          #   features: vendored
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            build-name: isograph_cli
+            artifact-name: isograph_cli-bin-linux-x64
           # - target: aarch64-unknown-linux-musl
           #   os: ubuntu-latest
-          #   build-name:isograph_cli
+          #   build-name: isograph_cli
           #   artifact-name: isograph_cli-bin-linux-arm64
-          #   features: vendored
-          #   cross: true
           - target: x86_64-apple-darwin
             os: macos-latest
             build-name: isograph_cli
@@ -116,20 +112,32 @@ jobs:
       # TODO reuse this somehow?
       - name: Build
         run: pnpm -r compile
-      - name: Download artifact isograph_cli-macos-arm64
+      - name: Download artifact isograph_cli-bin-linux-x64
         uses: actions/download-artifact@v2
         with:
-          name: isograph_cli-macos-arm64
-          path: libs/isograph-compiler/artifacts/macos-arm64
+          name: isograph_cli-bin-linux-x64
+          path: libs/isograph-compiler/artifacts/linux-x64
+      # - name: Download artifact isograph_cli-bin-linux-arm64
+      #   uses: actions/download-artifact@v2
+      #   with:
+      #     name: isograph_cli-bin-linux-arm64
+      #     path: libs/isograph-compiler/artifacts/linux-arm64
       - name: Download artifact isograph_cli-macos-x64
         uses: actions/download-artifact@v2
         with:
           name: isograph_cli-macos-x64
           path: libs/isograph-compiler/artifacts/macos-x64
+      - name: Download artifact isograph_cli-macos-arm64
+        uses: actions/download-artifact@v2
+        with:
+          name: isograph_cli-macos-arm64
+          path: libs/isograph-compiler/artifacts/macos-arm64
       - name: Mark binaries as executable
         run: |
-          chmod +x libs/isograph-compiler/artifacts/macos-arm64/isograph_cli
+          chmod +x libs/isograph-compiler/artifacts/linux-x64/isograph_cli
+          # chmod +x libs/isograph-compiler/artifacts/linux-arm64/isograph_cli
           chmod +x libs/isograph-compiler/artifacts/macos-x64/isograph_cli
+          chmod +x libs/isograph-compiler/artifacts/macos-arm64/isograph_cli
       - name: Publish to NPM
         if: github.ref == 'refs/heads/main' || github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
         run: |

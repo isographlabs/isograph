@@ -8,11 +8,9 @@ if (process.platform === "darwin" && process.arch === "x64") {
 } else if (process.platform === "darwin" && process.arch === "arm64") {
   binary = path.join(__dirname, "artifacts", "macos-arm64", "isograph_cli");
 } else if (process.platform === "linux" && process.arch === "x64") {
-  throw new Error("Platform not supported yet");
-  // binary = path.join(__dirname, "artifacts", "linux-x64", "isograph_cli");
+  binary = path.join(__dirname, "artifacts", "linux-x64", "isograph_cli");
 } else if (process.platform === "linux" && process.arch === "arm64") {
-  throw new Error("Platform not supported yet");
-  // binary = path.join(__dirname, "artifacts", "linux-arm64", "isograph_cli");
+  binary = path.join(__dirname, "artifacts", "linux-arm64", "isograph_cli");
 } else if (process.platform === "win32" && process.arch === "x64") {
   throw new Error("Platform not supported yet");
   // binary = path.join(__dirname, "artifacts", "win-x64", "isograph_cli.exe");
