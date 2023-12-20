@@ -1,6 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from "react";
 import Head from "next/head";
-import { DataId, Link, StoreRecord, setMissingFieldHandler, defaultMissingFieldHandler, setNetwork, subscribe } from "@isograph/react";
+import {
+  DataId,
+  Link,
+  StoreRecord,
+  setMissingFieldHandler,
+  defaultMissingFieldHandler,
+  setNetwork,
+  subscribe,
+} from "@isograph/react";
 import { GraphQLConfDemo } from "@/src/components/router";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 
@@ -15,34 +23,41 @@ function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
   return promise;
 }
 setNetwork(makeNetworkRequest);
-setMissingFieldHandler((
-  storeRecord: StoreRecord,
-  root: DataId,
-  fieldName: string,
-  arguments_: { [index: string]: any } | null,
-  variables: { [index: string]: any } | null,
-
-): Link | undefined => {
-  console.log("Missing field handler called", { storeRecord, root, fieldName, arguments_, variables })
-  const val = defaultMissingFieldHandler(
-    storeRecord,
-    root,
-    fieldName,
-    arguments_,
-    variables,
-  );
-  if (val == undefined) {
-    // This is the custom missing field handler
-    //
-    // N.B. this **not** correct. We need to pass the correct variables/args here.
-    // But it works for this demo.
-    if (fieldName === "pet" && variables?.id != null && root === '__ROOT') {
-      return { __link: variables.id }
+setMissingFieldHandler(
+  (
+    storeRecord: StoreRecord,
+    root: DataId,
+    fieldName: string,
+    arguments_: { [index: string]: any } | null,
+    variables: { [index: string]: any } | null
+  ): Link | undefined => {
+    console.log("Missing field handler called", {
+      storeRecord,
+      root,
+      fieldName,
+      arguments_,
+      variables,
+    });
+    const val = defaultMissingFieldHandler(
+      storeRecord,
+      root,
+      fieldName,
+      arguments_,
+      variables
+    );
+    if (val == undefined) {
+      // This is the custom missing field handler
+      //
+      // N.B. this **not** correct. We need to pass the correct variables/args here.
+      // But it works for this demo.
+      if (fieldName === "pet" && variables?.id != null && root === "__ROOT") {
+        return { __link: variables.id };
+      }
+    } else {
+      return val;
     }
-  } else {
-    return val;
   }
-})
+);
 
 export default function Home() {
   const [, setState] = useState<object | void>();
