@@ -28,6 +28,9 @@ pub enum SchemaParseError {
 
     #[error("Expected a type (e.g. String, [String], or String!)")]
     ExpectedTypeAnnotation,
+
+    #[error("Expected directive location. Found {text}")]
+    ExpectedDirectiveLocation { text: String },
 }
 
 impl From<LowLevelParseError> for SchemaParseError {

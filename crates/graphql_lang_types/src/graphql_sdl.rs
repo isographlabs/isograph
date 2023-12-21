@@ -4,21 +4,21 @@ use crate::{Directive, TypeAnnotation};
 
 use super::{write_arguments, write_directives, ConstantValue};
 use common_lang_types::{
-    DescriptionValue, InputTypeName, InputValueName, InterfaceTypeName, ObjectTypeName,
-    ScalarTypeName, SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
+    DescriptionValue, DirectiveName, InputTypeName, InputValueName, InterfaceTypeName,
+    ObjectTypeName, ScalarTypeName, SelectableFieldName, UnvalidatedTypeName, WithLocation,
+    WithSpan,
 };
 use intern::{string_key::Intern, Lookup};
+use strum::EnumString;
 
+// also Union, Enum, Schema
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum GraphQLTypeSystemDefinition {
     ObjectTypeDefinition(GraphQLObjectTypeDefinition),
     ScalarTypeDefinition(GraphQLScalarTypeDefinition),
     InterfaceTypeDefinition(GraphQLInterfaceTypeDefinition),
     InputObjectTypeDefinition(GraphQLInputObjectTypeDefinition),
-    // Union
-    // Enum
-    // Schema
-    // Directive
+    DirectiveDefinition(GraphQLDirectiveDefinition),
 }
 
 impl From<GraphQLObjectTypeDefinition> for GraphQLTypeSystemDefinition {
@@ -42,6 +42,12 @@ impl From<GraphQLScalarTypeDefinition> for GraphQLTypeSystemDefinition {
 impl From<GraphQLInputObjectTypeDefinition> for GraphQLTypeSystemDefinition {
     fn from(type_definition: GraphQLInputObjectTypeDefinition) -> Self {
         Self::InputObjectTypeDefinition(type_definition)
+    }
+}
+
+impl From<GraphQLDirectiveDefinition> for GraphQLTypeSystemDefinition {
+    fn from(directive_definition: GraphQLDirectiveDefinition) -> Self {
+        Self::DirectiveDefinition(directive_definition)
     }
 }
 
@@ -121,6 +127,39 @@ pub struct GraphQLInputObjectTypeDefinition {
     pub name: WithLocation<InterfaceTypeName>,
     pub directives: Vec<Directive<ConstantValue>>,
     pub fields: Vec<WithLocation<GraphQLInputValueDefinition>>,
+}
+
+#[allow(unused)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, EnumString)]
+#[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
+pub enum DirectiveLocation {
+    Query,
+    Mutation,
+    Subscription,
+    Field,
+    FragmentDefinition,
+    InlineFragment,
+    VariableDefinition,
+    Schema,
+    Scalar,
+    Object,
+    FieldDefinition,
+    ArgumentDefinition,
+    Interface,
+    Union,
+    Enum,
+    EnumValue,
+    InputObject,
+    InputFieldDefinition,
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub struct GraphQLDirectiveDefinition {
+    pub description: Option<WithSpan<DescriptionValue>>,
+    pub name: WithLocation<DirectiveName>,
+    pub arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+    pub repeatable: Option<WithSpan<()>>,
+    pub locations: Vec<WithSpan<DirectiveLocation>>,
 }
 
 impl From<GraphQLInputValueDefinition> for GraphQLOutputFieldDefinition {

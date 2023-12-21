@@ -92,6 +92,10 @@ impl UnvalidatedSchema {
                         &mut valid_type_refinement_map,
                     )?;
                 }
+                GraphQLTypeSystemDefinition::DirectiveDefinition(_) => {
+                    // For now, Isograph ignores directive definitions,
+                    // but it might choose to allow-list them.
+                }
             }
         }
 

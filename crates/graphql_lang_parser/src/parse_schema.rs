@@ -1,7 +1,8 @@
-use std::ops::ControlFlow;
+use std::{ops::ControlFlow, str::FromStr};
 
 use common_lang_types::{
-    DescriptionValue, InterfaceTypeName, StringLiteralValue, TextSource, WithLocation, WithSpan,
+    DescriptionValue, InterfaceTypeName, Span, StringLiteralValue, TextSource, WithLocation,
+    WithSpan,
 };
 use graphql_syntax::TokenKind;
 use intern::{
@@ -10,10 +11,11 @@ use intern::{
 };
 
 use graphql_lang_types::{
-    ConstantValue, Directive, GraphQLInputObjectTypeDefinition, GraphQLInputValueDefinition,
-    GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition, GraphQLObjectTypeExtension,
-    GraphQLOutputFieldDefinition, GraphQLScalarTypeDefinition, GraphQLTypeSystemDefinition,
-    GraphQLTypeSystemDocument, GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
+    ConstantValue, Directive, DirectiveLocation, GraphQLDirectiveDefinition,
+    GraphQLInputObjectTypeDefinition, GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition,
+    GraphQLObjectTypeDefinition, GraphQLObjectTypeExtension, GraphQLOutputFieldDefinition,
+    GraphQLScalarTypeDefinition, GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument,
+    GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
     GraphQLTypeSystemExtensionOrDefinition, ListTypeAnnotation, NameValuePair, NamedTypeAnnotation,
     NonNullTypeAnnotation, TypeAnnotation, ValueType,
 };
@@ -136,6 +138,8 @@ fn parse_type_system_definition(
             .map(GraphQLTypeSystemDefinition::from),
         "input" => parse_input_object_type_definition(tokens, description, text_source)
             .map(GraphQLTypeSystemDefinition::from),
+        "directive" => parse_directive_definition(tokens, description, text_source)
+            .map(GraphQLTypeSystemDefinition::from),
         _ => Err(WithSpan::new(
             SchemaParseError::TopLevelSchemaDeclarationExpected {
                 found_text: identifier_source.to_string(),
@@ -239,6 +243,86 @@ fn parse_input_object_type_definition(
         directives,
         fields,
     })
+}
+
+/// The state of the PeekableLexer is that it has processed the "directive" keyword
+fn parse_directive_definition(
+    tokens: &mut PeekableLexer,
+    description: Option<WithSpan<DescriptionValue>>,
+    text_source: TextSource,
+) -> ParseResult<GraphQLDirectiveDefinition> {
+    let _at = tokens.parse_token_of_kind(TokenKind::At);
+    let name = tokens
+        .parse_string_key_type(TokenKind::Identifier)
+        .map_err(|with_span| with_span.map(SchemaParseError::from))?
+        .to_with_location(text_source);
+
+    let arguments = parse_optional_argument_definitions(
+        tokens,
+        text_source,
+        TokenKind::OpenParen,
+        TokenKind::CloseParen,
+    )?;
+
+    let repeatable = tokens
+        .parse_matching_identifier("repeatable")
+        .ok()
+        .map(|x| x.map(|_| ()));
+    let _on = tokens
+        .parse_matching_identifier("on")
+        .map_err(|x| WithSpan::new(SchemaParseError::from(x), Span::todo_generated()))?;
+
+    let locations = parse_directive_locations(tokens)?;
+
+    Ok(GraphQLDirectiveDefinition {
+        name,
+        arguments,
+        repeatable,
+        locations,
+        description,
+    })
+}
+
+fn parse_directive_locations(
+    tokens: &mut PeekableLexer,
+) -> ParseResult<Vec<WithSpan<DirectiveLocation>>> {
+    // This is a no-op if the token kind doesn't match, so effectively
+    // this is an optional pipe
+    let _ = tokens.parse_token_of_kind(TokenKind::Pipe);
+    let required_location = parse_directive_location(tokens)?;
+    let mut locations = vec![required_location];
+
+    while tokens.parse_token_of_kind(TokenKind::Pipe).is_ok() {
+        locations.push(parse_directive_location(tokens)?);
+    }
+
+    Ok(locations)
+}
+
+fn parse_directive_location(
+    tokens: &mut PeekableLexer,
+) -> ParseResult<WithSpan<DirectiveLocation>> {
+    match tokens.parse_token_of_kind(TokenKind::Identifier) {
+        Ok(token) => {
+            let text = tokens.source(token.span);
+            DirectiveLocation::from_str(text)
+                .map_err(|_| {
+                    WithSpan::new(
+                        SchemaParseError::ExpectedDirectiveLocation {
+                            text: text.to_string(),
+                        },
+                        token.span,
+                    )
+                })
+                .map(|location| token.map(|_| location))
+        }
+        Err(e) => {
+            let span = e.span;
+            Err(e.map(|_| SchemaParseError::ExpectedDirectiveLocation {
+                text: tokens.source(span).to_string(),
+            }))
+        }
+    }
 }
 
 /// The state of the PeekableLexer is that it has processed the "scalar" keyword
