@@ -230,11 +230,12 @@ fn parse_input_object_type_definition(
         .to_with_location(text_source);
 
     let directives = parse_constant_directives(tokens, text_source)?;
-    let fields = parse_optional_argument_definitions(
+    let fields = parse_optional_enclosed_items(
         tokens,
         text_source,
         TokenKind::OpenBrace,
         TokenKind::CloseBrace,
+        parse_argument_definition,
     )?;
 
     Ok(GraphQLInputObjectTypeDefinition {
@@ -257,11 +258,12 @@ fn parse_directive_definition(
         .map_err(|with_span| with_span.map(SchemaParseError::from))?
         .to_with_location(text_source);
 
-    let arguments = parse_optional_argument_definitions(
+    let arguments = parse_optional_enclosed_items(
         tokens,
         text_source,
         TokenKind::OpenParen,
         TokenKind::CloseParen,
+        parse_argument_definition,
     )?;
 
     let repeatable = tokens
@@ -633,11 +635,12 @@ fn parse_field<'a>(
                 .map_err(|with_span| with_span.map(SchemaParseError::from))?
                 .to_with_location(text_source);
 
-            let arguments = parse_optional_argument_definitions(
+            let arguments = parse_optional_enclosed_items(
                 tokens,
                 text_source,
                 TokenKind::OpenParen,
                 TokenKind::CloseParen,
+                parse_argument_definition,
             )?;
 
             tokens
@@ -715,23 +718,21 @@ fn parse_type_annotation<T: From<StringKey>>(
     })
 }
 
-fn parse_optional_argument_definitions<'a>(
+fn parse_optional_enclosed_items<'a, T>(
     tokens: &mut PeekableLexer<'a>,
     text_source: TextSource,
     open_token: TokenKind,
     close_token: TokenKind,
-) -> ParseResult<Vec<WithLocation<GraphQLInputValueDefinition>>> {
+    mut parse: impl FnMut(&mut PeekableLexer<'a>, TextSource) -> ParseResult<WithSpan<T>>,
+) -> ParseResult<Vec<WithLocation<T>>> {
     let paren = tokens.parse_token_of_kind(open_token);
 
     if paren.is_ok() {
-        let argument =
-            parse_argument_definition(tokens, text_source)?.to_with_location(text_source);
+        let argument = parse(tokens, text_source)?.to_with_location(text_source);
         let mut arguments = vec![argument];
 
         while tokens.parse_token_of_kind(close_token).is_err() {
-            arguments.push(
-                parse_argument_definition(tokens, text_source)?.to_with_location(text_source),
-            );
+            arguments.push(parse(tokens, text_source)?.to_with_location(text_source));
         }
         Ok(arguments)
     } else {
