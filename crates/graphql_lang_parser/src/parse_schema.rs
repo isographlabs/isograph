@@ -1,8 +1,8 @@
 use std::{ops::ControlFlow, str::FromStr};
 
 use common_lang_types::{
-    DescriptionValue, EnumLiteralValue, InterfaceTypeName, Span, StringLiteralValue, TextSource,
-    WithLocation, WithSpan,
+    DescriptionValue, EnumLiteralValue, InterfaceTypeName, ObjectTypeName, Span,
+    StringLiteralValue, TextSource, WithLocation, WithSpan,
 };
 use graphql_syntax::TokenKind;
 use intern::{
@@ -16,8 +16,9 @@ use graphql_lang_types::{
     GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition,
     GraphQLObjectTypeExtension, GraphQLOutputFieldDefinition, GraphQLScalarTypeDefinition,
     GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument, GraphQLTypeSystemExtension,
-    GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition, ListTypeAnnotation,
-    NameValuePair, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation, ValueType,
+    GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition,
+    GraphQLUnionTypeDefinition, ListTypeAnnotation, NameValuePair, NamedTypeAnnotation,
+    NonNullTypeAnnotation, TypeAnnotation, ValueType,
 };
 
 use crate::ParseResult;
@@ -141,6 +142,8 @@ fn parse_type_system_definition(
         "directive" => parse_directive_definition(tokens, description, text_source)
             .map(GraphQLTypeSystemDefinition::from),
         "enum" => parse_enum_definition(tokens, description, text_source)
+            .map(GraphQLTypeSystemDefinition::from),
+        "union" => parse_union_definition(tokens, description, text_source)
             .map(GraphQLTypeSystemDefinition::from),
         _ => Err(WithSpan::new(
             SchemaParseError::TopLevelSchemaDeclarationExpected {
@@ -292,7 +295,7 @@ fn parse_directive_locations(
 ) -> ParseResult<Vec<WithSpan<DirectiveLocation>>> {
     // This is a no-op if the token kind doesn't match, so effectively
     // this is an optional pipe
-    let _ = tokens.parse_token_of_kind(TokenKind::Pipe);
+    let _pipe = tokens.parse_token_of_kind(TokenKind::Pipe);
     let required_location = parse_directive_location(tokens)?;
     let mut locations = vec![required_location];
 
@@ -398,6 +401,58 @@ fn parse_enum_value_definition(
             })
         })
         .transpose()
+}
+
+fn parse_union_definition(
+    tokens: &mut PeekableLexer,
+    description: Option<WithSpan<DescriptionValue>>,
+    text_source: TextSource,
+) -> ParseResult<GraphQLUnionTypeDefinition> {
+    let name = tokens
+        .parse_string_key_type(TokenKind::Identifier)
+        .map_err(|with_span| with_span.map(SchemaParseError::from))?
+        .to_with_location(text_source);
+
+    let directives = parse_constant_directives(tokens, text_source)?;
+
+    let _equal = tokens
+        .parse_token_of_kind(TokenKind::Equals)
+        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+
+    let union_member_types = parse_union_member_types(tokens, text_source)?;
+
+    Ok(GraphQLUnionTypeDefinition {
+        description,
+        name,
+        directives,
+        union_member_types,
+    })
+}
+
+fn parse_union_member_types(
+    tokens: &mut PeekableLexer,
+    text_source: TextSource,
+) -> ParseResult<Vec<WithLocation<ObjectTypeName>>> {
+    // This is a no-op if the token kind doesn't match, so effectively
+    // this is an optional pipe
+    let _pipe = tokens.parse_token_of_kind(TokenKind::Pipe);
+    let required_first_value = tokens
+        .parse_string_key_type(TokenKind::Identifier)
+        .map_err(|with_span| with_span.map(SchemaParseError::from))?
+        .to_with_location(text_source);
+
+    let mut values = vec![required_first_value];
+
+    while tokens.parse_token_of_kind(TokenKind::Pipe).is_ok() {
+        values.push(
+            tokens
+                .parse_string_key_type(TokenKind::Identifier)
+                .map_err(|with_span| with_span.map(SchemaParseError::from))?
+                .to_with_location(text_source),
+        );
+    }
+
+    Ok(values)
 }
 
 /// The state of the PeekableLexer is that it has processed the "scalar" keyword

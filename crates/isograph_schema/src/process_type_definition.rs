@@ -104,6 +104,19 @@ impl UnvalidatedSchema {
                         directives: enum_definition.directives,
                     })?;
                 }
+                GraphQLTypeSystemDefinition::UnionTypeDefinition(union_definition) => {
+                    // TODO do something reasonable here, once we add support for type refinements.
+                    self.process_object_type_definition(
+                        IsographObjectTypeDefinition {
+                            description: union_definition.description,
+                            name: union_definition.name.map(|x| x.into()),
+                            interfaces: vec![],
+                            directives: union_definition.directives,
+                            fields: vec![],
+                        },
+                        &mut valid_type_refinement_map,
+                    )?;
+                }
             }
         }
 

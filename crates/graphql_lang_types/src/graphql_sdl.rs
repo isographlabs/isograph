@@ -5,13 +5,13 @@ use crate::{GraphQLDirective, TypeAnnotation};
 use super::{write_arguments, write_directives, ConstantValue};
 use common_lang_types::{
     DescriptionValue, DirectiveName, EnumLiteralValue, InputTypeName, InputValueName,
-    InterfaceTypeName, ObjectTypeName, ScalarTypeName, SelectableFieldName, UnvalidatedTypeName,
-    WithLocation, WithSpan,
+    InterfaceTypeName, ObjectTypeName, ScalarTypeName, SelectableFieldName, UnionTypeName,
+    UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use intern::{string_key::Intern, Lookup};
 use strum::EnumString;
 
-// also Union, Schema
+// also Schema
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum GraphQLTypeSystemDefinition {
     ObjectTypeDefinition(GraphQLObjectTypeDefinition),
@@ -20,6 +20,7 @@ pub enum GraphQLTypeSystemDefinition {
     InputObjectTypeDefinition(GraphQLInputObjectTypeDefinition),
     DirectiveDefinition(GraphQLDirectiveDefinition),
     EnumDefinition(GraphQLEnumDefinition),
+    UnionTypeDefinition(GraphQLUnionTypeDefinition),
 }
 
 impl From<GraphQLObjectTypeDefinition> for GraphQLTypeSystemDefinition {
@@ -55,6 +56,12 @@ impl From<GraphQLDirectiveDefinition> for GraphQLTypeSystemDefinition {
 impl From<GraphQLEnumDefinition> for GraphQLTypeSystemDefinition {
     fn from(enum_definition: GraphQLEnumDefinition) -> Self {
         Self::EnumDefinition(enum_definition)
+    }
+}
+
+impl From<GraphQLUnionTypeDefinition> for GraphQLTypeSystemDefinition {
+    fn from(union_type_definition: GraphQLUnionTypeDefinition) -> Self {
+        Self::UnionTypeDefinition(union_type_definition)
     }
 }
 
@@ -182,6 +189,14 @@ pub struct GraphQLEnumValueDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub value: WithLocation<EnumLiteralValue>,
     pub directives: Vec<GraphQLDirective<ConstantValue>>,
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub struct GraphQLUnionTypeDefinition {
+    pub description: Option<WithSpan<DescriptionValue>>,
+    pub name: WithLocation<UnionTypeName>,
+    pub directives: Vec<GraphQLDirective<ConstantValue>>,
+    pub union_member_types: Vec<WithLocation<ObjectTypeName>>,
 }
 
 impl From<GraphQLInputValueDefinition> for GraphQLOutputFieldDefinition {
