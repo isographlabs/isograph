@@ -1,12 +1,12 @@
 use std::fmt;
 
-use super::{Directive, ValueType};
+use super::{GraphQLDirective, ValueType};
 
 // This should probably be its own crate?
 
 pub fn write_directives<T: ValueType>(
     f: &mut fmt::Formatter<'_>,
-    directives: &[Directive<T>],
+    directives: &[GraphQLDirective<T>],
 ) -> fmt::Result {
     if directives.is_empty() {
         return Ok(());

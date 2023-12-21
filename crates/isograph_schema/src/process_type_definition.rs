@@ -6,7 +6,7 @@ use common_lang_types::{
     UnvalidatedTypeName, ValueKeyName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    ConstantValue, Directive, GraphQLInputValueDefinition, GraphQLOutputFieldDefinition,
+    ConstantValue, GraphQLDirective, GraphQLInputValueDefinition, GraphQLOutputFieldDefinition,
     GraphQLScalarTypeDefinition, GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument,
     GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
     GraphQLTypeSystemExtensionOrDefinition, NamedTypeAnnotation, NonNullTypeAnnotation,
@@ -95,6 +95,14 @@ impl UnvalidatedSchema {
                 GraphQLTypeSystemDefinition::DirectiveDefinition(_) => {
                     // For now, Isograph ignores directive definitions,
                     // but it might choose to allow-list them.
+                }
+                GraphQLTypeSystemDefinition::EnumDefinition(enum_definition) => {
+                    // TODO Do not do this
+                    self.process_scalar_definition(GraphQLScalarTypeDefinition {
+                        description: enum_definition.description,
+                        name: enum_definition.name.map(|x| x.lookup().intern().into()),
+                        directives: enum_definition.directives,
+                    })?;
                 }
             }
         }
@@ -576,7 +584,7 @@ pub struct MagicMutationFieldInfo {
 impl UnvalidatedSchema {
     fn extract_magic_mutation_field_info(
         &self,
-        d: &Directive<ConstantValue>,
+        d: &GraphQLDirective<ConstantValue>,
         text_source: TextSource,
         mutation_id: ObjectId,
     ) -> ProcessTypeDefinitionResult<Option<MagicMutationFieldInfo>> {
@@ -593,7 +601,7 @@ impl UnvalidatedSchema {
 
     fn validate_magic_mutation_directive(
         &self,
-        d: &Directive<ConstantValue>,
+        d: &GraphQLDirective<ConstantValue>,
         text_source: TextSource,
         mutation_id: ObjectId,
     ) -> ProcessTypeDefinitionResult<MagicMutationFieldInfo> {
@@ -835,7 +843,7 @@ struct ModifiedArgument {
     name: WithLocation<InputValueName>,
     object: TypeAnnotation<ModifiedObject>,
     default_value: Option<WithLocation<ConstantValue>>,
-    directives: Vec<Directive<ConstantValue>>,
+    directives: Vec<GraphQLDirective<ConstantValue>>,
 }
 
 /// An object which has fields that are unmodified, deleted,

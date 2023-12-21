@@ -6,7 +6,7 @@ use common_lang_types::{
     ScalarTypeName, SelectableFieldName, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    ConstantValue, Directive, GraphQLInputObjectTypeDefinition, GraphQLInputValueDefinition,
+    ConstantValue, GraphQLDirective, GraphQLInputObjectTypeDefinition, GraphQLInputValueDefinition,
     GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition, GraphQLOutputFieldDefinition,
     NamedTypeAnnotation, TypeAnnotation,
 };
@@ -406,7 +406,7 @@ pub struct IsographObjectTypeDefinition {
     pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
     /// Directives that we don't know about. Maybe this should be validated to be
     /// empty, or not exist.
-    pub directives: Vec<Directive<ConstantValue>>,
+    pub directives: Vec<GraphQLDirective<ConstantValue>>,
     // TODO the spans of these fields are wrong
     // TODO use a shared field type
     pub fields: Vec<WithLocation<GraphQLOutputFieldDefinition>>,
@@ -461,7 +461,7 @@ pub struct SchemaObject<TEncounteredField> {
     pub name: IsographObjectTypeName,
     pub id: ObjectId,
     // We probably don't want this
-    pub directives: Vec<Directive<ConstantValue>>,
+    pub directives: Vec<GraphQLDirective<ConstantValue>>,
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
     pub id_field: Option<ServerIdFieldId>,

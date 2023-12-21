@@ -31,6 +31,9 @@ pub enum SchemaParseError {
 
     #[error("Expected directive location. Found {text}")]
     ExpectedDirectiveLocation { text: String },
+
+    #[error("Enum values cannot be true, false or null.")]
+    EnumValueTrueFalseNull,
 }
 
 impl From<LowLevelParseError> for SchemaParseError {

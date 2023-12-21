@@ -1,8 +1,8 @@
 use std::{ops::ControlFlow, str::FromStr};
 
 use common_lang_types::{
-    DescriptionValue, InterfaceTypeName, Span, StringLiteralValue, TextSource, WithLocation,
-    WithSpan,
+    DescriptionValue, EnumLiteralValue, InterfaceTypeName, Span, StringLiteralValue, TextSource,
+    WithLocation, WithSpan,
 };
 use graphql_syntax::TokenKind;
 use intern::{
@@ -11,13 +11,13 @@ use intern::{
 };
 
 use graphql_lang_types::{
-    ConstantValue, Directive, DirectiveLocation, GraphQLDirectiveDefinition,
-    GraphQLInputObjectTypeDefinition, GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition,
-    GraphQLObjectTypeDefinition, GraphQLObjectTypeExtension, GraphQLOutputFieldDefinition,
-    GraphQLScalarTypeDefinition, GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument,
-    GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
-    GraphQLTypeSystemExtensionOrDefinition, ListTypeAnnotation, NameValuePair, NamedTypeAnnotation,
-    NonNullTypeAnnotation, TypeAnnotation, ValueType,
+    ConstantValue, DirectiveLocation, GraphQLDirective, GraphQLDirectiveDefinition,
+    GraphQLEnumDefinition, GraphQLEnumValueDefinition, GraphQLInputObjectTypeDefinition,
+    GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition,
+    GraphQLObjectTypeExtension, GraphQLOutputFieldDefinition, GraphQLScalarTypeDefinition,
+    GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument, GraphQLTypeSystemExtension,
+    GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition, ListTypeAnnotation,
+    NameValuePair, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation, ValueType,
 };
 
 use crate::ParseResult;
@@ -139,6 +139,8 @@ fn parse_type_system_definition(
         "input" => parse_input_object_type_definition(tokens, description, text_source)
             .map(GraphQLTypeSystemDefinition::from),
         "directive" => parse_directive_definition(tokens, description, text_source)
+            .map(GraphQLTypeSystemDefinition::from),
+        "enum" => parse_enum_definition(tokens, description, text_source)
             .map(GraphQLTypeSystemDefinition::from),
         _ => Err(WithSpan::new(
             SchemaParseError::TopLevelSchemaDeclarationExpected {
@@ -327,6 +329,77 @@ fn parse_directive_location(
     }
 }
 
+fn parse_enum_definition(
+    tokens: &mut PeekableLexer,
+    description: Option<WithSpan<DescriptionValue>>,
+    text_source: TextSource,
+) -> ParseResult<GraphQLEnumDefinition> {
+    let name = tokens
+        .parse_string_key_type(TokenKind::Identifier)
+        .map_err(|with_span| with_span.map(SchemaParseError::from))?
+        .to_with_location(text_source);
+
+    let directives = parse_constant_directives(tokens, text_source)?;
+
+    let enum_value_definitions = parse_enum_value_definitions(tokens, text_source)?;
+
+    Ok(GraphQLEnumDefinition {
+        description,
+        name,
+        directives,
+        enum_value_definitions,
+    })
+}
+
+fn parse_enum_value_definitions(
+    tokens: &mut PeekableLexer,
+    text_source: TextSource,
+) -> ParseResult<Vec<WithLocation<GraphQLEnumValueDefinition>>> {
+    parse_optional_enclosed_items(
+        tokens,
+        text_source,
+        TokenKind::OpenBrace,
+        TokenKind::CloseBrace,
+        parse_enum_value_definition,
+    )
+}
+
+fn parse_enum_value_definition(
+    tokens: &mut PeekableLexer,
+    text_source: TextSource,
+) -> ParseResult<WithSpan<GraphQLEnumValueDefinition>> {
+    tokens
+        .with_span(|tokens| {
+            let description = parse_optional_description(tokens);
+            let enum_literal_value_str = tokens
+                .parse_source_of_kind(TokenKind::Identifier)
+                .map_err(|err| err.map(SchemaParseError::from))?;
+            let value = {
+                if enum_literal_value_str.item == "true"
+                    || enum_literal_value_str.item == "false"
+                    || enum_literal_value_str.item == "null"
+                {
+                    Err(enum_literal_value_str.map(|_| SchemaParseError::EnumValueTrueFalseNull))
+                } else {
+                    Ok(enum_literal_value_str
+                        .map(|enum_literal_value| {
+                            EnumLiteralValue::from(enum_literal_value.intern())
+                        })
+                        .to_with_location(text_source))
+                }
+            }?;
+
+            let directives = parse_constant_directives(tokens, text_source)?;
+
+            Ok(GraphQLEnumValueDefinition {
+                description,
+                value,
+                directives,
+            })
+        })
+        .transpose()
+}
+
 /// The state of the PeekableLexer is that it has processed the "scalar" keyword
 fn parse_scalar_type_definition(
     tokens: &mut PeekableLexer,
@@ -391,10 +464,10 @@ fn parse_interfaces(tokens: &mut PeekableLexer) -> ParseResult<Vec<WithSpan<Inte
 fn parse_constant_directives(
     tokens: &mut PeekableLexer,
     text_source: TextSource,
-) -> ParseResult<Vec<Directive<ConstantValue>>> {
+) -> ParseResult<Vec<GraphQLDirective<ConstantValue>>> {
     let mut directives = vec![];
     while tokens.parse_token_of_kind(TokenKind::At).is_ok() {
-        directives.push(Directive {
+        directives.push(GraphQLDirective {
             name: tokens
                 .parse_string_key_type(TokenKind::Identifier)
                 .map_err(|with_span| with_span.map(SchemaParseError::from))?
