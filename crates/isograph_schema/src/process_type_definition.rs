@@ -45,6 +45,11 @@ pub struct ProcessGraphQLDocumentOutcome {
     pub mutation_id: Option<ObjectId>,
 }
 
+struct ProcessObjectTypeDefinitionOutcome {
+    object_id: ObjectId,
+    mutation_object_id: Option<ObjectId>,
+}
+
 impl UnvalidatedSchema {
     pub fn process_graphql_type_system_document(
         &mut self,
@@ -66,10 +71,11 @@ impl UnvalidatedSchema {
                 GraphQLTypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
                     let object_type_definition = object_type_definition.into();
 
-                    if let (_, Some(mutation_id)) = self.process_object_type_definition(
+                    let outcome = self.process_object_type_definition(
                         object_type_definition,
                         &mut valid_type_refinement_map,
-                    )? {
+                    )?;
+                    if let Some(mutation_id) = outcome.mutation_object_id {
                         mutation_type_id = Some(mutation_id);
                     };
                 }
@@ -256,8 +262,7 @@ impl UnvalidatedSchema {
         &mut self,
         object_type_definition: IsographObjectTypeDefinition,
         valid_type_refinement_map: &mut TypeRefinementMap,
-        // TODO don't return a tuple, but a struct with named fields
-    ) -> ProcessTypeDefinitionResult<(ObjectId, Option<ObjectId>)> {
+    ) -> ProcessTypeDefinitionResult<ProcessObjectTypeDefinitionOutcome> {
         let &mut Schema {
             fields: ref mut schema_fields,
             ref mut schema_data,
@@ -349,7 +354,10 @@ impl UnvalidatedSchema {
             ));
         }
 
-        Ok((next_object_id, mutation_id))
+        Ok(ProcessObjectTypeDefinitionOutcome {
+            object_id: next_object_id,
+            mutation_object_id: mutation_id,
+        })
     }
 
     // TODO this should accept an IsographScalarTypeDefinition
@@ -925,7 +933,7 @@ impl ModifiedObject {
             fields,
         };
 
-        let (object_id, _) = schema
+        let ProcessObjectTypeDefinitionOutcome { object_id, .. } = schema
             .process_object_type_definition(item, &mut HashMap::new())
             // This is not (yet) true. If you reference a non-existent type in
             // a @exposeField directive, the compiler panics here. The solution is to
