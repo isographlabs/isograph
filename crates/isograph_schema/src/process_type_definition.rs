@@ -1547,6 +1547,7 @@ fn set_and_validate_id_field(
             if (*type_).0.item.lookup() != ID_GRAPHQL_TYPE.lookup() {
                 Err(WithLocation::new(
                     ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {
+                        strong_field_name: "id",
                         parent_type: parent_type_name,
                     },
                     // TODO this shows the wrong span?
@@ -1558,6 +1559,7 @@ fn set_and_validate_id_field(
         }
         None => Err(WithLocation::new(
             ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {
+                strong_field_name: "id",
                 parent_type: parent_type_name,
             },
             // TODO this might show the wrong span?
@@ -1613,8 +1615,11 @@ pub enum ProcessTypeDefinitionError {
     )]
     TypenameCannotBeDefined { parent_type: IsographObjectTypeName },
 
-    #[error("The id field on \"{parent_type}\" must be \"ID!\".")]
-    IdFieldMustBeNonNullIdType { parent_type: IsographObjectTypeName },
+    #[error("The {strong_field_name} field on \"{parent_type}\" must have type \"ID!\".")]
+    IdFieldMustBeNonNullIdType {
+        parent_type: IsographObjectTypeName,
+        strong_field_name: &'static str,
+    },
 
     #[error("The @exposeField directive should have three arguments")]
     InvalidPrimaryDirectiveArgumentCount,
