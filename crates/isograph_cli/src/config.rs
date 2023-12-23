@@ -15,6 +15,7 @@ pub(crate) struct CompilerConfig {
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ConfigFile {
     /// The relative path to the folder where the compiler should look for Isograph literals
     pub project_root: PathBuf,
