@@ -1,29 +1,29 @@
 import React from "react";
-import { iso, read, useLazyReference } from "@isograph/react";
+import { iso, isoFetch, read, useLazyReference } from "@isograph/react";
 import { Container } from "@mui/material";
 
-import userPageQuery from "./__isograph/Query/user_page/reader.isograph";
-import { FullPageLoading, Route, UserRoute } from "./github_demo";
+import { ResolverParameterType as UserRouteComponentParams } from "@iso/Query/user_page/reader.isograph";
+import {
+  FullPageLoading,
+  Route,
+  type UserRoute as UserRouteType,
+} from "./github_demo";
 
-iso`
-  Query.user_page($first: Int!, $userLogin: String!) @fetchable {
+export const user_page = iso<
+  UserRouteComponentParams,
+  ReturnType<typeof UserRouteComponent>
+>`
+  Query.user_page($first: Int!, $userLogin: String!) @component {
     header,
     user_detail,
   }
-`;
+`(UserRouteComponent);
 
-export function UserRoute({
+function UserRouteComponent({
+  data,
   route,
   setRoute,
-}: {
-  route: UserRoute;
-  setRoute: (route: Route) => void;
-}) {
-  const { queryReference } = useLazyReference(userPageQuery, {
-    userLogin: route.userLogin,
-    first: 20,
-  });
-  const data = read(queryReference);
+}: UserRouteComponentParams) {
   return (
     <>
       {data.header({ route, setRoute })}
@@ -36,4 +36,19 @@ export function UserRoute({
       </Container>
     </>
   );
+}
+
+export function UserRoute({
+  route,
+  setRoute,
+}: {
+  route: UserRouteType;
+  setRoute: (route: Route) => void;
+}) {
+  const { queryReference } = useLazyReference(isoFetch`Query.user_page`, {
+    userLogin: route.userLogin,
+    first: 20,
+  });
+  const component = read(queryReference);
+  return component({ route, setRoute });
 }

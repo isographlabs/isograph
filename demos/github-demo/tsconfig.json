@@ -16,7 +16,8 @@
     "incremental": true,
     "allowImportingTsExtensions": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@iso/*": ["./src/__isograph/*"]
     },
     "disableSourceOfProjectReferenceRedirect": false
   },

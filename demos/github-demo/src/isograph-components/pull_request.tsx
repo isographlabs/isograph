@@ -1,34 +1,30 @@
 import React from "react";
-import { iso, useLazyReference, read } from "@isograph/react";
-import { FullPageLoading, PullRequestRoute, Route } from "./github_demo";
+import { iso, useLazyReference, read, isoFetch } from "@isograph/react";
+import {
+  FullPageLoading,
+  type PullRequestRoute as PullRequestRouteType,
+  Route,
+} from "./github_demo";
 
-import PullRequestQuery from "./__isograph/Query/pull_request/reader.isograph";
+import { ResolverParameterType as PullRequestComponentProps } from "@iso/Query/pull_request/reader.isograph";
 
 import { Container } from "@mui/material";
 
-iso`
-  Query.pull_request($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!) @fetchable {
+export const pull_request = iso<
+  PullRequestComponentProps,
+  ReturnType<typeof PullRequestComponent>
+>`
+  Query.pull_request($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!) @component {
     header,
     pull_request_detail,
   }
-`;
+`(PullRequestComponent);
 
-export function PullRequestRoute({
+function PullRequestComponent({
+  data,
   route,
   setRoute,
-}: {
-  route: PullRequestRoute;
-  setRoute: (route: Route) => void;
-}) {
-  const { queryReference } = useLazyReference(PullRequestQuery, {
-    pullRequestNumber: route.pullRequestNumber,
-    repositoryName: route.repositoryName,
-    repositoryOwner: route.repositoryOwner,
-    last: 20,
-  });
-
-  const data = read(queryReference);
-
+}: PullRequestComponentProps) {
   return (
     <>
       {data.header({ route, setRoute })}
@@ -39,4 +35,22 @@ export function PullRequestRoute({
       </Container>
     </>
   );
+}
+
+export function PullRequestRoute({
+  route,
+  setRoute,
+}: {
+  route: PullRequestRouteType;
+  setRoute: (route: Route) => void;
+}) {
+  const { queryReference } = useLazyReference(isoFetch`Query.pull_request`, {
+    pullRequestNumber: route.pullRequestNumber,
+    repositoryName: route.repositoryName,
+    repositoryOwner: route.repositoryOwner,
+    last: 20,
+  });
+
+  const data = read(queryReference);
+  return data({ route, setRoute });
 }

@@ -1,31 +1,29 @@
 import React from "react";
-import { iso, read, useLazyReference } from "@isograph/react";
+import { iso, isoFetch, read, useLazyReference } from "@isograph/react";
 import { Container } from "@mui/material";
+import { ResolverParameterType as RepositoryPageParams } from "@iso/Query/repository_page/reader.isograph";
 
-import repositoryPageQuery from "./__isograph/Query/repository_page/reader.isograph";
-import { FullPageLoading, Route, RepositoryRoute } from "./github_demo";
+import {
+  FullPageLoading,
+  Route,
+  RepositoryRoute as RepositoryRouteType,
+} from "./github_demo";
 
-iso`
-  Query.repository_page($repositoryName: String!, $repositoryOwner: String!, $first: Int!) @fetchable {
+export const repository_page = iso<
+  RepositoryPageParams,
+  ReturnType<typeof RepositoryRouteComponent>
+>`
+  Query.repository_page($repositoryName: String!, $repositoryOwner: String!, $first: Int!) @component {
     header,
     repository_detail,
   }
-`;
+`(RepositoryRouteComponent);
 
-export function RepositoryRoute({
+function RepositoryRouteComponent({
+  data,
   route,
   setRoute,
-}: {
-  route: RepositoryRoute;
-  setRoute: (route: Route) => void;
-}) {
-  const { queryReference } = useLazyReference(repositoryPageQuery, {
-    repositoryName: route.repositoryName,
-    repositoryOwner: route.repositoryOwner,
-    first: 20,
-  });
-  console.log("repository route", { queryReference });
-  const data = read(queryReference);
+}: RepositoryPageParams) {
   return (
     <>
       {data.header({ route, setRoute })}
@@ -38,4 +36,21 @@ export function RepositoryRoute({
       </Container>
     </>
   );
+}
+
+export function RepositoryRoute({
+  route,
+  setRoute,
+}: {
+  route: RepositoryRouteType;
+  setRoute: (route: Route) => void;
+}) {
+  const { queryReference } = useLazyReference(isoFetch`Query.repository_page`, {
+    repositoryName: route.repositoryName,
+    repositoryOwner: route.repositoryOwner,
+    first: 20,
+  });
+  console.log("repository route", { queryReference });
+  const data = read(queryReference);
+  return data({ route, setRoute });
 }

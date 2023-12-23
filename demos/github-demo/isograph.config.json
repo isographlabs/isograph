@@ -1,5 +1,5 @@
 {
-    "project_root": "./src/isograph-components",
-    "artifact_directory": "./src/isograph-components",
-    "schema": "./schema.graphql"
+  "project_root": "./src/isograph-components",
+  "artifact_directory": "./src",
+  "schema": "./schema.graphql"
 }
