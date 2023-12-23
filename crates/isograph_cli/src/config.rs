@@ -83,7 +83,7 @@ enum ConfigFileOptionalValidationLevel {
 
 impl Default for ConfigFileOptionalValidationLevel {
     fn default() -> Self {
-        Self::Ignore
+        Self::Error
     }
 }
 
