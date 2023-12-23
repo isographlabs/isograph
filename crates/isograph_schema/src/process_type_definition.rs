@@ -74,6 +74,7 @@ impl UnvalidatedSchema {
                     let outcome = self.process_object_type_definition(
                         object_type_definition,
                         &mut valid_type_refinement_map,
+                        true,
                     )?;
                     if let Some(mutation_id) = outcome.mutation_object_id {
                         mutation_type_id = Some(mutation_id);
@@ -87,6 +88,7 @@ impl UnvalidatedSchema {
                     self.process_object_type_definition(
                         interface_type_definition.into(),
                         &mut valid_type_refinement_map,
+                        true,
                     )?;
                     // N.B. we assume that Mutation will be an object, not an interface
                 }
@@ -96,6 +98,7 @@ impl UnvalidatedSchema {
                     self.process_object_type_definition(
                         input_object_type_definition.into(),
                         &mut valid_type_refinement_map,
+                        false,
                     )?;
                 }
                 GraphQLTypeSystemDefinition::DirectiveDefinition(_) => {
@@ -121,6 +124,7 @@ impl UnvalidatedSchema {
                             fields: vec![],
                         },
                         &mut valid_type_refinement_map,
+                        true,
                     )?;
                 }
             }
@@ -262,6 +266,8 @@ impl UnvalidatedSchema {
         &mut self,
         object_type_definition: IsographObjectTypeDefinition,
         valid_type_refinement_map: &mut TypeRefinementMap,
+        // TODO this smells! We should probably pass Option<ServerIdFieldId>
+        may_have_id_field: bool,
     ) -> ProcessTypeDefinitionResult<ProcessObjectTypeDefinitionOutcome> {
         let &mut Schema {
             fields: ref mut schema_fields,
@@ -299,6 +305,7 @@ impl UnvalidatedSchema {
                     next_object_id,
                     type_def_2.name.item.into(),
                     get_typename_type(string_type_for_typename.item),
+                    may_have_id_field,
                 )?;
 
                 let object_resolvers = get_resolvers_for_schema_object(
@@ -934,7 +941,7 @@ impl ModifiedObject {
         };
 
         let ProcessObjectTypeDefinitionOutcome { object_id, .. } = schema
-            .process_object_type_definition(item, &mut HashMap::new())
+            .process_object_type_definition(item, &mut HashMap::new(), true)
             // This is not (yet) true. If you reference a non-existent type in
             // a @exposeField directive, the compiler panics here. The solution is to
             // process these directives after the definitions have been validated,
@@ -1427,6 +1434,8 @@ fn get_field_objects_ids_and_names(
     parent_type_id: ObjectId,
     parent_type_name: IsographObjectTypeName,
     typename_type: TypeAnnotation<UnvalidatedTypeName>,
+    // TODO this is hacky
+    may_have_field_id: bool,
 ) -> ProcessTypeDefinitionResult<FieldObjectIdsEtc> {
     let new_field_count = new_fields.len();
     let mut encountered_fields = HashMap::with_capacity(new_field_count);
@@ -1444,7 +1453,7 @@ fn get_field_objects_ids_and_names(
                 let current_field_id = next_field_id + current_field_index;
 
                 // TODO check for @strong directive instead!
-                if field.item.name.item == id_name {
+                if may_have_field_id && field.item.name.item == id_name {
                     set_and_validate_id_field(
                         &mut id_field,
                         current_field_id,
