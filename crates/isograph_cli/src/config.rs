@@ -13,6 +13,7 @@ struct ConfigFile {
     /// The relative path to the GraphQL schema
     pub schema: PathBuf,
     /// The relative path to schema extensions
+    #[serde(default)]
     pub schema_extensions: Vec<PathBuf>,
 
     /// Various that are of lesser importance
