@@ -10,7 +10,7 @@ mod write_artifacts;
 
 use batch_compile::compile_and_print;
 use colored::Colorize;
-use config::CompilerConfig;
+use config::create_config;
 use opt::CliOptions;
 use structopt::StructOpt;
 use watch::handle_watch_command;
@@ -18,7 +18,7 @@ use watch::handle_watch_command;
 #[tokio::main]
 async fn main() {
     let opt = CliOptions::from_args();
-    let config = CompilerConfig::create(opt.config.as_ref());
+    let config = create_config(opt.config.as_ref());
 
     if opt.watch {
         match handle_watch_command(config).await {

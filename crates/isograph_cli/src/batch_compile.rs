@@ -12,13 +12,13 @@ use intern::string_key::Intern;
 use isograph_lang_parser::{parse_iso_fetch, parse_iso_literal, IsographLiteralParseError};
 use isograph_lang_types::{ResolverDeclaration, ResolverFetch};
 use isograph_schema::{
-    ProcessGraphQLDocumentOutcome, ProcessResolverDeclarationError, Schema, UnvalidatedSchema,
+    CompilerConfig, ProcessGraphQLDocumentOutcome, ProcessResolverDeclarationError, Schema,
+    UnvalidatedSchema,
 };
 use pretty_duration::pretty_duration;
 use thiserror::Error;
 
 use crate::{
-    config::CompilerConfig,
     generate_artifacts::{generate_artifacts, GenerateArtifactsError},
     isograph_literals::{
         extract_iso_fetch_from_file_content, extract_iso_literal_from_file_content,

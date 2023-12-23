@@ -1,3 +1,4 @@
+mod compilation_options;
 mod isograph_schema;
 mod merged;
 mod process_resolver_declaration;
@@ -6,6 +7,7 @@ pub(crate) mod refetched_paths;
 mod validate_resolver_fetch;
 mod validate_schema;
 
+pub use compilation_options::*;
 pub use isograph_schema::*;
 pub use merged::*;
 pub use process_resolver_declaration::*;

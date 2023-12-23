@@ -1,4 +1,5 @@
 use colored::Colorize;
+use isograph_schema::CompilerConfig;
 use notify::{Error, RecommendedWatcher, RecursiveMode, Watcher};
 use notify_debouncer_full::{
     new_debouncer, DebounceEventResult, DebouncedEvent, Debouncer, FileIdMap,
@@ -6,7 +7,7 @@ use notify_debouncer_full::{
 use std::time::Duration;
 use tokio::{runtime::Handle, sync::mpsc::Receiver, task::JoinError};
 
-use crate::{batch_compile::compile_and_print, config::CompilerConfig};
+use crate::batch_compile::compile_and_print;
 
 pub(crate) async fn handle_watch_command(
     config: CompilerConfig,
