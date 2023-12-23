@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{error::Error, fmt};
 
 use intern::{string_key::Intern, Lookup};
 
@@ -82,6 +82,13 @@ impl fmt::Display for Location {
 pub struct WithLocation<T> {
     pub location: Location,
     pub item: T,
+}
+
+impl<T: Error> Error for WithLocation<T> {
+    fn description(&self) -> &str {
+        #[allow(deprecated)]
+        self.item.description()
+    }
 }
 
 impl<T: fmt::Display> fmt::Display for WithLocation<T> {

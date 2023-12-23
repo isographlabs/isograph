@@ -1,4 +1,6 @@
-use std::path::PathBuf;
+use std::{error::Error, path::PathBuf};
+
+use colorize::AnsiColor;
 
 #[derive(Debug)]
 pub struct CompilerConfig {
@@ -28,6 +30,25 @@ pub enum OptionalValidationLevel {
     Warn,
     /// If this validation error is encountered, the compilation will fail
     Error,
+}
+
+impl OptionalValidationLevel {
+    pub fn on_failure<E>(self, on_error: impl FnOnce() -> E) -> Result<(), E>
+    where
+        E: Error,
+    {
+        match self {
+            OptionalValidationLevel::Ignore => Ok(()),
+            OptionalValidationLevel::Warn => {
+                let warning = on_error();
+                // TODO pass to some sort of warning gatherer, this is weird!
+                // The fact that we know about colorize here is weird!
+                eprintln!("{}\n{}\n", "Warning:".yellow(), warning);
+                Ok(())
+            }
+            OptionalValidationLevel::Error => Err(on_error()),
+        }
+    }
 }
 
 impl Default for OptionalValidationLevel {

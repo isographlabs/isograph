@@ -170,6 +170,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "colorize"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc17e449bc7854c50b943d113a98bc0e01dc6585d2c66eaa09ca645ebd8a7e62"
+
+[[package]]
 name = "common"
 version = "0.0.0"
 source = "git+https://github.com/facebook/relay.git#7b5bee426ffc4fc5c9a3f9d06225020f7b7fe066"
@@ -574,6 +580,7 @@ dependencies = [
 name = "isograph_schema"
 version = "0.0.4"
 dependencies = [
+ "colorize",
  "common_lang_types",
  "graphql_lang_types",
  "intern",

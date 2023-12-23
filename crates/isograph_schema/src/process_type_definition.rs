@@ -21,7 +21,7 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    DefinedField, IsographObjectTypeDefinition, MutationFieldResolverActionKindInfo,
+    ConfigOptions, DefinedField, IsographObjectTypeDefinition, MutationFieldResolverActionKindInfo,
     MutationFieldResolverVariant, ResolverActionKind, ResolverTypeAndField, ResolverVariant,
     Schema, SchemaObject, SchemaResolver, SchemaScalar, SchemaServerField,
     UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
@@ -54,6 +54,7 @@ impl UnvalidatedSchema {
     pub fn process_graphql_type_system_document(
         &mut self,
         type_system_document: GraphQLTypeSystemDocument,
+        options: ConfigOptions,
     ) -> ProcessTypeDefinitionResult<ProcessGraphQLDocumentOutcome> {
         // In the schema, interfaces, unions and objects are the same type of object (SchemaType),
         // with e.g. interfaces "simply" being objects that can be refined to other
@@ -75,6 +76,7 @@ impl UnvalidatedSchema {
                         object_type_definition,
                         &mut valid_type_refinement_map,
                         true,
+                        options,
                     )?;
                     if let Some(mutation_id) = outcome.mutation_object_id {
                         mutation_type_id = Some(mutation_id);
@@ -89,6 +91,7 @@ impl UnvalidatedSchema {
                         interface_type_definition.into(),
                         &mut valid_type_refinement_map,
                         true,
+                        options,
                     )?;
                     // N.B. we assume that Mutation will be an object, not an interface
                 }
@@ -99,6 +102,7 @@ impl UnvalidatedSchema {
                         input_object_type_definition.into(),
                         &mut valid_type_refinement_map,
                         false,
+                        options,
                     )?;
                 }
                 GraphQLTypeSystemDefinition::DirectiveDefinition(_) => {
@@ -125,6 +129,7 @@ impl UnvalidatedSchema {
                         },
                         &mut valid_type_refinement_map,
                         true,
+                        options,
                     )?;
                 }
             }
@@ -188,6 +193,7 @@ impl UnvalidatedSchema {
     pub fn process_graphql_type_extension_document(
         &mut self,
         extension_document: GraphQLTypeSystemExtensionDocument,
+        options: ConfigOptions,
     ) -> ProcessTypeDefinitionResult<ProcessGraphQLDocumentOutcome> {
         let mut definitions = Vec::with_capacity(extension_document.0.len());
         let mut extensions = Vec::with_capacity(extension_document.0.len());
@@ -205,7 +211,7 @@ impl UnvalidatedSchema {
 
         // N.B. we should probably restructure this...?
         // Like, we could discover the mutation type right now!
-        self.process_graphql_type_system_document(GraphQLTypeSystemDocument(definitions))?;
+        self.process_graphql_type_system_document(GraphQLTypeSystemDocument(definitions), options)?;
 
         for extension in extensions.into_iter() {
             // TODO collect errors into vec
@@ -268,6 +274,7 @@ impl UnvalidatedSchema {
         valid_type_refinement_map: &mut TypeRefinementMap,
         // TODO this smells! We should probably pass Option<ServerIdFieldId>
         may_have_id_field: bool,
+        options: ConfigOptions,
     ) -> ProcessTypeDefinitionResult<ProcessObjectTypeDefinitionOutcome> {
         let &mut Schema {
             fields: ref mut schema_fields,
@@ -306,6 +313,7 @@ impl UnvalidatedSchema {
                     type_def_2.name.item.into(),
                     get_typename_type(string_type_for_typename.item),
                     may_have_id_field,
+                    options,
                 )?;
 
                 let object_resolvers = get_resolvers_for_schema_object(
@@ -416,6 +424,7 @@ impl UnvalidatedSchema {
     pub fn create_magic_mutation_fields(
         &mut self,
         mutation_id: ObjectId,
+        options: ConfigOptions,
     ) -> ProcessTypeDefinitionResult<()> {
         // TODO don't clone if possible
         let mutation_object = self.schema_data.object(mutation_id);
@@ -466,6 +475,7 @@ impl UnvalidatedSchema {
                         // TODO don't clone
                         field_map_items.clone(),
                         text_source,
+                        options,
                     )?;
 
                 // TODO this is dangerous! mutation_field.name is also formattable (with carats).
@@ -885,7 +895,11 @@ struct ModifiedObject {
 }
 
 impl ModifiedObject {
-    fn create_and_get_name(self, schema: &mut UnvalidatedSchema) -> IsographObjectTypeName {
+    fn create_and_get_name(
+        self,
+        schema: &mut UnvalidatedSchema,
+        options: ConfigOptions,
+    ) -> IsographObjectTypeName {
         let original_object = schema.schema_data.object(self.object_id);
 
         let fields = original_object
@@ -941,7 +955,7 @@ impl ModifiedObject {
         };
 
         let ProcessObjectTypeDefinitionOutcome { object_id, .. } = schema
-            .process_object_type_definition(item, &mut HashMap::new(), true)
+            .process_object_type_definition(item, &mut HashMap::new(), true, options)
             // This is not (yet) true. If you reference a non-existent type in
             // a @exposeField directive, the compiler panics here. The solution is to
             // process these directives after the definitions have been validated,
@@ -1283,6 +1297,7 @@ impl ArgumentMap {
     fn into_arguments(
         self,
         schema: &mut UnvalidatedSchema,
+        options: ConfigOptions,
     ) -> Vec<WithLocation<GraphQLInputValueDefinition>> {
         self.arguments
             .into_iter()
@@ -1304,7 +1319,7 @@ impl ArgumentMap {
                                 name,
                                 type_: object.map(|modified_object| {
                                     modified_object
-                                        .create_and_get_name(schema)
+                                        .create_and_get_name(schema, options)
                                         .lookup()
                                         .intern()
                                         .into()
@@ -1329,6 +1344,7 @@ fn skip_arguments_contained_in_field_map(
     mutation_field_name: SelectableFieldName,
     field_map_items: Vec<FieldMapItem>,
     text_source: TextSource,
+    options: ConfigOptions,
 ) -> ProcessTypeDefinitionResult<(
     Vec<WithLocation<GraphQLInputValueDefinition>>,
     Vec<ProcessedFieldMapItem>,
@@ -1351,7 +1367,7 @@ fn skip_arguments_contained_in_field_map(
     }
 
     Ok((
-        argument_map.into_arguments(schema),
+        argument_map.into_arguments(schema, options),
         processed_field_map_items,
     ))
 }
@@ -1436,6 +1452,7 @@ fn get_field_objects_ids_and_names(
     typename_type: TypeAnnotation<UnvalidatedTypeName>,
     // TODO this is hacky
     may_have_field_id: bool,
+    options: ConfigOptions,
 ) -> ProcessTypeDefinitionResult<FieldObjectIdsEtc> {
     let new_field_count = new_fields.len();
     let mut encountered_fields = HashMap::with_capacity(new_field_count);
@@ -1459,6 +1476,7 @@ fn get_field_objects_ids_and_names(
                         current_field_id,
                         &field,
                         parent_type_name,
+                        options,
                     )?;
                 }
 
@@ -1533,6 +1551,7 @@ fn set_and_validate_id_field(
     current_field_id: usize,
     field: &WithLocation<GraphQLOutputFieldDefinition>,
     parent_type_name: IsographObjectTypeName,
+    options: ConfigOptions,
 ) -> ProcessTypeDefinitionResult<()> {
     // N.B. id_field is guaranteed to be None; otherwise field_names_to_type_name would
     // have contained this field name already.
@@ -1545,17 +1564,18 @@ fn set_and_validate_id_field(
     match field.item.type_.inner_non_null_named_type() {
         Some(type_) => {
             if (*type_).0.item.lookup() != ID_GRAPHQL_TYPE.lookup() {
-                Err(WithLocation::new(
-                    ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {
-                        strong_field_name: "id",
-                        parent_type: parent_type_name,
-                    },
-                    // TODO this shows the wrong span?
-                    field.location,
-                ))
-            } else {
-                Ok(())
+                options.on_invalid_id_type.on_failure(|| {
+                    WithLocation::new(
+                        ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {
+                            strong_field_name: "id",
+                            parent_type: parent_type_name,
+                        },
+                        // TODO this shows the wrong span?
+                        field.location,
+                    )
+                })?;
             }
+            Ok(())
         }
         None => Err(WithLocation::new(
             ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {

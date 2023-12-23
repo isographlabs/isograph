@@ -70,6 +70,7 @@ struct ConfigFileOptions {
 }
 
 #[derive(Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
 enum ConfigFileOptionalValidationLevel {
     /// If this validation error is encountered, it will be ignored
     Ignore,

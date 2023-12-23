@@ -13,3 +13,4 @@ graphql_lang_types = { path = "../graphql_lang_types" }
 intern = { git = "https://github.com/facebook/relay.git" }
 thiserror = "1.0.40"
 lazy_static = "1.4"
+colorize = "0.1.0"

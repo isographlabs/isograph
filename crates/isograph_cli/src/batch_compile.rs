@@ -99,11 +99,11 @@ pub(crate) fn handle_compile_command(
     let mut schema = Schema::new();
 
     let mut process_graphql_outcome =
-        schema.process_graphql_type_system_document(type_system_document)?;
+        schema.process_graphql_type_system_document(type_system_document, config.options)?;
 
     for extension_document in type_extension_document {
         let ProcessGraphQLDocumentOutcome { mutation_id } =
-            schema.process_graphql_type_extension_document(extension_document)?;
+            schema.process_graphql_type_extension_document(extension_document, config.options)?;
 
         match (mutation_id, process_graphql_outcome.mutation_id) {
             (None, _) => {}
@@ -119,7 +119,7 @@ pub(crate) fn handle_compile_command(
     // - process parsed literals
     // - validate resolvers
     if let Some(mutation_id) = process_graphql_outcome.mutation_id {
-        schema.create_magic_mutation_fields(mutation_id)?;
+        schema.create_magic_mutation_fields(mutation_id, config.options)?;
     }
 
     let canonicalized_root_path = {
