@@ -2,5 +2,8 @@
   "project_root": "./src/components",
   "artifact_directory": "./src",
   "schema": "./backend/schema.graphql",
-  "schema_extensions": ["./backend/schema-extension.graphql"]
+  "schema_extensions": ["./backend/schema-extension.graphql"],
+  "options": {
+    "on_invalid_id_type": "error"
+  }
 }
