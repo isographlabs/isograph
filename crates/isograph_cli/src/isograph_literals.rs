@@ -75,11 +75,12 @@ pub(crate) static ISOGRAPH_FOLDER: &'static str = "__isograph";
 lazy_static! {
     // This is regex is inadequate, as iso<typeof foo`...`> is invalid, and
     // it's certainly possible to want that.
-    static ref EXTRACT_ISO_LITERAL: Regex = Regex::new(r"iso(<[^`]+>)?`([^`]+)`(\()?").unwrap();
+    static ref EXTRACT_ISO_LITERAL: Regex = Regex::new(r"(export const ([^ ]+) =\s+)?iso(<[^`]+>)?`([^`]+)`(\()?").unwrap();
     static ref EXTRACT_ISO_FETCH: Regex = Regex::new(r"isoFetch(<[^`]+>)?`([^`]+)`").unwrap();
 }
 
 pub(crate) struct IsoLiteralExtraction<'a> {
+    pub(crate) const_export_name: Option<&'a str>,
     pub(crate) iso_literal_text: &'a str,
     pub(crate) iso_literal_start_index: usize,
     pub(crate) has_associated_js_function: bool,
@@ -92,11 +93,12 @@ pub(crate) fn extract_iso_literal_from_file_content<'a>(
         .captures_iter(content)
         .into_iter()
         .map(|captures| {
-            let iso_literal_match = captures.get(2).unwrap();
+            let iso_literal_match = captures.get(4).unwrap();
             IsoLiteralExtraction {
+                const_export_name: captures.get(1).map(|_| captures.get(2).unwrap().as_str()),
                 iso_literal_text: iso_literal_match.as_str(),
                 iso_literal_start_index: iso_literal_match.start(),
-                has_associated_js_function: captures.get(3).is_some(),
+                has_associated_js_function: captures.get(5).is_some(),
             }
         })
 }

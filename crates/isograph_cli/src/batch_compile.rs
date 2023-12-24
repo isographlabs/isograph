@@ -8,7 +8,7 @@ use common_lang_types::{
     Location, ResolverDefinitionPath, SourceFileName, Span, TextSource, WithLocation, WithSpan,
 };
 use graphql_lang_parser::{parse_schema, parse_schema_extensions, SchemaParseError};
-use intern::string_key::Intern;
+use intern::{string_key::Intern, Lookup};
 use isograph_lang_parser::{parse_iso_fetch, parse_iso_literal, IsographLiteralParseError};
 use isograph_lang_types::{ResolverDeclaration, ResolverFetch};
 use isograph_schema::{
@@ -272,6 +272,7 @@ fn process_iso_literal_extraction(
         iso_literal_text,
         iso_literal_start_index,
         has_associated_js_function,
+        const_export_name,
     } = iso_literal_extraction;
     let text_source = TextSource {
         path: file_name,
@@ -290,6 +291,24 @@ fn process_iso_literal_extraction(
 
     let resolver_declaration =
         parse_iso_literal(&iso_literal_text, interned_file_path, text_source)?;
+
+    const_export_name
+        .and_then(|const_export_name| {
+            if resolver_declaration.item.resolver_field_name.item.lookup() == const_export_name {
+                Some(())
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| {
+            WithLocation::new(
+                IsographLiteralParseError::ExpectedLiteralToBeExported {
+                    const_export_name: resolver_declaration.item.resolver_field_name.item,
+                },
+                // TODO why does resolver_declaration.span cause a panic here?
+                Location::new(text_source, Span::todo_generated()),
+            )
+        })?;
 
     Ok((resolver_declaration, text_source))
 }

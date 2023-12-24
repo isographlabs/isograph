@@ -1,4 +1,4 @@
-use common_lang_types::{WithLocation, WithSpan};
+use common_lang_types::{ScalarFieldName, WithLocation, WithSpan};
 use thiserror::Error;
 
 use super::peekable_lexer::LowLevelParseError;
@@ -18,8 +18,11 @@ pub enum IsographLiteralParseError {
     #[error("Unparsed tokens remaining")]
     LeftoverTokens,
 
-    #[error("isograph literals must be immediately called, and passed a function")]
+    #[error("Isograph literals must be immediately called, and passed a function")]
     ExpectedAssociatedJsFunction,
+
+    #[error("This isograph literal must be exported as `export const {const_export_name}`")]
+    ExpectedLiteralToBeExported { const_export_name: ScalarFieldName },
 }
 
 impl From<LowLevelParseError> for IsographLiteralParseError {
