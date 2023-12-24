@@ -4,35 +4,81 @@ sidebar_position: 2
 
 # Quickstart guide
 
-## Adding Isograph to an existing compiler
+:::info
+This quickstart guide is somewhat incomplete. If there is a missing step, let me know! Your best bets are to emulate the demo projects.
+:::
 
-You can add Isograph to an existing project (for example, a NextJS app), as follows:
+## Adding Isograph to an existing NextJS project
 
-### Install the compiler and runtime
+The process for adding Isograph to an existing NextJS project is described in this document. It shouldn't be that different to add it to a project in another framework.
+
+### Install the compiler, babel plugin and runtime
 
 ```sh
-# Note: you cannot (yet) install @isograph/compiler. That will install
-# the wrong version.
-yarn install --dev @isograph/compiler@0.0.0-main-c23726d7
-yarn install @isograph/react@0.0.0-main-c23726d7
+yarn install --dev @isograph/compiler@0.0.0-main-4ef7c123
+yarn install --dev babel-plugin-isograph@0.0.0-main-4ef7c123
+yarn install @isograph/react@0.0.0-main-4ef7c123
 ```
+
+:::info
+You cannot install `@isograph/compiler` without specifying a version, as this will install an old version. However, a new release is cut with every push.
+
+To find the latest release, you should check out [the npm page](https://www.npmjs.com/package/@isograph/react?activeTab=versions) and choose the most recently published "main" version, **not** the most recently published "latest" version.
+
+This will not be an issue when we cut a proper, versioned release!
+:::
 
 Installing the compiler also adds the command `yarn iso`.
 
+### Install the babel plugin and add a recommended alias
+
+Install the babel plugin in your `.babelrc.js`:
+
+```js
+module.exports = {
+  presets: ["next/babel"],
+  plugins: ["babel-plugin-isograph"],
+};
+```
+
+And add an alias to your `tsconfig.json`. The alias should point to wherever your `artifact_directory` is located. (See the `isograph.config.json` step.)
+
+```json
+"paths": {
+  "@iso/*": ["./src/__isograph/*"]
+},
+```
+
+### Disable React strict mode
+
+Isograph is currently incompatible with React strict mode. Being compatible with strict mode means that (during dev), we will necessarily refetch every query twice. I will eventually lift this restriction, but for now, disable strict mode.
+
+```js
+// next.config.js
+const nextConfig = {
+  reactStrictMode: false,
+};
+```
+
 ### Create an `isograph.config.json` file
 
-Example contents:
+Create an `isograph.config.json` file. Example contents:
 
 ```json
 {
   "project_root": "./src/components",
   "artifact_directory": "./src",
-  "schema": "./backend/schema.graphql",
-  "schema_extensions": []
+  "schema": "./backend/schema.graphql"
 }
 ```
 
-Note that (for now!) the `artifact_directory` should not be within the `project_root`. Isograph generates relative paths, so it doesn't really matter where you put your `artifact_directory`.
+:::note
+Note that (for now!) the `artifact_directory` should not be within the `project_root`, as this causes an infinite build-rebuild loop. This is fixable.
+:::
+
+:::note
+Isograph generates relative paths, so it doesn't really matter where you put your `artifact_directory`.
+:::
 
 You should also have your graphql schema available at the point. An example schema might be:
 
@@ -46,6 +92,8 @@ type Viewer {
 }
 ```
 
+The `schema` field should point to this file.
+
 ### Run the isograph compiler in watch mode
 
 ```sh
@@ -53,6 +101,10 @@ yarn iso --config ./isograph.config.json --watch
 ```
 
 The compiler will start running, but since we haven't written any isograph literals, it won't do much.
+
+:::note
+Isograph **will** generate a `__refetch` artifact for each type that has an `id: ID!` field.
+:::
 
 ### Teach isograph about your backend
 
@@ -64,6 +116,9 @@ function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
   let promise = fetch("http://localhost:4000/graphql", {
     method: "POST",
     headers: {
+      // You may need to include a bearer token, for example if you are hitting
+      // the GitHub API.
+      // "Authorization": "Bearer " + BEARER_TOKEN,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ query: queryText, variables }),
@@ -73,9 +128,28 @@ function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
 setNetwork(makeNetworkRequest);
 ```
 
+:::note
+You may need to provide a bearer token if you are using a public API, like that of GitHub. See [this GitHub demo](https://github.com/rbalicki2/github-isograph-demo/tree/885530d74d9b8fb374dfe7d0ebdab7185d207c3a/src/isograph-components/SetNetworkWrapper.tsx) for an example of how to do with a token that you receive from OAuth. See also the `[...nextauth].tsx` file in the same repo.
+:::
+
+### Tell Isograph to re-render whenever new data is received
+
+Right now, there is no granular re-rendering in Isograph. (A lot of features are missing!) Instead, we just add a hook at the root that re-renders the entire tree if anything changes in the Isograph store. This can go in the `App` component in `pages/index.tsx`, defined in a future step.
+
+```tsx
+// N.B. we are rerendering the root component on any store change
+// here. Isograph will support more fine-grained re-rendering in
+// the future, and this will be done automatically as part of
+// useLazyReference.
+const [, setState] = useState<object | void>();
+useEffect(() => {
+  return subscribe(() => setState({}));
+}, []);
+```
+
 ### Create isograph literals
 
-Next, let's define the Isograph resolver that "is" your home route component! You might create the following in `src/home_route.tsx`:
+**Finally**, we can get to writing some Isograph components. Let's define the Isograph resolver that "is" your home route component! You might create the following in `src/home_route.tsx`:
 
 ```tsx
 import React from "react";
@@ -95,6 +169,16 @@ function HomeRoute(props: HomeRouteParams) {
 }
 ```
 
+:::info
+Note: for now, we have a lot of types to provide. These are fairly boilerplate, and should be able to removed in the future. For now, provide them!
+:::
+
+:::warning
+You **must** export the iso literal using the name of the field. If not, you will have errors similar to `TypeError: reference.readerArtifact.resolver is not a function`.
+
+This will be enforced by the compiler in the future. It is not at the moment.
+:::
+
 ### Fetch that Isograph component:
 
 That Isograph component isn't doing much on its own. We need to provide a way to fetch its data and render the results. So, in `pages/index.tsx`, add:
@@ -102,24 +186,14 @@ That Isograph component isn't doing much on its own. We need to provide a way to
 ```tsx
 import React from "react";
 import { subscribe, isoFetch, useLazyReference, read } from "@isograph/react";
-import NoSSR from "react-no-ssr";
 
 export default function App() {
-  // N.B. we are rerendering the root component on any store change
-  // here. Isograph will support more fine-grained re-rendering in
-  // the future, and this will be done automatically as part of
-  // useLazyReference.
-  const [, setState] = React.useState<object | void>();
-  React.useEffect(() => {
-    return subscribe(() => setState({}));
-  }, []);
+  // The "subscribe" code block can go here
 
   return (
-    <NoSSR>
-      <React.Suspense fallback={"suspending"}>
-        <Inner />
-      </React.Suspense>
-    </NoSSR>
+    <React.Suspense fallback={"suspending"}>
+      <Inner />
+    </React.Suspense>
   );
 }
 
@@ -128,13 +202,15 @@ function Inner() {
     isoFetch<typeof HomeRouteEntrypoint>`
       Query.home_route
     `,
-    {}
+    {
+      /* query variables */
+    }
   );
 
   return read(queryReference)({
-    /* additional props */
+    /* additional runtime props */
   });
 }
 ```
 
-Now, if you navigate to your home screen, you should see "Hello " and your name!
+Now, if you navigate to your home screen, you should see "Hello" and your name! (You actually won't, because there is no GraphQL server running on port 4000. But, a future version of this quickstart will hit an API, like the Star Wars API, that is publicly available and free.)
