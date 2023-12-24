@@ -50,14 +50,12 @@ pub(crate) fn generate_artifacts(
     schema: &ValidatedSchema,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
-) -> Result<(), GenerateArtifactsError> {
-    write_artifacts(
-        get_all_artifacts(schema, project_root, artifact_directory),
-        project_root,
-        artifact_directory,
-    )?;
+) -> Result<usize, GenerateArtifactsError> {
+    let artifacts = get_all_artifacts(schema, project_root, artifact_directory);
+    let artifact_count = artifacts.len();
+    write_artifacts(artifacts, project_root, artifact_directory)?;
 
-    Ok(())
+    Ok(artifact_count)
 }
 
 /// get all artifacts that we must generate according to the following rough plan:

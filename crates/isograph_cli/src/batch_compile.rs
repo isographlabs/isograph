@@ -29,8 +29,9 @@ use crate::{
 
 pub(crate) struct CompilationStats {
     pub elapsed_time: Duration,
-    pub resolver_count: usize,
+    pub iso_resolver_count: usize,
     pub entrypoint_count: usize,
+    pub total_artifacts_written: usize,
 }
 
 pub(crate) fn compile_and_print(
@@ -43,9 +44,10 @@ pub(crate) fn compile_and_print(
             eprintln!(
                 "{}",
                 format!(
-                    "Successfully compiled {} resolvers and {} entrypoints in {}.\n",
-                    stats.resolver_count,
+                    "Successfully compiled {} resolvers and {} entrypoints, and wrote {} artifacts, in {}.\n",
+                    stats.iso_resolver_count,
                     stats.entrypoint_count,
+                    stats.total_artifacts_written,
                     pretty_duration(&stats.elapsed_time, None)
                 )
                 .bright_green()
@@ -146,7 +148,7 @@ pub(crate) fn handle_compile_command(
 
     let validated_schema = Schema::validate_and_construct(schema)?;
 
-    generate_artifacts(
+    let total_artifacts_written = generate_artifacts(
         &validated_schema,
         &config.project_root,
         &config.artifact_directory,
@@ -154,8 +156,9 @@ pub(crate) fn handle_compile_command(
 
     Ok(CompilationStats {
         elapsed_time: start.elapsed(),
-        resolver_count,
+        iso_resolver_count: resolver_count,
         entrypoint_count,
+        total_artifacts_written,
     })
 }
 
