@@ -7,10 +7,9 @@ sidebar_position: 999
 ## Top QOL priorities
 
 - eslint enforcement that resolvers are exported
-- Expose compiler binary as `iso`.
 - rethink iso syntax
   - Consider combining isoFetch and iso, as in `` iso`entrypoint Query.home_page`  `` or the like
-- full support for GraphQL schema syntax
+- Rename babel-plugin-isograph to @isograph/babel
 
 ## V2 release
 
@@ -23,25 +22,28 @@ sidebar_position: 999
 - validate no unknown directives left over
 - exposeAs as param
   - use serde for this?
+- Handle unions etc. correctly
+- Special fields (or syntax?) for type casts (i.e. type refinement)
 
 ## Feature backlog
 
 - garbage collection
+- granular re-rendering
 - fetch policies
 - Unwraps (i.e. `!`) exist in the syntax, but are unused
-- Isograph only parses a subset of GraphQL schema syntax
+  - consider whether it is truly the case that there always is a linear way to unwrap a given field, or whether we should unify this with "execute this on the server" etc.
 - Resolvers are re-calculated every time. They should be cached in the store.
 - The store, etc. should be stored in context.
-- Resolvers return opaque objects and cannot be selected into. They should be extended to also allow the return of IDs, which can they be selected into.
+- Resolvers return opaque objects and cannot be selected into. They should be extended to also allow the return of IDs, which can then be selected into.
 - Stateful resolvers?
   - This could be thought of as "realized" resolvers, which is to say there is overlap with better DevEx for components
-- Subscriptions are not supported, and mutations are supported super inflexibly.
+- Subscriptions are not supported
 - Defer, etc.
-- Refetchable queries.
 - Pagination.
-- Types for variables.
-- Inferred types for iso literals via Typescript compiler plugin.
+- Types for variables
+- Inferred types for iso params w/iso overload
 - typed IDs
+- special fetch fields
 - consider resolvers that return functions only read data when called, i.e. do not eagerly read. Consider whether this can be achieved with omitting a !, i.e. foo_resolver! returns TReadFromStore, foo_resolver returns a `ReadDataResult TReadFromStore`
 
 ## Cleanup backlog
@@ -67,7 +69,6 @@ sidebar_position: 999
 
 - Docs
 - VSCode extension
-- Compiler watch mode
 - Fetch policies
 - Garbage collection
 - Preloaded queries
@@ -84,35 +85,36 @@ sidebar_position: 999
 - Refetch on missing data
 - Compile to non-GraphQL
 - Actually validate variables
-- Error reporting (compiler)
 - Persisted queries
-- Suspense for mutations
-- Suspense for refetch
+- Suspense/response for mutations/refetch
+  - this probably means we need mutations to be part of a stateful component
 - Strongly typed ID fields
 - Custom normalizers
+  - Garbage collection for custom normalizers by type
+  - other "by type" things?
 - Lazy normalization ASTs
 - Fetching off of typed IDs
-- Magic mutation/refetch field customizability
 - Stateful resolvers
-- Compiler executable for Mac/Windows/Linux
+- Compiler executable for ~Mac~/Windows/Linux
 - Unit tests
 - E2E tests
 - Network request errors
 - Proper missing field handlers
-- Missing field handlers from schema definitions
+- Missing field handlers from schema definitions/directives
 - Store held in context
 - Imperative store APIs
 - Typesafe updaters
 - Sample router integration
-- Emit new field definitions for GraphiQL and other tools
+- Emit new field definitions for GraphiQL and other tools (!!!)
 - Field groups
-- Lint rules to enforce e.g. export
+- Lint rules to enforce `export const` (or compiler support)
 - Guide for testing Isograph components
 - Support non-globally unique IDs
+  - @strong directive
 - Iso lang code mods
 - Iso lang syntax highlighting
 - Iso lang auto-format
-- Separate artifacts for fetching and reading fetchable resolvers
+- Separate artifacts for fetching, normalizing and reading fetchable resolvers
 - Incremental compilation
 - Saved state
 - Support strict mode?
@@ -126,7 +128,6 @@ sidebar_position: 999
 - Compile compiler to Wasm
 - IR explorer
 - Code sandbox example
-  x Non-fetchable fragments (???)
 - Topological sort in compiler
 - Validate no infinite recursion
 - Statically prune inaccessible branches
@@ -135,6 +136,7 @@ sidebar_position: 999
 - Babel integration for iso literal values
 - Typescript integration for type inference of iso literals
 - Parallelize artifact gen
-- Stuff should be wrapped with WithSource, locations should not be on individual fields
+- Rationalize WithSpan vs WithLocation
 - Display multiple errors, parse etc. in parallel
+  - Multiple errors when parsing the schema (is this possible??)
 - Do not look in artifact_directory, if project_root contains artifact_directory
