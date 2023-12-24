@@ -1,5 +1,4 @@
 import React from "react";
-import NoSSR from "react-no-ssr";
 import { HomeRoute } from "./home_page";
 import { RepositoryRoute } from "./repository";
 import { Container } from "@mui/material";
@@ -40,17 +39,15 @@ export function GithubDemo() {
     kind: "Home",
   });
   return (
-    <NoSSR>
-      <React.Suspense
-        fallback={
-          <Container maxWidth="md">
-            <FullPageLoading />
-          </Container>
-        }
-      >
-        <Router route={currentRoute} setRoute={setCurrentRoute} />
-      </React.Suspense>
-    </NoSSR>
+    <React.Suspense
+      fallback={
+        <Container maxWidth="md">
+          <FullPageLoading />
+        </Container>
+      }
+    >
+      <Router route={currentRoute} setRoute={setCurrentRoute} />
+    </React.Suspense>
   );
 }
 

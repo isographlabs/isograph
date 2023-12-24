@@ -1,5 +1,4 @@
 import React from "react";
-import NoSSR from "react-no-ssr";
 import { Container } from "@mui/material";
 import { subscribe, isoFetch, useLazyReference, read } from "@isograph/react";
 import HomeRouteEntrypoint from "@iso/Query/home_route/entrypoint.isograph";
@@ -32,17 +31,15 @@ export function GraphQLConfDemo(props: {}) {
     kind: "Home",
   });
   return (
-    <NoSSR>
-      <React.Suspense
-        fallback={
-          <Container maxWidth="md">
-            <FullPageLoading />
-          </Container>
-        }
-      >
-        <Router route={currentRoute} setRoute={setCurrentRoute} />
-      </React.Suspense>
-    </NoSSR>
+    <React.Suspense
+      fallback={
+        <Container maxWidth="md">
+          <FullPageLoading />
+        </Container>
+      }
+    >
+      <Router route={currentRoute} setRoute={setCurrentRoute} />
+    </React.Suspense>
   );
 }
 
