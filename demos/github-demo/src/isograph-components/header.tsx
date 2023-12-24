@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { iso } from "@isograph/react";
-import { ResolverParameterType as HeaderProps } from "./__isograph/Query/header/reader.isograph";
+import { ResolverParameterType as HeaderProps } from "@iso/Query/header/reader.isograph";
 
 import { AppBar, Button, Grid, Container } from "@mui/material";
 import { useTheme } from "@mui/material/styles";

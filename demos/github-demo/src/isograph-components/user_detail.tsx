@@ -1,5 +1,5 @@
 import { iso } from "@isograph/react";
-import type { ResolverParameterType as UserDetailParams } from "./__isograph/Query/user_detail/reader.isograph";
+import type { ResolverParameterType as UserDetailParams } from "@iso/Query/user_detail/reader.isograph";
 import { RepoLink } from "./RepoLink";
 
 export const user_detail = iso<UserDetailParams, ReturnType<typeof UserDetail>>`

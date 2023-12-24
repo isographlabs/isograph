@@ -1,5 +1,5 @@
 import { iso } from "@isograph/react";
-import { ResolverParameterType as AvatarProps } from "./__isograph/User/avatar/reader.isograph";
+import { ResolverParameterType as AvatarProps } from "@iso/User/avatar/reader.isograph";
 import { Avatar } from "@mui/material";
 
 export const avatar = iso<AvatarProps, ReturnType<typeof Avatar>>`

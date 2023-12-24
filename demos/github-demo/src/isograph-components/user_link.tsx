@@ -1,6 +1,6 @@
 import { iso } from "@isograph/react";
 
-import type { ResolverParameterType as UserLinkParams } from "./__isograph/Actor/user_link/reader.isograph";
+import type { ResolverParameterType as UserLinkParams } from "@iso/Actor/user_link/reader.isograph";
 
 import { Link } from "@mui/material";
 

@@ -1,6 +1,6 @@
 import { iso } from "@isograph/react";
-import type { ResolverParameterType as PullRequestTableParams } from "./__isograph/PullRequestConnection/pull_request_table/reader.isograph";
-import type { ResolverParameterType as CreatedAtFormattedType } from "./__isograph/PullRequest/created_at_formatted/reader.isograph";
+import type { ResolverParameterType as PullRequestTableParams } from "@iso/PullRequestConnection/pull_request_table/reader.isograph";
+import type { ResolverParameterType as CreatedAtFormattedType } from "@iso/PullRequest/created_at_formatted/reader.isograph";
 
 import {
   Table,

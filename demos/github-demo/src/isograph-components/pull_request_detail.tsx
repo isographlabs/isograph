@@ -1,7 +1,7 @@
 import React from "react";
 
 import { iso } from "@isograph/react";
-import { ResolverParameterType as PullRequestDetailsProps } from "./__isograph/Query/pull_request_detail/reader.isograph";
+import { ResolverParameterType as PullRequestDetailsProps } from "@iso/Query/pull_request_detail/reader.isograph";
 
 import { Card, CardContent } from "@mui/material";
 import { RepoLink } from "./RepoLink";

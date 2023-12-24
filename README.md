@@ -56,7 +56,7 @@ So, if the compiler encounters `` isoFetch`Query.user_list_page`; ``, it would g
 For example, the data might be fetched during render as follows:
 
 ```js
-const UserListPageQuery = require("./__isograph/Query/user_list_page.isograph");
+const UserListPageQuery = require("@iso/Query/user_list_page.isograph");
 
 function UserListPageRoute() {
   const queryVariables = {};

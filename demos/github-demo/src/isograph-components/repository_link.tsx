@@ -1,6 +1,6 @@
 import { iso } from "@isograph/react";
 
-import type { ResolverParameterType as RepositoryLinkParams } from "./__isograph/Repository/repository_link/reader.isograph";
+import type { ResolverParameterType as RepositoryLinkParams } from "@iso/Repository/repository_link/reader.isograph";
 
 import { Link } from "@mui/material";
 
