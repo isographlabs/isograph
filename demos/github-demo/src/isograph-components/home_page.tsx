@@ -58,7 +58,7 @@ export function HomeRoute({
   const [, setState] = useState({});
   useEffect(() => {
     return subscribe(() => setState({}));
-  });
+  }, []);
   const { queryReference } = useLazyReference(
     isoFetch`Query.home_page_component`,
     {

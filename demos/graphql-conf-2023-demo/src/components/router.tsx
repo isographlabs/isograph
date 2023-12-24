@@ -26,7 +26,7 @@ export function GraphQLConfDemo(props: {}) {
   const [, setState] = React.useState<object | void>();
   React.useEffect(() => {
     return subscribe(() => setState({}));
-  });
+  }, []);
 
   const [currentRoute, setCurrentRoute] = React.useState<Route>({
     kind: "Home",

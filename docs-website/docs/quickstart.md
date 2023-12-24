@@ -112,7 +112,7 @@ export default function App() {
   const [, setState] = React.useState<object | void>();
   React.useEffect(() => {
     return subscribe(() => setState({}));
-  });
+  }, []);
 
   return (
     <NoSSR>
