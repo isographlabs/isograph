@@ -26,6 +26,6 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/isographlabs/isograph",
-    "directory": "libs/babel-plugin-isograph"
+    "directory": "libs/isograph-reference-counted-pointer"
   }
 }

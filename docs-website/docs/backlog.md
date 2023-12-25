@@ -8,7 +8,6 @@ sidebar_position: 999
 
 - rethink iso syntax
   - Consider combining isoFetch and iso, as in `` iso`entrypoint Query.home_page`  `` or the like
-- Rename babel-plugin-isograph to @isograph/babel
 
 ## V2 release
 

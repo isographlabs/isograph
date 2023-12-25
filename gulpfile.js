@@ -10,8 +10,8 @@ const VERSION = RELEASE_COMMIT_SHA
 // TODO flesh this out
 const builds = [
   {
-    folder: "babel-plugin-isograph",
-    packageName: "babel-plugin-isograph",
+    folder: "isograph-babel-plugin-babel",
+    packageName: "@isograph/babel-plugin-babel",
   },
   {
     folder: "isograph-disposable-types",
