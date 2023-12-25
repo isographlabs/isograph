@@ -8,6 +8,7 @@ sidebar_position: 999
 
 - rethink iso syntax
   - Consider combining isoFetch and iso, as in `` iso`entrypoint Query.home_page`  `` or the like
+- publish isograph.dev (via gh-pages?)
 
 ## V2 release
 
@@ -140,3 +141,5 @@ sidebar_position: 999
 - Do not look in artifact_directory, if project_root contains artifact_directory
 - Do not require that the exported name of an iso is anything in particular.
   - Can we make the transform add an export if none is found?? Probably!
+- SWC plugin
+- plugin options to point to config
