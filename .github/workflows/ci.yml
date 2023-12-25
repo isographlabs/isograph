@@ -96,7 +96,7 @@ jobs:
   main-release:
     name: Release packages to NPM
     runs-on: macos-latest
-    # if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref == 'refs/heads/main' || github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref == 'refs/heads/main' || github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
     needs: [build-js-packages, build-cli, build-demos]
     steps:
       - uses: actions/checkout@v2
@@ -144,6 +144,7 @@ jobs:
           chmod +x libs/isograph-compiler/artifacts/macos-x64/isograph_cli
           chmod +x libs/isograph-compiler/artifacts/macos-arm64/isograph_cli
       - name: Publish to NPM
+        if: github.ref == 'refs/heads/main' || github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
         run: |
           for pkg in libs/*; do
             echo PUBLISHING $pkg
