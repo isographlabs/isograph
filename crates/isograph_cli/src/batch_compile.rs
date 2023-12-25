@@ -5,7 +5,8 @@ use std::{
 
 use colored::Colorize;
 use common_lang_types::{
-    Location, ResolverDefinitionPath, SourceFileName, Span, TextSource, WithLocation, WithSpan,
+    Location, ResolverDefinitionPath, ScalarFieldName, SourceFileName, Span, TextSource,
+    WithLocation, WithSpan,
 };
 use graphql_lang_parser::{parse_schema, parse_schema_extensions, SchemaParseError};
 use intern::{string_key::Intern, Lookup};
@@ -220,7 +221,7 @@ fn extract_iso_literals(
                 Ok((resolver_declaration, text_source)) => {
                     resolver_declarations_and_text_sources.push((resolver_declaration, text_source))
                 }
-                Err(e) => isograph_literal_parse_errors.push(e),
+                Err(e) => isograph_literal_parse_errors.extend(e.into_iter()),
             }
         }
 
@@ -267,7 +268,8 @@ fn process_iso_literal_extraction(
     iso_literal_extraction: IsoLiteralExtraction<'_>,
     file_name: SourceFileName,
     interned_file_path: ResolverDefinitionPath,
-) -> Result<(WithSpan<ResolverDeclaration>, TextSource), WithLocation<IsographLiteralParseError>> {
+) -> Result<(WithSpan<ResolverDeclaration>, TextSource), Vec<WithLocation<IsographLiteralParseError>>>
+{
     let IsoLiteralExtraction {
         iso_literal_text,
         iso_literal_start_index,
@@ -282,35 +284,54 @@ fn process_iso_literal_extraction(
         )),
     };
 
+    let mut errors = vec![];
+
     if !has_associated_js_function {
-        return Err(WithLocation::new(
+        errors.push(WithLocation::new(
             IsographLiteralParseError::ExpectedAssociatedJsFunction,
             Location::new(text_source, Span::todo_generated()),
         ));
     }
 
-    let resolver_declaration =
-        parse_iso_literal(&iso_literal_text, interned_file_path, text_source)?;
-
-    const_export_name
-        .and_then(|const_export_name| {
-            if resolver_declaration.item.resolver_field_name.item.lookup() == const_export_name {
-                Some(())
+    // TODO return errors if any occurred, otherwise Ok
+    match parse_iso_literal(&iso_literal_text, interned_file_path, text_source) {
+        Ok(resolver_declaration) => {
+            let exists_and_matches = const_export_name_exists_and_matches(
+                const_export_name,
+                resolver_declaration.item.resolver_field_name.item,
+            );
+            if exists_and_matches {
+                if errors.is_empty() {
+                    Ok((resolver_declaration, text_source))
+                } else {
+                    Err(errors)
+                }
             } else {
-                None
+                errors.push(WithLocation::new(
+                    IsographLiteralParseError::ExpectedLiteralToBeExported {
+                        const_export_name: resolver_declaration.item.resolver_field_name.item,
+                    },
+                    // TODO why does resolver_declaration.span cause a panic here?
+                    Location::new(text_source, Span::todo_generated()),
+                ));
+                Err(errors)
             }
-        })
-        .ok_or_else(|| {
-            WithLocation::new(
-                IsographLiteralParseError::ExpectedLiteralToBeExported {
-                    const_export_name: resolver_declaration.item.resolver_field_name.item,
-                },
-                // TODO why does resolver_declaration.span cause a panic here?
-                Location::new(text_source, Span::todo_generated()),
-            )
-        })?;
+        }
+        Err(e) => {
+            errors.push(e);
+            Err(errors)
+        }
+    }
+}
 
-    Ok((resolver_declaration, text_source))
+fn const_export_name_exists_and_matches(
+    const_export_name: Option<&str>,
+    resolver_name: ScalarFieldName,
+) -> bool {
+    match const_export_name {
+        Some(const_export_name) => const_export_name == resolver_name.lookup(),
+        None => false,
+    }
 }
 
 #[derive(Error, Debug)]
