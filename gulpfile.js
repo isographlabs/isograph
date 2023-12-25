@@ -1,4 +1,3 @@
-// const gulp = require("gulp");
 const path = require("path");
 const fs = require("fs");
 
@@ -7,11 +6,10 @@ const VERSION = RELEASE_COMMIT_SHA
   ? `0.0.0-main-${RELEASE_COMMIT_SHA.substr(0, 8)}`
   : process.env.npm_package_version;
 
-// TODO flesh this out
 const builds = [
   {
-    folder: "isograph-babel-plugin-babel",
-    packageName: "@isograph/babel-plugin-babel",
+    folder: "isograph-babel-plugin",
+    packageName: "@isograph/babel-plugin",
   },
   {
     folder: "isograph-disposable-types",

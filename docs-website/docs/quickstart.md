@@ -16,7 +16,7 @@ The process for adding Isograph to an existing NextJS project is described in th
 
 ```sh
 yarn install --dev @isograph/compiler@0.0.0-main-15a63333
-yarn install --dev @isograph/babel-plugin-babel@0.0.0-main-15a63333
+yarn install --dev @isograph/babel-plugin@0.0.0-main-15a63333
 yarn install @isograph/react@0.0.0-main-15a63333
 ```
 
@@ -37,9 +37,7 @@ Install the babel plugin in your `.babelrc.js`:
 ```js
 module.exports = {
   presets: ["next/babel"],
-  // Note that the yarn install was @isograph/babel-plugin-babel, but this is @isograph/babel.
-  // It's weird!
-  plugins: ["@isograph/babel"],
+  plugins: ["@isograph"],
 };
 ```
 

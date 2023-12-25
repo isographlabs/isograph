@@ -170,7 +170,7 @@ importers:
         specifier: 5.2.2
         version: 5.2.2
 
-  libs/isograph-babel-plugin-babel:
+  libs/isograph-babel-plugin:
     dependencies:
       babel-plugin-macros:
         specifier: ^2.0.0

@@ -1,5 +1,5 @@
 {
-  "name": "@isograph/babel-plugin-babel",
+  "name": "@isograph/babel-plugin",
   "description": "A Babel plugin for use with Isograph applications.",
   "version": "0.0.4",
   "keywords": [
