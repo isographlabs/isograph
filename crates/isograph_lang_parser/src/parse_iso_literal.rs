@@ -1,8 +1,8 @@
 use std::ops::ControlFlow;
 
 use common_lang_types::{
-    Location, ResolverDefinitionPath, SelectableFieldName, Span, StringKeyNewtype, TextSource,
-    UnvalidatedTypeName, WithLocation, WithSpan,
+    Location, ResolverDefinitionPath, ScalarFieldName, SelectableFieldName, Span, StringKeyNewtype,
+    TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation,
@@ -58,17 +58,26 @@ pub fn parse_iso_literal(
     iso_literal_text: &str,
     definition_file_path: ResolverDefinitionPath,
     text_source: TextSource,
-) -> ParseResultWithLocation<WithSpan<ResolverDeclaration>> {
+) -> Result<
+    WithSpan<ResolverDeclaration>,
+    (
+        Option<ScalarFieldName>,
+        WithLocation<IsographLiteralParseError>,
+    ),
+> {
     let mut tokens = PeekableLexer::new(iso_literal_text);
 
     let resolver_declaration =
         parse_resolver_declaration(&mut tokens, definition_file_path, text_source)
-            .map_err(|with_span| with_span.to_with_location(text_source))?;
+            .map_err(|(name, with_span)| (name, with_span.to_with_location(text_source)))?;
 
     if let Some(span) = tokens.remaining_token_span() {
-        return Err(WithLocation::new(
-            IsographLiteralParseError::LeftoverTokens,
-            Location::new(text_source, span),
+        return Err((
+            Some(resolver_declaration.item.resolver_field_name.item),
+            WithLocation::new(
+                IsographLiteralParseError::LeftoverTokens,
+                Location::new(text_source, span),
+            ),
         ));
     }
 
@@ -79,26 +88,37 @@ fn parse_resolver_declaration<'a>(
     tokens: &mut PeekableLexer<'a>,
     definition_file_path: ResolverDefinitionPath,
     text_source: TextSource,
-) -> ParseResultWithSpan<WithSpan<ResolverDeclaration>> {
+) -> Result<
+    WithSpan<ResolverDeclaration>,
+    (Option<ScalarFieldName>, WithSpan<IsographLiteralParseError>),
+> {
     let resolver_declaration = tokens
         .with_span(|tokens| {
             let description = parse_optional_description(tokens);
             let parent_type = tokens
                 .parse_string_key_type(IsographLangTokenKind::Identifier)
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))
+                .map_err(|e| (None, e))?;
+
             tokens
                 .parse_token_of_kind(IsographLangTokenKind::Period)
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))
+                .map_err(|e| (None, e))?;
+
             let resolver_field_name = tokens
                 .parse_string_key_type(IsographLangTokenKind::Identifier)
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))
+                .map_err(|e| (None, e))?;
 
-            let variable_definitions = parse_variable_definitions(tokens, text_source)?;
+            let variable_definitions = parse_variable_definitions(tokens, text_source)
+                .map_err(|e| (Some(resolver_field_name.item), e))?;
 
-            let directives = parse_directives(tokens)?;
+            let directives =
+                parse_directives(tokens).map_err(|e| (Some(resolver_field_name.item), e))?;
 
             let selection_set_and_unwraps =
-                parse_optional_selection_set_and_unwraps(tokens, text_source)?;
+                parse_optional_selection_set_and_unwraps(tokens, text_source)
+                    .map_err(|e| (Some(resolver_field_name.item), e))?;
 
             // --------------------
             // TODO: use directives to:
@@ -117,6 +137,7 @@ fn parse_resolver_declaration<'a>(
             })
         })
         .transpose();
+
     resolver_declaration
 }
 

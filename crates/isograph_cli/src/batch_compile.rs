@@ -309,7 +309,10 @@ fn process_iso_literal_extraction(
             } else {
                 errors.push(WithLocation::new(
                     IsographLiteralParseError::ExpectedLiteralToBeExported {
-                        const_export_name: resolver_declaration.item.resolver_field_name.item,
+                        expected_const_export_name: resolver_declaration
+                            .item
+                            .resolver_field_name
+                            .item,
                     },
                     // TODO why does resolver_declaration.span cause a panic here?
                     Location::new(text_source, Span::todo_generated()),
@@ -317,7 +320,21 @@ fn process_iso_literal_extraction(
                 Err(errors)
             }
         }
-        Err(e) => {
+        Err((name, e)) => {
+            if let Some(name) = name {
+                let exists_and_matches =
+                    const_export_name_exists_and_matches(const_export_name, name);
+                if !exists_and_matches {
+                    errors.push(WithLocation::new(
+                        IsographLiteralParseError::ExpectedLiteralToBeExported {
+                            expected_const_export_name: name,
+                        },
+                        // TODO why does resolver_declaration.span cause a panic here?
+                        Location::new(text_source, Span::todo_generated()),
+                    ));
+                }
+            }
+
             errors.push(e);
             Err(errors)
         }

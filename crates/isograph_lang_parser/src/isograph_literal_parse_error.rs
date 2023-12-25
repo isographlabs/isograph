@@ -21,8 +21,12 @@ pub enum IsographLiteralParseError {
     #[error("Isograph literals must be immediately called, and passed a function")]
     ExpectedAssociatedJsFunction,
 
-    #[error("This isograph literal must be exported as `export const {const_export_name}`")]
-    ExpectedLiteralToBeExported { const_export_name: ScalarFieldName },
+    #[error(
+        "This isograph literal must be exported as `export const {expected_const_export_name}`"
+    )]
+    ExpectedLiteralToBeExported {
+        expected_const_export_name: ScalarFieldName,
+    },
 }
 
 impl From<LowLevelParseError> for IsographLiteralParseError {
