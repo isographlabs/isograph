@@ -6,7 +6,6 @@ sidebar_position: 999
 
 ## Top QOL priorities
 
-- eslint enforcement that resolvers are exported
 - rethink iso syntax
   - Consider combining isoFetch and iso, as in `` iso`entrypoint Query.home_page`  `` or the like
 - Rename babel-plugin-isograph to @isograph/babel
@@ -140,3 +139,5 @@ sidebar_position: 999
 - Display multiple errors, parse etc. in parallel
   - Multiple errors when parsing the schema (is this possible??)
 - Do not look in artifact_directory, if project_root contains artifact_directory
+- Do not require that the exported name of an iso is anything in particular.
+  - Can we make the transform add an export if none is found?? Probably!

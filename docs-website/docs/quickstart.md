@@ -156,6 +156,7 @@ import React from "react";
 import { iso } from "@isograph/react";
 import { ResolverParameterType as HomeRouteParams } from "@iso/Query/home_route/reader.isograph";
 
+// You must export the iso literal
 export const home_route = iso<HomeRouteParams, ReturnType<typeof HomeRoute>>`
   Query.home_route @component {
     viewer {
@@ -171,12 +172,6 @@ function HomeRoute(props: HomeRouteParams) {
 
 :::info
 Note: for now, we have a lot of types to provide. These are fairly boilerplate, and should be able to removed in the future. For now, provide them!
-:::
-
-:::warning
-You **must** export the iso literal using the name of the field. If not, you will have errors similar to `TypeError: reference.readerArtifact.resolver is not a function`.
-
-This will be enforced by the compiler in the future. It is not at the moment.
 :::
 
 ### Fetch that Isograph component:
