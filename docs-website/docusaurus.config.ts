@@ -9,9 +9,11 @@ const config: Config = {
 
   url: "https://www.isograph.dev/",
   baseUrl: "/",
+  trailingSlash: true,
 
   organizationName: "isographlabs",
   projectName: "isograph",
+  deploymentBranch: "gh-pages",
 
   onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "throw",

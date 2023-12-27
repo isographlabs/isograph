@@ -2,6 +2,11 @@ name: CI
 
 on: [push, pull_request]
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   # TODO build for all platforms
   build-cli:
@@ -90,21 +95,84 @@ jobs:
       - uses: pnpm/action-setup@v2
         with:
           version: 8
-      - name: Use Node.js 16
+      - name: Use Node.js 18
         uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 18
           cache: "pnpm"
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Build
         run: pnpm -r compile
 
+  build-website:
+    # TODO parallelize. Right now, deploying happens before releasing to NPM,
+    # but that can be done at the same time. Also, we can build the website
+    # while we build the cli. This probably just means I have to upload the
+    # docs-website/build folder as an artifact
+    name: Build and deploy website
+    runs-on: ubuntu-latest
+    # environment:
+    #   name: github-pages
+    #   url: ${{ steps.deployment.outputs.page_url }}
+    defaults:
+      run:
+        working-directory: ./docs-website
+    steps:
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - name: Use Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      # - name: Build website
+      #   run: yarn build
+      - name: Build custom
+        run: mkdir ./build && echo "<html><h1>hiii</h1></html>" > ./build/index.html
+      - name: find
+        run: find .
+      - name: find3
+        run: echo $RUNNER_TEMP runer temp
+      - name: ls
+        run: ls $RUNNER_TEMP
+      # - name: Deploy to GitHub Pages
+      #   uses: peaceiris/actions-gh-pages@v3
+      #   with:
+      #     github_token: ${{ secrets.GITHUB_TOKEN }}
+      #     # Build output to publish to the `gh-pages` branch:
+      #     publish_dir: ./docs-website/build
+      #     user_name: github-actions[bot]
+      #     user_email: 41898282+github-actions[bot]@users.noreply.github.com
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      - name: Upload custom
+        run: tar --dereference --hard-dereference --directory "build" -cvf "$RUNNER_TEMP/artifact.tar" --exclude=.git --exclude=.github .
+      # - name: Upload artifact
+      #   uses: actions/upload-pages-artifact@v3
+      #   with:
+      #     # Upload entire repository
+      #     path: "build"
+      - name: Upload artifact
+        id: upload-artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: 1
+          if-no-files-found: error
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
   main-release:
     name: Release packages to NPM
     runs-on: macos-latest
     if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref == 'refs/heads/main' || github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
-    needs: [build-js-packages, build-cli, build-demos]
+    needs: [build-website]
     steps:
       - uses: actions/checkout@v2
       - uses: pnpm/action-setup@v2
@@ -112,7 +180,7 @@ jobs:
           version: 8
       - uses: actions/setup-node@v2
         with:
-          node-version: 16
+          node-version: 18
           registry-url: https://registry.npmjs.org/
           cache: "pnpm"
       - name: Install dependencies
