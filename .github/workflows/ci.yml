@@ -14,10 +14,11 @@ jobs:
             os: ubuntu-latest
             build-name: isograph_cli
             artifact-name: isograph_cli-linux-x64
-          # - target: aarch64-unknown-linux-musl
-          #   os: ubuntu-latest
-          #   build-name: isograph_cli
-          #   artifact-name: isograph_cli-bin-linux-arm64
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            build-name: isograph_cli
+            artifact-name: isograph_cli-bin-linux-arm64
+            cross: true
           - target: x86_64-apple-darwin
             os: macos-latest
             build-name: isograph_cli
@@ -38,8 +39,14 @@ jobs:
           toolchain: 1.72.0
           override: true
           target: ${{ matrix.target.target }}
+      - name: Install cross
+        if: matrix.target.cross
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cross
       - name: "Build isograph_cli with cargo (${{matrix.target.target}})"
-        run: cargo build --target ${{ matrix.target.target }} --release
+        run: ${{ matrix.target.cross && 'cross' || 'cargo' }} build --target ${{ matrix.target.target }} --release
       - uses: actions/upload-artifact@v2
         with:
           name: ${{ matrix.target.artifact-name }}
@@ -122,11 +129,11 @@ jobs:
         with:
           name: isograph_cli-linux-x64
           path: libs/isograph-compiler/artifacts/linux-x64
-      # - name: Download artifact isograph_cli-bin-linux-arm64
-      #   uses: actions/download-artifact@v2
-      #   with:
-      #     name: isograph_cli-bin-linux-arm64
-      #     path: libs/isograph-compiler/artifacts/linux-arm64
+      - name: Download artifact isograph_cli-bin-linux-arm64
+        uses: actions/download-artifact@v2
+        with:
+          name: isograph_cli-bin-linux-arm64
+          path: libs/isograph-compiler/artifacts/linux-arm64
       - name: Download artifact isograph_cli-macos-x64
         uses: actions/download-artifact@v2
         with:
@@ -140,7 +147,7 @@ jobs:
       - name: Mark binaries as executable
         run: |
           chmod +x libs/isograph-compiler/artifacts/linux-x64/isograph_cli
-          # chmod +x libs/isograph-compiler/artifacts/linux-arm64/isograph_cli
+          chmod +x libs/isograph-compiler/artifacts/linux-arm64/isograph_cli
           chmod +x libs/isograph-compiler/artifacts/macos-x64/isograph_cli
           chmod +x libs/isograph-compiler/artifacts/macos-arm64/isograph_cli
       - name: Publish to NPM
