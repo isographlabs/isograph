@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <id>https://www.isograph.dev/blog</id>
+    <title>Isograph Blog</title>
+    <updated>2023-12-20T00:00:00.000Z</updated>
+    <generator>https://github.com/jpmonette/feed</generator>
+    <link rel="alternate" href="https://www.isograph.dev/blog"/>
+    <subtitle>Isograph Blog</subtitle>
+    <icon>https://www.isograph.dev/img/isograph_logo.ico</icon>
+    <entry>
+        <title type="html"><![CDATA[Introducing Isograph]]></title>
+        <id>https://www.isograph.dev/blog/long-blog-post</id>
+        <link href="https://www.isograph.dev/blog/long-blog-post"/>
+        <updated>2023-12-20T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[Thank you for trying out Isograph!]]></summary>
+        <content type="html"><![CDATA[<p>Thank you for trying out Isograph!</p>]]></content>
+        <author>
+            <name>Robert Balicki</name>
+            <uri>https://www.robertbalicki.com</uri>
+        </author>
+    </entry>
+</feed>
