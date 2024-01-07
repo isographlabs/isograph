@@ -36,6 +36,7 @@ pub type ValidatedSchemaObject = SchemaObject<ValidatedEncounteredDefinedField>;
 
 pub type ValidatedSchemaIdField = SchemaIdField<NamedTypeAnnotation<ScalarId>>;
 
+#[derive(Debug)]
 pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
     type FieldAssociatedType = OutputTypeId;

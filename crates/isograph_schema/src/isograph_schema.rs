@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
 use common_lang_types::{
     DescriptionValue, FieldArgumentName, HasName, InputTypeName, InterfaceTypeName,
@@ -33,26 +33,26 @@ lazy_static! {
 /// are generic. As we go from parsed -> various states of validated -> fully
 /// validated, we will get objects that are generic over a different type
 /// that implements SchemaValidationState.
-pub trait SchemaValidationState {
+pub trait SchemaValidationState: Debug {
     /// Fields contain a field_type: TypeAnnotation<TFieldAssociatedType>
     /// Validated: OutputTypeId, Unvalidated: UnvalidatedTypeName
-    type FieldAssociatedType;
+    type FieldAssociatedType: Debug;
     /// The associated data type of scalars in resolvers' selection sets and unwraps
     /// Validated: ValidatedScalarDefinedField, Unvalidated: ()
-    type ScalarField;
+    type ScalarField: Debug;
     // The associated data type of linked fields in resolvers' selection sets and unwraps
     // Validated: ObjectId, Unvalidated: ()
-    type LinkedField;
+    type LinkedField: Debug;
     // The associated data type of resolvers' variable definitions
     // Validated: InputTypeId, Unvalidated: UnvalidatedTypeName
-    type VariableType;
+    type VariableType: Debug;
     // On objects, what does the HashMap of encountered types contain
     // Validated: ValidatedDefinedField, Unvalidated: UnvalidatedObjectFieldInfo
-    type EncounteredField;
+    type EncounteredField: Debug;
     // What we store in fetchable_resolvers
     // Validated: (ObjectId, ResolverFieldId)
     // Unvalidated: ResolverFetch
-    type FetchableResolver;
+    type FetchableResolver: Debug;
 }
 
 /// The in-memory representation of a schema.
@@ -77,7 +77,7 @@ pub struct Schema<TValidation: SchemaValidationState> {
     >,
     // TODO consider whether this belongs here. It could just be a free variable.
     pub fetchable_resolvers: Vec<TValidation::FetchableResolver>,
-    pub schema_data: SchemaData<TValidation::EncounteredField>,
+    pub schema_data: SchemaData<TValidation>,
 
     // Well known types
     pub id_type_id: ScalarId,
@@ -93,6 +93,7 @@ pub struct Schema<TValidation: SchemaValidationState> {
     // Mutation
 }
 
+#[derive(Debug)]
 pub struct UnvalidatedSchemaState {}
 
 impl SchemaValidationState for UnvalidatedSchemaState {
@@ -140,7 +141,7 @@ impl<TFieldAssociatedType, TResolverType> DefinedField<TFieldAssociatedType, TRe
 pub type UnvalidatedObjectFieldInfo =
     DefinedField<TypeAnnotation<UnvalidatedTypeName>, ResolverFieldId>;
 
-pub(crate) type UnvalidatedSchemaData = SchemaData<UnvalidatedObjectFieldInfo>;
+pub(crate) type UnvalidatedSchemaData = SchemaData<UnvalidatedSchemaState>;
 
 pub(crate) type UnvalidatedSchemaField = SchemaServerField<TypeAnnotation<UnvalidatedTypeName>>;
 
@@ -149,8 +150,8 @@ pub(crate) type UnvalidatedSchemaResolver = SchemaResolver<(), (), UnvalidatedTy
 pub(crate) type UnvalidatedSchemaServerField = SchemaServerField<TypeAnnotation<OutputTypeId>>;
 
 #[derive(Debug)]
-pub struct SchemaData<TEncounteredField> {
-    pub objects: Vec<SchemaObject<TEncounteredField>>,
+pub struct SchemaData<TValidation: SchemaValidationState> {
+    pub objects: Vec<SchemaObject<TValidation::EncounteredField>>,
     pub scalars: Vec<SchemaScalar>,
     pub defined_types: HashMap<UnvalidatedTypeName, DefinedTypeId>,
 }
@@ -282,13 +283,16 @@ impl UnvalidatedSchema {
     }
 }
 
-impl<TEncounteredField> SchemaData<TEncounteredField> {
+impl<TValidation: SchemaValidationState> SchemaData<TValidation> {
     /// Get a reference to a given scalar type by its id.
     pub fn scalar(&self, scalar_id: ScalarId) -> &SchemaScalar {
         &self.scalars[scalar_id.as_usize()]
     }
 
-    pub fn lookup_unvalidated_type(&self, type_id: DefinedTypeId) -> SchemaType<TEncounteredField> {
+    pub fn lookup_unvalidated_type(
+        &self,
+        type_id: DefinedTypeId,
+    ) -> SchemaType<TValidation::EncounteredField> {
         match type_id {
             DefinedTypeId::Object(id) => {
                 SchemaType::Object(self.objects.get(id.as_usize()).unwrap())
@@ -302,7 +306,7 @@ impl<TEncounteredField> SchemaData<TEncounteredField> {
     pub fn lookup_output_type(
         &self,
         output_type_id: OutputTypeId,
-    ) -> SchemaOutputType<TEncounteredField> {
+    ) -> SchemaOutputType<TValidation::EncounteredField> {
         match output_type_id {
             OutputTypeId::Object(id) => {
                 SchemaOutputType::Object(self.objects.get(id.as_usize()).unwrap())
@@ -314,12 +318,15 @@ impl<TEncounteredField> SchemaData<TEncounteredField> {
     }
 
     /// Get a reference to a given object type by its id.
-    pub fn object(&self, object_id: ObjectId) -> &SchemaObject<TEncounteredField> {
+    pub fn object(&self, object_id: ObjectId) -> &SchemaObject<TValidation::EncounteredField> {
         &self.objects[object_id.as_usize()]
     }
 
     /// Get a mutable reference to a given object type by its id.
-    pub fn object_mut(&mut self, object_id: ObjectId) -> &mut SchemaObject<TEncounteredField> {
+    pub fn object_mut(
+        &mut self,
+        object_id: ObjectId,
+    ) -> &mut SchemaObject<TValidation::EncounteredField> {
         &mut self.objects[object_id.as_usize()]
     }
 }
