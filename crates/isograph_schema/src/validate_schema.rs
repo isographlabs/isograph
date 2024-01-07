@@ -15,8 +15,8 @@ use crate::{
     refetched_paths::refetched_paths_with_path, DefinedField, NameAndArguments, PathToRefetchField,
     Schema, SchemaData, SchemaIdField, SchemaObject, SchemaResolver, SchemaServerField,
     SchemaValidationState, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData,
-    UnvalidatedSchemaField, UnvalidatedSchemaResolver, UnvalidatedSchemaServerField,
-    ValidateResolverFetchDeclarationError,
+    UnvalidatedSchemaField, UnvalidatedSchemaObject, UnvalidatedSchemaResolver,
+    UnvalidatedSchemaServerField, ValidateResolverFetchDeclarationError,
 };
 
 pub type ValidatedSchemaField = SchemaServerField<TypeAnnotation<OutputTypeId>>;
@@ -138,7 +138,7 @@ impl ValidatedSchema {
 fn transform_object_field_ids(
     schema_fields: &[ValidatedSchemaField],
     schema_resolvers: &[ValidatedSchemaResolver],
-    object: SchemaObject<UnvalidatedObjectFieldInfo>,
+    object: UnvalidatedSchemaObject,
 ) -> SchemaObject<ValidatedEncounteredDefinedField> {
     let SchemaObject {
         name,
@@ -372,7 +372,7 @@ fn validate_variable_definitions(
 
 fn validate_selections_error_to_validate_schema_error(
     err: WithLocation<ValidateSelectionsError>,
-    parent_object: &SchemaObject<UnvalidatedObjectFieldInfo>,
+    parent_object: &UnvalidatedSchemaObject,
     resolver_field_name: SelectableFieldName,
 ) -> WithLocation<ValidateSchemaError> {
     err.map(|item| match item {
@@ -449,7 +449,7 @@ enum ValidateSelectionsError {
 fn validate_resolver_definition_selections_exist_and_types_match(
     schema_data: &UnvalidatedSchemaData,
     selection_set: Vec<WithSpan<Selection<(), ()>>>,
-    parent_object: &SchemaObject<UnvalidatedObjectFieldInfo>,
+    parent_object: &UnvalidatedSchemaObject,
     server_fields: &Vec<UnvalidatedSchemaServerField>,
 ) -> ValidateSelectionsResult<Vec<WithSpan<ValidatedSelection>>> {
     // Currently, we only check that each field exists and has an appropriate type, not that
@@ -470,7 +470,7 @@ fn validate_resolver_definition_selections_exist_and_types_match(
 
 fn validate_resolver_definition_selection_exists_and_type_matches(
     selection: WithSpan<Selection<(), ()>>,
-    parent_object: &SchemaObject<UnvalidatedObjectFieldInfo>,
+    parent_object: &UnvalidatedSchemaObject,
     schema_data: &UnvalidatedSchemaData,
     server_fields: &Vec<UnvalidatedSchemaServerField>,
 ) -> ValidateSelectionsResult<WithSpan<ValidatedSelection>> {
@@ -505,7 +505,7 @@ fn validate_resolver_definition_selection_exists_and_type_matches(
 fn validate_field_type_exists_and_is_scalar(
     parent_encountered_fields: &HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
     schema_data: &UnvalidatedSchemaData,
-    parent_object: &SchemaObject<UnvalidatedObjectFieldInfo>,
+    parent_object: &UnvalidatedSchemaObject,
     scalar_field_selection: ScalarFieldSelection<()>,
     server_fields: &Vec<UnvalidatedSchemaServerField>,
 ) -> ValidateSelectionsResult<ScalarFieldSelection<ValidatedScalarDefinedField>> {
@@ -573,7 +573,7 @@ fn validate_field_type_exists_and_is_scalar(
 fn validate_field_type_exists_and_is_linked(
     parent_fields: &HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
     schema_data: &UnvalidatedSchemaData,
-    parent_object: &SchemaObject<UnvalidatedObjectFieldInfo>,
+    parent_object: &UnvalidatedSchemaObject,
     linked_field_selection: LinkedFieldSelection<(), ()>,
     server_fields: &Vec<UnvalidatedSchemaServerField>,
 ) -> ValidateSelectionsResult<LinkedFieldSelection<ValidatedScalarDefinedField, ObjectId>> {

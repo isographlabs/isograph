@@ -101,6 +101,8 @@ impl SchemaValidationState for UnvalidatedSchemaState {
 
 pub type UnvalidatedSchema = Schema<UnvalidatedSchemaState>;
 
+pub type UnvalidatedSchemaObject = SchemaObject<UnvalidatedObjectFieldInfo>;
+
 /// Distinguishes between server fields and locally-defined resolver fields.
 /// TFieldAssociatedType can be a ScalarFieldName in an unvalidated schema, or a
 /// ScalarId, in a validated schema.
