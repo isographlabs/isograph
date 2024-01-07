@@ -14,8 +14,9 @@ use thiserror::Error;
 use crate::{
     refetched_paths::refetched_paths_with_path, DefinedField, NameAndArguments, PathToRefetchField,
     Schema, SchemaData, SchemaIdField, SchemaObject, SchemaResolver, SchemaServerField,
-    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData, UnvalidatedSchemaField,
-    UnvalidatedSchemaResolver, UnvalidatedSchemaServerField, ValidateResolverFetchDeclarationError,
+    SchemaValidationState, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData,
+    UnvalidatedSchemaField, UnvalidatedSchemaResolver, UnvalidatedSchemaServerField,
+    ValidateResolverFetchDeclarationError,
 };
 
 pub type ValidatedSchemaField = SchemaServerField<TypeAnnotation<OutputTypeId>>;
@@ -35,20 +36,17 @@ pub type ValidatedSchemaObject = SchemaObject<ValidatedEncounteredDefinedField>;
 
 pub type ValidatedSchemaIdField = SchemaIdField<NamedTypeAnnotation<ScalarId>>;
 
-pub type ValidatedSchema = Schema<
-    // Fields contain a field_type: TypeAnnotation<TFieldAssociatedType>
-    OutputTypeId,
-    // The associated data type of scalars in resolvers' selection sets and unwraps
-    ValidatedScalarDefinedField,
-    // The associated data type of linked fields in resolvers' selection sets and unwraps
-    ObjectId,
-    // The associated data type of resolvers' variable definitions
-    DefinedTypeId,
-    // On objects, what does the HashMap of encountered types contain
-    ValidatedEncounteredDefinedField,
-    // fetchable resolvers:
-    ResolverFieldId,
->;
+pub struct ValidatedSchemaState {}
+impl SchemaValidationState for ValidatedSchemaState {
+    type FieldAssociatedType = OutputTypeId;
+    type ScalarField = ValidatedScalarDefinedField;
+    type LinkedField = ObjectId;
+    type VariableType = DefinedTypeId;
+    type EncounteredField = ValidatedEncounteredDefinedField;
+    type FetchableResolver = ResolverFieldId;
+}
+
+pub type ValidatedSchema = Schema<ValidatedSchemaState>;
 
 impl ValidatedSchema {
     pub fn validate_and_construct(

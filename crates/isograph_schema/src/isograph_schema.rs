@@ -29,6 +29,32 @@ lazy_static! {
     pub static ref ENTRYPOINT: SelectableFieldName = "entrypoint".intern().into();
 }
 
+/// A trait that encapsulates all the types over which a schema, fields, etc.
+/// are generic. As we go from parsed -> various states of validated -> fully
+/// validated, we will get objects that are generic over a different type
+/// that implements SchemaValidationState.
+pub trait SchemaValidationState {
+    /// Fields contain a field_type: TypeAnnotation<TFieldAssociatedType>
+    /// Validated: OutputTypeId, Unvalidated: UnvalidatedTypeName
+    type FieldAssociatedType;
+    /// The associated data type of scalars in resolvers' selection sets and unwraps
+    /// Validated: ValidatedScalarDefinedField, Unvalidated: ()
+    type ScalarField;
+    // The associated data type of linked fields in resolvers' selection sets and unwraps
+    // Validated: ObjectId, Unvalidated: ()
+    type LinkedField;
+    // The associated data type of resolvers' variable definitions
+    // Validated: InputTypeId, Unvalidated: UnvalidatedTypeName
+    type VariableType;
+    // On objects, what does the HashMap of encountered types contain
+    // Validated: ValidatedDefinedField, Unvalidated: UnvalidatedObjectFieldInfo
+    type EncounteredField;
+    // What we store in fetchable_resolvers
+    // Validated: (ObjectId, ResolverFieldId)
+    // Unvalidated: ResolverFetch
+    type FetchableResolver;
+}
+
 /// The in-memory representation of a schema.
 ///
 /// The generics with which the Schema type is instantiated vary based on
@@ -40,32 +66,18 @@ lazy_static! {
 /// form of newtype wrappers around u32 indexes (e.g. FieldId, etc.) As a result,
 /// the schema does not support removing items.
 #[derive(Debug)]
-pub struct Schema<
-    // Fields contain a field_type: TypeAnnotation<TFieldAssociatedType>
-    // Validated: OutputTypeId, Unvalidated: UnvalidatedTypeName
-    TFieldAssociatedType,
-    // The associated data type of scalars in resolvers' selection sets and unwraps
-    // Validated: ValidatedScalarDefinedField, Unvalidated: ()
-    TScalarField,
-    // The associated data type of linked fields in resolvers' selection sets and unwraps
-    // Validated: ObjectId, Unvalidated: ()
-    TLinkedField,
-    // The associated data type of resolvers' variable definitions
-    // Validated: InputTypeId, Unvalidated: UnvalidatedTypeName
-    TVariableType,
-    // On objects, what does the HashMap of encountered types contain
-    // Validated: ValidatedDefinedField, Unvalidated: UnvalidatedObjectFieldInfo
-    TEncounteredField,
-    // What we store in fetchable_resolvers
-    // Validated: (ObjectId, ResolverFieldId)
-    // Unvalidated: ResolverFetch
-    TFetchableResolver,
-> {
-    pub fields: Vec<SchemaServerField<TypeAnnotation<TFieldAssociatedType>>>,
-    pub resolvers: Vec<SchemaResolver<TScalarField, TLinkedField, TVariableType>>,
+pub struct Schema<TValidation: SchemaValidationState> {
+    pub fields: Vec<SchemaServerField<TypeAnnotation<TValidation::FieldAssociatedType>>>,
+    pub resolvers: Vec<
+        SchemaResolver<
+            TValidation::ScalarField,
+            TValidation::LinkedField,
+            TValidation::VariableType,
+        >,
+    >,
     // TODO consider whether this belongs here. It could just be a free variable.
-    pub fetchable_resolvers: Vec<TFetchableResolver>,
-    pub schema_data: SchemaData<TEncounteredField>,
+    pub fetchable_resolvers: Vec<TValidation::FetchableResolver>,
+    pub schema_data: SchemaData<TValidation::EncounteredField>,
 
     // Well known types
     pub id_type_id: ScalarId,
@@ -81,14 +93,18 @@ pub struct Schema<
     // Mutation
 }
 
-pub type UnvalidatedSchema = Schema<
-    UnvalidatedTypeName,
-    (),
-    (),
-    UnvalidatedTypeName,
-    UnvalidatedObjectFieldInfo,
-    (TextSource, WithSpan<ResolverFetch>),
->;
+pub struct UnvalidatedSchemaState {}
+
+impl SchemaValidationState for UnvalidatedSchemaState {
+    type FieldAssociatedType = UnvalidatedTypeName;
+    type ScalarField = ();
+    type LinkedField = ();
+    type VariableType = UnvalidatedTypeName;
+    type EncounteredField = UnvalidatedObjectFieldInfo;
+    type FetchableResolver = (TextSource, WithSpan<ResolverFetch>);
+}
+
+pub type UnvalidatedSchema = Schema<UnvalidatedSchemaState>;
 
 /// Distinguishes between server fields and locally-defined resolver fields.
 /// TFieldAssociatedType can be a ScalarFieldName in an unvalidated schema, or a
@@ -139,28 +155,12 @@ pub struct SchemaData<TEncounteredField> {
     pub defined_types: HashMap<UnvalidatedTypeName, DefinedTypeId>,
 }
 
-impl<
-        TFieldAssociatedType,
-        TScalarField,
-        TLinkedField,
-        TVariableType,
-        TEncounteredField,
-        TFetchableResolver,
-    >
-    Schema<
-        TFieldAssociatedType,
-        TScalarField,
-        TLinkedField,
-        TVariableType,
-        TEncounteredField,
-        TFetchableResolver,
-    >
-{
+impl<TValidation: SchemaValidationState> Schema<TValidation> {
     /// Get a reference to a given field by its id.
     pub fn field(
         &self,
         field_id: ServerFieldId,
-    ) -> &SchemaServerField<TypeAnnotation<TFieldAssociatedType>> {
+    ) -> &SchemaServerField<TypeAnnotation<TValidation::FieldAssociatedType>> {
         &self.fields[field_id.as_usize()]
     }
 
@@ -168,12 +168,16 @@ impl<
     pub fn resolver(
         &self,
         resolver_field_id: ResolverFieldId,
-    ) -> &SchemaResolver<TScalarField, TLinkedField, TVariableType> {
+    ) -> &SchemaResolver<
+        TValidation::ScalarField,
+        TValidation::LinkedField,
+        TValidation::VariableType,
+    > {
         &self.resolvers[resolver_field_id.as_usize()]
     }
 
     /// Get a reference to the root query_object, if it's defined.
-    pub fn query_object(&self) -> Option<&SchemaObject<TEncounteredField>> {
+    pub fn query_object(&self) -> Option<&SchemaObject<TValidation::EncounteredField>> {
         self.query_type_id
             .as_ref()
             .map(|id| self.schema_data.object(*id))
@@ -182,20 +186,8 @@ impl<
 
 impl<
         TFieldAssociatedType: Clone,
-        TScalarField,
-        TLinkedField,
-        TVariableType,
-        TEncounteredField,
-        TFetchableResolver,
-    >
-    Schema<
-        TFieldAssociatedType,
-        TScalarField,
-        TLinkedField,
-        TVariableType,
-        TEncounteredField,
-        TFetchableResolver,
-    >
+        TValidation: SchemaValidationState<FieldAssociatedType = TFieldAssociatedType>,
+    > Schema<TValidation>
 {
     /// Get a reference to a given id field by its id.
     pub fn id_field<TIdFieldAssociatedType: TryFrom<TFieldAssociatedType> + Copy>(
