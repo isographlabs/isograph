@@ -276,10 +276,7 @@ impl<TValidation: SchemaValidationState> SchemaData<TValidation> {
         &self.scalars[scalar_id.as_usize()]
     }
 
-    pub fn lookup_unvalidated_type(
-        &self,
-        type_id: DefinedTypeId,
-    ) -> SchemaType<TValidation::EncounteredField> {
+    pub fn lookup_unvalidated_type(&self, type_id: DefinedTypeId) -> SchemaType<TValidation> {
         match type_id {
             DefinedTypeId::Object(id) => {
                 SchemaType::Object(self.objects.get(id.as_usize()).unwrap())
@@ -344,12 +341,12 @@ fn add_schema_defined_scalar_type(
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum SchemaType<'a, TEncounteredField> {
-    Object(&'a SchemaObject<TEncounteredField>),
+pub enum SchemaType<'a, TValidation: SchemaValidationState> {
+    Object(&'a SchemaObject<TValidation::EncounteredField>),
     Scalar(&'a SchemaScalar),
 }
 
-impl<'a, TEncounteredField> HasName for SchemaType<'a, TEncounteredField> {
+impl<'a, TValidation: SchemaValidationState> HasName for SchemaType<'a, TValidation> {
     type Name = UnvalidatedTypeName;
 
     fn name(&self) -> Self::Name {
