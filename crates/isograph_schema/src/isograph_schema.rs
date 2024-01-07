@@ -290,7 +290,7 @@ impl<TValidation: SchemaValidationState> SchemaData<TValidation> {
     pub fn lookup_output_type(
         &self,
         output_type_id: OutputTypeId,
-    ) -> SchemaOutputType<TValidation::EncounteredField> {
+    ) -> SchemaOutputType<TValidation> {
         match output_type_id {
             OutputTypeId::Object(id) => {
                 SchemaOutputType::Object(self.objects.get(id.as_usize()).unwrap())
@@ -358,8 +358,8 @@ impl<'a, TValidation: SchemaValidationState> HasName for SchemaType<'a, TValidat
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum SchemaOutputType<'a, TEncounteredField> {
-    Object(&'a SchemaObject<TEncounteredField>),
+pub enum SchemaOutputType<'a, TValidation: SchemaValidationState> {
+    Object(&'a SchemaObject<TValidation::EncounteredField>),
     Scalar(&'a SchemaScalar),
     // excludes input object
 }
