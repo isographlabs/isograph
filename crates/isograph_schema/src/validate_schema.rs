@@ -31,7 +31,7 @@ pub type ValidatedEncounteredDefinedField = DefinedField<ServerFieldId, Resolver
 /// The validated defined field that shows up in the TScalarField generic.
 pub type ValidatedScalarDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;
 
-pub type ValidatedSchemaObject = SchemaObject<ValidatedEncounteredDefinedField>;
+pub type ValidatedSchemaObject = SchemaObject<ValidatedSchemaState>;
 
 pub type ValidatedSchemaIdField = SchemaIdField<NamedTypeAnnotation<ScalarId>>;
 

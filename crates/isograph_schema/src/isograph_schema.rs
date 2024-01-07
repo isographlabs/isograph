@@ -101,7 +101,7 @@ impl SchemaValidationState for UnvalidatedSchemaState {
 
 pub type UnvalidatedSchema = Schema<UnvalidatedSchemaState>;
 
-pub type UnvalidatedSchemaObject = SchemaObject<UnvalidatedObjectFieldInfo>;
+pub type UnvalidatedSchemaObject = SchemaObject<UnvalidatedSchemaState>;
 
 /// Distinguishes between server fields and locally-defined resolver fields.
 /// TFieldAssociatedType can be a ScalarFieldName in an unvalidated schema, or a
@@ -147,7 +147,7 @@ pub(crate) type UnvalidatedSchemaServerField = SchemaServerField<TypeAnnotation<
 
 #[derive(Debug)]
 pub struct SchemaData<TValidation: SchemaValidationState> {
-    pub objects: Vec<SchemaObject<TValidation::EncounteredField>>,
+    pub objects: Vec<SchemaObject<TValidation>>,
     pub scalars: Vec<SchemaScalar>,
     pub defined_types: HashMap<UnvalidatedTypeName, DefinedTypeId>,
 }
@@ -167,7 +167,7 @@ impl<TValidation: SchemaValidationState> Schema<TValidation> {
     }
 
     /// Get a reference to the root query_object, if it's defined.
-    pub fn query_object(&self) -> Option<&SchemaObject<TValidation::EncounteredField>> {
+    pub fn query_object(&self) -> Option<&SchemaObject<TValidation>> {
         self.query_type_id
             .as_ref()
             .map(|id| self.schema_data.object(*id))
@@ -304,15 +304,12 @@ impl<TValidation: SchemaValidationState> SchemaData<TValidation> {
     }
 
     /// Get a reference to a given object type by its id.
-    pub fn object(&self, object_id: ObjectId) -> &SchemaObject<TValidation::EncounteredField> {
+    pub fn object(&self, object_id: ObjectId) -> &SchemaObject<TValidation> {
         &self.objects[object_id.as_usize()]
     }
 
     /// Get a mutable reference to a given object type by its id.
-    pub fn object_mut(
-        &mut self,
-        object_id: ObjectId,
-    ) -> &mut SchemaObject<TValidation::EncounteredField> {
+    pub fn object_mut(&mut self, object_id: ObjectId) -> &mut SchemaObject<TValidation> {
         &mut self.objects[object_id.as_usize()]
     }
 }
@@ -344,7 +341,7 @@ fn add_schema_defined_scalar_type(
 
 #[derive(Clone, Copy, Debug)]
 pub enum SchemaType<'a, TValidation: SchemaValidationState> {
-    Object(&'a SchemaObject<TValidation::EncounteredField>),
+    Object(&'a SchemaObject<TValidation>),
     Scalar(&'a SchemaScalar),
 }
 
@@ -361,7 +358,7 @@ impl<'a, TValidation: SchemaValidationState> HasName for SchemaType<'a, TValidat
 
 #[derive(Clone, Copy, Debug)]
 pub enum SchemaOutputType<'a, TValidation: SchemaValidationState> {
-    Object(&'a SchemaObject<TValidation::EncounteredField>),
+    Object(&'a SchemaObject<TValidation>),
     Scalar(&'a SchemaScalar),
     // excludes input object
 }
@@ -441,7 +438,7 @@ impl From<GraphQLInputObjectTypeDefinition> for IsographObjectTypeDefinition {
 
 /// An object type in the schema.
 #[derive(Debug)]
-pub struct SchemaObject<TEncounteredField> {
+pub struct SchemaObject<TValidation: SchemaValidationState> {
     pub description: Option<DescriptionValue>,
     pub name: IsographObjectTypeName,
     pub id: ObjectId,
@@ -452,7 +449,7 @@ pub struct SchemaObject<TEncounteredField> {
     pub id_field: Option<ServerIdFieldId>,
     pub server_fields: Vec<ServerFieldId>,
     pub resolvers: Vec<ResolverFieldId>,
-    pub encountered_fields: HashMap<SelectableFieldName, TEncounteredField>,
+    pub encountered_fields: HashMap<SelectableFieldName, TValidation::EncounteredField>,
     /// This is an unused field right now, I think.
     pub valid_refinements: Vec<ValidRefinement>,
 }
