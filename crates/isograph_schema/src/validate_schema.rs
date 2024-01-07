@@ -139,7 +139,7 @@ fn transform_object_field_ids(
     schema_fields: &[ValidatedSchemaField],
     schema_resolvers: &[ValidatedSchemaResolver],
     object: UnvalidatedSchemaObject,
-) -> SchemaObject<ValidatedEncounteredDefinedField> {
+) -> ValidatedSchemaObject {
     let SchemaObject {
         name,
         server_fields,

@@ -17,9 +17,8 @@ use isograph_lang_types::{
 
 use crate::{
     ArgumentKeyAndValue, DefinedField, MutationFieldResolverVariant, NameAndArguments,
-    PathToRefetchField, ResolverVariant, SchemaObject, ValidatedEncounteredDefinedField,
-    ValidatedScalarDefinedField, ValidatedSchema, ValidatedSchemaIdField, ValidatedSchemaObject,
-    ValidatedSchemaResolver, ValidatedSelection,
+    PathToRefetchField, ResolverVariant, ValidatedScalarDefinedField, ValidatedSchema,
+    ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
 };
 
 type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSelection>>;
@@ -223,7 +222,7 @@ impl<'a> MergeTraversalState<'a> {
 /// to generate the refetch query.
 pub fn create_merged_selection_set(
     schema: &ValidatedSchema,
-    parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
+    parent_type: &ValidatedSchemaObject,
     validated_selections: &Vec<WithSpan<ValidatedSelection>>,
     artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
     // N.B. we call this for non-fetchable resolvers now, but that is a smell
@@ -331,7 +330,7 @@ pub fn create_merged_selection_set(
 
 fn create_merged_selection_set_with_merge_traversal_state(
     schema: &ValidatedSchema,
-    parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
+    parent_type: &ValidatedSchemaObject,
     validated_selections: &Vec<WithSpan<ValidatedSelection>>,
     merge_traversal_state: &mut MergeTraversalState<'_>,
 ) -> MergedSelectionSet {
@@ -359,7 +358,7 @@ fn create_merged_selection_set_with_merge_traversal_state(
 fn merge_selections_into_set(
     schema: &ValidatedSchema,
     merged_selection_map: &mut MergedSelectionMap,
-    parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
+    parent_type: &ValidatedSchemaObject,
     validated_selections: &Vec<WithSpan<ValidatedSelection>>,
     merge_traversal_state: &mut MergeTraversalState<'_>,
 ) {
@@ -499,7 +498,7 @@ fn merge_linked_field_into_occupied_entry(
 }
 
 fn merge_scalar_resolver_field(
-    parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
+    parent_type: &ValidatedSchemaObject,
     schema: &ValidatedSchema,
     merged_selection_map: &mut MergedSelectionMap,
     merge_traversal_state: &mut MergeTraversalState<'_>,
@@ -610,7 +609,7 @@ fn HACK__merge_linked_fields(
     schema: &ValidatedSchema,
     existing_selection_set: &mut Vec<WithSpan<MergedServerFieldSelection>>,
     new_selection_set: &Vec<WithSpan<ValidatedSelection>>,
-    linked_field_parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
+    linked_field_parent_type: &ValidatedSchemaObject,
     merge_traversal_state: &mut MergeTraversalState<'_>,
 ) {
     let mut merged_selection_set = HashMap::new();

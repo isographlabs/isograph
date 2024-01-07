@@ -24,10 +24,9 @@ use isograph_schema::{
     ArtifactQueueItem, DefinedField, FieldMapItem, MergedLinkedFieldSelection,
     MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection,
     MutationFieldResolverInfo, NameAndArguments, PathToRefetchField, RefetchFieldResolverInfo,
-    ResolverActionKind, ResolverTypeAndField, ResolverVariant, RootRefetchedPath, SchemaObject,
-    ValidatedEncounteredDefinedField, ValidatedScalarDefinedField, ValidatedSchema,
-    ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
-    ValidatedVariableDefinition,
+    ResolverActionKind, ResolverTypeAndField, ResolverVariant, RootRefetchedPath,
+    ValidatedScalarDefinedField, ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver,
+    ValidatedSelection, ValidatedVariableDefinition,
 };
 use thiserror::Error;
 
@@ -521,7 +520,7 @@ derive_display!(RefetchQueryArtifactImport);
 #[derive(Debug)]
 pub(crate) struct EntrypointArtifact<'schema> {
     pub(crate) query_name: QueryOperationName,
-    pub parent_type: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
+    pub parent_type: &'schema ValidatedSchemaObject,
     pub query_text: QueryText,
     pub normalization_ast: NormalizationAst,
     pub refetch_query_artifact_import: RefetchQueryArtifactImport,
@@ -529,7 +528,7 @@ pub(crate) struct EntrypointArtifact<'schema> {
 
 #[derive(Debug)]
 pub(crate) struct ReaderArtifact<'schema> {
-    pub parent_type: &'schema SchemaObject<ValidatedEncounteredDefinedField>,
+    pub parent_type: &'schema ValidatedSchemaObject,
     pub(crate) resolver_field_name: SelectableFieldName,
     pub nested_resolver_artifact_imports: NestedResolverImports,
     pub resolver_read_out_type: ResolverReadOutType,
@@ -697,7 +696,7 @@ fn generate_resolver_parameter_type(
     schema: &ValidatedSchema,
     selection_set: &Vec<WithSpan<ValidatedSelection>>,
     variant: &ResolverVariant,
-    parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
+    parent_type: &ValidatedSchemaObject,
     nested_resolver_imports: &mut NestedResolverImports,
     indentation_level: u8,
 ) -> ResolverParameterType {
@@ -737,7 +736,7 @@ fn write_query_types_from_selection(
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
     variant: &ResolverVariant,
-    parent_type: &SchemaObject<ValidatedEncounteredDefinedField>,
+    parent_type: &ValidatedSchemaObject,
     nested_resolver_imports: &mut NestedResolverImports,
     indentation_level: u8,
 ) {
