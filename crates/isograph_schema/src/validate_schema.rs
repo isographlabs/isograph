@@ -24,8 +24,7 @@ pub type ValidatedSchemaField = SchemaServerField<TypeAnnotation<OutputTypeId>>;
 pub type ValidatedSelection = Selection<ValidatedScalarDefinedField, ObjectId>;
 
 pub type ValidatedVariableDefinition = VariableDefinition<DefinedTypeId>;
-pub type ValidatedSchemaResolver =
-    SchemaResolver<ValidatedScalarDefinedField, ObjectId, DefinedTypeId>;
+pub type ValidatedSchemaResolver = SchemaResolver<ValidatedSchemaState>;
 
 /// The validated defined field that shows up in the encountered field generic.
 pub type ValidatedEncounteredDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;

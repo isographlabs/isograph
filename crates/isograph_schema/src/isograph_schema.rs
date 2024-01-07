@@ -68,13 +68,7 @@ pub trait SchemaValidationState: Debug {
 #[derive(Debug)]
 pub struct Schema<TValidation: SchemaValidationState> {
     pub fields: Vec<SchemaServerField<TypeAnnotation<TValidation::FieldAssociatedType>>>,
-    pub resolvers: Vec<
-        SchemaResolver<
-            TValidation::ScalarField,
-            TValidation::LinkedField,
-            TValidation::VariableType,
-        >,
-    >,
+    pub resolvers: Vec<SchemaResolver<TValidation>>,
     // TODO consider whether this belongs here. It could just be a free variable.
     pub fetchable_resolvers: Vec<TValidation::FetchableResolver>,
     pub schema_data: SchemaData<TValidation>,
@@ -145,7 +139,7 @@ pub(crate) type UnvalidatedSchemaData = SchemaData<UnvalidatedSchemaState>;
 
 pub(crate) type UnvalidatedSchemaField = SchemaServerField<TypeAnnotation<UnvalidatedTypeName>>;
 
-pub(crate) type UnvalidatedSchemaResolver = SchemaResolver<(), (), UnvalidatedTypeName>;
+pub(crate) type UnvalidatedSchemaResolver = SchemaResolver<UnvalidatedSchemaState>;
 
 pub(crate) type UnvalidatedSchemaServerField = SchemaServerField<TypeAnnotation<OutputTypeId>>;
 
@@ -166,14 +160,7 @@ impl<TValidation: SchemaValidationState> Schema<TValidation> {
     }
 
     /// Get a reference to a given resolver by its id.
-    pub fn resolver(
-        &self,
-        resolver_field_id: ResolverFieldId,
-    ) -> &SchemaResolver<
-        TValidation::ScalarField,
-        TValidation::LinkedField,
-        TValidation::VariableType,
-    > {
+    pub fn resolver(&self, resolver_field_id: ResolverFieldId) -> &SchemaResolver<TValidation> {
         &self.resolvers[resolver_field_id.as_usize()]
     }
 
@@ -587,7 +574,7 @@ pub struct MutationFieldResolverActionKindInfo {
 }
 
 #[derive(Debug)]
-pub struct SchemaResolver<TScalarField, TLinkedField, TVariableDefinitionType> {
+pub struct SchemaResolver<TValidation: SchemaValidationState> {
     pub description: Option<DescriptionValue>,
     // TODO make this a ResolverName that can be converted into a SelectableFieldName
     pub name: SelectableFieldName,
@@ -598,7 +585,7 @@ pub struct SchemaResolver<TScalarField, TLinkedField, TVariableDefinitionType> {
     // Perhaps refetch fields for viewer (or other fields that have a known path
     // that don't require id) will have no selection set.
     pub selection_set_and_unwraps: Option<(
-        Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
+        Vec<WithSpan<Selection<TValidation::ScalarField, TValidation::LinkedField>>>,
         Vec<WithSpan<Unwrap>>,
     )>,
 
@@ -607,7 +594,7 @@ pub struct SchemaResolver<TScalarField, TLinkedField, TVariableDefinitionType> {
 
     pub action_kind: ResolverActionKind,
 
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<TVariableDefinitionType>>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<TValidation::VariableType>>>,
 
     // TODO this is probably unused
     // Why is this not calculated when needed?
