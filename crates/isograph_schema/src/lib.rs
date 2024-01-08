@@ -1,5 +1,6 @@
 mod compilation_options;
 mod isograph_schema;
+mod magic_mutation_fields;
 mod merged;
 mod process_resolver_declaration;
 mod process_type_definition;
