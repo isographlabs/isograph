@@ -127,58 +127,69 @@ impl UnvalidatedSchema {
         }
 
         for (supertype_name, subtypes) in valid_type_refinement_map {
-            // TODO perhaps encode this in the type system
-            let first_item = subtypes
-                .first()
-                .expect("subtypes should not be empty. This indicates a bug in Isograph");
-
-            // supertype, if it exists, can be refined to each subtype
-            let supertype_id = self
-                .schema_data
-                .defined_types
-                .get(&supertype_name.into())
-                .ok_or(WithLocation::new(
-                    ProcessTypeDefinitionError::IsographObjectTypeNameNotDefined {
-                        type_name: supertype_name,
-                    },
-                    // TODO look up the first_item, get the matching implementing object, and
-                    // use that instead.
-                    first_item.location,
-                ))?;
-
-            match supertype_id {
-                DefinedTypeId::Scalar(scalar_id) => {
-                    let scalar = self.schema_data.scalar(*scalar_id);
-                    let first_implementing_object = self.schema_data.object(first_item.item);
-
-                    return Err(WithLocation::new(
-                        ProcessTypeDefinitionError::IsographObjectTypeNameIsScalar {
-                            type_name: supertype_name,
-                            implementing_object: first_implementing_object.name,
-                        },
-                        scalar.name.location,
-                    ));
-                }
-                DefinedTypeId::Object(object_id) => {
-                    let supertype = self.schema_data.object_mut(*object_id);
-                    // TODO validate that supertype was defined as an interface, perhaps by
-                    // including references to the original definition (i.e. as a type parameter)
-                    // and having the schema be able to validate this. (i.e. this should be
-                    // a way to execute GraphQL-specific code in isograph-land without actually
-                    // putting the code here.)
-
-                    for subtype_id in subtypes {
-                        supertype.valid_refinements.push(ValidRefinement {
-                            target: subtype_id.item,
-                        });
-                    }
-                }
-            }
+            self.add_valid_refinements_to_supertype(supertype_name, subtypes)?;
         }
 
         Ok(ProcessGraphQLDocumentOutcome {
             mutation_id: mutation_type_id,
         })
+    }
+
+    // TODO This is currently a completely useless function, serving only to surface
+    // some validation errors. It might be necessary once we handle __asNode etc.
+    // style fields.
+    fn add_valid_refinements_to_supertype(
+        &mut self,
+        supertype_name: IsographObjectTypeName,
+        subtypes: Vec<WithLocation<ObjectId>>,
+    ) -> ProcessTypeDefinitionResult<()> {
+        let first_item = subtypes
+            .first()
+            .expect("subtypes should not be empty. This indicates a bug in Isograph");
+
+        let supertype_id = self
+            .schema_data
+            .defined_types
+            .get(&supertype_name.into())
+            .ok_or(WithLocation::new(
+                ProcessTypeDefinitionError::IsographObjectTypeNameNotDefined {
+                    type_name: supertype_name,
+                },
+                // TODO look up the first_item, get the matching implementing object, and
+                // use that instead.
+                first_item.location,
+            ))?;
+
+        match supertype_id {
+            DefinedTypeId::Scalar(scalar_id) => {
+                let scalar = self.schema_data.scalar(*scalar_id);
+                let first_implementing_object = self.schema_data.object(first_item.item);
+
+                return Err(WithLocation::new(
+                    ProcessTypeDefinitionError::IsographObjectTypeNameIsScalar {
+                        type_name: supertype_name,
+                        implementing_object: first_implementing_object.name,
+                    },
+                    scalar.name.location,
+                ));
+            }
+            DefinedTypeId::Object(object_id) => {
+                let supertype = self.schema_data.object_mut(*object_id);
+                // TODO validate that supertype was defined as an interface, perhaps by
+                // including references to the original definition (i.e. as a type parameter)
+                // and having the schema be able to validate this. (i.e. this should be
+                // a way to execute GraphQL-specific code in isograph-land without actually
+                // putting the code here.)
+
+                for subtype_id in subtypes {
+                    supertype.valid_refinements.push(ValidRefinement {
+                        target: subtype_id.item,
+                    });
+                }
+            }
+        };
+
+        Ok(())
     }
 
     pub fn process_graphql_type_extension_document(
