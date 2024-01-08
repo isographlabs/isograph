@@ -1,6 +1,6 @@
 use std::{error::Error, fmt};
 
-use intern::{string_key::Intern, Lookup};
+use intern::Lookup;
 
 use crate::{text_with_carats::text_with_carats, SourceFileName, Span, WithSpan};
 
@@ -15,15 +15,6 @@ use crate::{text_with_carats::text_with_carats, SourceFileName, Span, WithSpan};
 pub struct TextSource {
     pub path: SourceFileName,
     pub span: Option<Span>,
-}
-
-impl TextSource {
-    pub fn todo_generated() -> TextSource {
-        TextSource {
-            path: "generated-file".intern().into(),
-            span: None,
-        }
-    }
 }
 
 impl TextSource {
@@ -42,13 +33,25 @@ impl TextSource {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct EmbeddedLocation {
+    pub text_source: TextSource,
+    /// The span is relative to the Source's span, not to the
+    /// entire source file.
+    pub span: Span,
+}
+
+impl std::fmt::Display for EmbeddedLocation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (file_path, read_out_text) = self.text_source.read_to_string();
+        let text_with_carats = text_with_carats(&read_out_text, self.span);
+
+        write!(f, "{}\n{}", file_path, text_with_carats)
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Location {
-    Embedded {
-        text_source: TextSource,
-        /// The span is relative to the Source's span, not to the
-        /// entire source file.
-        span: Span,
-    },
+    Embedded(EmbeddedLocation),
     Generated,
 }
 
@@ -56,21 +59,20 @@ impl Location {
     pub fn generated() -> Self {
         Location::Generated
     }
-
     pub fn new(text_source: TextSource, span: Span) -> Self {
-        Location::Embedded { text_source, span }
+        Location::Embedded(EmbeddedLocation::new(text_source, span))
+    }
+}
+impl EmbeddedLocation {
+    pub fn new(text_source: TextSource, span: Span) -> Self {
+        EmbeddedLocation { text_source, span }
     }
 }
 
 impl fmt::Display for Location {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Location::Embedded { text_source, span } => {
-                let (file_path, read_out_text) = text_source.read_to_string();
-                let text_with_carats = text_with_carats(&read_out_text, *span);
-
-                write!(f, "{}\n{}", file_path, text_with_carats)
-            }
+            Location::Embedded(e) => e.fmt(f),
             Location::Generated => {
                 write!(f, "<generated>")
             }
@@ -112,15 +114,65 @@ impl<T> WithLocation<T> {
 
     /// This method should not be called. It exists because in some places,
     /// we have locations where we want spans, which needs to be fixed with
-    /// refactoring.
+    /// refactoring. We can probably instead enforce that the type has a
+    /// EmbeddedLocation or WithEmbeddedLocation
     pub fn hack_to_with_span(self) -> WithSpan<T> {
         let span = match self.location {
-            Location::Embedded { span, .. } => span,
+            Location::Embedded(EmbeddedLocation { span, .. }) => span,
             Location::Generated => Span::todo_generated(),
         };
         WithSpan {
             item: self.item,
             span,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
+pub struct WithEmbeddedLocation<T> {
+    pub location: EmbeddedLocation,
+    pub item: T,
+}
+
+impl<T: Error> Error for WithEmbeddedLocation<T> {
+    fn description(&self) -> &str {
+        #[allow(deprecated)]
+        self.item.description()
+    }
+}
+
+impl<T: fmt::Display> fmt::Display for WithEmbeddedLocation<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}\n{}", self.item, self.location)
+    }
+}
+
+impl<T> WithEmbeddedLocation<T> {
+    pub fn new(item: T, location: EmbeddedLocation) -> Self {
+        WithEmbeddedLocation { item, location }
+    }
+
+    pub fn map<U>(self, map: impl FnOnce(T) -> U) -> WithEmbeddedLocation<U> {
+        WithEmbeddedLocation::new(map(self.item), self.location)
+    }
+
+    pub fn and_then<U, E>(
+        self,
+        map: impl FnOnce(T) -> Result<U, E>,
+    ) -> Result<WithEmbeddedLocation<U>, E> {
+        Ok(WithEmbeddedLocation::new(map(self.item)?, self.location))
+    }
+
+    pub fn into_with_location(self) -> WithLocation<T> {
+        self.into()
+    }
+}
+
+impl<T> From<WithEmbeddedLocation<T>> for WithLocation<T> {
+    fn from(value: WithEmbeddedLocation<T>) -> Self {
+        WithLocation {
+            location: Location::Embedded(value.location),
+            item: value.item,
         }
     }
 }

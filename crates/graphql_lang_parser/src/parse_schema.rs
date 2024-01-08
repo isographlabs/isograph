@@ -526,7 +526,7 @@ fn parse_constant_directives(
             name: tokens
                 .parse_string_key_type(TokenKind::Identifier)
                 .map_err(|with_span| with_span.map(SchemaParseError::from))?
-                .to_with_location(text_source),
+                .to_with_embedded_location(text_source),
             arguments: parse_optional_constant_arguments(tokens, text_source)?,
         })
     }

@@ -234,11 +234,9 @@ impl UnvalidatedSchema {
             GraphQLTypeSystemExtension::ObjectTypeExtension(object_extension) => {
                 let name = object_extension.name.item;
 
-                let id = self
-                    .schema_data
-                    .defined_types
-                    .get(&name.into())
-                    .ok_or_else(|| panic!("TODO why does this id not exist?"))?;
+                let id = self.schema_data.defined_types.get(&name.into()).expect(
+                    "TODO why does this id not exist. This probably indicates a bug in Isograph.",
+                );
 
                 match *id {
                     DefinedTypeId::Object(object_id) => {

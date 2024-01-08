@@ -330,7 +330,7 @@ pub struct SchemaObject<TValidation: SchemaValidationState> {
     pub server_fields: Vec<ServerFieldId>,
     pub resolvers: Vec<ResolverFieldId>,
     pub encountered_fields: HashMap<SelectableFieldName, TValidation::EncounteredField>,
-    /// This is an unused field right now, I think.
+    /// This is an unused field right now
     pub valid_refinements: Vec<ValidRefinement>,
 }
 

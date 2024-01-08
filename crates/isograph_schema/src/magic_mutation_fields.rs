@@ -1,6 +1,7 @@
 use common_lang_types::{
-    DirectiveArgumentName, DirectiveName, IsographObjectTypeName, Location, SelectableFieldName,
-    Span, StringLiteralValue, TextSource, ValueKeyName, WithLocation, WithSpan,
+    DirectiveArgumentName, DirectiveName, EmbeddedLocation, IsographObjectTypeName, Location,
+    SelectableFieldName, Span, StringLiteralValue, TextSource, ValueKeyName, WithEmbeddedLocation,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{ConstantValue, GraphQLDirective, GraphQLInputValueDefinition};
 use intern::{string_key::Intern, Lookup};
@@ -57,12 +58,12 @@ impl UnvalidatedSchema {
             .directives
             .iter()
             .map(|d| {
-                self.extract_magic_mutation_field_info(d, TextSource::todo_generated(), mutation_id)
+                self.extract_magic_mutation_field_info(d, d.name.location.text_source, mutation_id)
             })
             .collect::<Result<Vec<_>, _>>()?;
         let magic_mutation_infos = magic_mutation_infos
             .into_iter()
-            .filter_map(|x| x)
+            .flatten()
             .collect::<Vec<_>>();
 
         for magic_mutation_info in magic_mutation_infos.into_iter() {
@@ -255,11 +256,12 @@ impl UnvalidatedSchema {
         mutation_id: ObjectId,
     ) -> ProcessTypeDefinitionResult<MagicMutationFieldInfo> {
         if d.arguments.len() != 3 {
-            return Err(WithLocation::new(
+            return Err(WithEmbeddedLocation::new(
                 ProcessTypeDefinitionError::InvalidPrimaryDirectiveArgumentCount,
                 // This is wrong, the arguments should have a span, or the whole thing should have a span
                 d.name.location,
-            ));
+            )
+            .into_with_location());
         }
 
         let path = d
@@ -267,19 +269,21 @@ impl UnvalidatedSchema {
             .iter()
             .find(|d| d.name.item == *PATH_DIRECTIVE_ARGUMENT)
             .ok_or_else(|| {
-                WithLocation::new(
+                WithEmbeddedLocation::new(
                     ProcessTypeDefinitionError::MissingPathArg,
                     // This is wrong, the arguments should have a span, or the whole thing should have a span
                     d.name.location,
                 )
+                .into_with_location()
             })?;
         let path_val = match path.value.item {
             ConstantValue::String(s) => Ok(s),
-            _ => Err(WithLocation::new(
+            _ => Err(WithEmbeddedLocation::new(
                 ProcessTypeDefinitionError::PathValueShouldBeString,
                 // This is wrong, the arguments should have a span, or the whole thing should have a span
                 d.name.location,
-            )),
+            )
+            .into_with_location()),
         }?;
 
         let field_map = d
@@ -287,11 +291,12 @@ impl UnvalidatedSchema {
             .iter()
             .find(|d| d.name.item == *FIELD_MAP_DIRECTIVE_ARGUMENT)
             .ok_or_else(|| {
-                WithLocation::new(
+                WithEmbeddedLocation::new(
                     ProcessTypeDefinitionError::MissingFieldMapArg,
                     // This is wrong, the arguments should have a span, or the whole thing should have a span
                     d.name.location,
                 )
+                .into_with_location()
             })?;
 
         let field_map_items = parse_field_map_val(&field_map.value)?;
@@ -301,11 +306,12 @@ impl UnvalidatedSchema {
             .iter()
             .find(|d| d.name.item == *FIELD_DIRECTIVE_ARGUMENT)
             .ok_or_else(|| {
-                WithLocation::new(
+                WithEmbeddedLocation::new(
                     ProcessTypeDefinitionError::MissingFieldMapArg,
                     // This is wrong, the arguments should have a span, or the whole thing should have a span
                     d.name.location,
                 )
+                .into_with_location()
             })?;
 
         let field_id = self.parse_field(&field.value, mutation_id)?;
@@ -420,10 +426,10 @@ fn parse_field_map_val(
 
             // This is weirdly low-level!
             let span = match to.value.location {
-                Location::Embedded {
+                Location::Embedded(EmbeddedLocation {
                     text_source: _,
                     span,
-                } => span,
+                }) => span,
                 Location::Generated => {
                     panic!("TODO make this an error; location should not be generated here.")
                 }
