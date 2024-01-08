@@ -15,17 +15,13 @@ The process for adding Isograph to an existing NextJS project is described in th
 ### Install the compiler, babel plugin and runtime
 
 ```sh
-yarn install --dev @isograph/compiler@0.0.0-main-b5263898
-yarn install --dev @isograph/babel-plugin@0.0.0-main-b5263898
-yarn install @isograph/react@0.0.0-main-b5263898
+yarn install --dev @isograph/compiler@main
+yarn install --dev @isograph/babel-plugin@main
+yarn install @isograph/react@main
 ```
 
 :::info
-You cannot install `@isograph/compiler` without specifying a version, as this will install an old version. However, a new release is cut with every push.
-
-To find the latest release, you should check out [the npm page](https://www.npmjs.com/package/@isograph/react?activeTab=versions) and choose the most recently published "main" version, **not** the most recently published "latest" version.
-
-This will not be an issue when we cut a proper, versioned release!
+For now, you must install the `@main` versions of the packages.
 :::
 
 Installing the compiler also adds the command `yarn iso`.
