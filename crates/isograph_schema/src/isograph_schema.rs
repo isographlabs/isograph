@@ -12,8 +12,8 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    DefinedTypeId, LinkedFieldSelection, NonConstantValue, ObjectId, OutputTypeId, ResolverFieldId,
-    ScalarId, Selection, ServerFieldId, ServerIdFieldId, Unwrap, VariableDefinition,
+    DefinedTypeId, LinkedFieldSelection, NonConstantValue, ObjectId, ResolverFieldId, ScalarId,
+    Selection, ServerFieldId, ServerIdFieldId, Unwrap, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -190,20 +190,6 @@ impl<TValidation: SchemaValidationState> SchemaData<TValidation> {
             }
             DefinedTypeId::Scalar(id) => {
                 SchemaType::Scalar(self.scalars.get(id.as_usize()).unwrap())
-            }
-        }
-    }
-
-    pub fn lookup_output_type(
-        &self,
-        output_type_id: OutputTypeId,
-    ) -> SchemaOutputType<TValidation> {
-        match output_type_id {
-            OutputTypeId::Object(id) => {
-                SchemaOutputType::Object(self.objects.get(id.as_usize()).unwrap())
-            }
-            OutputTypeId::Scalar(id) => {
-                SchemaOutputType::Scalar(self.scalars.get(id.as_usize()).unwrap())
             }
         }
     }

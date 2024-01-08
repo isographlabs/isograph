@@ -6,8 +6,8 @@ use common_lang_types::{
 };
 use graphql_lang_types::{NamedTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
-    DefinedTypeId, LinkedFieldSelection, ObjectId, OutputTypeId, ResolverFieldId,
-    ScalarFieldSelection, ScalarId, Selection, ServerFieldId, VariableDefinition,
+    DefinedTypeId, LinkedFieldSelection, ObjectId, ResolverFieldId, ScalarFieldSelection, ScalarId,
+    Selection, ServerFieldId, VariableDefinition,
 };
 use thiserror::Error;
 
@@ -19,7 +19,7 @@ use crate::{
     UnvalidatedSchemaServerField, ValidateResolverFetchDeclarationError,
 };
 
-pub type ValidatedSchemaField = SchemaServerField<TypeAnnotation<OutputTypeId>>;
+pub type ValidatedSchemaField = SchemaServerField<TypeAnnotation<DefinedTypeId>>;
 
 pub type ValidatedSelection = Selection<ValidatedScalarDefinedField, ObjectId>;
 
@@ -38,7 +38,7 @@ pub type ValidatedSchemaIdField = SchemaIdField<NamedTypeAnnotation<ScalarId>>;
 #[derive(Debug)]
 pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
-    type FieldAssociatedType = OutputTypeId;
+    type FieldAssociatedType = DefinedTypeId;
     type ScalarField = ValidatedScalarDefinedField;
     type LinkedField = ObjectId;
     type VariableType = DefinedTypeId;
@@ -231,11 +231,8 @@ fn validate_and_transform_field(
 ) -> ValidateSchemaResult<ValidatedSchemaField> {
     // TODO rewrite as field.map(...).transpose()
     let (empty_field, server_field_type) = field.split();
-    let field_type = validate_server_field_type_exists_and_is_output_type(
-        schema_data,
-        &server_field_type,
-        &empty_field,
-    )?;
+    let field_type =
+        validate_server_field_type_exists(schema_data, &server_field_type, &empty_field)?;
     Ok(SchemaServerField {
         description: empty_field.description,
         name: empty_field.name,
@@ -246,27 +243,15 @@ fn validate_and_transform_field(
     })
 }
 
-fn validate_server_field_type_exists_and_is_output_type(
+fn validate_server_field_type_exists(
     schema_data: &UnvalidatedSchemaData,
     server_field_type: &TypeAnnotation<UnvalidatedTypeName>,
     field: &SchemaServerField<()>,
-) -> ValidateSchemaResult<TypeAnnotation<OutputTypeId>> {
+) -> ValidateSchemaResult<TypeAnnotation<DefinedTypeId>> {
     // look up the item in defined_types. If it's not there, error.
     match schema_data.defined_types.get(server_field_type.inner()) {
         // Why do we need to clone here? Can we avoid this?
-        Some(type_id) => server_field_type.clone().and_then(|_| {
-            type_id.as_output_type_id().ok_or_else(|| {
-                let parent_type = schema_data.object(field.parent_type_id);
-                WithLocation::new(
-                    ValidateSchemaError::FieldTypenameIsInputObject {
-                        parent_type_name: parent_type.name,
-                        field_name: field.name.item,
-                        field_type: *server_field_type.inner(),
-                    },
-                    field.name.location,
-                )
-            })
-        }),
+        Some(type_id) => Ok(server_field_type.clone().map(|_| *type_id)),
         None => Err(WithLocation::new(
             ValidateSchemaError::FieldTypenameDoesNotExist {
                 parent_type_name: schema_data.object(field.parent_type_id).name,

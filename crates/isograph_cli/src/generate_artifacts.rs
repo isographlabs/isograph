@@ -16,7 +16,7 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    DefinedTypeId, NonConstantValue, ObjectId, OutputTypeId, Selection, SelectionFieldArgument,
+    DefinedTypeId, NonConstantValue, ObjectId, Selection, SelectionFieldArgument,
     ServerFieldSelection, VariableDefinition,
 };
 use isograph_schema::{
@@ -759,7 +759,7 @@ fn write_query_types_from_selection(
                         // TODO there should be a clever way to print without cloning
                         let output_type = field.associated_data.clone().map(|output_type_id| {
                             // TODO not just scalars, enums as well. Both should have a javascript name
-                            let scalar_id = if let OutputTypeId::Scalar(scalar) = output_type_id {
+                            let scalar_id = if let DefinedTypeId::Scalar(scalar) = output_type_id {
                                 scalar
                             } else {
                                 panic!("output_type_id should be a scalar");
@@ -818,7 +818,7 @@ fn write_query_types_from_selection(
                 let name_or_alias = linked_field.name_or_alias().item;
                 let type_annotation = field.associated_data.clone().map(|output_type_id| {
                     // TODO Or interface or union type
-                    let object_id = if let OutputTypeId::Object(object) = output_type_id {
+                    let object_id = if let DefinedTypeId::Object(object) = output_type_id {
                         object
                     } else {
                         panic!("output_type_id should be a object");

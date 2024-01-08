@@ -5,7 +5,7 @@ use common_lang_types::{
 };
 use graphql_lang_types::TypeAnnotation;
 use intern::string_key::Intern;
-use isograph_lang_types::{DefinedTypeId, OutputTypeId, ResolverFetch, ResolverFieldId, ScalarId};
+use isograph_lang_types::{DefinedTypeId, ResolverFetch, ResolverFieldId, ScalarId};
 
 use crate::{
     DefinedField, Schema, SchemaData, SchemaObject, SchemaResolver, SchemaScalar,
@@ -45,7 +45,7 @@ pub(crate) type UnvalidatedSchemaField = SchemaServerField<TypeAnnotation<Unvali
 
 pub(crate) type UnvalidatedSchemaResolver = SchemaResolver<UnvalidatedSchemaState>;
 
-pub(crate) type UnvalidatedSchemaServerField = SchemaServerField<TypeAnnotation<OutputTypeId>>;
+pub(crate) type UnvalidatedSchemaServerField = SchemaServerField<TypeAnnotation<DefinedTypeId>>;
 
 impl UnvalidatedSchema {
     pub fn new() -> Self {
