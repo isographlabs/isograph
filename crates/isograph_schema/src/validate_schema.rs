@@ -279,7 +279,7 @@ fn validate_server_field_type_exists_and_is_output_type(
 fn validate_and_transform_resolvers(
     resolvers: Vec<UnvalidatedSchemaResolver>,
     schema_data: &UnvalidatedSchemaData,
-    server_fields: &Vec<UnvalidatedSchemaServerField>,
+    server_fields: &[UnvalidatedSchemaServerField],
 ) -> Result<Vec<ValidatedSchemaResolver>, Vec<WithLocation<ValidateSchemaError>>> {
     get_all_errors_or_all_ok(
         resolvers
@@ -291,7 +291,7 @@ fn validate_and_transform_resolvers(
 fn validate_resolver_fragment(
     schema_data: &UnvalidatedSchemaData,
     unvalidated_resolver: UnvalidatedSchemaResolver,
-    server_fields: &Vec<UnvalidatedSchemaServerField>,
+    server_fields: &[UnvalidatedSchemaServerField],
 ) -> ValidateSchemaResult<ValidatedSchemaResolver> {
     let variable_definitions =
         validate_variable_definitions(schema_data, unvalidated_resolver.variable_definitions)?;
@@ -450,7 +450,7 @@ fn validate_resolver_definition_selections_exist_and_types_match(
     schema_data: &UnvalidatedSchemaData,
     selection_set: Vec<WithSpan<Selection<(), ()>>>,
     parent_object: &UnvalidatedSchemaObject,
-    server_fields: &Vec<UnvalidatedSchemaServerField>,
+    server_fields: &[UnvalidatedSchemaServerField],
 ) -> ValidateSelectionsResult<Vec<WithSpan<ValidatedSelection>>> {
     // Currently, we only check that each field exists and has an appropriate type, not that
     // there are no selection conflicts due to aliases or parameters.
@@ -472,7 +472,7 @@ fn validate_resolver_definition_selection_exists_and_type_matches(
     selection: WithSpan<Selection<(), ()>>,
     parent_object: &UnvalidatedSchemaObject,
     schema_data: &UnvalidatedSchemaData,
-    server_fields: &Vec<UnvalidatedSchemaServerField>,
+    server_fields: &[UnvalidatedSchemaServerField],
 ) -> ValidateSelectionsResult<WithSpan<ValidatedSelection>> {
     selection.and_then(|selection| {
         selection.and_then(&mut |field_selection| {
@@ -507,7 +507,7 @@ fn validate_field_type_exists_and_is_scalar(
     schema_data: &UnvalidatedSchemaData,
     parent_object: &UnvalidatedSchemaObject,
     scalar_field_selection: ScalarFieldSelection<()>,
-    server_fields: &Vec<UnvalidatedSchemaServerField>,
+    server_fields: &[UnvalidatedSchemaServerField],
 ) -> ValidateSelectionsResult<ScalarFieldSelection<ValidatedScalarDefinedField>> {
     let scalar_field_name = scalar_field_selection.name.item.into();
     match parent_encountered_fields.get(&scalar_field_name) {
@@ -575,7 +575,7 @@ fn validate_field_type_exists_and_is_linked(
     schema_data: &UnvalidatedSchemaData,
     parent_object: &UnvalidatedSchemaObject,
     linked_field_selection: LinkedFieldSelection<(), ()>,
-    server_fields: &Vec<UnvalidatedSchemaServerField>,
+    server_fields: &[UnvalidatedSchemaServerField],
 ) -> ValidateSelectionsResult<LinkedFieldSelection<ValidatedScalarDefinedField, ObjectId>> {
     let linked_field_name = linked_field_selection.name.item.into();
     match parent_fields.get(&linked_field_name) {
@@ -639,7 +639,7 @@ fn validate_field_type_exists_and_is_linked(
 }
 
 fn find_server_field_id(
-    server_fields: &Vec<UnvalidatedSchemaServerField>,
+    server_fields: &[UnvalidatedSchemaServerField],
     field_name: ScalarFieldName,
     parent_server_fields: &[ServerFieldId],
 ) -> Option<ServerFieldId> {

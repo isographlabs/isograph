@@ -694,7 +694,7 @@ fn write_selections_for_query_text(
 
 fn generate_resolver_parameter_type(
     schema: &ValidatedSchema,
-    selection_set: &Vec<WithSpan<ValidatedSelection>>,
+    selection_set: &[WithSpan<ValidatedSelection>],
     variant: &ResolverVariant,
     parent_type: &ValidatedSchemaObject,
     nested_resolver_imports: &mut NestedResolverImports,
@@ -1181,7 +1181,7 @@ fn generate_reader_ast_node(
 
 fn generate_normalization_ast<'schema>(
     schema: &'schema ValidatedSchema,
-    selection_set: &Vec<WithSpan<MergedServerFieldSelection>>,
+    selection_set: &[WithSpan<MergedServerFieldSelection>],
     indentation_level: u8,
 ) -> NormalizationAst {
     let mut normalization_ast = "[\n".to_string();

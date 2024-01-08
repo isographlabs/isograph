@@ -223,7 +223,7 @@ impl<'a> MergeTraversalState<'a> {
 pub fn create_merged_selection_set(
     schema: &ValidatedSchema,
     parent_type: &ValidatedSchemaObject,
-    validated_selections: &Vec<WithSpan<ValidatedSelection>>,
+    validated_selections: &[WithSpan<ValidatedSelection>],
     artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
     // N.B. we call this for non-fetchable resolvers now, but that is a smell
     root_fetchable_resolver: &ValidatedSchemaResolver,
@@ -331,7 +331,7 @@ pub fn create_merged_selection_set(
 fn create_merged_selection_set_with_merge_traversal_state(
     schema: &ValidatedSchema,
     parent_type: &ValidatedSchemaObject,
-    validated_selections: &Vec<WithSpan<ValidatedSelection>>,
+    validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut MergeTraversalState<'_>,
 ) -> MergedSelectionSet {
     let mut merged_selection_map = HashMap::new();
@@ -359,7 +359,7 @@ fn merge_selections_into_set(
     schema: &ValidatedSchema,
     merged_selection_map: &mut MergedSelectionMap,
     parent_type: &ValidatedSchemaObject,
-    validated_selections: &Vec<WithSpan<ValidatedSelection>>,
+    validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut MergeTraversalState<'_>,
 ) {
     for validated_selection in validated_selections.iter().filter(filter_id_fields) {
@@ -608,7 +608,7 @@ fn HACK_combine_name_and_variables_into_normalization_alias(
 fn HACK__merge_linked_fields(
     schema: &ValidatedSchema,
     existing_selection_set: &mut Vec<WithSpan<MergedServerFieldSelection>>,
-    new_selection_set: &Vec<WithSpan<ValidatedSelection>>,
+    new_selection_set: &[WithSpan<ValidatedSelection>],
     linked_field_parent_type: &ValidatedSchemaObject,
     merge_traversal_state: &mut MergeTraversalState<'_>,
 ) {
