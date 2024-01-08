@@ -55,10 +55,8 @@ pub trait SchemaValidationState: Debug {
 
 /// The in-memory representation of a schema.
 ///
-/// The generics with which the Schema type is instantiated vary based on
-/// how far along in the validation pipeline the schema is. In particular,
-/// there is an [UnvalidatedSchema](UnvalidatedSchema) type and a
-/// ValidatedSchema type.
+/// The type param with which the Schema type is instantiated vary based on
+/// how far along in the validation pipeline the schema is.
 ///
 /// Invariant: a schema is append-only, because pointers into the Schema are in the
 /// form of newtype wrappers around u32 indexes (e.g. FieldId, etc.) As a result,

@@ -99,10 +99,13 @@ pub(crate) fn handle_compile_command(
         })
         .collect::<Result<Vec<_>, BatchCompileError>>()?;
 
-    let mut schema = Schema::new();
+    let mut schema = UnvalidatedSchema::new();
 
     let mut process_graphql_outcome =
         schema.process_graphql_type_system_document(type_system_document, config.options)?;
+
+    // TODO validate here! We should not allow a situation in which a base schema is invalid,
+    // but is made valid by the presence of schema extensions.
 
     for extension_document in type_extension_document {
         let ProcessGraphQLDocumentOutcome { mutation_id } =
@@ -117,6 +120,8 @@ pub(crate) fn handle_compile_command(
 
     // TODO the ordering should be:
     // - process schema
+    // - validate
+    // - process schema extension
     // - validate
     // - add mutation fields
     // - process parsed literals
