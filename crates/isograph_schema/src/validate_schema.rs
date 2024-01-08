@@ -86,7 +86,11 @@ impl ValidatedSchema {
             Ok(fields) => fields,
             Err(new_errors) => {
                 errors.extend(new_errors);
-                vec![]
+                return Err(errors);
+
+                // Because fields flows into updated_resolvers, we cannot optimistically
+                // continue here.
+                // TODO: figure out whether this can be worked around.
             }
         };
 
