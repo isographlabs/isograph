@@ -29,10 +29,24 @@ use crate::{
 };
 
 pub(crate) struct CompilationStats {
-    pub elapsed_time: Duration,
     pub iso_resolver_count: usize,
     pub entrypoint_count: usize,
     pub total_artifacts_written: usize,
+}
+pub(crate) struct WithDuration<T> {
+    pub elapsed_time: Duration,
+    pub item: T,
+}
+
+impl<T> WithDuration<T> {
+    pub fn new(calculate: impl FnOnce() -> T) -> WithDuration<T> {
+        let start = Instant::now();
+        let item = calculate();
+        WithDuration {
+            elapsed_time: start.elapsed(),
+            item,
+        }
+    }
 }
 
 pub(crate) fn compile_and_print(
@@ -40,23 +54,31 @@ pub(crate) fn compile_and_print(
 ) -> Result<CompilationStats, BatchCompileError> {
     eprintln!("{}", "Starting to compile.".cyan());
 
-    match handle_compile_command(config) {
+    let result = handle_compile_command(config);
+    let elapsed_time = result.elapsed_time;
+
+    match result.item {
         Ok(stats) => {
             eprintln!(
-                "{}",
-                format!(
-                    "Successfully compiled {} resolvers and {} entrypoints, and wrote {} artifacts, in {}.\n",
-                    stats.iso_resolver_count,
-                    stats.entrypoint_count,
-                    stats.total_artifacts_written,
-                    pretty_duration(&stats.elapsed_time, None)
-                )
-                .bright_green()
-            );
+                    "{}",
+                    format!(
+                        "Successfully compiled {} resolvers and {} entrypoints, and wrote {} artifacts, in {}.\n",
+                        stats.iso_resolver_count,
+                        stats.entrypoint_count,
+                        stats.total_artifacts_written,
+                        pretty_duration(&elapsed_time, None)
+                    )
+                    .bright_green()
+                );
             Ok(stats)
         }
         Err(err) => {
-            eprintln!("{}\n{}", "Error when compiling.\n".bright_red(), err);
+            eprintln!(
+                "{}\n{}\n{}",
+                "Error when compiling.\n".bright_red(),
+                err,
+                format!("Compilation took {}.", pretty_duration(&elapsed_time, None)).bright_red()
+            );
             Err(err)
         }
     }
@@ -64,107 +86,112 @@ pub(crate) fn compile_and_print(
 
 pub(crate) fn handle_compile_command(
     config: &CompilerConfig,
-) -> Result<CompilationStats, BatchCompileError> {
-    let start = Instant::now();
+) -> WithDuration<Result<CompilationStats, BatchCompileError>> {
+    WithDuration::new(|| {
+        let content = read_schema_file(&config.schema)?;
+        let schema_text_source = TextSource {
+            path: config
+                .schema
+                .to_str()
+                .expect("Expected schema to be valid string")
+                .intern()
+                .into(),
+            span: None,
+        };
+        let type_system_document = parse_schema(&content, schema_text_source)
+            .map_err(|with_span| with_span.to_with_location(schema_text_source))?;
 
-    let content = read_schema_file(&config.schema)?;
-    let schema_text_source = TextSource {
-        path: config
-            .schema
-            .to_str()
-            .expect("Expected schema to be valid string")
-            .intern()
-            .into(),
-        span: None,
-    };
-    let type_system_document = parse_schema(&content, schema_text_source)
-        .map_err(|with_span| with_span.to_with_location(schema_text_source))?;
+        let type_extension_document = config
+            .schema_extensions
+            .iter()
+            .map(|schema_extension_path| {
+                let extension_text_source = TextSource {
+                    path: schema_extension_path
+                        .to_str()
+                        .expect("Expected schema extension to be valid string")
+                        .intern()
+                        .into(),
+                    span: None,
+                };
+                let extension_content = read_schema_file(schema_extension_path)?;
+                let extension = parse_schema_extensions(&extension_content, extension_text_source)
+                    .map_err(|with_span| with_span.to_with_location(extension_text_source))?;
+                Ok(extension)
+            })
+            .collect::<Result<Vec<_>, BatchCompileError>>()?;
 
-    let type_extension_document = config
-        .schema_extensions
-        .iter()
-        .map(|schema_extension_path| {
-            let extension_text_source = TextSource {
-                path: schema_extension_path
-                    .to_str()
-                    .expect("Expected schema extension to be valid string")
-                    .intern()
-                    .into(),
-                span: None,
-            };
-            let extension_content = read_schema_file(schema_extension_path)?;
-            let extension = parse_schema_extensions(&extension_content, extension_text_source)
-                .map_err(|with_span| with_span.to_with_location(extension_text_source))?;
-            Ok(extension)
-        })
-        .collect::<Result<Vec<_>, BatchCompileError>>()?;
+        let mut schema = UnvalidatedSchema::new();
 
-    let mut schema = UnvalidatedSchema::new();
+        let mut process_graphql_outcome =
+            schema.process_graphql_type_system_document(type_system_document, config.options)?;
 
-    let mut process_graphql_outcome =
-        schema.process_graphql_type_system_document(type_system_document, config.options)?;
+        // TODO validate here! We should not allow a situation in which a base schema is invalid,
+        // but is made valid by the presence of schema extensions.
 
-    // TODO validate here! We should not allow a situation in which a base schema is invalid,
-    // but is made valid by the presence of schema extensions.
+        for extension_document in type_extension_document {
+            let ProcessGraphQLDocumentOutcome { mutation_id } = schema
+                .process_graphql_type_extension_document(extension_document, config.options)?;
 
-    for extension_document in type_extension_document {
-        let ProcessGraphQLDocumentOutcome { mutation_id } =
-            schema.process_graphql_type_extension_document(extension_document, config.options)?;
-
-        match (mutation_id, process_graphql_outcome.mutation_id) {
-            (None, _) => {}
-            (Some(mutation_id), None) => process_graphql_outcome.mutation_id = Some(mutation_id),
-            (Some(_), Some(_)) => return Err(BatchCompileError::MutationObjectDefinedTwice),
+            match (mutation_id, process_graphql_outcome.mutation_id) {
+                (None, _) => {}
+                (Some(mutation_id), None) => {
+                    process_graphql_outcome.mutation_id = Some(mutation_id)
+                }
+                (Some(_), Some(_)) => return Err(BatchCompileError::MutationObjectDefinedTwice),
+            }
         }
-    }
 
-    // TODO the ordering should be:
-    // - process schema
-    // - validate
-    // - process schema extension
-    // - validate
-    // - add mutation fields
-    // - process parsed literals
-    // - validate resolvers
-    if let Some(mutation_id) = process_graphql_outcome.mutation_id {
-        schema.create_magic_mutation_fields(mutation_id, config.options)?;
-    }
+        // TODO the ordering should be:
+        // - process schema
+        // - validate
+        // - process schema extension
+        // - validate
+        // - add mutation fields
+        // - process parsed literals
+        // - validate resolvers
+        if let Some(mutation_id) = process_graphql_outcome.mutation_id {
+            schema.create_magic_mutation_fields(mutation_id, config.options)?;
+        }
 
-    let canonicalized_root_path = {
-        let current_dir = std::env::current_dir().expect("current_dir should exist");
-        let joined = current_dir.join(&config.project_root);
-        joined
-            .canonicalize()
-            .map_err(|message| BatchCompileError::UnableToLoadSchema {
-                path: joined.clone(),
-                message,
-            })?
-    };
+        let canonicalized_root_path = {
+            let current_dir = std::env::current_dir().expect("current_dir should exist");
+            let joined = current_dir.join(&config.project_root);
+            joined
+                .canonicalize()
+                .map_err(|message| BatchCompileError::UnableToLoadSchema {
+                    path: joined.clone(),
+                    message,
+                })?
+        };
 
-    // TODO return an iterator
-    let project_files = read_files_in_folder(&canonicalized_root_path)?;
+        // TODO return an iterator
+        let project_files = read_files_in_folder(&canonicalized_root_path)?;
 
-    let (parsed_resolvers, parsed_entrypoints) =
-        extract_iso_literals(project_files, canonicalized_root_path)
-            .map_err(BatchCompileError::from)?;
-    let resolver_count = parsed_resolvers.len();
-    let entrypoint_count = parsed_entrypoints.len();
+        let (parsed_resolvers, parsed_entrypoints) =
+            extract_iso_literals(project_files, canonicalized_root_path)
+                .map_err(BatchCompileError::from)?;
+        let resolver_count = parsed_resolvers.len();
+        let entrypoint_count = parsed_entrypoints.len();
 
-    process_parsed_resolvers_and_entrypoints(&mut schema, parsed_resolvers, parsed_entrypoints)?;
+        process_parsed_resolvers_and_entrypoints(
+            &mut schema,
+            parsed_resolvers,
+            parsed_entrypoints,
+        )?;
 
-    let validated_schema = Schema::validate_and_construct(schema)?;
+        let validated_schema = Schema::validate_and_construct(schema)?;
 
-    let total_artifacts_written = generate_artifacts(
-        &validated_schema,
-        &config.project_root,
-        &config.artifact_directory,
-    )?;
+        let total_artifacts_written = generate_artifacts(
+            &validated_schema,
+            &config.project_root,
+            &config.artifact_directory,
+        )?;
 
-    Ok(CompilationStats {
-        elapsed_time: start.elapsed(),
-        iso_resolver_count: resolver_count,
-        entrypoint_count,
-        total_artifacts_written,
+        Ok(CompilationStats {
+            iso_resolver_count: resolver_count,
+            entrypoint_count,
+            total_artifacts_written,
+        })
     })
 }
 
