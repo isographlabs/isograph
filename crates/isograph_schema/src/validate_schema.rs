@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    IsographObjectTypeName, ScalarFieldName, SelectableFieldName, UnvalidatedTypeName,
-    VariableName, WithLocation, WithSpan,
+    InputTypeName, InputValueName, IsographObjectTypeName, ScalarFieldName, SelectableFieldName,
+    UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
-use graphql_lang_types::{NamedTypeAnnotation, TypeAnnotation};
+use graphql_lang_types::{GraphQLInputValueDefinition, NamedTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
     DefinedTypeId, LinkedFieldSelection, ObjectId, ResolverFieldId, ScalarFieldSelection, ScalarId,
     Selection, ServerFieldId, VariableDefinition,
@@ -198,7 +198,7 @@ fn validate_and_transform_fields(
     fields: Vec<UnvalidatedSchemaField>,
     schema_data: &UnvalidatedSchemaData,
 ) -> Result<Vec<ValidatedSchemaField>, Vec<WithLocation<ValidateSchemaError>>> {
-    get_all_errors_or_all_ok(
+    get_all_errors_or_all_ok_iter(
         fields
             .into_iter()
             .map(|field| validate_and_transform_field(field, schema_data)),
@@ -225,22 +225,75 @@ fn get_all_errors_or_all_ok<T, E>(
     }
 }
 
+fn get_all_errors_or_all_ok_iter<T, E>(
+    items: impl Iterator<Item = Result<T, impl Iterator<Item = E>>>,
+) -> Result<Vec<T>, Vec<E>> {
+    let mut oks = vec![];
+    let mut errors = vec![];
+
+    for item in items {
+        match item {
+            Ok(ok) => oks.push(ok),
+            Err(e) => errors.extend(e),
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(oks)
+    } else {
+        Err(errors)
+    }
+}
+
 fn validate_and_transform_field(
     field: UnvalidatedSchemaField,
     schema_data: &UnvalidatedSchemaData,
-) -> ValidateSchemaResult<ValidatedSchemaField> {
+) -> Result<ValidatedSchemaField, impl Iterator<Item = WithLocation<ValidateSchemaError>>> {
     // TODO rewrite as field.map(...).transpose()
     let (empty_field, server_field_type) = field.split();
+
+    let mut errors = vec![];
+
     let field_type =
-        validate_server_field_type_exists(schema_data, &server_field_type, &empty_field)?;
-    Ok(SchemaServerField {
-        description: empty_field.description,
-        name: empty_field.name,
-        id: empty_field.id,
-        associated_data: field_type,
-        parent_type_id: empty_field.parent_type_id,
-        arguments: empty_field.arguments,
-    })
+        match validate_server_field_type_exists(schema_data, &server_field_type, &empty_field) {
+            Ok(type_annotation) => Some(type_annotation),
+            Err(e) => {
+                errors.push(e);
+                None
+            }
+        };
+
+    let valid_arguments = match {
+        get_all_errors_or_all_ok(empty_field.arguments.into_iter().map(|arg| {
+            validate_server_field_argument(
+                arg,
+                schema_data,
+                empty_field.parent_type_id,
+                empty_field.name,
+            )
+        }))
+    } {
+        Ok(arguments) => Some(arguments),
+        Err(e) => {
+            errors.extend(e);
+            None
+        }
+    };
+
+    if let Some(field_type) = field_type {
+        if let Some(valid_arguments) = valid_arguments {
+            return Ok(SchemaServerField {
+                description: empty_field.description,
+                name: empty_field.name,
+                id: empty_field.id,
+                associated_data: field_type,
+                parent_type_id: empty_field.parent_type_id,
+                arguments: valid_arguments,
+            });
+        }
+    }
+
+    Err(errors.into_iter())
 }
 
 fn validate_server_field_type_exists(
@@ -259,6 +312,33 @@ fn validate_server_field_type_exists(
                 field_type: *server_field_type.inner(),
             },
             field.name.location,
+        )),
+    }
+}
+
+fn validate_server_field_argument(
+    argument: WithLocation<GraphQLInputValueDefinition>,
+    schema_data: &UnvalidatedSchemaData,
+    parent_type_id: ObjectId,
+    name: WithLocation<SelectableFieldName>,
+) -> ValidateSchemaResult<WithLocation<GraphQLInputValueDefinition>> {
+    // Isograph doesn't care about the default value, and that remains
+    // unvalidated.
+
+    // look up the item in defined_types. If it's not there, error.
+    match schema_data
+        .defined_types
+        .get(&(*argument.item.type_.inner()).into())
+    {
+        Some(_) => Ok(argument),
+        None => Err(WithLocation::new(
+            ValidateSchemaError::FieldArgumentTypeDoesNotExist {
+                parent_type_name: schema_data.object(parent_type_id).name,
+                field_name: name.item,
+                argument_name: argument.item.name.item,
+                argument_type: *argument.item.type_.inner(),
+            },
+            name.location,
         )),
     }
 }
@@ -647,12 +727,22 @@ type ValidateSchemaResult<T> = Result<T, WithLocation<ValidateSchemaError>>;
 #[derive(Debug, Error)]
 pub enum ValidateSchemaError {
     #[error(
-        "The field `{parent_type_name}.{field_name}` has type `{field_type}`, which does not exist."
+        "The field `{parent_type_name}.{field_name}` has inner type `{field_type}`, which does not exist."
     )]
     FieldTypenameDoesNotExist {
         parent_type_name: IsographObjectTypeName,
         field_name: SelectableFieldName,
         field_type: UnvalidatedTypeName,
+    },
+
+    #[error(
+        "The argument `{argument_name}` on field `{parent_type_name}.{field_name}` has inner type `{argument_type}`, which does not exist."
+    )]
+    FieldArgumentTypeDoesNotExist {
+        argument_name: InputValueName,
+        parent_type_name: IsographObjectTypeName,
+        field_name: SelectableFieldName,
+        argument_type: InputTypeName,
     },
 
     #[error(

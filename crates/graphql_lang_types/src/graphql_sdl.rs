@@ -238,6 +238,8 @@ pub struct GraphQLInputValueDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<InputValueName>,
     pub type_: TypeAnnotation<InputTypeName>,
+    // This unused, except for printing. Isograph does not care about this,
+    // except inasmuch as it means that the type is nullable.
     pub default_value: Option<WithLocation<ConstantValue>>,
     pub directives: Vec<GraphQLDirective<ConstantValue>>,
 }
