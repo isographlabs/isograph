@@ -1,5 +1,8 @@
 {
   "project_root": "./src/isograph-components",
   "artifact_directory": "./src",
-  "schema": "./schema.graphql"
+  "schema": "./schema.graphql",
+  "options": {
+    "on_invalid_id_type": "ignore"
+  }
 }
