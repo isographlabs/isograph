@@ -24,12 +24,17 @@ pub type ValidatedSchemaField = SchemaServerField<TypeAnnotation<DefinedTypeId>>
 pub type ValidatedSelection = Selection<ValidatedDefinedField, ObjectId>;
 
 pub type ValidatedVariableDefinition = VariableDefinition<DefinedTypeId>;
-pub type ValidatedSchemaResolver = SchemaResolver<ValidatedSchemaState>;
+pub type ValidatedSchemaResolver = SchemaResolver<
+    <ValidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ResolverSelectionLinkedFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ResolverVariableDefinitionAssociatedData,
+>;
 
 /// The validated defined field that shows up in the TScalarField generic.
 pub type ValidatedDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;
 
-pub type ValidatedSchemaObject = SchemaObject<ValidatedSchemaState>;
+pub type ValidatedSchemaObject =
+    SchemaObject<<ValidatedSchemaState as SchemaValidationState>::EncounteredField>;
 
 pub type ValidatedSchemaIdField = SchemaIdField<NamedTypeAnnotation<ScalarId>>;
 

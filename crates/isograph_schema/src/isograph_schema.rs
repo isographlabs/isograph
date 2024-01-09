@@ -77,10 +77,16 @@ pub trait SchemaValidationState: Debug {
 #[derive(Debug)]
 pub struct Schema<TValidation: SchemaValidationState> {
     pub fields: Vec<SchemaServerField<TypeAnnotation<TValidation::FieldTypeAssociatedData>>>,
-    pub resolvers: Vec<SchemaResolver<TValidation>>,
+    pub resolvers: Vec<
+        SchemaResolver<
+            TValidation::ResolverSelectionScalarFieldAssociatedData,
+            TValidation::ResolverSelectionLinkedFieldAssociatedData,
+            TValidation::ResolverVariableDefinitionAssociatedData,
+        >,
+    >,
     // TODO consider whether this belongs here. It could just be a free variable.
     pub fetchable_resolvers: Vec<TValidation::FetchableResolver>,
-    pub schema_data: SchemaData<TValidation>,
+    pub schema_data: SchemaData<TValidation::EncounteredField>,
 
     // Well known types
     pub id_type_id: ScalarId,
@@ -125,8 +131,8 @@ impl<TFieldAssociatedData, TResolverType> DefinedField<TFieldAssociatedData, TRe
 }
 
 #[derive(Debug)]
-pub struct SchemaData<TValidation: SchemaValidationState> {
-    pub objects: Vec<SchemaObject<TValidation>>,
+pub struct SchemaData<TEncounteredField> {
+    pub objects: Vec<SchemaObject<TEncounteredField>>,
     pub scalars: Vec<SchemaScalar>,
     pub defined_types: HashMap<UnvalidatedTypeName, DefinedTypeId>,
 }
@@ -141,12 +147,19 @@ impl<TValidation: SchemaValidationState> Schema<TValidation> {
     }
 
     /// Get a reference to a given resolver by its id.
-    pub fn resolver(&self, resolver_field_id: ResolverFieldId) -> &SchemaResolver<TValidation> {
+    pub fn resolver(
+        &self,
+        resolver_field_id: ResolverFieldId,
+    ) -> &SchemaResolver<
+        TValidation::ResolverSelectionScalarFieldAssociatedData,
+        TValidation::ResolverSelectionLinkedFieldAssociatedData,
+        TValidation::ResolverVariableDefinitionAssociatedData,
+    > {
         &self.resolvers[resolver_field_id.as_usize()]
     }
 
     /// Get a reference to the root query_object, if it's defined.
-    pub fn query_object(&self) -> Option<&SchemaObject<TValidation>> {
+    pub fn query_object(&self) -> Option<&SchemaObject<TValidation::EncounteredField>> {
         self.query_type_id
             .as_ref()
             .map(|id| self.schema_data.object(*id))
@@ -190,13 +203,13 @@ impl<
     }
 }
 
-impl<TValidation: SchemaValidationState> SchemaData<TValidation> {
+impl<TEncounteredField> SchemaData<TEncounteredField> {
     /// Get a reference to a given scalar type by its id.
     pub fn scalar(&self, scalar_id: ScalarId) -> &SchemaScalar {
         &self.scalars[scalar_id.as_usize()]
     }
 
-    pub fn lookup_unvalidated_type(&self, type_id: DefinedTypeId) -> SchemaType<TValidation> {
+    pub fn lookup_unvalidated_type(&self, type_id: DefinedTypeId) -> SchemaType<TEncounteredField> {
         match type_id {
             DefinedTypeId::Object(id) => {
                 SchemaType::Object(self.objects.get(id.as_usize()).unwrap())
@@ -208,23 +221,23 @@ impl<TValidation: SchemaValidationState> SchemaData<TValidation> {
     }
 
     /// Get a reference to a given object type by its id.
-    pub fn object(&self, object_id: ObjectId) -> &SchemaObject<TValidation> {
+    pub fn object(&self, object_id: ObjectId) -> &SchemaObject<TEncounteredField> {
         &self.objects[object_id.as_usize()]
     }
 
     /// Get a mutable reference to a given object type by its id.
-    pub fn object_mut(&mut self, object_id: ObjectId) -> &mut SchemaObject<TValidation> {
+    pub fn object_mut(&mut self, object_id: ObjectId) -> &mut SchemaObject<TEncounteredField> {
         &mut self.objects[object_id.as_usize()]
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum SchemaType<'a, TValidation: SchemaValidationState> {
-    Object(&'a SchemaObject<TValidation>),
+pub enum SchemaType<'a, TEncounteredField> {
+    Object(&'a SchemaObject<TEncounteredField>),
     Scalar(&'a SchemaScalar),
 }
 
-impl<'a, TValidation: SchemaValidationState> HasName for SchemaType<'a, TValidation> {
+impl<'a, T> HasName for SchemaType<'a, T> {
     type Name = UnvalidatedTypeName;
 
     fn name(&self) -> Self::Name {
@@ -317,7 +330,7 @@ impl From<GraphQLInputObjectTypeDefinition> for IsographObjectTypeDefinition {
 
 /// An object type in the schema.
 #[derive(Debug)]
-pub struct SchemaObject<TValidation: SchemaValidationState> {
+pub struct SchemaObject<TEncounteredField> {
     pub description: Option<DescriptionValue>,
     pub name: IsographObjectTypeName,
     pub id: ObjectId,
@@ -328,7 +341,7 @@ pub struct SchemaObject<TValidation: SchemaValidationState> {
     pub id_field: Option<ServerIdFieldId>,
     pub server_fields: Vec<ServerFieldId>,
     pub resolvers: Vec<ResolverFieldId>,
-    pub encountered_fields: HashMap<SelectableFieldName, TValidation::EncounteredField>,
+    pub encountered_fields: HashMap<SelectableFieldName, TEncounteredField>,
     /// This is an unused field right now
     pub valid_refinements: Vec<ValidRefinement>,
 }
@@ -449,7 +462,11 @@ pub struct MutationFieldResolverActionKindInfo {
 }
 
 #[derive(Debug)]
-pub struct SchemaResolver<TValidation: SchemaValidationState> {
+pub struct SchemaResolver<
+    TResolverSelectionScalarFieldAssociatedData,
+    TResolverSelectionLinkedFieldAssociatedData,
+    TResolverVariableDefinitionAssociatedData,
+> {
     pub description: Option<DescriptionValue>,
     // TODO make this a ResolverName that can be converted into a SelectableFieldName
     pub name: SelectableFieldName,
@@ -463,8 +480,8 @@ pub struct SchemaResolver<TValidation: SchemaValidationState> {
         Vec<
             WithSpan<
                 Selection<
-                    TValidation::ResolverSelectionScalarFieldAssociatedData,
-                    TValidation::ResolverSelectionLinkedFieldAssociatedData,
+                    TResolverSelectionScalarFieldAssociatedData,
+                    TResolverSelectionLinkedFieldAssociatedData,
                 >,
             >,
         >,
@@ -477,7 +494,7 @@ pub struct SchemaResolver<TValidation: SchemaValidationState> {
     pub action_kind: ResolverActionKind,
 
     pub variable_definitions:
-        Vec<WithSpan<VariableDefinition<TValidation::ResolverVariableDefinitionAssociatedData>>>,
+        Vec<WithSpan<VariableDefinition<TResolverVariableDefinitionAssociatedData>>>,
 
     // TODO this is probably unused
     // Why is this not calculated when needed?

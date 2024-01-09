@@ -31,7 +31,8 @@ impl SchemaValidationState for UnvalidatedSchemaState {
 
 pub type UnvalidatedSchema = Schema<UnvalidatedSchemaState>;
 
-pub type UnvalidatedSchemaObject = SchemaObject<UnvalidatedSchemaState>;
+pub type UnvalidatedSchemaObject =
+    SchemaObject<<UnvalidatedSchemaState as SchemaValidationState>::EncounteredField>;
 
 /// On unvalidated schema objects, the encountered types are either a type annotation
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
@@ -39,11 +40,16 @@ pub type UnvalidatedSchemaObject = SchemaObject<UnvalidatedSchemaState>;
 pub type UnvalidatedObjectFieldInfo =
     DefinedField<TypeAnnotation<UnvalidatedTypeName>, ResolverFieldId>;
 
-pub(crate) type UnvalidatedSchemaData = SchemaData<UnvalidatedSchemaState>;
+pub(crate) type UnvalidatedSchemaData =
+    SchemaData<<UnvalidatedSchemaState as SchemaValidationState>::EncounteredField>;
 
 pub(crate) type UnvalidatedSchemaField = SchemaServerField<TypeAnnotation<UnvalidatedTypeName>>;
 
-pub(crate) type UnvalidatedSchemaResolver = SchemaResolver<UnvalidatedSchemaState>;
+pub(crate) type UnvalidatedSchemaResolver = SchemaResolver<
+    <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionLinkedFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::ResolverVariableDefinitionAssociatedData,
+>;
 
 pub(crate) type UnvalidatedSchemaServerField = SchemaServerField<TypeAnnotation<DefinedTypeId>>;
 
