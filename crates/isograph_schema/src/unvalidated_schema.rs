@@ -21,10 +21,10 @@ lazy_static! {
 pub struct UnvalidatedSchemaState {}
 
 impl SchemaValidationState for UnvalidatedSchemaState {
-    type FieldAssociatedType = UnvalidatedTypeName;
-    type ScalarField = ();
-    type LinkedField = ();
-    type VariableType = UnvalidatedTypeName;
+    type FieldTypeAssociatedData = UnvalidatedTypeName;
+    type ScalarFieldAssociatedData = ();
+    type LinkedFieldAssociatedData = ();
+    type ResolverVariableDefinitionAssociatedData = UnvalidatedTypeName;
     type EncounteredField = UnvalidatedObjectFieldInfo;
     type FetchableResolver = (TextSource, WithSpan<ResolverFetch>);
 }

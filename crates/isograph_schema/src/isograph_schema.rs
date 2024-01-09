@@ -32,24 +32,36 @@ lazy_static! {
 /// validated, we will get objects that are generic over a different type
 /// that implements SchemaValidationState.
 pub trait SchemaValidationState: Debug {
-    /// Fields contain a field_type: TypeAnnotation<TFieldAssociatedType>
-    /// Validated: OutputTypeId, Unvalidated: UnvalidatedTypeName
-    type FieldAssociatedType: Debug;
+    /// A SchemaServerField contains a associated_data: TypeAnnotation<FieldTypeAssociatedData>
+    /// - Unvalidated: UnvalidatedTypeName
+    /// - Validated: DefinedTypeId
+    type FieldTypeAssociatedData: Debug;
+
     /// The associated data type of scalars in resolvers' selection sets and unwraps
-    /// Validated: ValidatedScalarDefinedField, Unvalidated: ()
-    type ScalarField: Debug;
-    // The associated data type of linked fields in resolvers' selection sets and unwraps
-    // Validated: ObjectId, Unvalidated: ()
-    type LinkedField: Debug;
-    // The associated data type of resolvers' variable definitions
-    // Validated: InputTypeId, Unvalidated: UnvalidatedTypeName
-    type VariableType: Debug;
-    // On objects, what does the HashMap of encountered types contain
-    // Validated: ValidatedDefinedField, Unvalidated: UnvalidatedObjectFieldInfo
+    /// - Unvalidated: ()
+    /// - Validated: ValidatedScalarDefinedField
+    type ScalarFieldAssociatedData: Debug;
+
+    /// The associated data type of linked fields in resolvers' selection sets and unwraps
+    /// - Unvalidated: ()
+    /// - Validated: ObjectId
+    type LinkedFieldAssociatedData: Debug;
+
+    /// The associated data type of resolvers' variable definitions
+    /// - Unvalidated: UnvalidatedTypeName
+    /// - Validated: DefinedTypeId
+    type ResolverVariableDefinitionAssociatedData: Debug;
+
+    /// On objects, what does the HashMap of encountered types contain
+    /// - Unvalidated: UnvalidatedObjectFieldInfo
+    ///   i.e. DefinedField<TypeAnnotation<UnvalidatedTypeName>, ResolverFieldId>
+    /// - Validated: ValidatedEncounteredDefinedField
+    ///   i.e. DefinedField<ServerFieldId, ResolverFieldId>
     type EncounteredField: Debug;
-    // What we store in fetchable_resolvers
-    // Validated: (ObjectId, ResolverFieldId)
-    // Unvalidated: ResolverFetch
+
+    /// What we store in fetchable_resolvers
+    /// - Unvalidated: (TextSource, WithSpan<ResolverFetch>)
+    /// - Validated: (ObjectId, ResolverFieldId)
     type FetchableResolver: Debug;
 }
 
@@ -63,7 +75,7 @@ pub trait SchemaValidationState: Debug {
 /// the schema does not support removing items.
 #[derive(Debug)]
 pub struct Schema<TValidation: SchemaValidationState> {
-    pub fields: Vec<SchemaServerField<TypeAnnotation<TValidation::FieldAssociatedType>>>,
+    pub fields: Vec<SchemaServerField<TypeAnnotation<TValidation::FieldTypeAssociatedData>>>,
     pub resolvers: Vec<SchemaResolver<TValidation>>,
     // TODO consider whether this belongs here. It could just be a free variable.
     pub fetchable_resolvers: Vec<TValidation::FetchableResolver>,
@@ -84,19 +96,19 @@ pub struct Schema<TValidation: SchemaValidationState> {
 }
 
 /// Distinguishes between server fields and locally-defined resolver fields.
-/// TFieldAssociatedType can be a ScalarFieldName in an unvalidated schema, or a
+/// TFieldAssociatedData can be a ScalarFieldName in an unvalidated schema, or a
 /// ScalarId, in a validated schema.
 ///
 /// TResolverType can be an UnvalidatedTypeName in an unvalidated schema, or an
-/// OutputTypeId in a validated schema.
+/// DefinedTypeId in a validated schema.
 #[derive(Debug, Clone, Copy)]
-pub enum DefinedField<TFieldAssociatedType, TResolverType> {
-    ServerField(TFieldAssociatedType),
+pub enum DefinedField<TFieldAssociatedData, TResolverType> {
+    ServerField(TFieldAssociatedData),
     ResolverField(TResolverType),
 }
 
-impl<TFieldAssociatedType, TResolverType> DefinedField<TFieldAssociatedType, TResolverType> {
-    pub fn as_server_field(&self) -> Option<&TFieldAssociatedType> {
+impl<TFieldAssociatedData, TResolverType> DefinedField<TFieldAssociatedData, TResolverType> {
+    pub fn as_server_field(&self) -> Option<&TFieldAssociatedData> {
         match self {
             DefinedField::ServerField(server_field) => Some(server_field),
             DefinedField::ResolverField(_) => None,
@@ -123,7 +135,7 @@ impl<TValidation: SchemaValidationState> Schema<TValidation> {
     pub fn field(
         &self,
         field_id: ServerFieldId,
-    ) -> &SchemaServerField<TypeAnnotation<TValidation::FieldAssociatedType>> {
+    ) -> &SchemaServerField<TypeAnnotation<TValidation::FieldTypeAssociatedData>> {
         &self.fields[field_id.as_usize()]
     }
 
@@ -141,22 +153,22 @@ impl<TValidation: SchemaValidationState> Schema<TValidation> {
 }
 
 impl<
-        TFieldAssociatedType: Clone,
-        TValidation: SchemaValidationState<FieldAssociatedType = TFieldAssociatedType>,
+        TFieldAssociatedData: Clone,
+        TValidation: SchemaValidationState<FieldTypeAssociatedData = TFieldAssociatedData>,
     > Schema<TValidation>
 {
     /// Get a reference to a given id field by its id.
-    pub fn id_field<TIdFieldAssociatedType: TryFrom<TFieldAssociatedType> + Copy>(
+    pub fn id_field<TIdFieldAssociatedData: TryFrom<TFieldAssociatedData> + Copy>(
         &self,
         id_field_id: ServerIdFieldId,
-    ) -> SchemaIdField<NamedTypeAnnotation<TIdFieldAssociatedType>> {
+    ) -> SchemaIdField<NamedTypeAnnotation<TIdFieldAssociatedData>> {
         let field_id = id_field_id.into();
 
         let field = self
             .field(field_id)
             .and_then(|e| match e.inner_non_null_named_type() {
                 Some(inner) => Ok(NamedTypeAnnotation(inner.0.clone().map(|x| {
-                    let y: Result<TIdFieldAssociatedType, _> = x.try_into();
+                    let y: Result<TIdFieldAssociatedData, _> = x.try_into();
                     match y {
                         Ok(y) => y,
                         Err(_) => {
@@ -381,7 +393,7 @@ impl<TData: Copy> TryFrom<SchemaServerField<TData>> for SchemaIdField<TData> {
         //
         // There are no arguments now, so this will always succeed.
         //
-        // Also, before this is called, we have already converted the field_type to be valid
+        // Also, before this is called, we have already converted the associated_data to be valid
         // (it should go from TypeAnnotation<T> to NamedTypeAnnotation<T>) via
         // inner_non_null_named_type. We should eventually add some NewType wrapper to
         // enforce that we didn't just call .inner()
@@ -447,7 +459,14 @@ pub struct SchemaResolver<TValidation: SchemaValidationState> {
     // Perhaps refetch fields for viewer (or other fields that have a known path
     // that don't require id) will have no selection set.
     pub selection_set_and_unwraps: Option<(
-        Vec<WithSpan<Selection<TValidation::ScalarField, TValidation::LinkedField>>>,
+        Vec<
+            WithSpan<
+                Selection<
+                    TValidation::ScalarFieldAssociatedData,
+                    TValidation::LinkedFieldAssociatedData,
+                >,
+            >,
+        >,
         Vec<WithSpan<Unwrap>>,
     )>,
 
@@ -456,7 +475,8 @@ pub struct SchemaResolver<TValidation: SchemaValidationState> {
 
     pub action_kind: ResolverActionKind,
 
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<TValidation::VariableType>>>,
+    pub variable_definitions:
+        Vec<WithSpan<VariableDefinition<TValidation::ResolverVariableDefinitionAssociatedData>>>,
 
     // TODO this is probably unused
     // Why is this not calculated when needed?
@@ -506,7 +526,7 @@ impl<T> SchemaServerField<T> {
             description,
             name,
             id,
-            associated_data: field_type,
+            associated_data,
             parent_type_id,
             arguments,
         } = self;
@@ -519,7 +539,7 @@ impl<T> SchemaServerField<T> {
                 parent_type_id,
                 arguments,
             },
-            field_type,
+            associated_data,
         )
     }
 }

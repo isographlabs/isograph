@@ -38,10 +38,10 @@ pub type ValidatedSchemaIdField = SchemaIdField<NamedTypeAnnotation<ScalarId>>;
 #[derive(Debug)]
 pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
-    type FieldAssociatedType = DefinedTypeId;
-    type ScalarField = ValidatedScalarDefinedField;
-    type LinkedField = ObjectId;
-    type VariableType = DefinedTypeId;
+    type FieldTypeAssociatedData = DefinedTypeId;
+    type ScalarFieldAssociatedData = ValidatedScalarDefinedField;
+    type LinkedFieldAssociatedData = ObjectId;
+    type ResolverVariableDefinitionAssociatedData = DefinedTypeId;
     type EncounteredField = ValidatedEncounteredDefinedField;
     type FetchableResolver = ResolverFieldId;
 }
