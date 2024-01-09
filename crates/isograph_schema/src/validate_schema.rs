@@ -21,15 +21,13 @@ use crate::{
 
 pub type ValidatedSchemaField = SchemaServerField<TypeAnnotation<DefinedTypeId>>;
 
-pub type ValidatedSelection = Selection<ValidatedScalarDefinedField, ObjectId>;
+pub type ValidatedSelection = Selection<ValidatedDefinedField, ObjectId>;
 
 pub type ValidatedVariableDefinition = VariableDefinition<DefinedTypeId>;
 pub type ValidatedSchemaResolver = SchemaResolver<ValidatedSchemaState>;
 
-/// The validated defined field that shows up in the encountered field generic.
-pub type ValidatedEncounteredDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;
 /// The validated defined field that shows up in the TScalarField generic.
-pub type ValidatedScalarDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;
+pub type ValidatedDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;
 
 pub type ValidatedSchemaObject = SchemaObject<ValidatedSchemaState>;
 
@@ -39,10 +37,10 @@ pub type ValidatedSchemaIdField = SchemaIdField<NamedTypeAnnotation<ScalarId>>;
 pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
     type FieldTypeAssociatedData = DefinedTypeId;
-    type ScalarFieldAssociatedData = ValidatedScalarDefinedField;
-    type LinkedFieldAssociatedData = ObjectId;
+    type ResolverSelectionScalarFieldAssociatedData = ValidatedDefinedField;
+    type ResolverSelectionLinkedFieldAssociatedData = ObjectId;
     type ResolverVariableDefinitionAssociatedData = DefinedTypeId;
-    type EncounteredField = ValidatedEncounteredDefinedField;
+    type EncounteredField = ValidatedDefinedField;
     type FetchableResolver = ResolverFieldId;
 }
 
@@ -577,7 +575,7 @@ fn validate_field_type_exists_and_is_scalar(
     parent_object: &UnvalidatedSchemaObject,
     scalar_field_selection: ScalarFieldSelection<()>,
     server_fields: &[UnvalidatedSchemaServerField],
-) -> ValidateSelectionsResult<ScalarFieldSelection<ValidatedScalarDefinedField>> {
+) -> ValidateSelectionsResult<ScalarFieldSelection<ValidatedDefinedField>> {
     let scalar_field_name = scalar_field_selection.name.item.into();
     match parent_encountered_fields.get(&scalar_field_name) {
         Some(defined_field_type) => match defined_field_type {
@@ -645,7 +643,7 @@ fn validate_field_type_exists_and_is_linked(
     parent_object: &UnvalidatedSchemaObject,
     linked_field_selection: LinkedFieldSelection<(), ()>,
     server_fields: &[UnvalidatedSchemaServerField],
-) -> ValidateSelectionsResult<LinkedFieldSelection<ValidatedScalarDefinedField, ObjectId>> {
+) -> ValidateSelectionsResult<LinkedFieldSelection<ValidatedDefinedField, ObjectId>> {
     let linked_field_name = linked_field_selection.name.item.into();
     match parent_fields.get(&linked_field_name) {
         Some(defined_field_type) => {

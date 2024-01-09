@@ -39,13 +39,14 @@ pub trait SchemaValidationState: Debug {
 
     /// The associated data type of scalars in resolvers' selection sets and unwraps
     /// - Unvalidated: ()
-    /// - Validated: ValidatedScalarDefinedField
-    type ScalarFieldAssociatedData: Debug;
+    /// - Validated: ValidatedDefinedField
+    ///   i.e. DefinedField<ServerFieldId, ResolverFieldId>
+    type ResolverSelectionScalarFieldAssociatedData: Debug;
 
     /// The associated data type of linked fields in resolvers' selection sets and unwraps
     /// - Unvalidated: ()
     /// - Validated: ObjectId
-    type LinkedFieldAssociatedData: Debug;
+    type ResolverSelectionLinkedFieldAssociatedData: Debug;
 
     /// The associated data type of resolvers' variable definitions
     /// - Unvalidated: UnvalidatedTypeName
@@ -55,7 +56,7 @@ pub trait SchemaValidationState: Debug {
     /// On objects, what does the HashMap of encountered types contain
     /// - Unvalidated: UnvalidatedObjectFieldInfo
     ///   i.e. DefinedField<TypeAnnotation<UnvalidatedTypeName>, ResolverFieldId>
-    /// - Validated: ValidatedEncounteredDefinedField
+    /// - Validated: ValidatedDefinedField
     ///   i.e. DefinedField<ServerFieldId, ResolverFieldId>
     type EncounteredField: Debug;
 
@@ -462,8 +463,8 @@ pub struct SchemaResolver<TValidation: SchemaValidationState> {
         Vec<
             WithSpan<
                 Selection<
-                    TValidation::ScalarFieldAssociatedData,
-                    TValidation::LinkedFieldAssociatedData,
+                    TValidation::ResolverSelectionScalarFieldAssociatedData,
+                    TValidation::ResolverSelectionLinkedFieldAssociatedData,
                 >,
             >,
         >,

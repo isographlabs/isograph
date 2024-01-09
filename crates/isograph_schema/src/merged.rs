@@ -17,7 +17,7 @@ use isograph_lang_types::{
 
 use crate::{
     ArgumentKeyAndValue, DefinedField, MutationFieldResolverVariant, NameAndArguments,
-    PathToRefetchField, ResolverVariant, ValidatedScalarDefinedField, ValidatedSchema,
+    PathToRefetchField, ResolverVariant, ValidatedDefinedField, ValidatedSchema,
     ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
 };
 
@@ -427,7 +427,7 @@ fn merge_selections_into_set(
     }
 }
 
-fn filter_id_fields(field: &&WithSpan<Selection<ValidatedScalarDefinedField, ObjectId>>) -> bool {
+fn filter_id_fields(field: &&WithSpan<Selection<ValidatedDefinedField, ObjectId>>) -> bool {
     // filter out id fields, and eventually other always-selected fields like __typename
     match &field.item {
         Selection::ServerField(server_field) => match server_field {
@@ -446,7 +446,7 @@ fn filter_id_fields(field: &&WithSpan<Selection<ValidatedScalarDefinedField, Obj
 
 fn merge_linked_field_into_vacant_entry(
     vacant_entry: VacantEntry<'_, NormalizationKey, WithSpan<MergedServerFieldSelection>>,
-    new_linked_field: &LinkedFieldSelection<ValidatedScalarDefinedField, ObjectId>,
+    new_linked_field: &LinkedFieldSelection<ValidatedDefinedField, ObjectId>,
     schema: &ValidatedSchema,
     span: Span,
     merge_traversal_state: &mut MergeTraversalState<'_>,
@@ -474,7 +474,7 @@ fn merge_linked_field_into_vacant_entry(
 
 fn merge_linked_field_into_occupied_entry(
     mut occupied: OccupiedEntry<'_, NormalizationKey, WithSpan<MergedServerFieldSelection>>,
-    new_linked_field: &LinkedFieldSelection<ValidatedScalarDefinedField, ObjectId>,
+    new_linked_field: &LinkedFieldSelection<ValidatedDefinedField, ObjectId>,
     schema: &ValidatedSchema,
     merge_traversal_state: &mut MergeTraversalState<'_>,
 ) {
@@ -545,7 +545,7 @@ fn merge_scalar_resolver_field(
 }
 
 fn merge_scalar_server_field(
-    scalar_field: &ScalarFieldSelection<ValidatedScalarDefinedField>,
+    scalar_field: &ScalarFieldSelection<ValidatedDefinedField>,
     merged_selection_set: &mut MergedSelectionMap,
     span: Span,
 ) {

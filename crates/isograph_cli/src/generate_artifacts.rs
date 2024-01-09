@@ -25,7 +25,7 @@ use isograph_schema::{
     MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection,
     MutationFieldResolverInfo, NameAndArguments, PathToRefetchField, RefetchFieldResolverInfo,
     ResolverActionKind, ResolverTypeAndField, ResolverVariant, RootRefetchedPath,
-    ValidatedScalarDefinedField, ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver,
+    ValidatedDefinedField, ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver,
     ValidatedSelection, ValidatedVariableDefinition,
 };
 use thiserror::Error;
@@ -1027,7 +1027,7 @@ fn generate_reader_ast_with_path<'schema>(
 }
 
 fn generate_reader_ast_node(
-    selection: &WithSpan<Selection<ValidatedScalarDefinedField, ObjectId>>,
+    selection: &WithSpan<Selection<ValidatedDefinedField, ObjectId>>,
     schema: &ValidatedSchema,
     indentation_level: u8,
     nested_resolver_imports: &mut NestedResolverImports,

@@ -4,12 +4,12 @@ use common_lang_types::WithSpan;
 use isograph_lang_types::{ObjectId, Selection, ServerFieldSelection};
 
 use crate::{
-    DefinedField, NameAndArguments, PathToRefetchField, ResolverVariant,
-    ValidatedScalarDefinedField, ValidatedSchema,
+    DefinedField, NameAndArguments, PathToRefetchField, ResolverVariant, ValidatedDefinedField,
+    ValidatedSchema,
 };
 
 pub fn refetched_paths_with_path(
-    selection_set: &[WithSpan<Selection<ValidatedScalarDefinedField, ObjectId>>],
+    selection_set: &[WithSpan<Selection<ValidatedDefinedField, ObjectId>>],
     schema: &ValidatedSchema,
     path: &mut Vec<NameAndArguments>,
 ) -> HashSet<PathToRefetchField> {

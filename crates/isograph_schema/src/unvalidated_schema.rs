@@ -22,8 +22,8 @@ pub struct UnvalidatedSchemaState {}
 
 impl SchemaValidationState for UnvalidatedSchemaState {
     type FieldTypeAssociatedData = UnvalidatedTypeName;
-    type ScalarFieldAssociatedData = ();
-    type LinkedFieldAssociatedData = ();
+    type ResolverSelectionScalarFieldAssociatedData = ();
+    type ResolverSelectionLinkedFieldAssociatedData = ();
     type ResolverVariableDefinitionAssociatedData = UnvalidatedTypeName;
     type EncounteredField = UnvalidatedObjectFieldInfo;
     type FetchableResolver = (TextSource, WithSpan<ResolverFetch>);
