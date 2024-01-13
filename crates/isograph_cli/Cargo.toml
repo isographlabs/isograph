@@ -8,7 +8,7 @@ license = "MIT"
 structopt = "0.3.26"
 thiserror = "1.0.40"
 intern = { git = "https://github.com/facebook/relay.git" }
-graphql_lang_parser = { path = "../graphql_lang_parser" }
+graphql_schema_parser = { path = "../graphql_schema_parser" }
 graphql_lang_types = { path = "../graphql_lang_types" }
 isograph_schema = { path = "../isograph_schema" }
 isograph_lang_parser = { path = "../isograph_lang_parser" }

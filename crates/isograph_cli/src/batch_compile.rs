@@ -8,7 +8,7 @@ use common_lang_types::{
     Location, ResolverDefinitionPath, ScalarFieldName, SourceFileName, Span, TextSource,
     WithLocation, WithSpan,
 };
-use graphql_lang_parser::{parse_schema, parse_schema_extensions, SchemaParseError};
+use graphql_schema_parser::{parse_schema, parse_schema_extensions, SchemaParseError};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_parser::{parse_iso_fetch, parse_iso_literal, IsographLiteralParseError};
 use isograph_lang_types::{ResolverDeclaration, ResolverFetch};

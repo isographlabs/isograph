@@ -1,5 +1,5 @@
 [package]
-name = "graphql_lang_parser"
+name = "graphql_schema_parser"
 version = "0.0.4"
 edition = "2021"
 license = "MIT"
