@@ -522,10 +522,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "isograph"
-version = "0.1.0"
-
-[[package]]
 name = "isograph_cli"
 version = "0.0.4"
 dependencies = [
