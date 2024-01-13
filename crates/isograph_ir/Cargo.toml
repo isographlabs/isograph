@@ -1,9 +1,0 @@
-[package]
-name = "isograph_ir"
-version = "0.0.4"
-edition = "2021"
-license = "MIT"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]

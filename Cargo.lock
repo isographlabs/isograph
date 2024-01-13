@@ -547,10 +547,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "isograph_ir"
-version = "0.0.4"
-
-[[package]]
 name = "isograph_lang_parser"
 version = "0.0.4"
 dependencies = [
