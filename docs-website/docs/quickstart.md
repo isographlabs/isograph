@@ -1,7 +1,3 @@
----
-sidebar_position: 2
----
-
 # Quickstart guide
 
 :::info
@@ -15,9 +11,9 @@ The process for adding Isograph to an existing NextJS project is described in th
 ### Install the compiler, babel plugin and runtime
 
 ```sh
-yarn install --dev @isograph/compiler@main
-yarn install --dev @isograph/babel-plugin@main
-yarn install @isograph/react@main
+yarn add --dev @isograph/compiler@main
+yarn add --dev @isograph/babel-plugin@main
+yarn add @isograph/react@main
 ```
 
 :::info

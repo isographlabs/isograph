@@ -1,7 +1,3 @@
----
-sidebar_position: 3
----
-
 # Magic mutation fields
 
 ## Schema extensions

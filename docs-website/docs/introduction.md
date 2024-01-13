@@ -1,8 +1,4 @@
----
-sidebar_position: 1
----
-
-# About Isograph
+# Introduction
 
 > Select your components like you select your fields — with GraphQL!
 

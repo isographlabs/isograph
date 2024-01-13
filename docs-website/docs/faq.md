@@ -1,7 +1,3 @@
----
-sidebar_position: 5
----
-
 # FAQ
 
 ## Why do `@component` resolvers need to be interpolated into the parent, and not rendered?

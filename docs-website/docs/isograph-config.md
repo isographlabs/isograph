@@ -1,8 +1,4 @@
----
-sidebar_position: 4
----
-
-# The Isograph config
+# The Isograph configuration object
 
 :::info
 If anything in this document is inaccurate, please consult the source of truth:
