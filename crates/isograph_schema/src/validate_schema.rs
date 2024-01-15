@@ -51,6 +51,8 @@ pub type ValidatedSchemaIdField = SchemaIdField<NamedTypeAnnotation<ScalarId>>;
 #[derive(Debug)]
 pub struct ValidatedLinkedFieldAssociatedData {
     pub parent_object_id: ObjectId,
+    // TODO this almost certainly needs to be a separate type parameter,
+    // since it flows into MergedLinkedFieldSelection (but parent_object_id does not.)
     pub artifact_generation_info: GraphQLArtifactGenerationInfo,
 }
 
@@ -662,38 +664,37 @@ fn validate_field_type_exists_and_is_linked(
 ) -> ValidateSelectionsResult<ValidatedLinkedFieldSelection> {
     let linked_field_name = linked_field_selection.name.item.into();
     match parent_object.encountered_fields.get(&linked_field_name) {
-        Some(defined_field_type) => {
-            match defined_field_type {
-                DefinedField::ServerField(server_field_name) => {
-                    let field_type_id = *schema_data
-                        .defined_types
-                        .get(server_field_name.inner())
-                        .expect(
-                            "Expected field type to be defined, which I \
+        Some(defined_field_type) => match defined_field_type {
+            DefinedField::ServerField(server_field_name) => {
+                let field_type_id = *schema_data
+                    .defined_types
+                    .get(server_field_name.inner())
+                    .expect(
+                        "Expected field type to be defined, which I \
                             think was validated earlier, probably indicates a bug in Isograph",
-                        );
-                    match field_type_id {
-                        DefinedTypeId::Scalar(_) => Err(WithLocation::new(
-                            ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsScalar {
-                                field_parent_type_name: parent_object.name,
-                                field_name: linked_field_name,
-                                target_type: "a scalar",
-                                target_type_name: *server_field_name.inner(),
-                            },
-                            linked_field_selection.name.location,
-                        )),
-                        DefinedTypeId::Object(object_id) => {
-                            let linked_field_target_type =
-                                schema_data.objects.get(object_id.as_usize()).unwrap();
-                            let server_field_id = find_server_field_id(
+                    );
+                match field_type_id {
+                    DefinedTypeId::Scalar(_) => Err(WithLocation::new(
+                        ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsScalar {
+                            field_parent_type_name: parent_object.name,
+                            field_name: linked_field_name,
+                            target_type: "a scalar",
+                            target_type_name: *server_field_name.inner(),
+                        },
+                        linked_field_selection.name.location,
+                    )),
+                    DefinedTypeId::Object(object_id) => {
+                        let linked_field_target_type =
+                            schema_data.objects.get(object_id.as_usize()).unwrap();
+                        let server_field_id = find_server_field_id(
                                 server_fields,
                                 linked_field_name,
                                 &parent_object.server_fields,
                             )
                             .expect("Expected to find scalar field, this probably indicates a bug in Isograph");
-                            let server_field = &server_fields[server_field_id.as_usize()];
+                        let server_field = &server_fields[server_field_id.as_usize()];
 
-                            Ok(LinkedFieldSelection {
+                        Ok(LinkedFieldSelection {
                             name: linked_field_selection.name,
                             reader_alias: linked_field_selection.reader_alias,
                             normalization_alias: linked_field_selection.normalization_alias,
@@ -712,22 +713,23 @@ fn validate_field_type_exists_and_is_linked(
                             unwraps: linked_field_selection.unwraps,
                             associated_data: ValidatedLinkedFieldAssociatedData {
                                 parent_object_id: object_id,
-                                artifact_generation_info: server_field.artifact_generation_info.clone(),
+                                artifact_generation_info: server_field
+                                    .artifact_generation_info
+                                    .clone(),
                             },
                             arguments: linked_field_selection.arguments,
                         })
-                        }
                     }
                 }
-                DefinedField::ResolverField(_) => Err(WithLocation::new(
-                    ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsResolver {
-                        field_parent_type_name: parent_object.name,
-                        field_name: linked_field_name,
-                    },
-                    linked_field_selection.name.location,
-                )),
             }
-        }
+            DefinedField::ResolverField(_) => Err(WithLocation::new(
+                ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsResolver {
+                    field_parent_type_name: parent_object.name,
+                    field_name: linked_field_name,
+                },
+                linked_field_selection.name.location,
+            )),
+        },
         None => Err(WithLocation::new(
             ValidateSelectionsError::FieldDoesNotExist(parent_object.name, linked_field_name),
             linked_field_selection.name.location,

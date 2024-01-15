@@ -7,8 +7,8 @@ use std::{
 };
 
 use common_lang_types::{
-    HasName, IsographObjectTypeName, Location, QueryOperationName, SelectableFieldName, Span,
-    UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
+    GraphQLArtifactGenerationInfo, HasName, IsographObjectTypeName, Location, QueryOperationName,
+    SelectableFieldName, Span, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLInputValueDefinition, ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
@@ -668,13 +668,22 @@ fn write_selections_for_query_text(
             }
             MergedServerFieldSelection::LinkedField(linked_field) => {
                 query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
-                if let Some(alias) = linked_field.normalization_alias {
-                    // This is bad, alias is WithLocation
-                    query_text.push_str(&format!("{}: ", alias.item));
-                }
-                let name = linked_field.name.item;
-                let arguments = get_serialized_arguments_for_query_text(&linked_field.arguments);
-                query_text.push_str(&format!("{}{} {{\\\n", name, arguments));
+                match linked_field.artifact_generation_info {
+                    GraphQLArtifactGenerationInfo::ServerField => {
+                        if let Some(alias) = linked_field.normalization_alias {
+                            // This is bad, alias is WithLocation
+                            query_text.push_str(&format!("{}: ", alias.item));
+                        }
+                        let name = linked_field.name.item;
+                        let arguments =
+                            get_serialized_arguments_for_query_text(&linked_field.arguments);
+                        query_text.push_str(&format!("{}{} {{\\\n", name, arguments));
+                    }
+                    GraphQLArtifactGenerationInfo::TypeRefinement(refine_to_type) => {
+                        query_text.push_str(&format!("... on {} {{\\\n", refine_to_type));
+                    }
+                };
+
                 write_selections_for_query_text(
                     query_text,
                     schema,
