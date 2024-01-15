@@ -12,9 +12,9 @@ use intern::{
 
 use graphql_lang_types::{
     ConstantValue, DirectiveLocation, GraphQLDirective, GraphQLDirectiveDefinition,
-    GraphQLEnumDefinition, GraphQLEnumValueDefinition, GraphQLInputObjectTypeDefinition,
-    GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition,
-    GraphQLObjectTypeExtension, GraphQLOutputFieldDefinition, GraphQLScalarTypeDefinition,
+    GraphQLEnumDefinition, GraphQLEnumValueDefinition, GraphQLFieldDefinition,
+    GraphQLInputObjectTypeDefinition, GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition,
+    GraphQLObjectTypeDefinition, GraphQLObjectTypeExtension, GraphQLScalarTypeDefinition,
     GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument, GraphQLTypeSystemExtension,
     GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition,
     GraphQLUnionTypeDefinition, ListTypeAnnotation, NameValuePair, NamedTypeAnnotation,
@@ -736,7 +736,7 @@ fn from_control_flow<T, E>(control_flow: impl FnOnce() -> ControlFlow<T, E>) -> 
 fn parse_optional_fields<'a>(
     tokens: &mut PeekableLexer<'a>,
     text_source: TextSource,
-) -> ParseResult<Vec<WithLocation<GraphQLOutputFieldDefinition>>> {
+) -> ParseResult<Vec<WithLocation<GraphQLFieldDefinition>>> {
     let brace = tokens.parse_token_of_kind(TokenKind::OpenBrace);
     if brace.is_err() {
         return Ok(vec![]);
@@ -754,7 +754,7 @@ fn parse_optional_fields<'a>(
 fn parse_field<'a>(
     tokens: &mut PeekableLexer<'a>,
     text_source: TextSource,
-) -> ParseResult<WithLocation<GraphQLOutputFieldDefinition>> {
+) -> ParseResult<WithLocation<GraphQLFieldDefinition>> {
     let with_span = tokens
         .with_span(|tokens| {
             let description = parse_optional_description(tokens);
@@ -778,7 +778,7 @@ fn parse_field<'a>(
 
             let directives = parse_constant_directives(tokens, text_source)?;
 
-            Ok(GraphQLOutputFieldDefinition {
+            Ok(GraphQLFieldDefinition {
                 name,
                 type_,
                 description,

@@ -5,7 +5,7 @@ use common_lang_types::{
     StringLiteralValue, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    GraphQLOutputFieldDefinition, GraphQLScalarTypeDefinition, GraphQLTypeSystemDefinition,
+    GraphQLFieldDefinition, GraphQLScalarTypeDefinition, GraphQLTypeSystemDefinition,
     GraphQLTypeSystemDocument, GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
     GraphQLTypeSystemExtensionOrDefinition, NamedTypeAnnotation, NonNullTypeAnnotation,
     TypeAnnotation,
@@ -495,7 +495,7 @@ struct FieldObjectIdsEtc {
 /// Given a vector of fields from the schema AST all belonging to the same object/interface,
 /// return a vector of unvalidated fields and a set of field names.
 fn get_field_objects_ids_and_names(
-    new_fields: Vec<WithLocation<GraphQLOutputFieldDefinition>>,
+    new_fields: Vec<WithLocation<GraphQLFieldDefinition>>,
     next_field_id: usize,
     parent_type_id: ObjectId,
     parent_type_name: IsographObjectTypeName,
@@ -599,7 +599,7 @@ fn get_field_objects_ids_and_names(
 fn set_and_validate_id_field(
     id_field: &mut Option<ServerIdFieldId>,
     current_field_id: usize,
-    field: &WithLocation<GraphQLOutputFieldDefinition>,
+    field: &WithLocation<GraphQLFieldDefinition>,
     parent_type_name: IsographObjectTypeName,
     options: ConfigOptions,
 ) -> ProcessTypeDefinitionResult<()> {
@@ -639,7 +639,7 @@ fn set_and_validate_id_field(
 }
 
 // TODO this should be a different type.
-pub(crate) type ProcessedFieldMapItem = FieldMapItem;
+pub(crate) struct ProcessedFieldMapItem(pub FieldMapItem);
 
 pub(crate) type ProcessTypeDefinitionResult<T> =
     Result<T, WithLocation<ProcessTypeDefinitionError>>;

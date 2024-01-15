@@ -108,7 +108,7 @@ pub struct GraphQLObjectTypeDefinition {
     pub name: WithLocation<ObjectTypeName>,
     pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
     pub directives: Vec<GraphQLDirective<ConstantValue>>,
-    pub fields: Vec<WithLocation<GraphQLOutputFieldDefinition>>,
+    pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -116,7 +116,7 @@ pub struct GraphQLObjectTypeExtension {
     pub name: WithLocation<ObjectTypeName>,
     pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
     pub directives: Vec<GraphQLDirective<ConstantValue>>,
-    pub fields: Vec<WithLocation<GraphQLOutputFieldDefinition>>,
+    pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -132,7 +132,7 @@ pub struct GraphQLInterfaceTypeDefinition {
     pub name: WithLocation<InterfaceTypeName>,
     pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
     pub directives: Vec<GraphQLDirective<ConstantValue>>,
-    pub fields: Vec<WithLocation<GraphQLOutputFieldDefinition>>,
+    pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -199,7 +199,7 @@ pub struct GraphQLUnionTypeDefinition {
     pub union_member_types: Vec<WithLocation<ObjectTypeName>>,
 }
 
-impl From<GraphQLInputValueDefinition> for GraphQLOutputFieldDefinition {
+impl From<GraphQLInputValueDefinition> for GraphQLFieldDefinition {
     fn from(value: GraphQLInputValueDefinition) -> Self {
         Self {
             description: value.description,
@@ -213,8 +213,9 @@ impl From<GraphQLInputValueDefinition> for GraphQLOutputFieldDefinition {
     }
 }
 
+/// A server field definition on an object or interface
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct GraphQLOutputFieldDefinition {
+pub struct GraphQLFieldDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<SelectableFieldName>,
     pub type_: TypeAnnotation<UnvalidatedTypeName>,
@@ -222,7 +223,7 @@ pub struct GraphQLOutputFieldDefinition {
     pub directives: Vec<GraphQLDirective<ConstantValue>>,
 }
 
-impl fmt::Display for GraphQLOutputFieldDefinition {
+impl fmt::Display for GraphQLFieldDefinition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name)?;
         write_arguments(f, &self.arguments)?;

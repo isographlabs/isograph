@@ -6,8 +6,8 @@ use common_lang_types::{
     ScalarTypeName, SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    ConstantValue, GraphQLDirective, GraphQLInputObjectTypeDefinition, GraphQLInputValueDefinition,
-    GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition, GraphQLOutputFieldDefinition,
+    ConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInputObjectTypeDefinition,
+    GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition,
     NamedTypeAnnotation, TypeAnnotation,
 };
 use intern::string_key::Intern;
@@ -283,7 +283,7 @@ pub struct IsographObjectTypeDefinition {
     pub directives: Vec<GraphQLDirective<ConstantValue>>,
     // TODO the spans of these fields are wrong
     // TODO use a shared field type
-    pub fields: Vec<WithLocation<GraphQLOutputFieldDefinition>>,
+    pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
 }
 
 impl From<GraphQLObjectTypeDefinition> for IsographObjectTypeDefinition {

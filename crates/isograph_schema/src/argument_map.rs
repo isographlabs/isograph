@@ -5,7 +5,7 @@ use common_lang_types::{
     StringLiteralValue, TextSource, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    ConstantValue, GraphQLDirective, GraphQLInputValueDefinition, GraphQLOutputFieldDefinition,
+    ConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInputValueDefinition,
     TypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
@@ -99,8 +99,8 @@ impl ArgumentMap {
                         }
 
                         self.arguments.swap_remove(index_of_argument);
-                        let processed_field_map_item: ProcessedFieldMapItem =
-                            field_map_item.clone();
+                        let processed_field_map_item =
+                            ProcessedFieldMapItem(field_map_item.clone());
                         processed_field_map_item
                     }
                     Some((first, rest)) => {
@@ -119,7 +119,7 @@ impl ArgumentMap {
                             WithLocation::new(PotentiallyModifiedArgument::Modified(arg), location);
                         // processed_field_map_item
                         // TODO wat
-                        field_map_item.clone()
+                        ProcessedFieldMapItem(field_map_item.clone())
                     }
                 }
             }
@@ -147,7 +147,7 @@ impl ArgumentMap {
                             text_source,
                         )?;
                         // TODO WAT
-                        field_map_item.clone()
+                        ProcessedFieldMapItem(field_map_item.clone())
                     }
                 }
             }
@@ -235,7 +235,7 @@ impl ModifiedObject {
 
                 let new_field = match potentially_modified_field {
                     PotentiallyModifiedField::Unmodified(_) => WithLocation::new(
-                        GraphQLOutputFieldDefinition {
+                        GraphQLFieldDefinition {
                             description: field.description.map(|description| {
                                 WithSpan::new(description, Span::todo_generated())
                             }),

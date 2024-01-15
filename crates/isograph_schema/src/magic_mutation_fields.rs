@@ -140,7 +140,7 @@ impl UnvalidatedSchema {
                                         name: WithLocation::new(
                                             // TODO make this no-op
                                             // TODO split on . here; we should be able to have from: "best_friend.id" or whatnot.
-                                            field_map_item.from.lookup().intern().into(),
+                                            field_map_item.0.from.lookup().intern().into(),
                                             Location::generated(),
                                         ),
                                         reader_alias: None,
