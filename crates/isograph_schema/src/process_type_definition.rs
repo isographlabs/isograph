@@ -1,8 +1,9 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    GraphQLArtifactGenerationInfo, IsographObjectTypeName, Location, ScalarTypeName,
-    SelectableFieldName, Span, StringLiteralValue, UnvalidatedTypeName, WithLocation, WithSpan,
+    GraphQLArtifactGenerationInfo, InterfaceTypeName, IsographObjectTypeName, Location,
+    ScalarTypeName, SelectableFieldName, Span, StringLiteralValue, UnvalidatedTypeName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLFieldDefinition, GraphQLScalarTypeDefinition, GraphQLTypeSystemDefinition,
@@ -302,8 +303,8 @@ impl UnvalidatedSchema {
                 // TODO avoid this
                 let type_def_2 = object_type_definition.clone();
                 let FieldObjectIdsEtc {
-                    unvalidated_schema_fields,
-                    server_fields,
+                    mut unvalidated_schema_fields,
+                    mut server_field_ids,
                     mut encountered_fields,
                     id_field,
                 } = get_field_objects_ids_and_names(
@@ -315,6 +316,16 @@ impl UnvalidatedSchema {
                     may_have_id_field,
                     options,
                 )?;
+
+                unvalidated_schema_fields.extend(get_type_refinement_fields(
+                    type_def_2.interfaces,
+                    schema_fields.len() + unvalidated_schema_fields.len(),
+                    next_object_id,
+                    // TODO this is blatantly wrong, the location should be wherever the interface comes from
+                    object_type_definition.name.location,
+                    &mut encountered_fields,
+                    &mut server_field_ids,
+                ));
 
                 let object_resolvers = get_resolvers_for_schema_object(
                     &id_field,
@@ -328,7 +339,7 @@ impl UnvalidatedSchema {
                     description: object_type_definition.description.map(|d| d.item),
                     name: object_type_definition.name.item,
                     id: next_object_id,
-                    server_fields,
+                    server_fields: server_field_ids,
                     resolvers: object_resolvers,
                     encountered_fields,
                     valid_refinements: vec![],
@@ -485,7 +496,7 @@ fn get_typename_type(
 
 struct FieldObjectIdsEtc {
     unvalidated_schema_fields: Vec<UnvalidatedSchemaField>,
-    server_fields: Vec<ServerFieldId>,
+    server_field_ids: Vec<ServerFieldId>,
     // TODO this should be HashMap<_, WithLocation<_>> or something
     encountered_fields: HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
     // TODO this should not be a ServerFieldId, but a special type
@@ -507,9 +518,10 @@ fn get_field_objects_ids_and_names(
     let new_field_count = new_fields.len();
     let mut encountered_fields = HashMap::with_capacity(new_field_count);
     let mut unvalidated_fields = Vec::with_capacity(new_field_count);
-    let mut field_ids = Vec::with_capacity(new_field_count + 1); // +1 for the typename
+    let mut server_field_ids = Vec::with_capacity(new_field_count + 1); // +1 for the typename
     let mut id_field = None;
     let id_name = "id".intern().into();
+
     for (current_field_index, field) in new_fields.into_iter().enumerate() {
         // TODO use entry
         match encountered_fields.insert(
@@ -539,7 +551,7 @@ fn get_field_objects_ids_and_names(
                     arguments: field.item.arguments,
                     artifact_generation_info: GraphQLArtifactGenerationInfo::ServerField,
                 });
-                field_ids.push(current_field_id.into());
+                server_field_ids.push(current_field_id.into());
             }
             Some(_) => {
                 return Err(WithLocation::new(
@@ -559,9 +571,9 @@ fn get_field_objects_ids_and_names(
     // TODO: the only way to determine that a field is a magic __typename field is
     // to check the name! That's a bit unfortunate. We should model these differently,
     // perhaps fields should contain an enum (IdField, TypenameField, ActualField)
-    let typename_field_id = (next_field_id + field_ids.len()).into();
+    let typename_field_id = (next_field_id + server_field_ids.len()).into();
     let typename_name = WithLocation::new("__typename".intern().into(), Location::generated());
-    field_ids.push(typename_field_id);
+    server_field_ids.push(typename_field_id);
     unvalidated_fields.push(SchemaServerField {
         description: None,
         name: typename_name,
@@ -589,7 +601,7 @@ fn get_field_objects_ids_and_names(
 
     Ok(FieldObjectIdsEtc {
         unvalidated_schema_fields: unvalidated_fields,
-        server_fields: field_ids,
+        server_field_ids,
         encountered_fields,
         id_field,
     })
@@ -638,6 +650,51 @@ fn set_and_validate_id_field(
             field.location,
         )),
     }
+}
+
+fn get_type_refinement_fields<'a>(
+    interfaces: Vec<WithSpan<InterfaceTypeName>>,
+    next_field_id: usize,
+    parent_type_id: ObjectId,
+    location: Location,
+    encountered_fields: &'a mut HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
+    server_field_ids: &'a mut Vec<ServerFieldId>,
+) -> impl Iterator<Item = SchemaServerField<TypeAnnotation<UnvalidatedTypeName>>> + 'a {
+    interfaces
+        .into_iter()
+        .enumerate()
+        .map(move |(current_field_index, interface)| {
+            let next_id = (next_field_id + current_field_index).into();
+            server_field_ids.push(next_id);
+
+            let refinement_field_name = format!("__as{}", interface.item).intern().into();
+            let refinement_type =
+                TypeAnnotation::Named(NamedTypeAnnotation(interface.map(|x| x.into())));
+
+            match encountered_fields.insert(
+                refinement_field_name,
+                DefinedField::ServerField(refinement_type.clone()),
+            ) {
+                Some(_) => {
+                    panic!(
+                        "TODO make this an error; encountered an existing \
+                        __as field; this probably indicates a bug in Isograph; or, \
+                        maybe you declared a concrete type implementing the same interface twice."
+                    )
+                }
+                None => SchemaServerField {
+                    description: None,
+                    name: WithLocation::new(refinement_field_name, location),
+                    id: next_id,
+                    associated_data: refinement_type,
+                    parent_type_id,
+                    arguments: vec![],
+                    artifact_generation_info: GraphQLArtifactGenerationInfo::TypeRefinement(
+                        interface.item.into(),
+                    ),
+                },
+            }
+        })
 }
 
 // TODO this should be a different type.

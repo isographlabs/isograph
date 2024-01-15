@@ -1,6 +1,6 @@
 use common_lang_types::{
-    InputTypeName, InputValueName, IsographObjectTypeName, ScalarFieldName, SelectableFieldName,
-    UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
+    GraphQLArtifactGenerationInfo, InputTypeName, InputValueName, IsographObjectTypeName,
+    SelectableFieldName, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, NamedTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
@@ -51,6 +51,7 @@ pub type ValidatedSchemaIdField = SchemaIdField<NamedTypeAnnotation<ScalarId>>;
 #[derive(Debug)]
 pub struct ValidatedLinkedFieldAssociatedData {
     pub parent_object_id: ObjectId,
+    pub artifact_generation_info: GraphQLArtifactGenerationInfo,
 }
 
 #[derive(Debug)]
@@ -609,7 +610,7 @@ fn validate_field_type_exists_and_is_scalar(
                         associated_data: DefinedField::ServerField(
                             find_server_field_id(
                                 server_fields,
-                                scalar_field_selection.name.item,
+                                scalar_field_selection.name.item.into(),
                                 &parent_object.server_fields,
                             )
                             .expect("Expected to find scalar field, this probably indicates a bug in Isograph"),
@@ -660,7 +661,7 @@ fn validate_field_type_exists_and_is_linked(
     server_fields: &[UnvalidatedSchemaServerField],
 ) -> ValidateSelectionsResult<ValidatedLinkedFieldSelection> {
     let linked_field_name = linked_field_selection.name.item.into();
-    match (&parent_object.encountered_fields).get(&linked_field_name) {
+    match parent_object.encountered_fields.get(&linked_field_name) {
         Some(defined_field_type) => {
             match defined_field_type {
                 DefinedField::ServerField(server_field_name) => {
@@ -682,27 +683,39 @@ fn validate_field_type_exists_and_is_linked(
                             linked_field_selection.name.location,
                         )),
                         DefinedTypeId::Object(object_id) => {
-                            let object = schema_data.objects.get(object_id.as_usize()).unwrap();
+                            let linked_field_target_type =
+                                schema_data.objects.get(object_id.as_usize()).unwrap();
+                            let server_field_id = find_server_field_id(
+                                server_fields,
+                                linked_field_name,
+                                &parent_object.server_fields,
+                            )
+                            .expect("Expected to find scalar field, this probably indicates a bug in Isograph");
+                            let server_field = &server_fields[server_field_id.as_usize()];
+
                             Ok(LinkedFieldSelection {
-                                name: linked_field_selection.name,
-                                reader_alias: linked_field_selection.reader_alias,
-                                normalization_alias: linked_field_selection.normalization_alias,
-                                selection_set: linked_field_selection.selection_set.into_iter().map(
-                                    |selection| {
-                                        validate_resolver_definition_selection_exists_and_type_matches(
-                                            selection,
-                                            object,
-                                            schema_data,
-                                            server_fields
-                                        )
-                                    },
-                                ).collect::<Result<Vec<_>, _>>()?,
-                                unwraps: linked_field_selection.unwraps,
-                                associated_data: ValidatedLinkedFieldAssociatedData {
-                                    parent_object_id: object_id,
-                                },
-                                arguments: linked_field_selection.arguments,
-                            })
+                            name: linked_field_selection.name,
+                            reader_alias: linked_field_selection.reader_alias,
+                            normalization_alias: linked_field_selection.normalization_alias,
+                            selection_set: linked_field_selection
+                                .selection_set
+                                .into_iter()
+                                .map(|selection| {
+                                    validate_resolver_definition_selection_exists_and_type_matches(
+                                        selection,
+                                        linked_field_target_type,
+                                        schema_data,
+                                        server_fields,
+                                    )
+                                })
+                                .collect::<Result<Vec<_>, _>>()?,
+                            unwraps: linked_field_selection.unwraps,
+                            associated_data: ValidatedLinkedFieldAssociatedData {
+                                parent_object_id: object_id,
+                                artifact_generation_info: server_field.artifact_generation_info.clone(),
+                            },
+                            arguments: linked_field_selection.arguments,
+                        })
                         }
                     }
                 }
@@ -724,7 +737,7 @@ fn validate_field_type_exists_and_is_linked(
 
 fn find_server_field_id(
     server_fields: &[UnvalidatedSchemaServerField],
-    field_name: ScalarFieldName,
+    field_name: SelectableFieldName,
     parent_server_fields: &[ServerFieldId],
 ) -> Option<ServerFieldId> {
     parent_server_fields.iter().find_map(|server_field_id| {
