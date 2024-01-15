@@ -1,8 +1,8 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    IsographObjectTypeName, Location, ScalarTypeName, SelectableFieldName, Span,
-    StringLiteralValue, UnvalidatedTypeName, WithLocation, WithSpan,
+    GraphQLArtifactGenerationInfo, IsographObjectTypeName, Location, ScalarTypeName,
+    SelectableFieldName, Span, StringLiteralValue, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLFieldDefinition, GraphQLScalarTypeDefinition, GraphQLTypeSystemDefinition,
@@ -537,6 +537,7 @@ fn get_field_objects_ids_and_names(
                     associated_data: field.item.type_,
                     parent_type_id,
                     arguments: field.item.arguments,
+                    artifact_generation_info: GraphQLArtifactGenerationInfo::ServerField,
                 });
                 field_ids.push(current_field_id.into());
             }
@@ -568,6 +569,7 @@ fn get_field_objects_ids_and_names(
         associated_data: typename_type.clone(),
         parent_type_id,
         arguments: vec![],
+        artifact_generation_info: GraphQLArtifactGenerationInfo::ServerField,
     });
 
     if encountered_fields

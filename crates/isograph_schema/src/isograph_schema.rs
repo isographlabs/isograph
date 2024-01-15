@@ -1,9 +1,10 @@
 use std::{collections::HashMap, fmt::Debug};
 
 use common_lang_types::{
-    DescriptionValue, FieldArgumentName, HasName, InputTypeName, InterfaceTypeName,
-    IsographObjectTypeName, JavascriptName, LinkedFieldName, ResolverDefinitionPath,
-    ScalarTypeName, SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
+    DescriptionValue, FieldArgumentName, GraphQLArtifactGenerationInfo, HasName, InputTypeName,
+    InterfaceTypeName, IsographObjectTypeName, JavascriptName, LinkedFieldName,
+    ResolverDefinitionPath, ScalarTypeName, SelectableFieldName, UnvalidatedTypeName, WithLocation,
+    WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInputObjectTypeDefinition,
@@ -366,6 +367,9 @@ pub struct SchemaServerField<TData> {
     pub parent_type_id: ObjectId,
     // pub directives: Vec<Directive<ConstantValue>>,
     pub arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+
+    // TODO make this generic over the type of this field
+    pub artifact_generation_info: GraphQLArtifactGenerationInfo,
 }
 
 impl<TData> SchemaServerField<TData> {
@@ -380,6 +384,7 @@ impl<TData> SchemaServerField<TData> {
             associated_data: convert(&self.associated_data)?,
             parent_type_id: self.parent_type_id,
             arguments: self.arguments.clone(),
+            artifact_generation_info: self.artifact_generation_info.clone(),
         })
     }
 }
@@ -547,6 +552,7 @@ impl<T> SchemaServerField<T> {
             associated_data,
             parent_type_id,
             arguments,
+            artifact_generation_info,
         } = self;
         (
             SchemaServerField {
@@ -556,6 +562,7 @@ impl<T> SchemaServerField<T> {
                 associated_data: (),
                 parent_type_id,
                 arguments,
+                artifact_generation_info,
             },
             associated_data,
         )
