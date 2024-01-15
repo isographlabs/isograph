@@ -45,7 +45,7 @@ macro_rules! derive_display {
 }
 
 // TODO move to another module
-pub(crate) fn generate_artifacts(
+pub(crate) fn generate_and_write_artifacts(
     schema: &ValidatedSchema,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,

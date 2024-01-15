@@ -20,7 +20,7 @@ use pretty_duration::pretty_duration;
 use thiserror::Error;
 
 use crate::{
-    generate_artifacts::{generate_artifacts, GenerateArtifactsError},
+    generate_artifacts::{generate_and_write_artifacts, GenerateArtifactsError},
     isograph_literals::{
         extract_iso_fetch_from_file_content, extract_iso_literal_from_file_content,
         read_files_in_folder, IsoFetchExtraction, IsoLiteralExtraction,
@@ -181,7 +181,7 @@ pub(crate) fn handle_compile_command(
 
         let validated_schema = Schema::validate_and_construct(schema)?;
 
-        let total_artifacts_written = generate_artifacts(
+        let total_artifacts_written = generate_and_write_artifacts(
             &validated_schema,
             &config.project_root,
             &config.artifact_directory,
