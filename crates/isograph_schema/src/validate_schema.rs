@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use common_lang_types::{
     InputTypeName, InputValueName, IsographObjectTypeName, ScalarFieldName, SelectableFieldName,
     UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
@@ -15,8 +13,8 @@ use thiserror::Error;
 use crate::{
     refetched_paths::refetched_paths_with_path, DefinedField, NameAndArguments, PathToRefetchField,
     Schema, SchemaData, SchemaIdField, SchemaObject, SchemaResolver, SchemaServerField,
-    SchemaValidationState, UnvalidatedLinkedFieldSelection, UnvalidatedObjectFieldInfo,
-    UnvalidatedSchema, UnvalidatedSchemaData, UnvalidatedSchemaField, UnvalidatedSchemaObject,
+    SchemaValidationState, UnvalidatedLinkedFieldSelection, UnvalidatedSchema,
+    UnvalidatedSchemaData, UnvalidatedSchemaField, UnvalidatedSchemaObject,
     UnvalidatedSchemaResolver, UnvalidatedSchemaServerField, ValidateResolverFetchDeclarationError,
 };
 
@@ -566,7 +564,6 @@ fn validate_resolver_definition_selection_exists_and_type_matches(
             field_selection.and_then(
                 &mut |scalar_field_selection| {
                     validate_field_type_exists_and_is_scalar(
-                        &parent_object.encountered_fields,
                         schema_data,
                         parent_object,
                         scalar_field_selection,
@@ -575,7 +572,6 @@ fn validate_resolver_definition_selection_exists_and_type_matches(
                 },
                 &mut |linked_field_selection| {
                     validate_field_type_exists_and_is_linked(
-                        &parent_object.encountered_fields,
                         schema_data,
                         parent_object,
                         linked_field_selection,
@@ -590,14 +586,13 @@ fn validate_resolver_definition_selection_exists_and_type_matches(
 /// Given that we selected a scalar field, the field should exist on the parent,
 /// and type should be a resolver (which is a scalar) or a server scalar type.
 fn validate_field_type_exists_and_is_scalar(
-    parent_encountered_fields: &HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
     schema_data: &UnvalidatedSchemaData,
     parent_object: &UnvalidatedSchemaObject,
     scalar_field_selection: UnvalidatedScalarFieldSelection,
     server_fields: &[UnvalidatedSchemaServerField],
 ) -> ValidateSelectionsResult<ValidatedScalarFieldSelection> {
     let scalar_field_name = scalar_field_selection.name.item.into();
-    match parent_encountered_fields.get(&scalar_field_name) {
+    match parent_object.encountered_fields.get(&scalar_field_name) {
         Some(defined_field_type) => match defined_field_type {
             DefinedField::ServerField(server_field_name) => {
                 let field_type_id = *schema_data
@@ -658,14 +653,13 @@ fn validate_field_type_exists_and_is_scalar(
 /// Given that we selected a linked field, the field should exist on the parent,
 /// and type should be a server interface, object or union.
 fn validate_field_type_exists_and_is_linked(
-    parent_fields: &HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
     schema_data: &UnvalidatedSchemaData,
     parent_object: &UnvalidatedSchemaObject,
     linked_field_selection: UnvalidatedLinkedFieldSelection,
     server_fields: &[UnvalidatedSchemaServerField],
 ) -> ValidateSelectionsResult<ValidatedLinkedFieldSelection> {
     let linked_field_name = linked_field_selection.name.item.into();
-    match parent_fields.get(&linked_field_name) {
+    match (&parent_object.encountered_fields).get(&linked_field_name) {
         Some(defined_field_type) => {
             match defined_field_type {
                 DefinedField::ServerField(server_field_name) => {
