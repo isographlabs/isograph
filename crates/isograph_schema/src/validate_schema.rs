@@ -363,8 +363,6 @@ fn validate_server_field_argument(
     }
 }
 
-// TODO this returns a single error for a given resolver, but a resolver
-// can handle multiple errors. We should emit all of them.
 fn validate_and_transform_resolvers(
     resolvers: Vec<UnvalidatedSchemaResolver>,
     schema_data: &UnvalidatedSchemaData,
