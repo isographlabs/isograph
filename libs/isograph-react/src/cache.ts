@@ -5,7 +5,7 @@ import {
 } from "@isograph/react-disposable-state";
 import { PromiseWrapper, wrapPromise } from "./PromiseWrapper";
 import {
-  IsographFetchableResolver,
+  IsographEntrypoint,
   NormalizationAst,
   NormalizationLinkedField,
   NormalizationScalarField,
@@ -54,7 +54,7 @@ function stableCopy<T>(value: T): T {
   return stable as any;
 }
 
-type IsoResolver = IsographFetchableResolver<any, any, any>;
+type IsoResolver = IsographEntrypoint<any, any, any>;
 
 export function getOrCreateCacheForArtifact<T>(
   artifact: IsoResolver,

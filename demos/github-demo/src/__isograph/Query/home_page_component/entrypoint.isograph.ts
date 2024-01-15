@@ -1,4 +1,4 @@
-import type {IsographFetchableResolver, FragmentReference, NormalizationAst, RefetchQueryArtifactWrapper} from '@isograph/react';
+import type {IsographEntrypoint, FragmentReference, NormalizationAst, RefetchQueryArtifactWrapper} from '@isograph/react';
 import type {ReadFromStoreType, ResolverParameterType, ReadOutType} from './reader.isograph';
 import readerResolver from './reader.isograph';
 import refetchQuery0 from './__refetch__0.isograph';
@@ -171,8 +171,8 @@ const normalizationAst: NormalizationAst = [
     ],
   },
 ];
-const artifact: IsographFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
-  kind: "FetchableResolver",
+const artifact: IsographEntrypoint<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
+  kind: "Entrypoint",
   queryText,
   normalizationAst,
   nestedRefetchQueries,

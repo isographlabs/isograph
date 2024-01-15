@@ -17,15 +17,15 @@ impl<'schema> EntrypointArtifact<'schema> {
         } = self;
 
         format!(
-            "import type {{IsographFetchableResolver, FragmentReference, \
+            "import type {{IsographEntrypoint, FragmentReference, \
             NormalizationAst, RefetchQueryArtifactWrapper}} from '@isograph/react';\n\
             import type {{ReadFromStoreType, ResolverParameterType, ReadOutType}} from './reader.isograph';\n\
             import readerResolver from './reader.isograph';\n\
             {refetch_query_artifact_import}\n\n\
             const queryText = '{query_text}';\n\n\
             const normalizationAst: NormalizationAst = {normalization_ast};\n\
-            const artifact: IsographFetchableResolver<ReadFromStoreType, ResolverParameterType, ReadOutType> = {{\n\
-            {}kind: \"FetchableResolver\",\n\
+            const artifact: IsographEntrypoint<ReadFromStoreType, ResolverParameterType, ReadOutType> = {{\n\
+            {}kind: \"Entrypoint\",\n\
             {}queryText,\n\
             {}normalizationAst,\n\
             {}nestedRefetchQueries,\n\
@@ -104,7 +104,7 @@ impl RefetchArtifact {
         } = self;
 
         format!(
-            "import type {{IsographFetchableResolver, ReaderAst, FragmentReference, NormalizationAst}} from '@isograph/react';\n\
+            "import type {{IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst}} from '@isograph/react';\n\
             const queryText = '{query_text}';\n\n\
             const normalizationAst: NormalizationAst = {normalization_ast};\n\
             const artifact: any = {{\n\

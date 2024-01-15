@@ -23,12 +23,12 @@ export {
 } from "./cache";
 
 // This type should be treated as an opaque type.
-export type IsographFetchableResolver<
+export type IsographEntrypoint<
   TReadFromStore extends Object,
   TResolverProps,
   TResolverResult
 > = {
-  kind: "FetchableResolver";
+  kind: "Entrypoint";
   queryText: string;
   normalizationAst: NormalizationAst;
   readerArtifact: ReaderArtifact<
@@ -160,7 +160,7 @@ export type FragmentReference<
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
-export function isoFetch<T extends IsographFetchableResolver<any, any, any>>(
+export function isoFetch<T extends IsographEntrypoint<any, any, any>>(
   _text: TemplateStringsArray
 ): T {
   return void 0 as any;
@@ -191,7 +191,7 @@ export function useLazyReference<
   TResolverProps,
   TResolverResult
 >(
-  fetchableResolverArtifact: IsographFetchableResolver<
+  entrypoint: IsographEntrypoint<
     TReadFromStore,
     TResolverProps,
     TResolverResult
@@ -205,10 +205,7 @@ export function useLazyReference<
   >;
 } {
   // Typechecking fails here... TODO investigate
-  const cache = getOrCreateCacheForArtifact(
-    fetchableResolverArtifact,
-    variables
-  );
+  const cache = getOrCreateCacheForArtifact(entrypoint, variables);
 
   // TODO add comment explaining why we never use this value
   // @ts-ignore
@@ -219,10 +216,10 @@ export function useLazyReference<
   return {
     queryReference: {
       kind: "FragmentReference",
-      readerArtifact: fetchableResolverArtifact.readerArtifact,
+      readerArtifact: entrypoint.readerArtifact,
       root: ROOT_ID,
       variables,
-      nestedRefetchQueries: fetchableResolverArtifact.nestedRefetchQueries,
+      nestedRefetchQueries: entrypoint.nestedRefetchQueries,
     },
   };
 }
