@@ -458,7 +458,7 @@ fn get_resolvers_for_schema_object(
             },
             parent_object_id,
             // N.B. __refetch fields are non-fetchable, but they do execute queries which
-            // have fetchable artifacts (i.e. normalization ASTs).
+            // have normalization ASTs.
             action_kind: ResolverActionKind::RefetchField,
         });
         encountered_fields.insert(

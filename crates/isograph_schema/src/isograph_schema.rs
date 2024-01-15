@@ -60,10 +60,10 @@ pub trait SchemaValidationState: Debug {
     ///   i.e. DefinedField<ServerFieldId, ResolverFieldId>
     type EncounteredField: Debug;
 
-    /// What we store in fetchable_resolvers
+    /// What we store in entrypoints
     /// - Unvalidated: (TextSource, WithSpan<ResolverFetch>)
     /// - Validated: (ObjectId, ResolverFieldId)
-    type FetchableResolver: Debug;
+    type Entrypoint: Debug;
 }
 
 /// The in-memory representation of a schema.
@@ -85,7 +85,7 @@ pub struct Schema<TValidation: SchemaValidationState> {
         >,
     >,
     // TODO consider whether this belongs here. It could just be a free variable.
-    pub fetchable_resolvers: Vec<TValidation::FetchableResolver>,
+    pub entrypoints: Vec<TValidation::Entrypoint>,
     pub schema_data: SchemaData<TValidation::EncounteredField>,
 
     // Well known types

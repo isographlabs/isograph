@@ -38,12 +38,12 @@ pub(crate) fn write_artifacts<'schema>(
     })?;
     for artifact in artifacts {
         match artifact {
-            Artifact::Entrypoint(fetchable_resolver) => {
+            Artifact::Entrypoint(entrypoint_artifact) => {
                 let EntrypointArtifact {
                     query_name,
                     parent_type,
                     ..
-                } = &fetchable_resolver;
+                } = &entrypoint_artifact;
 
                 let generated_file_name = generated_file_name(*ENTRYPOINT);
                 let intermediate_folder = generated_intermediate_folder(
@@ -66,7 +66,7 @@ pub(crate) fn write_artifacts<'schema>(
                     }
                 })?;
 
-                let file_contents = fetchable_resolver.file_contents();
+                let file_contents = entrypoint_artifact.file_contents();
 
                 file.write(file_contents.as_bytes()).map_err(|e| {
                     GenerateArtifactsError::UnableToWriteToArtifactFile {
@@ -75,12 +75,12 @@ pub(crate) fn write_artifacts<'schema>(
                     }
                 })?;
             }
-            Artifact::Reader(non_fetchable_resolver) => {
+            Artifact::Reader(reader_artifact) => {
                 let ReaderArtifact {
                     parent_type,
                     resolver_field_name,
                     ..
-                } = &non_fetchable_resolver;
+                } = &reader_artifact;
 
                 let generated_file_name = generated_file_name(*READER);
                 let intermediate_folder = generated_intermediate_folder(
@@ -103,7 +103,7 @@ pub(crate) fn write_artifacts<'schema>(
                     }
                 })?;
 
-                let file_contents = non_fetchable_resolver.file_contents();
+                let file_contents = reader_artifact.file_contents();
 
                 file.write(file_contents.as_bytes()).map_err(|e| {
                     GenerateArtifactsError::UnableToWriteToArtifactFile {
@@ -112,13 +112,13 @@ pub(crate) fn write_artifacts<'schema>(
                     }
                 })?;
             }
-            Artifact::RefetchQuery(refetch_query_resolver) => {
+            Artifact::RefetchQuery(refetch_artifact) => {
                 let RefetchArtifact {
                     root_fetchable_field,
                     root_fetchable_field_parent_object,
                     refetch_query_index,
                     ..
-                } = &refetch_query_resolver;
+                } = &refetch_artifact;
 
                 // TODO we will generate many different queries; they need unique names. For now,
                 // they have a single name each artifact clobbers the previous.
@@ -150,7 +150,7 @@ pub(crate) fn write_artifacts<'schema>(
                     }
                 })?;
 
-                let file_contents = refetch_query_resolver.file_contents();
+                let file_contents = refetch_artifact.file_contents();
 
                 file.write(file_contents.as_bytes()).map_err(|e| {
                     GenerateArtifactsError::UnableToWriteToArtifactFile {

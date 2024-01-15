@@ -2,21 +2,21 @@ use common_lang_types::{
     IsographObjectTypeName, Location, ScalarFieldName, TextSource, UnvalidatedTypeName,
     WithLocation, WithSpan,
 };
-use isograph_lang_types::{DefinedTypeId, ObjectId, ResolverFetch, ResolverFieldId};
+use isograph_lang_types::{DefinedTypeId, EntrypointTypeAndField, ObjectId, ResolverFieldId};
 use thiserror::Error;
 
 use crate::{DefinedField, UnvalidatedSchema};
 
 impl UnvalidatedSchema {
-    pub fn validate_resolver_fetch(
+    pub fn validate_entrypoint_type_and_field(
         &self,
         text_source: TextSource,
-        resolver_fetch: WithSpan<ResolverFetch>,
+        entrypoint_type_and_field: WithSpan<EntrypointTypeAndField>,
     ) -> Result<ResolverFieldId, WithLocation<ValidateResolverFetchDeclarationError>> {
-        let parent_object_id =
-            self.validate_parent_object_id(resolver_fetch.item.parent_type, text_source)?;
+        let parent_object_id = self
+            .validate_parent_object_id(entrypoint_type_and_field.item.parent_type, text_source)?;
         let resolver_field_id = self.validate_resolver_field(
-            resolver_fetch.item.resolver_field_name,
+            entrypoint_type_and_field.item.resolver_field_name,
             text_source,
             parent_object_id,
         )?;

@@ -46,7 +46,7 @@ impl SchemaValidationState for ValidatedSchemaState {
     type ResolverSelectionLinkedFieldAssociatedData = ObjectId;
     type ResolverVariableDefinitionAssociatedData = DefinedTypeId;
     type EncounteredField = ValidatedDefinedField;
-    type FetchableResolver = ResolverFieldId;
+    type Entrypoint = ResolverFieldId;
 }
 
 pub type ValidatedSchema = Schema<ValidatedSchemaState>;
@@ -57,17 +57,17 @@ impl ValidatedSchema {
     ) -> Result<Self, Vec<WithLocation<ValidateSchemaError>>> {
         let mut errors = vec![];
 
-        let mut updated_fetchable_resolvers = vec![];
-        for (text_source, fetchable_resolver) in unvalidated_schema.fetchable_resolvers.iter() {
+        let mut updated_entrypoints = vec![];
+        for (text_source, entrypoint_type_and_field) in unvalidated_schema.entrypoints.iter() {
             match unvalidated_schema
-                .validate_resolver_fetch(*text_source, *fetchable_resolver)
+                .validate_entrypoint_type_and_field(*text_source, *entrypoint_type_and_field)
                 .map_err(|e| {
                     WithLocation::new(
                         ValidateSchemaError::ErrorValidatingResolverFetch { message: e.item },
                         e.location,
                     )
                 }) {
-                Ok(resolver_id) => updated_fetchable_resolvers.push(resolver_id),
+                Ok(resolver_id) => updated_entrypoints.push(resolver_id),
                 Err(e) => errors.push(e),
             }
         }
@@ -75,7 +75,7 @@ impl ValidatedSchema {
         let Schema {
             fields,
             resolvers,
-            fetchable_resolvers: _,
+            entrypoints: _,
             schema_data,
             id_type_id: id_type,
             string_type_id: string_type,
@@ -123,7 +123,7 @@ impl ValidatedSchema {
             Ok(Self {
                 fields: updated_fields,
                 resolvers: updated_resolvers,
-                fetchable_resolvers: updated_fetchable_resolvers,
+                entrypoints: updated_entrypoints,
                 schema_data: SchemaData {
                     objects,
                     scalars,

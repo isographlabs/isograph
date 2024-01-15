@@ -11,7 +11,7 @@ use common_lang_types::{
 use graphql_schema_parser::{parse_schema, parse_schema_extensions, SchemaParseError};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_parser::{parse_iso_fetch, parse_iso_literal, IsographLiteralParseError};
-use isograph_lang_types::{ResolverDeclaration, ResolverFetch};
+use isograph_lang_types::{EntrypointTypeAndField, ResolverDeclaration};
 use isograph_schema::{
     CompilerConfig, ProcessGraphQLDocumentOutcome, ProcessResolverDeclarationError, Schema,
     UnvalidatedSchema,
@@ -198,7 +198,7 @@ pub(crate) fn handle_compile_command(
 fn process_parsed_resolvers_and_entrypoints(
     schema: &mut UnvalidatedSchema,
     resolvers: Vec<(WithSpan<ResolverDeclaration>, TextSource)>,
-    entrypoints: Vec<(WithSpan<ResolverFetch>, TextSource)>,
+    entrypoints: Vec<(WithSpan<EntrypointTypeAndField>, TextSource)>,
 ) -> Result<(), Vec<WithLocation<ProcessResolverDeclarationError>>> {
     let mut errors = vec![];
     for (resolver_declaration, text_source) in resolvers {
@@ -207,9 +207,7 @@ fn process_parsed_resolvers_and_entrypoints(
         }
     }
     for (resolver_fetch, text_source) in entrypoints {
-        schema
-            .fetchable_resolvers
-            .push((text_source, resolver_fetch))
+        schema.entrypoints.push((text_source, resolver_fetch))
     }
 
     if errors.is_empty() {
@@ -225,7 +223,7 @@ fn extract_iso_literals(
 ) -> Result<
     (
         Vec<(WithSpan<ResolverDeclaration>, TextSource)>,
-        Vec<(WithSpan<ResolverFetch>, TextSource)>,
+        Vec<(WithSpan<EntrypointTypeAndField>, TextSource)>,
     ),
     Vec<WithLocation<IsographLiteralParseError>>,
 > {
@@ -280,7 +278,8 @@ fn extract_iso_literals(
 fn process_iso_fetch_extraction(
     iso_fetch_extaction: IsoFetchExtraction<'_>,
     file_name: SourceFileName,
-) -> Result<(WithSpan<ResolverFetch>, TextSource), WithLocation<IsographLiteralParseError>> {
+) -> Result<(WithSpan<EntrypointTypeAndField>, TextSource), WithLocation<IsographLiteralParseError>>
+{
     let IsoFetchExtraction {
         iso_fetch_text,
         iso_fetch_start_index,

@@ -9,9 +9,9 @@ use graphql_lang_types::{
 };
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
-    FragmentDirectiveUsage, LinkedFieldSelection, NonConstantValue, ResolverDeclaration,
-    ResolverFetch, ScalarFieldSelection, Selection, SelectionFieldArgument, ServerFieldSelection,
-    Unwrap, VariableDefinition,
+    EntrypointTypeAndField, FragmentDirectiveUsage, LinkedFieldSelection, NonConstantValue,
+    ResolverDeclaration, ScalarFieldSelection, Selection, SelectionFieldArgument,
+    ServerFieldSelection, Unwrap, VariableDefinition,
 };
 
 use crate::{
@@ -22,7 +22,7 @@ use crate::{
 pub fn parse_iso_fetch(
     iso_fetch_text: &str,
     text_source: TextSource,
-) -> ParseResultWithLocation<WithSpan<ResolverFetch>> {
+) -> ParseResultWithLocation<WithSpan<EntrypointTypeAndField>> {
     let mut tokens = PeekableLexer::new(iso_fetch_text);
     let resolver_fetch = tokens
         .with_span(|tokens| {
@@ -36,7 +36,7 @@ pub fn parse_iso_fetch(
                 .parse_string_key_type(IsographLangTokenKind::Identifier)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-            Ok(ResolverFetch {
+            Ok(EntrypointTypeAndField {
                 parent_type,
                 resolver_field_name,
             })

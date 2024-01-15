@@ -59,24 +59,27 @@ pub(crate) fn generate_artifacts(
 
 /// get all artifacts that we must generate according to the following rough plan:
 /// - initially, we know we must generate artifacts for each resolver
-/// - we must also generate an artifact for each refetch field we encounter while
-///   generating an artifact for a fetchable resolver (TODO)
+/// - we must also generate an artifact for each refetch field/magic mutation we
+///   encounter while generating an artifact for an entrypoint
 ///
 /// We do this by keeping a queue of artifacts to generate, and adding to the queue
-/// as we process fetchable resolvers.
+/// as we process entrypoints.
 fn get_all_artifacts<'schema>(
     schema: &'schema ValidatedSchema,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
 ) -> Vec<Artifact<'schema>> {
-    let mut artifact_queue: Vec<_> = schema
-        .resolvers
-        .iter()
-        .map(ArtifactQueueItem::Reader)
-        .chain(schema.fetchable_resolvers.iter().map(|resolver_field_id| {
-            ArtifactQueueItem::Entrypoint(schema.resolver(*resolver_field_id))
-        }))
-        .collect();
+    let mut artifact_queue: Vec<_> =
+        schema
+            .resolvers
+            .iter()
+            .map(ArtifactQueueItem::Reader)
+            .chain(schema.entrypoints.iter().map(|resolver_field_id| {
+                ArtifactQueueItem::Entrypoint {
+                    top_level_resolver: schema.resolver(*resolver_field_id),
+                }
+            }))
+            .collect();
 
     let mut artifacts = vec![];
     while let Some(queue_item) = artifact_queue.pop() {
@@ -102,16 +105,14 @@ fn generate_artifact<'schema>(
     artifact_directory: &PathBuf,
 ) -> Artifact<'schema> {
     match queue_item {
-        ArtifactQueueItem::Reader(resolver) => {
-            Artifact::Reader(generate_non_fetchable_resolver_artifact(
-                schema,
-                resolver,
-                project_root,
-                artifact_directory,
-            ))
-        }
-        ArtifactQueueItem::Entrypoint(fetchable_resolver) => Artifact::Entrypoint(
-            generate_fetchable_resolver_artifact(schema, fetchable_resolver, artifact_queue),
+        ArtifactQueueItem::Reader(resolver) => Artifact::Reader(generate_reader_artifact(
+            schema,
+            resolver,
+            project_root,
+            artifact_directory,
+        )),
+        ArtifactQueueItem::Entrypoint { top_level_resolver } => Artifact::Entrypoint(
+            generate_entrypoint_artifact(schema, top_level_resolver, artifact_queue),
         ),
         ArtifactQueueItem::RefetchField(refetch_info) => {
             get_artifact_for_refetch_field(schema, refetch_info)
@@ -122,8 +123,8 @@ fn generate_artifact<'schema>(
     }
 }
 
-// N.B. this was originally copied from generate_fetchable_resolver_artifact,
-// and it could use some de-duplicatoni
+// N.B. this was originally copied from generate_entrypoint_artifact,
+// and it could use some de-duplication
 fn get_artifact_for_refetch_field<'schema>(
     schema: &'schema ValidatedSchema,
     refetch_info: RefetchFieldResolverInfo,
@@ -360,13 +361,13 @@ fn get_aliased_mutation_field_name(
     s
 }
 
-fn generate_fetchable_resolver_artifact<'schema>(
+fn generate_entrypoint_artifact<'schema>(
     schema: &'schema ValidatedSchema,
-    fetchable_resolver: &ValidatedSchemaResolver,
+    top_level_resolver: &ValidatedSchemaResolver,
     artifact_queue: &mut Vec<ArtifactQueueItem<'schema>>,
 ) -> EntrypointArtifact<'schema> {
-    if let Some((ref selection_set, _)) = fetchable_resolver.selection_set_and_unwraps {
-        let query_name = fetchable_resolver.name.into();
+    if let Some((ref selection_set, _)) = top_level_resolver.selection_set_and_unwraps {
+        let query_name = top_level_resolver.name.into();
 
         let (merged_selection_set, root_refetched_paths) = create_merged_selection_set(
             schema,
@@ -378,7 +379,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
                 .into(),
             selection_set,
             artifact_queue,
-            &fetchable_resolver,
+            &top_level_resolver,
         );
 
         let query_object = schema
@@ -388,7 +389,7 @@ fn generate_fetchable_resolver_artifact<'schema>(
             query_name,
             schema,
             &merged_selection_set,
-            &fetchable_resolver.variable_definitions,
+            &top_level_resolver.variable_definitions,
         );
         let refetch_query_artifact_imports =
             generate_refetch_query_artifact_imports(&root_refetched_paths);
@@ -408,16 +409,14 @@ fn generate_fetchable_resolver_artifact<'schema>(
     }
 }
 
-fn generate_non_fetchable_resolver_artifact<'schema>(
+fn generate_reader_artifact<'schema>(
     schema: &'schema ValidatedSchema,
-    non_fetchable_resolver: &ValidatedSchemaResolver,
+    resolver: &ValidatedSchemaResolver,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
 ) -> ReaderArtifact<'schema> {
-    if let Some((selection_set, _)) = &non_fetchable_resolver.selection_set_and_unwraps {
-        let parent_type = schema
-            .schema_data
-            .object(non_fetchable_resolver.parent_object_id);
+    if let Some((selection_set, _)) = &resolver.selection_set_and_unwraps {
+        let parent_type = schema.schema_data.object(resolver.parent_object_id);
         let mut nested_resolver_artifact_imports = HashMap::new();
 
         let (_merged_selection_set, root_refetched_paths) = create_merged_selection_set(
@@ -431,7 +430,7 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
             selection_set,
             // TODO this is obviously a smell
             &mut vec![],
-            &non_fetchable_resolver,
+            &resolver,
         );
 
         let reader_ast = generate_reader_ast(
@@ -445,29 +444,28 @@ fn generate_non_fetchable_resolver_artifact<'schema>(
         let resolver_parameter_type = generate_resolver_parameter_type(
             schema,
             &selection_set,
-            &non_fetchable_resolver.variant,
+            &resolver.variant,
             parent_type.into(),
             &mut nested_resolver_artifact_imports,
             0,
         );
-        let resolver_return_type =
-            generate_resolver_return_type_declaration(&non_fetchable_resolver.action_kind);
-        let resolver_read_out_type = generate_read_out_type(non_fetchable_resolver);
+        let resolver_return_type = generate_resolver_return_type_declaration(&resolver.action_kind);
+        let resolver_read_out_type = generate_read_out_type(resolver);
         let resolver_import_statement = generate_resolver_import_statement(
-            &non_fetchable_resolver.action_kind,
+            &resolver.action_kind,
             project_root,
             artifact_directory,
         );
         ReaderArtifact {
             parent_type: parent_type.into(),
-            resolver_field_name: non_fetchable_resolver.name,
+            resolver_field_name: resolver.name,
             reader_ast,
             nested_resolver_artifact_imports,
             resolver_import_statement,
             resolver_read_out_type,
             resolver_parameter_type,
             resolver_return_type,
-            resolver_variant: non_fetchable_resolver.variant.clone(),
+            resolver_variant: resolver.variant.clone(),
         }
     } else {
         panic!("Unsupported: resolvers not on query with no selection set")
@@ -986,7 +984,7 @@ fn generate_reader_ast<'schema>(
     selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
     indentation_level: u8,
     nested_resolver_imports: &mut NestedResolverImports,
-    // N.B. this is not root_refetched_paths when we're generating a non-fetchable resolver :(
+    // N.B. this is not root_refetched_paths when we're generating an entrypoint :(
     root_refetched_paths: &[RootRefetchedPath],
 ) -> ReaderAst {
     generate_reader_ast_with_path(
@@ -995,8 +993,8 @@ fn generate_reader_ast<'schema>(
         indentation_level,
         nested_resolver_imports,
         root_refetched_paths,
-        // TODO we are not starting at the root when generating ASTs for non-fetchable resolvers
-        // (and in theory some fetchable resolvers).
+        // TODO we are not starting at the root when generating ASTs for reader artifacts
+        // (and in theory some entrypoints).
         &mut vec![],
     )
 }

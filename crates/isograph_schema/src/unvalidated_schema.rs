@@ -5,7 +5,7 @@ use common_lang_types::{
 };
 use graphql_lang_types::TypeAnnotation;
 use intern::string_key::Intern;
-use isograph_lang_types::{DefinedTypeId, ResolverFetch, ResolverFieldId, ScalarId};
+use isograph_lang_types::{DefinedTypeId, EntrypointTypeAndField, ResolverFieldId, ScalarId};
 
 use crate::{
     DefinedField, Schema, SchemaData, SchemaObject, SchemaResolver, SchemaScalar,
@@ -26,7 +26,7 @@ impl SchemaValidationState for UnvalidatedSchemaState {
     type ResolverSelectionLinkedFieldAssociatedData = ();
     type ResolverVariableDefinitionAssociatedData = UnvalidatedTypeName;
     type EncounteredField = UnvalidatedObjectFieldInfo;
-    type FetchableResolver = (TextSource, WithSpan<ResolverFetch>);
+    type Entrypoint = (TextSource, WithSpan<EntrypointTypeAndField>);
 }
 
 pub type UnvalidatedSchema = Schema<UnvalidatedSchemaState>;
@@ -96,7 +96,7 @@ impl UnvalidatedSchema {
         Self {
             fields,
             resolvers,
-            fetchable_resolvers: Default::default(),
+            entrypoints: Default::default(),
             schema_data: SchemaData {
                 objects,
                 scalars,

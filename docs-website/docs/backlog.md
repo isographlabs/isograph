@@ -109,7 +109,8 @@
 - Iso lang code mods
 - Iso lang syntax highlighting
 - Iso lang auto-format
-- Separate artifacts for fetching, normalizing and reading fetchable resolvers
+- Entrypoints should have separate artifacts for normalization ASTs (and types?)
+- Do not hard require reader AST and normalization AST from entrypoints
 - Incremental compilation
 - Saved state
 - Support strict mode?
