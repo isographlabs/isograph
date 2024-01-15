@@ -51,11 +51,16 @@ pub type ValidatedSchemaObject =
 pub type ValidatedSchemaIdField = SchemaIdField<NamedTypeAnnotation<ScalarId>>;
 
 #[derive(Debug)]
+pub struct ValidatedLinkedFieldAssociatedData {
+    pub parent_object_id: ObjectId,
+}
+
+#[derive(Debug)]
 pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
     type FieldTypeAssociatedData = DefinedTypeId;
     type ResolverSelectionScalarFieldAssociatedData = ValidatedDefinedField;
-    type ResolverSelectionLinkedFieldAssociatedData = ObjectId;
+    type ResolverSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
     type ResolverVariableDefinitionAssociatedData = DefinedTypeId;
     type EncounteredField = ValidatedDefinedField;
     type Entrypoint = ResolverFieldId;
@@ -700,7 +705,9 @@ fn validate_field_type_exists_and_is_linked(
                                     },
                                 ).collect::<Result<Vec<_>, _>>()?,
                                 unwraps: linked_field_selection.unwraps,
-                                associated_data: object_id,
+                                associated_data: ValidatedLinkedFieldAssociatedData {
+                                    parent_object_id: object_id,
+                                },
                                 arguments: linked_field_selection.arguments,
                             })
                         }

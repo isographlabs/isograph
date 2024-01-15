@@ -458,7 +458,7 @@ fn merge_linked_field_into_vacant_entry(
         MergedServerFieldSelection::LinkedField(MergedLinkedFieldSelection {
             name: new_linked_field.name,
             selection_set: {
-                let type_id = new_linked_field.associated_data;
+                let type_id = new_linked_field.associated_data.parent_object_id;
                 let linked_field_parent_type = schema.schema_data.object(type_id);
                 let merged_set = create_merged_selection_set_with_merge_traversal_state(
                     schema,
@@ -487,7 +487,7 @@ fn merge_linked_field_into_occupied_entry(
             panic!("expected linked, probably a bug in Isograph")
         }
         MergedServerFieldSelection::LinkedField(existing_linked_field) => {
-            let type_id = new_linked_field.associated_data;
+            let type_id = new_linked_field.associated_data.parent_object_id;
             let linked_field_parent_type = schema.schema_data.object(type_id);
             HACK__merge_linked_fields(
                 schema,
