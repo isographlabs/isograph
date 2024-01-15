@@ -1,15 +1,15 @@
 use std::collections::HashSet;
 
 use common_lang_types::WithSpan;
-use isograph_lang_types::{ObjectId, Selection, ServerFieldSelection};
+use isograph_lang_types::{Selection, ServerFieldSelection};
 
 use crate::{
-    DefinedField, NameAndArguments, PathToRefetchField, ResolverVariant, ValidatedDefinedField,
-    ValidatedSchema,
+    DefinedField, NameAndArguments, PathToRefetchField, ResolverVariant, ValidatedSchema,
+    ValidatedSelection,
 };
 
 pub fn refetched_paths_with_path(
-    selection_set: &[WithSpan<Selection<ValidatedDefinedField, ObjectId>>],
+    selection_set: &[WithSpan<ValidatedSelection>],
     schema: &ValidatedSchema,
     path: &mut Vec<NameAndArguments>,
 ) -> HashSet<PathToRefetchField> {

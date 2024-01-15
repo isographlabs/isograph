@@ -11,7 +11,7 @@ use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
     EntrypointTypeAndField, FragmentDirectiveUsage, LinkedFieldSelection, NonConstantValue,
     ResolverDeclaration, ScalarFieldSelection, Selection, SelectionFieldArgument,
-    ServerFieldSelection, Unwrap, VariableDefinition,
+    ServerFieldSelection, UnvalidatedSelection, Unwrap, VariableDefinition,
 };
 
 use crate::{
@@ -144,7 +144,7 @@ fn parse_resolver_declaration<'a>(
 fn parse_optional_selection_set_and_unwraps<'a>(
     tokens: &mut PeekableLexer<'a>,
     text_source: TextSource,
-) -> ParseResultWithSpan<Option<(Vec<WithSpan<Selection<(), ()>>>, Vec<WithSpan<Unwrap>>)>> {
+) -> ParseResultWithSpan<Option<(Vec<WithSpan<UnvalidatedSelection>>, Vec<WithSpan<Unwrap>>)>> {
     let selection_set = parse_optional_selection_set(tokens, text_source)?;
     match selection_set {
         Some(selection_set) => {
@@ -158,7 +158,7 @@ fn parse_optional_selection_set_and_unwraps<'a>(
 fn parse_optional_selection_set<'a>(
     tokens: &mut PeekableLexer<'a>,
     text_source: TextSource,
-) -> ParseResultWithSpan<Option<Vec<WithSpan<Selection<(), ()>>>>> {
+) -> ParseResultWithSpan<Option<Vec<WithSpan<UnvalidatedSelection>>>> {
     let open_brace = tokens.parse_token_of_kind(IsographLangTokenKind::OpenBrace);
     if open_brace.is_err() {
         return Ok(None);
@@ -200,7 +200,7 @@ fn parse_delimited_list<'a, TResult>(
 fn parse_selection<'a>(
     tokens: &mut PeekableLexer<'a>,
     text_source: TextSource,
-) -> ParseResultWithSpan<WithSpan<Selection<(), ()>>> {
+) -> ParseResultWithSpan<WithSpan<UnvalidatedSelection>> {
     tokens
         .with_span(|tokens| {
             let (field_name, alias) = parse_optional_alias_and_field_name(tokens)?;

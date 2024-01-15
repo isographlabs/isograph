@@ -16,17 +16,17 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    DefinedTypeId, NonConstantValue, ObjectId, Selection, SelectionFieldArgument,
-    ServerFieldSelection, VariableDefinition,
+    DefinedTypeId, NonConstantValue, Selection, SelectionFieldArgument, ServerFieldSelection,
+    VariableDefinition,
 };
 use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_resolver,
     ArtifactQueueItem, DefinedField, FieldMapItem, MergedLinkedFieldSelection,
     MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection,
     MutationFieldResolverInfo, NameAndArguments, PathToRefetchField, RefetchFieldResolverInfo,
-    ResolverActionKind, ResolverTypeAndField, ResolverVariant, RootRefetchedPath,
-    ValidatedDefinedField, ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver,
-    ValidatedSelection, ValidatedVariableDefinition,
+    ResolverActionKind, ResolverTypeAndField, ResolverVariant, RootRefetchedPath, ValidatedSchema,
+    ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
+    ValidatedVariableDefinition,
 };
 use thiserror::Error;
 
@@ -1025,7 +1025,7 @@ fn generate_reader_ast_with_path<'schema>(
 }
 
 fn generate_reader_ast_node(
-    selection: &WithSpan<Selection<ValidatedDefinedField, ObjectId>>,
+    selection: &WithSpan<ValidatedSelection>,
     schema: &ValidatedSchema,
     indentation_level: u8,
     nested_resolver_imports: &mut NestedResolverImports,

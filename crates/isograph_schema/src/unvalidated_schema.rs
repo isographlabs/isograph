@@ -5,7 +5,9 @@ use common_lang_types::{
 };
 use graphql_lang_types::TypeAnnotation;
 use intern::string_key::Intern;
-use isograph_lang_types::{DefinedTypeId, EntrypointTypeAndField, ResolverFieldId, ScalarId};
+use isograph_lang_types::{
+    DefinedTypeId, EntrypointTypeAndField, LinkedFieldSelection, ResolverFieldId, ScalarId,
+};
 
 use crate::{
     DefinedField, Schema, SchemaData, SchemaObject, SchemaResolver, SchemaScalar,
@@ -22,7 +24,9 @@ pub struct UnvalidatedSchemaState {}
 
 impl SchemaValidationState for UnvalidatedSchemaState {
     type FieldTypeAssociatedData = UnvalidatedTypeName;
+    // N.B. this must be kept in sync with resolver_declaration.rs
     type ResolverSelectionScalarFieldAssociatedData = ();
+    // N.B. this must be kept in sync with resolver_declaration.rs
     type ResolverSelectionLinkedFieldAssociatedData = ();
     type ResolverVariableDefinitionAssociatedData = UnvalidatedTypeName;
     type EncounteredField = UnvalidatedObjectFieldInfo;
@@ -49,6 +53,11 @@ pub(crate) type UnvalidatedSchemaResolver = SchemaResolver<
     <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionLinkedFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::ResolverVariableDefinitionAssociatedData,
+>;
+
+pub type UnvalidatedLinkedFieldSelection = LinkedFieldSelection<
+    <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionLinkedFieldAssociatedData,
 >;
 
 pub(crate) type UnvalidatedSchemaServerField = SchemaServerField<TypeAnnotation<DefinedTypeId>>;

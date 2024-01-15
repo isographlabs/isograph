@@ -7,21 +7,33 @@ use common_lang_types::{
 use graphql_lang_types::{GraphQLInputValueDefinition, NamedTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
     DefinedTypeId, LinkedFieldSelection, ObjectId, ResolverFieldId, ScalarFieldSelection, ScalarId,
-    Selection, ServerFieldId, VariableDefinition,
+    Selection, ServerFieldId, UnvalidatedScalarFieldSelection, UnvalidatedSelection,
+    VariableDefinition,
 };
 use thiserror::Error;
 
 use crate::{
     refetched_paths::refetched_paths_with_path, DefinedField, NameAndArguments, PathToRefetchField,
     Schema, SchemaData, SchemaIdField, SchemaObject, SchemaResolver, SchemaServerField,
-    SchemaValidationState, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaData,
-    UnvalidatedSchemaField, UnvalidatedSchemaObject, UnvalidatedSchemaResolver,
-    UnvalidatedSchemaServerField, ValidateResolverFetchDeclarationError,
+    SchemaValidationState, UnvalidatedLinkedFieldSelection, UnvalidatedObjectFieldInfo,
+    UnvalidatedSchema, UnvalidatedSchemaData, UnvalidatedSchemaField, UnvalidatedSchemaObject,
+    UnvalidatedSchemaResolver, UnvalidatedSchemaServerField, ValidateResolverFetchDeclarationError,
 };
 
 pub type ValidatedSchemaField = SchemaServerField<TypeAnnotation<DefinedTypeId>>;
 
-pub type ValidatedSelection = Selection<ValidatedDefinedField, ObjectId>;
+pub type ValidatedSelection = Selection<
+    <ValidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ResolverSelectionLinkedFieldAssociatedData,
+>;
+
+pub type ValidatedLinkedFieldSelection = LinkedFieldSelection<
+    <ValidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ResolverSelectionLinkedFieldAssociatedData,
+>;
+pub type ValidatedScalarFieldSelection = ScalarFieldSelection<
+    <ValidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
+>;
 
 pub type ValidatedVariableDefinition = VariableDefinition<DefinedTypeId>;
 pub type ValidatedSchemaResolver = SchemaResolver<
@@ -520,7 +532,7 @@ enum ValidateSelectionsError {
 
 fn validate_resolver_definition_selections_exist_and_types_match(
     schema_data: &UnvalidatedSchemaData,
-    selection_set: Vec<WithSpan<Selection<(), ()>>>,
+    selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     parent_object: &UnvalidatedSchemaObject,
     server_fields: &[UnvalidatedSchemaServerField],
 ) -> ValidateSelectionsResult<Vec<WithSpan<ValidatedSelection>>> {
@@ -541,7 +553,7 @@ fn validate_resolver_definition_selections_exist_and_types_match(
 }
 
 fn validate_resolver_definition_selection_exists_and_type_matches(
-    selection: WithSpan<Selection<(), ()>>,
+    selection: WithSpan<UnvalidatedSelection>,
     parent_object: &UnvalidatedSchemaObject,
     schema_data: &UnvalidatedSchemaData,
     server_fields: &[UnvalidatedSchemaServerField],
@@ -578,9 +590,9 @@ fn validate_field_type_exists_and_is_scalar(
     parent_encountered_fields: &HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
     schema_data: &UnvalidatedSchemaData,
     parent_object: &UnvalidatedSchemaObject,
-    scalar_field_selection: ScalarFieldSelection<()>,
+    scalar_field_selection: UnvalidatedScalarFieldSelection,
     server_fields: &[UnvalidatedSchemaServerField],
-) -> ValidateSelectionsResult<ScalarFieldSelection<ValidatedDefinedField>> {
+) -> ValidateSelectionsResult<ValidatedScalarFieldSelection> {
     let scalar_field_name = scalar_field_selection.name.item.into();
     match parent_encountered_fields.get(&scalar_field_name) {
         Some(defined_field_type) => match defined_field_type {
@@ -646,9 +658,9 @@ fn validate_field_type_exists_and_is_linked(
     parent_fields: &HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
     schema_data: &UnvalidatedSchemaData,
     parent_object: &UnvalidatedSchemaObject,
-    linked_field_selection: LinkedFieldSelection<(), ()>,
+    linked_field_selection: UnvalidatedLinkedFieldSelection,
     server_fields: &[UnvalidatedSchemaServerField],
-) -> ValidateSelectionsResult<LinkedFieldSelection<ValidatedDefinedField, ObjectId>> {
+) -> ValidateSelectionsResult<ValidatedLinkedFieldSelection> {
     let linked_field_name = linked_field_selection.name.item.into();
     match parent_fields.get(&linked_field_name) {
         Some(defined_field_type) => {

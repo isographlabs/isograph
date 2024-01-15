@@ -7,13 +7,24 @@ use common_lang_types::{
 };
 use graphql_lang_types::TypeAnnotation;
 
+pub type UnvalidatedSelection = Selection<
+    // <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
+    (),
+    // <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionLinkedFieldAssociatedData,
+    (),
+>;
+pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
+    // <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
+    (),
+>;
+
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct ResolverDeclaration {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub resolver_field_name: WithSpan<ScalarFieldName>,
     pub selection_set_and_unwraps:
-        Option<(Vec<WithSpan<Selection<(), ()>>>, Vec<WithSpan<Unwrap>>)>,
+        Option<(Vec<WithSpan<UnvalidatedSelection>>, Vec<WithSpan<Unwrap>>)>,
     pub directives: Vec<WithSpan<FragmentDirectiveUsage>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub resolver_definition_path: ResolverDefinitionPath,
