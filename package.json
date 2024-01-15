@@ -7,7 +7,10 @@
   "scripts": {
     "watch-rs": "cargo watch -x build -d 0.1 -w ./crates/",
     "watch-graphql-conf-demo": "./target/debug/isograph_cli --config ./demos/graphql-conf-2023-demo/isograph.config.json --watch",
-    "watch-github-demo": "./target/debug/isograph_cli --config ./demos/github-demo/isograph.config.json --watch"
+    "watch-github-demo": "./target/debug/isograph_cli --config ./demos/github-demo/isograph.config.json --watch",
+    "build-demos": "yarn run build-github-demo && yarn run build-graphql-conf-demo",
+    "build-github-demo": "./target/debug/isograph_cli --config ./demos/github-demo/isograph.config.json",
+    "build-graphql-conf-demo": "./target/debug/isograph_cli --config ./demos/graphql-conf-2023-demo/isograph.config.json"
   },
   "license": "MIT",
   "repository": {
