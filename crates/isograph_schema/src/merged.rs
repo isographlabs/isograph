@@ -4,9 +4,9 @@ use std::collections::{
 };
 
 use common_lang_types::{
-    IsographObjectTypeName, LinkedFieldAlias, LinkedFieldName, Location, ScalarFieldAlias,
-    ScalarFieldName, SelectableFieldName, ServerFieldNormalizationKey, Span, VariableName,
-    WithLocation, WithSpan,
+    GraphQLArtifactGenerationInfo, IsographObjectTypeName, LinkedFieldAlias, LinkedFieldName,
+    Location, ScalarFieldAlias, ScalarFieldName, SelectableFieldName, ServerFieldNormalizationKey,
+    Span, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::{string_key::Intern, Lookup};
@@ -80,6 +80,9 @@ pub struct MergedLinkedFieldSelection {
     pub normalization_alias: Option<WithLocation<LinkedFieldAlias>>,
     pub selection_set: Vec<WithSpan<MergedServerFieldSelection>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
+
+    // TODO make this generic over the type of this field
+    pub artifact_generation_info: GraphQLArtifactGenerationInfo,
 }
 
 /// A merged selection set is an input for generating:
@@ -470,6 +473,10 @@ fn merge_linked_field_into_vacant_entry(
             },
             arguments: new_linked_field.arguments.clone(),
             normalization_alias: new_linked_field.normalization_alias,
+            artifact_generation_info: new_linked_field
+                .associated_data
+                .artifact_generation_info
+                .clone(),
         }),
         span,
     ));
