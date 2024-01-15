@@ -20,7 +20,7 @@ use crate::{
     UnvalidatedSchemaResolver, UnvalidatedSchemaServerField, ValidateResolverFetchDeclarationError,
 };
 
-pub type ValidatedSchemaField = SchemaServerField<TypeAnnotation<DefinedTypeId>>;
+pub type ValidatedSchemaServerField = SchemaServerField<TypeAnnotation<DefinedTypeId>>;
 
 pub type ValidatedSelection = Selection<
     <ValidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
@@ -160,7 +160,7 @@ impl ValidatedSchema {
 }
 
 fn transform_object_field_ids(
-    schema_fields: &[ValidatedSchemaField],
+    schema_fields: &[ValidatedSchemaServerField],
     schema_resolvers: &[ValidatedSchemaResolver],
     object: UnvalidatedSchemaObject,
 ) -> ValidatedSchemaObject {
@@ -217,7 +217,7 @@ fn transform_object_field_ids(
 fn validate_and_transform_fields(
     fields: Vec<UnvalidatedSchemaField>,
     schema_data: &UnvalidatedSchemaData,
-) -> Result<Vec<ValidatedSchemaField>, Vec<WithLocation<ValidateSchemaError>>> {
+) -> Result<Vec<ValidatedSchemaServerField>, Vec<WithLocation<ValidateSchemaError>>> {
     get_all_errors_or_all_ok_iter(
         fields
             .into_iter()
@@ -268,7 +268,7 @@ fn get_all_errors_or_all_ok_iter<T, E>(
 fn validate_and_transform_field(
     field: UnvalidatedSchemaField,
     schema_data: &UnvalidatedSchemaData,
-) -> Result<ValidatedSchemaField, impl Iterator<Item = WithLocation<ValidateSchemaError>>> {
+) -> Result<ValidatedSchemaServerField, impl Iterator<Item = WithLocation<ValidateSchemaError>>> {
     // TODO rewrite as field.map(...).transpose()
     let (empty_field, server_field_type) = field.split();
 
