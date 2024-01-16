@@ -342,8 +342,6 @@ pub struct SchemaObject<TEncounteredField> {
     pub server_fields: Vec<ServerFieldId>,
     pub resolvers: Vec<ResolverFieldId>,
     pub encountered_fields: HashMap<SelectableFieldName, TEncounteredField>,
-    /// This is an unused field right now
-    pub valid_refinements: Vec<ValidRefinement>,
 }
 
 /// In GraphQL, ValidRefinement's are essentially the concrete types that an interface or

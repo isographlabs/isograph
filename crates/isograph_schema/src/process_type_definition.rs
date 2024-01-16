@@ -22,7 +22,7 @@ use crate::{
     ConfigOptions, DefinedField, IsographObjectTypeDefinition, ResolverActionKind,
     ResolverTypeAndField, ResolverVariant, Schema, SchemaObject, SchemaResolver, SchemaScalar,
     SchemaServerField, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
-    UnvalidatedSchemaResolver, ValidRefinement, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
+    UnvalidatedSchemaResolver, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
 };
 
 lazy_static! {
@@ -173,19 +173,12 @@ impl UnvalidatedSchema {
                     scalar.name.location,
                 ));
             }
-            DefinedTypeId::Object(object_id) => {
-                let supertype = self.schema_data.object_mut(*object_id);
+            DefinedTypeId::Object(_supertype_object_id) => {
                 // TODO validate that supertype was defined as an interface, perhaps by
                 // including references to the original definition (i.e. as a type parameter)
                 // and having the schema be able to validate this. (i.e. this should be
                 // a way to execute GraphQL-specific code in isograph-land without actually
                 // putting the code here.)
-
-                for subtype_id in subtypes {
-                    supertype.valid_refinements.push(ValidRefinement {
-                        target: subtype_id.item,
-                    });
-                }
             }
         };
 
@@ -331,7 +324,6 @@ impl UnvalidatedSchema {
                     server_fields,
                     resolvers: object_resolvers,
                     encountered_fields,
-                    valid_refinements: vec![],
                     id_field,
                     directives: object_type_definition.directives,
                 });

@@ -169,7 +169,6 @@ fn transform_object_field_ids(
         id,
         encountered_fields: unvalidated_encountered_fields,
         resolvers,
-        valid_refinements,
         id_field,
         directives,
     } = object;
@@ -206,7 +205,6 @@ fn transform_object_field_ids(
         server_fields,
         encountered_fields: validated_encountered_fields,
         resolvers,
-        valid_refinements,
         id_field,
         directives,
     }
