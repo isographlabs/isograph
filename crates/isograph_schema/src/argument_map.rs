@@ -273,7 +273,14 @@ impl ModifiedObject {
         };
 
         let ProcessObjectTypeDefinitionOutcome { object_id, .. } = schema
-            .process_object_type_definition(item, &mut HashMap::new(), true, options)
+            .process_object_type_definition(
+                item,
+                // Obviously, this is a smell
+                &mut HashMap::new(),
+                &mut HashMap::new(),
+                true,
+                options,
+            )
             // This is not (yet) true. If you reference a non-existent type in
             // a @exposeField directive, the compiler panics here. The solution is to
             // process these directives after the definitions have been validated,

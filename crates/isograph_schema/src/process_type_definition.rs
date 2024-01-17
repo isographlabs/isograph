@@ -30,10 +30,23 @@ lazy_static! {
     static ref MUTATION_TYPE: IsographObjectTypeName = "Mutation".intern().into();
 }
 
-type TypeRefinementMap = HashMap<IsographObjectTypeName, Vec<WithLocation<ObjectId>>>;
+// When parsing, we have the subtype's ObjectId, but only the Supertype's name
+type UnvalidatedSupertypeToSubtypeMap = HashMap<IsographObjectTypeName, Vec<ObjectId>>;
+type UnvalidatedSubtypeToSupertypeMap =
+    HashMap<ObjectId, Vec<WithLocation<IsographObjectTypeName>>>;
+// When constructing the final map, we have both!
+pub type TypeRefinementMap = HashMap<ObjectId, Vec<ObjectId>>;
+
+#[allow(unused)]
+#[derive(Debug)]
+pub struct TypeRefinementMaps {
+    subtype_to_supertype_map: TypeRefinementMap,
+    supertype_to_subtype_map: TypeRefinementMap,
+}
 
 pub struct ProcessGraphQLDocumentOutcome {
     pub mutation_id: Option<ObjectId>,
+    pub type_refinement_maps: TypeRefinementMaps,
 }
 
 pub(crate) struct ProcessObjectTypeDefinitionOutcome {
@@ -55,7 +68,8 @@ impl UnvalidatedSchema {
         // - First, create types for interfaces, objects, scalars, etc.
         // - Then, validate that all implemented interfaces exist, and add refinements
         //   to the found interface.
-        let mut valid_type_refinement_map = HashMap::new();
+        let mut supertype_to_subtype_map = HashMap::new();
+        let mut subtype_to_supertype_map = HashMap::new();
 
         let mut mutation_type_id = None;
         for type_system_definition in type_system_document.0 {
@@ -65,7 +79,8 @@ impl UnvalidatedSchema {
 
                     let outcome = self.process_object_type_definition(
                         object_type_definition,
-                        &mut valid_type_refinement_map,
+                        &mut supertype_to_subtype_map,
+                        &mut subtype_to_supertype_map,
                         true,
                         options,
                     )?;
@@ -80,7 +95,8 @@ impl UnvalidatedSchema {
                 GraphQLTypeSystemDefinition::InterfaceTypeDefinition(interface_type_definition) => {
                     self.process_object_type_definition(
                         interface_type_definition.into(),
-                        &mut valid_type_refinement_map,
+                        &mut supertype_to_subtype_map,
+                        &mut subtype_to_supertype_map,
                         true,
                         options,
                     )?;
@@ -91,7 +107,8 @@ impl UnvalidatedSchema {
                 ) => {
                     self.process_object_type_definition(
                         input_object_type_definition.into(),
-                        &mut valid_type_refinement_map,
+                        &mut supertype_to_subtype_map,
+                        &mut subtype_to_supertype_map,
                         false,
                         options,
                     )?;
@@ -118,7 +135,8 @@ impl UnvalidatedSchema {
                             directives: union_definition.directives,
                             fields: vec![],
                         },
-                        &mut valid_type_refinement_map,
+                        &mut supertype_to_subtype_map,
+                        &mut subtype_to_supertype_map,
                         true,
                         options,
                     )?;
@@ -126,63 +144,113 @@ impl UnvalidatedSchema {
             }
         }
 
-        for (supertype_name, subtypes) in valid_type_refinement_map {
-            self.add_valid_refinements_to_supertype(supertype_name, subtypes)?;
-        }
+        let type_refinement_map =
+            self.get_type_refinement_map(supertype_to_subtype_map, subtype_to_supertype_map)?;
 
         Ok(ProcessGraphQLDocumentOutcome {
             mutation_id: mutation_type_id,
+            type_refinement_maps: type_refinement_map,
         })
     }
 
     // TODO This is currently a completely useless function, serving only to surface
     // some validation errors. It might be necessary once we handle __asNode etc.
     // style fields.
-    fn add_valid_refinements_to_supertype(
+    fn get_type_refinement_map(
         &mut self,
-        supertype_name: IsographObjectTypeName,
-        subtypes: Vec<WithLocation<ObjectId>>,
-    ) -> ProcessTypeDefinitionResult<()> {
-        let first_item = subtypes
-            .first()
-            .expect("subtypes should not be empty. This indicates a bug in Isograph");
+        unvalidated_supertype_to_subtype_map: UnvalidatedSupertypeToSubtypeMap,
+        unvalidated_subtype_to_supertype_map: UnvalidatedSubtypeToSupertypeMap,
+    ) -> ProcessTypeDefinitionResult<TypeRefinementMaps> {
+        let mut subtype_to_supertype_map = HashMap::new();
+        for (subtype_id, supertype_names) in unvalidated_subtype_to_supertype_map {
+            match subtype_to_supertype_map.entry(subtype_id) {
+                Entry::Occupied(_) => {
+                    panic!(
+                        "Expected type_refinement_map to be empty at {} \
+                        ({}). This is indicative of a bug in Isograph.",
+                        self.schema_data.object(subtype_id).name,
+                        subtype_id
+                    );
+                }
+                Entry::Vacant(vacant) => {
+                    let entries = supertype_names
+                        .into_iter()
+                        .map(|supertype_name| {
+                            let supertype_id = self
+                                .schema_data
+                                .defined_types
+                                .get(&supertype_name.item.into())
+                                .ok_or(WithLocation::new(
+                                    ProcessTypeDefinitionError::IsographObjectTypeNameNotDefined {
+                                        type_name: supertype_name.item,
+                                    },
+                                    supertype_name.location,
+                                ))?;
+                            match supertype_id {
+                                DefinedTypeId::Scalar(scalar_id) => {
+                                    let scalar = self.schema_data.scalar(*scalar_id);
+                                    let first_implementing_object =
+                                        self.schema_data.object(subtype_id);
 
-        let supertype_id = self
-            .schema_data
-            .defined_types
-            .get(&supertype_name.into())
-            .ok_or(WithLocation::new(
-                ProcessTypeDefinitionError::IsographObjectTypeNameNotDefined {
-                    type_name: supertype_name,
-                },
-                // TODO look up the first_item, get the matching implementing object, and
-                // use that instead.
-                first_item.location,
-            ))?;
+                                    return Err(WithLocation::new(
+                                        ProcessTypeDefinitionError::ObjectIsScalar {
+                                            type_name: supertype_name.item,
+                                            implementing_object: first_implementing_object.name,
+                                        },
+                                        scalar.name.location,
+                                    ));
+                                }
+                                DefinedTypeId::Object(supertype_object_id) => {
+                                    Ok(*supertype_object_id)
+                                }
+                            }
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
 
-        match supertype_id {
-            DefinedTypeId::Scalar(scalar_id) => {
-                let scalar = self.schema_data.scalar(*scalar_id);
-                let first_implementing_object = self.schema_data.object(first_item.item);
-
-                return Err(WithLocation::new(
-                    ProcessTypeDefinitionError::IsographObjectTypeNameIsScalar {
-                        type_name: supertype_name,
-                        implementing_object: first_implementing_object.name,
-                    },
-                    scalar.name.location,
-                ));
+                    vacant.insert(entries);
+                }
             }
-            DefinedTypeId::Object(_supertype_object_id) => {
-                // TODO validate that supertype was defined as an interface, perhaps by
-                // including references to the original definition (i.e. as a type parameter)
-                // and having the schema be able to validate this. (i.e. this should be
-                // a way to execute GraphQL-specific code in isograph-land without actually
-                // putting the code here.)
-            }
-        };
+        }
 
-        Ok(())
+        let mut supertype_to_subtype_map = HashMap::new();
+        for (supertype_name, subtypes) in unvalidated_supertype_to_subtype_map {
+            let supertype_id = self
+                .schema_data
+                .defined_types
+                .get(&supertype_name.into())
+                .expect("Expected Interface to be found. This indicates a bug in Isograph.");
+
+            match supertype_id {
+                DefinedTypeId::Scalar(_) => {
+                    panic!(
+                        "Expected an object id; this is indicative of a bug in Isograph and \
+                        should have already been validated."
+                    );
+                }
+                DefinedTypeId::Object(supertype_object_id) => {
+                    // TODO validate that supertype was defined as an interface, perhaps by
+                    // including references to the original definition (i.e. as a type parameter)
+                    // and having the schema be able to validate this. (i.e. this should be
+                    // a way to execute GraphQL-specific code in isograph-land without actually
+                    // putting the code here.)
+
+                    let value = subtypes.into_iter().map(|subtype_id| subtype_id).collect();
+                    match supertype_to_subtype_map.entry(*supertype_object_id) {
+                        Entry::Occupied(_) => {
+                            panic!("Encountered duplicate supertype. This is indicative of a bug in Isograph.")
+                        }
+                        Entry::Vacant(vacant) => {
+                            vacant.insert(value);
+                        }
+                    }
+                }
+            };
+        }
+
+        Ok(TypeRefinementMaps {
+            subtype_to_supertype_map,
+            supertype_to_subtype_map,
+        })
     }
 
     pub fn process_graphql_type_extension_document(
@@ -206,17 +274,18 @@ impl UnvalidatedSchema {
 
         // N.B. we should probably restructure this...?
         // Like, we could discover the mutation type right now!
-        self.process_graphql_type_system_document(GraphQLTypeSystemDocument(definitions), options)?;
+        let outcome = self.process_graphql_type_system_document(
+            GraphQLTypeSystemDocument(definitions),
+            options,
+        )?;
 
         for extension in extensions.into_iter() {
             // TODO collect errors into vec
+            // TODO we can encounter new interface implementations; we should account for that
             self.process_graphql_type_system_extension(extension)?;
         }
 
-        Ok(ProcessGraphQLDocumentOutcome {
-            // TODO process schema and return mutation id
-            mutation_id: None,
-        })
+        Ok(outcome)
     }
 
     fn process_graphql_type_system_extension(
@@ -264,7 +333,8 @@ impl UnvalidatedSchema {
     pub(crate) fn process_object_type_definition(
         &mut self,
         object_type_definition: IsographObjectTypeDefinition,
-        valid_type_refinement_map: &mut TypeRefinementMap,
+        supertype_to_subtype_map: &mut UnvalidatedSupertypeToSubtypeMap,
+        subtype_to_supertype_map: &mut UnvalidatedSubtypeToSupertypeMap,
         // TODO this smells! We should probably pass Option<ServerIdFieldId>
         may_have_id_field: bool,
         options: ConfigOptions,
@@ -350,15 +420,35 @@ impl UnvalidatedSchema {
             }
         }
 
-        for interface in object_type_definition.interfaces {
+        for interface in &object_type_definition.interfaces {
             // type_definition implements interface
-            let definitions = valid_type_refinement_map
+            let definitions = supertype_to_subtype_map
                 .entry(interface.item.into())
                 .or_default();
-            definitions.push(WithLocation::new(
-                next_object_id,
-                object_type_definition.name.location,
-            ));
+            definitions.push(next_object_id);
+        }
+        // This check isn't necessary, but it keeps the data structure smaller
+        if !object_type_definition.interfaces.is_empty() {
+            match subtype_to_supertype_map.entry(next_object_id) {
+                Entry::Occupied(_) => panic!(
+                    "Expected object id to not have been encountered before.\
+                    This is indicative of a bug in Isograph."
+                ),
+                Entry::Vacant(vacant) => {
+                    vacant.insert(
+                        object_type_definition
+                            .interfaces
+                            .iter()
+                            .map(|x| {
+                                WithLocation::new(
+                                    x.item.into(),
+                                    object_type_definition.name.location,
+                                )
+                            })
+                            .collect(),
+                    );
+                }
+            }
         }
 
         Ok(ProcessObjectTypeDefinitionOutcome {
@@ -671,7 +761,7 @@ pub enum ProcessTypeDefinitionError {
 
     // When type Foo implements Bar and Bar is scalar
     #[error("\"{implementing_object}\" attempted to implement \"{type_name}\". However, \"{type_name}\" is a scalar, but only other object types can be implemented.")]
-    IsographObjectTypeNameIsScalar {
+    ObjectIsScalar {
         type_name: IsographObjectTypeName,
         implementing_object: IsographObjectTypeName,
     },

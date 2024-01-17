@@ -129,8 +129,12 @@ pub(crate) fn handle_compile_command(
         // but is made valid by the presence of schema extensions.
 
         for extension_document in type_extension_document {
-            let ProcessGraphQLDocumentOutcome { mutation_id } = schema
+            let ProcessGraphQLDocumentOutcome {
+                mutation_id,
+                type_refinement_maps: _,
+            } = schema
                 .process_graphql_type_extension_document(extension_document, config.options)?;
+            // TODO extend the process_graphql_outcome.type_refinement_map and the one from the extensions?
 
             match (mutation_id, process_graphql_outcome.mutation_id) {
                 (None, _) => {}
