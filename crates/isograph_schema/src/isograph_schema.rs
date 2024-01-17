@@ -277,7 +277,7 @@ pub struct IsographObjectTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<IsographObjectTypeName>,
     // maybe this should be Vec<WithSpan<IsographObjectTypeName>>>
-    pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
+    pub interfaces: Vec<WithLocation<InterfaceTypeName>>,
     /// Directives that we don't know about. Maybe this should be validated to be
     /// empty, or not exist.
     pub directives: Vec<GraphQLDirective<ConstantValue>>,

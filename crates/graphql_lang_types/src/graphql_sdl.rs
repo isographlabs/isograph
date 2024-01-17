@@ -106,7 +106,7 @@ impl From<GraphQLObjectTypeExtension> for GraphQLTypeSystemExtension {
 pub struct GraphQLObjectTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<ObjectTypeName>,
-    pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
+    pub interfaces: Vec<WithLocation<InterfaceTypeName>>,
     pub directives: Vec<GraphQLDirective<ConstantValue>>,
     pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
 }
@@ -114,7 +114,7 @@ pub struct GraphQLObjectTypeDefinition {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct GraphQLObjectTypeExtension {
     pub name: WithLocation<ObjectTypeName>,
-    pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
+    pub interfaces: Vec<WithLocation<InterfaceTypeName>>,
     pub directives: Vec<GraphQLDirective<ConstantValue>>,
     pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
 }
@@ -130,7 +130,7 @@ pub struct GraphQLScalarTypeDefinition {
 pub struct GraphQLInterfaceTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<InterfaceTypeName>,
-    pub interfaces: Vec<WithSpan<InterfaceTypeName>>,
+    pub interfaces: Vec<WithLocation<InterfaceTypeName>>,
     pub directives: Vec<GraphQLDirective<ConstantValue>>,
     pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
 }

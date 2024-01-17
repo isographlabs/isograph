@@ -165,7 +165,7 @@ fn parse_object_type_definition(
         .map_err(|with_span| with_span.map(SchemaParseError::from))?
         .to_with_location(text_source);
 
-    let interfaces = parse_implements_interfaces_if_present(tokens)?;
+    let interfaces = parse_implements_interfaces_if_present(tokens, text_source)?;
     let directives = parse_constant_directives(tokens, text_source)?;
     let fields = parse_optional_fields(tokens, text_source)?;
 
@@ -188,7 +188,7 @@ fn parse_object_type_extension(
         .map(|with_span| with_span.to_with_location(text_source))
         .map_err(|with_span| with_span.map(SchemaParseError::from))?;
 
-    let interfaces = parse_implements_interfaces_if_present(tokens)?;
+    let interfaces = parse_implements_interfaces_if_present(tokens, text_source)?;
     let directives = parse_constant_directives(tokens, text_source)?;
     let fields = parse_optional_fields(tokens, text_source)?;
 
@@ -211,7 +211,7 @@ fn parse_interface_type_definition(
         .map_err(|with_span| with_span.map(SchemaParseError::from))?
         .to_with_location(text_source);
 
-    let interfaces = parse_implements_interfaces_if_present(tokens)?;
+    let interfaces = parse_implements_interfaces_if_present(tokens, text_source)?;
     let directives = parse_constant_directives(tokens, text_source)?;
     let fields = parse_optional_fields(tokens, text_source)?;
 
@@ -478,9 +478,10 @@ fn parse_scalar_type_definition(
 /// The state of the PeekableLexer is that we have not parsed the "implements" keyword.
 fn parse_implements_interfaces_if_present(
     tokens: &mut PeekableLexer,
-) -> ParseResult<Vec<WithSpan<InterfaceTypeName>>> {
+    text_source: TextSource,
+) -> ParseResult<Vec<WithLocation<InterfaceTypeName>>> {
     if tokens.parse_matching_identifier("implements").is_ok() {
-        let interfaces = parse_interfaces(tokens)?;
+        let interfaces = parse_interfaces(tokens, text_source)?;
         Ok(interfaces)
     } else {
         Ok(vec![])
@@ -496,20 +497,24 @@ fn parse_implements_interfaces_if_present(
 ///
 /// In the spec, this would error later, e.g. after an ObjectTypeDefinition
 /// with only "Foo", no directives and no fields was successfully parsed.
-fn parse_interfaces(tokens: &mut PeekableLexer) -> ParseResult<Vec<WithSpan<InterfaceTypeName>>> {
+fn parse_interfaces(
+    tokens: &mut PeekableLexer,
+    text_source: TextSource,
+) -> ParseResult<Vec<WithLocation<InterfaceTypeName>>> {
     let _optional_ampersand = tokens.parse_token_of_kind(TokenKind::Ampersand);
 
     let first_interface = tokens
         .parse_string_key_type(TokenKind::Identifier)
         .map_err(|with_span| with_span.map(SchemaParseError::from))?;
 
-    let mut interfaces = vec![first_interface];
+    let mut interfaces = vec![first_interface.to_with_location(text_source)];
 
     while tokens.parse_token_of_kind(TokenKind::Ampersand).is_ok() {
         interfaces.push(
             tokens
                 .parse_string_key_type(TokenKind::Identifier)
-                .map_err(|with_span| with_span.map(SchemaParseError::from))?,
+                .map_err(|with_span| with_span.map(SchemaParseError::from))?
+                .to_with_location(text_source),
         );
     }
 
