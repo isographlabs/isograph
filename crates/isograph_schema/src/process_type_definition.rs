@@ -187,17 +187,15 @@ impl UnvalidatedSchema {
                                     supertype_name.location,
                                 ))?;
                             match supertype_id {
-                                DefinedTypeId::Scalar(scalar_id) => {
-                                    let scalar = self.schema_data.scalar(*scalar_id);
-                                    let first_implementing_object =
-                                        self.schema_data.object(subtype_id);
+                                DefinedTypeId::Scalar(_) => {
+                                    let subtype_name = self.schema_data.object(subtype_id).name;
 
                                     return Err(WithLocation::new(
                                         ProcessTypeDefinitionError::ObjectIsScalar {
                                             type_name: supertype_name.item,
-                                            implementing_object: first_implementing_object.name,
+                                            implementing_object: subtype_name,
                                         },
-                                        scalar.name.location,
+                                        supertype_name.location,
                                     ));
                                 }
                                 DefinedTypeId::Object(supertype_object_id) => {
@@ -438,13 +436,8 @@ impl UnvalidatedSchema {
                     vacant.insert(
                         object_type_definition
                             .interfaces
-                            .iter()
-                            .map(|x| {
-                                WithLocation::new(
-                                    x.item.into(),
-                                    object_type_definition.name.location,
-                                )
-                            })
+                            .into_iter()
+                            .map(|with_location| with_location.map(|x| x.into()))
                             .collect(),
                     );
                 }
