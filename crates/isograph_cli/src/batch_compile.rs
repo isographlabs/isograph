@@ -154,7 +154,13 @@ pub(crate) fn handle_compile_command(
         // - process parsed literals
         // - validate resolvers
         if let Some(mutation_id) = process_graphql_outcome.mutation_id {
-            schema.create_magic_mutation_fields(mutation_id, config.options)?;
+            schema.create_magic_mutation_fields(
+                mutation_id,
+                config.options,
+                &process_graphql_outcome
+                    .type_refinement_maps
+                    .supertype_to_subtype_map,
+            )?;
         }
 
         let canonicalized_root_path = {

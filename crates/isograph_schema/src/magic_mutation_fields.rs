@@ -13,7 +13,7 @@ use crate::{
     ArgumentMap, ConfigOptions, DefinedField, FieldMapItem, MutationFieldResolverActionKindInfo,
     MutationFieldResolverVariant, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
     ProcessedFieldMapItem, ResolverActionKind, ResolverTypeAndField, ResolverVariant,
-    SchemaResolver, UnvalidatedSchema,
+    SchemaResolver, TypeRefinementMap, UnvalidatedSchema,
 };
 use lazy_static::lazy_static;
 
@@ -48,6 +48,7 @@ impl UnvalidatedSchema {
         &mut self,
         mutation_id: ObjectId,
         options: ConfigOptions,
+        supertype_to_subtype_map: &TypeRefinementMap,
     ) -> ProcessTypeDefinitionResult<()> {
         // TODO don't clone if possible
         let mutation_object = self.schema_data.object(mutation_id);
@@ -71,6 +72,7 @@ impl UnvalidatedSchema {
                 magic_mutation_info,
                 mutation_object_name,
                 options,
+                supertype_to_subtype_map,
             )?;
         }
 
@@ -82,6 +84,7 @@ impl UnvalidatedSchema {
         magic_mutation_info: &MagicMutationFieldInfo,
         mutation_object_name: IsographObjectTypeName,
         options: ConfigOptions,
+        supertype_to_subtype_map: &TypeRefinementMap,
     ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
         let MagicMutationFieldInfo {
             path,
@@ -184,18 +187,25 @@ impl UnvalidatedSchema {
                 })
                 .collect::<Vec<_>>();
 
-            self.create_magic_mutation_field_on_object(
-                &fields,
-                description,
-                magic_mutation_field_name,
-                path_selectable_field_name,
-                &mutation_field_arguments,
-                &mutation_field_args_without_id,
-                inner_type_name,
-                resolver_parent_object_id,
-                field_map_items,
-                payload_object_name,
-            )?;
+            let mut object_ids = vec![resolver_parent_object_id];
+            if let Some(subtypes) = supertype_to_subtype_map.get(&resolver_parent_object_id) {
+                object_ids.extend(subtypes);
+            }
+
+            for object_id in object_ids {
+                self.create_magic_mutation_field_on_object(
+                    &fields,
+                    description,
+                    magic_mutation_field_name,
+                    path_selectable_field_name,
+                    &mutation_field_arguments,
+                    &mutation_field_args_without_id,
+                    inner_type_name,
+                    object_id,
+                    field_map_items,
+                    payload_object_name,
+                )?;
+            }
         }
         Ok(())
     }
