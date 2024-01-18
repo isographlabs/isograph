@@ -176,15 +176,15 @@ impl UnvalidatedSchema {
     // TODO clean up these arguments!!
     fn create_magic_mutation_field_on_object(
         &mut self,
-        processed_field_map_items: Vec<ProcessedFieldMapItem>,
+        processed_field_map_items: &[ProcessedFieldMapItem],
         description: Option<DescriptionValue>,
         magic_mutation_field_name: SelectableFieldName,
         path_selectable_field_name: SelectableFieldName,
-        mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
-        mutation_field_args_without_id: Vec<WithLocation<GraphQLInputValueDefinition>>,
+        mutation_field_arguments: &[WithLocation<GraphQLInputValueDefinition>],
+        mutation_field_args_without_id: &[WithLocation<GraphQLInputValueDefinition>],
         inner_type_name: UnvalidatedTypeName,
         resolver_parent_object_id: ObjectId,
-        field_map_items: &Vec<FieldMapItem>,
+        field_map_items: &[FieldMapItem],
         payload_object_name: IsographObjectTypeName,
     ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
         let next_resolver_id = self.resolvers.len().into();
@@ -224,8 +224,8 @@ impl UnvalidatedSchema {
             variant: ResolverVariant::MutationField(MutationFieldResolverVariant {
                 mutation_name: magic_mutation_field_name,
                 mutation_primary_field_name: path_selectable_field_name,
-                mutation_field_arguments,
-                filtered_mutation_field_arguments: mutation_field_args_without_id,
+                mutation_field_arguments: mutation_field_arguments.to_vec(),
+                filtered_mutation_field_arguments: mutation_field_args_without_id.to_vec(),
             }),
             variable_definitions: vec![],
             type_and_field: ResolverTypeAndField {
@@ -236,7 +236,7 @@ impl UnvalidatedSchema {
             parent_object_id: resolver_parent_object_id,
             action_kind: ResolverActionKind::MutationField(MutationFieldResolverActionKindInfo {
                 // TODO don't clone
-                field_map: field_map_items.clone(),
+                field_map: field_map_items.to_vec(),
             }),
         });
         let resolver_parent = self.schema_data.object_mut(resolver_parent_object_id);
