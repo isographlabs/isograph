@@ -66,7 +66,7 @@ impl UnvalidatedSchema {
             .flatten()
             .collect::<Vec<_>>();
 
-        for magic_mutation_info in magic_mutation_infos.into_iter() {
+        for magic_mutation_info in magic_mutation_infos.iter() {
             let MagicMutationFieldInfo {
                 path,
                 field_map_items,
@@ -74,7 +74,7 @@ impl UnvalidatedSchema {
                 field_id,
             } = magic_mutation_info;
 
-            let mutation_field = self.field(field_id);
+            let mutation_field = self.field(*field_id);
 
             let mutation_field_payload_type_name = *mutation_field.associated_data.inner();
             let mutation_field_name = mutation_field.name.item;
@@ -97,7 +97,7 @@ impl UnvalidatedSchema {
                         mutation_field_name,
                         // TODO don't clone
                         field_map_items.clone(),
-                        text_source,
+                        *text_source,
                         options,
                     )?;
 
@@ -185,7 +185,7 @@ impl UnvalidatedSchema {
                                 action_kind: ResolverActionKind::MutationField(
                                     MutationFieldResolverActionKindInfo {
                                         // TODO don't clone
-                                        field_map: field_map_items,
+                                        field_map: field_map_items.clone(),
                                     },
                                 ),
                             });
