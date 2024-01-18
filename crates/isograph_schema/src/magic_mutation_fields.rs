@@ -1,7 +1,7 @@
 use common_lang_types::{
-    DirectiveArgumentName, DirectiveName, EmbeddedLocation, IsographObjectTypeName, Location,
-    SelectableFieldName, Span, StringLiteralValue, TextSource, ValueKeyName, WithEmbeddedLocation,
-    WithLocation, WithSpan,
+    DescriptionValue, DirectiveArgumentName, DirectiveName, EmbeddedLocation,
+    IsographObjectTypeName, Location, SelectableFieldName, Span, StringLiteralValue, TextSource,
+    UnvalidatedTypeName, ValueKeyName, WithEmbeddedLocation, WithLocation, WithSpan,
 };
 use graphql_lang_types::{ConstantValue, GraphQLDirective, GraphQLInputValueDefinition};
 use intern::{string_key::Intern, Lookup};
@@ -157,85 +157,110 @@ impl UnvalidatedSchema {
                 )),
             }?;
 
-            let next_resolver_id = self.resolvers.len().into();
-
-            let fields = processed_field_map_items
-                .iter()
-                .map(|field_map_item| {
-                    let scalar_field_selection = ScalarFieldSelection {
-                        name: WithLocation::new(
-                            // TODO make this no-op
-                            // TODO split on . here; we should be able to have from: "best_friend.id" or whatnot.
-                            field_map_item.0.from.lookup().intern().into(),
-                            Location::generated(),
-                        ),
-                        reader_alias: None,
-                        normalization_alias: None,
-                        associated_data: (),
-                        unwraps: vec![],
-                        // TODO what about arguments? How would we handle them?
-                        arguments: vec![],
-                    };
-
-                    WithSpan::new(
-                        Selection::ServerField(ServerFieldSelection::ScalarField(
-                            scalar_field_selection,
-                        )),
-                        Span::todo_generated(),
-                    )
-                })
-                .collect();
-
-            self.resolvers.push(SchemaResolver {
+            self.create_magic_mutation_field_on_object(
+                processed_field_map_items,
                 description,
-                // __set_pet_best_friend
-                name: magic_mutation_field_name,
-                id: next_resolver_id,
-                selection_set_and_unwraps: Some((fields, vec![])),
-                variant: ResolverVariant::MutationField(MutationFieldResolverVariant {
-                    mutation_name: magic_mutation_field_name,
-                    mutation_primary_field_name: path_selectable_field_name,
-                    mutation_field_arguments,
-                    filtered_mutation_field_arguments: mutation_field_args_without_id,
-                }),
-                variable_definitions: vec![],
-                type_and_field: ResolverTypeAndField {
-                    // TODO make this zero cost?
-                    type_name: inner_type_name.lookup().intern().into(), // e.g. Pet
-                    field_name: magic_mutation_field_name,               // __set_pet_best_friend
-                },
-                parent_object_id: resolver_parent_object_id,
-                action_kind: ResolverActionKind::MutationField(
-                    MutationFieldResolverActionKindInfo {
-                        // TODO don't clone
-                        field_map: field_map_items.clone(),
-                    },
-                ),
-            });
-
-            // This is the "Pet" object
-            let resolver_parent = self.schema_data.object_mut(resolver_parent_object_id);
-
-            if resolver_parent
-                .encountered_fields
-                .insert(
-                    magic_mutation_field_name,
-                    DefinedField::ResolverField(next_resolver_id),
-                )
-                .is_some()
-            {
-                return Err(WithLocation::new(
-                    ProcessTypeDefinitionError::MutationFieldIsDuplicate {
-                        field_name: magic_mutation_field_name,
-                        parent_type: payload_object_name,
-                    },
-                    // TODO this is blatantly incorrect
-                    Location::generated(),
-                ));
-            }
-
-            resolver_parent.resolvers.push(next_resolver_id);
+                magic_mutation_field_name,
+                path_selectable_field_name,
+                mutation_field_arguments,
+                mutation_field_args_without_id,
+                inner_type_name,
+                resolver_parent_object_id,
+                field_map_items,
+                payload_object_name,
+            )?;
         }
+        Ok(())
+    }
+
+    // TODO clean up these arguments!!
+    fn create_magic_mutation_field_on_object(
+        &mut self,
+        processed_field_map_items: Vec<ProcessedFieldMapItem>,
+        description: Option<DescriptionValue>,
+        magic_mutation_field_name: SelectableFieldName,
+        path_selectable_field_name: SelectableFieldName,
+        mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+        mutation_field_args_without_id: Vec<WithLocation<GraphQLInputValueDefinition>>,
+        inner_type_name: UnvalidatedTypeName,
+        resolver_parent_object_id: ObjectId,
+        field_map_items: &Vec<FieldMapItem>,
+        payload_object_name: IsographObjectTypeName,
+    ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
+        let next_resolver_id = self.resolvers.len().into();
+        let fields = processed_field_map_items
+            .iter()
+            .map(|field_map_item| {
+                let scalar_field_selection = ScalarFieldSelection {
+                    name: WithLocation::new(
+                        // TODO make this no-op
+                        // TODO split on . here; we should be able to have from: "best_friend.id" or whatnot.
+                        field_map_item.0.from.lookup().intern().into(),
+                        Location::generated(),
+                    ),
+                    reader_alias: None,
+                    normalization_alias: None,
+                    associated_data: (),
+                    unwraps: vec![],
+                    // TODO what about arguments? How would we handle them?
+                    arguments: vec![],
+                };
+
+                WithSpan::new(
+                    Selection::ServerField(ServerFieldSelection::ScalarField(
+                        scalar_field_selection,
+                    )),
+                    Span::todo_generated(),
+                )
+            })
+            .collect();
+
+        self.resolvers.push(SchemaResolver {
+            description,
+            // __set_pet_best_friend
+            name: magic_mutation_field_name,
+            id: next_resolver_id,
+            selection_set_and_unwraps: Some((fields, vec![])),
+            variant: ResolverVariant::MutationField(MutationFieldResolverVariant {
+                mutation_name: magic_mutation_field_name,
+                mutation_primary_field_name: path_selectable_field_name,
+                mutation_field_arguments,
+                filtered_mutation_field_arguments: mutation_field_args_without_id,
+            }),
+            variable_definitions: vec![],
+            type_and_field: ResolverTypeAndField {
+                // TODO make this zero cost?
+                type_name: inner_type_name.lookup().intern().into(), // e.g. Pet
+                field_name: magic_mutation_field_name,               // __set_pet_best_friend
+            },
+            parent_object_id: resolver_parent_object_id,
+            action_kind: ResolverActionKind::MutationField(MutationFieldResolverActionKindInfo {
+                // TODO don't clone
+                field_map: field_map_items.clone(),
+            }),
+        });
+        let resolver_parent = self.schema_data.object_mut(resolver_parent_object_id);
+        if resolver_parent
+            .encountered_fields
+            .insert(
+                magic_mutation_field_name,
+                DefinedField::ResolverField(next_resolver_id),
+            )
+            .is_some()
+        {
+            return Err(WithLocation::new(
+                ProcessTypeDefinitionError::MutationFieldIsDuplicate {
+                    field_name: magic_mutation_field_name,
+                    parent_type: payload_object_name,
+                },
+                // TODO this is blatantly incorrect
+                Location::generated(),
+            ));
+        }
+        resolver_parent.resolvers.push(next_resolver_id);
+
+        // This is the "Pet" object
+
         Ok(())
     }
 
