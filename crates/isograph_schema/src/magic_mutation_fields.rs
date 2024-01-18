@@ -157,13 +157,40 @@ impl UnvalidatedSchema {
                 )),
             }?;
 
+            let fields = processed_field_map_items
+                .iter()
+                .map(|field_map_item| {
+                    let scalar_field_selection = ScalarFieldSelection {
+                        name: WithLocation::new(
+                            // TODO make this no-op
+                            // TODO split on . here; we should be able to have from: "best_friend.id" or whatnot.
+                            field_map_item.0.from.lookup().intern().into(),
+                            Location::generated(),
+                        ),
+                        reader_alias: None,
+                        normalization_alias: None,
+                        associated_data: (),
+                        unwraps: vec![],
+                        // TODO what about arguments? How would we handle them?
+                        arguments: vec![],
+                    };
+
+                    WithSpan::new(
+                        Selection::ServerField(ServerFieldSelection::ScalarField(
+                            scalar_field_selection,
+                        )),
+                        Span::todo_generated(),
+                    )
+                })
+                .collect::<Vec<_>>();
+
             self.create_magic_mutation_field_on_object(
-                processed_field_map_items,
+                &fields,
                 description,
                 magic_mutation_field_name,
                 path_selectable_field_name,
-                mutation_field_arguments,
-                mutation_field_args_without_id,
+                &mutation_field_arguments,
+                &mutation_field_args_without_id,
                 inner_type_name,
                 resolver_parent_object_id,
                 field_map_items,
@@ -176,7 +203,7 @@ impl UnvalidatedSchema {
     // TODO clean up these arguments!!
     fn create_magic_mutation_field_on_object(
         &mut self,
-        processed_field_map_items: &[ProcessedFieldMapItem],
+        fields: &[WithSpan<Selection<(), ()>>],
         description: Option<DescriptionValue>,
         magic_mutation_field_name: SelectableFieldName,
         path_selectable_field_name: SelectableFieldName,
@@ -188,39 +215,13 @@ impl UnvalidatedSchema {
         payload_object_name: IsographObjectTypeName,
     ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
         let next_resolver_id = self.resolvers.len().into();
-        let fields = processed_field_map_items
-            .iter()
-            .map(|field_map_item| {
-                let scalar_field_selection = ScalarFieldSelection {
-                    name: WithLocation::new(
-                        // TODO make this no-op
-                        // TODO split on . here; we should be able to have from: "best_friend.id" or whatnot.
-                        field_map_item.0.from.lookup().intern().into(),
-                        Location::generated(),
-                    ),
-                    reader_alias: None,
-                    normalization_alias: None,
-                    associated_data: (),
-                    unwraps: vec![],
-                    // TODO what about arguments? How would we handle them?
-                    arguments: vec![],
-                };
-
-                WithSpan::new(
-                    Selection::ServerField(ServerFieldSelection::ScalarField(
-                        scalar_field_selection,
-                    )),
-                    Span::todo_generated(),
-                )
-            })
-            .collect();
 
         self.resolvers.push(SchemaResolver {
             description,
             // __set_pet_best_friend
             name: magic_mutation_field_name,
             id: next_resolver_id,
-            selection_set_and_unwraps: Some((fields, vec![])),
+            selection_set_and_unwraps: Some((fields.to_vec(), vec![])),
             variant: ResolverVariant::MutationField(MutationFieldResolverVariant {
                 mutation_name: magic_mutation_field_name,
                 mutation_primary_field_name: path_selectable_field_name,
@@ -258,8 +259,6 @@ impl UnvalidatedSchema {
             ));
         }
         resolver_parent.resolvers.push(next_resolver_id);
-
-        // This is the "Pet" object
 
         Ok(())
     }
