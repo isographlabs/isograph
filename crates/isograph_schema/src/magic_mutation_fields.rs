@@ -129,12 +129,11 @@ impl UnvalidatedSchema {
             // TODO split path on .
             let path_selectable_field_name = path.lookup().intern().into();
 
-            // field here is the pet field
             let primary_field = payload_object
                 .encountered_fields
                 .get(&path_selectable_field_name);
 
-            let (next_resolver_id, resolver_parent_object_id) = match primary_field {
+            let (resolver_parent_object_id, inner_type_name) = match primary_field {
                 Some(DefinedField::ServerField(server_field)) => {
                     // This is the parent type name (Pet)
                     let inner = server_field.inner();
@@ -143,64 +142,8 @@ impl UnvalidatedSchema {
 
                     let primary_type = self.schema_data.defined_types.get(inner).clone();
 
-                    if let Some(DefinedTypeId::Object(primary_object_type)) = primary_type {
-                        let next_resolver_id = self.resolvers.len().into();
-
-                        let fields = processed_field_map_items
-                            .iter()
-                            .map(|field_map_item| {
-                                let scalar_field_selection = ScalarFieldSelection {
-                                    name: WithLocation::new(
-                                        // TODO make this no-op
-                                        // TODO split on . here; we should be able to have from: "best_friend.id" or whatnot.
-                                        field_map_item.0.from.lookup().intern().into(),
-                                        Location::generated(),
-                                    ),
-                                    reader_alias: None,
-                                    normalization_alias: None,
-                                    associated_data: (),
-                                    unwraps: vec![],
-                                    // TODO what about arguments? How would we handle them?
-                                    arguments: vec![],
-                                };
-
-                                WithSpan::new(
-                                    Selection::ServerField(ServerFieldSelection::ScalarField(
-                                        scalar_field_selection,
-                                    )),
-                                    Span::todo_generated(),
-                                )
-                            })
-                            .collect();
-
-                        self.resolvers.push(SchemaResolver {
-                            description,
-                            // __set_pet_best_friend
-                            name: magic_mutation_field_name,
-                            id: next_resolver_id,
-                            selection_set_and_unwraps: Some((fields, vec![])),
-                            variant: ResolverVariant::MutationField(MutationFieldResolverVariant {
-                                mutation_name: magic_mutation_field_name,
-                                mutation_primary_field_name: path_selectable_field_name,
-                                mutation_field_arguments,
-                                filtered_mutation_field_arguments: mutation_field_args_without_id,
-                            }),
-                            variable_definitions: vec![],
-                            type_and_field: ResolverTypeAndField {
-                                // TODO make this zero cost?
-                                type_name: inner.lookup().intern().into(), // e.g. Pet
-                                field_name: magic_mutation_field_name,     // __set_pet_best_friend
-                            },
-                            parent_object_id: *primary_object_type,
-                            action_kind: ResolverActionKind::MutationField(
-                                MutationFieldResolverActionKindInfo {
-                                    // TODO don't clone
-                                    field_map: field_map_items.clone(),
-                                },
-                            ),
-                        });
-
-                        Ok((next_resolver_id, primary_object_type))
+                    if let Some(DefinedTypeId::Object(resolver_parent_object_id)) = primary_type {
+                        Ok((*resolver_parent_object_id, *inner))
                     } else {
                         Err(WithLocation::new(
                             ProcessTypeDefinitionError::InvalidMutationField,
@@ -214,8 +157,64 @@ impl UnvalidatedSchema {
                 )),
             }?;
 
+            let next_resolver_id = self.resolvers.len().into();
+
+            let fields = processed_field_map_items
+                .iter()
+                .map(|field_map_item| {
+                    let scalar_field_selection = ScalarFieldSelection {
+                        name: WithLocation::new(
+                            // TODO make this no-op
+                            // TODO split on . here; we should be able to have from: "best_friend.id" or whatnot.
+                            field_map_item.0.from.lookup().intern().into(),
+                            Location::generated(),
+                        ),
+                        reader_alias: None,
+                        normalization_alias: None,
+                        associated_data: (),
+                        unwraps: vec![],
+                        // TODO what about arguments? How would we handle them?
+                        arguments: vec![],
+                    };
+
+                    WithSpan::new(
+                        Selection::ServerField(ServerFieldSelection::ScalarField(
+                            scalar_field_selection,
+                        )),
+                        Span::todo_generated(),
+                    )
+                })
+                .collect();
+
+            self.resolvers.push(SchemaResolver {
+                description,
+                // __set_pet_best_friend
+                name: magic_mutation_field_name,
+                id: next_resolver_id,
+                selection_set_and_unwraps: Some((fields, vec![])),
+                variant: ResolverVariant::MutationField(MutationFieldResolverVariant {
+                    mutation_name: magic_mutation_field_name,
+                    mutation_primary_field_name: path_selectable_field_name,
+                    mutation_field_arguments,
+                    filtered_mutation_field_arguments: mutation_field_args_without_id,
+                }),
+                variable_definitions: vec![],
+                type_and_field: ResolverTypeAndField {
+                    // TODO make this zero cost?
+                    type_name: inner_type_name.lookup().intern().into(), // e.g. Pet
+                    field_name: magic_mutation_field_name,               // __set_pet_best_friend
+                },
+                parent_object_id: resolver_parent_object_id,
+                action_kind: ResolverActionKind::MutationField(
+                    MutationFieldResolverActionKindInfo {
+                        // TODO don't clone
+                        field_map: field_map_items.clone(),
+                    },
+                ),
+            });
+
             // This is the "Pet" object
-            let resolver_parent = self.schema_data.object_mut(*resolver_parent_object_id);
+            let resolver_parent = self.schema_data.object_mut(resolver_parent_object_id);
 
             if resolver_parent
                 .encountered_fields

@@ -40,8 +40,8 @@ pub type TypeRefinementMap = HashMap<ObjectId, Vec<ObjectId>>;
 #[allow(unused)]
 #[derive(Debug)]
 pub struct TypeRefinementMaps {
-    subtype_to_supertype_map: TypeRefinementMap,
-    supertype_to_subtype_map: TypeRefinementMap,
+    pub subtype_to_supertype_map: TypeRefinementMap,
+    pub supertype_to_subtype_map: TypeRefinementMap,
 }
 
 pub struct ProcessGraphQLDocumentOutcome {
