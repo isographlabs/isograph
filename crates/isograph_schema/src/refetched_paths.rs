@@ -4,8 +4,8 @@ use common_lang_types::WithSpan;
 use isograph_lang_types::{Selection, ServerFieldSelection};
 
 use crate::{
-    DefinedField, NameAndArguments, PathToRefetchField, ResolverVariant, ValidatedSchema,
-    ValidatedSelection,
+    ArgumentKeyAndValue, DefinedField, NameAndArguments, PathToRefetchField, ResolverVariant,
+    ValidatedSchema, ValidatedSelection,
 };
 
 pub fn refetched_paths_with_path(
@@ -49,8 +49,14 @@ pub fn refetched_paths_with_path(
                 ServerFieldSelection::LinkedField(linked_field_selection) => {
                     path.push(NameAndArguments {
                         name: linked_field_selection.name.item,
-                        // arguments: linked_field_selection.arguments.clone(),
-                        arguments: vec![],
+                        arguments: linked_field_selection
+                            .arguments
+                            .iter()
+                            .map(|x| ArgumentKeyAndValue {
+                                key: x.item.name.item,
+                                value: x.item.value.item.clone(),
+                            })
+                            .collect::<Vec<_>>(),
                     });
 
                     let new_paths = refetched_paths_with_path(
