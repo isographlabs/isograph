@@ -24,9 +24,9 @@ use isograph_schema::{
     ArtifactQueueItem, DefinedField, FieldMapItem, MergedLinkedFieldSelection,
     MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection,
     MutationFieldResolverInfo, NameAndArguments, PathToRefetchField, RefetchFieldResolverInfo,
-    ResolverActionKind, ResolverTypeAndField, ResolverVariant, RootRefetchedPath, ValidatedSchema,
-    ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
-    ValidatedVariableDefinition,
+    RequiresRefinement, ResolverActionKind, ResolverTypeAndField, ResolverVariant,
+    RootRefetchedPath, ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver,
+    ValidatedSelection, ValidatedVariableDefinition,
 };
 use thiserror::Error;
 
@@ -184,6 +184,7 @@ fn get_artifact_for_mutation_field<'schema>(
         mutation_field_name: magic_mutation_field_name,
         mutation_primary_field_name,
         mutation_field_arguments,
+        requires_refinement,
         ..
     } = refetch_info;
 
@@ -224,6 +225,7 @@ fn get_artifact_for_mutation_field<'schema>(
         &mutation_field_name,
         mutation_primary_field_name,
         mutation_field_arguments,
+        requires_refinement,
     );
 
     let selections = generate_normalization_ast(schema, &merged_selection_set, 2);
@@ -295,6 +297,7 @@ fn generate_mutation_query_text<'schema>(
     mutation_field_name: &str,
     mutation_primary_field_name: SelectableFieldName,
     mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+    requires_refinement: RequiresRefinement,
 ) -> QueryText {
     let mut query_text = String::new();
 
@@ -339,7 +342,15 @@ fn generate_mutation_query_text<'schema>(
         {aliased_mutation_field_name}: {mutation_field_name}{mutation_field_arguments} {{\\\n\
         {mutation_primary_field_name} {{ \\\n",
     ));
-    write_selections_for_query_text(&mut query_text, schema, &merged_selection_set, 1);
+
+    if let RequiresRefinement::Yes(refine_to) = requires_refinement {
+        query_text.push_str(&format!("... on {} {{\\\n", refine_to));
+        write_selections_for_query_text(&mut query_text, schema, &merged_selection_set, 1);
+        query_text.push_str("}\\\n");
+    } else {
+        write_selections_for_query_text(&mut query_text, schema, &merged_selection_set, 1);
+    }
+
     query_text.push_str("}}}");
     QueryText(query_text)
 }

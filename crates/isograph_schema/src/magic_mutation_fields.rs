@@ -33,6 +33,12 @@ pub struct MagicMutationFieldInfo {
     field_id: ServerFieldId,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum RequiresRefinement {
+    Yes(IsographObjectTypeName),
+    No,
+}
+
 impl UnvalidatedSchema {
     /// Add magical mutation fields.
     ///
@@ -187,12 +193,19 @@ impl UnvalidatedSchema {
                 })
                 .collect::<Vec<_>>();
 
-            let mut object_ids = vec![resolver_parent_object_id];
+            let mut object_ids = vec![(resolver_parent_object_id, RequiresRefinement::No)];
             if let Some(subtypes) = supertype_to_subtype_map.get(&resolver_parent_object_id) {
-                object_ids.extend(subtypes);
+                object_ids.extend(subtypes.into_iter().map(|object_id| {
+                    (
+                        *object_id,
+                        // TODO we should store this information on object_ids to begin with...
+                        // we probably have it already
+                        RequiresRefinement::Yes(self.schema_data.object(*object_id).name),
+                    )
+                }));
             }
 
-            for object_id in object_ids {
+            for (object_id, requires_refinement) in object_ids {
                 self.create_magic_mutation_field_on_object(
                     &fields,
                     description,
@@ -204,6 +217,7 @@ impl UnvalidatedSchema {
                     object_id,
                     field_map_items,
                     payload_object_name,
+                    requires_refinement,
                 )?;
             }
         }
@@ -223,6 +237,7 @@ impl UnvalidatedSchema {
         resolver_parent_object_id: ObjectId,
         field_map_items: &[FieldMapItem],
         payload_object_name: IsographObjectTypeName,
+        requires_refinement: RequiresRefinement,
     ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
         let next_resolver_id = self.resolvers.len().into();
 
@@ -237,6 +252,7 @@ impl UnvalidatedSchema {
                 mutation_primary_field_name: path_selectable_field_name,
                 mutation_field_arguments: mutation_field_arguments.to_vec(),
                 filtered_mutation_field_arguments: mutation_field_args_without_id.to_vec(),
+                requires_refinement,
             }),
             variable_definitions: vec![],
             type_and_field: ResolverTypeAndField {

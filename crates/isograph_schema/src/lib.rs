@@ -13,6 +13,7 @@ mod validate_schema;
 use argument_map::*;
 pub use compilation_options::*;
 pub use isograph_schema::*;
+pub use magic_mutation_fields::*;
 pub use merged::*;
 pub use process_resolver_declaration::*;
 pub use process_type_definition::*;

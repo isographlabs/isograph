@@ -16,10 +16,10 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ArgumentKeyAndValue, DefinedField, MutationFieldResolverVariant, NameAndArguments,
-    PathToRefetchField, ResolverVariant, ValidatedDefinedField, ValidatedLinkedFieldSelection,
-    ValidatedSchema, ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSchemaResolver,
-    ValidatedSelection,
+    magic_mutation_fields::RequiresRefinement, ArgumentKeyAndValue, DefinedField,
+    MutationFieldResolverVariant, NameAndArguments, PathToRefetchField, ResolverVariant,
+    ValidatedDefinedField, ValidatedLinkedFieldSelection, ValidatedSchema, ValidatedSchemaIdField,
+    ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
 };
 
 type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSelection>>;
@@ -191,6 +191,7 @@ pub struct MutationFieldResolverInfo {
     pub mutation_field_name: SelectableFieldName,
     pub mutation_primary_field_name: SelectableFieldName,
     pub mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+    pub requires_refinement: RequiresRefinement,
 }
 
 /// This struct contains everything that is available when we start
@@ -292,6 +293,7 @@ pub fn create_merged_selection_set(
                         mutation_primary_field_name,
                         mutation_field_arguments,
                         filtered_mutation_field_arguments: _,
+                        requires_refinement,
                     }) => {
                         artifact_queue.push(ArtifactQueueItem::MutationField(
                             MutationFieldResolverInfo {
@@ -307,6 +309,7 @@ pub fn create_merged_selection_set(
                                 mutation_field_name,
                                 mutation_primary_field_name,
                                 mutation_field_arguments: mutation_field_arguments.clone(),
+                                requires_refinement,
                             },
                         ));
                         mutation_field_name
@@ -529,7 +532,8 @@ fn merge_scalar_resolver_field(
         mutation_primary_field_name,
         mutation_field_arguments,
         filtered_mutation_field_arguments,
-        ..
+        mutation_field_name: _,
+        requires_refinement,
     }) = &resolver_field.variant
     {
         merge_traversal_state.paths_to_refetch_fields.push((
@@ -540,6 +544,7 @@ fn merge_scalar_resolver_field(
                 mutation_primary_field_name: *mutation_primary_field_name,
                 mutation_field_arguments: mutation_field_arguments.clone(),
                 filtered_mutation_field_arguments: filtered_mutation_field_arguments.clone(),
+                requires_refinement: *requires_refinement,
             }),
         ));
     }
