@@ -261,20 +261,17 @@ pub fn create_merged_selection_set(
                             // TODO make this an error, don't panic
                             .expect(&format!(
                                 "Did not find matching variable definition. \
-                            This might not be validated yet. For now, each resolver \
-                            containing a __refetch field must re-defined all used variables. \
-                            Resolver {} is missing variable definition {}",
+                                This might not be validated yet. For now, each resolver \
+                                containing a __refetch field must re-defined all used variables. \
+                                Resolver {} is missing variable definition {}",
                                 root_fetchable_resolver.name, variable_name
                             ))
                             .clone()
                     })
                     .collect();
 
-                // This is just horrible
-                let field_name;
-                match resolver_variant {
+                let field_name = match resolver_variant {
                     ResolverVariant::RefetchField => {
-                        field_name = "__refetch".intern().into();
                         artifact_queue.push(ArtifactQueueItem::RefetchField(
                             RefetchFieldResolverInfo {
                                 merged_selection_set: nested_merged_selection_set,
@@ -288,14 +285,14 @@ pub fn create_merged_selection_set(
                                 refetch_query_index: index,
                             },
                         ));
+                        "__refetch".intern().into()
                     }
                     ResolverVariant::MutationField(MutationFieldResolverVariant {
-                        mutation_name,
+                        mutation_field_name,
                         mutation_primary_field_name,
                         mutation_field_arguments,
                         filtered_mutation_field_arguments: _,
                     }) => {
-                        field_name = mutation_name;
                         artifact_queue.push(ArtifactQueueItem::MutationField(
                             MutationFieldResolverInfo {
                                 merged_selection_set: nested_merged_selection_set,
@@ -307,14 +304,15 @@ pub fn create_merged_selection_set(
                                     .name,
                                 root_fetchable_field: root_fetchable_resolver.name,
                                 refetch_query_index: index,
-                                mutation_field_name: mutation_name,
+                                mutation_field_name,
                                 mutation_primary_field_name,
                                 mutation_field_arguments: mutation_field_arguments.clone(),
                             },
                         ));
+                        mutation_field_name
                     }
                     _ => panic!("invalid resolver variant"),
-                }
+                };
 
                 let mut reachable_variables_vec: Vec<_> = reachable_variables.into_iter().collect();
                 reachable_variables_vec.sort();
@@ -538,7 +536,7 @@ fn merge_scalar_resolver_field(
             merge_traversal_state.current_path.clone(),
             parent_type.id,
             ResolverVariant::MutationField(MutationFieldResolverVariant {
-                mutation_name: resolver_field.name,
+                mutation_field_name: resolver_field.name,
                 mutation_primary_field_name: *mutation_primary_field_name,
                 mutation_field_arguments: mutation_field_arguments.clone(),
                 filtered_mutation_field_arguments: filtered_mutation_field_arguments.clone(),

@@ -1113,7 +1113,7 @@ fn generate_reader_ast_node(
                                 let refetch_query_index = find_mutation_query_index(
                                     root_refetched_paths,
                                     path,
-                                    s.mutation_name,
+                                    s.mutation_field_name,
                                 );
                                 format!(
                                     "{indent_1}{{\n\

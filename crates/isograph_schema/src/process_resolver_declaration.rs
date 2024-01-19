@@ -150,7 +150,7 @@ pub enum ProcessResolverDeclarationError {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MutationFieldResolverVariant {
-    pub mutation_name: SelectableFieldName,
+    pub mutation_field_name: SelectableFieldName,
     pub mutation_primary_field_name: SelectableFieldName,
     pub mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
     pub filtered_mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,

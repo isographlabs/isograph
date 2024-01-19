@@ -233,7 +233,7 @@ impl UnvalidatedSchema {
             id: next_resolver_id,
             selection_set_and_unwraps: Some((fields.to_vec(), vec![])),
             variant: ResolverVariant::MutationField(MutationFieldResolverVariant {
-                mutation_name: magic_mutation_field_name,
+                mutation_field_name: magic_mutation_field_name,
                 mutation_primary_field_name: path_selectable_field_name,
                 mutation_field_arguments: mutation_field_arguments.to_vec(),
                 filtered_mutation_field_arguments: mutation_field_args_without_id.to_vec(),
