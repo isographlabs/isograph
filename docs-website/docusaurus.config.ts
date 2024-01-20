@@ -7,11 +7,13 @@ const config: Config = {
   tagline: "Select your components like you select your data — with GraphQL!",
   favicon: "img/isograph_logo.ico",
 
-  url: "https://www.isograph.dev/",
-  baseUrl: "/",
+  url: "https://isographlabs.github.io/",
+  baseUrl: "/isograph/",
+  trailingSlash: true,
 
   organizationName: "isographlabs",
   projectName: "isograph",
+  deploymentBranch: "gh-pages",
 
   onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "throw",
@@ -83,7 +85,7 @@ const config: Config = {
           items: [
             {
               label: "Tutorial",
-              to: "/docs/intro",
+              to: "/docs/introduction",
             },
           ],
         },

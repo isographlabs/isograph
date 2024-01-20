@@ -139,7 +139,7 @@ The fields that are refetched as part of the mutation response are whatever fiel
 
 There's a lot more. These docs are threadbare.
 
-- See the sample apps in [`./demos`](./demos/). The [GraphQL conf demo](./demos/graphql-conf-2023-demo/) is more full-featured.
+- See the sample apps in [`./demos`](https://github.com/isographlabs/isograph/tree/main/demos). The [GraphQL conf demo](https://github.com/isographlabs/isograph/tree/main/demos/graphql-conf-2023-demo) is more full-featured.
 - Watch the [talk at GraphQL Conf](https://www.youtube.com/watch?v=gO65JJRqjuc).
 - Join the discord: https://discord.gg/Q2c5tM5T8A (#isograph channel on the GraphQL discord.)
 - [Follow the official twitter account](https://twitter.com/isographlabs)

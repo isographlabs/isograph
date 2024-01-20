@@ -12,7 +12,7 @@ Currently, there are two things you must to do to use Isograph:
 - call `subscribe(() => setState({}))`, in order to make some root component re-render whenever anything in the store changes. This is obviously bad for performance.
 
 :::note
-You should also see [the quickstart guide](../quickstart) for more one-time setup, e.g. changes to the `babelrc.js`.
+You should also see [the quickstart guide](../../quickstart) for more one-time setup, e.g. changes to the `babelrc.js`.
 :::
 
 ## Big picture
