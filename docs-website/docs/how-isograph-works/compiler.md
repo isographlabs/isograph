@@ -14,7 +14,7 @@ Calling `yarn iso --config ./isograph.config.json` runs the Isograph compiler in
 
 At a very high level, the Isograph compiler does the following:
 
-- It will parse [the Isograph config file](../isograph-config).
+- It will parse [the Isograph config file](../../isograph-config).
 - It will parse and validate the GraphQL schema.
 - It will parse and validate `iso` and `isoFetch` literals.
 - It will generate artifacts.
@@ -120,7 +120,7 @@ The types in this list are simplified and a bit idealized. For example, there is
 Once we support resolvers that return IDs and which can be selected through (e.g. `best_friend { name }`, where `best_friend` is a resolver), the validated resolver linked field generic type will be an enum containing an id of either a `ResolverWhichReturnsId` or an object.
 :::
 
-## Parsing [the Isograph config file](../isograph-config)
+## Parsing [the Isograph config file](../../isograph-config)
 
 There are two representations of the config:
 
@@ -131,7 +131,7 @@ These are basically identical. The split may be overengineering for now.
 
 ## Artifact generation
 
-- An Isograph artifact refers to a [generated file](./generated-artifacts) that the Isograph runtime uses. For example, reader artifacts are used to read the fields that a resolver needs from the Isograph store.
+- An Isograph artifact refers to a [generated file](../generated-artifacts) that the Isograph runtime uses. For example, reader artifacts are used to read the fields that a resolver needs from the Isograph store.
 - Artifact generation is a bit haphazard and can use some improvement.
 - Given a validated schema, we generate a bunch of data structures representing _what_ we want to write to each file.
 - Then, we clear the target directory, and for each artifact, write the contents to the file.
