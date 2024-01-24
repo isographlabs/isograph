@@ -7,11 +7,13 @@ tags: []
 
 Please check out this [presentation about Isograph](https://www.youtube.com/watch?v=gO65JJRqjuc) at GraphQL Conf 2023. Please also see [the slides](https://docs.google.com/presentation/d/1ffot9Dmy2Z5YFnr6hEjAlr_Fn4Nrzc-zEnFK54QA6Jo/edit#slide=id.g27f8644aff7_0_1).
 
+<!-- truncate -->
+
 In this presentation, Robert Balicki covers:
 
 ## Introduction and motivation
 
-- His frustration with the state of the art of building data driven apps, exemplified by the many steps that one goes through when one extracts a child component
+- The many steps that one goes through when one extracts a child component
 - Data masking, and why it is important
 - The fundamental tension at the heart of GraphQL: it is a language for querying servers being used to provide isolation to front-end components
 - The big idea: **every fragment is associated with exactly one function**
