@@ -31,8 +31,8 @@ const FeatureList = [
         </div>
         <br />
         <div>
-          Isograph goes further, and improves your apps performance in ways that
-          aren't possible in other frameworks.
+          Isograph goes further, and improves your app's performance in ways
+          that aren't possible in other frameworks.
         </div>
       </>
     ),
