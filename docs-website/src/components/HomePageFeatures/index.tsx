@@ -185,7 +185,7 @@ export default function HomepageFeatures() {
         </div>
         <div className="row">
           <div className="col col--8 col--offset-2 margin-top--xl">
-            <h2 className="text--center">The basics:</h2>
+            <h2 className="text--center">The basics</h2>
           </div>
           <div className="col col--8 margin-bottom--xl col--offset-2">
             <Tabs>
