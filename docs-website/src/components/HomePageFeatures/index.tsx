@@ -184,6 +184,26 @@ export default function HomepageFeatures() {
           ))}
         </div>
         <div className="row">
+          <div className="col col--8 col--offset-2">
+            <h2 className="text--center margin-top--xl">
+              Watch the talk from GraphQL Conf
+            </h2>
+          </div>
+        </div>
+        <div className="row">
+          <div className="col col--8 col--offset-2 margin-top--lg">
+            <iframe
+              width="100%"
+              height="444"
+              src="https://www.youtube-nocookie.com/embed/gO65JJRqjuc?si=cPnngBys86lgWeLA"
+              title="YouTube video player"
+              frameborder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowfullscreen
+            ></iframe>
+          </div>
+        </div>
+        <div className="row">
           <div className="col col--8 col--offset-2 margin-top--xl">
             <h2 className="text--center">The basics</h2>
           </div>
