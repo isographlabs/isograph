@@ -1,12 +1,10 @@
 # Quickstart guide
 
-:::info
-This quickstart guide is somewhat incomplete. If there is a missing step, let me know! Your best bets are to emulate the demo projects.
-:::
-
 ## Adding Isograph to an existing NextJS project
 
-The process for adding Isograph to an existing NextJS project is described in this document. It shouldn't be that different to add it to a project in another framework.
+:::note
+This is the process for adding Isograph to an existing **NextJS project**. However, it shouldn't be that different to add it to a project in another framework.
+:::
 
 ### Install the compiler, babel plugin and runtime
 
