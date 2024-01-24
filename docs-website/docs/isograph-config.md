@@ -9,10 +9,6 @@ If anything in this document is inaccurate, please consult the source of truth:
 
 The file should be named `isograph.config.json` and located at the root of your project.
 
-:::warning
-`yarn iso --config $PATH` will work if the config is not named `isograph.config.json`, or is not found in the root of the project. But the babel plugin will not (yet!)
-:::
-
 ## Config file contents
 
 An example (complete) Isograph config is as follows:

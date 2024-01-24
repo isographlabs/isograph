@@ -87,7 +87,7 @@ The `schema` field should point to this file.
 ### Run the isograph compiler in watch mode
 
 ```sh
-yarn iso --config ./isograph.config.json --watch
+yarn iso --watch
 ```
 
 The compiler will start running, but since we haven't written any isograph literals, it won't do much.

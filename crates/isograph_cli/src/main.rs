@@ -18,7 +18,7 @@ use watch::handle_watch_command;
 #[tokio::main]
 async fn main() {
     let opt = CliOptions::from_args();
-    let config = create_config(opt.config.as_ref());
+    let config = create_config(opt.config.unwrap_or("./isograph.config.json".into()));
 
     if opt.watch {
         match handle_watch_command(config).await {

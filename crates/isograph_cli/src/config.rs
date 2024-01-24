@@ -21,12 +21,18 @@ struct ConfigFile {
     pub options: ConfigFileOptions,
 }
 
-pub(crate) fn create_config(config_location: Option<&PathBuf>) -> CompilerConfig {
-    let mut config_location = config_location
-        .expect("--config must be provided for now.")
-        .clone();
-    let config_contents =
-        std::fs::read_to_string(&config_location).expect("Expected config to be found");
+pub(crate) fn create_config(mut config_location: PathBuf) -> CompilerConfig {
+    let config_contents = match std::fs::read_to_string(&config_location) {
+        Ok(contents) => contents,
+        Err(_) => match config_location.to_str() {
+            Some(loc) => {
+                panic!("Expected config to be found at {}", loc)
+            }
+            None => {
+                panic!("Expectd config to be found.")
+            }
+        },
+    };
 
     let config_parsed: ConfigFile = serde_json::from_str(&config_contents)
         .unwrap_or_else(|e| panic!("Error parsing config. Error: {}", e));
