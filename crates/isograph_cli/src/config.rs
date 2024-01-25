@@ -47,23 +47,35 @@ pub(crate) fn create_config(mut config_location: PathBuf) -> CompilerConfig {
         project_root: config_dir
             .join(&config_parsed.project_root)
             .canonicalize()
-            .expect("Unable to canonicalize project root."),
+            .expect(&format!(
+                "Unable to canonicalize project root. Does {:?} exist?",
+                config_parsed.project_root
+            )),
         artifact_directory: config_dir
             .join(&config_parsed.artifact_directory)
             .canonicalize()
-            .expect("Unable to canonicalize artifact directory."),
+            .expect(&format!(
+                "Unable to canonicalize artifact directory. Does {:?} exist?",
+                config_parsed.artifact_directory
+            )),
         schema: config_dir
             .join(&config_parsed.schema)
             .canonicalize()
-            .expect("Unable to canonicalize schema path."),
+            .expect(&format!(
+                "Unable to canonicalize schema path. Does {:?} exist?",
+                config_parsed.schema
+            )),
         schema_extensions: config_parsed
             .schema_extensions
             .into_iter()
-            .map(|schema_extensions| {
+            .map(|schema_extension| {
                 config_dir
-                    .join(schema_extensions)
+                    .join(&schema_extension)
                     .canonicalize()
-                    .expect("Unable to canonicalize schema extension path.")
+                    .expect(&format!(
+                        "Unable to canonicalize schema extension path. Does {:?} exist?",
+                        schema_extension
+                    ))
             })
             .collect(),
         options: create_options(config_parsed.options),
