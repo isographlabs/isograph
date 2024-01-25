@@ -194,9 +194,10 @@ export default function HomepageFeatures() {
               height="444"
               src="https://www.youtube-nocookie.com/embed/gO65JJRqjuc?si=cPnngBys86lgWeLA"
               title="YouTube video player"
-              frameborder="0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowfullscreen
+              allowFullScreen
+              // @ts-ignore
+              frameborder="0"
             ></iframe>
           </div>
         </div>
