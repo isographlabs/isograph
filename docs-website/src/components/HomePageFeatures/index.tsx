@@ -106,12 +106,12 @@ export const home_page_component = iso<
   HomePageComponentParams,
   ReturnType<typeof HomePageComponent>
 >${"`"}
-  // Step 3: Define a field named home_page_component on the
-  // Query type, and tell the Isograph compiler that it is a
-  // React @component
+  # Step 3: Define a field named home_page_component on the
+  # Query type, and tell the Isograph compiler that it is a
+  # React @component
   Query.home_page_component @component {
-    // Step 4: Select whatever fields you'll need, including
-    // other client-defined fields like avatar_component.
+    # Step 4: Select whatever fields you'll need, including
+    # other client-defined fields like avatar_component.
     viewer {
       first_name,
       last_name,
