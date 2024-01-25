@@ -5,13 +5,15 @@
 - rethink iso syntax
   - Consider combining isoFetch and iso, as in `` iso`entrypoint Query.home_page`  `` or the like
 - publish isograph.dev (via gh-pages?)
+- handle schema keyword in GraphQL
+- handle renamed query object (e.g. in Star Wars schema)
+- iso overload in files
 
 ## V2 release
 
 - components and "realized" resolvers, as well as ways to invalidate them
   - they could also be lazily calculated
   - may require garbage collection
-- iso overload in files
 - cleanup types
 - error handling
 - validate no unknown directives left over
