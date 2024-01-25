@@ -88,6 +88,12 @@ curl https://raw.githubusercontent.com/graphql/swapi-graphql/master/schema.graph
 
 ## Run the isograph compiler in watch mode
 
+:::warning
+This will not compile currently. To fix this, remove the `schema { ... }` block in the Schema and rename `Root` to `Query`. Then rename `Root` to `Query` below.
+
+This will be supported soon.
+:::
+
 ```sh
 yarn iso --watch
 ```
