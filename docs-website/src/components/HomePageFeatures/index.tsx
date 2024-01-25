@@ -11,12 +11,13 @@ const FeatureList = [
       <>
         <div>
           Isograph eliminates the boilerplate of working with GraphQL. No more
-          fussing with fragment references — Isograph does all of that for you.
+          fussing with props and fragment references — Isograph does all of that
+          for you.
         </div>
         <br />
         <div>
           All you need to do is to define a component and the fields it needs.
-          Isograph will take care of the rest.
+          Isograph takes care of the rest.
         </div>
       </>
     ),
@@ -26,13 +27,8 @@ const FeatureList = [
     description: (
       <>
         <div>
-          Great performance &mdash; like a single query per view that fetches
-          exactly the right fields. That's all table stakes.
-        </div>
-        <br />
-        <div>
-          Isograph goes further, and improves your app's performance in ways
-          that aren't possible in other frameworks.
+          Isograph gives you great performance out of the box &mdash; like a
+          single query per view that fetches exactly the right fields.
         </div>
       </>
     ),
@@ -42,9 +38,9 @@ const FeatureList = [
     description: (
       <>
         <div>
-          A component's dependencies do not affect the data that another
-          component receives. Local reasoning is enough to ensure application
-          stability, so engineers can feel safe moving fast.
+          Local reasoning is enough to ensure application stability, because the
+          data one component requests cannot affect the data another component
+          receives. So engineers can feel safe moving fast.
         </div>
         <br />
         <div>
@@ -125,6 +121,7 @@ export const home_page_component = iso<
 ${"`"}(HomePageComponent);
 
 function HomePageComponent({ data }: HomePageComponentParams) {
+  // Step 5: Render your component
   const viewer = data.viewer;
   return <>
     <h1>Hello {viewer?.first_name} {viewer?.last_name}!</h1>
