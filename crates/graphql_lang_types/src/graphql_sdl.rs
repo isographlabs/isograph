@@ -21,6 +21,7 @@ pub enum GraphQLTypeSystemDefinition {
     DirectiveDefinition(GraphQLDirectiveDefinition),
     EnumDefinition(GraphQLEnumDefinition),
     UnionTypeDefinition(GraphQLUnionTypeDefinition),
+    SchemaDefinition(GraphQLSchemaDefinition),
 }
 
 impl From<GraphQLObjectTypeDefinition> for GraphQLTypeSystemDefinition {
@@ -62,6 +63,12 @@ impl From<GraphQLEnumDefinition> for GraphQLTypeSystemDefinition {
 impl From<GraphQLUnionTypeDefinition> for GraphQLTypeSystemDefinition {
     fn from(union_type_definition: GraphQLUnionTypeDefinition) -> Self {
         Self::UnionTypeDefinition(union_type_definition)
+    }
+}
+
+impl From<GraphQLSchemaDefinition> for GraphQLTypeSystemDefinition {
+    fn from(schema_definition: GraphQLSchemaDefinition) -> Self {
+        Self::SchemaDefinition(schema_definition)
     }
 }
 
@@ -141,6 +148,15 @@ pub struct GraphQLInputObjectTypeDefinition {
     pub name: WithLocation<InterfaceTypeName>,
     pub directives: Vec<GraphQLDirective<ConstantValue>>,
     pub fields: Vec<WithLocation<GraphQLInputValueDefinition>>,
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub struct GraphQLSchemaDefinition {
+    pub description: Option<WithSpan<DescriptionValue>>,
+    pub query_type: Option<WithSpan<ObjectTypeName>>,
+    pub subscription_type: Option<WithSpan<ObjectTypeName>>,
+    pub mutation_type: Option<WithSpan<ObjectTypeName>>,
+    pub directives: Vec<GraphQLDirective<ConstantValue>>,
 }
 
 #[allow(unused)]

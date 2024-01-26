@@ -141,6 +141,7 @@ impl UnvalidatedSchema {
                         options,
                     )?;
                 }
+                GraphQLTypeSystemDefinition::SchemaDefinition(_schema_definition) => {}
             }
         }
 

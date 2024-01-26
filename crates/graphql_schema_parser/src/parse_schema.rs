@@ -15,10 +15,10 @@ use graphql_lang_types::{
     GraphQLEnumDefinition, GraphQLEnumValueDefinition, GraphQLFieldDefinition,
     GraphQLInputObjectTypeDefinition, GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition,
     GraphQLObjectTypeDefinition, GraphQLObjectTypeExtension, GraphQLScalarTypeDefinition,
-    GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument, GraphQLTypeSystemExtension,
-    GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition,
-    GraphQLUnionTypeDefinition, ListTypeAnnotation, NameValuePair, NamedTypeAnnotation,
-    NonNullTypeAnnotation, TypeAnnotation, ValueType,
+    GraphQLSchemaDefinition, GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument,
+    GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
+    GraphQLTypeSystemExtensionOrDefinition, GraphQLUnionTypeDefinition, ListTypeAnnotation,
+    NameValuePair, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation, ValueType,
 };
 
 use crate::ParseResult;
@@ -142,6 +142,8 @@ fn parse_type_system_definition(
         "enum" => parse_enum_definition(tokens, description, text_source)
             .map(GraphQLTypeSystemDefinition::from),
         "union" => parse_union_definition(tokens, description, text_source)
+            .map(GraphQLTypeSystemDefinition::from),
+        "schema" => parse_schema_definition(tokens, description, text_source)
             .map(GraphQLTypeSystemDefinition::from),
         _ => Err(WithSpan::new(
             SchemaParseError::TopLevelSchemaDeclarationExpected {
@@ -448,6 +450,99 @@ fn parse_union_member_types(
     }
 
     Ok(values)
+}
+
+fn parse_schema_definition(
+    tokens: &mut PeekableLexer,
+    description: Option<WithSpan<DescriptionValue>>,
+    text_source: TextSource,
+) -> ParseResult<GraphQLSchemaDefinition> {
+    let directives = parse_constant_directives(tokens, text_source)?;
+
+    let _open_curly = tokens
+        .parse_token_of_kind(TokenKind::OpenBrace)
+        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+
+    let mut query_type = None;
+    let mut mutation_type = None;
+    let mut subscription_type = None;
+
+    let first_root_operation_type = parse_root_operation_type(tokens)?;
+    match first_root_operation_type.0.item {
+        RootOperationKind::Query => query_type = Some(first_root_operation_type.1),
+        RootOperationKind::Subscription => subscription_type = Some(first_root_operation_type.1),
+        RootOperationKind::Mutation => mutation_type = Some(first_root_operation_type.1),
+    };
+
+    while tokens.parse_token_of_kind(TokenKind::CloseBrace).is_err() {
+        let operation_type = parse_root_operation_type(tokens)?;
+
+        match operation_type.0.item {
+            RootOperationKind::Query => reassign_or_error(&mut query_type, &operation_type)?,
+            RootOperationKind::Subscription => {
+                reassign_or_error(&mut subscription_type, &operation_type)?
+            }
+            RootOperationKind::Mutation => reassign_or_error(&mut mutation_type, &operation_type)?,
+        }
+    }
+
+    Ok(GraphQLSchemaDefinition {
+        description,
+        query_type,
+        subscription_type,
+        mutation_type,
+        directives,
+    })
+}
+
+fn reassign_or_error(
+    root_type: &mut Option<WithSpan<ObjectTypeName>>,
+    operation_type: &(WithSpan<RootOperationKind>, WithSpan<ObjectTypeName>),
+) -> ParseResult<()> {
+    if root_type.is_some() {
+        return Err(WithSpan::new(
+            SchemaParseError::RootOperationTypeRedefined,
+            operation_type.0.span,
+        ));
+    }
+    *root_type = Some(operation_type.1);
+    Ok(())
+}
+
+enum RootOperationKind {
+    Query,
+    Subscription,
+    Mutation,
+}
+
+fn parse_root_operation_type(
+    tokens: &mut PeekableLexer,
+) -> ParseResult<(WithSpan<RootOperationKind>, WithSpan<ObjectTypeName>)> {
+    let name = tokens
+        .parse_source_of_kind(TokenKind::Identifier)
+        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+
+    let root_operation_type = match name.item {
+        "query" => WithSpan::new(RootOperationKind::Query, name.span),
+        "subscription" => WithSpan::new(RootOperationKind::Subscription, name.span),
+        "mutation" => WithSpan::new(RootOperationKind::Mutation, name.span),
+        _ => {
+            return Err(WithSpan::new(
+                SchemaParseError::ExpectedRootOperationType,
+                name.span,
+            ))
+        }
+    };
+
+    let _colon = tokens
+        .parse_token_of_kind(TokenKind::Colon)
+        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+
+    let object_name = tokens
+        .parse_string_key_type(TokenKind::Identifier)
+        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+
+    Ok((root_operation_type, object_name))
 }
 
 /// The state of the PeekableLexer is that it has processed the "scalar" keyword

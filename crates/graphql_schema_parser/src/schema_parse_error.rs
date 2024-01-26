@@ -34,6 +34,12 @@ pub enum SchemaParseError {
 
     #[error("Enum values cannot be true, false or null.")]
     EnumValueTrueFalseNull,
+
+    #[error("Expected schema, mutation or subscription")]
+    ExpectedRootOperationType,
+
+    #[error("Root operation types (query, subscription and mutation) cannot be defined twice in a schema definition")]
+    RootOperationTypeRedefined,
 }
 
 impl From<LowLevelParseError> for SchemaParseError {
