@@ -96,24 +96,23 @@ fn parse_type_system_extension(
     text_source: TextSource,
 ) -> ParseResult<GraphQLTypeSystemExtension> {
     let identifier = tokens
-        .parse_token_of_kind(TokenKind::Identifier)
+        .parse_source_of_kind(TokenKind::Identifier)
         .expect("Expected identifier extend. This is indicative of a bug in Isograph.");
     assert!(
-        tokens.source(identifier.span) == "extend",
+        identifier.item == "extend",
         "Expected identifier extend. This is indicative of a bug in Isograph."
     );
 
     let identifier = tokens
-        .parse_token_of_kind(TokenKind::Identifier)
+        .parse_source_of_kind(TokenKind::Identifier)
         .map_err(|with_span| with_span.map(SchemaParseError::from))?;
-    let identifier_source = tokens.source(identifier.span);
-    match identifier_source {
+    match identifier.item {
         "type" => {
             parse_object_type_extension(tokens, text_source).map(GraphQLTypeSystemExtension::from)
         }
         _ => Err(WithSpan::new(
             SchemaParseError::TopLevelSchemaDeclarationExpected {
-                found_text: identifier_source.to_string(),
+                found_text: identifier.to_string(),
             },
             identifier.span,
         )),
@@ -126,11 +125,10 @@ fn parse_type_system_definition(
 ) -> ParseResult<GraphQLTypeSystemDefinition> {
     let description = parse_optional_description(tokens);
     let identifier = tokens
-        .parse_token_of_kind(TokenKind::Identifier)
+        .parse_source_of_kind(TokenKind::Identifier)
         .map_err(|with_span| with_span.map(SchemaParseError::from))?;
-    let identifier_source = tokens.source(identifier.span);
 
-    match identifier_source {
+    match identifier.item {
         "type" => parse_object_type_definition(tokens, description, text_source)
             .map(GraphQLTypeSystemDefinition::from),
         "scalar" => parse_scalar_type_definition(tokens, description, text_source)
@@ -147,7 +145,7 @@ fn parse_type_system_definition(
             .map(GraphQLTypeSystemDefinition::from),
         _ => Err(WithSpan::new(
             SchemaParseError::TopLevelSchemaDeclarationExpected {
-                found_text: identifier_source.to_string(),
+                found_text: identifier.item.to_string(),
             },
             identifier.span,
         )),
@@ -309,20 +307,17 @@ fn parse_directive_locations(
 fn parse_directive_location(
     tokens: &mut PeekableLexer,
 ) -> ParseResult<WithSpan<DirectiveLocation>> {
-    match tokens.parse_token_of_kind(TokenKind::Identifier) {
-        Ok(token) => {
-            let text = tokens.source(token.span);
-            DirectiveLocation::from_str(text)
-                .map_err(|_| {
-                    WithSpan::new(
-                        SchemaParseError::ExpectedDirectiveLocation {
-                            text: text.to_string(),
-                        },
-                        token.span,
-                    )
-                })
-                .map(|location| token.map(|_| location))
-        }
+    match tokens.parse_source_of_kind(TokenKind::Identifier) {
+        Ok(text) => DirectiveLocation::from_str(text.item)
+            .map_err(|_| {
+                WithSpan::new(
+                    SchemaParseError::ExpectedDirectiveLocation {
+                        text: text.item.to_string(),
+                    },
+                    text.span,
+                )
+            })
+            .map(|location| text.map(|_| location)),
         Err(e) => {
             let span = e.span;
             Err(e.map(|_| SchemaParseError::ExpectedDirectiveLocation {
