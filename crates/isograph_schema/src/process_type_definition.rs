@@ -19,9 +19,10 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    ConfigOptions, DefinedField, IsographObjectTypeDefinition, ResolverActionKind,
-    ResolverTypeAndField, ResolverVariant, Schema, SchemaObject, SchemaResolver, SchemaScalar,
-    SchemaServerField, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
+    ConfigOptions, DefinedField, EncounteredRootTypes, IsographObjectTypeDefinition,
+    ProcessedRootTypes, ResolverActionKind, ResolverTypeAndField, ResolverVariant, RootTypes,
+    Schema, SchemaObject, SchemaResolver, SchemaScalar, SchemaServerField,
+    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
     UnvalidatedSchemaResolver, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
 };
 
@@ -53,14 +54,6 @@ pub(crate) struct ProcessObjectTypeDefinitionOutcome {
     pub(crate) object_id: ObjectId,
     pub(crate) mutation_object_id: Option<ObjectId>,
 }
-
-struct RootTypes<T> {
-    query: Option<T>,
-    mutation: Option<T>,
-    subscription: Option<T>,
-}
-type EncounteredRootTypes = RootTypes<ObjectId>;
-type ProcessedRootTypes = RootTypes<WithLocation<ObjectTypeName>>;
 
 impl UnvalidatedSchema {
     pub fn process_graphql_type_system_document(
