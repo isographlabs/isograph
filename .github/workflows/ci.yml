@@ -106,10 +106,8 @@ jobs:
         run: pnpm -r compile
 
   build-website:
-    name: Build and deploy website
+    name: Build website
     runs-on: ubuntu-latest
-    needs: [build-js-packages, build-cli, build-demos]
-    if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref == 'refs/heads/main' || github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
     defaults:
       run:
         working-directory: ./docs-website
@@ -127,6 +125,40 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Build website
         run: yarn build
+      - name: Upload artifact
+        id: upload-artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docusaurus-build
+          # upload-artifact ignores working-directory, seemingly, though
+          # the docs indicate otherwise.
+          path: docs-website/build/
+          retention-days: 1
+          if-no-files-found: error
+
+  deploy-website:
+    name: Deploy website
+    runs-on: ubuntu-latest
+    needs: [build-js-packages, build-cli, build-demos, build-website]
+    if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref == 'refs/heads/main' || github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    defaults:
+      run:
+        working-directory: ./docs-website
+    steps:
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - name: Use Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "pnpm"
+      - name: "Download build folder"
+        uses: actions/download-artifact@v4
+        with:
+          name: docusaurus-build
+          path: docs-website/build
       - name: Setup Pages
         uses: actions/configure-pages@v4
       - name: Upload custom
