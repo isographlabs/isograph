@@ -8,7 +8,7 @@ const config: Config = {
   favicon: "img/isograph_logo.ico",
 
   url: "https://isographlabs.github.io/",
-  baseUrl: "/isograph/",
+  baseUrl: "/",
   trailingSlash: true,
 
   organizationName: "isographlabs",
