@@ -4,9 +4,6 @@
 
 - rethink iso syntax
   - Consider combining isoFetch and iso, as in `` iso`entrypoint Query.home_page`  `` or the like
-- publish isograph.dev (via gh-pages?)
-- handle schema keyword in GraphQL
-- handle renamed query object (e.g. in Star Wars schema)
 - iso overload in files
 
 ## V2 release
