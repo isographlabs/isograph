@@ -7,7 +7,7 @@ const config: Config = {
   tagline: "Select your components like you select your data — with GraphQL!",
   favicon: "img/isograph_logo.ico",
 
-  url: "https://isographlabs.github.io/",
+  url: "https://isograph.dev/",
   baseUrl: "/",
   trailingSlash: true,
 
