@@ -1,7 +1,7 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    IsographObjectTypeName, Location, ScalarTypeName, SelectableFieldName, Span,
+    IsographObjectTypeName, Location, ObjectTypeName, ScalarTypeName, SelectableFieldName, Span,
     StringLiteralValue, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
@@ -54,6 +54,14 @@ pub(crate) struct ProcessObjectTypeDefinitionOutcome {
     pub(crate) mutation_object_id: Option<ObjectId>,
 }
 
+struct RootTypes<T> {
+    query: Option<T>,
+    mutation: Option<T>,
+    subscription: Option<T>,
+}
+type EncounteredRootTypes = RootTypes<ObjectId>;
+type ProcessedRootTypes = RootTypes<WithLocation<ObjectTypeName>>;
+
 impl UnvalidatedSchema {
     pub fn process_graphql_type_system_document(
         &mut self,
@@ -71,10 +79,16 @@ impl UnvalidatedSchema {
         let mut supertype_to_subtype_map = HashMap::new();
         let mut subtype_to_supertype_map = HashMap::new();
 
-        let mut mutation_type_id = None;
+        let mut encountered_root_types = RootTypes {
+            query: None,
+            mutation: None,
+            subscription: None,
+        };
+        let mut processed_root_types = None;
+
         for with_location in type_system_document.0 {
             let WithLocation {
-                location: _,
+                location,
                 item: type_system_definition,
             } = with_location;
             match type_system_definition {
@@ -89,7 +103,7 @@ impl UnvalidatedSchema {
                         options,
                     )?;
                     if let Some(mutation_id) = outcome.mutation_object_id {
-                        mutation_type_id = Some(mutation_id);
+                        encountered_root_types.mutation = Some(mutation_id);
                     };
                 }
                 GraphQLTypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
@@ -145,15 +159,29 @@ impl UnvalidatedSchema {
                         options,
                     )?;
                 }
-                GraphQLTypeSystemDefinition::SchemaDefinition(_schema_definition) => {}
+                GraphQLTypeSystemDefinition::SchemaDefinition(schema_definition) => {
+                    if processed_root_types.is_some() {
+                        return Err(WithLocation::new(
+                            ProcessTypeDefinitionError::DuplicateSchemaDefinition,
+                            location,
+                        ));
+                    }
+                    processed_root_types = Some(RootTypes {
+                        query: schema_definition.query,
+                        mutation: schema_definition.mutation,
+                        subscription: schema_definition.subscription,
+                    })
+                }
             }
         }
 
         let type_refinement_map =
             self.get_type_refinement_map(supertype_to_subtype_map, subtype_to_supertype_map)?;
 
+        let root_types = self.process_root_types(processed_root_types, encountered_root_types)?;
+
         Ok(ProcessGraphQLDocumentOutcome {
-            mutation_id: mutation_type_id,
+            mutation_id: root_types.mutation,
             type_refinement_maps: type_refinement_map,
         })
     }
@@ -490,6 +518,58 @@ impl UnvalidatedSchema {
             }
         }
         Ok(())
+    }
+
+    fn process_root_types(
+        &self,
+        processed_root_types: Option<ProcessedRootTypes>,
+        encountered_root_types: EncounteredRootTypes,
+    ) -> ProcessTypeDefinitionResult<EncounteredRootTypes> {
+        match processed_root_types {
+            Some(processed_root_types) => {
+                let RootTypes {
+                    query: query_type_name,
+                    mutation: mutation_type_name,
+                    subscription: subscription_type_name,
+                } = processed_root_types;
+
+                let query_id = query_type_name
+                    .map(|query_type_name| self.look_up_root_type(query_type_name))
+                    .transpose()?;
+                let mutation_id = mutation_type_name
+                    .map(|mutation_type_name| self.look_up_root_type(mutation_type_name))
+                    .transpose()?;
+                let subscription_id = subscription_type_name
+                    .map(|subscription_type_name| self.look_up_root_type(subscription_type_name))
+                    .transpose()?;
+
+                Ok(RootTypes {
+                    query: query_id,
+                    mutation: mutation_id,
+                    subscription: subscription_id,
+                })
+            }
+            None => Ok(encountered_root_types),
+        }
+    }
+
+    fn look_up_root_type(
+        &self,
+        type_name: WithLocation<ObjectTypeName>,
+    ) -> ProcessTypeDefinitionResult<ObjectId> {
+        match self.schema_data.defined_types.get(&type_name.item.into()) {
+            Some(DefinedTypeId::Object(object_id)) => Ok(*object_id),
+            Some(DefinedTypeId::Scalar(_)) => Err(WithLocation::new(
+                ProcessTypeDefinitionError::RootTypeMustBeObject,
+                type_name.location,
+            )),
+            None => Err(WithLocation::new(
+                ProcessTypeDefinitionError::IsographObjectTypeNameNotDefined {
+                    type_name: type_name.item.into(),
+                },
+                type_name.location,
+            )),
+        }
     }
 }
 
@@ -847,4 +927,10 @@ pub enum ProcessTypeDefinitionError {
         is_type: &'static str,
         extended_as_type: &'static str,
     },
+
+    #[error("Duplicate schema definition")]
+    DuplicateSchemaDefinition,
+
+    #[error("Root types must be objects. This type is a scalar.")]
+    RootTypeMustBeObject,
 }

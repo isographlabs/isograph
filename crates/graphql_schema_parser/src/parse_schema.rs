@@ -475,7 +475,7 @@ fn parse_schema_definition(
     let mut mutation_type = None;
     let mut subscription_type = None;
 
-    let first_root_operation_type = parse_root_operation_type(tokens)?;
+    let first_root_operation_type = parse_root_operation_type(tokens, text_source)?;
     match first_root_operation_type.0.item {
         RootOperationKind::Query => query_type = Some(first_root_operation_type.1),
         RootOperationKind::Subscription => subscription_type = Some(first_root_operation_type.1),
@@ -483,7 +483,7 @@ fn parse_schema_definition(
     };
 
     while tokens.parse_token_of_kind(TokenKind::CloseBrace).is_err() {
-        let operation_type = parse_root_operation_type(tokens)?;
+        let operation_type = parse_root_operation_type(tokens, text_source)?;
 
         match operation_type.0.item {
             RootOperationKind::Query => reassign_or_error(&mut query_type, &operation_type)?,
@@ -496,16 +496,16 @@ fn parse_schema_definition(
 
     Ok(GraphQLSchemaDefinition {
         description,
-        query_type,
-        subscription_type,
-        mutation_type,
+        query: query_type,
+        subscription: subscription_type,
+        mutation: mutation_type,
         directives,
     })
 }
 
 fn reassign_or_error(
-    root_type: &mut Option<WithSpan<ObjectTypeName>>,
-    operation_type: &(WithSpan<RootOperationKind>, WithSpan<ObjectTypeName>),
+    root_type: &mut Option<WithLocation<ObjectTypeName>>,
+    operation_type: &(WithSpan<RootOperationKind>, WithLocation<ObjectTypeName>),
 ) -> ParseResult<()> {
     if root_type.is_some() {
         return Err(WithSpan::new(
@@ -525,7 +525,8 @@ enum RootOperationKind {
 
 fn parse_root_operation_type(
     tokens: &mut PeekableLexer,
-) -> ParseResult<(WithSpan<RootOperationKind>, WithSpan<ObjectTypeName>)> {
+    text_source: TextSource,
+) -> ParseResult<(WithSpan<RootOperationKind>, WithLocation<ObjectTypeName>)> {
     let name = tokens
         .parse_source_of_kind(TokenKind::Identifier)
         .map_err(|with_span| with_span.map(SchemaParseError::from))?;
@@ -550,7 +551,10 @@ fn parse_root_operation_type(
         .parse_string_key_type(TokenKind::Identifier)
         .map_err(|with_span| with_span.map(SchemaParseError::from))?;
 
-    Ok((root_operation_type, object_name))
+    Ok((
+        root_operation_type,
+        object_name.to_with_location(text_source),
+    ))
 }
 
 /// The state of the PeekableLexer is that it has processed the "scalar" keyword

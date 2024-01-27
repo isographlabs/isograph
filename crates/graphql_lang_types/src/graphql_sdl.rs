@@ -155,9 +155,9 @@ pub struct GraphQLInputObjectTypeDefinition {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct GraphQLSchemaDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub query_type: Option<WithSpan<ObjectTypeName>>,
-    pub subscription_type: Option<WithSpan<ObjectTypeName>>,
-    pub mutation_type: Option<WithSpan<ObjectTypeName>>,
+    pub query: Option<WithLocation<ObjectTypeName>>,
+    pub subscription: Option<WithLocation<ObjectTypeName>>,
+    pub mutation: Option<WithLocation<ObjectTypeName>>,
     pub directives: Vec<GraphQLDirective<ConstantValue>>,
 }
 
