@@ -10,7 +10,7 @@ pub(crate) struct PeekableLexer<'source> {
     lexer: logos::Lexer<'source, TokenKind>,
     source: &'source str,
     /// the byte offset of the *end* of the previous token
-    end_index: u32,
+    end_index_of_last_parsed_token: u32,
     offset: u32,
 }
 
@@ -31,7 +31,7 @@ impl<'source> PeekableLexer<'source> {
             current: dummy,
             lexer,
             source,
-            end_index: 0,
+            end_index_of_last_parsed_token: 0,
             offset: 0,
         };
 
@@ -53,8 +53,9 @@ impl<'source> PeekableLexer<'source> {
                     )
                 }
                 _ => {
-                    self.end_index = self.current.span.end;
+                    self.end_index_of_last_parsed_token = self.current.span.end;
                     let span = self.lexer_span();
+                    // TODO why does self.current = ... not work here?
                     return std::mem::replace(&mut self.current, WithSpan::new(kind, span));
                 }
             }
@@ -149,7 +150,15 @@ impl<'source> PeekableLexer<'source> {
     pub fn with_span<T>(&mut self, do_stuff: impl FnOnce(&mut Self) -> T) -> WithSpan<T> {
         let start = self.current.span.start;
         let result = do_stuff(self);
-        let end = self.current.span.end;
+        let end = self.end_index_of_last_parsed_token;
+
+        // Note: if do_stuff didn't actually parse anything, e.g. if it
+        // attempted to parse and bailed, then end < start. Hence, we
+        // return the larger (end, start) for end.
+        //
+        // Maybe this can be encoded in the type system?
+        let end = std::cmp::max(end, start);
+
         WithSpan::new(result, Span::new(start, end))
     }
 }
