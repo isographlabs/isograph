@@ -48,8 +48,7 @@ impl<'source> PeekableLexer<'source> {
             match kind {
                 IsographLangTokenKind::Error => {
                     // TODO propagate? continue?
-                    eprintln!("{:?}", self.source);
-                    panic!("found an error token don't do that")
+                    panic!("Encountered an error. This probably means you have an invalid token.")
                 }
                 _ => {
                     self.end_index = self.current.span.end;

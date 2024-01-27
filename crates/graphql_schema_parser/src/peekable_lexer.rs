@@ -48,7 +48,9 @@ impl<'source> PeekableLexer<'source> {
             match kind {
                 TokenKind::Error => {
                     // TODO propagate? continue?
-                    panic!("found an error token don't do that")
+                    panic!(
+                        "Encountered an error; this probably means you have an invalid character."
+                    )
                 }
                 _ => {
                     self.end_index = self.current.span.end;
