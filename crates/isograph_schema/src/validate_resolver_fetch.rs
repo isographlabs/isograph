@@ -49,7 +49,7 @@ impl UnvalidatedSchema {
                 // know how to fetch (e.g. viewer, an item implementing Node, etc.)
                 // should be fetchable.
                 let query_id = self.query_type_id.ok_or(WithLocation::new(
-                    ValidateResolverFetchDeclarationError::QueryMustExist,
+                    ValidateResolverFetchDeclarationError::RootQueryTypeMustExist,
                     Location::generated(),
                 ))?;
 
@@ -123,8 +123,8 @@ pub enum ValidateResolverFetchDeclarationError {
         parent_type_name: UnvalidatedTypeName,
     },
 
-    #[error("The Query type must exist.")]
-    QueryMustExist,
+    #[error("A root query type must exist.")]
+    RootQueryTypeMustExist,
 
     #[error(
         "The type `{parent_type_name}` is not fetchable. (Currently, only Query is fetchable.)"

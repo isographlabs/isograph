@@ -8,7 +8,7 @@ use graphql_lang_types::{
     GraphQLFieldDefinition, GraphQLScalarTypeDefinition, GraphQLTypeSystemDefinition,
     GraphQLTypeSystemDocument, GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
     GraphQLTypeSystemExtensionOrDefinition, NamedTypeAnnotation, NonNullTypeAnnotation,
-    TypeAnnotation,
+    RootOperationKind, TypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -46,13 +46,13 @@ pub struct TypeRefinementMaps {
 }
 
 pub struct ProcessGraphQLDocumentOutcome {
-    pub mutation_id: Option<ObjectId>,
     pub type_refinement_maps: TypeRefinementMaps,
+    pub root_types: EncounteredRootTypes,
 }
 
-pub(crate) struct ProcessObjectTypeDefinitionOutcome {
-    pub(crate) object_id: ObjectId,
-    pub(crate) mutation_object_id: Option<ObjectId>,
+pub struct ProcessObjectTypeDefinitionOutcome {
+    pub object_id: ObjectId,
+    pub encountered_root_kind: Option<RootOperationKind>,
 }
 
 impl UnvalidatedSchema {
@@ -95,9 +95,10 @@ impl UnvalidatedSchema {
                         true,
                         options,
                     )?;
-                    if let Some(mutation_id) = outcome.mutation_object_id {
-                        encountered_root_types.mutation = Some(mutation_id);
-                    };
+                    if let Some(encountered_root_kind) = outcome.encountered_root_kind {
+                        encountered_root_types
+                            .set_root_type(encountered_root_kind, outcome.object_id);
+                    }
                 }
                 GraphQLTypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
                     self.process_scalar_definition(scalar_type_definition)?;
@@ -173,8 +174,16 @@ impl UnvalidatedSchema {
 
         let root_types = self.process_root_types(processed_root_types, encountered_root_types)?;
 
+        if let Some(query_type_id) = root_types.query {
+            debug_assert!(
+                self.query_type_id.is_none(),
+                "Expected query not to be already defined."
+            );
+            self.query_type_id = Some(query_type_id);
+        }
+
         Ok(ProcessGraphQLDocumentOutcome {
-            mutation_id: root_types.mutation,
+            root_types,
             type_refinement_maps: type_refinement_map,
         })
     }
@@ -374,8 +383,8 @@ impl UnvalidatedSchema {
         let string_type_for_typename = schema_data.scalar(self.string_type_id).name;
         let ref mut type_names = schema_data.defined_types;
         let ref mut objects = schema_data.objects;
-        let mut mutation_id = None;
-        match type_names.entry(object_type_definition.name.item.into()) {
+        let encountered_root_kind = match type_names.entry(object_type_definition.name.item.into())
+        {
             Entry::Occupied(_) => {
                 return Err(WithLocation::new(
                     ProcessTypeDefinitionError::DuplicateTypeDefinition {
@@ -423,27 +432,20 @@ impl UnvalidatedSchema {
                     directives: object_type_definition.directives,
                 });
 
-                // ----- HACK -----
-                // This should mutate a default query object; only if no schema declaration is ultimately
-                // encountered should we use the default query object.
-                //
-                // Also, this is a GraphQL concept, but it's leaking into Isograph land :/ (is it?)
-                if object_type_definition.name.item == *QUERY_TYPE {
-                    self.query_type_id = Some(next_object_id);
-                }
-                // --- END HACK ---
-
-                // ----- HACK -----
-                // It's unclear to me that this is the best way to add magic mutation fields.
-                if object_type_definition.name.item == *MUTATION_TYPE {
-                    mutation_id = Some(next_object_id)
-                }
-                // --- END HACK ---
-
                 schema_fields.extend(unvalidated_schema_fields);
                 vacant.insert(DefinedTypeId::Object(next_object_id));
+
+                // TODO default types are a GraphQL-land concept, but this is Isograph-land
+                if object_type_definition.name.item == *QUERY_TYPE {
+                    Some(RootOperationKind::Query)
+                } else if object_type_definition.name.item == *MUTATION_TYPE {
+                    Some(RootOperationKind::Mutation)
+                } else {
+                    // TODO subscription
+                    None
+                }
             }
-        }
+        };
 
         for interface in &object_type_definition.interfaces {
             // type_definition implements interface
@@ -473,7 +475,7 @@ impl UnvalidatedSchema {
 
         Ok(ProcessObjectTypeDefinitionOutcome {
             object_id: next_object_id,
-            mutation_object_id: mutation_id,
+            encountered_root_kind,
         })
     }
 
