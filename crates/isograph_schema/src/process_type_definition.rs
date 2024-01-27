@@ -72,7 +72,11 @@ impl UnvalidatedSchema {
         let mut subtype_to_supertype_map = HashMap::new();
 
         let mut mutation_type_id = None;
-        for type_system_definition in type_system_document.0 {
+        for with_location in type_system_document.0 {
+            let WithLocation {
+                location: _,
+                item: type_system_definition,
+            } = with_location;
             match type_system_definition {
                 GraphQLTypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
                     let object_type_definition = object_type_definition.into();
@@ -261,12 +265,13 @@ impl UnvalidatedSchema {
         let mut extensions = Vec::with_capacity(extension_document.0.len());
 
         for extension_or_definition in extension_document.0 {
-            match extension_or_definition {
+            let WithLocation { location, item } = extension_or_definition;
+            match item {
                 GraphQLTypeSystemExtensionOrDefinition::Definition(definition) => {
-                    definitions.push(definition);
+                    definitions.push(WithLocation::new(definition, location));
                 }
                 GraphQLTypeSystemExtensionOrDefinition::Extension(extension) => {
-                    extensions.push(extension)
+                    extensions.push(WithLocation::new(extension, location))
                 }
             }
         }
@@ -289,9 +294,9 @@ impl UnvalidatedSchema {
 
     fn process_graphql_type_system_extension(
         &mut self,
-        extension: GraphQLTypeSystemExtension,
+        extension: WithLocation<GraphQLTypeSystemExtension>,
     ) -> ProcessTypeDefinitionResult<()> {
-        match extension {
+        match extension.item {
             GraphQLTypeSystemExtension::ObjectTypeExtension(object_extension) => {
                 let name = object_extension.name.item;
 

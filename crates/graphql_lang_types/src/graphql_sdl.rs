@@ -73,10 +73,10 @@ impl From<GraphQLSchemaDefinition> for GraphQLTypeSystemDefinition {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct GraphQLTypeSystemDocument(pub Vec<GraphQLTypeSystemDefinition>);
+pub struct GraphQLTypeSystemDocument(pub Vec<WithLocation<GraphQLTypeSystemDefinition>>);
 
 impl Deref for GraphQLTypeSystemDocument {
-    type Target = Vec<GraphQLTypeSystemDefinition>;
+    type Target = Vec<WithLocation<GraphQLTypeSystemDefinition>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -84,7 +84,9 @@ impl Deref for GraphQLTypeSystemDocument {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct GraphQLTypeSystemExtensionDocument(pub Vec<GraphQLTypeSystemExtensionOrDefinition>);
+pub struct GraphQLTypeSystemExtensionDocument(
+    pub Vec<WithLocation<GraphQLTypeSystemExtensionOrDefinition>>,
+);
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum GraphQLTypeSystemExtensionOrDefinition {

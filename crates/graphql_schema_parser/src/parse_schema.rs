@@ -67,14 +67,12 @@ fn parse_type_system_extension_document(
         let definition_or_extension = match peek_type_system_doc_type(tokens) {
             Ok(type_system_document_kind) => match type_system_document_kind {
                 TypeSystemDocType::Definition => {
-                    Ok(GraphQLTypeSystemExtensionOrDefinition::Definition(
-                        parse_type_system_definition(tokens, text_source)?,
-                    ))
+                    let with_loc = parse_type_system_definition(tokens, text_source)?;
+                    Ok(with_loc.map(GraphQLTypeSystemExtensionOrDefinition::Definition))
                 }
                 TypeSystemDocType::Extension => {
-                    Ok(GraphQLTypeSystemExtensionOrDefinition::Extension(
-                        parse_type_system_extension(tokens, text_source)?,
-                    ))
+                    let with_loc = parse_type_system_extension(tokens, text_source)?;
+                    Ok(with_loc.map(GraphQLTypeSystemExtensionOrDefinition::Extension))
                 }
             },
             Err(unexpected_token) => Err(WithSpan::new(
@@ -94,64 +92,74 @@ fn parse_type_system_extension_document(
 fn parse_type_system_extension(
     tokens: &mut PeekableLexer,
     text_source: TextSource,
-) -> ParseResult<GraphQLTypeSystemExtension> {
-    let identifier = tokens
-        .parse_source_of_kind(TokenKind::Identifier)
-        .expect("Expected identifier extend. This is indicative of a bug in Isograph.");
-    assert!(
-        identifier.item == "extend",
-        "Expected identifier extend. This is indicative of a bug in Isograph."
-    );
+) -> ParseResult<WithLocation<GraphQLTypeSystemExtension>> {
+    let extension = tokens
+        .with_span(|tokens| {
+            let identifier = tokens
+                .parse_source_of_kind(TokenKind::Identifier)
+                .expect("Expected identifier extend. This is indicative of a bug in Isograph.");
+            assert!(
+                identifier.item == "extend",
+                "Expected identifier extend. This is indicative of a bug in Isograph."
+            );
 
-    let identifier = tokens
-        .parse_source_of_kind(TokenKind::Identifier)
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
-    match identifier.item {
-        "type" => {
-            parse_object_type_extension(tokens, text_source).map(GraphQLTypeSystemExtension::from)
-        }
-        _ => Err(WithSpan::new(
-            SchemaParseError::TopLevelSchemaDeclarationExpected {
-                found_text: identifier.to_string(),
-            },
-            identifier.span,
-        )),
-    }
+            let identifier = tokens
+                .parse_source_of_kind(TokenKind::Identifier)
+                .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+            match identifier.item {
+                "type" => parse_object_type_extension(tokens, text_source)
+                    .map(GraphQLTypeSystemExtension::from),
+                _ => Err(WithSpan::new(
+                    SchemaParseError::TopLevelSchemaDeclarationExpected {
+                        found_text: identifier.to_string(),
+                    },
+                    identifier.span,
+                )),
+            }
+        })
+        .transpose()?;
+
+    Ok(extension.to_with_location(text_source))
 }
 
 fn parse_type_system_definition(
     tokens: &mut PeekableLexer,
     text_source: TextSource,
-) -> ParseResult<GraphQLTypeSystemDefinition> {
-    let description = parse_optional_description(tokens);
-    let identifier = tokens
-        .parse_source_of_kind(TokenKind::Identifier)
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+) -> ParseResult<WithLocation<GraphQLTypeSystemDefinition>> {
+    let definition = tokens
+        .with_span(|tokens| {
+            let description = parse_optional_description(tokens);
+            let identifier = tokens
+                .parse_source_of_kind(TokenKind::Identifier)
+                .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+            match identifier.item {
+                "type" => parse_object_type_definition(tokens, description, text_source)
+                    .map(GraphQLTypeSystemDefinition::from),
+                "scalar" => parse_scalar_type_definition(tokens, description, text_source)
+                    .map(GraphQLTypeSystemDefinition::from),
+                "interface" => parse_interface_type_definition(tokens, description, text_source)
+                    .map(GraphQLTypeSystemDefinition::from),
+                "input" => parse_input_object_type_definition(tokens, description, text_source)
+                    .map(GraphQLTypeSystemDefinition::from),
+                "directive" => parse_directive_definition(tokens, description, text_source)
+                    .map(GraphQLTypeSystemDefinition::from),
+                "enum" => parse_enum_definition(tokens, description, text_source)
+                    .map(GraphQLTypeSystemDefinition::from),
+                "union" => parse_union_definition(tokens, description, text_source)
+                    .map(GraphQLTypeSystemDefinition::from),
+                "schema" => parse_schema_definition(tokens, description, text_source)
+                    .map(GraphQLTypeSystemDefinition::from),
+                _ => Err(WithSpan::new(
+                    SchemaParseError::TopLevelSchemaDeclarationExpected {
+                        found_text: identifier.item.to_string(),
+                    },
+                    identifier.span,
+                )),
+            }
+        })
+        .transpose()?;
 
-    match identifier.item {
-        "type" => parse_object_type_definition(tokens, description, text_source)
-            .map(GraphQLTypeSystemDefinition::from),
-        "scalar" => parse_scalar_type_definition(tokens, description, text_source)
-            .map(GraphQLTypeSystemDefinition::from),
-        "interface" => parse_interface_type_definition(tokens, description, text_source)
-            .map(GraphQLTypeSystemDefinition::from),
-        "input" => parse_input_object_type_definition(tokens, description, text_source)
-            .map(GraphQLTypeSystemDefinition::from),
-        "directive" => parse_directive_definition(tokens, description, text_source)
-            .map(GraphQLTypeSystemDefinition::from),
-        "enum" => parse_enum_definition(tokens, description, text_source)
-            .map(GraphQLTypeSystemDefinition::from),
-        "union" => parse_union_definition(tokens, description, text_source)
-            .map(GraphQLTypeSystemDefinition::from),
-        "schema" => parse_schema_definition(tokens, description, text_source)
-            .map(GraphQLTypeSystemDefinition::from),
-        _ => Err(WithSpan::new(
-            SchemaParseError::TopLevelSchemaDeclarationExpected {
-                found_text: identifier.item.to_string(),
-            },
-            identifier.span,
-        )),
-    }
+    Ok(definition.to_with_location(text_source))
 }
 
 /// The state of the PeekableLexer is that it has processed the "type" keyword
