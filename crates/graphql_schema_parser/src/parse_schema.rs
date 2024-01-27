@@ -18,7 +18,8 @@ use graphql_lang_types::{
     GraphQLSchemaDefinition, GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument,
     GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
     GraphQLTypeSystemExtensionOrDefinition, GraphQLUnionTypeDefinition, ListTypeAnnotation,
-    NameValuePair, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation, ValueType,
+    NameValuePair, NamedTypeAnnotation, NonNullTypeAnnotation, RootOperationKind, TypeAnnotation,
+    ValueType,
 };
 
 use crate::ParseResult;
@@ -515,12 +516,6 @@ fn reassign_or_error(
     }
     *root_type = Some(operation_type.1);
     Ok(())
-}
-
-enum RootOperationKind {
-    Query,
-    Subscription,
-    Mutation,
 }
 
 fn parse_root_operation_type(
