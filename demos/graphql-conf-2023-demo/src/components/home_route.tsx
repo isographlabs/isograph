@@ -1,29 +1,32 @@
 import React from "react";
 import { iso } from "@isograph/react";
 import { Container, Stack } from "@mui/material";
-import { ResolverParameterType as HomeRouteParams } from "@iso/Query/home_route/reader.isograph";
+import { ResolverParameterType as HomeRouteParams } from "@iso/Query/HomeRoute/reader.isograph";
 
-export const home_route = iso<HomeRouteParams, ReturnType<typeof HomeRoute>>`
-  Query.home_route @component {
+export const HomeRoute = iso<
+  HomeRouteParams,
+  ReturnType<typeof HomeRouteComponent>
+>`
+  Query.HomeRoute @component {
     pets {
       id,
-      pet_summary_card,
+      PetSummaryCard,
     },
   }
-`(HomeRoute);
+`(HomeRouteComponent);
 
-function HomeRoute(props: HomeRouteParams) {
+function HomeRouteComponent(props: HomeRouteParams) {
   return (
     <Container maxWidth="md">
       <h1>Robert's Pet List 3000</h1>
       <Stack direction="column" spacing={4}>
-        {props.data.pets.map((pet) => (
-          <React.Fragment key={pet.id}>
-            {pet.pet_summary_card({
-              navigateTo: props.navigateTo,
-            })}
-          </React.Fragment>
-        ))}
+        {props.data.pets.map((pet) => {
+          return (
+            <React.Fragment key={pet.id}>
+              <pet.PetSummaryCard navigateTo={props.navigateTo} />
+            </React.Fragment>
+          );
+        })}
       </Stack>
     </Container>
   );

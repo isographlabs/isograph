@@ -1,19 +1,20 @@
 import React from "react";
 import { iso } from "@isograph/react";
 import { Container, Stack } from "@mui/material";
-import { ResolverParameterType as PetDetailRouteParams } from "@iso/Query/pet_detail_route/reader.isograph";
+import { ResolverParameterType as PetDetailRouteParams } from "@iso/Query/PetDetailRoute/reader.isograph";
+import { PetPhraseCard } from "./pet_phrase_card";
 
-export const pet_detail_route = iso<
+export const PetDetailRoute = iso<
   PetDetailRouteParams,
   ReturnType<typeof PetDetailRouteComponent>
 >`
-  Query.pet_detail_route($id: ID!) @component {
+  Query.PetDetailRoute($id: ID!) @component {
     pet(id: $id) {
       name,
-      pet_checkins_card,
-      pet_best_friend_card,
-      pet_phrase_card,
-      pet_tagline_card,
+      PetCheckinsCard,
+      PetBestFriendCard,
+      PetPhraseCard,
+      PetTaglineCard,
     },
   }
 `(PetDetailRouteComponent);
@@ -22,6 +23,10 @@ export function PetDetailRouteComponent({
   data,
   navigateTo,
 }: PetDetailRouteParams) {
+  const { pet } = data;
+  if (pet == null) {
+    return <h1>Pet not found.</h1>;
+  }
   return (
     <Container maxWidth="md">
       <h1>Pet Detail for {data.pet?.name}</h1>
@@ -33,11 +38,12 @@ export function PetDetailRouteComponent({
       </h3>
       <React.Suspense fallback={<h2>Loading pet details...</h2>}>
         <Stack direction="row" spacing={4}>
-          {data.pet?.pet_checkins_card({ navigateTo })}
+          <pet.PetCheckinsCard navigateTo={navigateTo} />
           <Stack direction="column" spacing={4}>
-            {data.pet?.pet_best_friend_card({})}
-            {data.pet?.pet_phrase_card({})}
-            {data.pet?.pet_tagline_card({})}
+            <pet.PetBestFriendCard />
+
+            <pet.PetPhraseCard />
+            <pet.PetTaglineCard />
           </Stack>
         </Stack>
       </React.Suspense>

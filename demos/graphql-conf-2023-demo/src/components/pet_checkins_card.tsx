@@ -2,13 +2,13 @@ import React from "react";
 import { iso } from "@isograph/react";
 import { Card, CardContent } from "@mui/material";
 
-import { ResolverParameterType as PetCheckinsCardParams } from "@iso/Pet/pet_checkins_card/reader.isograph";
+import { ResolverParameterType as PetCheckinsCardParams } from "@iso/Pet/PetCheckinsCard/reader.isograph";
 
-export const pet_checkins_card = iso<
+export const PetCheckinsCard = iso<
   PetCheckinsCardParams,
-  ReturnType<typeof PetCheckinsCard>
+  ReturnType<typeof PetCheckinsCardComponent>
 >`
-  Pet.pet_checkins_card @component {
+  Pet.PetCheckinsCard @component {
     id,
     checkins {
       id,
@@ -16,9 +16,9 @@ export const pet_checkins_card = iso<
       time,
     },
   }
-`(PetCheckinsCard);
+`(PetCheckinsCardComponent);
 
-function PetCheckinsCard(props: PetCheckinsCardParams) {
+function PetCheckinsCardComponent(props: PetCheckinsCardParams) {
   return (
     <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
       <CardContent>

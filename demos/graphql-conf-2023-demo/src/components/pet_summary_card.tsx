@@ -2,21 +2,21 @@ import React from "react";
 import { iso } from "@isograph/react";
 import { Avatar, Card, CardContent, Stack } from "@mui/material";
 
-import { ResolverParameterType as PetSummaryCardParams } from "@iso/Pet/pet_summary_card/reader.isograph";
+import { ResolverParameterType as PetSummaryCardParams } from "@iso/Pet/PetSummaryCard/reader.isograph";
 
-export const pet_summary_card = iso<
+export const PetSummaryCard = iso<
   PetSummaryCardParams,
-  ReturnType<typeof PetSummaryCard>
+  ReturnType<typeof PetSummaryCardComponent>
 >`
-  Pet.pet_summary_card @component {
+  Pet.PetSummaryCard @component {
     id,
     name,
     picture,
     tagline,
   }
-`(PetSummaryCard);
+`(PetSummaryCardComponent);
 
-function PetSummaryCard(props: PetSummaryCardParams) {
+function PetSummaryCardComponent(props: PetSummaryCardParams) {
   return (
     <Card
       variant="outlined"

@@ -1,9 +1,9 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { pet_detail_route as resolver } from '../../../components/pet_detail_route.tsx';
-import Pet__pet_best_friend_card, { ReadOutType as Pet__pet_best_friend_card__outputType } from '../../Pet/pet_best_friend_card/reader.isograph';
-import Pet__pet_checkins_card, { ReadOutType as Pet__pet_checkins_card__outputType } from '../../Pet/pet_checkins_card/reader.isograph';
-import Pet__pet_phrase_card, { ReadOutType as Pet__pet_phrase_card__outputType } from '../../Pet/pet_phrase_card/reader.isograph';
-import Pet__pet_tagline_card, { ReadOutType as Pet__pet_tagline_card__outputType } from '../../Pet/pet_tagline_card/reader.isograph';
+import { PetDetailRoute as resolver } from '../../../components/pet_detail_route.tsx';
+import Pet__PetBestFriendCard, { ReadOutType as Pet__PetBestFriendCard__outputType } from '../../Pet/PetBestFriendCard/reader.isograph';
+import Pet__PetCheckinsCard, { ReadOutType as Pet__PetCheckinsCard__outputType } from '../../Pet/PetCheckinsCard/reader.isograph';
+import Pet__PetPhraseCard, { ReadOutType as Pet__PetPhraseCard__outputType } from '../../Pet/PetPhraseCard/reader.isograph';
+import Pet__PetTaglineCard, { ReadOutType as Pet__PetTaglineCard__outputType } from '../../Pet/PetTaglineCard/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
@@ -30,30 +30,30 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
       },
       {
         kind: "Resolver",
-        alias: "pet_checkins_card",
+        alias: "PetCheckinsCard",
         arguments: null,
-        readerArtifact: Pet__pet_checkins_card,
+        readerArtifact: Pet__PetCheckinsCard,
         usedRefetchQueries: [],
       },
       {
         kind: "Resolver",
-        alias: "pet_best_friend_card",
+        alias: "PetBestFriendCard",
         arguments: null,
-        readerArtifact: Pet__pet_best_friend_card,
+        readerArtifact: Pet__PetBestFriendCard,
         usedRefetchQueries: [0, 1, ],
       },
       {
         kind: "Resolver",
-        alias: "pet_phrase_card",
+        alias: "PetPhraseCard",
         arguments: null,
-        readerArtifact: Pet__pet_phrase_card,
+        readerArtifact: Pet__PetPhraseCard,
         usedRefetchQueries: [],
       },
       {
         kind: "Resolver",
-        alias: "pet_tagline_card",
+        alias: "PetTaglineCard",
         arguments: null,
-        readerArtifact: Pet__pet_tagline_card,
+        readerArtifact: Pet__PetTaglineCard,
         usedRefetchQueries: [],
       },
     ],
@@ -64,10 +64,10 @@ export type ResolverParameterType = { data:
 {
   pet: ({
     name: string,
-    pet_checkins_card: Pet__pet_checkins_card__outputType,
-    pet_best_friend_card: Pet__pet_best_friend_card__outputType,
-    pet_phrase_card: Pet__pet_phrase_card__outputType,
-    pet_tagline_card: Pet__pet_tagline_card__outputType,
+    PetCheckinsCard: Pet__PetCheckinsCard__outputType,
+    PetBestFriendCard: Pet__PetBestFriendCard__outputType,
+    PetPhraseCard: Pet__PetPhraseCard__outputType,
+    PetTaglineCard: Pet__PetTaglineCard__outputType,
   } | null),
 },
 [index: string]: any };
@@ -79,7 +79,7 @@ const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOut
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
-  variant: { kind: "Component", componentName: "Query.pet_detail_route" },
+  variant: { kind: "Component", componentName: "Query.PetDetailRoute" },
 };
 
 export default artifact;

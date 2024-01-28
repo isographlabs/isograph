@@ -2,11 +2,14 @@ import React, { useState } from "react";
 import { iso } from "@isograph/react";
 import { MenuItem, Select, Button, Input, Box } from "@mui/material";
 
-import { ResolverParameterType as PetUpdaterParams } from "@iso/Pet/pet_updater/reader.isograph";
+import { ResolverParameterType as PetUpdaterParams } from "@iso/Pet/PetUpdater/reader.isograph";
 import { PetId } from "./router";
 
-export const pet_updater = iso<PetUpdaterParams, ReturnType<typeof PetUpdater>>`
-  Pet.pet_updater @component {
+export const PetUpdater = iso<
+  PetUpdaterParams,
+  ReturnType<typeof PetUpdaterComponent>
+>`
+  Pet.PetUpdater @component {
     __set_pet_best_friend,
     potential_new_best_friends {
       id,
@@ -16,9 +19,9 @@ export const pet_updater = iso<PetUpdaterParams, ReturnType<typeof PetUpdater>>`
     __set_pet_tagline,
     tagline,
   }
-`(PetUpdater);
+`(PetUpdaterComponent);
 
-function PetUpdater(props: PetUpdaterParams) {
+function PetUpdaterComponent(props: PetUpdaterParams) {
   const [selected, setSelected] = useState<PetId | "NONE">("NONE");
   const [tagline, setTagline] = useState<string>(props.data.tagline);
 

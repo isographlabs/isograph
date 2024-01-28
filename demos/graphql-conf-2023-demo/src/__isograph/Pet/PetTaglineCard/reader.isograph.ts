@@ -1,5 +1,5 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { pet_tagline_card as resolver } from '../../../components/pet_tagline_card.tsx';
+import { PetTaglineCard as resolver } from '../../../components/pet_tagline_card.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
@@ -35,7 +35,7 @@ const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOut
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
-  variant: { kind: "Component", componentName: "Pet.pet_tagline_card" },
+  variant: { kind: "Component", componentName: "Pet.PetTaglineCard" },
 };
 
 export default artifact;

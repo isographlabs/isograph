@@ -1,5 +1,5 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { pet_updater as resolver } from '../../../components/pet_updater.tsx';
+import { PetUpdater as resolver } from '../../../components/pet_updater.tsx';
 import Pet____set_pet_best_friend, { ReadOutType as Pet____set_pet_best_friend__outputType } from '../__set_pet_best_friend/reader.isograph';
 import Pet____set_pet_tagline, { ReadOutType as Pet____set_pet_tagline__outputType } from '../__set_pet_tagline/reader.isograph';
 
@@ -68,7 +68,7 @@ const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOut
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
-  variant: { kind: "Component", componentName: "Pet.pet_updater" },
+  variant: { kind: "Component", componentName: "Pet.PetUpdater" },
 };
 
 export default artifact;

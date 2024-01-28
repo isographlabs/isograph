@@ -1,6 +1,6 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { home_route as resolver } from '../../../components/home_route.tsx';
-import Pet__pet_summary_card, { ReadOutType as Pet__pet_summary_card__outputType } from '../../Pet/pet_summary_card/reader.isograph';
+import { HomeRoute as resolver } from '../../../components/home_route.tsx';
+import Pet__PetSummaryCard, { ReadOutType as Pet__PetSummaryCard__outputType } from '../../Pet/PetSummaryCard/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
@@ -22,9 +22,9 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
       },
       {
         kind: "Resolver",
-        alias: "pet_summary_card",
+        alias: "PetSummaryCard",
         arguments: null,
-        readerArtifact: Pet__pet_summary_card,
+        readerArtifact: Pet__PetSummaryCard,
         usedRefetchQueries: [],
       },
     ],
@@ -35,7 +35,7 @@ export type ResolverParameterType = { data:
 {
   pets: ({
     id: string,
-    pet_summary_card: Pet__pet_summary_card__outputType,
+    PetSummaryCard: Pet__PetSummaryCard__outputType,
   })[],
 },
 [index: string]: any };
@@ -47,7 +47,7 @@ const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOut
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
-  variant: { kind: "Component", componentName: "Query.home_route" },
+  variant: { kind: "Component", componentName: "Query.HomeRoute" },
 };
 
 export default artifact;

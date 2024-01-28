@@ -3,7 +3,7 @@ import type {ReadFromStoreType, ResolverParameterType, ReadOutType} from './read
 import readerResolver from './reader.isograph';
 const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [];
 
-const queryText = 'query home_route  {\
+const queryText = 'query HomeRoute  {\
   pets {\
     id,\
     name,\

@@ -77,7 +77,7 @@ function HomeRouteLoader({
 }) {
   const { queryReference } = useLazyReference(
     isoFetch<typeof HomeRouteEntrypoint>`
-      Query.home_route
+      Query.HomeRoute
     `,
     {}
   );
@@ -94,7 +94,7 @@ function PetDetailRouteLoader({
 }) {
   const { queryReference } = useLazyReference(
     isoFetch<typeof PetDetailRouteEntrypoint>`
-      Query.pet_detail_route
+      Query.PetDetailRoute
     `,
     { id: route.id }
   );

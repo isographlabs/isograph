@@ -2,19 +2,19 @@ import React from "react";
 import { iso } from "@isograph/react";
 import { Card, CardContent } from "@mui/material";
 
-import { ResolverParameterType as PetPhraseCardParams } from "@iso/Pet/pet_phrase_card/reader.isograph";
+import { ResolverParameterType as PetPhraseCardParams } from "@iso/Pet/PetPhraseCard/reader.isograph";
 
-export const pet_phrase_card = iso<
+export const PetPhraseCard = iso<
   PetPhraseCardParams,
-  ReturnType<typeof PetPhraseCard>
+  ReturnType<typeof PetPhraseCardComponent>
 >`
-Pet.pet_phrase_card @component {
+Pet.PetPhraseCard @component {
   id,
   favorite_phrase,
 }
-`(PetPhraseCard);
+`(PetPhraseCardComponent);
 
-function PetPhraseCard(props: PetPhraseCardParams) {
+function PetPhraseCardComponent(props: PetPhraseCardParams) {
   return (
     <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
       <CardContent>

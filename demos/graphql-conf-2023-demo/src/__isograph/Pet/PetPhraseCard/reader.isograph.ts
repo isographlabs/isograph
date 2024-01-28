@@ -1,5 +1,5 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { pet_checkins_card as resolver } from '../../../components/pet_checkins_card.tsx';
+import { PetPhraseCard as resolver } from '../../../components/pet_phrase_card.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
@@ -14,41 +14,17 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     arguments: null,
   },
   {
-    kind: "Linked",
-    fieldName: "checkins",
+    kind: "Scalar",
+    fieldName: "favorite_phrase",
     alias: null,
     arguments: null,
-    selections: [
-      {
-        kind: "Scalar",
-        fieldName: "id",
-        alias: null,
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "location",
-        alias: null,
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "time",
-        alias: null,
-        arguments: null,
-      },
-    ],
   },
 ];
 
 export type ResolverParameterType = { data:
 {
   id: string,
-  checkins: ({
-    id: string,
-    location: string,
-    time: string,
-  })[],
+  favorite_phrase: (string | null),
 },
 [index: string]: any };
 
@@ -59,7 +35,7 @@ const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOut
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
-  variant: { kind: "Component", componentName: "Pet.pet_checkins_card" },
+  variant: { kind: "Component", componentName: "Pet.PetPhraseCard" },
 };
 
 export default artifact;
