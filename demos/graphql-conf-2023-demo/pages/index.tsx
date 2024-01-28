@@ -62,10 +62,6 @@ setMissingFieldHandler(
 );
 
 export default function Home() {
-  const [, setState] = useState<object | void>();
-  useEffect(() => {
-    return subscribe(() => setState({}));
-  }, []);
   return (
     <>
       <Head>
