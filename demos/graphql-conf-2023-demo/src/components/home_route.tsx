@@ -20,13 +20,9 @@ function HomeRouteComponent(props: HomeRouteParams) {
     <Container maxWidth="md">
       <h1>Robert's Pet List 3000</h1>
       <Stack direction="column" spacing={4}>
-        {props.data.pets.map((pet) => {
-          return (
-            <React.Fragment key={pet.id}>
-              <pet.PetSummaryCard navigateTo={props.navigateTo} />
-            </React.Fragment>
-          );
-        })}
+        {props.data.pets.map((pet) => (
+          <pet.PetSummaryCard navigateTo={props.navigateTo} key={pet.id} />
+        ))}
       </Stack>
     </Container>
   );

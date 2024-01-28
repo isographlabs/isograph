@@ -2,7 +2,6 @@ import React from "react";
 import { iso } from "@isograph/react";
 import { Container, Stack } from "@mui/material";
 import { ResolverParameterType as PetDetailRouteParams } from "@iso/Query/PetDetailRoute/reader.isograph";
-import { PetPhraseCard } from "./pet_phrase_card";
 
 export const PetDetailRoute = iso<
   PetDetailRouteParams,
