@@ -222,7 +222,7 @@ export default function HomepageFeatures() {
                 label="home_page_component.tsx"
               >
                 <p>
-                  <code>home_page_component</code> is an Isograph client-defined
+                  <code>Query.HomePage</code> is an Isograph client-defined
                   field. The function HomePageComponent will be called with the
                   data selected in the <code>iso</code> literal.
                 </p>
@@ -238,7 +238,7 @@ export default function HomepageFeatures() {
               </TabItem>
               <TabItem value="avatar_component" label="avatar_component.tsx">
                 <p>
-                  The code for this <code>avatar_component</code> client-defined
+                  The code for this <code>User.Avatar</code> client-defined
                   field should be pretty familiar. The only thing to note is
                   that we're importing a regular ol' React component:{" "}
                   <code>Avatar</code>. That's allowed, too!
@@ -249,13 +249,12 @@ export default function HomepageFeatures() {
               </TabItem>
               <TabItem value="schema" label="Schema.graphql">
                 <p>
-                  Our GraphQL schema defines all server fields that we have
-                  accessed (such as <code>Query.viewer</code> and{" "}
-                  <code>User.first_name</code>.) It does <b>not</b> define our
+                  Our GraphQL schema file includes all server fields that we
+                  have accessed (such as <code>Query.viewer</code> and{" "}
+                  <code>User.first_name</code>.) It does <b>not</b> include our
                   client-defined fields &mdash; the Isograph compiler
-                  understands that
-                  <code>iso</code> literals <b>are</b> the definition of
-                  client-defined fields.
+                  understands that <code>iso</code> literals <b>are</b> the
+                  definition of client-defined fields.
                 </p>
                 <CodeBlock language="tsx">{CodeBlocks.schema.trim()}</CodeBlock>
               </TabItem>
