@@ -17,7 +17,7 @@ impl<'schema> EntrypointArtifact<'schema> {
         } = self;
 
         format!(
-            "import type {{IsographEntrypoint, FragmentReference, \
+            "import type {{IsographEntrypoint, \
             NormalizationAst, RefetchQueryArtifactWrapper}} from '@isograph/react';\n\
             import type {{ReadFromStoreType, ResolverParameterType, ReadOutType}} from './reader.isograph';\n\
             import readerResolver from './reader.isograph';\n\
