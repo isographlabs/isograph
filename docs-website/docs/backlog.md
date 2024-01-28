@@ -2,8 +2,6 @@
 
 ## Top QOL priorities
 
-- rethink iso syntax
-  - Consider combining isoFetch and iso, as in `` iso`entrypoint Query.home_page`  `` or the like
 - publish isograph.dev (via gh-pages?)
 - handle schema keyword in GraphQL
 - handle renamed query object (e.g. in Star Wars schema)
@@ -75,8 +73,6 @@
 - Defer/stream
 - Subscriptions
 - Interfaces/unions
-- Entrypoints
-  - Directives on isoFetch
 - Field unwrapping syntax
 - Pagination
 - Refetch on missing data

@@ -1,6 +1,6 @@
 import React from "react";
 import { Container } from "@mui/material";
-import { subscribe, isoFetch, useLazyReference, read } from "@isograph/react";
+import { subscribe, iso, useLazyReference, read } from "@isograph/react";
 import HomeRouteEntrypoint from "@iso/Query/home_route/entrypoint.isograph";
 import PetDetailRouteEntrypoint from "@iso/Query/pet_detail_route/entrypoint.isograph";
 
@@ -76,8 +76,8 @@ function HomeRouteLoader({
   navigateTo: (path: Route) => void;
 }) {
   const { queryReference } = useLazyReference(
-    isoFetch<typeof HomeRouteEntrypoint>`
-      Query.home_route
+    iso<typeof HomeRouteEntrypoint>`
+      entrypoint Query.home_route
     `,
     {}
   );
@@ -93,8 +93,8 @@ function PetDetailRouteLoader({
   route: PetDetailRoute;
 }) {
   const { queryReference } = useLazyReference(
-    isoFetch<typeof PetDetailRouteEntrypoint>`
-      Query.pet_detail_route
+    iso<typeof PetDetailRouteEntrypoint>`
+      entrypoint Query.pet_detail_route
     `,
     { id: route.id }
   );

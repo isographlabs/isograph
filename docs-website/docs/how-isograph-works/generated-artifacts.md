@@ -22,7 +22,7 @@ The reader AST is a data structure that is used to read out precisely the fields
 
 The entrypoint artifact is generated at `TypeName/field_name/entrypoint.isograph.ts`.
 
-An entrypoint (e.g. `isoFetch Query.home_page_component `) is always associated with a single resolver. The entrypoint artifact contains:
+An entrypoint (e.g. `iso entrypoint Query.home_page_component `) is always associated with a single resolver. The entrypoint artifact contains:
 
 - the query text
 - the normalization AST

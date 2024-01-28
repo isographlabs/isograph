@@ -160,17 +160,16 @@ export type FragmentReference<
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
-export function isoFetch<T extends IsographEntrypoint<any, any, any>>(
-  _text: TemplateStringsArray
-): T {
-  return void 0 as any;
-}
+// export function iso<T extends IsographEntrypoint<any, any, any>>(
+//   _text: TemplateStringsArray
+// ): T {
+//   throw new Error("Babel plugin not enabled")
+// }
 
 export function iso<TResolverParameter, TResolverReturn = TResolverParameter>(
   _queryText: TemplateStringsArray
 ): (
-  x: ((param: TResolverParameter) => TResolverReturn) | void
-) => (param: TResolverParameter) => TResolverReturn {
+  x: ((param: TResolverParameter) => TResolverReturn) ) => (param: TResolverParameter) => TResolverReturn {
   // The name `identity` here is a bit of a double entendre.
   // First, it is the identity function, constrained to operate
   // on a very specific type. Thus, the value of b Declare`...`(
@@ -186,6 +185,16 @@ export function iso<TResolverParameter, TResolverReturn = TResolverParameter>(
   };
 }
 
+function assertIsEntrypoint<TReadFromStore extends Object,
+  TResolverProps,
+  TResolverResult>(value: IsographEntrypoint<
+    TReadFromStore,
+    TResolverProps,
+    TResolverResult
+  > | typeof iso): asserts value is IsographEntrypoint<TReadFromStore, TResolverProps, TResolverResult> {
+  if (typeof value === 'function') throw new Error("Not a string")
+}
+
 export function useLazyReference<
   TReadFromStore extends Object,
   TResolverProps,
@@ -195,7 +204,7 @@ export function useLazyReference<
     TReadFromStore,
     TResolverProps,
     TResolverResult
-  >,
+  > | typeof iso,
   variables: object
 ): {
   queryReference: FragmentReference<
@@ -204,7 +213,9 @@ export function useLazyReference<
     TResolverResult
   >;
 } {
+
   // Typechecking fails here... TODO investigate
+  assertIsEntrypoint(entrypoint);
   const cache = getOrCreateCacheForArtifact(entrypoint, variables);
 
   // TODO add comment explaining why we never use this value
@@ -290,14 +301,14 @@ export function readButDoNotEvaluate<TReadFromStore extends Object>(
 
 type ReadDataResult<TReadFromStore> =
   | {
-      kind: "Success";
-      data: TReadFromStore;
-    }
+    kind: "Success";
+    data: TReadFromStore;
+  }
   | {
-      kind: "MissingData";
-      reason: string;
-      nestedReason?: ReadDataResult<unknown>;
-    };
+    kind: "MissingData";
+    reason: string;
+    nestedReason?: ReadDataResult<unknown>;
+  };
 
 function readData<TReadFromStore>(
   ast: ReaderAst<TReadFromStore>,

@@ -3,7 +3,7 @@
 The workflow for developers is as follows:
 
 - Run the compiler in watch mode via `yarn iso --watch --config ./isograph.config.json`
-- Whenever a file containing an `iso` or `isoFetch` literal changes, or the schema changes, or a schema extension changes, the Isograph compiler will re-compile your code.
+- Whenever a file containing an `iso` literal changes, or the schema changes, or a schema extension changes, the Isograph compiler will re-compile your code.
 - The compiler will write a bunch of files to the `artifact_directory` folder, which are used by the Isograph runtime.
 
 ## Warnings

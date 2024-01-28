@@ -10,7 +10,9 @@ use common_lang_types::{
 };
 use graphql_schema_parser::{parse_schema, parse_schema_extensions, SchemaParseError};
 use intern::{string_key::Intern, Lookup};
-use isograph_lang_parser::{parse_iso_fetch, parse_iso_literal, IsographLiteralParseError};
+use isograph_lang_parser::{
+    parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
+};
 use isograph_lang_types::{EntrypointTypeAndField, ResolverDeclaration};
 use isograph_schema::{
     CompilerConfig, ProcessGraphQLDocumentOutcome, ProcessResolverDeclarationError, Schema,
@@ -22,8 +24,7 @@ use thiserror::Error;
 use crate::{
     generate_artifacts::{generate_and_write_artifacts, GenerateArtifactsError},
     isograph_literals::{
-        extract_iso_fetch_from_file_content, extract_iso_literal_from_file_content,
-        read_files_in_folder, IsoFetchExtraction, IsoLiteralExtraction,
+        extract_iso_literal_from_file_content, read_files_in_folder, IsoLiteralExtraction,
     },
     schema::read_schema_file,
 };
@@ -258,19 +259,15 @@ fn extract_iso_literals(
                 file_name,
                 interned_file_path,
             ) {
-                Ok((resolver_declaration, text_source)) => {
-                    resolver_declarations_and_text_sources.push((resolver_declaration, text_source))
-                }
+                Ok((extraction_result, text_source)) => match extraction_result {
+                    IsoLiteralExtractionResult::ClientFieldDeclaration(decl) => {
+                        resolver_declarations_and_text_sources.push((decl, text_source))
+                    }
+                    IsoLiteralExtractionResult::EntrypointDeclaration(decl) => {
+                        resolver_fetch_and_text_sources.push((decl, text_source))
+                    }
+                },
                 Err(e) => isograph_literal_parse_errors.extend(e.into_iter()),
-            }
-        }
-
-        for iso_fetch_extaction in extract_iso_fetch_from_file_content(&file_content) {
-            match process_iso_fetch_extraction(iso_fetch_extaction, file_name) {
-                Ok((fetch_declaration, text_source)) => {
-                    resolver_fetch_and_text_sources.push((fetch_declaration, text_source))
-                }
-                Err(e) => isograph_literal_parse_errors.push(e),
             }
         }
     }
@@ -285,31 +282,11 @@ fn extract_iso_literals(
     }
 }
 
-fn process_iso_fetch_extraction(
-    iso_fetch_extaction: IsoFetchExtraction<'_>,
-    file_name: SourceFileName,
-) -> Result<(WithSpan<EntrypointTypeAndField>, TextSource), WithLocation<IsographLiteralParseError>>
-{
-    let IsoFetchExtraction {
-        iso_fetch_text,
-        iso_fetch_start_index,
-    } = iso_fetch_extaction;
-    let text_source = TextSource {
-        path: file_name,
-        span: Some(Span::new(
-            iso_fetch_start_index as u32,
-            (iso_fetch_start_index + iso_fetch_text.len()) as u32,
-        )),
-    };
-    let fetch_declaration = parse_iso_fetch(iso_fetch_text, text_source)?;
-    Ok((fetch_declaration, text_source))
-}
-
 fn process_iso_literal_extraction(
     iso_literal_extraction: IsoLiteralExtraction<'_>,
     file_name: SourceFileName,
     interned_file_path: ResolverDefinitionPath,
-) -> Result<(WithSpan<ResolverDeclaration>, TextSource), Vec<WithLocation<IsographLiteralParseError>>>
+) -> Result<(IsoLiteralExtractionResult, TextSource), Vec<WithLocation<IsographLiteralParseError>>>
 {
     let IsoLiteralExtraction {
         iso_literal_text,
@@ -327,55 +304,47 @@ fn process_iso_literal_extraction(
 
     let mut errors = vec![];
 
-    if !has_associated_js_function {
-        errors.push(WithLocation::new(
-            IsographLiteralParseError::ExpectedAssociatedJsFunction,
-            Location::new(text_source, Span::todo_generated()),
-        ));
-    }
-
     // TODO return errors if any occurred, otherwise Ok
     match parse_iso_literal(&iso_literal_text, interned_file_path, text_source) {
-        Ok(resolver_declaration) => {
-            let exists_and_matches = const_export_name_exists_and_matches(
-                const_export_name,
-                resolver_declaration.item.resolver_field_name.item,
-            );
-            if exists_and_matches {
-                if errors.is_empty() {
-                    Ok((resolver_declaration, text_source))
-                } else {
-                    Err(errors)
+        Ok(res) => {
+            let extraction_result = res.item;
+            if let IsoLiteralExtractionResult::ClientFieldDeclaration(resolver_declaration) =
+                &extraction_result
+            {
+                let exists_and_matches = const_export_name_exists_and_matches(
+                    const_export_name,
+                    resolver_declaration.item.resolver_field_name.item,
+                );
+                if !has_associated_js_function {
+                    errors.push(WithLocation::new(
+                        IsographLiteralParseError::ExpectedAssociatedJsFunction,
+                        Location::new(text_source, Span::todo_generated()),
+                    ));
                 }
-            } else {
-                errors.push(WithLocation::new(
-                    IsographLiteralParseError::ExpectedLiteralToBeExported {
-                        expected_const_export_name: resolver_declaration
-                            .item
-                            .resolver_field_name
-                            .item,
-                    },
-                    // TODO why does resolver_declaration.span cause a panic here?
-                    Location::new(text_source, Span::todo_generated()),
-                ));
-                Err(errors)
-            }
-        }
-        Err((name, e)) => {
-            if let Some(name) = name {
-                let exists_and_matches =
-                    const_export_name_exists_and_matches(const_export_name, name);
-                if !exists_and_matches {
+                if exists_and_matches {
+                    if errors.is_empty() {
+                        Ok((extraction_result, text_source))
+                    } else {
+                        Err(errors)
+                    }
+                } else {
                     errors.push(WithLocation::new(
                         IsographLiteralParseError::ExpectedLiteralToBeExported {
-                            expected_const_export_name: name,
+                            expected_const_export_name: resolver_declaration
+                                .item
+                                .resolver_field_name
+                                .item,
                         },
                         // TODO why does resolver_declaration.span cause a panic here?
                         Location::new(text_source, Span::todo_generated()),
                     ));
+                    Err(errors)
                 }
+            } else {
+                Ok((extraction_result, text_source))
             }
-
+        }
+        Err(e) => {
             errors.push(e);
             Err(errors)
         }

@@ -1,5 +1,5 @@
 import React from "react";
-import { iso, isoFetch, read, useLazyReference } from "@isograph/react";
+import { iso, read, useLazyReference } from "@isograph/react";
 import { Container } from "@mui/material";
 
 import { ResolverParameterType as UserRouteComponentParams } from "@iso/Query/user_page/reader.isograph";
@@ -45,7 +45,7 @@ export function UserRoute({
   route: UserRouteType;
   setRoute: (route: Route) => void;
 }) {
-  const { queryReference } = useLazyReference(isoFetch`Query.user_page`, {
+  const { queryReference } = useLazyReference(iso`entrypoint Query.user_page`, {
     userLogin: route.userLogin,
     first: 20,
   });

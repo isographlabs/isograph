@@ -4,7 +4,7 @@ import {
   read,
   useLazyReference,
   subscribe,
-  isoFetch,
+  iso,
 } from "@isograph/react";
 import { Container } from "@mui/material";
 
@@ -60,7 +60,7 @@ export function HomeRoute({
     return subscribe(() => setState({}));
   }, []);
   const { queryReference } = useLazyReference(
-    isoFetch`Query.home_page_component`,
+    iso`entrypoint Query.home_page_component`,
     {
       first: 15,
     }

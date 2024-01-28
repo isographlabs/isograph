@@ -50,9 +50,9 @@ These calls to `iso` define resolvers, which are functions from graph data (such
 
 ### How does Isograph fetch data?
 
-At the root of each page, you will define an entrypoint with `isoFetch`. Isograph's compiler finds and processes all the entrypoints in your codebase, and will generate the appropriate GraphQL query.
+At the root of each page, you will define an entrypoint with `iso`. Isograph's compiler finds and processes all the entrypoints in your codebase, and will generate the appropriate GraphQL query.
 
-So, if the compiler encounters `` isoFetch`Query.user_list_page`; ``, it would generate a query that would fetch all the server fields needed for the `Query.user_list_page` resolver and all of the resolvers that it references. Then, when the user navigates to the user list page, that query would be executed.
+So, if the compiler encounters `` iso`entrypoint Query.user_list_page`; ``, it would generate a query that would fetch all the server fields needed for the `Query.user_list_page` resolver and all of the resolvers that it references. Then, when the user navigates to the user list page, that query would be executed.
 
 For example, the data might be fetched during render as follows:
 
@@ -62,7 +62,7 @@ const UserListPageQuery = require("@iso/Query/user_list_page.isograph");
 function UserListPageRoute() {
   const queryVariables = {};
   const { queryReference } = useLazyReference(
-    isoFetch`Query.user_list_page`,
+    iso`entrypoint Query.user_list_page`,
     queryVariables
   );
 
@@ -84,7 +84,7 @@ You may have noticed that when we called `data.avatar_component({})`, we did not
 
 ### Big picture
 
-At the root of a page, you will define an `isoFetch` entrypoint. For any such entrypoint, Isograph will:
+At the root of a page, you will define an `iso` entrypoint. For any such entrypoint, Isograph will:
 
 - Recursively walk it's dependencies and create a single GraphQL query that fetches **all** of the data reachable from this literal.
 - When that page renders, or possibly sooner, Isograph will make the API call to fetch that data.

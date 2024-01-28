@@ -829,7 +829,7 @@ pub enum ValidateSchemaError {
         inner_type: UnvalidatedTypeName,
     },
 
-    #[error("Error when validating isoFetch calls.\nMessage: {message}")]
+    #[error("Error when validating iso calls.\nMessage: {message}")]
     ErrorValidatingResolverFetch {
         message: ValidateResolverFetchDeclarationError,
     },

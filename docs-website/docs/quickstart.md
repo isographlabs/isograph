@@ -208,7 +208,7 @@ That Isograph component isn't doing much on its own. We need to provide a way to
 
 ```tsx
 import React from "react";
-import { isoFetch, useLazyReference, read } from "@isograph/react";
+import { iso, useLazyReference, read } from "@isograph/react";
 import EpisodeListEntrypoint from "@iso/Root/episode_list_component/entrypoint.isograph";
 
 export default function EpisodeListRoute() {
@@ -221,7 +221,7 @@ export default function EpisodeListRoute() {
 
 function Inner() {
   const { queryReference } = useLazyReference(
-    isoFetch<typeof EpisodeListEntrypoint>`Root.episode_list_component`,
+    iso<typeof EpisodeListEntrypoint>`entrypoint Root.episode_list_component`,
     {
       /* query variables */
     }
