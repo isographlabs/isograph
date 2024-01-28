@@ -3,7 +3,7 @@ import { pet_stats_card as resolver } from '../../../components/pet_stats_card.t
 import Pet____refetch, { ReadOutType as Pet____refetch__outputType } from '../__refetch/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
+export type ReadOutType = (React.FC<any>);
 
 export type ReadFromStoreType = ResolverParameterType;
 

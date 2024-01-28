@@ -4,7 +4,7 @@ import Query__header, { ReadOutType as Query__header__outputType } from '../head
 import Query__repository_detail, { ReadOutType as Query__repository_detail__outputType } from '../repository_detail/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
+export type ReadOutType = (React.FC<any>);
 
 export type ReadFromStoreType = ResolverParameterType;
 

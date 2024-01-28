@@ -5,7 +5,7 @@ import PullRequest__created_at_formatted, { ReadOutType as PullRequest__created_
 import PullRequest__pull_request_link, { ReadOutType as PullRequest__pull_request_link__outputType } from '../../PullRequest/pull_request_link/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
+export type ReadOutType = (React.FC<any>);
 
 export type ReadFromStoreType = ResolverParameterType;
 

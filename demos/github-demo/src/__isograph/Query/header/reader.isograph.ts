@@ -3,7 +3,7 @@ import { header as resolver } from '../../../isograph-components/header.tsx';
 import User__avatar, { ReadOutType as User__avatar__outputType } from '../../User/avatar/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
+export type ReadOutType = (React.FC<any>);
 
 export type ReadFromStoreType = ResolverParameterType;
 

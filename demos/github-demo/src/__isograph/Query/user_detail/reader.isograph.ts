@@ -3,7 +3,7 @@ import { user_detail as resolver } from '../../../isograph-components/user_detai
 import User__repository_list, { ReadOutType as User__repository_list__outputType } from '../../User/repository_list/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
+export type ReadOutType = (React.FC<any>);
 
 export type ReadFromStoreType = ResolverParameterType;
 

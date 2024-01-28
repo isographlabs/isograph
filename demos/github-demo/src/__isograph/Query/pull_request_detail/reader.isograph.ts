@@ -3,7 +3,7 @@ import { pull_request_detail as resolver } from '../../../isograph-components/pu
 import PullRequest__comment_list, { ReadOutType as PullRequest__comment_list__outputType } from '../../PullRequest/comment_list/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
+export type ReadOutType = (React.FC<any>);
 
 export type ReadFromStoreType = ResolverParameterType;
 

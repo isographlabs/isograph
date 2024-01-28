@@ -3,7 +3,7 @@ import { comment_list as resolver } from '../../../isograph-components/comment_l
 import IssueComment__formatted_comment_creation_date, { ReadOutType as IssueComment__formatted_comment_creation_date__outputType } from '../../IssueComment/formatted_comment_creation_date/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
+export type ReadOutType = (React.FC<any>);
 
 export type ReadFromStoreType = ResolverParameterType;
 

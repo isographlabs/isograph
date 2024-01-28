@@ -1359,14 +1359,7 @@ fn get_nested_refetch_query_text(
 fn generate_read_out_type(resolver_definition: &ValidatedSchemaResolver) -> ResolverReadOutType {
     match &resolver_definition.variant {
         variant => match variant {
-            ResolverVariant::Component => {
-                // The read out type of a component is a function that accepts additional
-                // (currently untyped) runtime props, and returns a component.
-                ResolverReadOutType(
-                    "(additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null)"
-                        .to_string(),
-                )
-            }
+            ResolverVariant::Component => ResolverReadOutType("(React.FC<any>)".to_string()),
             ResolverVariant::Eager => ResolverReadOutType("ResolverReturnType".to_string()),
             ResolverVariant::RefetchField => ResolverReadOutType("any".to_string()),
             ResolverVariant::MutationField(_) => ResolverReadOutType("any".to_string()),

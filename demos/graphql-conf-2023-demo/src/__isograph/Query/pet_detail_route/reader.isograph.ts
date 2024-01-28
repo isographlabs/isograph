@@ -6,7 +6,7 @@ import Pet__pet_phrase_card, { ReadOutType as Pet__pet_phrase_card__outputType }
 import Pet__pet_tagline_card, { ReadOutType as Pet__pet_tagline_card__outputType } from '../../Pet/pet_tagline_card/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
+export type ReadOutType = (React.FC<any>);
 
 export type ReadFromStoreType = ResolverParameterType;
 

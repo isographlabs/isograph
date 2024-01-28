@@ -4,7 +4,7 @@ import Pet____set_pet_best_friend, { ReadOutType as Pet____set_pet_best_friend__
 import Pet____set_pet_tagline, { ReadOutType as Pet____set_pet_tagline__outputType } from '../__set_pet_tagline/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = (additionalRuntimeProps: Object | void) => (React.ReactElement<any, any> | null);
+export type ReadOutType = (React.FC<any>);
 
 export type ReadFromStoreType = ResolverParameterType;
 
