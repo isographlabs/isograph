@@ -22,7 +22,7 @@ yarn add @isograph/react@main
 For now, you must install the `@main` versions of the packages.
 :::
 
-Installing the compiler also adds the command `yarn iso` and `yarn iso --watch`. But before this command works, you'll need to set up some folders, download your schema and create an `isograph.config.json` file.
+Installing the compiler also adds the command `yarn iso` and `yarn iso --watch`. But before this command works, you'll need to set up some folders, download your schema and create an `isograph.config.json` file. So, be patient!
 
 ## Install the babel plugin and add a recommended alias
 
@@ -173,15 +173,15 @@ export async function getServerSideProps() {
 ```tsx
 import React from "react";
 import { iso } from "@isograph/react";
-import { ResolverParameterType as EpisodeListParams } from "@iso/Root/episode_list_component/reader.isograph";
+import { ResolverParameterType as EpisodeListParams } from "@iso/Root/EpisodeList/reader.isograph";
 
-export const episode_list_component = iso<
+export const EpisodeList = iso<
   EpisodeListParams,
-  ReturnType<typeof EpisodeList>
+  ReturnType<typeof EpisodeListComponent>
 >`
   # Note: normally, the "root" field is called Query, but in the Star Wars API
   # it is called Root. Odd!
-  Root.episode_list_component @component {
+  Root.EpisodeList @component {
     allFilms {
       films {
         id,
@@ -190,9 +190,9 @@ export const episode_list_component = iso<
       },
     },
   }
-`(EpisodeList);
+`(EpisodeListComponent);
 
-function EpisodeList({ data }: EpisodeListParams) {
+function EpisodeListComponent({ data }: EpisodeListParams) {
   const filmsSorted = data.allFilms?.films ?? [];
   filmsSorted.sort((film1, film2) =>
     film1?.episodeID > film2?.episodeID ? 1 : -1
@@ -221,7 +221,7 @@ That Isograph component isn't doing much on its own. We need to provide a way to
 ```tsx
 import React from "react";
 import { isoFetch, useLazyReference, read } from "@isograph/react";
-import EpisodeListEntrypoint from "@iso/Root/episode_list_component/entrypoint.isograph";
+import EpisodeListEntrypoint from "@iso/Root/EpisodeList/entrypoint.isograph";
 
 export default function EpisodeListRoute() {
   return (
@@ -233,15 +233,15 @@ export default function EpisodeListRoute() {
 
 function Inner() {
   const { queryReference } = useLazyReference(
-    isoFetch<typeof EpisodeListEntrypoint>`Root.episode_list_component`,
+    isoFetch<typeof EpisodeListEntrypoint>`Root.EpisodeList`,
     {
       /* query variables */
     }
   );
 
-  return read(queryReference)({
-    /* additional runtime props */
-  });
+  const Component = read(queryReference);
+  const additionalRenderProps = {};
+  return <Component {...additionalRenderProps} />;
 }
 ```
 
@@ -274,21 +274,21 @@ Next, you might create another Isograph component. For example, if you create a 
 ```tsx
 import React from "react";
 import { iso } from "@isograph/react";
-import { ResolverParameterType as PersonComponentParams } from "@iso/Person/person_component/reader.isograph";
+import { ResolverParameterType as CharacterSummaryParams } from "@iso/Person/CharacterSummary/reader.isograph";
 
-export const person_component = iso<
-  PersonComponentParams,
-  ReturnType<typeof PersonComponent>
+export const CharacterSummary = iso<
+  CharacterSummaryParams,
+  ReturnType<typeof CharacterSummaryComponent>
 >`
-  Person.person_component @component {
+  Person.CharacterSummary @component {
     name,
     homeworld {
       name,
     },
   }
-`(PersonComponent);
+`(CharacterSummaryComponent);
 
-function PersonComponent({ data }: PersonComponentParams) {
+function PersonComponentComponent({ data }: CharacterSummaryParams) {
   return (
     <>
       {data.name}, from the planet {data.homeworld?.name}
@@ -297,20 +297,20 @@ function PersonComponent({ data }: PersonComponentParams) {
 }
 ```
 
-You might use this component by modifying the `episode_list_component` to be the following. Note the two new sections:
+You might use this component by modifying the `episode_list_component` file to be the following. Note the two new sections:
 
 ```tsx
 import React from "react";
 import { iso } from "@isograph/react";
-import { ResolverParameterType as EpisodeListParams } from "@iso/Root/episode_list_component/reader.isograph";
+import { ResolverParameterType as EpisodeListParams } from "@iso/Root/EpisodeList/reader.isograph";
 
-export const episode_list_component = iso<
+export const EpisodeList = iso<
   EpisodeListParams,
-  ReturnType<typeof EpisodeList>
+  ReturnType<typeof EpisodeListComponent>
 >`
   # Note: normally, the "root" field is called Query, but in the Star Wars API
   # it is called Root. Odd!
-  Root.episode_list_component @component {
+  Root.EpisodeList @component {
     allFilms {
       films {
         id,
@@ -320,16 +320,15 @@ export const episode_list_component = iso<
         # THIS IS NEW
         characterConnection {
           characters {
-            person_component,
+            CharacterSummary,
           },
         },
-
       },
     },
   }
-`(EpisodeList);
+`(EpisodeListComponent);
 
-function EpisodeList({ data }: EpisodeListParams) {
+function EpisodeListComponent({ data }: EpisodeListParams) {
   const filmsSorted = data.allFilms?.films ?? [];
   filmsSorted.sort((film1, film2) =>
     film1?.episodeID > film2?.episodeID ? 1 : -1
@@ -339,14 +338,14 @@ function EpisodeList({ data }: EpisodeListParams) {
     <ul>
       {filmsSorted.map((film) => (
         <li>
-          Episode {film.episodeID}: {film.title}.
+          Episode {film.episodeID}: {film.title}
           {/*
            THE FOLLOWING IS NEW
           */}
           <div style={{ marginLeft: 20 }}>
             Featuring
             {film?.characterConnection?.characters?.map((character) => {
-              return character?.person_component({});
+              return <character.CharacterSummary />;
             })}
           </div>
         </li>
