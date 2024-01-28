@@ -25,10 +25,11 @@ pub enum IsographLiteralParseError {
     ExpectedFieldOrEntrypoint,
 
     #[error(
-        "This isograph literal must be exported as `export const {expected_const_export_name}`"
+        "This isograph field literal must be exported as a named export, for example \
+        as `export const {suggested_const_export_name}`"
     )]
     ExpectedLiteralToBeExported {
-        expected_const_export_name: ScalarFieldName,
+        suggested_const_export_name: ScalarFieldName,
     },
 }
 

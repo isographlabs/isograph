@@ -90,6 +90,7 @@ string_key_conversion!(from: LinkedFieldAlias, to: FieldNameOrAlias);
 string_key_conversion!(from: SelectableFieldName, to: FieldNameOrAlias);
 
 string_key_newtype!(ResolverDefinitionPath);
+string_key_newtype!(ConstExportName);
 
 // Operations
 

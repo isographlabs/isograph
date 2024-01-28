@@ -1,8 +1,8 @@
 use std::ops::ControlFlow;
 
 use common_lang_types::{
-    Location, ResolverDefinitionPath, SelectableFieldName, Span, StringKeyNewtype, TextSource,
-    UnvalidatedTypeName, WithLocation, WithSpan,
+    Location, ResolverDefinitionPath, ScalarFieldName, SelectableFieldName, Span, StringKeyNewtype,
+    TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation,
@@ -27,6 +27,7 @@ pub enum IsoLiteralExtractionResult {
 pub fn parse_iso_literal(
     iso_literal_text: &str,
     definition_file_path: ResolverDefinitionPath,
+    const_export_name: Option<&str>,
     text_source: TextSource,
 ) -> Result<WithSpan<IsoLiteralExtractionResult>, WithLocation<IsographLiteralParseError>> {
     let mut tokens = PeekableLexer::new(iso_literal_text);
@@ -41,7 +42,12 @@ pub fn parse_iso_literal(
                     parse_iso_fetch(tokens, text_source)?,
                 )),
                 "field" => Ok(IsoLiteralExtractionResult::ClientFieldDeclaration(
-                    parse_iso_client_field(tokens, definition_file_path, text_source)?,
+                    parse_iso_client_field(
+                        tokens,
+                        definition_file_path,
+                        const_export_name,
+                        text_source,
+                    )?,
                 )),
                 _ => Err(WithLocation::new(
                     IsographLiteralParseError::ExpectedFieldOrEntrypoint,
@@ -89,10 +95,11 @@ fn parse_iso_fetch(
 fn parse_iso_client_field(
     tokens: &mut PeekableLexer<'_>,
     definition_file_path: ResolverDefinitionPath,
+    const_export_name: Option<&str>,
     text_source: TextSource,
 ) -> ParseResultWithLocation<WithSpan<ResolverDeclaration>> {
     let resolver_declaration =
-        parse_resolver_declaration(tokens, definition_file_path, text_source)
+        parse_resolver_declaration(tokens, definition_file_path, const_export_name, text_source)
             .map_err(|with_span| with_span.to_with_location(text_source))?;
 
     if let Some(span) = tokens.remaining_token_span() {
@@ -108,6 +115,7 @@ fn parse_iso_client_field(
 fn parse_resolver_declaration<'a>(
     tokens: &mut PeekableLexer<'a>,
     definition_file_path: ResolverDefinitionPath,
+    const_export_name: Option<&str>,
     text_source: TextSource,
 ) -> ParseResultWithSpan<WithSpan<ResolverDeclaration>> {
     let resolver_declaration = tokens
@@ -121,7 +129,7 @@ fn parse_resolver_declaration<'a>(
                 .parse_token_of_kind(IsographLangTokenKind::Period)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-            let resolver_field_name = tokens
+            let resolver_field_name: WithSpan<ScalarFieldName> = tokens
                 .parse_string_key_type(IsographLangTokenKind::Identifier)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
@@ -131,6 +139,15 @@ fn parse_resolver_declaration<'a>(
 
             let selection_set_and_unwraps =
                 parse_optional_selection_set_and_unwraps(tokens, text_source)?;
+
+            let const_export_name = const_export_name.ok_or_else(|| {
+                WithSpan::new(
+                    IsographLiteralParseError::ExpectedLiteralToBeExported {
+                        suggested_const_export_name: resolver_field_name.item.into(),
+                    },
+                    Span::todo_generated(),
+                )
+            })?;
 
             // --------------------
             // TODO: use directives to:
@@ -145,6 +162,7 @@ fn parse_resolver_declaration<'a>(
                 selection_set_and_unwraps,
                 resolver_definition_path: definition_file_path,
                 directives,
+                const_export_name: const_export_name.intern().into(),
                 variable_definitions,
             })
         })

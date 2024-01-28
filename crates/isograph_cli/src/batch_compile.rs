@@ -5,11 +5,10 @@ use std::{
 
 use colored::Colorize;
 use common_lang_types::{
-    Location, ResolverDefinitionPath, ScalarFieldName, SourceFileName, Span, TextSource,
-    WithLocation, WithSpan,
+    Location, ResolverDefinitionPath, SourceFileName, Span, TextSource, WithLocation, WithSpan,
 };
 use graphql_schema_parser::{parse_schema, parse_schema_extensions, SchemaParseError};
-use intern::{string_key::Intern, Lookup};
+use intern::string_key::Intern;
 use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
 };
@@ -293,39 +292,26 @@ fn process_iso_literal_extraction(
     let mut errors = vec![];
 
     // TODO return errors if any occurred, otherwise Ok
-    match parse_iso_literal(&iso_literal_text, interned_file_path, text_source) {
+    match parse_iso_literal(
+        &iso_literal_text,
+        interned_file_path,
+        const_export_name,
+        text_source,
+    ) {
         Ok(res) => {
             let extraction_result = res.item;
-            if let IsoLiteralExtractionResult::ClientFieldDeclaration(resolver_declaration) =
+            if let IsoLiteralExtractionResult::ClientFieldDeclaration(_resolver_declaration) =
                 &extraction_result
             {
-                let exists_and_matches = const_export_name_exists_and_matches(
-                    const_export_name,
-                    resolver_declaration.item.resolver_field_name.item,
-                );
                 if !has_associated_js_function {
                     errors.push(WithLocation::new(
                         IsographLiteralParseError::ExpectedAssociatedJsFunction,
                         Location::new(text_source, Span::todo_generated()),
                     ));
                 }
-                if exists_and_matches {
-                    if errors.is_empty() {
-                        Ok((extraction_result, text_source))
-                    } else {
-                        Err(errors)
-                    }
+                if errors.is_empty() {
+                    Ok((extraction_result, text_source))
                 } else {
-                    errors.push(WithLocation::new(
-                        IsographLiteralParseError::ExpectedLiteralToBeExported {
-                            expected_const_export_name: resolver_declaration
-                                .item
-                                .resolver_field_name
-                                .item,
-                        },
-                        // TODO why does resolver_declaration.span cause a panic here?
-                        Location::new(text_source, Span::todo_generated()),
-                    ));
                     Err(errors)
                 }
             } else {
@@ -336,16 +322,6 @@ fn process_iso_literal_extraction(
             errors.push(e);
             Err(errors)
         }
-    }
-}
-
-fn const_export_name_exists_and_matches(
-    const_export_name: Option<&str>,
-    resolver_name: ScalarFieldName,
-) -> bool {
-    match const_export_name {
-        Some(const_export_name) => const_export_name == resolver_name.lookup(),
-        None => false,
     }
 }
 

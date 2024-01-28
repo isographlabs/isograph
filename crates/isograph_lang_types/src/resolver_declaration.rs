@@ -1,9 +1,10 @@
 use std::fmt;
 
 use common_lang_types::{
-    DescriptionValue, FieldArgumentName, FieldNameOrAlias, HasName, IsographDirectiveName,
-    LinkedFieldAlias, LinkedFieldName, ResolverDefinitionPath, ScalarFieldAlias, ScalarFieldName,
-    SelectableFieldName, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
+    ConstExportName, DescriptionValue, FieldArgumentName, FieldNameOrAlias, HasName,
+    IsographDirectiveName, LinkedFieldAlias, LinkedFieldName, ResolverDefinitionPath,
+    ScalarFieldAlias, ScalarFieldName, SelectableFieldName, UnvalidatedTypeName, VariableName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::TypeAnnotation;
 
@@ -21,6 +22,7 @@ pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct ResolverDeclaration {
     pub description: Option<WithSpan<DescriptionValue>>,
+    pub const_export_name: ConstExportName,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub resolver_field_name: WithSpan<ScalarFieldName>,
     pub selection_set_and_unwraps:

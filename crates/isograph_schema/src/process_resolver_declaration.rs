@@ -86,7 +86,7 @@ impl UnvalidatedSchema {
         let name = resolver_declaration.item.resolver_field_name.item.into();
         let variant = get_resolver_variant(&resolver_declaration.item.directives);
         let resolver_action_kind = ResolverActionKind::NamedImport((
-            resolver_field_name.into(),
+            resolver_declaration.item.const_export_name,
             resolver_declaration.item.resolver_definition_path,
         ));
 
