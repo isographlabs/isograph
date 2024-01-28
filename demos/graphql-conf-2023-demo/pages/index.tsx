@@ -31,13 +31,15 @@ setMissingFieldHandler(
     arguments_: { [index: string]: any } | null,
     variables: { [index: string]: any } | null
   ): Link | undefined => {
-    console.log("Missing field handler called", {
-      storeRecord,
-      root,
-      fieldName,
-      arguments_,
-      variables,
-    });
+    if (typeof window !== "undefined" && window.__LOG) {
+      console.log("Missing field handler called", {
+        storeRecord,
+        root,
+        fieldName,
+        arguments_,
+        variables,
+      });
+    }
     const val = defaultMissingFieldHandler(
       storeRecord,
       root,

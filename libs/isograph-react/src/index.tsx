@@ -282,7 +282,9 @@ export function readButDoNotEvaluate<TReadFromStore extends Object>(
     reference.variables ?? {},
     reference.nestedRefetchQueries
   );
-  console.log("done reading but not evaluating", { response });
+  if (typeof window !== "undefined" && window.__LOG) {
+    console.log("done reading but not evaluating", { response });
+  }
   if (response.kind === "MissingData") {
     throw onNextChange();
   } else {
@@ -433,7 +435,9 @@ function readData<TReadFromStore>(
           // Refetch fields just read the id, and don't need refetch query artifacts
           []
         );
-        console.log("refetch field data", data, field);
+        if (typeof window !== "undefined" && window.__LOG) {
+          console.log("refetch field data", data, field);
+        }
         if (data.kind === "MissingData") {
           return {
             kind: "MissingData",
@@ -469,7 +473,9 @@ function readData<TReadFromStore>(
           // Refetch fields just read the id, and don't need refetch query artifacts
           []
         );
-        console.log("refetch field data", data, field);
+        if (typeof window !== "undefined" && window.__LOG) {
+          console.log("refetch field data", data, field);
+        }
         if (data.kind === "MissingData") {
           return {
             kind: "MissingData",

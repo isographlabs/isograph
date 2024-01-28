@@ -14,4 +14,4 @@ The workflow for developers is as follows:
 ## Debugging
 
 - You can use React dev tools. In particular, searching for `@component` will show you where all of your resolvers defined with `@component` are rendered.
-- Isograph also logs a bunch of stuff to the console (for now!)
+- Isograph also logs a bunch of stuff to the console if you set `window.__LOG = true`.

@@ -14,17 +14,25 @@ import {
   RefetchQueryArtifactWrapper,
 } from "./index";
 
+declare global {
+  interface Window {
+    __LOG: boolean;
+  }
+}
+
 const cache: { [index: string]: ParentCache<any> } = {};
 
 function getOrCreateCache<T>(
   index: string,
   factory: Factory<T>
 ): ParentCache<T> {
-  console.log("getting cache for", {
-    index,
-    cache: Object.keys(cache),
-    found: !!cache[index],
-  });
+  if (typeof window !== "undefined" && window.__LOG) {
+    console.log("getting cache for", {
+      index,
+      cache: Object.keys(cache),
+      found: !!cache[index],
+    });
+  }
   if (cache[index] == null) {
     cache[index] = new ParentCache(factory);
   }
@@ -77,14 +85,18 @@ export function makeNetworkRequest<T>(
   artifact: IsoResolver,
   variables: object
 ): ItemCleanupPair<PromiseWrapper<T>> {
-  console.log("make network request", artifact, variables);
+  if (typeof window !== "undefined" && window.__LOG) {
+    console.log("make network request", artifact, variables);
+  }
   if (network == null) {
     throw new Error("Network must be set before makeNetworkRequest is called");
   }
 
   const promise = network(artifact.queryText, variables).then(
     (networkResponse) => {
-      console.log("network response", artifact);
+      if (typeof window !== "undefined" && window.__LOG) {
+        console.log("network response", artifact);
+      }
       normalizeData(
         artifact.normalizationAst,
         networkResponse.data,
@@ -160,12 +172,14 @@ function normalizeData(
   variables: Object,
   nestedRefetchQueries: RefetchQueryArtifactWrapper[]
 ) {
-  console.log(
-    "about to normalize",
-    normalizationAst,
-    networkResponse,
-    variables
-  );
+  if (typeof window !== "undefined" && window.__LOG) {
+    console.log(
+      "about to normalize",
+      normalizationAst,
+      networkResponse,
+      variables
+    );
+  }
   normalizeDataIntoRecord(
     normalizationAst,
     networkResponse,
@@ -174,7 +188,9 @@ function normalizeData(
     variables as any,
     nestedRefetchQueries
   );
-  console.log("after normalization", { store });
+  if (typeof window !== "undefined" && window.__LOG) {
+    console.log("after normalization", { store });
+  }
   callSubscriptions();
 }
 
