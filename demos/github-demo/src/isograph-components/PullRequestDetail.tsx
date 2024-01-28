@@ -34,7 +34,7 @@ function PullRequestDetailComponent(props: PullRequestDetailsProps) {
 
   return (
     <>
-      <RepoLink filePath="demos/github-demo/src/isograph-components/pull_request_detail.tsx">
+      <RepoLink filePath="demos/github-demo/src/isograph-components/PullRequestDetail.tsx">
         Pull Request Detail Component
       </RepoLink>
 

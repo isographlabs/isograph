@@ -28,7 +28,7 @@ function HomePageComponent({ data, route, setRoute }: HomePageComponentParams) {
     <>
       <data.Header route={route} setRoute={setRoute} />
       <Container maxWidth="md">
-        <RepoLink filePath="demos/github-demo/src/isograph-components/home.tsx">
+        <RepoLink filePath="demos/github-demo/src/isograph-components/HomeRoute.tsx">
           Home Page Route
         </RepoLink>
         <React.Suspense fallback={<FullPageLoading />}>
