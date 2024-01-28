@@ -6,12 +6,11 @@ import {
   ROOT_ID,
   getOrCreateCacheForArtifact,
   onNextChange,
-  store,
+  getStore,
   getParentRecordKey,
 } from "./cache";
 import { useLazyDisposableState } from "@isograph/react-disposable-state";
 import { type PromiseWrapper } from "./PromiseWrapper";
-import React from "react";
 import { getOrCreateCachedComponent } from "./componentCache";
 
 export {
@@ -302,7 +301,7 @@ function readData<TReadFromStore>(
   variables: { [index: string]: string },
   nestedRefetchQueries: RefetchQueryArtifactWrapper[]
 ): ReadDataResult<TReadFromStore> {
-  let storeRecord = store[root];
+  let storeRecord = getStore()[root];
   if (storeRecord === undefined) {
     return { kind: "MissingData", reason: "No record for root " + root };
   }

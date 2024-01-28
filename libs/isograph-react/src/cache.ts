@@ -145,12 +145,15 @@ export type StoreRecord = {
 export type DataId = string;
 
 export const ROOT_ID: DataId & "__ROOT" = "__ROOT";
-export const store: {
+const store: {
   [index: DataId]: StoreRecord | null;
   __ROOT: StoreRecord;
 } = {
   __ROOT: {},
 };
+export function getStore() {
+  return store;
+}
 
 type NetworkResponseScalarValue = string | number | boolean;
 type NetworkResponseValue =
