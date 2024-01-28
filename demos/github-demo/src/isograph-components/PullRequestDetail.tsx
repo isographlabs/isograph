@@ -47,10 +47,7 @@ function PullRequestDetailComponent(props: PullRequestDetailsProps) {
       </Card>
 
       <h2>Comments</h2>
-      {pullRequest.comment_list({
-        route: props.route,
-        setRoute: props.setRoute,
-      })}
+      <pullRequest.CommentList route={props.route} setRoute={props.setRoute} />
     </>
   );
 }

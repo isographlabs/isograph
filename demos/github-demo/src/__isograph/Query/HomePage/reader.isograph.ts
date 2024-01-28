@@ -1,5 +1,5 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { HomePage as resolver } from '../../../isograph-components/home_page.tsx';
+import { HomePage as resolver } from '../../../isograph-components/HomeRoute.tsx';
 import Query__Header, { ReadOutType as Query__Header__outputType } from '../Header/reader.isograph';
 import Query__HomePageList, { ReadOutType as Query__HomePageList__outputType } from '../HomePageList/reader.isograph';
 

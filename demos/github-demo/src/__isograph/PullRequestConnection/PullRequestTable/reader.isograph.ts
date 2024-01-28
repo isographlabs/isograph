@@ -1,8 +1,8 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { PullRequestTable as resolver } from '../../../isograph-components/pull_request_table.tsx';
+import { PullRequestTable as resolver } from '../../../isograph-components/PullRequestTable.tsx';
 import Actor__UserLink, { ReadOutType as Actor__UserLink__outputType } from '../../Actor/UserLink/reader.isograph';
 import PullRequest__PullRequestLink, { ReadOutType as PullRequest__PullRequestLink__outputType } from '../../PullRequest/PullRequestLink/reader.isograph';
-import PullRequest__created_at_formatted, { ReadOutType as PullRequest__created_at_formatted__outputType } from '../../PullRequest/created_at_formatted/reader.isograph';
+import PullRequest__createdAtFormatted, { ReadOutType as PullRequest__createdAtFormatted__outputType } from '../../PullRequest/createdAtFormatted/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
@@ -82,9 +82,9 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
           },
           {
             kind: "Resolver",
-            alias: "created_at_formatted",
+            alias: "createdAtFormatted",
             arguments: null,
-            readerArtifact: PullRequest__created_at_formatted,
+            readerArtifact: PullRequest__createdAtFormatted,
             usedRefetchQueries: [],
           },
         ],
@@ -107,7 +107,7 @@ export type ResolverParameterType = { data:
       } | null),
       closed: boolean,
       totalCommentsCount: (number | null),
-      created_at_formatted: PullRequest__created_at_formatted__outputType,
+      createdAtFormatted: PullRequest__createdAtFormatted__outputType,
     } | null),
   } | null))[],
 },

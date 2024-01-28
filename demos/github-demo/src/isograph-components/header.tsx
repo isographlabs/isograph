@@ -4,7 +4,7 @@ import { ResolverParameterType as HeaderProps } from "@iso/Query/Header/reader.i
 
 import { AppBar, Button, Grid, Container } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { Route } from "./github_demo";
+import { Route } from "./GithubDemo";
 
 import logo from "./svgs/dark-logo.svg";
 
@@ -33,7 +33,7 @@ function HeaderComponent(props: HeaderProps) {
             </Grid>
             <Grid item xs={6}>
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                {props.data.viewer.avatar({})}
+                <props.data.viewer.Avatar />
               </div>
             </Grid>
           </Grid>

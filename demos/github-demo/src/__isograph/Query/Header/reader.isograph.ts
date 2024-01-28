@@ -1,5 +1,5 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Header as resolver } from '../../../isograph-components/header.tsx';
+import { Header as resolver } from '../../../isograph-components/Header.tsx';
 import User__Avatar, { ReadOutType as User__Avatar__outputType } from '../../User/Avatar/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)

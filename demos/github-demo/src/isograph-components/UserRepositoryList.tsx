@@ -58,7 +58,7 @@ function UserRepositoryListComponent(props: UserRepositoryListParams) {
           return (
             <TableRow key={node.id}>
               <TableCell>
-                <node.repository_link
+                <node.RepositoryLink
                   setRoute={props.setRoute}
                   children={node.nameWithOwner}
                 />

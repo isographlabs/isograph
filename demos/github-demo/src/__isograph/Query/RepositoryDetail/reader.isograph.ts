@@ -1,5 +1,5 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { RepositoryDetail as resolver } from '../../../isograph-components/repository_detail.tsx';
+import { RepositoryDetail as resolver } from '../../../isograph-components/RepositoryDetail.tsx';
 import PullRequestConnection__PullRequestTable, { ReadOutType as PullRequestConnection__PullRequestTable__outputType } from '../../PullRequestConnection/PullRequestTable/reader.isograph';
 import Repository__RepositoryLink, { ReadOutType as Repository__RepositoryLink__outputType } from '../../Repository/RepositoryLink/reader.isograph';
 

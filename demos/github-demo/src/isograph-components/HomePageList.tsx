@@ -27,7 +27,7 @@ function HomePageListComponent(props: HomePageListParams) {
       <Button onClick={() => props.data.viewer.__refetch()} variant="contained">
         Refetch viewer
       </Button>
-      {props.data.viewer.repository_list({ setRoute: props.setRoute })}
+      <props.data.viewer.RepositoryList setRoute={props.setRoute} />
     </>
   );
 }

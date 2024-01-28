@@ -1,6 +1,6 @@
 import Head from "next/head";
 
-import { GithubDemo } from "@/isograph-components/github_demo";
+import { GithubDemo } from "@/isograph-components/GithubDemo";
 import { clearStore, setNetwork } from "@isograph/react";
 
 function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {

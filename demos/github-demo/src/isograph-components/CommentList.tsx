@@ -3,12 +3,12 @@ import React from "react";
 import { iso } from "@isograph/react";
 
 import { ResolverParameterType as CommentListProps } from "@iso/PullRequest/CommentList/reader.isograph";
-import { ResolverParameterType as IssueCommentProps } from "@iso/IssueComment/formatted_comment_creation_date/reader.isograph";
+import { ResolverParameterType as IssueCommentProps } from "@iso/IssueComment/formattedCommentCreationDate/reader.isograph";
 
 import { Card, CardContent } from "@mui/material";
 
-export const formatted_comment_creation_date = iso<IssueCommentProps, string>`
-  IssueComment.formatted_comment_creation_date @eager {
+export const formattedCommentCreationDate = iso<IssueCommentProps, string>`
+  IssueComment.formattedCommentCreationDate {
     createdAt,
   }
 `((props) => {
@@ -30,7 +30,7 @@ export const CommentList = iso<
         node {
           id,
           bodyText,
-          formatted_comment_creation_date,
+          formattedCommentCreationDate,
           author {
             login,
           },
@@ -55,7 +55,7 @@ function CommentListComponent(props: CommentListProps) {
           <p>
             <small>
               {comment.author?.login} commented on{" "}
-              {comment.formatted_comment_creation_date}
+              {comment.formattedCommentCreationDate}
             </small>
           </p>
         </CardContent>

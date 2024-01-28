@@ -110,7 +110,7 @@ export const HomePage = iso<
   # React @component
   Query.HomePage @component {
     # Step 4: Select whatever fields you'll need, including
-    # other client-defined fields like avatar_component.
+    # other client-defined fields like Avatar.
     viewer {
       first_name,
       last_name,
@@ -206,7 +206,7 @@ export default function HomepageFeatures() {
           </div>
           <div className="col col--8 margin-bottom--xl col--offset-2">
             <Tabs>
-              <TabItem value="home_page" label="HomePageRoute.tsx">
+              <TabItem value="HomePageRoute" label="HomePageRoute.tsx">
                 <p>
                   <code>HomePageRoute</code> is a regular ol' React component.
                   It makes a network request for the data needed by all the
@@ -217,10 +217,7 @@ export default function HomepageFeatures() {
                   {CodeBlocks.home_page.trim()}
                 </CodeBlock>
               </TabItem>
-              <TabItem
-                value="home_page_component"
-                label="home_page_component.tsx"
-              >
+              <TabItem value="HomePage" label="HomePage.tsx">
                 <p>
                   <code>Query.HomePage</code> is an Isograph client-defined
                   field. The function HomePageComponent will be called with the
@@ -236,7 +233,7 @@ export default function HomepageFeatures() {
                   {CodeBlocks.home_page_component.trim()}
                 </CodeBlock>
               </TabItem>
-              <TabItem value="avatar_component" label="avatar_component.tsx">
+              <TabItem value="Avatar" label="Avatar.tsx">
                 <p>
                   The code for this <code>User.Avatar</code> client-defined
                   field should be pretty familiar. The only thing to note is

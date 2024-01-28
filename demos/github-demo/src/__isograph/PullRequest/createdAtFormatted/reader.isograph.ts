@@ -1,5 +1,5 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { created_at_formatted as resolver } from '../../../isograph-components/pull_request_table.tsx';
+import { createdAtFormatted as resolver } from '../../../isograph-components/PullRequestTable.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = ResolverReturnType;
