@@ -17,6 +17,7 @@ const sidebars: SidebarsConfig = {
     "workflow",
     "isograph-config",
     "faq",
+    "refetching",
     "magic-mutation-fields",
     {
       type: "category",

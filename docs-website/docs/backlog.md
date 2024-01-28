@@ -8,6 +8,7 @@
 
 ## V2 release
 
+- network request handling
 - components and "realized" resolvers, as well as ways to invalidate them
   - they could also be lazily calculated
   - may require garbage collection
@@ -23,6 +24,7 @@
 
 - garbage collection
 - granular re-rendering
+  - Refetch on missing data
 - fetch policies
 - Unwraps (i.e. `!`) exist in the syntax, but are unused
   - consider whether it is truly the case that there always is a linear way to unwrap a given field, or whether we should unify this with "execute this on the server" etc.
@@ -50,6 +52,8 @@
 - Remove the requirement that arguments and parameters have a terminal comma.
 - IsographSchemaObject, etc. should not contain name: `WithLocation<...>`, but instead, be stored `WithLocation T`, and WithLocation should **not** have a span.
 - There should be a cleaner separation between GraphQL and Isograph. In particular, we should load the GraphQL schema, but turn it into Isograph concepts, and only deal with Isograph concepts.
+- CLI should be separate crate than batch-compile; so should watch mode utils, so as to increase the speed of iteration if the dev is running builds.
+- CLI command to create missing directories (e.g. project_root).
 
 ## Known bugs
 
@@ -68,7 +72,7 @@
 - Preloaded queries
 - Fetch/cache policies
 - Granular re-renders
-- Traditional refetch fields
+- Ability to select fewer or extra fields on mutation and refetch fields
 - Defer/stream
 - Subscriptions
 - Interfaces/unions
@@ -76,7 +80,6 @@
   - Directives on isoFetch
 - Field unwrapping syntax
 - Pagination
-- Refetch on missing data
 - Compile to non-GraphQL
 - Actually validate variables
 - Persisted queries
@@ -89,7 +92,7 @@
 - Lazy normalization ASTs
 - Fetching off of typed IDs
 - Stateful resolvers
-- Compiler executable for ~Mac~/Windows/Linux
+- Compiler executable for ~Mac~/Windows/~Linux~
 - Unit tests
 - E2E tests
 - Network request errors
@@ -117,6 +120,7 @@
 - Object literals as variables
 - Server support for JSResource
 - Injectable code for @component
+  - Structure the compiler such that the injectable code can live in the React-specific CLI layer
 - Isograph dev tools
 - Experiment with context and JSX for @component
 - Vue/Svelte/etc. integration
@@ -133,9 +137,12 @@
 - Parallelize artifact gen
 - Rationalize WithSpan vs WithLocation
 - Display multiple errors, parse etc. in parallel
-  - Multiple errors when parsing the schema (is this possible??)
 - Do not look in artifact_directory, if project_root contains artifact_directory
 - Do not require that the exported name of an iso is anything in particular.
   - Can we make the transform add an export if none is found?? Probably!
 - SWC plugin
 - plugin options to point to config
+- Namespaces and components installable from external libraries
+- npx way to install Isograph in an existing library
+- periodic refetch (live queries)
+- router example and integration

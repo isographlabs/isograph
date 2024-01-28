@@ -6,6 +6,8 @@ In this quickstart guide, we will add Isograph to an existing NextJS project. We
 This is the process for adding Isograph to an existing **NextJS project**. However, it shouldn't be that different to add it to a project in another framework.
 
 If you don't have a NextJS project handy, you can follow the instructions [here](https://nextjs.org/docs/getting-started/installation) and proceed with this quickstart!
+
+This currently requires NextJS to be run with Babel and for React to be run in React strict mode.
 :::
 
 ## Install the compiler, babel plugin and runtime
@@ -20,7 +22,7 @@ yarn add @isograph/react@main
 For now, you must install the `@main` versions of the packages.
 :::
 
-Installing the compiler also adds the command `yarn iso`.
+Installing the compiler also adds the command `yarn iso` and `yarn iso --watch`. But before this command works, you'll need to set up some folders, download your schema and create an `isograph.config.json` file.
 
 ## Install the babel plugin and add a recommended alias
 
@@ -64,7 +66,7 @@ Create an `isograph.config.json` file. Example contents:
 }
 ```
 
-Then, create the `src/components` directory:
+Then, create the `project_root` directory, e.g.:
 
 ```sh
 mkdir -p src/components
@@ -195,6 +197,10 @@ function EpisodeList({ data }: EpisodeListParams) {
   );
 }
 ```
+
+:::note
+That's a lot of types! Soon, it won't be necessary to provide them.
+:::
 
 ## Fetch that Isograph component:
 

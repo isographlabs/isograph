@@ -79,7 +79,7 @@ export const pet_tagline_input = iso<
 `(PetTaglineInput);
 ```
 
-When read out, the field is a function that when called, makes a network request for the mutation. (Also, in the future, you will be able to do things like get the status of the mutation, suspend on it, etc. For now, it just triggers a mutation in the background.)
+When read out, the field is a function that when called will make a network request for the mutation. (Also, in the future, you will be able to do things like get the status of the mutation, suspend on it, etc. For now, it just triggers a mutation in the background.)
 
 You might use it as follows:
 
@@ -95,16 +95,13 @@ function PetUpdater(props: PetUpdaterParams) {
       <Input
         value={tagline}
         onChange={(e) => setTagline(e.target.value)}
-        color="primary"
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             updateTagline();
           }
         }}
       />
-      <Button variant="contained" onClick={updateTagline}>
-        Set tagline
-      </Button>
+      <Button onClick={updateTagline}>Set tagline</Button>
     </>
   );
 }
