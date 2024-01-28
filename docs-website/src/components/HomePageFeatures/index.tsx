@@ -74,7 +74,7 @@ import {
 
 export function HomePageRoute() {
   // Step 1: Make a network request (during render) for the
-  // Query.home_page_component client-defined field.
+  // Query.HomePage client-defined field.
   const { queryReference } = useLazyReference(
     // Note that calling isoFetch here **generates** a query
     // at compile time!
@@ -83,7 +83,7 @@ export function HomePageRoute() {
   );
   
   // Step 2: Attempt to read the query reference. This will
-  // return the value of the Query.home_page_component field
+  // return the value of the Query.HomePage field
   // when the network request is complete.
   const HomePage = read(queryReference);
 
