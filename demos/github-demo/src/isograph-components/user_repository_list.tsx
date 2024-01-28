@@ -1,5 +1,5 @@
 import { iso } from "@isograph/react";
-import type { ResolverParameterType as UserRepositoryListParams } from "@iso/User/repository_list/reader.isograph";
+import type { ResolverParameterType as UserRepositoryListParams } from "@iso/User/RepositoryList/reader.isograph";
 
 import {
   Table,
@@ -9,16 +9,16 @@ import {
   TableRow,
 } from "@mui/material";
 
-export const repository_list = iso<
+export const RepositoryList = iso<
   UserRepositoryListParams,
-  ReturnType<typeof UserRepositoryList>
+  ReturnType<typeof UserRepositoryListComponent>
 >`
-  User.repository_list @component {
+  User.RepositoryList @component {
     repositories(last: $first) {
       edges {
         node {
           id,
-          repository_link,
+          RepositoryLink,
           name,
           nameWithOwner,
           description,
@@ -34,9 +34,9 @@ export const repository_list = iso<
       },
     },
   }
-`(UserRepositoryList);
+`(UserRepositoryListComponent);
 
-function UserRepositoryList(props: UserRepositoryListParams) {
+function UserRepositoryListComponent(props: UserRepositoryListParams) {
   const repositories = [...props.data.repositories.edges].reverse();
   return (
     <Table>
@@ -58,10 +58,10 @@ function UserRepositoryList(props: UserRepositoryListParams) {
           return (
             <TableRow key={node.id}>
               <TableCell>
-                {node.repository_link({
-                  setRoute: props.setRoute,
-                  children: node.nameWithOwner,
-                })}
+                <node.repository_link
+                  setRoute={props.setRoute}
+                  children={node.nameWithOwner}
+                />
               </TableCell>
               <TableCell>{node.stargazerCount}</TableCell>
               <TableCell>{node.forkCount}</TableCell>

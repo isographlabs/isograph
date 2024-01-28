@@ -5,11 +5,11 @@ import { ResolverParameterType as PullRequestProps } from "@iso/PullRequest/pull
 
 import { Link } from "@mui/material";
 
-export const pull_request_link = iso<
+export const PullRequestLink = iso<
   PullRequestProps,
-  ReturnType<typeof PullRequestLink>
+  ReturnType<typeof PullRequestLinkComponent>
 >`
-  PullRequest.pull_request_link @component {
+  PullRequest.PullRequestLink @component {
     number,
     repository {
       name,
@@ -18,9 +18,9 @@ export const pull_request_link = iso<
       },
     },
   }
-`(PullRequestLink);
+`(PullRequestLinkComponent);
 
-function PullRequestLink(props: PullRequestProps) {
+function PullRequestLinkComponent(props: PullRequestProps) {
   return (
     <Link
       onClick={() =>

@@ -1,5 +1,5 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Avatar as resolver } from '../../../isograph-components/avatar.tsx';
+import { UserLink as resolver } from '../../../isograph-components/user_link.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
@@ -9,13 +9,7 @@ export type ReadFromStoreType = ResolverParameterType;
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Scalar",
-    fieldName: "name",
-    alias: null,
-    arguments: null,
-  },
-  {
-    kind: "Scalar",
-    fieldName: "avatarUrl",
+    fieldName: "login",
     alias: null,
     arguments: null,
   },
@@ -23,8 +17,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 
 export type ResolverParameterType = { data:
 {
-  name: (string | null),
-  avatarUrl: string,
+  login: string,
 },
 [index: string]: any };
 
@@ -35,7 +28,7 @@ const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOut
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
-  variant: { kind: "Component", componentName: "User.Avatar" },
+  variant: { kind: "Component", componentName: "Actor.UserLink" },
 };
 
 export default artifact;

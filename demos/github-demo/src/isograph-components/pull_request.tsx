@@ -6,31 +6,31 @@ import {
   Route,
 } from "./github_demo";
 
-import { ResolverParameterType as PullRequestComponentProps } from "@iso/Query/pull_request/reader.isograph";
+import { ResolverParameterType as PullRequestComponentProps } from "@iso/Query/PullRequest/reader.isograph";
 
 import { Container } from "@mui/material";
 
-export const pull_request = iso<
+export const PullRequest = iso<
   PullRequestComponentProps,
-  ReturnType<typeof PullRequestComponent>
+  ReturnType<typeof PullRequestComponentComponent>
 >`
-  Query.pull_request($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!) @component {
-    header,
-    pull_request_detail,
+  Query.PullRequest($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!) @component {
+    Header,
+    PullRequestDetail,
   }
-`(PullRequestComponent);
+`(PullRequestComponentComponent);
 
-function PullRequestComponent({
+function PullRequestComponentComponent({
   data,
   route,
   setRoute,
 }: PullRequestComponentProps) {
   return (
     <>
-      {data.header({ route, setRoute })}
+      <data.Header route={route} setRoute={setRoute} />
       <Container maxWidth="md">
         <React.Suspense fallback={<FullPageLoading />}>
-          {data.pull_request_detail({ route, setRoute })}
+          <data.PullRequestDetail route={route} setRoute={setRoute} />
         </React.Suspense>
       </Container>
     </>
@@ -44,7 +44,7 @@ export function PullRequestRoute({
   route: PullRequestRouteType;
   setRoute: (route: Route) => void;
 }) {
-  const { queryReference } = useLazyReference(isoFetch`Query.pull_request`, {
+  const { queryReference } = useLazyReference(isoFetch`Query.PullRequest `, {
     pullRequestNumber: route.pullRequestNumber,
     repositoryName: route.repositoryName,
     repositoryOwner: route.repositoryOwner,

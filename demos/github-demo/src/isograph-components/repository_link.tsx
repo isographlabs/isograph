@@ -1,23 +1,23 @@
 import { iso } from "@isograph/react";
 
-import type { ResolverParameterType as RepositoryLinkParams } from "@iso/Repository/repository_link/reader.isograph";
+import type { ResolverParameterType as RepositoryLinkParams } from "@iso/Repository/RepositoryLink/reader.isograph";
 
 import { Link } from "@mui/material";
 
-export const repository_link = iso<
+export const RepositoryLink = iso<
   RepositoryLinkParams,
-  ReturnType<typeof RepositoryLink>
+  ReturnType<typeof RepositoryLinkComponent>
 >`
-  Repository.repository_link @component {
+  Repository.RepositoryLink @component {
     id,
     name,
     owner {
       login,
     },
   }
-`(RepositoryLink);
+`(RepositoryLinkComponent);
 
-function RepositoryLink(props: RepositoryLinkParams) {
+function RepositoryLinkComponent(props: RepositoryLinkParams) {
   return (
     <Link
       onClick={() =>

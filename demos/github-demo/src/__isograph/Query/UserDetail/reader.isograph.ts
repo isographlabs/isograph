@@ -1,6 +1,6 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Header as resolver } from '../../../isograph-components/header.tsx';
-import User__Avatar, { ReadOutType as User__Avatar__outputType } from '../../User/Avatar/reader.isograph';
+import { UserDetail as resolver } from '../../../isograph-components/user_detail.tsx';
+import User__RepositoryList, { ReadOutType as User__RepositoryList__outputType } from '../../User/RepositoryList/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
@@ -10,9 +10,14 @@ export type ReadFromStoreType = ResolverParameterType;
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Linked",
-    fieldName: "viewer",
+    fieldName: "user",
     alias: null,
-    arguments: null,
+    arguments: [
+      {
+        argumentName: "login",
+        variableName: "userLogin",
+      },
+    ],
     selections: [
       {
         kind: "Scalar",
@@ -22,9 +27,9 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
       },
       {
         kind: "Resolver",
-        alias: "Avatar",
+        alias: "RepositoryList",
         arguments: null,
-        readerArtifact: User__Avatar,
+        readerArtifact: User__RepositoryList,
         usedRefetchQueries: [],
       },
     ],
@@ -33,10 +38,10 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 
 export type ResolverParameterType = { data:
 {
-  viewer: {
+  user: ({
     name: (string | null),
-    Avatar: User__Avatar__outputType,
-  },
+    RepositoryList: User__RepositoryList__outputType,
+  } | null),
 },
 [index: string]: any };
 
@@ -47,7 +52,7 @@ const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOut
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
-  variant: { kind: "Component", componentName: "Query.Header" },
+  variant: { kind: "Component", componentName: "Query.UserDetail" },
 };
 
 export default artifact;

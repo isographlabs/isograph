@@ -2,7 +2,7 @@ import React from "react";
 
 import { iso } from "@isograph/react";
 
-import { ResolverParameterType as CommentListProps } from "@iso/PullRequest/comment_list/reader.isograph";
+import { ResolverParameterType as CommentListProps } from "@iso/PullRequest/CommentList/reader.isograph";
 import { ResolverParameterType as IssueCommentProps } from "@iso/IssueComment/formatted_comment_creation_date/reader.isograph";
 
 import { Card, CardContent } from "@mui/material";
@@ -20,11 +20,11 @@ export const formatted_comment_creation_date = iso<IssueCommentProps, string>`
   });
 });
 
-export const comment_list = iso<
+export const CommentList = iso<
   CommentListProps,
-  ReturnType<typeof CommentList>
+  ReturnType<typeof CommentListComponent>
 >`
-  PullRequest.comment_list @component {
+  PullRequest.CommentList @component {
     comments(last: $last,) {
       edges {
         node {
@@ -38,9 +38,9 @@ export const comment_list = iso<
       },
     },
   }
-`(CommentList);
+`(CommentListComponent);
 
-function CommentList(props: CommentListProps) {
+function CommentListComponent(props: CommentListProps) {
   const comments = [...props.data.comments.edges].reverse();
 
   return comments.map((commentNode) => {

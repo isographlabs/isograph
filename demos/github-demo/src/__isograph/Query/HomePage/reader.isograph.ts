@@ -1,5 +1,7 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Avatar as resolver } from '../../../isograph-components/avatar.tsx';
+import { HomePage as resolver } from '../../../isograph-components/home_page.tsx';
+import Query__Header, { ReadOutType as Query__Header__outputType } from '../Header/reader.isograph';
+import Query__HomePageList, { ReadOutType as Query__HomePageList__outputType } from '../HomePageList/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
@@ -8,23 +10,25 @@ export type ReadFromStoreType = ResolverParameterType;
 
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
-    kind: "Scalar",
-    fieldName: "name",
-    alias: null,
+    kind: "Resolver",
+    alias: "Header",
     arguments: null,
+    readerArtifact: Query__Header,
+    usedRefetchQueries: [],
   },
   {
-    kind: "Scalar",
-    fieldName: "avatarUrl",
-    alias: null,
+    kind: "Resolver",
+    alias: "HomePageList",
     arguments: null,
+    readerArtifact: Query__HomePageList,
+    usedRefetchQueries: [0, ],
   },
 ];
 
 export type ResolverParameterType = { data:
 {
-  name: (string | null),
-  avatarUrl: string,
+  Header: Query__Header__outputType,
+  HomePageList: Query__HomePageList__outputType,
 },
 [index: string]: any };
 
@@ -35,7 +39,7 @@ const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOut
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
-  variant: { kind: "Component", componentName: "User.Avatar" },
+  variant: { kind: "Component", componentName: "Query.HomePage" },
 };
 
 export default artifact;

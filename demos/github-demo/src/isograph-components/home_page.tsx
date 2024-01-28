@@ -8,40 +8,31 @@ import {
 } from "@isograph/react";
 import { Container } from "@mui/material";
 
-import { ResolverParameterType as HomePageComponentParams } from "@iso/Query/home_page_component/reader.isograph";
+import { ResolverParameterType as HomePageComponentParams } from "@iso/Query/HomePage/reader.isograph";
 
 import { FullPageLoading, Route } from "./github_demo";
 import { RepoLink } from "./RepoLink";
 
-export const home_page_component = iso<
+export const HomePage = iso<
   HomePageComponentParams,
   ReturnType<typeof HomePageComponent>
 >`
-  Query.home_page_component($first: Int!) @component {
-    header,
-    home_page_list,
+  Query.HomePage($first: Int!) @component {
+    Header,
+    HomePageList,
   }
 `(HomePageComponent);
 
 function HomePageComponent({ data, route, setRoute }: HomePageComponentParams) {
   return (
     <>
-      {data.header({ route, setRoute })}
+      <data.Header route={route} setRoute={setRoute} />
       <Container maxWidth="md">
         <RepoLink filePath="demos/github-demo/src/isograph-components/home.tsx">
           Home Page Route
         </RepoLink>
-        {/* <div
-          onClick={() =>
-            data.home_page_list_wrapper.viewer?.status?.__update_user_bio({
-              bio: "asdf",
-            })
-          }
-        >
-          Update user bio
-        </div> */}
         <React.Suspense fallback={<FullPageLoading />}>
-          {data.home_page_list({ route, setRoute })}
+          <data.HomePageList route={route} setRoute={setRoute} />
         </React.Suspense>
       </Container>
     </>
@@ -59,12 +50,9 @@ export function HomeRoute({
   useEffect(() => {
     return subscribe(() => setState({}));
   }, []);
-  const { queryReference } = useLazyReference(
-    isoFetch`Query.home_page_component`,
-    {
-      first: 15,
-    }
-  );
+  const { queryReference } = useLazyReference(isoFetch`Query.HomePage`, {
+    first: 15,
+  });
   const component = read(queryReference);
   return component({ route, setRoute });
 }

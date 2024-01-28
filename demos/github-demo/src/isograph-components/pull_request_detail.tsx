@@ -1,27 +1,27 @@
 import React from "react";
 
 import { iso } from "@isograph/react";
-import { ResolverParameterType as PullRequestDetailsProps } from "@iso/Query/pull_request_detail/reader.isograph";
+import { ResolverParameterType as PullRequestDetailsProps } from "@iso/Query/PullRequestDetail/reader.isograph";
 
 import { Card, CardContent } from "@mui/material";
 import { RepoLink } from "./RepoLink";
 
-export const pull_request_detail = iso<
+export const PullRequestDetail = iso<
   PullRequestDetailsProps,
-  ReturnType<typeof PullRequestDetail>
+  ReturnType<typeof PullRequestDetailComponent>
 >`
-  Query.pull_request_detail @component {
+  Query.PullRequestDetail @component {
     repository(owner: $repositoryOwner, name: $repositoryName) {
       pullRequest(number: $pullRequestNumber) {
         title,
         bodyHTML,
-        comment_list,
+        CommentList,
       },
     },
   }
-`(PullRequestDetail);
+`(PullRequestDetailComponent);
 
-function PullRequestDetail(props: PullRequestDetailsProps) {
+function PullRequestDetailComponent(props: PullRequestDetailsProps) {
   const repository = props.data.repository;
   if (repository === null) {
     return <h1>Repository not found</h1>;

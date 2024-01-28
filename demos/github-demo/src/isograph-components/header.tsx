@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { iso } from "@isograph/react";
-import { ResolverParameterType as HeaderProps } from "@iso/Query/header/reader.isograph";
+import { ResolverParameterType as HeaderProps } from "@iso/Query/Header/reader.isograph";
 
 import { AppBar, Button, Grid, Container } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
@@ -8,16 +8,16 @@ import { Route } from "./github_demo";
 
 import logo from "./svgs/dark-logo.svg";
 
-export const header = iso<HeaderProps, ReturnType<typeof Header>>`
-  Query.header @component {
+export const Header = iso<HeaderProps, ReturnType<typeof HeaderComponent>>`
+  Query.Header @component {
     viewer {
       name,
-      avatar,
+      Avatar,
     },
   }
-`(Header);
+`(HeaderComponent);
 
-function Header(props: HeaderProps) {
+function HeaderComponent(props: HeaderProps) {
   return (
     <>
       <AppBar position="fixed" color="primary" sx={{ p: 0.5 }}>

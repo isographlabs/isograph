@@ -1,27 +1,27 @@
 import { iso } from "@isograph/react";
-import type { ResolverParameterType as RepositoryDetailParams } from "@iso/Query/repository_detail/reader.isograph";
+import type { ResolverParameterType as RepositoryDetailParams } from "@iso/Query/RepositoryDetail/reader.isograph";
 import { RepoLink } from "./RepoLink";
 
-export const repository_detail = iso<
+export const RepositoryDetail = iso<
   RepositoryDetailParams,
-  ReturnType<typeof RepositoryDetail>
+  ReturnType<typeof RepositoryDetailComponent>
 >`
-  Query.repository_detail @component {
+  Query.RepositoryDetail @component {
     repository(name: $repositoryName, owner: $repositoryOwner) {
       nameWithOwner,
       parent {
-        repository_link,
+        RepositoryLink,
         nameWithOwner,
       },
 
       pullRequests(last: $first) {
-        pull_request_table,
+        PullRequestTable,
       },
     },
   }
-`(RepositoryDetail);
+`(RepositoryDetailComponent);
 
-function RepositoryDetail(props: RepositoryDetailParams) {
+function RepositoryDetailComponent(props: RepositoryDetailParams) {
   const parent = props.data.repository?.parent;
   return (
     <>
@@ -32,15 +32,15 @@ function RepositoryDetail(props: RepositoryDetailParams) {
       {parent != null ? (
         <h3>
           <small>Forked from</small>{" "}
-          {parent.repository_link({
-            setRoute: props.setRoute,
-            children: parent.nameWithOwner,
-          })}
+          <parent.RepositoryLink
+            setRoute={props.setRoute}
+            children={parent.nameWithOwner}
+          />
         </h3>
       ) : null}
-      {props.data.repository?.pullRequests.pull_request_table({
-        setRoute: props.setRoute,
-      })}
+      <props.data.repository.pullRequests.PullRequestTable
+        setRoute={props.setRoute}
+      />
       {/* <div>Stargazer count: {props.data.repository?.stargazerCount}</div> */}
     </>
   );

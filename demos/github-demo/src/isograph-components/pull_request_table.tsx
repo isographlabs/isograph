@@ -1,5 +1,5 @@
 import { iso } from "@isograph/react";
-import type { ResolverParameterType as PullRequestTableParams } from "@iso/PullRequestConnection/pull_request_table/reader.isograph";
+import type { ResolverParameterType as PullRequestTableParams } from "@iso/PullRequestConnection/PullRequestTable/reader.isograph";
 import type { ResolverParameterType as CreatedAtFormattedType } from "@iso/PullRequest/created_at_formatted/reader.isograph";
 
 import {
@@ -23,19 +23,19 @@ export const created_at_formatted = iso<CreatedAtFormattedType, string>`
   });
 });
 
-export const pull_request_table = iso<
+export const PullRequestTable = iso<
   PullRequestTableParams,
-  ReturnType<typeof PullRequestTable>
+  ReturnType<typeof PullRequestTableComponent>
 >`
-  PullRequestConnection.pull_request_table @component {
+  PullRequestConnection.PullRequestTable @component {
     edges {
       node {
         id,
-        pull_request_link,
+        PullRequestLink,
         number,
         title,
         author {
-          user_link,
+          UserLink,
           login,
         },
         closed,
@@ -44,9 +44,9 @@ export const pull_request_table = iso<
       },
     },
   }
-`(PullRequestTable);
+`(PullRequestTableComponent);
 
-function PullRequestTable(props: PullRequestTableParams) {
+function PullRequestTableComponent(props: PullRequestTableParams) {
   const reversedPullRequests = [...props.data.edges].reverse();
   return (
     <>

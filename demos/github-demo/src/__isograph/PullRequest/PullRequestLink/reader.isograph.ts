@@ -1,6 +1,5 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Header as resolver } from '../../../isograph-components/header.tsx';
-import User__Avatar, { ReadOutType as User__Avatar__outputType } from '../../User/Avatar/reader.isograph';
+import { PullRequestLink as resolver } from '../../../isograph-components/pull_request_link.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
@@ -9,8 +8,14 @@ export type ReadFromStoreType = ResolverParameterType;
 
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
+    kind: "Scalar",
+    fieldName: "number",
+    alias: null,
+    arguments: null,
+  },
+  {
     kind: "Linked",
-    fieldName: "viewer",
+    fieldName: "repository",
     alias: null,
     arguments: null,
     selections: [
@@ -21,11 +26,18 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
         arguments: null,
       },
       {
-        kind: "Resolver",
-        alias: "Avatar",
+        kind: "Linked",
+        fieldName: "owner",
+        alias: null,
         arguments: null,
-        readerArtifact: User__Avatar,
-        usedRefetchQueries: [],
+        selections: [
+          {
+            kind: "Scalar",
+            fieldName: "login",
+            alias: null,
+            arguments: null,
+          },
+        ],
       },
     ],
   },
@@ -33,9 +45,12 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 
 export type ResolverParameterType = { data:
 {
-  viewer: {
-    name: (string | null),
-    Avatar: User__Avatar__outputType,
+  number: number,
+  repository: {
+    name: string,
+    owner: {
+      login: string,
+    },
   },
 },
 [index: string]: any };
@@ -47,7 +62,7 @@ const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOut
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
-  variant: { kind: "Component", componentName: "Query.Header" },
+  variant: { kind: "Component", componentName: "PullRequest.PullRequestLink" },
 };
 
 export default artifact;
