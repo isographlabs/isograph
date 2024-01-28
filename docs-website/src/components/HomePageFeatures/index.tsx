@@ -78,7 +78,7 @@ export function HomePageRoute() {
   const { queryReference } = useLazyReference(
     // Note that calling isoFetch here **generates** a query
     // at compile time!
-    isoFetch${"`"}Query.home_page_component${"`"},
+    isoFetch${"`"}Query.HomePage${"`"},
     { /* Query variables */ }
   );
   
@@ -88,19 +88,18 @@ export function HomePageRoute() {
   const HomePage = read(queryReference);
 
   // Step 3: Render the resulting component.
-  // (In the future, <HomePage /> will be valid! For now,
-  // you must call it as a function.)
-  return HomePage({ /* render-time props */ });
+  const additionalProps = {};
+  return <HomePage {...additionalProps} />;
 }
   `,
   home_page_component: `
 import { iso } from "@isograph/react";
 import {
   ResolverParameterType as HomePageComponentParams,
-} from "@iso/Query/home_page_component/reader.isograph";
+} from "@iso/Query/HomePage/reader.isograph";
 
 // Step 1: Export the home_page_component and call iso
-export const home_page_component = iso<
+export const HomePage = iso<
   // Step 2: Pass type parameters to iso. (This will not be
   // necessary soon.)
   HomePageComponentParams,
@@ -109,13 +108,13 @@ export const home_page_component = iso<
   # Step 3: Define a field named home_page_component on the
   # Query type, and tell the Isograph compiler that it is a
   # React @component
-  Query.home_page_component @component {
+  Query.HomePage @component {
     # Step 4: Select whatever fields you'll need, including
     # other client-defined fields like avatar_component.
     viewer {
       first_name,
       last_name,
-      avatar_component,
+      Avatar,
     },
   }
 ${"`"}(HomePageComponent);
@@ -133,14 +132,14 @@ function HomePageComponent({ data }: HomePageComponentParams) {
 import { iso } from "@isograph/react";
 import {
   ResolverParameterType as AvatarProps,
-} from "@iso/User/avatar/reader.isograph";
+} from "@iso/User/Avatar/reader.isograph";
 import Avatar from 'my-component-library';
   
-export const avatar_component = iso<
+export const Avatar = iso<
   AvatarProps,
-  ReturnType<typeof Avatar>,
+  ReturnType<typeof AvatarComponent>,
 >${"`"}
-  User.avatar_component @component {
+  User.Avatar @component {
     avatarUrl,
   }
 ${"`"}(AvatarComponent);
