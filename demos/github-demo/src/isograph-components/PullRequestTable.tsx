@@ -11,7 +11,7 @@ import {
 } from "@mui/material";
 
 export const createdAtFormatted = iso<CreatedAtFormattedType, string>`
-  PullRequest.createdAtFormatted {
+  field PullRequest.createdAtFormatted {
     createdAt,
   }
 `((props) => {
@@ -27,7 +27,7 @@ export const PullRequestTable = iso<
   PullRequestTableParams,
   ReturnType<typeof PullRequestTableComponent>
 >`
-  PullRequestConnection.PullRequestTable @component {
+  field PullRequestConnection.PullRequestTable @component {
     edges {
       node {
         id,

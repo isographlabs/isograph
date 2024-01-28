@@ -8,7 +8,7 @@ export const PetBestFriendCard = iso<
   PetBestFriendCardParams,
   ReturnType<typeof PetBestFriendCardComponent>
 >`
-  Pet.PetBestFriendCard @component {
+  field Pet.PetBestFriendCard @component {
     id,
     PetUpdater,
     best_friend_relationship {

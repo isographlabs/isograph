@@ -9,7 +9,7 @@ export const PetUpdater = iso<
   PetUpdaterParams,
   ReturnType<typeof PetUpdaterComponent>
 >`
-  Pet.PetUpdater @component {
+  field Pet.PetUpdater @component {
     __set_pet_best_friend,
     potential_new_best_friends {
       id,

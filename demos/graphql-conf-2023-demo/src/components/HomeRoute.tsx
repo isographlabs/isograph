@@ -7,7 +7,7 @@ export const HomeRoute = iso<
   HomeRouteParams,
   ReturnType<typeof HomeRouteComponent>
 >`
-  Query.HomeRoute @component {
+  field Query.HomeRoute @component {
     pets {
       id,
       PetSummaryCard,

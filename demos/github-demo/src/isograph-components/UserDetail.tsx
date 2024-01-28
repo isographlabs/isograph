@@ -6,7 +6,7 @@ export const UserDetail = iso<
   UserDetailParams,
   ReturnType<typeof UserDetailComponent>
 >`
-  Query.UserDetail @component {
+  field Query.UserDetail @component {
     user(login: $userLogin) {
       name,
       RepositoryList,

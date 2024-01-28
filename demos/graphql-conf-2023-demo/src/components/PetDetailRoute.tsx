@@ -7,7 +7,7 @@ export const PetDetailRoute = iso<
   PetDetailRouteParams,
   ReturnType<typeof PetDetailRouteComponent>
 >`
-  Query.PetDetailRoute($id: ID!) @component {
+  field Query.PetDetailRoute($id: ID!) @component {
     pet(id: $id) {
       name,
       PetCheckinsCard,

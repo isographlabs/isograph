@@ -8,7 +8,7 @@ export const PetPhraseCard = iso<
   PetPhraseCardParams,
   ReturnType<typeof PetPhraseCardComponent>
 >`
-Pet.PetPhraseCard @component {
+field Pet.PetPhraseCard @component {
   id,
   favorite_phrase,
 }

@@ -8,7 +8,7 @@ export const UserLink = iso<
   UserLinkParams,
   ReturnType<typeof UserLinkComponent>
 >`
-  Actor.UserLink @component {
+  field Actor.UserLink @component {
     login,
   }
 `(UserLinkComponent);

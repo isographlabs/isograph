@@ -8,7 +8,7 @@ export const PetTaglineCard = iso<
   PetTaglineCardParams,
   ReturnType<typeof PetTaglineCardComponent>
 >`
-Pet.PetTaglineCard @component {
+field Pet.PetTaglineCard @component {
   id,
   tagline,
 }

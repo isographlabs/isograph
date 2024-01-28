@@ -6,7 +6,7 @@ export const RepositoryDetail = iso<
   RepositoryDetailParams,
   ReturnType<typeof RepositoryDetailComponent>
 >`
-  Query.RepositoryDetail @component {
+  field Query.RepositoryDetail @component {
     repository(name: $repositoryName, owner: $repositoryOwner) {
       nameWithOwner,
       parent {
