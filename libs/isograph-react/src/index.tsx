@@ -256,7 +256,6 @@ export function read<
     return getOrCreateCachedComponent(
       fragmentReference.root,
       variant.componentName,
-      "TODO",
       fragmentReference.readerArtifact,
       fragmentReference.variables ?? {},
       fragmentReference.nestedRefetchQueries
@@ -519,7 +518,6 @@ function readData<TReadFromStore>(
           target[field.alias] = getOrCreateCachedComponent(
             root,
             variant.componentName,
-            "TODO",
             field.readerArtifact,
             variables,
             resolverRefetchQueries

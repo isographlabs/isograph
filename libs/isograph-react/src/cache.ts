@@ -45,7 +45,7 @@ function getOrCreateCache<T>(
  * keys sorted such that equivalent values would have identical JSON.stringify
  * results.
  */
-function stableCopy<T>(value: T): T {
+export function stableCopy<T>(value: T): T {
   if (!value || typeof value !== "object") {
     return value;
   }
