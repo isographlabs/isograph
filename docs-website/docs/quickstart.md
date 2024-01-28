@@ -154,6 +154,18 @@ export default function App({ Component, pageProps }: AppProps) {
 }
 ```
 
+## Tell NextJS not to re-use values in the store when you refresh
+
+Add the following to each page (e.g. to `pages/index.tsx`). Otherwise, NextJS will reuse the value in the store for all network requests, which is a serious privacy liability.
+
+```tsx
+import { clearStore } from "@isograph/react";
+export async function getServerSideProps() {
+  clearStore();
+  return { props: {} };
+}
+```
+
 ## Create isograph literals
 
 **Finally**, we can get to writing some Isograph components. Let's define the Isograph resolver that "is" your home route component! Create a file in `src/components/episode_list_component.tsx` containing the following:

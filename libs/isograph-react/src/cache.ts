@@ -145,7 +145,7 @@ export type StoreRecord = {
 export type DataId = string;
 
 export const ROOT_ID: DataId & "__ROOT" = "__ROOT";
-const store: {
+let store: {
   [index: DataId]: StoreRecord | null;
   __ROOT: StoreRecord;
 } = {
@@ -153,6 +153,11 @@ const store: {
 };
 export function getStore() {
   return store;
+}
+export function clearStore() {
+  store = {
+    __ROOT: {},
+  };
 }
 
 type NetworkResponseScalarValue = string | number | boolean;

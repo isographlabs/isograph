@@ -1,7 +1,7 @@
 import Head from "next/head";
 
 import { GithubDemo } from "@/isograph-components/github_demo";
-import { setNetwork } from "@isograph/react";
+import { clearStore, setNetwork } from "@isograph/react";
 
 function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
   let promise = fetch("https://api.github.com/graphql", {
@@ -50,4 +50,9 @@ export default function Home() {
       </ThemeProvider>
     </>
   );
+}
+
+export async function getServerSideProps() {
+  clearStore();
+  return { props: {} };
 }

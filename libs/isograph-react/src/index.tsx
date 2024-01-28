@@ -20,6 +20,7 @@ export {
   DataId,
   Link,
   StoreRecord,
+  clearStore,
 } from "./cache";
 
 // This type should be treated as an opaque type.

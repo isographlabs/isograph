@@ -7,7 +7,7 @@ import {
   setMissingFieldHandler,
   defaultMissingFieldHandler,
   setNetwork,
-  subscribe,
+  clearStore,
 } from "@isograph/react";
 import { GraphQLConfDemo } from "@/src/components/router";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
@@ -92,3 +92,8 @@ const theme = createTheme({
     },
   },
 });
+
+export async function getServerSideProps() {
+  clearStore();
+  return { props: {} };
+}
