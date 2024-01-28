@@ -12,6 +12,7 @@ import {
 import { useLazyDisposableState } from "@isograph/react-disposable-state";
 import { type PromiseWrapper } from "./PromiseWrapper";
 import React from "react";
+import { getOrCreateCachedComponent } from "./componentCache";
 
 export {
   setNetwork,
@@ -251,23 +252,15 @@ export function read<
       return fragmentReference.readerArtifact.resolver(data.data);
     }
   } else if (variant.kind === "Component") {
-    return (additionalRuntimeProps: any) => {
-      // TODO also incorporate the typename
-      const RefReaderForName = getRefReaderForName(variant.componentName);
-      // TODO do not create a new reference on every render?
-      return (
-        <RefReaderForName
-          reference={{
-            kind: "FragmentReference",
-            readerArtifact: fragmentReference.readerArtifact,
-            root: fragmentReference.root,
-            variables: fragmentReference.variables,
-            nestedRefetchQueries: fragmentReference.nestedRefetchQueries,
-          }}
-          additionalRuntimeProps={additionalRuntimeProps}
-        />
-      );
-    };
+    // @ts-ignore
+    return getOrCreateCachedComponent(
+      fragmentReference.root,
+      variant.componentName,
+      "TODO",
+      fragmentReference.readerArtifact,
+      fragmentReference.variables ?? {},
+      fragmentReference.nestedRefetchQueries
+    );
   }
   // Why can't Typescript realize that this is unreachable??
   throw new Error("This is unreachable");
@@ -283,7 +276,7 @@ export function readButDoNotEvaluate<TReadFromStore extends Object>(
     reference.nestedRefetchQueries
   );
   if (typeof window !== "undefined" && window.__LOG) {
-    console.log("done reading but not evaluating", { response });
+    console.log("done reading", { response });
   }
   if (response.kind === "MissingData") {
     throw onNextChange();
@@ -523,23 +516,14 @@ function readData<TReadFromStore>(
             target[field.alias] = field.readerArtifact.resolver(data.data);
           }
         } else if (variant.kind === "Component") {
-          target[field.alias] = (additionalRuntimeProps: any) => {
-            // TODO also incorporate the typename
-            const RefReaderForName = getRefReaderForName(variant.componentName);
-            // TODO do not create a new reference on every render?
-            return (
-              <RefReaderForName
-                reference={{
-                  kind: "FragmentReference",
-                  readerArtifact: field.readerArtifact,
-                  root,
-                  variables,
-                  nestedRefetchQueries: resolverRefetchQueries,
-                }}
-                additionalRuntimeProps={additionalRuntimeProps}
-              />
-            );
-          };
+          target[field.alias] = getOrCreateCachedComponent(
+            root,
+            variant.componentName,
+            "TODO",
+            field.readerArtifact,
+            variables,
+            resolverRefetchQueries
+          );
         }
         break;
       }
@@ -611,29 +595,6 @@ function assertLink(link: DataTypeValue): Link | undefined | null {
     return undefined;
   }
   throw new Error("Invalid link");
-}
-
-const refReaders: { [index: string]: any } = {};
-export function getRefReaderForName(name: string) {
-  if (refReaders[name] == null) {
-    function Component({
-      reference,
-      additionalRuntimeProps,
-    }: {
-      reference: FragmentReference<any, any, any>;
-      additionalRuntimeProps: any;
-    }) {
-      const data = readButDoNotEvaluate(reference);
-
-      return reference.readerArtifact.resolver({
-        data,
-        ...additionalRuntimeProps,
-      });
-    }
-    Component.displayName = `${name} @component`;
-    refReaders[name] = Component;
-  }
-  return refReaders[name];
 }
 
 export type IsographComponentProps<TDataType, TOtherProps = Object> = {
