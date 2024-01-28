@@ -19,11 +19,44 @@ use crate::{
     ParseResultWithLocation, ParseResultWithSpan, PeekableLexer,
 };
 
-pub fn parse_iso_fetch(
-    iso_fetch_text: &str,
+pub enum IsoLiteralExtractionResult {
+    ClientFieldDeclaration(WithSpan<ResolverDeclaration>),
+    EntrypointDeclaration(WithSpan<EntrypointTypeAndField>),
+}
+
+pub fn parse_iso_literal(
+    iso_literal_text: &str,
+    definition_file_path: ResolverDefinitionPath,
+    text_source: TextSource,
+) -> Result<WithSpan<IsoLiteralExtractionResult>, WithLocation<IsographLiteralParseError>> {
+    let mut tokens = PeekableLexer::new(iso_literal_text);
+    tokens
+        .with_span(|tokens| {
+            let discriminator = tokens
+                .parse_source_of_kind(IsographLangTokenKind::Identifier)
+                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))
+                .map_err(|err| err.to_with_location(text_source))?;
+            match discriminator.item {
+                "entrypoint" => Ok(IsoLiteralExtractionResult::EntrypointDeclaration(
+                    parse_iso_fetch(tokens, text_source)?,
+                )),
+                "field" => Ok(IsoLiteralExtractionResult::ClientFieldDeclaration(
+                    parse_iso_client_field(tokens, definition_file_path, text_source)
+                        .map_err(|err| err.1)?,
+                )),
+                _ => Err(WithLocation::new(
+                    IsographLiteralParseError::ExpectedFieldOrEntrypoint,
+                    Location::new(text_source, discriminator.span),
+                )),
+            }
+        })
+        .transpose()
+}
+
+fn parse_iso_fetch(
+    tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
 ) -> ParseResultWithLocation<WithSpan<EntrypointTypeAndField>> {
-    let mut tokens = PeekableLexer::new(iso_fetch_text);
     let resolver_fetch = tokens
         .with_span(|tokens| {
             let parent_type = tokens
@@ -54,8 +87,8 @@ pub fn parse_iso_fetch(
     Ok(resolver_fetch)
 }
 
-pub fn parse_iso_literal(
-    iso_literal_text: &str,
+fn parse_iso_client_field(
+    tokens: &mut PeekableLexer<'_>,
     definition_file_path: ResolverDefinitionPath,
     text_source: TextSource,
 ) -> Result<
@@ -65,10 +98,8 @@ pub fn parse_iso_literal(
         WithLocation<IsographLiteralParseError>,
     ),
 > {
-    let mut tokens = PeekableLexer::new(iso_literal_text);
-
     let resolver_declaration =
-        parse_resolver_declaration(&mut tokens, definition_file_path, text_source)
+        parse_resolver_declaration(tokens, definition_file_path, text_source)
             .map_err(|(name, with_span)| (name, with_span.to_with_location(text_source)))?;
 
     if let Some(span) = tokens.remaining_token_span() {

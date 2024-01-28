@@ -10,21 +10,17 @@ use common_lang_types::{
 };
 use graphql_schema_parser::{parse_schema, parse_schema_extensions, SchemaParseError};
 use intern::{string_key::Intern, Lookup};
-use isograph_lang_parser::{
-    parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
-};
+use isograph_lang_parser::{parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError};
 use isograph_lang_types::{EntrypointTypeAndField, ResolverDeclaration};
-use isograph_schema::{
-    CompilerConfig, ProcessGraphQLDocumentOutcome, ProcessResolverDeclarationError, Schema,
-    UnvalidatedSchema,
-};
+use isograph_schema::{CompilerConfig, ProcessResolverDeclarationError, Schema, UnvalidatedSchema};
 use pretty_duration::pretty_duration;
 use thiserror::Error;
 
 use crate::{
     generate_artifacts::{generate_and_write_artifacts, GenerateArtifactsError},
     isograph_literals::{
-        extract_iso_literal_from_file_content, read_files_in_folder, IsoLiteralExtraction,
+        extract_iso_literal_from_file_content,
+        read_files_in_folder, IsoLiteralExtraction,
     },
     schema::read_schema_file,
 };
@@ -123,27 +119,18 @@ pub(crate) fn handle_compile_command(
 
         let mut schema = UnvalidatedSchema::new();
 
-        let mut process_graphql_outcome =
+        let original_outcome =
             schema.process_graphql_type_system_document(type_system_document, config.options)?;
 
         // TODO validate here! We should not allow a situation in which a base schema is invalid,
         // but is made valid by the presence of schema extensions.
 
         for extension_document in type_extension_document {
-            let ProcessGraphQLDocumentOutcome {
-                mutation_id,
-                type_refinement_maps: _,
-            } = schema
+            let _extension_outcome = schema
                 .process_graphql_type_extension_document(extension_document, config.options)?;
-            // TODO extend the process_graphql_outcome.type_refinement_map and the one from the extensions?
-
-            match (mutation_id, process_graphql_outcome.mutation_id) {
-                (None, _) => {}
-                (Some(mutation_id), None) => {
-                    process_graphql_outcome.mutation_id = Some(mutation_id)
-                }
-                (Some(_), Some(_)) => return Err(BatchCompileError::MutationObjectDefinedTwice),
-            }
+            // TODO extend the process_graphql_outcome.type_refinement_map and the one
+            // from the extensions? Does that even make sense?
+            // TODO validate that we didn't define any new root types (as they are ignored)
         }
 
         // TODO the ordering should be:
@@ -154,11 +141,11 @@ pub(crate) fn handle_compile_command(
         // - add mutation fields
         // - process parsed literals
         // - validate resolvers
-        if let Some(mutation_id) = process_graphql_outcome.mutation_id {
+        if let Some(mutation_id) = &original_outcome.root_types.mutation {
             schema.create_magic_mutation_fields(
-                mutation_id,
+                *mutation_id,
                 config.options,
-                &process_graphql_outcome
+                &original_outcome
                     .type_refinement_maps
                     .supertype_to_subtype_map,
             )?;
@@ -270,6 +257,7 @@ fn extract_iso_literals(
                 Err(e) => isograph_literal_parse_errors.extend(e.into_iter()),
             }
         }
+
     }
 
     if isograph_literal_parse_errors.is_empty() {
@@ -281,6 +269,7 @@ fn extract_iso_literals(
         Err(isograph_literal_parse_errors)
     }
 }
+
 
 fn process_iso_literal_extraction(
     iso_literal_extraction: IsoLiteralExtraction<'_>,
@@ -303,6 +292,7 @@ fn process_iso_literal_extraction(
     };
 
     let mut errors = vec![];
+
 
     // TODO return errors if any occurred, otherwise Ok
     match parse_iso_literal(&iso_literal_text, interned_file_path, text_source) {
@@ -440,9 +430,6 @@ pub(crate) enum BatchCompileError {
 
     #[error("Unable to print.\nReason: {message}")]
     UnableToPrint { message: GenerateArtifactsError },
-
-    #[error("Mutation object defined twice")]
-    MutationObjectDefinedTwice,
 }
 
 impl From<WithLocation<SchemaParseError>> for BatchCompileError {
