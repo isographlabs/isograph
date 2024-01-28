@@ -23,7 +23,7 @@ function UserDetailComponent(props: UserDetailParams) {
 
   return (
     <>
-      <RepoLink filePath="demos/github-demo/src/isograph-components/user_detail.tsx">
+      <RepoLink filePath="demos/github-demo/src/isograph-components/UserDetail.tsx">
         User Detail Component
       </RepoLink>
       <h1>{user.name}</h1>

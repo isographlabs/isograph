@@ -20,7 +20,7 @@ export const HomePageList = iso<
 function HomePageListComponent(props: HomePageListParams) {
   return (
     <>
-      <RepoLink filePath="demos/github-demo/src/isograph-components/home_page_list.tsx">
+      <RepoLink filePath="demos/github-demo/src/isograph-components/HomePage.tsx">
         Home Page List Component
       </RepoLink>
       <h1>rbalicki2's repository stats</h1>

@@ -27,7 +27,7 @@ function RepositoryDetailComponent(props: RepositoryDetailParams) {
   if (repository == null) return null;
   return (
     <>
-      <RepoLink filePath="demos/github-demo/src/isograph-components/repository_detail.tsx">
+      <RepoLink filePath="demos/github-demo/src/isograph-components/RepositoryDetail.tsx">
         Repository Detail Component
       </RepoLink>
       <h1>{props.data.repository?.nameWithOwner}</h1>
