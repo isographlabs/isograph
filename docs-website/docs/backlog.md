@@ -2,8 +2,6 @@
 
 ## Top QOL priorities
 
-- rethink iso syntax
-  - Consider combining isoFetch and iso, as in `` iso`entrypoint Query.home_page`  `` or the like
 - iso overload in files
 
 ## V2 release
@@ -77,7 +75,6 @@
 - Subscriptions
 - Interfaces/unions
 - Entrypoints
-  - Directives on isoFetch
 - Field unwrapping syntax
 - Pagination
 - Compile to non-GraphQL

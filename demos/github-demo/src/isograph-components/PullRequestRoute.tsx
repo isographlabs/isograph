@@ -1,5 +1,5 @@
 import React from "react";
-import { iso, useLazyReference, read, isoFetch } from "@isograph/react";
+import { iso, useLazyReference, read } from "@isograph/react";
 import {
   FullPageLoading,
   type PullRequestRoute as PullRequestRouteType,
@@ -14,7 +14,7 @@ export const PullRequest = iso<
   PullRequestComponentProps,
   ReturnType<typeof PullRequestComponentComponent>
 >`
-  Query.PullRequest($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!) @component {
+  field Query.PullRequest($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!) @component {
     Header,
     PullRequestDetail,
   }
@@ -44,7 +44,7 @@ export function PullRequestRoute({
   route: PullRequestRouteType;
   setRoute: (route: Route) => void;
 }) {
-  const { queryReference } = useLazyReference(isoFetch`Query.PullRequest `, {
+  const { queryReference } = useLazyReference(iso`entrypoint Query.PullRequest `, {
     pullRequestNumber: route.pullRequestNumber,
     repositoryName: route.repositoryName,
     repositoryOwner: route.repositoryOwner,

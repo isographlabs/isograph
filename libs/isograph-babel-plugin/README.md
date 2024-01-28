@@ -20,7 +20,7 @@ module.exports = {
 
 ## What does it do?
 
-This package changes calls to `isoFetch` to `require` calls for the generated artifact. For example, `` isoFetch`Query.HomePage` `` might get replaced with `require("../__isograph/Query/HomePage/entrypoint.isograph.ts")`.
+This package changes calls to `iso` entrypoint to `require` calls for the generated artifact. For example, `` iso`entrypoint Query.HomePage` `` might get replaced with `require("../__isograph/Query/HomePage/entrypoint.isograph.ts")`.
 
 ## Requirements
 

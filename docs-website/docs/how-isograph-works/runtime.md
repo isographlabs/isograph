@@ -19,8 +19,8 @@ You should also see [the quickstart guide](../../quickstart) for more one-time s
 
 In order to make a network request and read the results, the following occurs:
 
-- the developer calls `` const {queryReference} = useLazyReference(isoFetch`Query.HomePage`); ``. This will make the network request when that component renders.
-  - The babel plugin changes the `isoFetch` call to a `require` call that imports the generated `Query/HomePage/entrypoint.isograph.ts` file.
+- the developer calls `` const {queryReference} = useLazyReference(iso`entrypoint Query.HomePage`); ``. This will make the network request when that component renders.
+  - The babel plugin changes the `iso` entrypoint call to a `require` call that imports the generated `Query/HomePage/entrypoint.isograph.ts` file.
 - The developer calls `const HomePage = read(queryReference);`. This will attempt to read the `Query.HomePage` resolver. This may suspend. In particular, if there isn't enough data in the store to read all of the data required by the `HomePage` resolver, the call to `read` will suspend.
   - It is a good practice to pass the `queryReference` to a child component, which is wrapped in a `<Suspense>` boundary. This isn't required for `useLazyReference` to work correctly, but it does eliminate some edge cases (namely, if the network response takes too long to come back), and does make refetching on error easier.
   - In the future, there will be other APIs, akin to Relay's `loadQuery` and `useQueryLoader`. These have not been implemented. The `@isograph/react-disposable-state` library contains their building blocks.
@@ -40,7 +40,7 @@ For NextJS, we need to clear the store on every request, since it otherwise woul
 
 ## Fetching and entrypoints
 
-Declaring an `isoFetch` literal results in the creation of an `entrypoint.isograph.ts` file. This contains three things:
+Declaring an `iso` entrypoint literal results in the creation of an `entrypoint.isograph.ts` file. This contains three things:
 
 - The query text (in the future, we will support [persisted queries](https://relay.dev/docs/guides/persisted-queries/) as well.)
 - The normalization AST, which is the data structure used to write the network response into the store.
