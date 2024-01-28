@@ -3,7 +3,7 @@ import {
   RefetchQueryArtifactWrapper,
   readButDoNotEvaluate,
 } from "./index";
-import { DataId } from "./cache";
+import { DataId, stableCopy } from "./cache";
 
 type ComponentName = string;
 type StringifiedArgs = string;
@@ -15,11 +15,11 @@ const cachedComponentsById: {
 export function getOrCreateCachedComponent(
   root: DataId,
   componentName: string,
-  stringifiedArgs: string,
   readerArtifact: ReaderArtifact<any, any, any>,
   variables: { [key: string]: string },
   resolverRefetchQueries: RefetchQueryArtifactWrapper[]
 ) {
+  const stringifiedArgs = JSON.stringify(stableCopy(variables));
   cachedComponentsById[root] = cachedComponentsById[root] ?? {};
   const componentsByName = cachedComponentsById[root];
   componentsByName[componentName] = componentsByName[componentName] ?? {};
