@@ -16,7 +16,6 @@ const sidebars: SidebarsConfig = {
     "quickstart",
     "workflow",
     "isograph-config",
-    "faq",
     "refetching",
     "magic-mutation-fields",
     {

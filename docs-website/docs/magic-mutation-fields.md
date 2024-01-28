@@ -68,15 +68,15 @@ Now, this field (prefixed with two underscores) is available on the `Pet` object
 You might select it like
 
 ```tsx
-export const pet_tagline_input = iso<
-  PetUpdaterParams,
-  ReturnType<typeof PetUpdater>
+export const PetTaglineInput = iso<
+  PetTaglineInputParameters,
+  ReturnType<typeof PetTaglineInputComponent>
 >`
-  Pet.pet_tagline_input @component {
+  Pet.PetTaglineInput @component {
     __set_pet_tagline,
     tagline,
   }
-`(PetTaglineInput);
+`(PetTaglineInputComponent);
 ```
 
 When read out, the field is a function that when called will make a network request for the mutation. (Also, in the future, you will be able to do things like get the status of the mutation, suspend on it, etc. For now, it just triggers a mutation in the background.)
@@ -84,7 +84,7 @@ When read out, the field is a function that when called will make a network requ
 You might use it as follows:
 
 ```tsx
-function PetUpdater(props: PetUpdaterParams) {
+function PetTaglineInputComponent(props: PetUpdaterParams) {
   const [tagline, setTagline] = useState<string>(props.data.tagline);
 
   const updateTagline = () =>
@@ -107,10 +107,10 @@ function PetUpdater(props: PetUpdaterParams) {
 }
 ```
 
-The fields selected on the mutation response (under the pet) will be **exactly the fields that are selected on that Pet in the merged query**. In other words, it will contain `tagline` (because that is selected in `Pet.pet_tagline_input`), `id` (because that is auto-selected by Isograph) and any other fields that are selected by resolvers on the same pet in the same query.
+The fields selected on the mutation response (under the pet) will be **exactly the fields that are selected on that Pet in the merged query**. In other words, it will contain `tagline` (because that is selected in `Pet.PetTaglineInput`), `id` (which is automatically selected by Isograph) and any other fields that are selected by resolvers on the same pet in the same query.
 
 You can view the generated mutation query by looking for a file whose name starts with `__refetch__`.
 
 ## We're just modifying the tagline! Why refetch the entire Pet?
 
-A future version of Isograph will support this!
+A future version of Isograph will support refetching fewer fields.
