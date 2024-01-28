@@ -1,5 +1,5 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { PetTaglineCard as resolver } from '../../../components/pet_tagline_card.tsx';
+import { PetTaglineCard as resolver } from '../../../components/PetTaglineCard.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);

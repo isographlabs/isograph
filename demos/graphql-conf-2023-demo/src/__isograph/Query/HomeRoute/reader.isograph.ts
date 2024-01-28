@@ -1,5 +1,5 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { HomeRoute as resolver } from '../../../components/home_route.tsx';
+import { HomeRoute as resolver } from '../../../components/HomeRoute.tsx';
 import Pet__PetSummaryCard, { ReadOutType as Pet__PetSummaryCard__outputType } from '../../Pet/PetSummaryCard/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
