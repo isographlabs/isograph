@@ -205,12 +205,14 @@ export function useLazyReference<
   >;
 } {
   // Typechecking fails here... TODO investigate
-  const cache = getOrCreateCacheForArtifact(entrypoint, variables);
+  const cache = getOrCreateCacheForArtifact<TResolverResult>(
+    entrypoint,
+    variables
+  );
 
   // TODO add comment explaining why we never use this value
   // @ts-ignore
   const data =
-    // @ts-ignore
     useLazyDisposableState<PromiseWrapper<TResolverResult>>(cache).state;
 
   return {
