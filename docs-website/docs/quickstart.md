@@ -22,7 +22,7 @@ yarn add @isograph/react@main
 For now, you must install the `@main` versions of the packages.
 :::
 
-Installing the compiler also adds the command `yarn iso` and `yarn iso --watch`. But before this command works, you'll need to set up some folders, download your schema and create an `isograph.config.json` file. So, be patient!
+Installing the compiler also adds the command `yarn iso` and `yarn iso --watch`. But hang tight — before this command works, you'll need to set up some folders, download your schema and create an `isograph.config.json` file!
 
 ## Install the babel plugin and add a recommended alias
 
