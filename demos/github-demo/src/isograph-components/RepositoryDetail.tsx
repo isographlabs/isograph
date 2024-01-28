@@ -23,6 +23,8 @@ export const RepositoryDetail = iso<
 
 function RepositoryDetailComponent(props: RepositoryDetailParams) {
   const parent = props.data.repository?.parent;
+  const repository = props.data.repository;
+  if (repository == null) return null;
   return (
     <>
       <RepoLink filePath="demos/github-demo/src/isograph-components/repository_detail.tsx">
@@ -38,9 +40,7 @@ function RepositoryDetailComponent(props: RepositoryDetailParams) {
           />
         </h3>
       ) : null}
-      <props.data.repository.pullRequests.PullRequestTable
-        setRoute={props.setRoute}
-      />
+      <repository.pullRequests.PullRequestTable setRoute={props.setRoute} />
       {/* <div>Stargazer count: {props.data.repository?.stargazerCount}</div> */}
     </>
   );

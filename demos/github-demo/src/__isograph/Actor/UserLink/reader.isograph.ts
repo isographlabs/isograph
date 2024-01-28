@@ -1,5 +1,5 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { UserLink as resolver } from '../../../isograph-components/user_link.tsx';
+import { UserLink as resolver } from '../../../isograph-components/UserLink.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);

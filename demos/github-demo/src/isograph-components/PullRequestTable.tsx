@@ -1,6 +1,6 @@
 import { iso } from "@isograph/react";
 import type { ResolverParameterType as PullRequestTableParams } from "@iso/PullRequestConnection/PullRequestTable/reader.isograph";
-import type { ResolverParameterType as CreatedAtFormattedType } from "@iso/PullRequest/created_at_formatted/reader.isograph";
+import type { ResolverParameterType as CreatedAtFormattedType } from "@iso/PullRequest/createdAtFormatted/reader.isograph";
 
 import {
   Table,
@@ -10,8 +10,8 @@ import {
   TableRow,
 } from "@mui/material";
 
-export const created_at_formatted = iso<CreatedAtFormattedType, string>`
-  PullRequest.created_at_formatted @eager {
+export const createdAtFormatted = iso<CreatedAtFormattedType, string>`
+  PullRequest.createdAtFormatted {
     createdAt,
   }
 `((props) => {
@@ -40,7 +40,7 @@ export const PullRequestTable = iso<
         },
         closed,
         totalCommentsCount,
-        created_at_formatted,
+        createdAtFormatted,
       },
     },
   }
@@ -66,25 +66,25 @@ function PullRequestTableComponent(props: PullRequestTableParams) {
           {reversedPullRequests.map((data) => {
             const node = data?.node;
             if (node == null) return null;
+            const author = node.author;
+            if (author == null) return null;
             return (
               <TableRow key={node.id}>
                 <TableCell>
                   <small>
-                    {node.pull_request_link({
-                      children: node.number,
-                      setRoute: props.setRoute,
-                    })}
+                    <node.PullRequestLink setRoute={props.setRoute}>
+                      {node.number}
+                    </node.PullRequestLink>
                   </small>
                 </TableCell>
                 <TableCell>{node.title}</TableCell>
                 <TableCell>
-                  {node.author?.user_link({
-                    setRoute: props.setRoute,
-                    children: node.author?.login,
-                  })}
+                  <author.UserLink setRoute={props.setRoute}>
+                    {node.author?.login}
+                  </author.UserLink>
                 </TableCell>
                 <TableCell>{node.closed ? "Closed" : "Open"}</TableCell>
-                <TableCell>{node.created_at_formatted}</TableCell>
+                <TableCell>{node.createdAtFormatted}</TableCell>
                 <TableCell>{node.totalCommentsCount}</TableCell>
               </TableRow>
             );

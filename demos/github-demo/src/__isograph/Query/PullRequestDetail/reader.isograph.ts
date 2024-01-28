@@ -1,5 +1,5 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { PullRequestDetail as resolver } from '../../../isograph-components/pull_request_detail.tsx';
+import { PullRequestDetail as resolver } from '../../../isograph-components/PullRequestDetail.tsx';
 import PullRequest__CommentList, { ReadOutType as PullRequest__CommentList__outputType } from '../../PullRequest/CommentList/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)

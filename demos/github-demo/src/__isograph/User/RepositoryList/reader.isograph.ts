@@ -1,5 +1,5 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { RepositoryList as resolver } from '../../../isograph-components/user_repository_list.tsx';
+import { RepositoryList as resolver } from '../../../isograph-components/UserRepositoryList.tsx';
 import Repository__RepositoryLink, { ReadOutType as Repository__RepositoryLink__outputType } from '../../Repository/RepositoryLink/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)

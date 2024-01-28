@@ -4,7 +4,7 @@ import {
   FullPageLoading,
   type PullRequestRoute as PullRequestRouteType,
   Route,
-} from "./github_demo";
+} from "./GithubDemo";
 
 import { ResolverParameterType as PullRequestComponentProps } from "@iso/Query/PullRequest/reader.isograph";
 

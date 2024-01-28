@@ -7,7 +7,7 @@ import {
   FullPageLoading,
   Route,
   type UserRoute as UserRouteType,
-} from "./github_demo";
+} from "./GithubDemo";
 
 export const UserPage = iso<
   UserRouteComponentParams,

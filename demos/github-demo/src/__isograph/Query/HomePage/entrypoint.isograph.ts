@@ -6,9 +6,9 @@ const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [{ artifact: refetch
 
 const queryText = 'query HomePage ($first: Int!) {\
   viewer {\
+    login,\
     avatarUrl,\
     name,\
-    login,\
     id,\
     repositories____last___first: repositories(last: $first) {\
       edges {\
@@ -43,17 +43,17 @@ const normalizationAst: NormalizationAst = [
     selections: [
       {
         kind: "Scalar",
+        fieldName: "login",
+        arguments: null,
+      },
+      {
+        kind: "Scalar",
         fieldName: "avatarUrl",
         arguments: null,
       },
       {
         kind: "Scalar",
         fieldName: "name",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "login",
         arguments: null,
       },
       {

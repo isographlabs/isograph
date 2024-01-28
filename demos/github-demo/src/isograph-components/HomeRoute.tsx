@@ -10,7 +10,7 @@ import { Container } from "@mui/material";
 
 import { ResolverParameterType as HomePageComponentParams } from "@iso/Query/HomePage/reader.isograph";
 
-import { FullPageLoading, Route } from "./github_demo";
+import { FullPageLoading, Route } from "./GithubDemo";
 import { RepoLink } from "./RepoLink";
 
 export const HomePage = iso<

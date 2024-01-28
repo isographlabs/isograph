@@ -1,6 +1,6 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { CommentList as resolver } from '../../../isograph-components/comment_list.tsx';
-import IssueComment__formatted_comment_creation_date, { ReadOutType as IssueComment__formatted_comment_creation_date__outputType } from '../../IssueComment/formatted_comment_creation_date/reader.isograph';
+import { CommentList as resolver } from '../../../isograph-components/CommentList.tsx';
+import IssueComment__formattedCommentCreationDate, { ReadOutType as IssueComment__formattedCommentCreationDate__outputType } from '../../IssueComment/formattedCommentCreationDate/reader.isograph';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
@@ -45,9 +45,9 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
               },
               {
                 kind: "Resolver",
-                alias: "formatted_comment_creation_date",
+                alias: "formattedCommentCreationDate",
                 arguments: null,
-                readerArtifact: IssueComment__formatted_comment_creation_date,
+                readerArtifact: IssueComment__formattedCommentCreationDate,
                 usedRefetchQueries: [],
               },
               {
@@ -79,7 +79,7 @@ export type ResolverParameterType = { data:
       node: ({
         id: string,
         bodyText: string,
-        formatted_comment_creation_date: IssueComment__formatted_comment_creation_date__outputType,
+        formattedCommentCreationDate: IssueComment__formattedCommentCreationDate__outputType,
         author: ({
           login: string,
         } | null),

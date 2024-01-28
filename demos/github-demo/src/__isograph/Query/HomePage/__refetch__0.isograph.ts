@@ -1,8 +1,8 @@
 import type {IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst} from '@isograph/react';
 const queryText = 'query User_refetch ($first: Int!, $id: ID!) { node____id___id: node(id: $id) { ... on User { \
+  login,\
   avatarUrl,\
   name,\
-  login,\
   id,\
   repositories____last___first: repositories(last: $first) {\
     edges {\
@@ -31,17 +31,17 @@ const queryText = 'query User_refetch ($first: Int!, $id: ID!) { node____id___id
 const normalizationAst: NormalizationAst = [{ kind: "Linked", fieldName: "node", alias: null, arguments: [{ argumentName: "id", variableName: "id" }], selections: [
   {
     kind: "Scalar",
+    fieldName: "login",
+    arguments: null,
+  },
+  {
+    kind: "Scalar",
     fieldName: "avatarUrl",
     arguments: null,
   },
   {
     kind: "Scalar",
     fieldName: "name",
-    arguments: null,
-  },
-  {
-    kind: "Scalar",
-    fieldName: "login",
     arguments: null,
   },
   {

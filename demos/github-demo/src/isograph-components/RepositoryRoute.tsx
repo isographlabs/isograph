@@ -7,7 +7,7 @@ import {
   FullPageLoading,
   Route,
   RepositoryRoute as RepositoryRouteType,
-} from "./github_demo";
+} from "./GithubDemo";
 
 export const RepositoryPage = iso<
   RepositoryPageParams,
@@ -26,12 +26,10 @@ function RepositoryRouteComponent({
 }: RepositoryPageParams) {
   return (
     <>
-      <data.Header route={route}, setRoute={setRoute} />
+      <data.Header route={route} setRoute={setRoute} />
       <Container maxWidth="md">
         <React.Suspense fallback={<FullPageLoading />}>
-          <data.RepositoryDetail
-            setRoute={setRoute}
-          />
+          <data.RepositoryDetail setRoute={setRoute} />
         </React.Suspense>
       </Container>
     </>
@@ -50,7 +48,10 @@ export function RepositoryRoute({
     repositoryOwner: route.repositoryOwner,
     first: 20,
   });
-  console.log("repository route", { queryReference });
-  const data = read(queryReference);
-  return data({ route, setRoute });
+  console.log("repository route", {
+    queryReference,
+    name: route.repositoryName,
+  });
+  const Component = read(queryReference);
+  return <Component route={route} setRoute={setRoute} />;
 }
