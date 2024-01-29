@@ -211,7 +211,10 @@ export function useLazyReference<
 >(
   entrypoint:
     | IsographEntrypoint<TReadFromStore, TResolverProps, TResolverResult>
-    | typeof iso,
+    // Temporarily, we need to allow useLazyReference to take the result of calling
+    // iso`...`. At runtime, we confirm that the passed-in `iso` literal is actually
+    // an entrypoint.
+    | ((_: any) => any),
   variables: object
 ): {
   queryReference: FragmentReference<
