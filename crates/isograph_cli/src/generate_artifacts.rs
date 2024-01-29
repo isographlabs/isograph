@@ -30,7 +30,7 @@ use isograph_schema::{
 };
 use thiserror::Error;
 
-use crate::write_artifacts::write_artifacts;
+use crate::write_artifacts::write_artifacts_to_disk;
 
 type NestedResolverImports = HashMap<ResolverTypeAndField, ResolverImport>;
 
@@ -50,9 +50,9 @@ pub(crate) fn generate_and_write_artifacts(
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
 ) -> Result<usize, GenerateArtifactsError> {
-    let artifacts = get_all_artifacts(schema, project_root, artifact_directory);
-    let artifact_count = artifacts.len();
-    write_artifacts(artifacts, project_root, artifact_directory)?;
+    let artifact_infos = get_artifact_info(schema, project_root, artifact_directory);
+    let artifact_count = artifact_infos.len();
+    write_artifacts_to_disk(artifact_infos, project_root, artifact_directory)?;
 
     Ok(artifact_count)
 }
@@ -64,11 +64,11 @@ pub(crate) fn generate_and_write_artifacts(
 ///
 /// We do this by keeping a queue of artifacts to generate, and adding to the queue
 /// as we process entrypoints.
-fn get_all_artifacts<'schema>(
+fn get_artifact_info<'schema>(
     schema: &'schema ValidatedSchema,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
-) -> Vec<Artifact<'schema>> {
+) -> Vec<ArtifactInfo<'schema>> {
     let mut artifact_queue: Vec<_> =
         schema
             .resolvers
@@ -103,15 +103,15 @@ fn generate_artifact<'schema>(
     artifact_queue: &mut Vec<ArtifactQueueItem<'schema>>,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
-) -> Artifact<'schema> {
+) -> ArtifactInfo<'schema> {
     match queue_item {
-        ArtifactQueueItem::Reader(resolver) => Artifact::Reader(generate_reader_artifact(
+        ArtifactQueueItem::Reader(resolver) => ArtifactInfo::Reader(generate_reader_artifact(
             schema,
             resolver,
             project_root,
             artifact_directory,
         )),
-        ArtifactQueueItem::Entrypoint { top_level_resolver } => Artifact::Entrypoint(
+        ArtifactQueueItem::Entrypoint { top_level_resolver } => ArtifactInfo::Entrypoint(
             generate_entrypoint_artifact(schema, top_level_resolver, artifact_queue),
         ),
         ArtifactQueueItem::RefetchField(refetch_info) => {
@@ -128,7 +128,7 @@ fn generate_artifact<'schema>(
 fn get_artifact_for_refetch_field<'schema>(
     schema: &'schema ValidatedSchema,
     refetch_info: RefetchFieldResolverInfo,
-) -> Artifact<'schema> {
+) -> ArtifactInfo<'schema> {
     let RefetchFieldResolverInfo {
         merged_selection_set,
         refetch_field_parent_id: parent_id,
@@ -161,7 +161,7 @@ fn get_artifact_for_refetch_field<'schema>(
     ));
     // ------- END HACK -------
 
-    Artifact::RefetchQuery(RefetchArtifact {
+    ArtifactInfo::RefetchQuery(RefetchArtifactInfo {
         normalization_ast,
         query_text,
         root_fetchable_field,
@@ -173,7 +173,7 @@ fn get_artifact_for_refetch_field<'schema>(
 fn get_artifact_for_mutation_field<'schema>(
     schema: &'schema ValidatedSchema,
     refetch_info: MutationFieldResolverInfo,
-) -> Artifact<'schema> {
+) -> ArtifactInfo<'schema> {
     let MutationFieldResolverInfo {
         merged_selection_set,
         refetch_field_parent_id: parent_id,
@@ -248,7 +248,7 @@ fn get_artifact_for_mutation_field<'schema>(
         }}]",
     ));
 
-    Artifact::RefetchQuery(RefetchArtifact {
+    ArtifactInfo::RefetchQuery(RefetchArtifactInfo {
         normalization_ast,
         query_text,
         root_fetchable_field,
@@ -376,7 +376,7 @@ fn generate_entrypoint_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     top_level_resolver: &ValidatedSchemaResolver,
     artifact_queue: &mut Vec<ArtifactQueueItem<'schema>>,
-) -> EntrypointArtifact<'schema> {
+) -> EntrypointArtifactInfo<'schema> {
     if let Some((ref selection_set, _)) = top_level_resolver.selection_set_and_unwraps {
         let query_name = top_level_resolver.name.into();
 
@@ -407,7 +407,7 @@ fn generate_entrypoint_artifact<'schema>(
 
         let normalization_ast = generate_normalization_ast(schema, &merged_selection_set, 0);
 
-        EntrypointArtifact {
+        EntrypointArtifactInfo {
             query_text,
             query_name,
             parent_type: query_object.into(),
@@ -425,7 +425,7 @@ fn generate_reader_artifact<'schema>(
     resolver: &ValidatedSchemaResolver,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
-) -> ReaderArtifact<'schema> {
+) -> ReaderArtifactInfo<'schema> {
     if let Some((selection_set, _)) = &resolver.selection_set_and_unwraps {
         let parent_type = schema.schema_data.object(resolver.parent_object_id);
         let mut nested_resolver_artifact_imports = HashMap::new();
@@ -467,7 +467,7 @@ fn generate_reader_artifact<'schema>(
             project_root,
             artifact_directory,
         );
-        ReaderArtifact {
+        ReaderArtifactInfo {
             parent_type: parent_type.into(),
             resolver_field_name: resolver.name,
             reader_ast,
@@ -483,11 +483,14 @@ fn generate_reader_artifact<'schema>(
     }
 }
 
+/// A data structure that contains enough information to infallibly
+/// generate the contents of the generated file (e.g. of the entrypoint
+/// artifact), as well as the path to the generated file.
 #[derive(Debug)]
-pub(crate) enum Artifact<'schema> {
-    Entrypoint(EntrypointArtifact<'schema>),
-    Reader(ReaderArtifact<'schema>),
-    RefetchQuery(RefetchArtifact),
+pub(crate) enum ArtifactInfo<'schema> {
+    Entrypoint(EntrypointArtifactInfo<'schema>),
+    Reader(ReaderArtifactInfo<'schema>),
+    RefetchQuery(RefetchArtifactInfo),
 }
 
 #[derive(Debug)]
@@ -527,7 +530,7 @@ pub(crate) struct RefetchQueryArtifactImport(pub String);
 derive_display!(RefetchQueryArtifactImport);
 
 #[derive(Debug)]
-pub(crate) struct EntrypointArtifact<'schema> {
+pub(crate) struct EntrypointArtifactInfo<'schema> {
     pub(crate) query_name: QueryOperationName,
     pub parent_type: &'schema ValidatedSchemaObject,
     pub query_text: QueryText,
@@ -536,7 +539,7 @@ pub(crate) struct EntrypointArtifact<'schema> {
 }
 
 #[derive(Debug)]
-pub(crate) struct ReaderArtifact<'schema> {
+pub(crate) struct ReaderArtifactInfo<'schema> {
     pub parent_type: &'schema ValidatedSchemaObject,
     pub(crate) resolver_field_name: SelectableFieldName,
     pub nested_resolver_artifact_imports: NestedResolverImports,
@@ -549,7 +552,7 @@ pub(crate) struct ReaderArtifact<'schema> {
 }
 
 #[derive(Debug)]
-pub(crate) struct RefetchArtifact {
+pub(crate) struct RefetchArtifactInfo {
     pub normalization_ast: NormalizationAst,
     pub query_text: QueryText,
     pub root_fetchable_field: SelectableFieldName,

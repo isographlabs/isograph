@@ -10,13 +10,14 @@ use isograph_schema::{ENTRYPOINT, READER};
 
 use crate::{
     generate_artifacts::{
-        Artifact, EntrypointArtifact, GenerateArtifactsError, ReaderArtifact, RefetchArtifact,
+        ArtifactInfo, EntrypointArtifactInfo, GenerateArtifactsError, ReaderArtifactInfo,
+        RefetchArtifactInfo,
     },
     isograph_literals::ISOGRAPH_FOLDER,
 };
 
-pub(crate) fn write_artifacts<'schema>(
-    artifacts: Vec<Artifact<'schema>>,
+pub(crate) fn write_artifacts_to_disk<'schema>(
+    artifact_infos: Vec<ArtifactInfo<'schema>>,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
 ) -> Result<(), GenerateArtifactsError> {
@@ -36,10 +37,10 @@ pub(crate) fn write_artifacts<'schema>(
             message: e,
         }
     })?;
-    for artifact in artifacts {
+    for artifact in artifact_infos {
         match artifact {
-            Artifact::Entrypoint(entrypoint_artifact) => {
-                let EntrypointArtifact {
+            ArtifactInfo::Entrypoint(entrypoint_artifact) => {
+                let EntrypointArtifactInfo {
                     query_name,
                     parent_type,
                     ..
@@ -75,8 +76,8 @@ pub(crate) fn write_artifacts<'schema>(
                     }
                 })?;
             }
-            Artifact::Reader(reader_artifact) => {
-                let ReaderArtifact {
+            ArtifactInfo::Reader(reader_artifact) => {
+                let ReaderArtifactInfo {
                     parent_type,
                     resolver_field_name,
                     ..
@@ -112,8 +113,8 @@ pub(crate) fn write_artifacts<'schema>(
                     }
                 })?;
             }
-            Artifact::RefetchQuery(refetch_artifact) => {
-                let RefetchArtifact {
+            ArtifactInfo::RefetchQuery(refetch_artifact) => {
+                let RefetchArtifactInfo {
                     root_fetchable_field,
                     root_fetchable_field_parent_object,
                     refetch_query_index,

@@ -4,12 +4,13 @@ use common_lang_types::IsographObjectTypeName;
 use isograph_schema::{ResolverTypeAndField, ResolverVariant};
 
 use crate::generate_artifacts::{
-    EntrypointArtifact, ReaderArtifact, RefetchArtifact, ResolverImport, ResolverReadOutType,
+    EntrypointArtifactInfo, ReaderArtifactInfo, RefetchArtifactInfo, ResolverImport,
+    ResolverReadOutType,
 };
 
-impl<'schema> EntrypointArtifact<'schema> {
+impl<'schema> EntrypointArtifactInfo<'schema> {
     pub(crate) fn file_contents(self) -> String {
-        let EntrypointArtifact {
+        let EntrypointArtifactInfo {
             query_text,
             normalization_ast,
             refetch_query_artifact_import,
@@ -41,9 +42,9 @@ impl<'schema> EntrypointArtifact<'schema> {
     }
 }
 
-impl<'schema> ReaderArtifact<'schema> {
+impl<'schema> ReaderArtifactInfo<'schema> {
     pub(crate) fn file_contents(self) -> String {
-        let ReaderArtifact {
+        let ReaderArtifactInfo {
             resolver_import_statement,
             resolver_parameter_type,
             resolver_return_type,
@@ -95,9 +96,9 @@ impl<'schema> ReaderArtifact<'schema> {
     }
 }
 
-impl RefetchArtifact {
+impl RefetchArtifactInfo {
     pub(crate) fn file_contents(self) -> String {
-        let RefetchArtifact {
+        let RefetchArtifactInfo {
             normalization_ast,
             query_text,
             ..
