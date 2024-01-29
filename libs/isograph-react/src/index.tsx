@@ -184,7 +184,7 @@ function assertIsEntrypoint<
   if (typeof value === "function") throw new Error("Not a string");
 }
 
-export function iso<TResolverParameter, TResolverReturn = TResolverParameter>(
+export function iso<TResolverParameter, TResolverReturn>(
   _queryText: TemplateStringsArray
 ): (
   x: (param: TResolverParameter) => TResolverReturn
