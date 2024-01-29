@@ -168,7 +168,7 @@ export async function getServerSideProps() {
 
 ## Create isograph literals
 
-**Finally**, we can get to writing some Isograph components. Let's define the Isograph resolver that "is" your home route component! Create a file in `src/components/episode_list_component.tsx` containing the following:
+**Finally**, we can get to writing some Isograph components. Let's define the Isograph resolver that "is" your home route component! Create a file in `src/components/EpisodeList.tsx` containing the following:
 
 ```tsx
 import React from "react";
@@ -297,7 +297,7 @@ function PersonComponentComponent({ data }: CharacterSummaryParams) {
 }
 ```
 
-You might use this component by modifying the `episode_list_component` file to be the following. Note the two new sections:
+You might use this component by modifying `EpisodeList.tsx` to be the following. Note the two new sections:
 
 ```tsx
 import React from "react";
