@@ -15,7 +15,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     arguments: [
       [
         "last",
-        { kind: "Variable", name: "first" },
+        { kind: "Literal", value: "10" },
       ],
     ],
     selections: [

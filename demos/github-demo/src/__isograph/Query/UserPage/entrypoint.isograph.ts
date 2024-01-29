@@ -7,7 +7,7 @@ const queryText = 'query UserPage ($first: Int!, $userLogin: String!) {\
   user____login___v_userLogin: user(login: $userLogin) {\
     id,\
     name,\
-    repositories____last___v_first: repositories(last: $first) {\
+    repositories____last___l_10: repositories(last: 10) {\
       edges {\
         node {\
           id,\
@@ -64,7 +64,7 @@ const normalizationAst: NormalizationAst = [
         arguments: [
           [
             "last",
-            { kind: "Variable", name: "first" },
+            { kind: "Literal", value: "10" },
           ],
         ],
         selections: [

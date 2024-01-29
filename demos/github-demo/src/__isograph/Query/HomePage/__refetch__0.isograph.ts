@@ -4,7 +4,7 @@ const queryText = 'query User_refetch ($first: Int!, $id: ID!) { node____id___id
   avatarUrl,\
   name,\
   id,\
-  repositories____last___v_first: repositories(last: $first) {\
+  repositories____last___l_10: repositories(last: 10) {\
     edges {\
       node {\
         id,\
@@ -55,7 +55,7 @@ const normalizationAst: NormalizationAst = [{ kind: "Linked", fieldName: "node",
     arguments: [
       [
         "last",
-        { kind: "Variable", name: "first" },
+        { kind: "Literal", value: "10" },
       ],
     ],
     selections: [
