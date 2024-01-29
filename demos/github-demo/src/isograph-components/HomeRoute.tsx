@@ -4,7 +4,6 @@ import {
   read,
   useLazyReference,
   subscribe,
-  isoFetch,
 } from "@isograph/react";
 import { Container } from "@mui/material";
 
@@ -17,7 +16,7 @@ export const HomePage = iso<
   HomePageComponentParams,
   ReturnType<typeof HomePageComponent>
 >`
-  Query.HomePage($first: Int!) @component {
+  field Query.HomePage($first: Int!) @component {
     Header,
     HomePageList,
   }
@@ -50,7 +49,7 @@ export function HomeRoute({
   useEffect(() => {
     return subscribe(() => setState({}));
   }, []);
-  const { queryReference } = useLazyReference(isoFetch`Query.HomePage`, {
+  const { queryReference } = useLazyReference(iso`entrypoint Query.HomePage`, {
     first: 15,
   });
   const component = read(queryReference);

@@ -8,7 +8,7 @@ import { ResolverParameterType as IssueCommentProps } from "@iso/IssueComment/fo
 import { Card, CardContent } from "@mui/material";
 
 export const formattedCommentCreationDate = iso<IssueCommentProps, string>`
-  IssueComment.formattedCommentCreationDate {
+  field IssueComment.formattedCommentCreationDate {
     createdAt,
   }
 `((props) => {
@@ -24,7 +24,7 @@ export const CommentList = iso<
   CommentListProps,
   ReturnType<typeof CommentListComponent>
 >`
-  PullRequest.CommentList @component {
+  field PullRequest.CommentList @component {
     comments(last: $last,) {
       edges {
         node {

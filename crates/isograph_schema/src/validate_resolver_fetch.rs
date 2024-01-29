@@ -43,7 +43,7 @@ impl UnvalidatedSchema {
         match parent_type_id {
             DefinedTypeId::Object(object_id) => {
                 // For now, only the query object is fetchable, and thus
-                // can be used as a parent type in an isoFetch declaration.
+                // can be used as a parent type in an iso entrypoint declaration.
                 //
                 // This requirement should be loosened — anything that we
                 // know how to fetch (e.g. viewer, an item implementing Node, etc.)

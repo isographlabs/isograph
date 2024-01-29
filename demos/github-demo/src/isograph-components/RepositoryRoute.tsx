@@ -13,7 +13,7 @@ export const RepositoryPage = iso<
   RepositoryPageParams,
   ReturnType<typeof RepositoryRouteComponent>
 >`
-  Query.RepositoryPage($repositoryName: String!, $repositoryOwner: String!, $first: Int!) @component {
+  field Query.RepositoryPage($repositoryName: String!, $repositoryOwner: String!, $first: Int!) @component {
     Header,
     RepositoryDetail,
   }
@@ -43,7 +43,7 @@ export function RepositoryRoute({
   route: RepositoryRouteType;
   setRoute: (route: Route) => void;
 }) {
-  const { queryReference } = useLazyReference(isoFetch`Query.RepositoryPage`, {
+  const { queryReference } = useLazyReference(iso`entrypoint Query.RepositoryPage`, {
     repositoryName: route.repositoryName,
     repositoryOwner: route.repositoryOwner,
     first: 20,

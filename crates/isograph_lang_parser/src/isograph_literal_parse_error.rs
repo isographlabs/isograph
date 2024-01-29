@@ -21,6 +21,9 @@ pub enum IsographLiteralParseError {
     #[error("Isograph literals must be immediately called, and passed a function")]
     ExpectedAssociatedJsFunction,
 
+    #[error("Isograph literals must start with field or entrypoint")]
+    ExpectedFieldOrEntrypoint,
+
     #[error(
         "This isograph literal must be exported as `export const {expected_const_export_name}`"
     )]

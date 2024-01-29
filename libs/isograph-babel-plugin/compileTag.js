@@ -6,26 +6,30 @@ function compileTag(t, path, config) {
   const tag = path.get("tag");
 
   if (tag.isIdentifier({ name: "iso" })) {
-    // Don't do anything for iso tags
-  }
-  if (tag.isIdentifier({ name: "isoFetch" })) {
-    return compileIsoFetchTag(t, path, config);
+    const { keyword, type, field } = getTypeAndField(path);
+    if (keyword === "entrypoint") {
+      // This throws if the tag is invalid
+      compileImportStatement(t, path, type, field, "entrypoint", config);
+    } else if (keyword === "field") {
+      // No-op
+      return false;
+    } else {
+      throw new Error(
+        "Invalid iso tag usage. Expected 'entrypoint' or 'field'."
+      );
+    }
   }
 
   return false;
 }
 
-const typeAndFieldRegex = new RegExp("\\s*([^\\.\\s]+)\\.([^\\s\\(]+)", "m");
-
-function compileIsoFetchTag(t, path, config) {
-  // This throws if the tag is invalid
-  const { type, field } = getTypeAndField(path);
-  compileImportStatement(t, path, type, field, "entrypoint", config);
-}
+const typeAndFieldRegex = new RegExp(
+  "\\s*(entrypoint|field)\\s*([^\\.\\s]+)\\.([^\\s\\(]+)",
+  "m"
+);
 
 function getTypeAndField(path) {
   const quasis = path.node.quasi.quasis;
-
   if (quasis.length !== 1) {
     throw new Error(
       "BabelPluginIsograph: Substitutions are not allowed in iso fragments."
@@ -34,15 +38,17 @@ function getTypeAndField(path) {
 
   const content = path.node.quasi.quasis[0].value.raw;
   const typeAndField = typeAndFieldRegex.exec(content);
-  const type = typeAndField[1];
-  const field = typeAndField[2];
 
-  if (type == null || field == null) {
+  const keyword = typeAndField[1];
+  const type = typeAndField[2];
+  const field = typeAndField[3];
+
+  if (keyword == null || type == null || field == null) {
     throw new Error(
       "Malformed iso literal. I hope the iso compiler failed to accept this literal!"
     );
   }
-  return { type, field };
+  return { keyword, type, field };
 }
 
 function compileImportStatement(t, path, type, field, artifactType, config) {

@@ -8,7 +8,7 @@ export const RepositoryLink = iso<
   RepositoryLinkParams,
   ReturnType<typeof RepositoryLinkComponent>
 >`
-  Repository.RepositoryLink @component {
+  field Repository.RepositoryLink @component {
     id,
     name,
     owner {
