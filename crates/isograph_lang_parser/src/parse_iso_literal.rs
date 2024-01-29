@@ -374,14 +374,31 @@ fn parse_argument(
 fn parse_non_constant_value(
     tokens: &mut PeekableLexer,
 ) -> ParseResultWithSpan<WithSpan<NonConstantValue>> {
-    // For now, we only support variables!
-    let _dollar_sign = tokens
-        .parse_token_of_kind(IsographLangTokenKind::Dollar)
-        .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
-    let name = tokens
-        .parse_string_key_type(IsographLangTokenKind::Identifier)
-        .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
-    Ok(name.map(NonConstantValue::Variable))
+    from_control_flow(|| {
+        to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
+            let _dollar_sign = tokens
+                .parse_token_of_kind(IsographLangTokenKind::Dollar)
+                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+            let name = tokens
+                .parse_string_key_type(IsographLangTokenKind::Identifier)
+                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+            Ok(name.map(NonConstantValue::Variable))
+        })?;
+
+        to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
+            let number = tokens
+                .parse_source_of_kind(IsographLangTokenKind::IntegerLiteral)
+                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+            Ok(number.map(|number| {
+                NonConstantValue::Integer(number.parse().expect("Expected valid integer"))
+            }))
+        })?;
+
+        ControlFlow::Continue(WithSpan::new(
+            IsographLiteralParseError::ExpectedNonConstantValue,
+            Span::todo_generated(),
+        ))
+    })
 }
 
 fn parse_variable_definitions(

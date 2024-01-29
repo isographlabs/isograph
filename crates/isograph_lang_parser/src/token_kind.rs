@@ -42,8 +42,8 @@ pub enum IsographLangTokenKind {
     #[regex("[a-zA-Z_][a-zA-Z0-9_]*")]
     Identifier,
 
-    // #[regex("-?(0|[1-9][0-9]*)")]
-    // IntegerLiteral,
+    #[regex("-?(0|[1-9][0-9]*)")]
+    IntegerLiteral,
     #[regex("-?0[0-9]+(\\.[0-9]+[eE][+-]?[0-9]+|\\.[0-9]+|[eE][+-]?[0-9]+)?")]
     ErrorNumberLiteralLeadingZero,
 
@@ -163,7 +163,7 @@ impl fmt::Display for IsographLangTokenKind {
             IsographLangTokenKind::Exclamation => "exclamation mark ('!')",
             // IsographLangTokenKind::FloatLiteral => "floating point value (e.g. '3.14')",
             IsographLangTokenKind::Identifier => "non-variable identifier (e.g. 'x' or 'Foo')",
-            // IsographLangTokenKind::IntegerLiteral => "integer value (e.g. '0' or '42')",
+            IsographLangTokenKind::IntegerLiteral => "integer value (e.g. '0' or '42')",
             IsographLangTokenKind::OpenBrace => "open brace ('{')",
             IsographLangTokenKind::OpenBracket => "open bracket ('[')",
             IsographLangTokenKind::OpenParen => "open parenthesis ('(')",

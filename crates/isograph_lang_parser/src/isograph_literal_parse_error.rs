@@ -31,6 +31,9 @@ pub enum IsographLiteralParseError {
     ExpectedLiteralToBeExported {
         suggested_const_export_name: ScalarFieldName,
     },
+
+    #[error("Expected a valid value, like $foo or 42")]
+    ExpectedNonConstantValue,
 }
 
 impl From<LowLevelParseError> for IsographLiteralParseError {
