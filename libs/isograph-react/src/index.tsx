@@ -161,20 +161,26 @@ export type FragmentReference<
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
-function assertIsEntrypoint<TReadFromStore extends Object,
+function assertIsEntrypoint<
+  TReadFromStore extends Object,
   TResolverProps,
-  TResolverResult>(value: IsographEntrypoint<
-    TReadFromStore,
-    TResolverProps,
-    TResolverResult
-  > | typeof iso): asserts value is IsographEntrypoint<TReadFromStore, TResolverProps, TResolverResult> {
-  if (typeof value === 'function') throw new Error("Not a string")
+  TResolverResult
+>(
+  value:
+    | IsographEntrypoint<TReadFromStore, TResolverProps, TResolverResult>
+    | typeof iso
+): asserts value is IsographEntrypoint<
+  TReadFromStore,
+  TResolverProps,
+  TResolverResult
+> {
+  if (typeof value === "function") throw new Error("Not a string");
 }
 
 export function iso<TResolverParameter, TResolverReturn = TResolverParameter>(
   _queryText: TemplateStringsArray
 ): (
-  x: ((param: TResolverParameter) => TResolverReturn)
+  x: (param: TResolverParameter) => TResolverReturn
 ) => (param: TResolverParameter) => TResolverReturn {
   // The name `identity` here is a bit of a double entendre.
   // First, it is the identity function, constrained to operate
@@ -196,11 +202,9 @@ export function useLazyReference<
   TResolverProps,
   TResolverResult
 >(
-  entrypoint: IsographEntrypoint<
-    TReadFromStore,
-    TResolverProps,
-    TResolverResult
-  > | typeof iso,
+  entrypoint:
+    | IsographEntrypoint<TReadFromStore, TResolverProps, TResolverResult>
+    | typeof iso,
   variables: object
 ): {
   queryReference: FragmentReference<
