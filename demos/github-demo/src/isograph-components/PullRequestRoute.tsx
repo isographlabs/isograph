@@ -44,12 +44,15 @@ export function PullRequestRoute({
   route: PullRequestRouteType;
   setRoute: (route: Route) => void;
 }) {
-  const { queryReference } = useLazyReference(iso`entrypoint Query.PullRequest `, {
-    pullRequestNumber: route.pullRequestNumber,
-    repositoryName: route.repositoryName,
-    repositoryOwner: route.repositoryOwner,
-    last: 20,
-  });
+  const { queryReference } = useLazyReference(
+    iso`entrypoint Query.PullRequest `,
+    {
+      pullRequestNumber: route.pullRequestNumber,
+      repositoryName: route.repositoryName,
+      repositoryOwner: route.repositoryOwner,
+      last: 20,
+    }
+  );
 
   const data = read(queryReference);
   return data({ route, setRoute });
