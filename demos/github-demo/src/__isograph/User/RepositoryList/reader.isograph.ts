@@ -13,10 +13,10 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     fieldName: "repositories",
     alias: null,
     arguments: [
-      {
-        argumentName: "last",
-        variableName: "first",
-      },
+      [
+        "last",
+        { kind: "Variable", name: "first" },
+      ],
     ],
     selections: [
       {
@@ -73,10 +73,10 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
                 fieldName: "pullRequests",
                 alias: null,
                 arguments: [
-                  {
-                    argumentName: "first",
-                    variableName: "first",
-                  },
+                  [
+                    "first",
+                    { kind: "Variable", name: "first" },
+                  ],
                 ],
                 selections: [
                   {
@@ -98,10 +98,10 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
                 fieldName: "watchers",
                 alias: null,
                 arguments: [
-                  {
-                    argumentName: "first",
-                    variableName: "first",
-                  },
+                  [
+                    "first",
+                    { kind: "Variable", name: "first" },
+                  ],
                 ],
                 selections: [
                   {

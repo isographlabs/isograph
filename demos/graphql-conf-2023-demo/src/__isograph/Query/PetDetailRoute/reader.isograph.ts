@@ -16,10 +16,10 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     fieldName: "pet",
     alias: null,
     arguments: [
-      {
-        argumentName: "id",
-        variableName: "id",
-      },
+      [
+        "id",
+        { kind: "Variable", name: "id" },
+      ],
     ],
     selections: [
       {

@@ -36,15 +36,15 @@ const normalizationAst: NormalizationAst = [
     kind: "Linked",
     fieldName: "repository",
     arguments: [
-      {
-        argumentName: "owner",
-        variableName: "repositoryOwner",
-      },
+      [
+        "owner",
+        { kind: "Variable", name: "repositoryOwner" },
+      ],
 
-      {
-        argumentName: "name",
-        variableName: "repositoryName",
-      },
+      [
+        "name",
+        { kind: "Variable", name: "repositoryName" },
+      ],
     ],
     selections: [
       {
@@ -56,10 +56,10 @@ const normalizationAst: NormalizationAst = [
         kind: "Linked",
         fieldName: "pullRequest",
         arguments: [
-          {
-            argumentName: "number",
-            variableName: "pullRequestNumber",
-          },
+          [
+            "number",
+            { kind: "Variable", name: "pullRequestNumber" },
+          ],
         ],
         selections: [
           {
@@ -76,10 +76,10 @@ const normalizationAst: NormalizationAst = [
             kind: "Linked",
             fieldName: "comments",
             arguments: [
-              {
-                argumentName: "last",
-                variableName: "last",
-              },
+              [
+                "last",
+                { kind: "Variable", name: "last" },
+              ],
             ],
             selections: [
               {

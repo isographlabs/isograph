@@ -36,10 +36,10 @@ const normalizationAst: NormalizationAst = [
     kind: "Linked",
     fieldName: "pet",
     arguments: [
-      {
-        argumentName: "id",
-        variableName: "id",
-      },
+      [
+        "id",
+        { kind: "Variable", name: "id" },
+      ],
     ],
     selections: [
       {

@@ -29,15 +29,15 @@ const normalizationAst: NormalizationAst = [{
   kind: "Linked",
   fieldName: "set_pet_best_friend",
   arguments: [
-    {
-      argumentName: "id",
-      variableName: "id",
-    },
+    [
+      "id",
+      { kind: "Variable", name: "id" },
+    ],
 
-    {
-      argumentName: "new_best_friend_id",
-      variableName: "new_best_friend_id",
-    },
+    [
+      "new_best_friend_id",
+      { kind: "Variable", name: "new_best_friend_id" },
+    ],
   ],
   selections: [
     {

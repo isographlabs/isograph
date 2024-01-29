@@ -13,15 +13,15 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     fieldName: "repository",
     alias: null,
     arguments: [
-      {
-        argumentName: "owner",
-        variableName: "repositoryOwner",
-      },
+      [
+        "owner",
+        { kind: "Variable", name: "repositoryOwner" },
+      ],
 
-      {
-        argumentName: "name",
-        variableName: "repositoryName",
-      },
+      [
+        "name",
+        { kind: "Variable", name: "repositoryName" },
+      ],
     ],
     selections: [
       {
@@ -29,10 +29,10 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
         fieldName: "pullRequest",
         alias: null,
         arguments: [
-          {
-            argumentName: "number",
-            variableName: "pullRequestNumber",
-          },
+          [
+            "number",
+            { kind: "Variable", name: "pullRequestNumber" },
+          ],
         ],
         selections: [
           {

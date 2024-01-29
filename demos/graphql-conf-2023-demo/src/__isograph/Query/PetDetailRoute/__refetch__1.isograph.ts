@@ -29,10 +29,10 @@ const normalizationAst: NormalizationAst = [{
   kind: "Linked",
   fieldName: "set_pet_tagline",
   arguments: [
-    {
-      argumentName: "input",
-      variableName: "input",
-    },
+    [
+      "input",
+      { kind: "Variable", name: "input" },
+    ],
   ],
   selections: [
     {

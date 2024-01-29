@@ -139,9 +139,11 @@ export type RefetchQueryArtifactWrapper = {
 };
 
 export type Arguments = Argument[];
-export type Argument = {
-  argumentName: string;
-  variableName: string;
+export type Argument = [ArgumentName, ArgumentValue];
+export type ArgumentName = string;
+export type ArgumentValue = {
+  kind: "Variable";
+  name: string;
 };
 
 export type FragmentReference<

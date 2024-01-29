@@ -13,10 +13,10 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     fieldName: "comments",
     alias: null,
     arguments: [
-      {
-        argumentName: "last",
-        variableName: "last",
-      },
+      [
+        "last",
+        { kind: "Variable", name: "last" },
+      ],
     ],
     selections: [
       {

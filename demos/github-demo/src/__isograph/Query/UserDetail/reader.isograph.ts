@@ -13,10 +13,10 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     fieldName: "user",
     alias: null,
     arguments: [
-      {
-        argumentName: "login",
-        variableName: "userLogin",
-      },
+      [
+        "login",
+        { kind: "Variable", name: "userLogin" },
+      ],
     ],
     selections: [
       {

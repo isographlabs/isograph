@@ -1303,10 +1303,10 @@ fn get_serialized_field_arguments(
             NonConstantValue::Variable(variable_name) => {
                 format!(
                     "\n\
-                    {indent_1}{{\n\
-                    {indent_2}argumentName: \"{argument_name}\",\n\
-                    {indent_2}variableName: \"{variable_name}\",\n\
-                    {indent_1}}},\n",
+                    {indent_1}[\n\
+                    {indent_2}\"{argument_name}\",\n\
+                    {indent_2}{{ kind: \"Variable\", name: \"{variable_name}\" }},\n\
+                    {indent_1}],\n",
                 )
             }
         };
