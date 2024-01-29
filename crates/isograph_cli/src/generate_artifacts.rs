@@ -1299,15 +1299,19 @@ fn get_serialized_field_arguments(
 
     for argument in arguments {
         let argument_name = argument.item.name.item;
-        let non_constant_value_for_js =
-            serialize_non_constant_value_for_js(&argument.item.value.item);
-        s.push_str(&format!(
-            "\n\
-            {indent_1}{{\n\
-            {indent_2}argumentName: \"{argument_name}\",\n\
-            {indent_2}variableName: {non_constant_value_for_js},\n\
-            {indent_1}}},\n",
-        ));
+        let arg_value = match argument.item.value.item {
+            NonConstantValue::Variable(variable_name) => {
+                format!(
+                    "\n\
+                    {indent_1}{{\n\
+                    {indent_2}argumentName: \"{argument_name}\",\n\
+                    {indent_2}variableName: \"{variable_name}\",\n\
+                    {indent_1}}},\n",
+                )
+            }
+        };
+
+        s.push_str(&arg_value);
     }
 
     s.push_str(&format!("{}]", "  ".repeat(indentation_level as usize)));
@@ -1317,13 +1321,6 @@ fn get_serialized_field_arguments(
 fn serialize_non_constant_value_for_graphql(value: &NonConstantValue) -> String {
     match value {
         NonConstantValue::Variable(variable_name) => format!("${}", variable_name),
-    }
-}
-
-// TODO strings and variables are indistinguishable
-fn serialize_non_constant_value_for_js(value: &NonConstantValue) -> String {
-    match value {
-        NonConstantValue::Variable(variable_name) => format!("\"{}\"", variable_name),
     }
 }
 
