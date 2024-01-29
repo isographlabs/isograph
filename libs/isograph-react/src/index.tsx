@@ -141,10 +141,15 @@ export type RefetchQueryArtifactWrapper = {
 export type Arguments = Argument[];
 export type Argument = [ArgumentName, ArgumentValue];
 export type ArgumentName = string;
-export type ArgumentValue = {
-  kind: "Variable";
-  name: string;
-};
+export type ArgumentValue =
+  | {
+      kind: "Variable";
+      name: string;
+    }
+  | {
+      kind: "Literal";
+      value: any;
+    };
 
 export type FragmentReference<
   TReadFromStore extends Object,

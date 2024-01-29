@@ -1307,6 +1307,15 @@ fn get_serialized_field_arguments(
                     {indent_1}],\n",
                 )
             }
+            NonConstantValue::Integer(int_value) => {
+                format!(
+                    "\n\
+                    {indent_1}[\n\
+                    {indent_2}\"{argument_name}\",\n\
+                    {indent_2}{{ kind: \"Literal\", value: \"{int_value}\" }},\n\
+                    {indent_1}],\n"
+                )
+            }
         };
 
         s.push_str(&arg_value);
@@ -1319,6 +1328,7 @@ fn get_serialized_field_arguments(
 fn serialize_non_constant_value_for_graphql(value: &NonConstantValue) -> String {
     match value {
         NonConstantValue::Variable(variable_name) => format!("${}", variable_name),
+        NonConstantValue::Integer(int_value) => int_value.to_string(),
     }
 }
 

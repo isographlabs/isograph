@@ -5,6 +5,8 @@ import {
 } from "@isograph/react-disposable-state";
 import { PromiseWrapper, wrapPromise } from "./PromiseWrapper";
 import {
+  Argument,
+  ArgumentValue,
   IsographEntrypoint,
   NormalizationAst,
   NormalizationLinkedField,
@@ -412,13 +414,40 @@ export function getParentRecordKey(
   const fieldParameters = astNode.arguments;
   if (fieldParameters != null) {
     for (const fieldParameter of fieldParameters) {
-      const [argumentName, variable] = fieldParameter;
-      const valueToUse = variables[variable.name];
-      parentRecordKey += `${FIRST_SPLIT_KEY}${argumentName}${SECOND_SPLIT_KEY}${valueToUse}`;
+      parentRecordKey += getStoreKeyChunkForArgument(fieldParameter, variables);
     }
   }
 
   return parentRecordKey;
+}
+
+function getStoreKeyChunkForArgumentValue(
+  argumentValue: ArgumentValue,
+  variables: { [index: string]: string }
+) {
+  switch (argumentValue.kind) {
+    case "Literal": {
+      return argumentValue.value;
+      break;
+    }
+    case "Variable": {
+      return variables[argumentValue.name];
+      break;
+    }
+    default: {
+      // TODO configure eslint to allow unused vars starting with _
+      let _: never = argumentValue;
+      throw new Error("Unexpected case");
+    }
+  }
+}
+
+function getStoreKeyChunkForArgument(
+  argument: Argument,
+  variables: { [index: string]: string }
+) {
+  const chunk = getStoreKeyChunkForArgumentValue(argument[1], variables);
+  return `${FIRST_SPLIT_KEY}${argument[0]}${SECOND_SPLIT_KEY}${chunk}`;
 }
 
 function getNetworkResponseKey(
@@ -428,8 +457,23 @@ function getNetworkResponseKey(
   const fieldParameters = astNode.arguments;
   if (fieldParameters != null) {
     for (const fieldParameter of fieldParameters) {
-      const [argumentName, variable] = fieldParameter;
-      networkResponseKey += `${FIRST_SPLIT_KEY}${argumentName}${SECOND_SPLIT_KEY}v_${variable.name}`;
+      const [argumentName, argumentValue] = fieldParameter;
+      let argumentValueChunk;
+      switch (argumentValue.kind) {
+        case "Literal": {
+          argumentValueChunk = "l_" + argumentValue.value;
+          break;
+        }
+        case "Variable": {
+          argumentValueChunk = "v_" + argumentValue.name;
+          break;
+        }
+        default: {
+          let _: never = argumentValue;
+          throw new Error("Unexpected case");
+        }
+      }
+      networkResponseKey += `${FIRST_SPLIT_KEY}${argumentName}${SECOND_SPLIT_KEY}${argumentValueChunk}`;
     }
   }
   return networkResponseKey;
@@ -466,9 +510,7 @@ function getDataIdOfNetworkResponse(
   }
 
   for (const fieldParameter of fieldParameters) {
-    const [argumentName, variable] = fieldParameter;
-    const valueToUse = variables[variable.name];
-    storeKey += `${FIRST_SPLIT_KEY}${argumentName}${SECOND_SPLIT_KEY}${valueToUse}`;
+    storeKey += getStoreKeyChunkForArgument(fieldParameter, variables);
   }
   return storeKey;
 }
