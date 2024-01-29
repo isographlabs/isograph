@@ -6,12 +6,12 @@ import {
   ROOT_ID,
   getOrCreateCacheForArtifact,
   onNextChange,
-  getStore,
+  store,
   getParentRecordKey,
 } from "./cache";
 import { useLazyDisposableState } from "@isograph/react-disposable-state";
 import { type PromiseWrapper } from "./PromiseWrapper";
-import { getOrCreateCachedComponent } from "./componentCache";
+import React from "react";
 
 export {
   setNetwork,
@@ -20,7 +20,6 @@ export {
   DataId,
   Link,
   StoreRecord,
-  clearStore,
 } from "./cache";
 
 // This type should be treated as an opaque type.
@@ -161,17 +160,11 @@ export type FragmentReference<
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
-export function isoFetch<T extends IsographEntrypoint<any, any, any>>(
-  _text: TemplateStringsArray
-): T {
-  return void 0 as any;
-}
 
 export function iso<TResolverParameter, TResolverReturn = TResolverParameter>(
   _queryText: TemplateStringsArray
 ): (
-  x: ((param: TResolverParameter) => TResolverReturn) | void
-) => (param: TResolverParameter) => TResolverReturn {
+  x: ((param: TResolverParameter) => TResolverReturn) ) => (param: TResolverParameter) => TResolverReturn {
   // The name `identity` here is a bit of a double entendre.
   // First, it is the identity function, constrained to operate
   // on a very specific type. Thus, the value of b Declare`...`(
@@ -187,6 +180,16 @@ export function iso<TResolverParameter, TResolverReturn = TResolverParameter>(
   };
 }
 
+function assertIsEntrypoint<TReadFromStore extends Object,
+  TResolverProps,
+  TResolverResult>(value: IsographEntrypoint<
+    TReadFromStore,
+    TResolverProps,
+    TResolverResult
+  > | typeof iso): asserts value is IsographEntrypoint<TReadFromStore, TResolverProps, TResolverResult> {
+  if (typeof value === 'function') throw new Error("Not a string")
+}
+
 export function useLazyReference<
   TReadFromStore extends Object,
   TResolverProps,
@@ -196,7 +199,7 @@ export function useLazyReference<
     TReadFromStore,
     TResolverProps,
     TResolverResult
-  >,
+  > | typeof iso,
   variables: object
 ): {
   queryReference: FragmentReference<
@@ -205,15 +208,15 @@ export function useLazyReference<
     TResolverResult
   >;
 } {
+
   // Typechecking fails here... TODO investigate
-  const cache = getOrCreateCacheForArtifact<TResolverResult>(
-    entrypoint,
-    variables
-  );
+  assertIsEntrypoint(entrypoint);
+  const cache = getOrCreateCacheForArtifact(entrypoint, variables);
 
   // TODO add comment explaining why we never use this value
   // @ts-ignore
   const data =
+    // @ts-ignore
     useLazyDisposableState<PromiseWrapper<TResolverResult>>(cache).state;
 
   return {
@@ -252,14 +255,23 @@ export function read<
       return fragmentReference.readerArtifact.resolver(data.data);
     }
   } else if (variant.kind === "Component") {
-    // @ts-ignore
-    return getOrCreateCachedComponent(
-      fragmentReference.root,
-      variant.componentName,
-      fragmentReference.readerArtifact,
-      fragmentReference.variables ?? {},
-      fragmentReference.nestedRefetchQueries
-    );
+    return (additionalRuntimeProps: any) => {
+      // TODO also incorporate the typename
+      const RefReaderForName = getRefReaderForName(variant.componentName);
+      // TODO do not create a new reference on every render?
+      return (
+        <RefReaderForName
+          reference={{
+            kind: "FragmentReference",
+            readerArtifact: fragmentReference.readerArtifact,
+            root: fragmentReference.root,
+            variables: fragmentReference.variables,
+            nestedRefetchQueries: fragmentReference.nestedRefetchQueries,
+          }}
+          additionalRuntimeProps={additionalRuntimeProps}
+        />
+      );
+    };
   }
   // Why can't Typescript realize that this is unreachable??
   throw new Error("This is unreachable");
@@ -274,9 +286,7 @@ export function readButDoNotEvaluate<TReadFromStore extends Object>(
     reference.variables ?? {},
     reference.nestedRefetchQueries
   );
-  if (typeof window !== "undefined" && window.__LOG) {
-    console.log("done reading", { response });
-  }
+  console.log("done reading but not evaluating", { response });
   if (response.kind === "MissingData") {
     throw onNextChange();
   } else {
@@ -286,14 +296,14 @@ export function readButDoNotEvaluate<TReadFromStore extends Object>(
 
 type ReadDataResult<TReadFromStore> =
   | {
-      kind: "Success";
-      data: TReadFromStore;
-    }
+    kind: "Success";
+    data: TReadFromStore;
+  }
   | {
-      kind: "MissingData";
-      reason: string;
-      nestedReason?: ReadDataResult<unknown>;
-    };
+    kind: "MissingData";
+    reason: string;
+    nestedReason?: ReadDataResult<unknown>;
+  };
 
 function readData<TReadFromStore>(
   ast: ReaderAst<TReadFromStore>,
@@ -301,7 +311,7 @@ function readData<TReadFromStore>(
   variables: { [index: string]: string },
   nestedRefetchQueries: RefetchQueryArtifactWrapper[]
 ): ReadDataResult<TReadFromStore> {
-  let storeRecord = getStore()[root];
+  let storeRecord = store[root];
   if (storeRecord === undefined) {
     return { kind: "MissingData", reason: "No record for root " + root };
   }
@@ -427,9 +437,7 @@ function readData<TReadFromStore>(
           // Refetch fields just read the id, and don't need refetch query artifacts
           []
         );
-        if (typeof window !== "undefined" && window.__LOG) {
-          console.log("refetch field data", data, field);
-        }
+        console.log("refetch field data", data, field);
         if (data.kind === "MissingData") {
           return {
             kind: "MissingData",
@@ -465,9 +473,7 @@ function readData<TReadFromStore>(
           // Refetch fields just read the id, and don't need refetch query artifacts
           []
         );
-        if (typeof window !== "undefined" && window.__LOG) {
-          console.log("refetch field data", data, field);
-        }
+        console.log("refetch field data", data, field);
         if (data.kind === "MissingData") {
           return {
             kind: "MissingData",
@@ -515,13 +521,23 @@ function readData<TReadFromStore>(
             target[field.alias] = field.readerArtifact.resolver(data.data);
           }
         } else if (variant.kind === "Component") {
-          target[field.alias] = getOrCreateCachedComponent(
-            root,
-            variant.componentName,
-            field.readerArtifact,
-            variables,
-            resolverRefetchQueries
-          );
+          target[field.alias] = (additionalRuntimeProps: any) => {
+            // TODO also incorporate the typename
+            const RefReaderForName = getRefReaderForName(variant.componentName);
+            // TODO do not create a new reference on every render?
+            return (
+              <RefReaderForName
+                reference={{
+                  kind: "FragmentReference",
+                  readerArtifact: field.readerArtifact,
+                  root,
+                  variables,
+                  nestedRefetchQueries: resolverRefetchQueries,
+                }}
+                additionalRuntimeProps={additionalRuntimeProps}
+              />
+            );
+          };
         }
         break;
       }
@@ -593,6 +609,29 @@ function assertLink(link: DataTypeValue): Link | undefined | null {
     return undefined;
   }
   throw new Error("Invalid link");
+}
+
+const refReaders: { [index: string]: any } = {};
+export function getRefReaderForName(name: string) {
+  if (refReaders[name] == null) {
+    function Component({
+      reference,
+      additionalRuntimeProps,
+    }: {
+      reference: FragmentReference<any, any, any>;
+      additionalRuntimeProps: any;
+    }) {
+      const data = readButDoNotEvaluate(reference);
+
+      return reference.readerArtifact.resolver({
+        data,
+        ...additionalRuntimeProps,
+      });
+    }
+    Component.displayName = `${name} @component`;
+    refReaders[name] = Component;
+  }
+  return refReaders[name];
 }
 
 export type IsographComponentProps<TDataType, TOtherProps = Object> = {

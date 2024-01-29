@@ -10,7 +10,9 @@ use common_lang_types::{
 };
 use graphql_schema_parser::{parse_schema, parse_schema_extensions, SchemaParseError};
 use intern::{string_key::Intern, Lookup};
-use isograph_lang_parser::{parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError};
+use isograph_lang_parser::{
+    parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
+};
 use isograph_lang_types::{EntrypointTypeAndField, ResolverDeclaration};
 use isograph_schema::{CompilerConfig, ProcessResolverDeclarationError, Schema, UnvalidatedSchema};
 use pretty_duration::pretty_duration;
@@ -19,8 +21,7 @@ use thiserror::Error;
 use crate::{
     generate_artifacts::{generate_and_write_artifacts, GenerateArtifactsError},
     isograph_literals::{
-        extract_iso_literal_from_file_content,
-        read_files_in_folder, IsoLiteralExtraction,
+        extract_iso_literal_from_file_content, read_files_in_folder, IsoLiteralExtraction,
     },
     schema::read_schema_file,
 };
@@ -257,7 +258,6 @@ fn extract_iso_literals(
                 Err(e) => isograph_literal_parse_errors.extend(e.into_iter()),
             }
         }
-
     }
 
     if isograph_literal_parse_errors.is_empty() {
@@ -269,7 +269,6 @@ fn extract_iso_literals(
         Err(isograph_literal_parse_errors)
     }
 }
-
 
 fn process_iso_literal_extraction(
     iso_literal_extraction: IsoLiteralExtraction<'_>,
@@ -292,7 +291,6 @@ fn process_iso_literal_extraction(
     };
 
     let mut errors = vec![];
-
 
     // TODO return errors if any occurred, otherwise Ok
     match parse_iso_literal(&iso_literal_text, interned_file_path, text_source) {
