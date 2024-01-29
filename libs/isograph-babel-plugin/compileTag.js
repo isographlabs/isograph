@@ -4,24 +4,29 @@ const pathModule = require("path");
 
 function compileTag(t, path, config) {
   const tag = path.get("tag");
-  
+
   if (tag.isIdentifier({ name: "iso" })) {
     const { keyword, type, field } = getTypeAndField(path);
-    if (keyword === 'entrypoint') {
+    if (keyword === "entrypoint") {
       // This throws if the tag is invalid
       compileImportStatement(t, path, type, field, "entrypoint", config);
-    } else if (keyword === 'field') {
+    } else if (keyword === "field") {
       // No-op
       return false;
     } else {
-      throw new Error("Invalid iso tag usage. Expected 'entrypoint' or 'field'.");
+      throw new Error(
+        "Invalid iso tag usage. Expected 'entrypoint' or 'field'."
+      );
     }
   }
 
   return false;
 }
 
-const typeAndFieldRegex = new RegExp("\\s*(entrypoint|field)\\s*([^\\.\\s]+)\\.([^\\s\\(]+)", "m");
+const typeAndFieldRegex = new RegExp(
+  "\\s*(entrypoint|field)\\s*([^\\.\\s]+)\\.([^\\s\\(]+)",
+  "m"
+);
 
 function getTypeAndField(path) {
   const quasis = path.node.quasi.quasis;
@@ -33,7 +38,7 @@ function getTypeAndField(path) {
 
   const content = path.node.quasi.quasis[0].value.raw;
   const typeAndField = typeAndFieldRegex.exec(content);
-  
+
   const keyword = typeAndField[1];
   const type = typeAndField[2];
   const field = typeAndField[3];
