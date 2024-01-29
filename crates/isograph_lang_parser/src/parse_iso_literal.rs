@@ -519,9 +519,8 @@ fn HACK_combine_name_and_variables_into_normalization_alias<T: StringKeyNewtype>
         for argument in arguments {
             alias_str.push_str(&format!(
                 // this will not be necessary once we have normalization ASTs
-                "____{}___{}",
-                argument.item.name.item,
-                &argument.item.value.item.to_string()[1..]
+                "____{}",
+                argument.item.to_alias_str_chunk()
             ));
         }
         Some(name.map(|_| T::from(alias_str.intern())))

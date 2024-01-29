@@ -7,6 +7,7 @@ use common_lang_types::{
     WithLocation, WithSpan,
 };
 use graphql_lang_types::TypeAnnotation;
+use intern::Lookup;
 
 pub type UnvalidatedSelection = Selection<
     // <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
@@ -207,6 +208,18 @@ pub struct SelectionFieldArgument {
     pub value: WithSpan<NonConstantValue>,
 }
 
+impl SelectionFieldArgument {
+    /// A function called on each SelectionFieldArgument when
+    /// generating queries. This must be kept in sync with @isograph/react
+    pub fn to_alias_str_chunk(&self) -> String {
+        format!(
+            "{}___{}",
+            self.name.item,
+            self.value.item.to_alias_str_chunk()
+        )
+    }
+}
+
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum NonConstantValue {
     Variable(VariableName),
@@ -216,6 +229,12 @@ impl NonConstantValue {
     pub fn reachable_variables(&self) -> Vec<VariableName> {
         match self {
             NonConstantValue::Variable(name) => vec![*name],
+        }
+    }
+
+    pub fn to_alias_str_chunk(&self) -> String {
+        match self {
+            NonConstantValue::Variable(name) => name.lookup().to_string(),
         }
     }
 }
