@@ -364,10 +364,8 @@ fn get_aliased_mutation_field_name(
     for param in parameters.iter() {
         // TODO NonConstantValue will format to a string like "$name", but we want just "name".
         // There is probably a better way to do this.
-        let value_str = match param.item.value.item {
-            NonConstantValue::Variable(var) => format!("{}", var),
-        };
-        s.push_str(&format!("____{}___{}", param.item.name.item, value_str))
+        s.push_str("____");
+        s.push_str(&param.item.to_alias_str_chunk());
     }
     s
 }

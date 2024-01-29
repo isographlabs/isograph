@@ -6,7 +6,7 @@ import refetchQuery1 from './__refetch__1.isograph';
 const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [{ artifact: refetchQuery0, allowedVariables: [] }, { artifact: refetchQuery1, allowedVariables: [] }, ];
 
 const queryText = 'query PetDetailRoute ($id: ID!) {\
-  pet____id___id: pet(id: $id) {\
+  pet____id___v_id: pet(id: $id) {\
     id,\
     best_friend_relationship {\
       best_friend {\

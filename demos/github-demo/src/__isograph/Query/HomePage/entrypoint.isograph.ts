@@ -10,7 +10,7 @@ const queryText = 'query HomePage ($first: Int!) {\
     avatarUrl,\
     name,\
     id,\
-    repositories____last___first: repositories(last: $first) {\
+    repositories____last___v_first: repositories(last: $first) {\
       edges {\
         node {\
           id,\
@@ -22,11 +22,11 @@ const queryText = 'query HomePage ($first: Int!) {\
             id,\
             login,\
           },\
-          pullRequests____first___first: pullRequests(first: $first) {\
+          pullRequests____first___v_first: pullRequests(first: $first) {\
             totalCount,\
           },\
           stargazerCount,\
-          watchers____first___first: watchers(first: $first) {\
+          watchers____first___v_first: watchers(first: $first) {\
             totalCount,\
           },\
         },\

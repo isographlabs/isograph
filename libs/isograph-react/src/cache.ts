@@ -429,7 +429,7 @@ function getNetworkResponseKey(
   if (fieldParameters != null) {
     for (const fieldParameter of fieldParameters) {
       const [argumentName, variable] = fieldParameter;
-      networkResponseKey += `${FIRST_SPLIT_KEY}${argumentName}${SECOND_SPLIT_KEY}${variable.name}`;
+      networkResponseKey += `${FIRST_SPLIT_KEY}${argumentName}${SECOND_SPLIT_KEY}v_${variable.name}`;
     }
   }
   return networkResponseKey;

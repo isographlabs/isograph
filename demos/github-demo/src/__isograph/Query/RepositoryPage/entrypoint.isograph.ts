@@ -4,7 +4,7 @@ import readerResolver from './reader.isograph';
 const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [];
 
 const queryText = 'query RepositoryPage ($repositoryName: String!, $repositoryOwner: String!, $first: Int!) {\
-  repository____name___repositoryName____owner___repositoryOwner: repository(name: $repositoryName, owner: $repositoryOwner) {\
+  repository____name___v_repositoryName____owner___v_repositoryOwner: repository(name: $repositoryName, owner: $repositoryOwner) {\
     id,\
     nameWithOwner,\
     parent {\
@@ -16,7 +16,7 @@ const queryText = 'query RepositoryPage ($repositoryName: String!, $repositoryOw
         login,\
       },\
     },\
-    pullRequests____last___first: pullRequests(last: $first) {\
+    pullRequests____last___v_first: pullRequests(last: $first) {\
       edges {\
         node {\
           id,\

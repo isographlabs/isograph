@@ -7,7 +7,6 @@ use common_lang_types::{
     WithLocation, WithSpan,
 };
 use graphql_lang_types::TypeAnnotation;
-use intern::Lookup;
 
 pub type UnvalidatedSelection = Selection<
     // <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
@@ -234,7 +233,7 @@ impl NonConstantValue {
 
     pub fn to_alias_str_chunk(&self) -> String {
         match self {
-            NonConstantValue::Variable(name) => name.lookup().to_string(),
+            NonConstantValue::Variable(name) => format!("v_{}", name),
         }
     }
 }

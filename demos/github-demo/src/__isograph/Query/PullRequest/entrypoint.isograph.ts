@@ -4,12 +4,12 @@ import readerResolver from './reader.isograph';
 const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [];
 
 const queryText = 'query PullRequest ($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!) {\
-  repository____owner___repositoryOwner____name___repositoryName: repository(owner: $repositoryOwner, name: $repositoryName) {\
+  repository____owner___v_repositoryOwner____name___v_repositoryName: repository(owner: $repositoryOwner, name: $repositoryName) {\
     id,\
-    pullRequest____number___pullRequestNumber: pullRequest(number: $pullRequestNumber) {\
+    pullRequest____number___v_pullRequestNumber: pullRequest(number: $pullRequestNumber) {\
       id,\
       bodyHTML,\
-      comments____last___last: comments(last: $last) {\
+      comments____last___v_last: comments(last: $last) {\
         edges {\
           node {\
             id,\
