@@ -254,7 +254,7 @@ fn extract_iso_literals(
                         resolver_fetch_and_text_sources.push((decl, text_source))
                     }
                 },
-                Err(e) => isograph_literal_parse_errors.extend(e.into_iter()),
+                Err(e) => isograph_literal_parse_errors.push(e),
             }
         }
     }
@@ -273,8 +273,7 @@ fn process_iso_literal_extraction(
     iso_literal_extraction: IsoLiteralExtraction<'_>,
     file_name: SourceFileName,
     interned_file_path: ResolverDefinitionPath,
-) -> Result<(IsoLiteralExtractionResult, TextSource), Vec<WithLocation<IsographLiteralParseError>>>
-{
+) -> Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>> {
     let IsoLiteralExtraction {
         iso_literal_text,
         iso_literal_start_index,
@@ -289,40 +288,27 @@ fn process_iso_literal_extraction(
         )),
     };
 
-    let mut errors = vec![];
-
     // TODO return errors if any occurred, otherwise Ok
-    match parse_iso_literal(
+    let iso_literal_extraction_result = parse_iso_literal(
         &iso_literal_text,
         interned_file_path,
         const_export_name,
         text_source,
+    )?;
+
+    if matches!(
+        &iso_literal_extraction_result,
+        IsoLiteralExtractionResult::ClientFieldDeclaration(_)
     ) {
-        Ok(res) => {
-            let extraction_result = res.item;
-            if let IsoLiteralExtractionResult::ClientFieldDeclaration(_resolver_declaration) =
-                &extraction_result
-            {
-                if !has_associated_js_function {
-                    errors.push(WithLocation::new(
-                        IsographLiteralParseError::ExpectedAssociatedJsFunction,
-                        Location::new(text_source, Span::todo_generated()),
-                    ));
-                }
-                if errors.is_empty() {
-                    Ok((extraction_result, text_source))
-                } else {
-                    Err(errors)
-                }
-            } else {
-                Ok((extraction_result, text_source))
-            }
-        }
-        Err(e) => {
-            errors.push(e);
-            Err(errors)
+        if !has_associated_js_function {
+            return Err(WithLocation::new(
+                IsographLiteralParseError::ExpectedAssociatedJsFunction,
+                Location::new(text_source, Span::todo_generated()),
+            ));
         }
     }
+
+    Ok((iso_literal_extraction_result, text_source))
 }
 
 #[derive(Error, Debug)]
