@@ -12,8 +12,9 @@
     "build-demos": "yarn run build-github-demo && yarn run build-graphql-conf-demo",
     "build-github-demo": "./target/debug/isograph_cli --config ./demos/github-demo/isograph.config.json",
     "build-graphql-conf-demo": "./target/debug/isograph_cli --config ./demos/graphql-conf-2023-demo/isograph.config.json",
-    "format": "yarn run format-prettier",
-    "format-prettier": "prettier --config ./.prettier.config.js --write ."
+    "format": "yarn run format-prettier && yarn run format-rust",
+    "format-prettier": "prettier --config ./.prettier.config.js --write .",
+    "format-rust": "cargo fmt"
   },
   "license": "MIT",
   "repository": {
