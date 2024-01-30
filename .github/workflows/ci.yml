@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         target:
-          - target:
+          - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
             build-name: isograph_cli
             artifact-name: isograph_cli-linux-x64
