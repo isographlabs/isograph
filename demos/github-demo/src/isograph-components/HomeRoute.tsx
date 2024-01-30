@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { iso, read, useLazyReference, subscribe } from '@isograph/react';
-import { Container } from '@mui/material';
+import React, { useEffect, useState } from "react";
+import { iso, read, useLazyReference, subscribe } from "@isograph/react";
+import { Container } from "@mui/material";
 
-import { ResolverParameterType as HomePageComponentParams } from '@iso/Query/HomePage/reader.isograph';
+import { ResolverParameterType as HomePageComponentParams } from "@iso/Query/HomePage/reader.isograph";
+import HomePageEntrypoint from "@iso/Query/HomePage/entrypoint.isograph";
 
-import { FullPageLoading, Route } from './GithubDemo';
-import { RepoLink } from './RepoLink';
+import { FullPageLoading, Route } from "./GithubDemo";
+import { RepoLink } from "./RepoLink";
 
 export const HomePage = iso<HomePageComponentParams>`
   field Query.HomePage($first: Int!) @component {
@@ -30,14 +31,23 @@ function HomePageComponent({ data, route, setRoute }: HomePageComponentParams) {
   );
 }
 
-export function HomeRoute({ route, setRoute }: { route: Route; setRoute: (route: Route) => void }) {
+export function HomeRoute({
+  route,
+  setRoute,
+}: {
+  route: Route;
+  setRoute: (route: Route) => void;
+}) {
   const [, setState] = useState({});
   useEffect(() => {
     return subscribe(() => setState({}));
   }, []);
-  const { queryReference } = useLazyReference(iso`entrypoint Query.HomePage`, {
-    first: 15,
-  });
-  const component = read(queryReference);
-  return component({ route, setRoute });
+  const { queryReference } = useLazyReference<typeof HomePageEntrypoint>(
+    iso`entrypoint Query.HomePage`,
+    {
+      first: 15,
+    }
+  );
+  const Component = read(queryReference);
+  return <Component route={route} setRoute={setRoute} />;
 }
