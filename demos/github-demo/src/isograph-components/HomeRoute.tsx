@@ -6,7 +6,7 @@ import { ResolverParameterType as HomePageComponentParams } from "@iso/Query/Hom
 import HomePageEntrypoint from "@iso/Query/HomePage/entrypoint.isograph";
 
 import { FullPageLoading, Route } from "./GithubDemo";
-import { RepoLink } from "./RepoLink";
+import { RepoGitHubLink } from "./RepoGitHubLink";
 
 export const HomePage = iso<HomePageComponentParams>`
   field Query.HomePage($first: Int!) @component {
@@ -20,9 +20,9 @@ function HomePageComponent({ data, route, setRoute }: HomePageComponentParams) {
     <>
       <data.Header route={route} setRoute={setRoute} />
       <Container maxWidth="md">
-        <RepoLink filePath="demos/github-demo/src/isograph-components/HomeRoute.tsx">
+        <RepoGitHubLink filePath="demos/github-demo/src/isograph-components/HomeRoute.tsx">
           Home Page Route
-        </RepoLink>
+        </RepoGitHubLink>
         <React.Suspense fallback={<FullPageLoading />}>
           <data.HomePageList route={route} setRoute={setRoute} />
         </React.Suspense>
