@@ -1,13 +1,10 @@
-import React from "react";
-import { iso } from "@isograph/react";
-import { Avatar, Card, CardContent, Stack } from "@mui/material";
+import React from 'react';
+import { iso } from '@isograph/react';
+import { Avatar, Card, CardContent, Stack } from '@mui/material';
 
-import { ResolverParameterType as PetSummaryCardParams } from "@iso/Pet/PetSummaryCard/reader.isograph";
+import { ResolverParameterType as PetSummaryCardParams } from '@iso/Pet/PetSummaryCard/reader.isograph';
 
-export const PetSummaryCard = iso<
-  PetSummaryCardParams,
-  ReturnType<typeof PetSummaryCardComponent>
->`
+export const PetSummaryCard = iso<PetSummaryCardParams, ReturnType<typeof PetSummaryCardComponent>>`
   field Pet.PetSummaryCard @component {
     id,
     name,
@@ -20,8 +17,8 @@ function PetSummaryCardComponent(props: PetSummaryCardParams) {
   return (
     <Card
       variant="outlined"
-      sx={{ width: 450, boxShadow: 3, cursor: "pointer" }}
-      onClick={() => props.navigateTo({ kind: "PetDetail", id: props.data.id })}
+      sx={{ width: 450, boxShadow: 3, cursor: 'pointer' }}
+      onClick={() => props.navigateTo({ kind: 'PetDetail', id: props.data.id })}
     >
       <CardContent>
         <Stack direction="row" spacing={4}>

@@ -1,22 +1,21 @@
-import { describe, assert, test, vi, expect } from "vitest";
-import { ParentCache } from "./ParentCache";
-import { ItemCleanupPair } from "@isograph/disposable-types";
-import { CacheItem } from "./CacheItem";
+import { describe, assert, test, vi, expect } from 'vitest';
+import { ParentCache } from './ParentCache';
+import { ItemCleanupPair } from '@isograph/disposable-types';
+import { CacheItem } from './CacheItem';
 
 function getValue<T>(cache: ParentCache<T>): CacheItem<T> | null {
   return (cache as any).__item as CacheItem<T> | null;
 }
 
-describe("ParentCache", () => {
-  test("Populated, emptied, repopulated cache is not re-emptied by original temporary retain being disposed", () => {
+describe('ParentCache', () => {
+  test('Populated, emptied, repopulated cache is not re-emptied by original temporary retain being disposed', () => {
     const factory = vi.fn(() => {
       const pair: ItemCleanupPair<number> = [1, vi.fn()];
       return pair;
     });
     const parentCache = new ParentCache<number>(factory);
 
-    const [_cacheItem, value, clearTemporaryRetain] =
-      parentCache.getOrPopulateAndTemporaryRetain();
+    const [_cacheItem, value, clearTemporaryRetain] = parentCache.getOrPopulateAndTemporaryRetain();
 
     expect(factory.mock.calls.length).toBe(1);
     assert(value === 1);
@@ -35,7 +34,7 @@ describe("ParentCache", () => {
     assert(getValue(parentCache) != null);
   });
 
-  test("Clearing the only temporary retain removes the item from the parent cache", () => {
+  test('Clearing the only temporary retain removes the item from the parent cache', () => {
     const factory = vi.fn(() => {
       const pair: ItemCleanupPair<number> = [1, vi.fn()];
       return pair;
@@ -49,7 +48,7 @@ describe("ParentCache", () => {
     assert(getValue(parentCache) === null);
   });
 
-  test("Clearing one of two temporary retains does not remove the item from the parent cache", () => {
+  test('Clearing one of two temporary retains does not remove the item from the parent cache', () => {
     const factory = vi.fn(() => {
       const pair: ItemCleanupPair<number> = [1, vi.fn()];
       return pair;

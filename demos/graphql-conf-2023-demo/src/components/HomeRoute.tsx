@@ -1,12 +1,9 @@
-import React from "react";
-import { iso } from "@isograph/react";
-import { Container, Stack } from "@mui/material";
-import { ResolverParameterType as HomeRouteParams } from "@iso/Query/HomeRoute/reader.isograph";
+import React from 'react';
+import { iso } from '@isograph/react';
+import { Container, Stack } from '@mui/material';
+import { ResolverParameterType as HomeRouteParams } from '@iso/Query/HomeRoute/reader.isograph';
 
-export const HomeRoute = iso<
-  HomeRouteParams,
-  ReturnType<typeof HomeRouteComponent>
->`
+export const HomeRoute = iso<HomeRouteParams, ReturnType<typeof HomeRouteComponent>>`
   field Query.HomeRoute @component {
     pets {
       id,

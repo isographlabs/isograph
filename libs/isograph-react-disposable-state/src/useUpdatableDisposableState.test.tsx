@@ -1,10 +1,7 @@
-import { describe, test, vi, expect } from "vitest";
-import React from "react";
-import { create } from "react-test-renderer";
-import {
-  useUpdatableDisposableState,
-  UNASSIGNED_STATE,
-} from "./useUpdatableDisposableState";
+import { describe, test, vi, expect } from 'vitest';
+import React from 'react';
+import { create } from 'react-test-renderer';
+import { useUpdatableDisposableState, UNASSIGNED_STATE } from './useUpdatableDisposableState';
 
 function Suspender({ promise, isResolvedRef }) {
   if (!isResolvedRef.current) {
@@ -44,29 +41,26 @@ function promiseAndResolver() {
 // The fact that sometimes we need to render in concurrent mode and sometimes
 // not is a bit worrisome.
 async function awaitableCreate(Component, isConcurrent) {
-  const element = create(
-    Component,
-    isConcurrent ? { unstable_isConcurrent: true } : undefined
-  );
+  const element = create(Component, isConcurrent ? { unstable_isConcurrent: true } : undefined);
   await shortPromise();
   return element;
 }
 
-describe("useUpdatableDisposableState", () => {
-  test("it should return a sentinel value initially and a setter", async () => {
+describe('useUpdatableDisposableState', () => {
+  test('it should return a sentinel value initially and a setter', async () => {
     const render = vi.fn();
     function TestComponent() {
       render();
       const value = useUpdatableDisposableState();
       expect(value.state).toBe(UNASSIGNED_STATE);
-      expect(typeof value.setState).toBe("function");
+      expect(typeof value.setState).toBe('function');
       return null;
     }
     await awaitableCreate(<TestComponent />, false);
     expect(render).toHaveBeenCalledTimes(1);
   });
 
-  test("it should allow you to update the value in state", async () => {
+  test('it should allow you to update the value in state', async () => {
     const render = vi.fn();
     let value;
     function TestComponent() {
@@ -85,7 +79,7 @@ describe("useUpdatableDisposableState", () => {
     expect(value.state).toEqual(1);
   });
 
-  test("it should dispose previous values on commit", async () => {
+  test('it should dispose previous values on commit', async () => {
     const render = vi.fn();
     const componentCommits = vi.fn();
     let value;
@@ -120,7 +114,7 @@ describe("useUpdatableDisposableState", () => {
     expect(componentCommits).toHaveBeenCalled();
   });
 
-  test("it should dispose identical previous values on commit", async () => {
+  test('it should dispose identical previous values on commit', async () => {
     const render = vi.fn();
     const componentCommits = vi.fn();
     let value;
@@ -158,7 +152,7 @@ describe("useUpdatableDisposableState", () => {
     expect(componentCommits).toHaveBeenCalled();
   });
 
-  test("it should dispose multiple previous values on commit", async () => {
+  test('it should dispose multiple previous values on commit', async () => {
     const render = vi.fn();
     const componentCommits = vi.fn();
     let value;
@@ -202,7 +196,7 @@ describe("useUpdatableDisposableState", () => {
     expect(componentCommits).toHaveBeenCalled();
   });
 
-  test("it should throw if setState is called during a render before commit", async () => {
+  test('it should throw if setState is called during a render before commit', async () => {
     let didCatch;
     function TestComponent() {
       const value = useUpdatableDisposableState<number>();
@@ -219,7 +213,7 @@ describe("useUpdatableDisposableState", () => {
     expect(didCatch).toBe(true);
   });
 
-  test("it should not throw if setState is called during render after commit", async () => {
+  test('it should not throw if setState is called during render after commit', async () => {
     let value;
     const cleanupFn = vi.fn();
     const sawCorrectValue = vi.fn();
@@ -254,7 +248,7 @@ describe("useUpdatableDisposableState", () => {
     expect(value.state).toBe(1);
   });
 
-  test("it should throw if setState is called after a render before commit", async () => {
+  test('it should throw if setState is called after a render before commit', async () => {
     let value;
     const componentCommits = vi.fn();
     function TestComponent() {
@@ -271,7 +265,7 @@ describe("useUpdatableDisposableState", () => {
         <TestComponent />
         <Suspender promise={promise} isResolvedRef={isResolvedRef} />
       </React.Suspense>,
-      true
+      true,
     );
 
     expect(componentCommits).not.toHaveBeenCalled();
@@ -282,8 +276,8 @@ describe("useUpdatableDisposableState", () => {
   });
 
   test(
-    "it should dispose items that were set during " +
-      "suspense when the component commits due to unsuspense",
+    'it should dispose items that were set during ' +
+      'suspense when the component commits due to unsuspense',
     async () => {
       // Note that "during suspense" implies that there is no commit, so this
       // follows from the descriptions of the previous tests. Nonetheless, we
@@ -320,7 +314,7 @@ describe("useUpdatableDisposableState", () => {
         <React.Suspense fallback="fallback">
           <ParentComponent />
         </React.Suspense>,
-        true
+        true,
       );
 
       expect(render).toHaveBeenCalledTimes(1);
@@ -354,10 +348,10 @@ describe("useUpdatableDisposableState", () => {
       expect(cleanup1).toHaveBeenCalledTimes(1);
       expect(render).toHaveBeenCalledTimes(3);
       expect(componentCommits).toHaveBeenCalledTimes(2);
-    }
+    },
   );
 
-  test("it should properly clean up all items passed to setState during suspense on unmount", async () => {
+  test('it should properly clean up all items passed to setState during suspense on unmount', async () => {
     let value;
     const componentCommits = vi.fn();
     const render = vi.fn();
@@ -391,7 +385,7 @@ describe("useUpdatableDisposableState", () => {
       <React.Suspense fallback="fallback">
         <ParentComponent shouldMountRef={shouldMountRef} />
       </React.Suspense>,
-      true
+      true,
     );
 
     expect(render).toHaveBeenCalledTimes(1);
@@ -430,7 +424,7 @@ describe("useUpdatableDisposableState", () => {
     expect(cleanup2).toHaveBeenCalled();
   });
 
-  test("it should clean up the item currently in state on unmount", async () => {
+  test('it should clean up the item currently in state on unmount', async () => {
     let value;
     const componentCommits = vi.fn();
     const render = vi.fn();
@@ -452,10 +446,7 @@ describe("useUpdatableDisposableState", () => {
 
     const shouldMountRef = { current: true };
 
-    await awaitableCreate(
-      <ParentComponent shouldMountRef={shouldMountRef} />,
-      true
-    );
+    await awaitableCreate(<ParentComponent shouldMountRef={shouldMountRef} />, true);
 
     expect(render).toHaveBeenCalledTimes(1);
     expect(componentCommits).toHaveBeenCalledTimes(1);

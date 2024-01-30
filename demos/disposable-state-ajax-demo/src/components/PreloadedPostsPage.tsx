@@ -1,14 +1,11 @@
-import React, { useEffect } from "react";
-import NoSSR from "react-no-ssr";
+import React, { useEffect } from 'react';
+import NoSSR from 'react-no-ssr';
 
-import {
-  UNASSIGNED_STATE,
-  useUpdatableDisposableState,
-} from "@isograph/react-disposable-state";
-import { makeNetworkRequest } from "./api";
-import { Comment, Post, User } from "./networkTypes";
-import { PromiseWrapper, useReadPromise } from "./PromiseWrapper";
-import { Card } from "./Card";
+import { UNASSIGNED_STATE, useUpdatableDisposableState } from '@isograph/react-disposable-state';
+import { makeNetworkRequest } from './api';
+import { Comment, Post, User } from './networkTypes';
+import { PromiseWrapper, useReadPromise } from './PromiseWrapper';
+import { Card } from './Card';
 
 /**
  * Preloading demo
@@ -81,9 +78,7 @@ export function PreloadedPostsWrapper() {
   const { state: requestForPosts, setState: setRequestForPosts } =
     useUpdatableDisposableState<PromiseWrapper<Post[]>>();
   useEffect(() => {
-    setRequestForPosts(
-      makeNetworkRequest("https://jsonplaceholder.typicode.com/posts")
-    );
+    setRequestForPosts(makeNetworkRequest('https://jsonplaceholder.typicode.com/posts'));
   }, [setRequestForPosts]);
 
   if (requestForPosts === UNASSIGNED_STATE) {
@@ -99,11 +94,7 @@ export function PreloadedPostsWrapper() {
   );
 }
 
-function PreloadedPostsReader({
-  requestForPosts,
-}: {
-  requestForPosts: PromiseWrapper<Post[]>;
-}) {
+function PreloadedPostsReader({ requestForPosts }: { requestForPosts: PromiseWrapper<Post[]> }) {
   const data = useReadPromise(requestForPosts);
 
   return (
@@ -146,11 +137,11 @@ function PostCard({ post, user }: { post: Post; user?: User }) {
  */
 type CommentsWrapperState =
   | {
-      kind: "LoadedNotRevealed";
+      kind: 'LoadedNotRevealed';
       requestForComments: PromiseWrapper<Comment[]>;
     }
   | {
-      kind: "LoadedRevealed";
+      kind: 'LoadedRevealed';
       requestForComments: PromiseWrapper<Comment[]>;
     };
 
@@ -160,12 +151,12 @@ function CommentsWrapper({ postId }: { postId: number }) {
 
   function onMouseOver() {
     if (commentsWrapperState === UNASSIGNED_STATE) {
-      const [networkRequest, cleanupNetworkRequest] = makeNetworkRequest<
-        Comment[]
-      >(`https://jsonplaceholder.typicode.com/post/${postId}/comments`);
+      const [networkRequest, cleanupNetworkRequest] = makeNetworkRequest<Comment[]>(
+        `https://jsonplaceholder.typicode.com/post/${postId}/comments`,
+      );
       setCommentsWrapperState([
         {
-          kind: "LoadedNotRevealed",
+          kind: 'LoadedNotRevealed',
           requestForComments: networkRequest,
         },
         cleanupNetworkRequest,
@@ -175,17 +166,17 @@ function CommentsWrapper({ postId }: { postId: number }) {
 
   function onClick() {
     if (commentsWrapperState === UNASSIGNED_STATE) {
-      const [networkRequest, cleanupNetworkRequest] = makeNetworkRequest<
-        Comment[]
-      >(`https://jsonplaceholder.typicode.com/post/${postId}/comments`);
+      const [networkRequest, cleanupNetworkRequest] = makeNetworkRequest<Comment[]>(
+        `https://jsonplaceholder.typicode.com/post/${postId}/comments`,
+      );
       setCommentsWrapperState([
         {
-          kind: "LoadedRevealed",
+          kind: 'LoadedRevealed',
           requestForComments: networkRequest,
         },
         cleanupNetworkRequest,
       ]);
-    } else if (commentsWrapperState.kind === "LoadedNotRevealed") {
+    } else if (commentsWrapperState.kind === 'LoadedNotRevealed') {
       const { requestForComments } = commentsWrapperState;
       /**
        * Note: normally, here we would do
@@ -203,7 +194,7 @@ function CommentsWrapper({ postId }: { postId: number }) {
       const cleanupNetworkRequest = () => {};
 
       setCommentsWrapperState([
-        { kind: "LoadedRevealed", requestForComments },
+        { kind: 'LoadedRevealed', requestForComments },
         cleanupNetworkRequest,
       ]);
     }
@@ -211,15 +202,11 @@ function CommentsWrapper({ postId }: { postId: number }) {
 
   if (
     commentsWrapperState === UNASSIGNED_STATE ||
-    commentsWrapperState.kind === "LoadedNotRevealed"
+    commentsWrapperState.kind === 'LoadedNotRevealed'
   ) {
     return (
       <div className="d-grid mt-2">
-        <button
-          className="btn btn-primary"
-          onClick={onClick}
-          onMouseOver={onMouseOver}
-        >
+        <button className="btn btn-primary" onClick={onClick} onMouseOver={onMouseOver}>
           Fetch comments on hover, reveal comments on click
         </button>
       </div>
@@ -228,18 +215,12 @@ function CommentsWrapper({ postId }: { postId: number }) {
 
   return (
     <React.Suspense fallback={<h5 className="mt-2">Loading comments...</h5>}>
-      <CommentsReader
-        requestForComments={commentsWrapperState.requestForComments}
-      />
+      <CommentsReader requestForComments={commentsWrapperState.requestForComments} />
     </React.Suspense>
   );
 }
 
-function CommentsReader({
-  requestForComments,
-}: {
-  requestForComments: PromiseWrapper<Comment[]>;
-}) {
+function CommentsReader({ requestForComments }: { requestForComments: PromiseWrapper<Comment[]> }) {
   const comments = useReadPromise(requestForComments);
 
   return (

@@ -7,9 +7,7 @@ export type PromiseWrapper<T extends object> = {
   value: T | null;
 };
 
-export function wrapPromise<T extends object>(
-  promise: Promise<T>
-): PromiseWrapper<T> {
+export function wrapPromise<T extends object>(promise: Promise<T>): PromiseWrapper<T> {
   // TODO confirm suspense works if the promise is already resolved.
   const wrapper: PromiseWrapper<T> = { promise, value: null };
   promise.then((v) => {

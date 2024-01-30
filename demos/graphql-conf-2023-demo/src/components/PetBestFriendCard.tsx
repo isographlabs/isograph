@@ -1,8 +1,8 @@
-import React from "react";
-import { iso } from "@isograph/react";
-import { Avatar, Card, CardContent, Stack } from "@mui/material";
+import React from 'react';
+import { iso } from '@isograph/react';
+import { Avatar, Card, CardContent, Stack } from '@mui/material';
 
-import { ResolverParameterType as PetBestFriendCardParams } from "@iso/Pet/PetBestFriendCard/reader.isograph";
+import { ResolverParameterType as PetBestFriendCardParams } from '@iso/Pet/PetBestFriendCard/reader.isograph';
 
 export const PetBestFriendCard = iso<
   PetBestFriendCardParams,

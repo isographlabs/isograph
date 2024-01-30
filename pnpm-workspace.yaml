@@ -1,4 +1,4 @@
 packages:
-  - "libs/*"
-  - "demos/*"
-  - "docs-website"
+  - 'libs/*'
+  - 'demos/*'
+  - 'docs-website'

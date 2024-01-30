@@ -1,9 +1,5 @@
-import {
-  ReaderArtifact,
-  RefetchQueryArtifactWrapper,
-  readButDoNotEvaluate,
-} from "./index";
-import { DataId, stableCopy } from "./cache";
+import { ReaderArtifact, RefetchQueryArtifactWrapper, readButDoNotEvaluate } from './index';
+import { DataId, stableCopy } from './cache';
 
 type ComponentName = string;
 type StringifiedArgs = string;
@@ -17,7 +13,7 @@ export function getOrCreateCachedComponent(
   componentName: string,
   readerArtifact: ReaderArtifact<any, any, any>,
   variables: { [key: string]: string },
-  resolverRefetchQueries: RefetchQueryArtifactWrapper[]
+  resolverRefetchQueries: RefetchQueryArtifactWrapper[],
 ) {
   const stringifiedArgs = JSON.stringify(stableCopy(variables));
   cachedComponentsById[root] = cachedComponentsById[root] ?? {};
@@ -29,7 +25,7 @@ export function getOrCreateCachedComponent(
     (() => {
       function Component(additionalRuntimeProps) {
         const data = readButDoNotEvaluate({
-          kind: "FragmentReference",
+          kind: 'FragmentReference',
           readerArtifact: readerArtifact,
           root,
           variables,

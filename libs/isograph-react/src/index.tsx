@@ -8,10 +8,10 @@ import {
   onNextChange,
   getStore,
   getParentRecordKey,
-} from "./cache";
-import { useLazyDisposableState } from "@isograph/react-disposable-state";
-import { type PromiseWrapper } from "./PromiseWrapper";
-import { getOrCreateCachedComponent } from "./componentCache";
+} from './cache';
+import { useLazyDisposableState } from '@isograph/react-disposable-state';
+import { type PromiseWrapper } from './PromiseWrapper';
+import { getOrCreateCachedComponent } from './componentCache';
 
 export {
   setNetwork,
@@ -21,31 +21,19 @@ export {
   Link,
   StoreRecord,
   clearStore,
-} from "./cache";
+} from './cache';
 
 // This type should be treated as an opaque type.
-export type IsographEntrypoint<
-  TReadFromStore extends Object,
-  TResolverProps,
-  TResolverResult
-> = {
-  kind: "Entrypoint";
+export type IsographEntrypoint<TReadFromStore extends Object, TResolverProps, TResolverResult> = {
+  kind: 'Entrypoint';
   queryText: string;
   normalizationAst: NormalizationAst;
-  readerArtifact: ReaderArtifact<
-    TReadFromStore,
-    TResolverProps,
-    TResolverResult
-  >;
+  readerArtifact: ReaderArtifact<TReadFromStore, TResolverProps, TResolverResult>;
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
-export type ReaderArtifact<
-  TReadFromStore extends Object,
-  TResolverProps,
-  TResolverResult
-> = {
-  kind: "ReaderArtifact";
+export type ReaderArtifact<TReadFromStore extends Object, TResolverProps, TResolverResult> = {
+  kind: 'ReaderArtifact';
   readerAst: ReaderAst<TReadFromStore>;
   resolver: (data: TResolverProps) => TResolverResult;
   variant: ReaderResolverVariant;
@@ -62,13 +50,13 @@ export type ReaderAstNode =
 export type ReaderAst<TReadFromStore> = ReaderAstNode[];
 
 export type ReaderScalarField = {
-  kind: "Scalar";
+  kind: 'Scalar';
   fieldName: string;
   alias: string | null;
   arguments: Arguments | null;
 };
 export type ReaderLinkedField = {
-  kind: "Linked";
+  kind: 'Linked';
   fieldName: string;
   alias: string | null;
   selections: ReaderAst<unknown>;
@@ -76,13 +64,13 @@ export type ReaderLinkedField = {
 };
 
 export type ReaderResolverVariant =
-  | { kind: "Eager" }
+  | { kind: 'Eager' }
   // componentName is the component's cacheKey for getRefReaderByName
   // and is the type + field concatenated
-  | { kind: "Component"; componentName: string };
+  | { kind: 'Component'; componentName: string };
 
 export type ReaderResolverField = {
-  kind: "Resolver";
+  kind: 'Resolver';
   alias: string;
   readerArtifact: ReaderArtifact<any, any, any>;
   arguments: Arguments | null;
@@ -90,7 +78,7 @@ export type ReaderResolverField = {
 };
 
 export type ReaderRefetchField = {
-  kind: "RefetchField";
+  kind: 'RefetchField';
   alias: string;
   // TODO this bad modeling. A refetch field cannot have variant: "Component" (I think)
   readerArtifact: ReaderArtifact<any, any, any>;
@@ -98,7 +86,7 @@ export type ReaderRefetchField = {
 };
 
 export type ReaderMutationField = {
-  kind: "MutationField";
+  kind: 'MutationField';
   alias: string;
   // TODO this bad modeling. A mutation field cannot have variant: "Component" (I think)
   readerArtifact: ReaderArtifact<any, any, any>;
@@ -106,20 +94,18 @@ export type ReaderMutationField = {
   allowedVariables: string[];
 };
 
-export type NormalizationAstNode =
-  | NormalizationScalarField
-  | NormalizationLinkedField;
+export type NormalizationAstNode = NormalizationScalarField | NormalizationLinkedField;
 // @ts-ignore
 export type NormalizationAst = NormalizationAstNode[];
 
 export type NormalizationScalarField = {
-  kind: "Scalar";
+  kind: 'Scalar';
   fieldName: string;
   arguments: Arguments | null;
 };
 
 export type NormalizationLinkedField = {
-  kind: "Linked";
+  kind: 'Linked';
   fieldName: string;
   arguments: Arguments | null;
   selections: NormalizationAst;
@@ -127,7 +113,7 @@ export type NormalizationLinkedField = {
 
 // This is more like an entrypoint, but one specifically for a refetch query/mutation
 export type RefetchQueryArtifact = {
-  kind: "RefetchQuery";
+  kind: 'RefetchQuery';
   queryText: string;
   normalizationAst: NormalizationAst;
 };
@@ -143,51 +129,33 @@ export type Argument = [ArgumentName, ArgumentValue];
 export type ArgumentName = string;
 export type ArgumentValue =
   | {
-      kind: "Variable";
+      kind: 'Variable';
       name: string;
     }
   | {
-      kind: "Literal";
+      kind: 'Literal';
       value: any;
     };
 
-export type FragmentReference<
-  TReadFromStore extends Object,
-  TResolverProps,
-  TResolverResult
-> = {
-  kind: "FragmentReference";
-  readerArtifact: ReaderArtifact<
-    TReadFromStore,
-    TResolverProps,
-    TResolverResult
-  >;
+export type FragmentReference<TReadFromStore extends Object, TResolverProps, TResolverResult> = {
+  kind: 'FragmentReference';
+  readerArtifact: ReaderArtifact<TReadFromStore, TResolverProps, TResolverResult>;
   root: DataId;
   variables: { [index: string]: string } | null;
   // TODO: We should instead have ReaderAst<TResolverProps>
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
-function assertIsEntrypoint<
-  TReadFromStore extends Object,
-  TResolverProps,
-  TResolverResult
->(
-  value:
-    | IsographEntrypoint<TReadFromStore, TResolverProps, TResolverResult>
-    | typeof iso
-): asserts value is IsographEntrypoint<
-  TReadFromStore,
-  TResolverProps,
-  TResolverResult
-> {
-  if (typeof value === "function") throw new Error("Not a string");
+function assertIsEntrypoint<TReadFromStore extends Object, TResolverProps, TResolverResult>(
+  value: IsographEntrypoint<TReadFromStore, TResolverProps, TResolverResult> | typeof iso,
+): asserts value is IsographEntrypoint<TReadFromStore, TResolverProps, TResolverResult> {
+  if (typeof value === 'function') throw new Error('Not a string');
 }
 
 export function iso<TResolverParameter, TResolverReturn>(
-  _queryText: TemplateStringsArray
+  _queryText: TemplateStringsArray,
 ): (
-  x: (param: TResolverParameter) => TResolverReturn
+  x: (param: TResolverParameter) => TResolverReturn,
 ) => (param: TResolverParameter) => TResolverReturn {
   // The name `identity` here is a bit of a double entendre.
   // First, it is the identity function, constrained to operate
@@ -198,46 +166,34 @@ export function iso<TResolverParameter, TResolverReturn>(
   // TResolverParameter and TResolverReturn must be identical.
 
   return function identity(
-    x: (param: TResolverParameter) => TResolverReturn
+    x: (param: TResolverParameter) => TResolverReturn,
   ): (param: TResolverParameter) => TResolverReturn {
     return x;
   };
 }
 
-export function useLazyReference<
-  TReadFromStore extends Object,
-  TResolverProps,
-  TResolverResult
->(
+export function useLazyReference<TReadFromStore extends Object, TResolverProps, TResolverResult>(
   entrypoint:
     | IsographEntrypoint<TReadFromStore, TResolverProps, TResolverResult>
     // Temporarily, we need to allow useLazyReference to take the result of calling
     // iso`...`. At runtime, we confirm that the passed-in `iso` literal is actually
     // an entrypoint.
     | ((_: any) => any),
-  variables: object
+  variables: object,
 ): {
-  queryReference: FragmentReference<
-    TReadFromStore,
-    TResolverProps,
-    TResolverResult
-  >;
+  queryReference: FragmentReference<TReadFromStore, TResolverProps, TResolverResult>;
 } {
   assertIsEntrypoint(entrypoint);
   // Typechecking fails here... TODO investigate
-  const cache = getOrCreateCacheForArtifact<TResolverResult>(
-    entrypoint,
-    variables
-  );
+  const cache = getOrCreateCacheForArtifact<TResolverResult>(entrypoint, variables);
 
   // TODO add comment explaining why we never use this value
   // @ts-ignore
-  const data =
-    useLazyDisposableState<PromiseWrapper<TResolverResult>>(cache).state;
+  const data = useLazyDisposableState<PromiseWrapper<TResolverResult>>(cache).state;
 
   return {
     queryReference: {
-      kind: "FragmentReference",
+      kind: 'FragmentReference',
       readerArtifact: entrypoint.readerArtifact,
       root: ROOT_ID,
       variables,
@@ -246,57 +202,49 @@ export function useLazyReference<
   };
 }
 
-export function read<
-  TReadFromStore extends Object,
-  TResolverProps,
-  TResolverResult
->(
-  fragmentReference: FragmentReference<
-    TReadFromStore,
-    TResolverProps,
-    TResolverResult
-  >
+export function read<TReadFromStore extends Object, TResolverProps, TResolverResult>(
+  fragmentReference: FragmentReference<TReadFromStore, TResolverProps, TResolverResult>,
 ): TResolverResult {
   const variant = fragmentReference.readerArtifact.variant;
-  if (variant.kind === "Eager") {
+  if (variant.kind === 'Eager') {
     const data = readData(
       fragmentReference.readerArtifact.readerAst,
       fragmentReference.root,
       fragmentReference.variables ?? {},
-      fragmentReference.nestedRefetchQueries
+      fragmentReference.nestedRefetchQueries,
     );
-    if (data.kind === "MissingData") {
+    if (data.kind === 'MissingData') {
       throw onNextChange();
     } else {
       return fragmentReference.readerArtifact.resolver(data.data);
     }
-  } else if (variant.kind === "Component") {
+  } else if (variant.kind === 'Component') {
     // @ts-ignore
     return getOrCreateCachedComponent(
       fragmentReference.root,
       variant.componentName,
       fragmentReference.readerArtifact,
       fragmentReference.variables ?? {},
-      fragmentReference.nestedRefetchQueries
+      fragmentReference.nestedRefetchQueries,
     );
   }
   // Why can't Typescript realize that this is unreachable??
-  throw new Error("This is unreachable");
+  throw new Error('This is unreachable');
 }
 
 export function readButDoNotEvaluate<TReadFromStore extends Object>(
-  reference: FragmentReference<TReadFromStore, unknown, unknown>
+  reference: FragmentReference<TReadFromStore, unknown, unknown>,
 ): TReadFromStore {
   const response = readData(
     reference.readerArtifact.readerAst,
     reference.root,
     reference.variables ?? {},
-    reference.nestedRefetchQueries
+    reference.nestedRefetchQueries,
   );
-  if (typeof window !== "undefined" && window.__LOG) {
-    console.log("done reading", { response });
+  if (typeof window !== 'undefined' && window.__LOG) {
+    console.log('done reading', { response });
   }
-  if (response.kind === "MissingData") {
+  if (response.kind === 'MissingData') {
     throw onNextChange();
   } else {
     return response.data;
@@ -305,11 +253,11 @@ export function readButDoNotEvaluate<TReadFromStore extends Object>(
 
 type ReadDataResult<TReadFromStore> =
   | {
-      kind: "Success";
+      kind: 'Success';
       data: TReadFromStore;
     }
   | {
-      kind: "MissingData";
+      kind: 'MissingData';
       reason: string;
       nestedReason?: ReadDataResult<unknown>;
     };
@@ -318,36 +266,36 @@ function readData<TReadFromStore>(
   ast: ReaderAst<TReadFromStore>,
   root: DataId,
   variables: { [index: string]: string },
-  nestedRefetchQueries: RefetchQueryArtifactWrapper[]
+  nestedRefetchQueries: RefetchQueryArtifactWrapper[],
 ): ReadDataResult<TReadFromStore> {
   let storeRecord = getStore()[root];
   if (storeRecord === undefined) {
-    return { kind: "MissingData", reason: "No record for root " + root };
+    return { kind: 'MissingData', reason: 'No record for root ' + root };
   }
 
   if (storeRecord === null) {
-    return { kind: "Success", data: null as any };
+    return { kind: 'Success', data: null as any };
   }
 
   let target: { [index: string]: any } = {};
 
   for (const field of ast) {
     switch (field.kind) {
-      case "Scalar": {
+      case 'Scalar': {
         const storeRecordName = getParentRecordKey(field, variables);
         const value = storeRecord[storeRecordName];
         // TODO consider making scalars into discriminated unions. This probably has
         // to happen for when we handle errors.
         if (value === undefined) {
           return {
-            kind: "MissingData",
-            reason: "No value for " + storeRecordName + " on root " + root,
+            kind: 'MissingData',
+            reason: 'No value for ' + storeRecordName + ' on root ' + root,
           };
         }
         target[field.alias ?? field.fieldName] = value;
         break;
       }
-      case "Linked": {
+      case 'Linked': {
         const storeRecordName = getParentRecordKey(field, variables);
         const value = storeRecord[storeRecordName];
         if (Array.isArray(value)) {
@@ -356,34 +304,29 @@ function readData<TReadFromStore>(
             const link = assertLink(item);
             if (link === undefined) {
               return {
-                kind: "MissingData",
+                kind: 'MissingData',
                 reason:
-                  "No link for " +
+                  'No link for ' +
                   storeRecordName +
-                  " on root " +
+                  ' on root ' +
                   root +
-                  ". Link is " +
+                  '. Link is ' +
                   JSON.stringify(item),
               };
             } else if (link === null) {
               results.push(null);
               continue;
             }
-            const result = readData(
-              field.selections,
-              link.__link,
-              variables,
-              nestedRefetchQueries
-            );
-            if (result.kind === "MissingData") {
+            const result = readData(field.selections, link.__link, variables, nestedRefetchQueries);
+            if (result.kind === 'MissingData') {
               return {
-                kind: "MissingData",
+                kind: 'MissingData',
                 reason:
-                  "Missing data for " +
+                  'Missing data for ' +
                   storeRecordName +
-                  " on root " +
+                  ' on root ' +
                   root +
-                  ". Link is " +
+                  '. Link is ' +
                   JSON.stringify(item),
                 nestedReason: result,
               };
@@ -401,17 +344,17 @@ function readData<TReadFromStore>(
             root,
             field.fieldName,
             field.arguments,
-            variables
+            variables,
           );
           if (altLink === undefined) {
             return {
-              kind: "MissingData",
+              kind: 'MissingData',
               reason:
-                "No link for " +
+                'No link for ' +
                 storeRecordName +
-                " on root " +
+                ' on root ' +
                 root +
-                ". Link is " +
+                '. Link is ' +
                 JSON.stringify(value),
             };
           } else {
@@ -422,81 +365,73 @@ function readData<TReadFromStore>(
           break;
         }
         const targetId = link.__link;
-        const data = readData(
-          field.selections,
-          targetId,
-          variables,
-          nestedRefetchQueries
-        );
-        if (data.kind === "MissingData") {
+        const data = readData(field.selections, targetId, variables, nestedRefetchQueries);
+        if (data.kind === 'MissingData') {
           return {
-            kind: "MissingData",
-            reason: "Missing data for " + storeRecordName + " on root " + root,
+            kind: 'MissingData',
+            reason: 'Missing data for ' + storeRecordName + ' on root ' + root,
             nestedReason: data,
           };
         }
         target[field.alias ?? field.fieldName] = data.data;
         break;
       }
-      case "RefetchField": {
+      case 'RefetchField': {
         const data = readData(
           field.readerArtifact.readerAst,
           root,
           variables,
           // Refetch fields just read the id, and don't need refetch query artifacts
-          []
+          [],
         );
-        if (typeof window !== "undefined" && window.__LOG) {
-          console.log("refetch field data", data, field);
+        if (typeof window !== 'undefined' && window.__LOG) {
+          console.log('refetch field data', data, field);
         }
-        if (data.kind === "MissingData") {
+        if (data.kind === 'MissingData') {
           return {
-            kind: "MissingData",
-            reason: "Missing data for " + field.alias + " on root " + root,
+            kind: 'MissingData',
+            reason: 'Missing data for ' + field.alias + ' on root ' + root,
             nestedReason: data,
           };
         } else {
           const refetchQueryIndex = field.refetchQuery;
           if (refetchQueryIndex == null) {
-            throw new Error("refetchQuery is null in RefetchField");
+            throw new Error('refetchQuery is null in RefetchField');
           }
           const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
           const refetchQueryArtifact = refetchQuery.artifact;
           const allowedVariables = refetchQuery.allowedVariables;
 
-          target[field.alias] = field.readerArtifact.resolver(
-            refetchQueryArtifact,
-            {
-              ...data.data,
-              // TODO continue from here
-              // variables need to be filtered for what we need just for the refetch query
-              ...filterVariables(variables, allowedVariables),
-            }
-          );
+          target[field.alias] = field.readerArtifact.resolver(refetchQueryArtifact, {
+            ...data.data,
+            // TODO continue from here
+            // variables need to be filtered for what we need just for the refetch query
+            ...filterVariables(variables, allowedVariables),
+          });
         }
         break;
       }
-      case "MutationField": {
+      case 'MutationField': {
         const data = readData(
           field.readerArtifact.readerAst,
           root,
           variables,
           // Refetch fields just read the id, and don't need refetch query artifacts
-          []
+          [],
         );
-        if (typeof window !== "undefined" && window.__LOG) {
-          console.log("refetch field data", data, field);
+        if (typeof window !== 'undefined' && window.__LOG) {
+          console.log('refetch field data', data, field);
         }
-        if (data.kind === "MissingData") {
+        if (data.kind === 'MissingData') {
           return {
-            kind: "MissingData",
-            reason: "Missing data for " + field.alias + " on root " + root,
+            kind: 'MissingData',
+            reason: 'Missing data for ' + field.alias + ' on root ' + root,
             nestedReason: data,
           };
         } else {
           const refetchQueryIndex = field.refetchQuery;
           if (refetchQueryIndex == null) {
-            throw new Error("refetchQuery is null in MutationField");
+            throw new Error('refetchQuery is null in MutationField');
           }
           const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
           const refetchQueryArtifact = refetchQuery.artifact;
@@ -505,48 +440,48 @@ function readData<TReadFromStore>(
           target[field.alias] = field.readerArtifact.resolver(
             refetchQueryArtifact,
             data.data,
-            filterVariables(variables, allowedVariables)
+            filterVariables(variables, allowedVariables),
           );
         }
         break;
       }
-      case "Resolver": {
+      case 'Resolver': {
         const usedRefetchQueries = field.usedRefetchQueries;
         const resolverRefetchQueries = usedRefetchQueries.map(
-          (index) => nestedRefetchQueries[index]
+          (index) => nestedRefetchQueries[index],
         );
 
         const variant = field.readerArtifact.variant;
-        if (variant.kind === "Eager") {
+        if (variant.kind === 'Eager') {
           const data = readData(
             field.readerArtifact.readerAst,
             root,
             variables,
-            resolverRefetchQueries
+            resolverRefetchQueries,
           );
-          if (data.kind === "MissingData") {
+          if (data.kind === 'MissingData') {
             return {
-              kind: "MissingData",
-              reason: "Missing data for " + field.alias + " on root " + root,
+              kind: 'MissingData',
+              reason: 'Missing data for ' + field.alias + ' on root ' + root,
               nestedReason: data,
             };
           } else {
             target[field.alias] = field.readerArtifact.resolver(data.data);
           }
-        } else if (variant.kind === "Component") {
+        } else if (variant.kind === 'Component') {
           target[field.alias] = getOrCreateCachedComponent(
             root,
             variant.componentName,
             field.readerArtifact,
             variables,
-            resolverRefetchQueries
+            resolverRefetchQueries,
           );
         }
         break;
       }
     }
   }
-  return { kind: "Success", data: target as any };
+  return { kind: 'Success', data: target as any };
 }
 
 let customMissingFieldHandler: typeof defaultMissingFieldHandler | null = null;
@@ -556,24 +491,12 @@ function missingFieldHandler(
   root: DataId,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
-  variables: { [index: string]: any } | null
+  variables: { [index: string]: any } | null,
 ): Link | undefined {
   if (customMissingFieldHandler != null) {
-    return customMissingFieldHandler(
-      storeRecord,
-      root,
-      fieldName,
-      arguments_,
-      variables
-    );
+    return customMissingFieldHandler(storeRecord, root, fieldName, arguments_, variables);
   } else {
-    return defaultMissingFieldHandler(
-      storeRecord,
-      root,
-      fieldName,
-      arguments_,
-      variables
-    );
+    return defaultMissingFieldHandler(storeRecord, root, fieldName, arguments_, variables);
   }
 }
 
@@ -582,10 +505,10 @@ export function defaultMissingFieldHandler(
   root: DataId,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
-  variables: { [index: string]: any } | null
+  variables: { [index: string]: any } | null,
 ): Link | undefined {
-  if (fieldName === "node" || fieldName === "user") {
-    const variable = arguments_?.["id"];
+  if (fieldName === 'node' || fieldName === 'user') {
+    const variable = arguments_?.['id'];
     const value = variables?.[variable];
 
     // TODO can we handle explicit nulls here too? Probably, after wrapping in objects
@@ -595,23 +518,21 @@ export function defaultMissingFieldHandler(
   }
 }
 
-export function setMissingFieldHandler(
-  handler: typeof defaultMissingFieldHandler
-) {
+export function setMissingFieldHandler(handler: typeof defaultMissingFieldHandler) {
   customMissingFieldHandler = handler;
 }
 
 function assertLink(link: DataTypeValue): Link | undefined | null {
   if (Array.isArray(link)) {
-    throw new Error("Unexpected array");
+    throw new Error('Unexpected array');
   }
-  if (typeof link === "object") {
+  if (typeof link === 'object') {
     return link;
   }
   if (link === undefined) {
     return undefined;
   }
-  throw new Error("Invalid link");
+  throw new Error('Invalid link');
 }
 
 export type IsographComponentProps<TDataType, TOtherProps = Object> = {
@@ -620,7 +541,7 @@ export type IsographComponentProps<TDataType, TOtherProps = Object> = {
 
 function filterVariables(
   variables: { [index: string]: string },
-  allowedVariables: string[]
+  allowedVariables: string[],
 ): { [index: string]: string } {
   const result: { [index: string]: string } = {};
   for (const key of allowedVariables) {

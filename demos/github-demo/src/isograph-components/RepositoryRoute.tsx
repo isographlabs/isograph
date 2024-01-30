@@ -1,13 +1,9 @@
-import React from "react";
-import { iso, isoFetch, read, useLazyReference } from "@isograph/react";
-import { Container } from "@mui/material";
-import { ResolverParameterType as RepositoryPageParams } from "@iso/Query/RepositoryPage/reader.isograph";
+import React from 'react';
+import { iso, isoFetch, read, useLazyReference } from '@isograph/react';
+import { Container } from '@mui/material';
+import { ResolverParameterType as RepositoryPageParams } from '@iso/Query/RepositoryPage/reader.isograph';
 
-import {
-  FullPageLoading,
-  Route,
-  RepositoryRoute as RepositoryRouteType,
-} from "./GithubDemo";
+import { FullPageLoading, Route, RepositoryRoute as RepositoryRouteType } from './GithubDemo';
 
 export const RepositoryPage = iso<
   RepositoryPageParams,
@@ -19,11 +15,7 @@ export const RepositoryPage = iso<
   }
 `(RepositoryRouteComponent);
 
-function RepositoryRouteComponent({
-  data,
-  route,
-  setRoute,
-}: RepositoryPageParams) {
+function RepositoryRouteComponent({ data, route, setRoute }: RepositoryPageParams) {
   return (
     <>
       <data.Header route={route} setRoute={setRoute} />
@@ -48,7 +40,7 @@ export function RepositoryRoute({
     repositoryOwner: route.repositoryOwner,
     first: 20,
   });
-  console.log("repository route", {
+  console.log('repository route', {
     queryReference,
     name: route.repositoryName,
   });

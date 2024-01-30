@@ -1,12 +1,12 @@
-import Image from "next/image";
-import { iso } from "@isograph/react";
-import { ResolverParameterType as HeaderProps } from "@iso/Query/Header/reader.isograph";
+import Image from 'next/image';
+import { iso } from '@isograph/react';
+import { ResolverParameterType as HeaderProps } from '@iso/Query/Header/reader.isograph';
 
-import { AppBar, Button, Grid, Container } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
-import { Route } from "./GithubDemo";
+import { AppBar, Button, Grid, Container } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
+import { Route } from './GithubDemo';
 
-import logo from "./svgs/dark-logo.svg";
+import logo from './svgs/dark-logo.svg';
 
 export const Header = iso<HeaderProps, ReturnType<typeof HeaderComponent>>`
   field Query.Header @component {
@@ -22,17 +22,12 @@ function HeaderComponent(props: HeaderProps) {
     <>
       <AppBar position="fixed" color="primary" sx={{ p: 0.5 }}>
         <Container maxWidth="md">
-          <Grid
-            container
-            spacing={24}
-            justifyContent="space-between"
-            maxWidth="md"
-          >
+          <Grid container spacing={24} justifyContent="space-between" maxWidth="md">
             <Grid item xs={6} style={{ flex: 1 }}>
               <Buttons route={props.route} setRoute={props.setRoute} />
             </Grid>
             <Grid item xs={6}>
-              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <props.data.viewer.Avatar />
               </div>
             </Grid>
@@ -44,17 +39,11 @@ function HeaderComponent(props: HeaderProps) {
   );
 }
 
-function Buttons({
-  route,
-  setRoute,
-}: {
-  route: Route;
-  setRoute: (route: Route) => void;
-}) {
+function Buttons({ route, setRoute }: { route: Route; setRoute: (route: Route) => void }) {
   const theme = useTheme();
   return (
     <>
-      <div style={{ display: "flex" }}>
+      <div style={{ display: 'flex' }}>
         <a href="https://github.com/isographlabs/isograph">
           <Image src={logo} alt="Isograph Logo" height={40} width={40} />
         </a>
@@ -62,9 +51,9 @@ function Buttons({
           variant="text"
           style={{
             color: theme.palette.primary.contrastText,
-            textDecoration: route.kind === "Home" ? "underline" : "none",
+            textDecoration: route.kind === 'Home' ? 'underline' : 'none',
           }}
-          onClick={() => setRoute({ kind: "Home" })}
+          onClick={() => setRoute({ kind: 'Home' })}
         >
           Home
         </Button>

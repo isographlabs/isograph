@@ -1,19 +1,19 @@
-import React from "react";
-import { Container } from "@mui/material";
-import { subscribe, useLazyReference, read } from "@isograph/react";
-import HomeRouteEntrypoint from "@iso/Query/HomeRoute/entrypoint.isograph";
-import PetDetailRouteEntrypoint from "@iso/Query/PetDetailRoute/entrypoint.isograph";
+import React from 'react';
+import { Container } from '@mui/material';
+import { subscribe, useLazyReference, read } from '@isograph/react';
+import HomeRouteEntrypoint from '@iso/Query/HomeRoute/entrypoint.isograph';
+import PetDetailRouteEntrypoint from '@iso/Query/PetDetailRoute/entrypoint.isograph';
 
 export type PetId = string;
 
 export type Route = HomeRoute | PetDetailRoute;
 
 export type HomeRoute = {
-  kind: "Home";
+  kind: 'Home';
 };
 
 export type PetDetailRoute = {
-  kind: "PetDetail";
+  kind: 'PetDetail';
   id: PetId;
 };
 
@@ -28,7 +28,7 @@ export function GraphQLConfDemo(props: {}) {
   }, []);
 
   const [currentRoute, setCurrentRoute] = React.useState<Route>({
-    kind: "Home",
+    kind: 'Home',
   });
   return (
     <React.Suspense
@@ -43,24 +43,12 @@ export function GraphQLConfDemo(props: {}) {
   );
 }
 
-function Router({
-  route,
-  setRoute,
-}: {
-  route: Route;
-  setRoute: (route: Route) => void;
-}) {
+function Router({ route, setRoute }: { route: Route; setRoute: (route: Route) => void }) {
   switch (route.kind) {
-    case "Home":
+    case 'Home':
       return <HomeRouteLoader navigateTo={setRoute} />;
-    case "PetDetail":
-      return (
-        <PetDetailRouteLoader
-          navigateTo={setRoute}
-          route={route}
-          key={route.id}
-        />
-      );
+    case 'PetDetail':
+      return <PetDetailRouteLoader navigateTo={setRoute} route={route} key={route.id} />;
     default:
       const exhaustiveCheck: never = route;
   }
@@ -70,16 +58,12 @@ export function FullPageLoading() {
   return <h1 className="mt-5">Loading...</h1>;
 }
 
-function HomeRouteLoader({
-  navigateTo,
-}: {
-  navigateTo: (path: Route) => void;
-}) {
+function HomeRouteLoader({ navigateTo }: { navigateTo: (path: Route) => void }) {
   const { queryReference } = useLazyReference(
     iso<typeof HomeRouteEntrypoint>`
       entrypoint Query.HomeRoute
     `,
-    {}
+    {},
   );
 
   return read(queryReference)({ navigateTo });
@@ -96,7 +80,7 @@ function PetDetailRouteLoader({
     iso<typeof PetDetailRouteEntrypoint>`
       entrypoint Query.PetDetailRoute
     `,
-    { id: route.id }
+    { id: route.id },
   );
 
   return read(queryReference)({ navigateTo });

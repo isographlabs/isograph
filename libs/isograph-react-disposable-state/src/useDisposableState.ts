@@ -1,12 +1,12 @@
-import { useEffect, useRef } from "react";
-import { ParentCache } from "./ParentCache";
-import { ItemCleanupPair } from "@isograph/disposable-types";
-import { useCachedPrecommitValue } from "./useCachedPrecommitValue";
+import { useEffect, useRef } from 'react';
+import { ParentCache } from './ParentCache';
+import { ItemCleanupPair } from '@isograph/disposable-types';
+import { useCachedPrecommitValue } from './useCachedPrecommitValue';
 import {
   UNASSIGNED_STATE,
   UnassignedState,
   useUpdatableDisposableState,
-} from "./useUpdatableDisposableState";
+} from './useUpdatableDisposableState';
 
 type UseUpdatableDisposableStateReturnValue<T> = {
   state: T;
@@ -14,7 +14,7 @@ type UseUpdatableDisposableStateReturnValue<T> = {
 };
 
 export function useDisposableState<T = never>(
-  parentCache: ParentCache<T>
+  parentCache: ParentCache<T>,
 ): UseUpdatableDisposableStateReturnValue<T> {
   const itemCleanupPairRef = useRef<ItemCleanupPair<T> | null>(null);
 
@@ -22,8 +22,7 @@ export function useDisposableState<T = never>(
     itemCleanupPairRef.current = pair;
   });
 
-  const { state: stateFromDisposableStateHook, setState } =
-    useUpdatableDisposableState<T>();
+  const { state: stateFromDisposableStateHook, setState } = useUpdatableDisposableState<T>();
 
   useEffect(
     function cleanupItemCleanupPairRefAfterSetState() {
@@ -33,13 +32,13 @@ export function useDisposableState<T = never>(
           itemCleanupPairRef.current = null;
         } else {
           throw new Error(
-            "itemCleanupPairRef.current is unexpectedly null. " +
-              "This indicates a bug in react-disposable-state."
+            'itemCleanupPairRef.current is unexpectedly null. ' +
+              'This indicates a bug in react-disposable-state.',
           );
         }
       }
     },
-    [stateFromDisposableStateHook]
+    [stateFromDisposableStateHook],
   );
 
   useEffect(function cleanupItemCleanupPairRefIfSetStateNotCalled() {
@@ -65,9 +64,7 @@ export function useDisposableState<T = never>(
   // can still be assigned, during the render before the
   // cleanupItemCleanupPairRefAfterSetState effect is called.
   const state: T | undefined =
-    (stateFromDisposableStateHook != UNASSIGNED_STATE
-      ? stateFromDisposableStateHook
-      : null) ??
+    (stateFromDisposableStateHook != UNASSIGNED_STATE ? stateFromDisposableStateHook : null) ??
     itemCleanupPairRef.current?.[0] ??
     preCommitItem?.state;
 
@@ -82,11 +79,11 @@ function tsTests() {
   let x: any;
   const a = useDisposableState(x);
   // @ts-expect-error
-  a.setState(["asdf", () => {}]);
+  a.setState(['asdf', () => {}]);
   // @ts-expect-error
   a.setState([UNASSIGNED_STATE, () => {}]);
   const b = useDisposableState<string | UnassignedState>(x);
   // @ts-expect-error
   b.setState([UNASSIGNED_STATE, () => {}]);
-  b.setState(["asdf", () => {}]);
+  b.setState(['asdf', () => {}]);
 }

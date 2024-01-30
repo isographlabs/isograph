@@ -1,0 +1,6 @@
+**/__isograph/**/*
+**/build/**
+**/target/**
+**/pnpm-lock.yaml
+**/*.md
+**/.docusaurus/**

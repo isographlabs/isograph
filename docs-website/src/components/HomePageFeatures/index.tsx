@@ -1,52 +1,50 @@
-import Heading from "@theme/Heading";
-import styles from "./styles.module.css";
-import Tabs from "@theme/Tabs";
-import TabItem from "@theme/TabItem";
-import CodeBlock from "@theme/CodeBlock";
+import Heading from '@theme/Heading';
+import styles from './styles.module.css';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import CodeBlock from '@theme/CodeBlock';
 
 const FeatureList = [
   {
-    title: "No boilerplate",
+    title: 'No boilerplate',
     description: (
       <>
         <div>
-          Isograph eliminates the boilerplate of working with GraphQL. No more
-          fussing with props and fragment references — Isograph does all of that
-          for you.
+          Isograph eliminates the boilerplate of working with GraphQL. No more fussing with props
+          and fragment references — Isograph does all of that for you.
         </div>
         <br />
         <div>
-          All you need to do is to define a component and the fields it needs.
-          Isograph takes care of the rest.
+          All you need to do is to define a component and the fields it needs. Isograph takes care
+          of the rest.
         </div>
       </>
     ),
   },
   {
-    title: "Unparalleled performance",
+    title: 'Unparalleled performance',
     description: (
       <>
         <div>
-          Isograph gives you great performance out of the box &mdash; like a
-          single query per view that fetches exactly the right fields.
+          Isograph gives you great performance out of the box &mdash; like a single query per view
+          that fetches exactly the right fields.
         </div>
       </>
     ),
   },
   {
-    title: "Tremendous stability",
+    title: 'Tremendous stability',
     description: (
       <>
         <div>
-          Local reasoning is enough to ensure application stability, because the
-          data one component requests cannot affect the data another component
-          receives. So engineers can feel safe moving fast.
+          Local reasoning is enough to ensure application stability, because the data one component
+          requests cannot affect the data another component receives. So engineers can feel safe
+          moving fast.
         </div>
         <br />
         <div>
-          But Isograph goes further: with mutations, Isograph ensures that all
-          the fields you need are refetched, without requiring any work by the
-          developer.
+          But Isograph goes further: with mutations, Isograph ensures that all the fields you need
+          are refetched, without requiring any work by the developer.
         </div>
       </>
     ),
@@ -78,7 +76,7 @@ export function HomePageRoute() {
   const { queryReference } = useLazyReference(
     // Note that calling isoFetch here **generates** a query
     // at compile time!
-    isoFetch${"`"}Query.HomePage${"`"},
+    isoFetch${'`'}Query.HomePage${'`'},
     { /* Query variables */ }
   );
   
@@ -104,7 +102,7 @@ export const HomePage = iso<
   // necessary soon.)
   HomePageComponentParams,
   ReturnType<typeof HomePageComponent>
->${"`"}
+>${'`'}
   # Step 3: Define a field named home_page_component on the
   # Query type, and tell the Isograph compiler that it is a
   # React @component
@@ -117,7 +115,7 @@ export const HomePage = iso<
       Avatar,
     },
   }
-${"`"}(HomePageComponent);
+${'`'}(HomePageComponent);
 
 function HomePageComponent({ data }: HomePageComponentParams) {
   // Step 5: Render your component
@@ -138,11 +136,11 @@ import Avatar from 'my-component-library';
 export const Avatar = iso<
   AvatarProps,
   ReturnType<typeof AvatarComponent>,
->${"`"}
+>${'`'}
   User.Avatar @component {
     avatarUrl,
   }
-${"`"}(AvatarComponent);
+${'`'}(AvatarComponent);
   
 function AvatarComponent(props: AvatarProps) {
   return <Avatar url={props.data.avatarUrl} />
@@ -181,9 +179,7 @@ export default function HomepageFeatures() {
         </div>
         <div className="row">
           <div className="col col--8 col--offset-2">
-            <h2 className="text--center margin-top--xl">
-              Watch the talk from GraphQL Conf
-            </h2>
+            <h2 className="text--center margin-top--xl">Watch the talk from GraphQL Conf</h2>
           </div>
         </div>
         <div className="row">
@@ -208,50 +204,39 @@ export default function HomepageFeatures() {
             <Tabs>
               <TabItem value="HomePageRoute" label="HomePageRoute.tsx">
                 <p>
-                  <code>HomePageRoute</code> is a regular ol' React component.
-                  It makes a network request for the data needed by all the
-                  components on the home page (no more, no less!). When that
-                  request completes, it renders the home page.
+                  <code>HomePageRoute</code> is a regular ol' React component. It makes a network
+                  request for the data needed by all the components on the home page (no more, no
+                  less!). When that request completes, it renders the home page.
                 </p>
-                <CodeBlock language="tsx">
-                  {CodeBlocks.home_page.trim()}
-                </CodeBlock>
+                <CodeBlock language="tsx">{CodeBlocks.home_page.trim()}</CodeBlock>
               </TabItem>
               <TabItem value="HomePage" label="HomePage.tsx">
                 <p>
-                  <code>Query.HomePage</code> is an Isograph client-defined
-                  field. The function HomePageComponent will be called with the
-                  data selected in the <code>iso</code> literal.
+                  <code>Query.HomePage</code> is an Isograph client-defined field. The function
+                  HomePageComponent will be called with the data selected in the <code>iso</code>{' '}
+                  literal.
                 </p>
                 <p>
-                  In this <code>iso</code> literal, we select another
-                  client-defined field: <code>avatar_component</code>.
-                  Client-defined fields can reference each other, and must
-                  eventually bottom out at server fields.
+                  In this <code>iso</code> literal, we select another client-defined field:{' '}
+                  <code>avatar_component</code>. Client-defined fields can reference each other, and
+                  must eventually bottom out at server fields.
                 </p>
-                <CodeBlock language="tsx">
-                  {CodeBlocks.home_page_component.trim()}
-                </CodeBlock>
+                <CodeBlock language="tsx">{CodeBlocks.home_page_component.trim()}</CodeBlock>
               </TabItem>
               <TabItem value="Avatar" label="Avatar.tsx">
                 <p>
-                  The code for this <code>User.Avatar</code> client-defined
-                  field should be pretty familiar. The only thing to note is
-                  that we're importing a regular ol' React component:{" "}
-                  <code>Avatar</code>. That's allowed, too!
+                  The code for this <code>User.Avatar</code> client-defined field should be pretty
+                  familiar. The only thing to note is that we're importing a regular ol' React
+                  component: <code>Avatar</code>. That's allowed, too!
                 </p>
-                <CodeBlock language="tsx">
-                  {CodeBlocks.avatar_component.trim()}
-                </CodeBlock>
+                <CodeBlock language="tsx">{CodeBlocks.avatar_component.trim()}</CodeBlock>
               </TabItem>
               <TabItem value="schema" label="Schema.graphql">
                 <p>
-                  Our GraphQL schema file includes all server fields that we
-                  have accessed (such as <code>Query.viewer</code> and{" "}
-                  <code>User.first_name</code>.) It does <b>not</b> include our
-                  client-defined fields &mdash; the Isograph compiler
-                  understands that <code>iso</code> literals <b>are</b> the
-                  definition of client-defined fields.
+                  Our GraphQL schema file includes all server fields that we have accessed (such as{' '}
+                  <code>Query.viewer</code> and <code>User.first_name</code>.) It does <b>not</b>{' '}
+                  include our client-defined fields &mdash; the Isograph compiler understands that{' '}
+                  <code>iso</code> literals <b>are</b> the definition of client-defined fields.
                 </p>
                 <CodeBlock language="tsx">{CodeBlocks.schema.trim()}</CodeBlock>
               </TabItem>

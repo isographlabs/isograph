@@ -1,14 +1,14 @@
-import Head from "next/head";
+import Head from 'next/head';
 
-import { GithubDemo } from "@/isograph-components/GithubDemo";
-import { clearStore, setNetwork } from "@isograph/react";
+import { GithubDemo } from '@/isograph-components/GithubDemo';
+import { clearStore, setNetwork } from '@isograph/react';
 
 function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
-  let promise = fetch("https://api.github.com/graphql", {
-    method: "POST",
+  let promise = fetch('https://api.github.com/graphql', {
+    method: 'POST',
     headers: {
-      Authorization: "Bearer " + process.env.NEXT_PUBLIC_GITHUB_TOKEN,
-      "Content-Type": "application/json",
+      Authorization: 'Bearer ' + process.env.NEXT_PUBLIC_GITHUB_TOKEN,
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({ query: queryText, variables }),
   }).then((response) => response.json());
@@ -16,21 +16,21 @@ function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
 }
 setNetwork(makeNetworkRequest);
 
-import { createTheme, ThemeProvider } from "@mui/material/styles";
+import { createTheme, ThemeProvider } from '@mui/material/styles';
 
 const theme = createTheme({
   palette: {
     primary: {
-      light: "#788caf",
-      main: "#385276",
-      dark: "#1a2f4a",
-      contrastText: "#fff",
+      light: '#788caf',
+      main: '#385276',
+      dark: '#1a2f4a',
+      contrastText: '#fff',
     },
     secondary: {
-      light: "#ff7961",
-      main: "#f28800",
-      dark: "#e86600",
-      contrastText: "#000",
+      light: '#ff7961',
+      main: '#f28800',
+      dark: '#e86600',
+      contrastText: '#000',
     },
   },
 });

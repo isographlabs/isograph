@@ -1,14 +1,14 @@
-import React from "react";
-import { iso, useLazyReference, read } from "@isograph/react";
+import React from 'react';
+import { iso, useLazyReference, read } from '@isograph/react';
 import {
   FullPageLoading,
   type PullRequestRoute as PullRequestRouteType,
   Route,
-} from "./GithubDemo";
+} from './GithubDemo';
 
-import { ResolverParameterType as PullRequestComponentProps } from "@iso/Query/PullRequest/reader.isograph";
+import { ResolverParameterType as PullRequestComponentProps } from '@iso/Query/PullRequest/reader.isograph';
 
-import { Container } from "@mui/material";
+import { Container } from '@mui/material';
 
 export const PullRequest = iso<
   PullRequestComponentProps,
@@ -20,11 +20,7 @@ export const PullRequest = iso<
   }
 `(PullRequestComponentComponent);
 
-function PullRequestComponentComponent({
-  data,
-  route,
-  setRoute,
-}: PullRequestComponentProps) {
+function PullRequestComponentComponent({ data, route, setRoute }: PullRequestComponentProps) {
   return (
     <>
       <data.Header route={route} setRoute={setRoute} />
@@ -44,15 +40,12 @@ export function PullRequestRoute({
   route: PullRequestRouteType;
   setRoute: (route: Route) => void;
 }) {
-  const { queryReference } = useLazyReference(
-    iso`entrypoint Query.PullRequest `,
-    {
-      pullRequestNumber: route.pullRequestNumber,
-      repositoryName: route.repositoryName,
-      repositoryOwner: route.repositoryOwner,
-      last: 20,
-    }
-  );
+  const { queryReference } = useLazyReference(iso`entrypoint Query.PullRequest `, {
+    pullRequestNumber: route.pullRequestNumber,
+    repositoryName: route.repositoryName,
+    repositoryOwner: route.repositoryOwner,
+    last: 20,
+  });
 
   const data = read(queryReference);
   return data({ route, setRoute });

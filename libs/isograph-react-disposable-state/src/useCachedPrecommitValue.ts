@@ -1,9 +1,9 @@
-"use strict";
+'use strict';
 
-import { useEffect, useState } from "react";
-import { ParentCache } from "./ParentCache";
-import { useHasCommittedRef } from "./useHasCommittedRef";
-import { ItemCleanupPair } from "@isograph/isograph-disposable-types/dist";
+import { useEffect, useState } from 'react';
+import { ParentCache } from './ParentCache';
+import { useHasCommittedRef } from './useHasCommittedRef';
+import { ItemCleanupPair } from '@isograph/isograph-disposable-types/dist';
 
 /**
  * usePrecommitValue<T>
@@ -38,7 +38,7 @@ import { ItemCleanupPair } from "@isograph/isograph-disposable-types/dist";
  */
 export function useCachedPrecommitValue<T>(
   parentCache: ParentCache<T>,
-  onCommit: (pair: ItemCleanupPair<T>) => void
+  onCommit: (pair: ItemCleanupPair<T>) => void,
 ): { state: T } | null {
   // TODO: there should be two APIs. One in which we always re-render if the
   // committed item was not returned during the last render, and one in which
@@ -65,16 +65,13 @@ export function useCachedPrecommitValue<T>(
     //
     // After the above, we have a non-disposed item and a cleanup function, which we
     // can pass to onCommit.
-    const undisposedPair = cacheItem.permanentRetainIfNotDisposed(
-      disposeOfTemporaryRetain
-    );
+    const undisposedPair = cacheItem.permanentRetainIfNotDisposed(disposeOfTemporaryRetain);
     if (undisposedPair !== null) {
       onCommit(undisposedPair);
     } else {
       // The cache item we created during render has been disposed. Check if the parent
       // cache is populated.
-      const existingCacheItemCleanupPair =
-        parentCache.getAndPermanentRetainIfPresent();
+      const existingCacheItemCleanupPair = parentCache.getAndPermanentRetainIfPresent();
       if (existingCacheItemCleanupPair !== null) {
         onCommit(existingCacheItemCleanupPair);
       } else {
@@ -97,8 +94,7 @@ export function useCachedPrecommitValue<T>(
 
   // Safety: item is only safe to use (i.e. guaranteed not to have disposed)
   // during this tick.
-  const [cacheItem, item, disposeOfTemporaryRetain] =
-    parentCache.getOrPopulateAndTemporaryRetain();
+  const [cacheItem, item, disposeOfTemporaryRetain] = parentCache.getOrPopulateAndTemporaryRetain();
 
   return { state: item };
 }

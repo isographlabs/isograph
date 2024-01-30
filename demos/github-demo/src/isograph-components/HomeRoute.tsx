@@ -1,21 +1,13 @@
-import React, { useEffect, useState } from "react";
-import {
-  iso,
-  read,
-  useLazyReference,
-  subscribe,
-} from "@isograph/react";
-import { Container } from "@mui/material";
+import React, { useEffect, useState } from 'react';
+import { iso, read, useLazyReference, subscribe } from '@isograph/react';
+import { Container } from '@mui/material';
 
-import { ResolverParameterType as HomePageComponentParams } from "@iso/Query/HomePage/reader.isograph";
+import { ResolverParameterType as HomePageComponentParams } from '@iso/Query/HomePage/reader.isograph';
 
-import { FullPageLoading, Route } from "./GithubDemo";
-import { RepoLink } from "./RepoLink";
+import { FullPageLoading, Route } from './GithubDemo';
+import { RepoLink } from './RepoLink';
 
-export const HomePage = iso<
-  HomePageComponentParams,
-  ReturnType<typeof HomePageComponent>
->`
+export const HomePage = iso<HomePageComponentParams, ReturnType<typeof HomePageComponent>>`
   field Query.HomePage($first: Int!) @component {
     Header,
     HomePageList,
@@ -38,13 +30,7 @@ function HomePageComponent({ data, route, setRoute }: HomePageComponentParams) {
   );
 }
 
-export function HomeRoute({
-  route,
-  setRoute,
-}: {
-  route: Route;
-  setRoute: (route: Route) => void;
-}) {
+export function HomeRoute({ route, setRoute }: { route: Route; setRoute: (route: Route) => void }) {
   const [, setState] = useState({});
   useEffect(() => {
     return subscribe(() => setState({}));
