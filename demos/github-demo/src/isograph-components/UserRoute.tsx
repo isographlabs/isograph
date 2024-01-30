@@ -1,13 +1,9 @@
-import React from "react";
-import { iso, read, useLazyReference } from "@isograph/react";
-import { Container } from "@mui/material";
+import React from 'react';
+import { iso, read, useLazyReference } from '@isograph/react';
+import { Container } from '@mui/material';
 
-import { ResolverParameterType as UserRouteComponentParams } from "@iso/Query/UserPage/reader.isograph";
-import {
-  FullPageLoading,
-  Route,
-  type UserRoute as UserRouteType,
-} from "./GithubDemo";
+import { ResolverParameterType as UserRouteComponentParams } from '@iso/Query/UserPage/reader.isograph';
+import { FullPageLoading, Route, type UserRoute as UserRouteType } from './GithubDemo';
 
 export const UserPage = iso<
   UserRouteComponentParams,
@@ -19,11 +15,7 @@ export const UserPage = iso<
   }
 `(UserRouteComponentComponent);
 
-function UserRouteComponentComponent({
-  data,
-  route,
-  setRoute,
-}: UserRouteComponentParams) {
+function UserRouteComponentComponent({ data, route, setRoute }: UserRouteComponentParams) {
   return (
     <>
       <data.Header route={route} setRoute={setRoute} />

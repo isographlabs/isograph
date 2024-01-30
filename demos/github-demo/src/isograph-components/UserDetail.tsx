@@ -1,11 +1,8 @@
-import { iso } from "@isograph/react";
-import type { ResolverParameterType as UserDetailParams } from "@iso/Query/UserDetail/reader.isograph";
-import { RepoLink } from "./RepoLink";
+import { iso } from '@isograph/react';
+import type { ResolverParameterType as UserDetailParams } from '@iso/Query/UserDetail/reader.isograph';
+import { RepoLink } from './RepoLink';
 
-export const UserDetail = iso<
-  UserDetailParams,
-  ReturnType<typeof UserDetailComponent>
->`
+export const UserDetail = iso<UserDetailParams, ReturnType<typeof UserDetailComponent>>`
   field Query.UserDetail @component {
     user(login: $userLogin) {
       name,
@@ -15,7 +12,7 @@ export const UserDetail = iso<
 `(UserDetailComponent);
 
 function UserDetailComponent(props: UserDetailParams) {
-  console.log("user detail props.data:", props.data);
+  console.log('user detail props.data:', props.data);
   const user = props.data.user;
   if (user == null) {
     return <h1>user not found</h1>;

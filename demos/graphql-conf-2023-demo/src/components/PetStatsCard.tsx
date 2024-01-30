@@ -1,13 +1,10 @@
-import React from "react";
-import { iso } from "@isograph/react";
-import { Card, CardContent } from "@mui/material";
+import React from 'react';
+import { iso } from '@isograph/react';
+import { Card, CardContent } from '@mui/material';
 
-import { ResolverParameterType as PetStatsCardParams } from "@iso/Pet/PetStatsCard/reader.isograph";
+import { ResolverParameterType as PetStatsCardParams } from '@iso/Pet/PetStatsCard/reader.isograph';
 
-export const PetStatsCard = iso<
-  PetStatsCardParams,
-  ReturnType<typeof PetStatsCardComponent>
->`
+export const PetStatsCard = iso<PetStatsCardParams, ReturnType<typeof PetStatsCardComponent>>`
   field Pet.PetStatsCard @component {
     id,
     nickname,
@@ -26,10 +23,7 @@ export const PetStatsCard = iso<
 
 function PetStatsCardComponent(props: PetStatsCardParams) {
   return (
-    <Card
-      variant="outlined"
-      sx={{ width: 450, boxShadow: 3, cursor: "pointer" }}
-    >
+    <Card variant="outlined" sx={{ width: 450, boxShadow: 3, cursor: 'pointer' }}>
       <CardContent>
         <h2>Stats</h2>
         <ul>

@@ -17,10 +17,10 @@
     "allowImportingTsExtensions": true,
     "paths": {
       "@/*": ["./src/*"],
-      "@iso/*": ["./src/__isograph/*"]
+      "@iso/*": ["./src/__isograph/*"],
     },
-    "disableSourceOfProjectReferenceRedirect": false
+    "disableSourceOfProjectReferenceRedirect": false,
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules"],
 }

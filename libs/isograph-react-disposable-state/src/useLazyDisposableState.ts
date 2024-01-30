@@ -1,9 +1,9 @@
-"use strict";
+'use strict';
 
-import { useEffect, useRef } from "react";
-import type { ItemCleanupPair } from "@isograph/disposable-types";
-import { ParentCache } from "./ParentCache";
-import { useCachedPrecommitValue } from "./useCachedPrecommitValue";
+import { useEffect, useRef } from 'react';
+import type { ItemCleanupPair } from '@isograph/disposable-types';
+import { ParentCache } from './ParentCache';
+import { useCachedPrecommitValue } from './useCachedPrecommitValue';
 
 /**
  * useLazyDisposableState<T>
@@ -28,7 +28,7 @@ export function useLazyDisposableState<T>(parentCache: ParentCache<T>): {
     // TODO confirm useEffect is called in order.
     if (cleanupFn == null) {
       throw new Error(
-        "cleanupFn unexpectedly null. This indicates a bug in react-disposable-state."
+        'cleanupFn unexpectedly null. This indicates a bug in react-disposable-state.',
       );
     }
     return cleanupFn;
@@ -43,6 +43,6 @@ export function useLazyDisposableState<T>(parentCache: ParentCache<T>): {
   // is non-null. During the initial commit, we assign itemCleanupPairRef.current,
   // so during subsequent renders, itemCleanupPairRef.current is non-null.
   throw new Error(
-    "returnedItem was unexpectedly null. This indicates a bug in react-disposable-state."
+    'returnedItem was unexpectedly null. This indicates a bug in react-disposable-state.',
   );
 }

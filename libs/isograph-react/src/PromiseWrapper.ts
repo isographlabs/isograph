@@ -1,4 +1,4 @@
-const NOT_SET: Symbol = Symbol("NOT_SET");
+const NOT_SET: Symbol = Symbol('NOT_SET');
 type NotSet = typeof NOT_SET;
 
 /**

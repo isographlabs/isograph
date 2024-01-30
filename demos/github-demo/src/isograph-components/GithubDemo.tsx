@@ -1,33 +1,33 @@
-import React from "react";
-import { HomeRoute } from "./HomeRoute";
-import { RepositoryRoute } from "./RepositoryRoute";
-import { Container } from "@mui/material";
-import { UserRoute } from "./UserRoute";
-import { PullRequestRoute } from "./PullRequestRoute";
+import React from 'react';
+import { HomeRoute } from './HomeRoute';
+import { RepositoryRoute } from './RepositoryRoute';
+import { Container } from '@mui/material';
+import { UserRoute } from './UserRoute';
+import { PullRequestRoute } from './PullRequestRoute';
 
 export type Route =
   | {
-      kind: "Home";
+      kind: 'Home';
     }
   | RepositoryRoute
   | UserRoute
   | PullRequestRoute;
 
 export type UserRoute = {
-  kind: "User";
+  kind: 'User';
   userId: string;
   userLogin: string;
 };
 
 export type RepositoryRoute = {
-  kind: "Repository";
+  kind: 'Repository';
   repositoryName: string;
   repositoryOwner: string;
   repositoryId: string;
 };
 
 export type PullRequestRoute = {
-  kind: "PullRequest";
+  kind: 'PullRequest';
   pullRequestNumber: number;
   repositoryName: string;
   // this is owner login:
@@ -36,7 +36,7 @@ export type PullRequestRoute = {
 
 export function GithubDemo() {
   const [currentRoute, setCurrentRoute] = React.useState<Route>({
-    kind: "Home",
+    kind: 'Home',
   });
   return (
     <React.Suspense
@@ -55,28 +55,16 @@ export function FullPageLoading() {
   return <h1 className="mt-5">Loading...</h1>;
 }
 
-function Router({
-  route,
-  setRoute,
-}: {
-  route: Route;
-  setRoute: (route: Route) => void;
-}) {
+function Router({ route, setRoute }: { route: Route; setRoute: (route: Route) => void }) {
   console.log({ route });
   switch (route.kind) {
-    case "Home":
+    case 'Home':
       return <HomeRoute route={route} setRoute={setRoute} />;
-    case "Repository":
-      return (
-        <RepositoryRoute
-          route={route}
-          setRoute={setRoute}
-          key={route.repositoryId}
-        />
-      );
-    case "User":
+    case 'Repository':
+      return <RepositoryRoute route={route} setRoute={setRoute} key={route.repositoryId} />;
+    case 'User':
       return <UserRoute route={route} setRoute={setRoute} />;
-    case "PullRequest":
+    case 'PullRequest':
       return <PullRequestRoute route={route} setRoute={setRoute} />;
     default:
       const exhaustiveCheck: never = route;

@@ -1,39 +1,39 @@
-import { themes as prismThemes } from "prism-react-renderer";
-import type { Config } from "@docusaurus/types";
-import type * as Preset from "@docusaurus/preset-classic";
+import { themes as prismThemes } from 'prism-react-renderer';
+import type { Config } from '@docusaurus/types';
+import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
-  title: "Isograph",
-  tagline: "Select your components like you select your data — with GraphQL!",
-  favicon: "img/isograph_logo.ico",
+  title: 'Isograph',
+  tagline: 'Select your components like you select your data — with GraphQL!',
+  favicon: 'img/isograph_logo.ico',
 
-  url: "https://isograph.dev/",
-  baseUrl: "/",
+  url: 'https://isograph.dev/',
+  baseUrl: '/',
   trailingSlash: true,
 
-  organizationName: "isographlabs",
-  projectName: "isograph",
-  deploymentBranch: "gh-pages",
+  organizationName: 'isographlabs',
+  projectName: 'isograph',
+  deploymentBranch: 'gh-pages',
 
-  onBrokenLinks: "throw",
-  onBrokenMarkdownLinks: "throw",
+  onBrokenLinks: 'throw',
+  onBrokenMarkdownLinks: 'throw',
 
-  staticDirectories: ["static"],
+  staticDirectories: ['static'],
 
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
   // may want to replace "en" with "zh-Hans".
   i18n: {
-    defaultLocale: "en",
-    locales: ["en"],
+    defaultLocale: 'en',
+    locales: ['en'],
   },
 
   presets: [
     [
-      "classic",
+      'classic',
       {
         docs: {
-          sidebarPath: "./sidebars.ts",
+          sidebarPath: './sidebars.ts',
           // // Please change this to your repo.
           // // Remove this to remove the "edit this page" links.
           // editUrl:
@@ -47,80 +47,79 @@ const config: Config = {
           //   "https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/",
         },
         theme: {
-          customCss: "./src/css/custom.css",
+          customCss: './src/css/custom.css',
         },
       } satisfies Preset.Options,
     ],
   ],
 
   themeConfig: {
-    image: "img/isograph_logo.png",
+    image: 'img/isograph_logo.png',
 
     metadata: [
       {
-        name: "keywords",
-        content:
-          "Isograph, GraphQL, React, data, JavaScript, framework, compiler",
+        name: 'keywords',
+        content: 'Isograph, GraphQL, React, data, JavaScript, framework, compiler',
       },
-      { name: "twitter:card", content: "img/isograph_logo.png" },
+      { name: 'twitter:card', content: 'img/isograph_logo.png' },
     ],
 
     navbar: {
-      title: "Isograph",
+      title: 'Isograph',
       logo: {
-        alt: "Isograph Logo",
-        src: "img/isograph_logo.png",
+        alt: 'Isograph Logo',
+        src: 'img/isograph_logo.png',
       },
       items: [
         {
-          type: "docSidebar",
-          sidebarId: "documentationSidebar",
-          position: "left",
-          label: "Documentation",
+          type: 'docSidebar',
+          sidebarId: 'documentationSidebar',
+          position: 'left',
+          label: 'Documentation',
         },
-        { to: "/blog", label: "Blog", position: "left" },
+        { to: '/blog', label: 'Blog', position: 'left' },
         {
-          href: "https://github.com/isographlabs/isograph",
-          label: "GitHub",
-          position: "right",
+          href: 'https://github.com/isographlabs/isograph',
+          label: 'GitHub',
+          position: 'right',
         },
       ],
     },
     footer: {
-      style: "dark",
+      style: 'dark',
       links: [
         {
-          title: "Docs",
+          title: 'Docs',
           items: [
             {
-              label: "Tutorial",
-              to: "/docs/introduction",
+              label: 'Tutorial',
+              to: '/docs/introduction',
             },
           ],
         },
         {
-          title: "Community",
+          title: 'Community',
           items: [
             {
-              label: "Discord (go to the #isograph channel)",
-              href: "https://discord.gg/Q2c5tM5T8A",
+              label: 'Discord (go to the #isograph channel)',
+              href: 'https://discord.gg/Q2c5tM5T8A',
             },
             {
-              label: "Twitter",
-              href: "https://twitter.com/isographlabs",
+              label: 'Twitter',
+              href: 'https://twitter.com/isographlabs',
             },
           ],
         },
         {
-          title: "More",
+          title: 'More',
           items: [
             {
-              label: "Blog",
-              to: "/blog",
+              label: 'Blog',
+              to: '/blog',
             },
             {
-              label: "GitHub",
-              href: "https://github.com/isographlabs/isograph",
+              label: 'GitHub',
+              href: 'https://github.com/isographlabs/isograph',
             },
           ],
         },

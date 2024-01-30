@@ -1,10 +1,10 @@
-import React from "react";
+import React from 'react';
 
-import { iso } from "@isograph/react";
-import { ResolverParameterType as PullRequestDetailsProps } from "@iso/Query/PullRequestDetail/reader.isograph";
+import { iso } from '@isograph/react';
+import { ResolverParameterType as PullRequestDetailsProps } from '@iso/Query/PullRequestDetail/reader.isograph';
 
-import { Card, CardContent } from "@mui/material";
-import { RepoLink } from "./RepoLink";
+import { Card, CardContent } from '@mui/material';
+import { RepoLink } from './RepoLink';
 
 export const PullRequestDetail = iso<
   PullRequestDetailsProps,

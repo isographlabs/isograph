@@ -1,1 +1,1 @@
-export * from "./createReferenceCountedPointer";
+export * from './createReferenceCountedPointer';

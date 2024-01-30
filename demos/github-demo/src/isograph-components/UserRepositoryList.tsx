@@ -1,13 +1,7 @@
-import { iso } from "@isograph/react";
-import type { ResolverParameterType as UserRepositoryListParams } from "@iso/User/RepositoryList/reader.isograph";
+import { iso } from '@isograph/react';
+import type { ResolverParameterType as UserRepositoryListParams } from '@iso/User/RepositoryList/reader.isograph';
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-} from "@mui/material";
+import { Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 
 export const RepositoryList = iso<
   UserRepositoryListParams,
@@ -58,10 +52,7 @@ function UserRepositoryListComponent(props: UserRepositoryListParams) {
           return (
             <TableRow key={node.id}>
               <TableCell>
-                <node.RepositoryLink
-                  setRoute={props.setRoute}
-                  children={node.nameWithOwner}
-                />
+                <node.RepositoryLink setRoute={props.setRoute} children={node.nameWithOwner} />
               </TableCell>
               <TableCell>{node.stargazerCount}</TableCell>
               <TableCell>{node.forkCount}</TableCell>

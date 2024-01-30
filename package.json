@@ -2,6 +2,7 @@
   "private": true,
   "devDependencies": {
     "gulp": "4.0.2",
+    "prettier": "^3.2.4",
     "typescript": "^5.0.3"
   },
   "scripts": {
@@ -10,7 +11,9 @@
     "watch-github-demo": "./target/debug/isograph_cli --config ./demos/github-demo/isograph.config.json --watch",
     "build-demos": "yarn run build-github-demo && yarn run build-graphql-conf-demo",
     "build-github-demo": "./target/debug/isograph_cli --config ./demos/github-demo/isograph.config.json",
-    "build-graphql-conf-demo": "./target/debug/isograph_cli --config ./demos/graphql-conf-2023-demo/isograph.config.json"
+    "build-graphql-conf-demo": "./target/debug/isograph_cli --config ./demos/graphql-conf-2023-demo/isograph.config.json",
+    "format": "yarn run format-prettier",
+    "format-prettier": "prettier --config ./.prettier.config.js --write ."
   },
   "license": "MIT",
   "repository": {

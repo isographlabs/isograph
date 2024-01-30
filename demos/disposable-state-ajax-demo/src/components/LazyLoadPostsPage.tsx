@@ -1,11 +1,11 @@
-import React, { useState } from "react";
-import NoSSR from "react-no-ssr";
+import React, { useState } from 'react';
+import NoSSR from 'react-no-ssr';
 
-import { useLazyDisposableState } from "@isograph/react-disposable-state";
-import { getOrCreateCacheForUrl } from "./api";
-import { Comment, Post, User } from "./networkTypes";
-import { useReadPromise } from "./PromiseWrapper";
-import { Card } from "./Card";
+import { useLazyDisposableState } from '@isograph/react-disposable-state';
+import { getOrCreateCacheForUrl } from './api';
+import { Comment, Post, User } from './networkTypes';
+import { useReadPromise } from './PromiseWrapper';
+import { Card } from './Card';
 
 /**
  * Lazy loading demo
@@ -55,9 +55,7 @@ export function LazyLoadPostsWrapper() {
 }
 
 function PostsLazyLoader() {
-  const cache = getOrCreateCacheForUrl<Post[]>(
-    "https://jsonplaceholder.typicode.com/posts"
-  );
+  const cache = getOrCreateCacheForUrl<Post[]>('https://jsonplaceholder.typicode.com/posts');
   const apiCall = useLazyDisposableState(cache);
   const data = useReadPromise(apiCall.state);
 
@@ -96,7 +94,7 @@ function PostCard({ post, user }: { post: Post; user?: User }) {
 
 function PostLazyLoader({ post }: { post: Post }) {
   const cache = getOrCreateCacheForUrl<User>(
-    `https://jsonplaceholder.typicode.com/users/${post.userId}`
+    `https://jsonplaceholder.typicode.com/users/${post.userId}`,
   );
   const apiCall = useLazyDisposableState(cache);
   const user = useReadPromise(apiCall.state);
@@ -110,10 +108,7 @@ function CommentsWrapper({ postId }: { postId: number }) {
   if (!showComments) {
     return (
       <div className="d-grid mt-2">
-        <button
-          className="btn btn-primary"
-          onClick={() => setShowComments(true)}
-        >
+        <button className="btn btn-primary" onClick={() => setShowComments(true)}>
           Fetch comments using render-as-you-fetch
         </button>
       </div>
@@ -129,7 +124,7 @@ function CommentsWrapper({ postId }: { postId: number }) {
 
 function CommentsLazyLoader({ postId }: { postId: number }) {
   const cache = getOrCreateCacheForUrl<Comment[]>(
-    `https://jsonplaceholder.typicode.com/post/${postId}/comments`
+    `https://jsonplaceholder.typicode.com/post/${postId}/comments`,
   );
   const apiCall = useLazyDisposableState(cache);
   const comments = useReadPromise(apiCall.state);

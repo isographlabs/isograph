@@ -1,12 +1,9 @@
-import { iso } from "@isograph/react";
-import type { ResolverParameterType as HomePageListParams } from "@iso/Query/HomePageList/reader.isograph";
-import { RepoLink } from "./RepoLink";
-import { Button } from "@mui/material";
+import { iso } from '@isograph/react';
+import type { ResolverParameterType as HomePageListParams } from '@iso/Query/HomePageList/reader.isograph';
+import { RepoLink } from './RepoLink';
+import { Button } from '@mui/material';
 
-export const HomePageList = iso<
-  HomePageListParams,
-  ReturnType<typeof HomePageListComponent>
->`
+export const HomePageList = iso<HomePageListParams, ReturnType<typeof HomePageListComponent>>`
   field Query.HomePageList($first: Int!) @component {
     viewer {
       login,

@@ -1,12 +1,9 @@
-import React from "react";
-import { iso } from "@isograph/react";
-import { Container, Stack } from "@mui/material";
-import { ResolverParameterType as PetDetailRouteParams } from "@iso/Query/PetDetailRoute/reader.isograph";
+import React from 'react';
+import { iso } from '@isograph/react';
+import { Container, Stack } from '@mui/material';
+import { ResolverParameterType as PetDetailRouteParams } from '@iso/Query/PetDetailRoute/reader.isograph';
 
-export const PetDetailRoute = iso<
-  PetDetailRouteParams,
-  ReturnType<typeof PetDetailRouteComponent>
->`
+export const PetDetailRoute = iso<PetDetailRouteParams, ReturnType<typeof PetDetailRouteComponent>>`
   field Query.PetDetailRoute($id: ID!) @component {
     pet(id: $id) {
       name,
@@ -18,10 +15,7 @@ export const PetDetailRoute = iso<
   }
 `(PetDetailRouteComponent);
 
-export function PetDetailRouteComponent({
-  data,
-  navigateTo,
-}: PetDetailRouteParams) {
+export function PetDetailRouteComponent({ data, navigateTo }: PetDetailRouteParams) {
   const { pet } = data;
   if (pet == null) {
     return <h1>Pet not found.</h1>;
@@ -29,10 +23,7 @@ export function PetDetailRouteComponent({
   return (
     <Container maxWidth="md">
       <h1>Pet Detail for {data.pet?.name}</h1>
-      <h3
-        onClick={() => navigateTo({ kind: "Home" })}
-        style={{ cursor: "pointer" }}
-      >
+      <h3 onClick={() => navigateTo({ kind: 'Home' })} style={{ cursor: 'pointer' }}>
         ← Home
       </h3>
       <React.Suspense fallback={<h2>Loading pet details...</h2>}>

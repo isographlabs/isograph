@@ -1,6 +1,6 @@
-import Head from "next/head";
+import Head from 'next/head';
 
-import { PreloadedPostsWrapper } from "@/components/PreloadedPostsPage";
+import { PreloadedPostsWrapper } from '@/components/PreloadedPostsPage';
 
 export default function Home() {
   return (

@@ -50,7 +50,7 @@ jobs:
         with:
           command: install
           args: cross
-      - name: "Build isograph_cli with cargo (${{matrix.target.target}})"
+      - name: 'Build isograph_cli with cargo (${{matrix.target.target}})'
         run: ${{ matrix.target.cross && 'cross' || 'cargo' }} build --target ${{ matrix.target.target }} --release
       - uses: actions/upload-artifact@v2
         with:
@@ -75,17 +75,17 @@ jobs:
           toolchain: 1.72.0
           override: true
           target: x86_64-apple-darwin
-      - name: "Download cli binary"
+      - name: 'Download cli binary'
         uses: actions/download-artifact@v2
         with:
           name: isograph_cli-linux-x64
           path: artifacts/linux-x64
       - name: Make artifact executable
         run: chmod +x ./artifacts/linux-x64/isograph_cli
-      - name: "Build project"
+      - name: 'Build project'
         run: ./artifacts/linux-x64/isograph_cli --config ./demos/${{ matrix.target.folder }}/isograph.config.json
-      - name: "Check working directory status"
-        run: "./scripts/check-git-status.sh"
+      - name: 'Check working directory status'
+        run: './scripts/check-git-status.sh'
 
   build-js-packages:
     name: Build js packages
@@ -99,7 +99,7 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 18
-          cache: "pnpm"
+          cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Build
@@ -120,7 +120,7 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 18
-          cache: "pnpm"
+          cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Build website
@@ -153,8 +153,8 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 18
-          cache: "pnpm"
-      - name: "Download build folder"
+          cache: 'pnpm'
+      - name: 'Download build folder'
         uses: actions/download-artifact@v4
         with:
           name: docusaurus-build
@@ -189,7 +189,7 @@ jobs:
         with:
           node-version: 18
           registry-url: https://registry.npmjs.org/
-          cache: "pnpm"
+          cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Change package versions to commit

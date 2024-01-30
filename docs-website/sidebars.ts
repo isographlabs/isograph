@@ -1,4 +1,4 @@
-import type { SidebarsConfig } from "@docusaurus/plugin-content-docs";
+import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
 
 /**
  * Creating a sidebar enables you to:
@@ -12,23 +12,23 @@ import type { SidebarsConfig } from "@docusaurus/plugin-content-docs";
  */
 const sidebars: SidebarsConfig = {
   documentationSidebar: [
-    "introduction",
-    "quickstart",
-    "workflow",
-    "isograph-config",
-    "refetching",
-    "magic-mutation-fields",
+    'introduction',
+    'quickstart',
+    'workflow',
+    'isograph-config',
+    'refetching',
+    'magic-mutation-fields',
     {
-      type: "category",
-      label: "How Isograph works",
+      type: 'category',
+      label: 'How Isograph works',
       items: [
-        "how-isograph-works/compiler",
-        "how-isograph-works/runtime",
-        "how-isograph-works/generated-artifacts",
-        "how-isograph-works/babel-plugin",
+        'how-isograph-works/compiler',
+        'how-isograph-works/runtime',
+        'how-isograph-works/generated-artifacts',
+        'how-isograph-works/babel-plugin',
       ],
     },
-    "backlog",
+    'backlog',
   ],
 };
 

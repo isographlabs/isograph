@@ -1,1 +1,1 @@
-module.exports = require("./BabelPluginIsograph.js");
+module.exports = require('./BabelPluginIsograph.js');

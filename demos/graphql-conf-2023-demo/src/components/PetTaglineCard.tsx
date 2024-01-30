@@ -1,13 +1,10 @@
-import React from "react";
-import { iso } from "@isograph/react";
-import { Card, CardContent } from "@mui/material";
+import React from 'react';
+import { iso } from '@isograph/react';
+import { Card, CardContent } from '@mui/material';
 
-import { ResolverParameterType as PetTaglineCardParams } from "@iso/Pet/PetTaglineCard/reader.isograph";
+import { ResolverParameterType as PetTaglineCardParams } from '@iso/Pet/PetTaglineCard/reader.isograph';
 
-export const PetTaglineCard = iso<
-  PetTaglineCardParams,
-  ReturnType<typeof PetTaglineCardComponent>
->`
+export const PetTaglineCard = iso<PetTaglineCardParams, ReturnType<typeof PetTaglineCardComponent>>`
 field Pet.PetTaglineCard @component {
   id,
   tagline,

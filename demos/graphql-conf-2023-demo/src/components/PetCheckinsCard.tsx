@@ -1,8 +1,8 @@
-import React from "react";
-import { iso } from "@isograph/react";
-import { Card, CardContent } from "@mui/material";
+import React from 'react';
+import { iso } from '@isograph/react';
+import { Card, CardContent } from '@mui/material';
 
-import { ResolverParameterType as PetCheckinsCardParams } from "@iso/Pet/PetCheckinsCard/reader.isograph";
+import { ResolverParameterType as PetCheckinsCardParams } from '@iso/Pet/PetCheckinsCard/reader.isograph';
 
 export const PetCheckinsCard = iso<
   PetCheckinsCardParams,

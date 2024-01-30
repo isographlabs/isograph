@@ -1,13 +1,10 @@
-import { iso } from "@isograph/react";
+import { iso } from '@isograph/react';
 
-import type { ResolverParameterType as UserLinkParams } from "@iso/Actor/UserLink/reader.isograph";
+import type { ResolverParameterType as UserLinkParams } from '@iso/Actor/UserLink/reader.isograph';
 
-import { Link } from "@mui/material";
+import { Link } from '@mui/material';
 
-export const UserLink = iso<
-  UserLinkParams,
-  ReturnType<typeof UserLinkComponent>
->`
+export const UserLink = iso<UserLinkParams, ReturnType<typeof UserLinkComponent>>`
   field Actor.UserLink @component {
     login,
   }
@@ -18,11 +15,11 @@ function UserLinkComponent(props: UserLinkParams) {
     <Link
       onClick={() =>
         props.setRoute({
-          kind: "User",
+          kind: 'User',
           userLogin: props.data.login,
         })
       }
-      style={{ cursor: "pointer" }}
+      style={{ cursor: 'pointer' }}
     >
       {props.children}
     </Link>
