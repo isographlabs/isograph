@@ -2,10 +2,7 @@ import { iso } from '@isograph/react';
 import type { ResolverParameterType as RepositoryDetailParams } from '@iso/Query/RepositoryDetail/reader.isograph';
 import { RepoLink } from './RepoLink';
 
-export const RepositoryDetail = iso<
-  RepositoryDetailParams,
-  ReturnType<typeof RepositoryDetailComponent>
->`
+export const RepositoryDetail = iso<RepositoryDetailParams>`
   field Query.RepositoryDetail @component {
     repository(name: $repositoryName, owner: $repositoryOwner) {
       nameWithOwner,

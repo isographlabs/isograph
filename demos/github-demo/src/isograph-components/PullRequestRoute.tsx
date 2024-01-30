@@ -10,10 +10,7 @@ import { ResolverParameterType as PullRequestComponentProps } from '@iso/Query/P
 
 import { Container } from '@mui/material';
 
-export const PullRequest = iso<
-  PullRequestComponentProps,
-  ReturnType<typeof PullRequestComponentComponent>
->`
+export const PullRequest = iso<PullRequestComponentProps>`
   field Query.PullRequest($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!) @component {
     Header,
     PullRequestDetail,

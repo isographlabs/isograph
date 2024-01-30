@@ -1,11 +1,11 @@
 import React from 'react';
 import { iso } from '@isograph/react';
 
-import { ResolverParameterType as PullRequestProps } from '@iso/PullRequest/pull_request_link/reader.isograph';
+import { ResolverParameterType as PullRequestProps } from '@iso/PullRequest/PullRequestLink/reader.isograph';
 
 import { Link } from '@mui/material';
 
-export const PullRequestLink = iso<PullRequestProps, ReturnType<typeof PullRequestLinkComponent>>`
+export const PullRequestLink = iso<PullRequestProps>`
   field PullRequest.PullRequestLink @component {
     number,
     repository {

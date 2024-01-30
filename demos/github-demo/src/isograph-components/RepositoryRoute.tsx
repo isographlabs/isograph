@@ -5,10 +5,7 @@ import { ResolverParameterType as RepositoryPageParams } from '@iso/Query/Reposi
 
 import { FullPageLoading, Route, RepositoryRoute as RepositoryRouteType } from './GithubDemo';
 
-export const RepositoryPage = iso<
-  RepositoryPageParams,
-  ReturnType<typeof RepositoryRouteComponent>
->`
+export const RepositoryPage = iso<RepositoryPageParams>`
   field Query.RepositoryPage($repositoryName: String!, $repositoryOwner: String!, $first: Int!) @component {
     Header,
     RepositoryDetail,

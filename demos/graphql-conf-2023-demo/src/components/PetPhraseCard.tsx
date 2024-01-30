@@ -4,7 +4,7 @@ import { Card, CardContent } from '@mui/material';
 
 import { ResolverParameterType as PetPhraseCardParams } from '@iso/Pet/PetPhraseCard/reader.isograph';
 
-export const PetPhraseCard = iso<PetPhraseCardParams, ReturnType<typeof PetPhraseCardComponent>>`
+export const PetPhraseCard = iso<PetPhraseCardParams>`
 field Pet.PetPhraseCard @component {
   id,
   favorite_phrase,

@@ -7,7 +7,7 @@ import { ResolverParameterType as HomePageComponentParams } from '@iso/Query/Hom
 import { FullPageLoading, Route } from './GithubDemo';
 import { RepoLink } from './RepoLink';
 
-export const HomePage = iso<HomePageComponentParams, ReturnType<typeof HomePageComponent>>`
+export const HomePage = iso<HomePageComponentParams>`
   field Query.HomePage($first: Int!) @component {
     Header,
     HomePageList,

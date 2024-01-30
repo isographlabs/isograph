@@ -2,7 +2,7 @@ import { iso } from '@isograph/react';
 import type { ResolverParameterType as UserDetailParams } from '@iso/Query/UserDetail/reader.isograph';
 import { RepoLink } from './RepoLink';
 
-export const UserDetail = iso<UserDetailParams, ReturnType<typeof UserDetailComponent>>`
+export const UserDetail = iso<UserDetailParams>`
   field Query.UserDetail @component {
     user(login: $userLogin) {
       name,

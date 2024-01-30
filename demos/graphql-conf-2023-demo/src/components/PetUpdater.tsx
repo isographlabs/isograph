@@ -5,7 +5,7 @@ import { MenuItem, Select, Button, Input, Box } from '@mui/material';
 import { ResolverParameterType as PetUpdaterParams } from '@iso/Pet/PetUpdater/reader.isograph';
 import { PetId } from './router';
 
-export const PetUpdater = iso<PetUpdaterParams, ReturnType<typeof PetUpdaterComponent>>`
+export const PetUpdater = iso<PetUpdaterParams>`
   field Pet.PetUpdater @component {
     __set_pet_best_friend,
     potential_new_best_friends {

@@ -4,10 +4,7 @@ import { Avatar, Card, CardContent, Stack } from '@mui/material';
 
 import { ResolverParameterType as PetBestFriendCardParams } from '@iso/Pet/PetBestFriendCard/reader.isograph';
 
-export const PetBestFriendCard = iso<
-  PetBestFriendCardParams,
-  ReturnType<typeof PetBestFriendCardComponent>
->`
+export const PetBestFriendCard = iso<PetBestFriendCardParams>`
   field Pet.PetBestFriendCard @component {
     id,
     PetUpdater,

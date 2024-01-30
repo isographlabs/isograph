@@ -4,7 +4,7 @@ import type { ResolverParameterType as RepositoryLinkParams } from '@iso/Reposit
 
 import { Link } from '@mui/material';
 
-export const RepositoryLink = iso<RepositoryLinkParams, ReturnType<typeof RepositoryLinkComponent>>`
+export const RepositoryLink = iso<RepositoryLinkParams>`
   field Repository.RepositoryLink @component {
     id,
     name,

@@ -6,10 +6,7 @@ import { ResolverParameterType as PullRequestDetailsProps } from '@iso/Query/Pul
 import { Card, CardContent } from '@mui/material';
 import { RepoLink } from './RepoLink';
 
-export const PullRequestDetail = iso<
-  PullRequestDetailsProps,
-  ReturnType<typeof PullRequestDetailComponent>
->`
+export const PullRequestDetail = iso<PullRequestDetailsProps>`
   field Query.PullRequestDetail @component {
     repository(owner: $repositoryOwner, name: $repositoryName) {
       pullRequest(number: $pullRequestNumber) {

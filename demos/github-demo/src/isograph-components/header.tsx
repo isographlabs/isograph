@@ -8,7 +8,7 @@ import { Route } from './GithubDemo';
 
 import logo from './svgs/dark-logo.svg';
 
-export const Header = iso<HeaderProps, ReturnType<typeof HeaderComponent>>`
+export const Header = iso<HeaderProps>`
   field Query.Header @component {
     viewer {
       name,
