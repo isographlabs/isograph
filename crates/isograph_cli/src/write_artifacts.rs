@@ -4,175 +4,61 @@ use std::{
     path::PathBuf,
 };
 
-use common_lang_types::SelectableFieldName;
-use intern::{string_key::Intern, Lookup};
-use isograph_schema::{ENTRYPOINT, READER};
-
 use crate::{
-    generate_artifacts::{
-        ArtifactInfo, EntrypointArtifactInfo, GenerateArtifactsError, ReaderArtifactInfo,
-        RefetchArtifactInfo,
-    },
+    generate_artifacts::{GenerateArtifactsError, PathAndContent},
     isograph_literals::ISOGRAPH_FOLDER,
 };
 
-pub(crate) fn write_artifacts_to_disk<'schema>(
-    artifact_infos: Vec<ArtifactInfo<'schema>>,
-    project_root: &PathBuf,
+pub(crate) fn write_to_disk<'schema>(
+    paths_and_contents: impl Iterator<Item = PathAndContent>,
     artifact_directory: &PathBuf,
-) -> Result<(), GenerateArtifactsError> {
+) -> Result<usize, GenerateArtifactsError> {
     let artifact_directory = artifact_directory.join(ISOGRAPH_FOLDER);
 
     if artifact_directory.exists() {
         fs::remove_dir_all(&artifact_directory).map_err(|e| {
             GenerateArtifactsError::UnableToDeleteDirectory {
-                path: project_root.clone(),
+                path: artifact_directory.clone(),
                 message: e,
             }
         })?;
     }
     fs::create_dir_all(&artifact_directory).map_err(|e| {
         GenerateArtifactsError::UnableToCreateDirectory {
-            path: project_root.clone(),
+            path: artifact_directory.clone(),
             message: e,
         }
     })?;
-    for artifact in artifact_infos {
-        match artifact {
-            ArtifactInfo::Entrypoint(entrypoint_artifact) => {
-                let EntrypointArtifactInfo {
-                    query_name,
-                    parent_type,
-                    ..
-                } = &entrypoint_artifact;
 
-                let generated_file_name = generated_file_name(*ENTRYPOINT);
-                let intermediate_folder = generated_intermediate_folder(
-                    &artifact_directory,
-                    &[parent_type.name.lookup(), query_name.lookup()],
-                );
-                let generated_file_path = intermediate_folder.join(generated_file_name);
+    let mut count = 0;
+    for path_and_content in paths_and_contents {
+        // Is this better than materializing paths_and_contents sooner?
+        count += 1;
 
-                fs::create_dir_all(&intermediate_folder).map_err(|e| {
-                    GenerateArtifactsError::UnableToCreateDirectory {
-                        path: intermediate_folder.clone(),
-                        message: e,
-                    }
-                })?;
-
-                let mut file = File::create(&generated_file_path).map_err(|e| {
-                    GenerateArtifactsError::UnableToWriteToArtifactFile {
-                        path: generated_file_path.clone(),
-                        message: e,
-                    }
-                })?;
-
-                let file_contents = entrypoint_artifact.file_contents();
-
-                file.write(file_contents.as_bytes()).map_err(|e| {
-                    GenerateArtifactsError::UnableToWriteToArtifactFile {
-                        path: generated_file_path.clone(),
-                        message: e,
-                    }
-                })?;
+        let absolute_directory = artifact_directory.join(path_and_content.relative_directory);
+        fs::create_dir_all(&absolute_directory).map_err(|e| {
+            GenerateArtifactsError::UnableToCreateDirectory {
+                path: absolute_directory.clone(),
+                message: e,
             }
-            ArtifactInfo::Reader(reader_artifact) => {
-                let ReaderArtifactInfo {
-                    parent_type,
-                    resolver_field_name,
-                    ..
-                } = &reader_artifact;
+        })?;
 
-                let generated_file_name = generated_file_name(*READER);
-                let intermediate_folder = generated_intermediate_folder(
-                    &artifact_directory,
-                    &[parent_type.name.lookup(), resolver_field_name.lookup()],
-                );
-                let generated_file_path = intermediate_folder.join(generated_file_name);
-
-                fs::create_dir_all(&intermediate_folder).map_err(|e| {
-                    GenerateArtifactsError::UnableToCreateDirectory {
-                        path: intermediate_folder.clone(),
-                        message: e,
-                    }
-                })?;
-
-                let mut file = File::create(&generated_file_path).map_err(|e| {
-                    GenerateArtifactsError::UnableToWriteToArtifactFile {
-                        path: generated_file_path.clone(),
-                        message: e,
-                    }
-                })?;
-
-                let file_contents = reader_artifact.file_contents();
-
-                file.write(file_contents.as_bytes()).map_err(|e| {
-                    GenerateArtifactsError::UnableToWriteToArtifactFile {
-                        path: generated_file_path.clone(),
-                        message: e,
-                    }
-                })?;
+        let absolute_file_path = absolute_directory.join(&format!(
+            "{}.isograph.ts",
+            path_and_content.file_name_prefix
+        ));
+        let mut file = File::create(&absolute_file_path).map_err(|e| {
+            GenerateArtifactsError::UnableToWriteToArtifactFile {
+                path: absolute_file_path.clone(),
+                message: e,
             }
-            ArtifactInfo::RefetchQuery(refetch_artifact) => {
-                let RefetchArtifactInfo {
-                    root_fetchable_field,
-                    root_fetchable_field_parent_object,
-                    refetch_query_index,
-                    ..
-                } = &refetch_artifact;
+        })?;
 
-                // TODO we will generate many different queries; they need unique names. For now,
-                // they have a single name each artifact clobbers the previous.
-                let generated_file_name = generated_file_name(
-                    format!("__refetch__{}", refetch_query_index)
-                        .intern()
-                        .into(),
-                );
-                let intermediate_folder = generated_intermediate_folder(
-                    &artifact_directory,
-                    &[
-                        root_fetchable_field_parent_object.lookup(),
-                        root_fetchable_field.lookup(),
-                    ],
-                );
-                let generated_file_path = intermediate_folder.join(generated_file_name);
-
-                fs::create_dir_all(&intermediate_folder).map_err(|e| {
-                    GenerateArtifactsError::UnableToCreateDirectory {
-                        path: intermediate_folder.clone(),
-                        message: e,
-                    }
-                })?;
-
-                let mut file = File::create(&generated_file_path).map_err(|e| {
-                    GenerateArtifactsError::UnableToWriteToArtifactFile {
-                        path: generated_file_path.clone(),
-                        message: e,
-                    }
-                })?;
-
-                let file_contents = refetch_artifact.file_contents();
-
-                file.write(file_contents.as_bytes()).map_err(|e| {
-                    GenerateArtifactsError::UnableToWriteToArtifactFile {
-                        path: generated_file_path.clone(),
-                        message: e,
-                    }
-                })?;
-            }
-        }
+        file.write(path_and_content.file_content.as_bytes())
+            .map_err(|e| GenerateArtifactsError::UnableToWriteToArtifactFile {
+                path: absolute_file_path.clone(),
+                message: e,
+            })?;
     }
-    Ok(())
-}
-
-fn generated_file_name(field_name: SelectableFieldName) -> PathBuf {
-    PathBuf::from(format!("{}.isograph.ts", field_name))
-}
-
-fn generated_intermediate_folder(project_root: &PathBuf, items: &[&'static str]) -> PathBuf {
-    let mut project_root = project_root.clone();
-    for item in items.iter() {
-        project_root = project_root.join(item);
-    }
-    project_root
+    Ok(count)
 }

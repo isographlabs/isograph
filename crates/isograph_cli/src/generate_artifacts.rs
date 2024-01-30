@@ -26,11 +26,11 @@ use isograph_schema::{
     MutationFieldResolverInfo, NameAndArguments, PathToRefetchField, RefetchFieldResolverInfo,
     RequiresRefinement, ResolverActionKind, ResolverTypeAndField, ResolverVariant,
     RootRefetchedPath, ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver,
-    ValidatedSelection, ValidatedVariableDefinition,
+    ValidatedSelection, ValidatedVariableDefinition, ENTRYPOINT, READER,
 };
 use thiserror::Error;
 
-use crate::write_artifacts::write_artifacts_to_disk;
+use crate::write_artifacts::write_to_disk;
 
 type NestedResolverImports = HashMap<ResolverTypeAndField, ResolverImport>;
 
@@ -44,17 +44,36 @@ macro_rules! derive_display {
     };
 }
 
+pub(crate) struct PathAndContent {
+    pub(crate) relative_directory: PathBuf,
+    // It doesn't make sense that this is a SelectableFieldName
+    pub(crate) file_name_prefix: SelectableFieldName,
+    pub(crate) file_content: String,
+}
+
 // TODO move to another module
 pub(crate) fn generate_and_write_artifacts(
     schema: &ValidatedSchema,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
 ) -> Result<usize, GenerateArtifactsError> {
-    let artifact_infos = get_artifact_info(schema, project_root, artifact_directory);
-    let artifact_count = artifact_infos.len();
-    write_artifacts_to_disk(artifact_infos, project_root, artifact_directory)?;
+    let paths_and_contents =
+        get_artifact_path_and_contents(schema, project_root, artifact_directory);
+    let artifact_count = write_to_disk(paths_and_contents, artifact_directory)?;
 
     Ok(artifact_count)
+}
+
+fn get_artifact_path_and_contents<'schema>(
+    schema: &'schema ValidatedSchema,
+    project_root: &PathBuf,
+    artifact_directory: &PathBuf,
+) -> impl Iterator<Item = PathAndContent> + 'schema {
+    let artifact_infos = get_artifact_infos(schema, project_root, artifact_directory);
+
+    artifact_infos
+        .into_iter()
+        .map(ArtifactInfo::to_path_and_content)
 }
 
 /// get all artifacts that we must generate according to the following rough plan:
@@ -64,7 +83,7 @@ pub(crate) fn generate_and_write_artifacts(
 ///
 /// We do this by keeping a queue of artifacts to generate, and adding to the queue
 /// as we process entrypoints.
-fn get_artifact_info<'schema>(
+fn get_artifact_infos<'schema>(
     schema: &'schema ValidatedSchema,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
@@ -491,6 +510,16 @@ pub(crate) enum ArtifactInfo<'schema> {
     RefetchQuery(RefetchArtifactInfo),
 }
 
+impl<'schema> ArtifactInfo<'schema> {
+    pub fn to_path_and_content(self) -> PathAndContent {
+        match self {
+            ArtifactInfo::Entrypoint(entrypoint_artifact) => entrypoint_artifact.path_and_content(),
+            ArtifactInfo::Reader(reader_artifact) => reader_artifact.path_and_content(),
+            ArtifactInfo::RefetchQuery(refetch_query) => refetch_query.path_and_content(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct ResolverParameterType(pub String);
 derive_display!(ResolverParameterType);
@@ -536,6 +565,24 @@ pub(crate) struct EntrypointArtifactInfo<'schema> {
     pub refetch_query_artifact_import: RefetchQueryArtifactImport,
 }
 
+impl<'schema> EntrypointArtifactInfo<'schema> {
+    pub fn path_and_content(self) -> PathAndContent {
+        let EntrypointArtifactInfo {
+            query_name,
+            parent_type,
+            ..
+        } = &self;
+
+        let directory = generate_path(parent_type.name, (*query_name).into());
+
+        PathAndContent {
+            relative_directory: directory,
+            file_content: self.file_contents(),
+            file_name_prefix: *ENTRYPOINT,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct ReaderArtifactInfo<'schema> {
     pub parent_type: &'schema ValidatedSchemaObject,
@@ -549,6 +596,24 @@ pub(crate) struct ReaderArtifactInfo<'schema> {
     pub resolver_variant: ResolverVariant,
 }
 
+impl<'schema> ReaderArtifactInfo<'schema> {
+    pub fn path_and_content(self) -> PathAndContent {
+        let ReaderArtifactInfo {
+            parent_type,
+            resolver_field_name,
+            ..
+        } = &self;
+
+        let relative_directory = generate_path(parent_type.name, *resolver_field_name);
+
+        PathAndContent {
+            file_content: self.file_contents(),
+            relative_directory,
+            file_name_prefix: *READER,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct RefetchArtifactInfo {
     pub normalization_ast: NormalizationAst,
@@ -557,6 +622,29 @@ pub(crate) struct RefetchArtifactInfo {
     pub root_fetchable_field_parent_object: IsographObjectTypeName,
     // TODO wrap in a newtype
     pub refetch_query_index: usize,
+}
+
+impl RefetchArtifactInfo {
+    pub fn path_and_content(self) -> PathAndContent {
+        let RefetchArtifactInfo {
+            root_fetchable_field,
+            root_fetchable_field_parent_object,
+            refetch_query_index,
+            ..
+        } = &self;
+
+        let relative_directory =
+            generate_path(*root_fetchable_field_parent_object, *root_fetchable_field);
+        let file_name_prefix = format!("__refetch__{}", refetch_query_index)
+            .intern()
+            .into();
+
+        PathAndContent {
+            file_content: self.file_contents(),
+            relative_directory,
+            file_name_prefix,
+        }
+    }
 }
 
 fn generate_query_text(
@@ -1421,4 +1509,8 @@ fn find_mutation_query_index(
             }
         })
         .expect("Expected refetch query to be found")
+}
+
+fn generate_path(object_name: IsographObjectTypeName, field_name: SelectableFieldName) -> PathBuf {
+    PathBuf::from(object_name.lookup()).join(field_name.lookup())
 }
