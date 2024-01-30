@@ -3,7 +3,7 @@ import { iso } from '@isograph/react';
 import { Container, Stack } from '@mui/material';
 import { ResolverParameterType as PetDetailRouteParams } from '@iso/Query/PetDetailRoute/reader.isograph';
 
-export const PetDetailRoute = iso<PetDetailRouteParams, ReturnType<typeof PetDetailRouteComponent>>`
+export const PetDetailRoute = iso<PetDetailRouteParams>`
   field Query.PetDetailRoute($id: ID!) @component {
     pet(id: $id) {
       name,

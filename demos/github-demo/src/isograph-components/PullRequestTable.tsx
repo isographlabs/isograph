@@ -4,7 +4,7 @@ import type { ResolverParameterType as CreatedAtFormattedType } from '@iso/PullR
 
 import { Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 
-export const createdAtFormatted = iso<CreatedAtFormattedType, string>`
+export const createdAtFormatted = iso<CreatedAtFormattedType>`
   field PullRequest.createdAtFormatted {
     createdAt,
   }
@@ -17,10 +17,7 @@ export const createdAtFormatted = iso<CreatedAtFormattedType, string>`
   });
 });
 
-export const PullRequestTable = iso<
-  PullRequestTableParams,
-  ReturnType<typeof PullRequestTableComponent>
->`
+export const PullRequestTable = iso<PullRequestTableParams>`
   field PullRequestConnection.PullRequestTable @component {
     edges {
       node {

@@ -3,7 +3,7 @@ import type { ResolverParameterType as HomePageListParams } from '@iso/Query/Hom
 import { RepoLink } from './RepoLink';
 import { Button } from '@mui/material';
 
-export const HomePageList = iso<HomePageListParams, ReturnType<typeof HomePageListComponent>>`
+export const HomePageList = iso<HomePageListParams>`
   field Query.HomePageList($first: Int!) @component {
     viewer {
       login,

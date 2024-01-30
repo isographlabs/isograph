@@ -152,9 +152,9 @@ function assertIsEntrypoint<TReadFromStore extends Object, TResolverProps, TReso
   if (typeof value === 'function') throw new Error('Not a string');
 }
 
-export function iso<TResolverParameter, TResolverReturn>(
+export function iso<TResolverParameter>(
   _queryText: TemplateStringsArray,
-): (
+): <TResolverReturn>(
   x: (param: TResolverParameter) => TResolverReturn,
 ) => (param: TResolverParameter) => TResolverReturn {
   // The name `identity` here is a bit of a double entendre.
@@ -165,7 +165,7 @@ export function iso<TResolverParameter, TResolverReturn>(
   // is the identity function. At that point, the types
   // TResolverParameter and TResolverReturn must be identical.
 
-  return function identity(
+  return function identity<TResolverReturn>(
     x: (param: TResolverParameter) => TResolverReturn,
   ): (param: TResolverParameter) => TResolverReturn {
     return x;

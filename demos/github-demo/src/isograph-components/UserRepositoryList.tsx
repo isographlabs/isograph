@@ -3,10 +3,7 @@ import type { ResolverParameterType as UserRepositoryListParams } from '@iso/Use
 
 import { Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 
-export const RepositoryList = iso<
-  UserRepositoryListParams,
-  ReturnType<typeof UserRepositoryListComponent>
->`
+export const RepositoryList = iso<UserRepositoryListParams>`
   field User.RepositoryList @component {
     repositories(last: 10) {
       edges {

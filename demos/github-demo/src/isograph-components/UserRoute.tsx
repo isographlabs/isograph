@@ -5,10 +5,7 @@ import { Container } from '@mui/material';
 import { ResolverParameterType as UserRouteComponentParams } from '@iso/Query/UserPage/reader.isograph';
 import { FullPageLoading, Route, type UserRoute as UserRouteType } from './GithubDemo';
 
-export const UserPage = iso<
-  UserRouteComponentParams,
-  ReturnType<typeof UserRouteComponentComponent>
->`
+export const UserPage = iso<UserRouteComponentParams>`
   field Query.UserPage($first: Int!, $userLogin: String!) @component {
     Header,
     UserDetail,
