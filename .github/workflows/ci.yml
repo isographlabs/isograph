@@ -152,6 +152,8 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Run prettier
         run: pnpm run format-prettier
+      - name: print diff
+        run: git --no-pager diff
       - name: "Check working directory status"
         run: "./scripts/check-git-status.sh"
 
@@ -159,6 +161,9 @@ jobs:
     name: All checks passed
     runs-on: ubuntu-latest
     needs: [build-js-packages, build-cli, build-demos, build-website, prettier]
+    steps:
+      - name: Do nothing
+        run: echo Isograph is awesome!
 
   deploy-website:
     name: Deploy website
