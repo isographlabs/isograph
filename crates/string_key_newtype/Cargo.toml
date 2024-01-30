@@ -5,4 +5,4 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
-intern = { git = "https://github.com/facebook/relay.git" }
+intern = { git = "https://github.com/facebook/relay.git#f53a93272a1d756c60de795090fe70ca9532bb67" }

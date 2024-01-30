@@ -7,5 +7,5 @@ license = "MIT"
 [dependencies]
 common_lang_types = { path = "../common_lang_types" }
 graphql_lang_types = { path = "../graphql_lang_types" }
-intern = { git = "https://github.com/facebook/relay.git" }
+intern = { git = "https://github.com/facebook/relay.git#f53a93272a1d756c60de795090fe70ca9532bb67" }
 u32_newtypes = { path = "../u32_newtypes" }
