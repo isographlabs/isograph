@@ -13,9 +13,7 @@ const configExplorer = cosmiconfig('isograph', {
 let IsographConfig;
 const result = configExplorer.searchSync();
 if (result) {
-     IsographConfig = result.config;
-
-
+  IsographConfig = result.config;
 } else {
   throw new Error('No config found. Do you have a isograph.config.json file somewhere?');
 }
