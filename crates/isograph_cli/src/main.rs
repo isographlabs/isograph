@@ -16,7 +16,7 @@ use structopt::StructOpt;
 use watch::handle_watch_command;
 
 #[tokio::main]
-async fn main() {
+ async fn main() {
     let opt = CliOptions::from_args();
     let config = create_config(opt.config.unwrap_or("./isograph.config.json".into()));
 
