@@ -14,7 +14,7 @@ type UseUpdatableDisposableStateReturnValue<T> = {
 };
 
 export function useDisposableState<T = never>(
-  parentCache: ParentCache<T>
+  parentCache: ParentCache<T>,
 ): UseUpdatableDisposableStateReturnValue<T> {
   const itemCleanupPairRef = useRef<ItemCleanupPair<T> | null>(null);
 
@@ -34,12 +34,12 @@ export function useDisposableState<T = never>(
         } else {
           throw new Error(
             "itemCleanupPairRef.current is unexpectedly null. " +
-              "This indicates a bug in react-disposable-state."
+              "This indicates a bug in react-disposable-state.",
           );
         }
       }
     },
-    [stateFromDisposableStateHook]
+    [stateFromDisposableStateHook],
   );
 
   useEffect(function cleanupItemCleanupPairRefIfSetStateNotCalled() {

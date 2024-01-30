@@ -1,10 +1,5 @@
 import React, { useEffect, useState } from "react";
-import {
-  iso,
-  read,
-  useLazyReference,
-  subscribe,
-} from "@isograph/react";
+import { iso, read, useLazyReference, subscribe } from "@isograph/react";
 import { Container } from "@mui/material";
 
 import { ResolverParameterType as HomePageComponentParams } from "@iso/Query/HomePage/reader.isograph";

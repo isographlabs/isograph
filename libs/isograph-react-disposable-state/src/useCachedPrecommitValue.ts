@@ -38,7 +38,7 @@ import { ItemCleanupPair } from "@isograph/isograph-disposable-types/dist";
  */
 export function useCachedPrecommitValue<T>(
   parentCache: ParentCache<T>,
-  onCommit: (pair: ItemCleanupPair<T>) => void
+  onCommit: (pair: ItemCleanupPair<T>) => void,
 ): { state: T } | null {
   // TODO: there should be two APIs. One in which we always re-render if the
   // committed item was not returned during the last render, and one in which
@@ -66,7 +66,7 @@ export function useCachedPrecommitValue<T>(
     // After the above, we have a non-disposed item and a cleanup function, which we
     // can pass to onCommit.
     const undisposedPair = cacheItem.permanentRetainIfNotDisposed(
-      disposeOfTemporaryRetain
+      disposeOfTemporaryRetain,
     );
     if (undisposedPair !== null) {
       onCommit(undisposedPair);

@@ -43,11 +43,14 @@ export function RepositoryRoute({
   route: RepositoryRouteType;
   setRoute: (route: Route) => void;
 }) {
-  const { queryReference } = useLazyReference(iso`entrypoint Query.RepositoryPage`, {
-    repositoryName: route.repositoryName,
-    repositoryOwner: route.repositoryOwner,
-    first: 20,
-  });
+  const { queryReference } = useLazyReference(
+    iso`entrypoint Query.RepositoryPage`,
+    {
+      repositoryName: route.repositoryName,
+      repositoryOwner: route.repositoryOwner,
+      first: 20,
+    },
+  );
   console.log("repository route", {
     queryReference,
     name: route.repositoryName,

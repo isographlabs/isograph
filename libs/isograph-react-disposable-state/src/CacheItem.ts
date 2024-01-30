@@ -74,7 +74,7 @@ export class CacheItem<T> {
   constructor(
     factory: Factory<T>,
     removeFromParentCache: CleanupFn,
-    options: CacheItemOptions | void
+    options: CacheItemOptions | void,
   ) {
     this.__options = options ?? null;
     const [value, disposeValue] = factory();
@@ -101,14 +101,14 @@ export class CacheItem<T> {
       default: {
         throw new Error(
           "Attempted to access disposed value from CacheItem. " +
-            "This indicates a bug in react-disposable-state."
+            "This indicates a bug in react-disposable-state.",
         );
       }
     }
   }
 
   permanentRetainIfNotDisposed(
-    disposeOfTemporaryRetain: CleanupFn
+    disposeOfTemporaryRetain: CleanupFn,
   ): ItemCleanupPair<T> | null {
     switch (this.__state.kind) {
       case "InParentCacheAndNotDisposed": {
@@ -121,7 +121,7 @@ export class CacheItem<T> {
             if (cleared) {
               throw new Error(
                 "A permanent retain should only be cleared once. " +
-                  "This indicates a bug in react-disposable-state."
+                  "This indicates a bug in react-disposable-state.",
               );
             }
             cleared = true;
@@ -134,14 +134,14 @@ export class CacheItem<T> {
               case "NotInParentCacheAndNotDisposed": {
                 this.__state.permanentRetainCount--;
                 this.__maybeExitNotInParentCacheAndNotDisposedState(
-                  this.__state
+                  this.__state,
                 );
                 return;
               }
               default: {
                 throw new Error(
                   "CacheItem was in a disposed state, but there existed a permanent retain. " +
-                    "This indicates a bug in react-disposable-state."
+                    "This indicates a bug in react-disposable-state.",
                 );
               }
             }
@@ -158,7 +158,7 @@ export class CacheItem<T> {
             if (cleared) {
               throw new Error(
                 "A permanent retain should only be cleared once. " +
-                  "This indicates a bug in react-disposable-state."
+                  "This indicates a bug in react-disposable-state.",
               );
             }
             cleared = true;
@@ -166,14 +166,14 @@ export class CacheItem<T> {
               case "NotInParentCacheAndNotDisposed": {
                 this.__state.permanentRetainCount--;
                 this.__maybeExitNotInParentCacheAndNotDisposedState(
-                  this.__state
+                  this.__state,
                 );
                 return;
               }
               default: {
                 throw new Error(
                   "CacheItem was in an unexpected state. " +
-                    "This indicates a bug in react-disposable-state."
+                    "This indicates a bug in react-disposable-state.",
                 );
               }
             }
@@ -201,7 +201,7 @@ export class CacheItem<T> {
           if (status === "ClearedByCallback") {
             throw new Error(
               "A temporary retain should only be cleared once. " +
-                "This indicates a bug in react-disposable-state."
+                "This indicates a bug in react-disposable-state.",
             );
           } else if (status === "Uncleared") {
             switch (this.__state.kind) {
@@ -214,7 +214,7 @@ export class CacheItem<T> {
               default: {
                 throw new Error(
                   "A temporary retain was cleared, for which the CacheItem is in an invalid state. " +
-                    "This indicates a bug in react-disposable-state."
+                    "This indicates a bug in react-disposable-state.",
                 );
               }
             }
@@ -232,7 +232,7 @@ export class CacheItem<T> {
             default: {
               throw new Error(
                 "A temporary retain was cleared, for which the CacheItem is in an invalid state. " +
-                  "This indicates a bug in react-disposable-state."
+                  "This indicates a bug in react-disposable-state.",
               );
             }
           }
@@ -240,14 +240,14 @@ export class CacheItem<T> {
 
         const timeoutId = setTimeout(
           clearTemporaryRetainByTimeout,
-          this.__options?.temporaryRetainTime ?? DEFAULT_TEMPORARY_RETAIN_TIME
+          this.__options?.temporaryRetainTime ?? DEFAULT_TEMPORARY_RETAIN_TIME,
         );
         return clearTemporaryRetainByCallack;
       }
       default: {
         throw new Error(
           "temporaryRetain was called, for which the CacheItem is in an invalid state. " +
-            "This indicates a bug in react-disposable-state."
+            "This indicates a bug in react-disposable-state.",
         );
       }
     }
@@ -262,7 +262,7 @@ export class CacheItem<T> {
           if (cleared) {
             throw new Error(
               "A permanent retain should only be cleared once. " +
-                "This indicates a bug in react-disposable-state."
+                "This indicates a bug in react-disposable-state.",
             );
           }
           cleared = true;
@@ -280,7 +280,7 @@ export class CacheItem<T> {
             default: {
               throw new Error(
                 "CacheItem was in a disposed state, but there existed a permanent retain. " +
-                  "This indicates a bug in react-disposable-state."
+                  "This indicates a bug in react-disposable-state.",
               );
             }
           }
@@ -293,7 +293,7 @@ export class CacheItem<T> {
           if (cleared) {
             throw new Error(
               "A permanent retain should only be cleared once. " +
-                "This indicates a bug in react-disposable-state."
+                "This indicates a bug in react-disposable-state.",
             );
           }
           cleared = true;
@@ -306,7 +306,7 @@ export class CacheItem<T> {
             default: {
               throw new Error(
                 "CacheItem was in an unexpected state. " +
-                  "This indicates a bug in react-disposable-state."
+                  "This indicates a bug in react-disposable-state.",
               );
             }
           }
@@ -315,14 +315,14 @@ export class CacheItem<T> {
       default: {
         throw new Error(
           "permanentRetain was called, but the CacheItem is in an invalid state. " +
-            "This indicates a bug in react-disposable-state."
+            "This indicates a bug in react-disposable-state.",
         );
       }
     }
   }
 
   private __maybeExitInParentCacheAndNotDisposedState(
-    state: InParentCacheAndNotDisposed<T>
+    state: InParentCacheAndNotDisposed<T>,
   ) {
     if (state.temporaryRetainCount === 0 && state.permanentRetainCount === 0) {
       state.removeFromParentCache();
@@ -342,7 +342,7 @@ export class CacheItem<T> {
   }
 
   private __maybeExitNotInParentCacheAndNotDisposedState(
-    state: NotInParentCacheAndNotDisposed<T>
+    state: NotInParentCacheAndNotDisposed<T>,
   ) {
     if (state.permanentRetainCount === 0) {
       state.disposeValue();
@@ -356,7 +356,7 @@ export class CacheItem<T> {
 export function createTemporarilyRetainedCacheItem<T>(
   factory: Factory<T>,
   removeFromParentCache: CleanupFn,
-  options: CacheItemOptions | void
+  options: CacheItemOptions | void,
 ): [CacheItem<T>, CleanupFn] {
   const cacheItem = new CacheItem(factory, removeFromParentCache, options);
   const disposeTemporaryRetain = cacheItem.temporaryRetain();

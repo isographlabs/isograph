@@ -51,7 +51,7 @@ export function PullRequestRoute({
       repositoryName: route.repositoryName,
       repositoryOwner: route.repositoryOwner,
       last: 20,
-    }
+    },
   );
 
   const data = read(queryReference);

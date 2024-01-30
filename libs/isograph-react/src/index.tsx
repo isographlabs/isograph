@@ -27,7 +27,7 @@ export {
 export type IsographEntrypoint<
   TReadFromStore extends Object,
   TResolverProps,
-  TResolverResult
+  TResolverResult,
 > = {
   kind: "Entrypoint";
   queryText: string;
@@ -43,7 +43,7 @@ export type IsographEntrypoint<
 export type ReaderArtifact<
   TReadFromStore extends Object,
   TResolverProps,
-  TResolverResult
+  TResolverResult,
 > = {
   kind: "ReaderArtifact";
   readerAst: ReaderAst<TReadFromStore>;
@@ -154,7 +154,7 @@ export type ArgumentValue =
 export type FragmentReference<
   TReadFromStore extends Object,
   TResolverProps,
-  TResolverResult
+  TResolverResult,
 > = {
   kind: "FragmentReference";
   readerArtifact: ReaderArtifact<
@@ -171,11 +171,11 @@ export type FragmentReference<
 function assertIsEntrypoint<
   TReadFromStore extends Object,
   TResolverProps,
-  TResolverResult
+  TResolverResult,
 >(
   value:
     | IsographEntrypoint<TReadFromStore, TResolverProps, TResolverResult>
-    | typeof iso
+    | typeof iso,
 ): asserts value is IsographEntrypoint<
   TReadFromStore,
   TResolverProps,
@@ -185,9 +185,9 @@ function assertIsEntrypoint<
 }
 
 export function iso<TResolverParameter, TResolverReturn>(
-  _queryText: TemplateStringsArray
+  _queryText: TemplateStringsArray,
 ): (
-  x: (param: TResolverParameter) => TResolverReturn
+  x: (param: TResolverParameter) => TResolverReturn,
 ) => (param: TResolverParameter) => TResolverReturn {
   // The name `identity` here is a bit of a double entendre.
   // First, it is the identity function, constrained to operate
@@ -198,7 +198,7 @@ export function iso<TResolverParameter, TResolverReturn>(
   // TResolverParameter and TResolverReturn must be identical.
 
   return function identity(
-    x: (param: TResolverParameter) => TResolverReturn
+    x: (param: TResolverParameter) => TResolverReturn,
   ): (param: TResolverParameter) => TResolverReturn {
     return x;
   };
@@ -207,7 +207,7 @@ export function iso<TResolverParameter, TResolverReturn>(
 export function useLazyReference<
   TReadFromStore extends Object,
   TResolverProps,
-  TResolverResult
+  TResolverResult,
 >(
   entrypoint:
     | IsographEntrypoint<TReadFromStore, TResolverProps, TResolverResult>
@@ -215,7 +215,7 @@ export function useLazyReference<
     // iso`...`. At runtime, we confirm that the passed-in `iso` literal is actually
     // an entrypoint.
     | ((_: any) => any),
-  variables: object
+  variables: object,
 ): {
   queryReference: FragmentReference<
     TReadFromStore,
@@ -227,7 +227,7 @@ export function useLazyReference<
   // Typechecking fails here... TODO investigate
   const cache = getOrCreateCacheForArtifact<TResolverResult>(
     entrypoint,
-    variables
+    variables,
   );
 
   // TODO add comment explaining why we never use this value
@@ -249,13 +249,13 @@ export function useLazyReference<
 export function read<
   TReadFromStore extends Object,
   TResolverProps,
-  TResolverResult
+  TResolverResult,
 >(
   fragmentReference: FragmentReference<
     TReadFromStore,
     TResolverProps,
     TResolverResult
-  >
+  >,
 ): TResolverResult {
   const variant = fragmentReference.readerArtifact.variant;
   if (variant.kind === "Eager") {
@@ -263,7 +263,7 @@ export function read<
       fragmentReference.readerArtifact.readerAst,
       fragmentReference.root,
       fragmentReference.variables ?? {},
-      fragmentReference.nestedRefetchQueries
+      fragmentReference.nestedRefetchQueries,
     );
     if (data.kind === "MissingData") {
       throw onNextChange();
@@ -277,7 +277,7 @@ export function read<
       variant.componentName,
       fragmentReference.readerArtifact,
       fragmentReference.variables ?? {},
-      fragmentReference.nestedRefetchQueries
+      fragmentReference.nestedRefetchQueries,
     );
   }
   // Why can't Typescript realize that this is unreachable??
@@ -285,13 +285,13 @@ export function read<
 }
 
 export function readButDoNotEvaluate<TReadFromStore extends Object>(
-  reference: FragmentReference<TReadFromStore, unknown, unknown>
+  reference: FragmentReference<TReadFromStore, unknown, unknown>,
 ): TReadFromStore {
   const response = readData(
     reference.readerArtifact.readerAst,
     reference.root,
     reference.variables ?? {},
-    reference.nestedRefetchQueries
+    reference.nestedRefetchQueries,
   );
   if (typeof window !== "undefined" && window.__LOG) {
     console.log("done reading", { response });
@@ -318,7 +318,7 @@ function readData<TReadFromStore>(
   ast: ReaderAst<TReadFromStore>,
   root: DataId,
   variables: { [index: string]: string },
-  nestedRefetchQueries: RefetchQueryArtifactWrapper[]
+  nestedRefetchQueries: RefetchQueryArtifactWrapper[],
 ): ReadDataResult<TReadFromStore> {
   let storeRecord = getStore()[root];
   if (storeRecord === undefined) {
@@ -373,7 +373,7 @@ function readData<TReadFromStore>(
               field.selections,
               link.__link,
               variables,
-              nestedRefetchQueries
+              nestedRefetchQueries,
             );
             if (result.kind === "MissingData") {
               return {
@@ -401,7 +401,7 @@ function readData<TReadFromStore>(
             root,
             field.fieldName,
             field.arguments,
-            variables
+            variables,
           );
           if (altLink === undefined) {
             return {
@@ -426,7 +426,7 @@ function readData<TReadFromStore>(
           field.selections,
           targetId,
           variables,
-          nestedRefetchQueries
+          nestedRefetchQueries,
         );
         if (data.kind === "MissingData") {
           return {
@@ -444,7 +444,7 @@ function readData<TReadFromStore>(
           root,
           variables,
           // Refetch fields just read the id, and don't need refetch query artifacts
-          []
+          [],
         );
         if (typeof window !== "undefined" && window.__LOG) {
           console.log("refetch field data", data, field);
@@ -471,7 +471,7 @@ function readData<TReadFromStore>(
               // TODO continue from here
               // variables need to be filtered for what we need just for the refetch query
               ...filterVariables(variables, allowedVariables),
-            }
+            },
           );
         }
         break;
@@ -482,7 +482,7 @@ function readData<TReadFromStore>(
           root,
           variables,
           // Refetch fields just read the id, and don't need refetch query artifacts
-          []
+          [],
         );
         if (typeof window !== "undefined" && window.__LOG) {
           console.log("refetch field data", data, field);
@@ -505,7 +505,7 @@ function readData<TReadFromStore>(
           target[field.alias] = field.readerArtifact.resolver(
             refetchQueryArtifact,
             data.data,
-            filterVariables(variables, allowedVariables)
+            filterVariables(variables, allowedVariables),
           );
         }
         break;
@@ -513,7 +513,7 @@ function readData<TReadFromStore>(
       case "Resolver": {
         const usedRefetchQueries = field.usedRefetchQueries;
         const resolverRefetchQueries = usedRefetchQueries.map(
-          (index) => nestedRefetchQueries[index]
+          (index) => nestedRefetchQueries[index],
         );
 
         const variant = field.readerArtifact.variant;
@@ -522,7 +522,7 @@ function readData<TReadFromStore>(
             field.readerArtifact.readerAst,
             root,
             variables,
-            resolverRefetchQueries
+            resolverRefetchQueries,
           );
           if (data.kind === "MissingData") {
             return {
@@ -539,7 +539,7 @@ function readData<TReadFromStore>(
             variant.componentName,
             field.readerArtifact,
             variables,
-            resolverRefetchQueries
+            resolverRefetchQueries,
           );
         }
         break;
@@ -556,7 +556,7 @@ function missingFieldHandler(
   root: DataId,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
-  variables: { [index: string]: any } | null
+  variables: { [index: string]: any } | null,
 ): Link | undefined {
   if (customMissingFieldHandler != null) {
     return customMissingFieldHandler(
@@ -564,7 +564,7 @@ function missingFieldHandler(
       root,
       fieldName,
       arguments_,
-      variables
+      variables,
     );
   } else {
     return defaultMissingFieldHandler(
@@ -572,7 +572,7 @@ function missingFieldHandler(
       root,
       fieldName,
       arguments_,
-      variables
+      variables,
     );
   }
 }
@@ -582,7 +582,7 @@ export function defaultMissingFieldHandler(
   root: DataId,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
-  variables: { [index: string]: any } | null
+  variables: { [index: string]: any } | null,
 ): Link | undefined {
   if (fieldName === "node" || fieldName === "user") {
     const variable = arguments_?.["id"];
@@ -596,7 +596,7 @@ export function defaultMissingFieldHandler(
 }
 
 export function setMissingFieldHandler(
-  handler: typeof defaultMissingFieldHandler
+  handler: typeof defaultMissingFieldHandler,
 ) {
   customMissingFieldHandler = handler;
 }
@@ -620,7 +620,7 @@ export type IsographComponentProps<TDataType, TOtherProps = Object> = {
 
 function filterVariables(
   variables: { [index: string]: string },
-  allowedVariables: string[]
+  allowedVariables: string[],
 ): { [index: string]: string } {
   const result: { [index: string]: string } = {};
   for (const key of allowedVariables) {

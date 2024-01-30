@@ -25,7 +25,7 @@ import type { CleanupFn, ItemCleanupPair } from "@isograph/disposable-types";
  * was never disposed, and we could reuse it between states.
  */
 export function createReferenceCountedPointer<T>(
-  pair: ItemCleanupPair<T>
+  pair: ItemCleanupPair<T>,
 ): ItemCleanupPair<ReferenceCountedPointer<T>> {
   const originalReferenceCountedPointer = new RefCounter(pair);
 
@@ -84,21 +84,21 @@ class RefCounter<T> {
       const dispose = () => {
         if (disposed) {
           throw new Error(
-            "Do not dispose an already-disposed ActiveReference."
+            "Do not dispose an already-disposed ActiveReference.",
           );
         }
         disposed = true;
         if (activeReference.__original === null) {
           throw new Error(
             "Attempted to dispose an active reference, but it was already disposed. " +
-              "This indicates a bug in reference-counted-pointer."
+              "This indicates a bug in reference-counted-pointer.",
           );
         }
         activeReference.__original = null;
         if (this.__state === null) {
           throw new Error(
             "Attempted to dispose, but the underlying reference counted pointer was disposed. " +
-              "This indicates a bug in reference-counted-pointer."
+              "This indicates a bug in reference-counted-pointer.",
           );
         }
         this.__state.activeReferenceCount--;
@@ -115,7 +115,7 @@ class RefCounter<T> {
     if (this.__state === null) {
       throw new Error(
         "__maybeDispose was called, but the reference counted pointer was disposed. " +
-          "This indicates a bug in reference-counted-pointer."
+          "This indicates a bug in reference-counted-pointer.",
       );
     }
     if (this.__state.activeReferenceCount === 0) {

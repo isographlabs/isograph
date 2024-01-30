@@ -54,7 +54,7 @@ function promiseAndResolver() {
 async function awaitableCreate(Component, isConcurrent) {
   const element = create(
     Component,
-    isConcurrent ? { unstable_isConcurrent: true } : undefined
+    isConcurrent ? { unstable_isConcurrent: true } : undefined,
   );
   await shortPromise();
   return element;
@@ -70,7 +70,7 @@ describe("useCachedPrecommitValue", () => {
     const cache = new ParentCache(factory);
     const getOrPopulateAndTemporaryRetain = vi.spyOn(
       cache,
-      "getOrPopulateAndTemporaryRetain"
+      "getOrPopulateAndTemporaryRetain",
     );
 
     const componentCommits = vi.fn();
@@ -197,7 +197,7 @@ describe("useCachedPrecommitValue", () => {
       const cache = new ParentCache(factory);
       const getOrPopulateAndTemporaryRetain = vi.spyOn(
         cache,
-        "getOrPopulateAndTemporaryRetain"
+        "getOrPopulateAndTemporaryRetain",
       );
 
       const componentCommits = vi.fn();
@@ -213,7 +213,7 @@ describe("useCachedPrecommitValue", () => {
 
         renderCount++;
         expect(getOrPopulateAndTemporaryRetain).toHaveBeenCalledTimes(
-          renderCount
+          renderCount,
         );
 
         React.useEffect(() => {
@@ -233,7 +233,7 @@ describe("useCachedPrecommitValue", () => {
           <TestComponent />
           <Suspender promise={promise} isResolvedRef={isResolvedRef} />
         </React.Suspense>,
-        true
+        true,
       );
 
       expect(componentCommits).toHaveBeenCalledTimes(0);
@@ -244,7 +244,7 @@ describe("useCachedPrecommitValue", () => {
 
       expect(componentCommits).toHaveBeenCalledTimes(1);
       expect(render).toHaveBeenCalledTimes(2);
-    }
+    },
   );
 
   test(
@@ -262,7 +262,7 @@ describe("useCachedPrecommitValue", () => {
 
       const getOrPopulateAndTemporaryRetain = vi.spyOn(
         cache,
-        "getOrPopulateAndTemporaryRetain"
+        "getOrPopulateAndTemporaryRetain",
       );
 
       const componentCommits = vi.fn();
@@ -305,7 +305,7 @@ describe("useCachedPrecommitValue", () => {
           <TestComponent />
           <Suspender promise={promise} isResolvedRef={isResolvedRef} />
         </React.Suspense>,
-        true
+        true,
       );
 
       expect(componentCommits).toHaveBeenCalledTimes(0);
@@ -316,7 +316,7 @@ describe("useCachedPrecommitValue", () => {
 
       expect(componentCommits).toHaveBeenCalledTimes(1);
       expect(render).toHaveBeenCalledTimes(2);
-    }
+    },
   );
 
   test(
@@ -334,11 +334,11 @@ describe("useCachedPrecommitValue", () => {
       const cache = new ParentCache(factory);
       const getOrPopulateAndTemporaryRetain = vi.spyOn(
         cache,
-        "getOrPopulateAndTemporaryRetain"
+        "getOrPopulateAndTemporaryRetain",
       );
       const getAndPermanentRetainIfPresent = vi.spyOn(
         cache,
-        "getAndPermanentRetainIfPresent"
+        "getAndPermanentRetainIfPresent",
       );
 
       const componentCommits = vi.fn();
@@ -354,7 +354,7 @@ describe("useCachedPrecommitValue", () => {
           expect(getOrPopulateAndTemporaryRetain).toHaveBeenCalledTimes(1);
           expect(getAndPermanentRetainIfPresent).toHaveBeenCalledTimes(1);
           expect(getAndPermanentRetainIfPresent.mock.results[0].value).toBe(
-            null
+            null,
           );
           expect(factory).toHaveBeenCalledTimes(2);
           expect(cache.isEmpty()).toBe(true);
@@ -402,14 +402,14 @@ describe("useCachedPrecommitValue", () => {
           <TestComponent />
           <CodeExecutor />
         </>,
-        false
+        false,
       );
 
       // This code executes after the commit and re-render of TestComponent.
       // The commit triggers a re-render, because the item was disposed.
       expect(render).toHaveBeenCalledTimes(2);
       expect(factory).toBeCalledTimes(2);
-    }
+    },
   );
 
   test(
@@ -427,7 +427,7 @@ describe("useCachedPrecommitValue", () => {
       const cache = new ParentCache(factory);
       const getAndPermanentRetainIfPresent = vi.spyOn(
         cache,
-        "getAndPermanentRetainIfPresent"
+        "getAndPermanentRetainIfPresent",
       );
 
       const componentCommits = vi.fn();
@@ -443,7 +443,7 @@ describe("useCachedPrecommitValue", () => {
           expect(getOrPopulateAndTemporaryRetain).toHaveBeenCalledTimes(2);
           expect(getAndPermanentRetainIfPresent).toHaveBeenCalledTimes(1);
           expect(getAndPermanentRetainIfPresent.mock.results[0].value[0]).toBe(
-            2
+            2,
           );
           expect(factory).toHaveBeenCalledTimes(2);
           expect(hookOnCommit).toHaveBeenCalledTimes(1);
@@ -455,7 +455,7 @@ describe("useCachedPrecommitValue", () => {
 
       const getOrPopulateAndTemporaryRetain = vi.spyOn(
         cache,
-        "getOrPopulateAndTemporaryRetain"
+        "getOrPopulateAndTemporaryRetain",
       );
 
       // wat is going on?
@@ -499,7 +499,7 @@ describe("useCachedPrecommitValue", () => {
           <TestComponent />
           <CodeExecutor />
         </React.Suspense>,
-        false
+        false,
       );
 
       // This code executes after the commit and re-render of TestComponent.
@@ -508,7 +508,7 @@ describe("useCachedPrecommitValue", () => {
       // Note that this is the same number of calls as inside of CodeExecutor,
       // implying that the factory function was not called again.
       expect(factory).toBeCalledTimes(2);
-    }
+    },
   );
 
   test(
@@ -570,7 +570,7 @@ describe("useCachedPrecommitValue", () => {
         // If we're not in concurrent mode, TestComponent will mount before
         // unmounting. This perhaps is a bug in react-test-renderer. Regardless,
         // we're not interested in that scenario.
-        true
+        true,
       );
 
       // This code executes after the commit and re-render of TestComponent.
@@ -582,6 +582,6 @@ describe("useCachedPrecommitValue", () => {
       assert(state.kind === "InParentCacheAndNotDisposed");
       expect(state.permanentRetainCount).toBe(0);
       expect(state.temporaryRetainCount).toBe(1);
-    }
+    },
   );
 });

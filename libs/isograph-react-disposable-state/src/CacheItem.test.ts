@@ -37,7 +37,7 @@ describe("CacheItem", () => {
       const [cacheItem, _disposeTemporaryRetain] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       expect(factory.mock.calls.length).toEqual(1);
@@ -63,7 +63,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       expect(factory.mock.calls.length).toEqual(1);
@@ -88,7 +88,7 @@ describe("CacheItem", () => {
       const [cacheItem, _disposeTemporaryRetain] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       expect(factory.mock.calls.length).toEqual(1);
@@ -113,7 +113,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       expect(factory.mock.calls.length).toEqual(1);
@@ -142,7 +142,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       expect(factory.mock.calls.length).toEqual(1);
@@ -172,7 +172,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       const mockedDisposeTemporaryRetain = vi.fn(disposeTemporaryRetain);
@@ -206,7 +206,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       expect(factory.mock.calls.length).toEqual(1);
@@ -230,7 +230,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       const mockedDisposeTemporaryRetain = vi.fn(disposeTemporaryRetain);
@@ -259,7 +259,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       const mockedDisposeTemporaryRetain = vi.fn(disposeTemporaryRetain);
@@ -286,7 +286,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       expect(factory.mock.calls.length).toEqual(1);
@@ -298,7 +298,7 @@ describe("CacheItem", () => {
       assert(state.kind === "NotInParentCacheAndDisposed");
 
       assert(
-        cacheItem.permanentRetainIfNotDisposed(disposeTemporaryRetain) === null
+        cacheItem.permanentRetainIfNotDisposed(disposeTemporaryRetain) === null,
       );
 
       expect(() => {
@@ -317,7 +317,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain1] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       const [_value, disposeOfPermanentRetain1] =
@@ -341,7 +341,7 @@ describe("CacheItem", () => {
       const [cacheItem, _disposeTemporaryRetain1] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       vi.advanceTimersByTime(1000);
@@ -372,7 +372,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain1] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       vi.advanceTimersByTime(1000);
@@ -402,7 +402,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain1] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       vi.advanceTimersByTime(1000);
@@ -426,7 +426,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain1] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       vi.advanceTimersByTime(1000);
@@ -449,7 +449,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain1] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       const disposeTemporaryRetain2 = cacheItem.temporaryRetain();
@@ -475,7 +475,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain1] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       const disposeTemporaryRetain2 = cacheItem.temporaryRetain();
@@ -501,7 +501,7 @@ describe("CacheItem", () => {
       const [cacheItem, _disposeTemporaryRetain1] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       vi.advanceTimersByTime(1000);
@@ -534,7 +534,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain1] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       vi.advanceTimersByTime(1000);
@@ -562,7 +562,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain1] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       vi.advanceTimersByTime(1000);
@@ -594,7 +594,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain1] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       vi.advanceTimersByTime(1000);
@@ -626,7 +626,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain1] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       vi.advanceTimersByTime(1000);
@@ -654,7 +654,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain1] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       vi.advanceTimersByTime(1000);
@@ -681,7 +681,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain1] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       vi.advanceTimersByTime(1000);
@@ -708,7 +708,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain1] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       vi.advanceTimersByTime(1000);
@@ -735,7 +735,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain1] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       vi.advanceTimersByTime(1000);
@@ -764,7 +764,7 @@ describe("CacheItem", () => {
       const [cacheItem, disposeTemporaryRetain1] =
         createTemporarilyRetainedCacheItem<number>(
           factory,
-          removeFromParentCache
+          removeFromParentCache,
         );
 
       vi.advanceTimersByTime(1000);

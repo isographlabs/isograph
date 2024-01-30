@@ -28,7 +28,7 @@ setMissingFieldHandler(
     root: DataId,
     fieldName: string,
     arguments_: { [index: string]: any } | null,
-    variables: { [index: string]: any } | null
+    variables: { [index: string]: any } | null,
   ): Link | undefined => {
     if (typeof window !== "undefined" && window.__LOG) {
       console.log("Missing field handler called", {
@@ -44,7 +44,7 @@ setMissingFieldHandler(
       root,
       fieldName,
       arguments_,
-      variables
+      variables,
     );
     if (val == undefined) {
       // This is the custom missing field handler
@@ -57,7 +57,7 @@ setMissingFieldHandler(
     } else {
       return val;
     }
-  }
+  },
 );
 
 export default function Home() {

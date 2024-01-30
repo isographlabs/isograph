@@ -59,7 +59,7 @@ type ICI<T> = { item: T; cleanup: () => void; index: number };
  *   - This may only work in concurrent mode, though.
  */
 export function useUpdatableDisposableState<
-  T = never
+  T = never,
 >(): UseUpdatableDisposableStateReturnValue<T> {
   const hasCommittedRef = useHasCommittedRef();
 
@@ -67,14 +67,14 @@ export function useUpdatableDisposableState<
   const setStateCountRef = useRef(0);
 
   const [stateICI, setStateICI] = useState<ICI<T> | UnassignedState>(
-    UNASSIGNED_STATE
+    UNASSIGNED_STATE,
   );
 
   const setStateAfterCommit = useCallback(
     (itemCleanupPair: ItemCleanupPair<T>) => {
       if (!hasCommittedRef.current) {
         throw new Error(
-          "Calling setState before the component has committed is unsafe and disallowed."
+          "Calling setState before the component has committed is unsafe and disallowed.",
         );
       }
 
@@ -87,7 +87,7 @@ export function useUpdatableDisposableState<
       undisposedICIs.current.add(ici);
       setStateICI(ici);
     },
-    [setStateICI]
+    [setStateICI],
   );
 
   useEffect(function cleanupUnreachableItems() {

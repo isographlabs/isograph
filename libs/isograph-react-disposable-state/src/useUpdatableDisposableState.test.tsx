@@ -46,7 +46,7 @@ function promiseAndResolver() {
 async function awaitableCreate(Component, isConcurrent) {
   const element = create(
     Component,
-    isConcurrent ? { unstable_isConcurrent: true } : undefined
+    isConcurrent ? { unstable_isConcurrent: true } : undefined,
   );
   await shortPromise();
   return element;
@@ -271,7 +271,7 @@ describe("useUpdatableDisposableState", () => {
         <TestComponent />
         <Suspender promise={promise} isResolvedRef={isResolvedRef} />
       </React.Suspense>,
-      true
+      true,
     );
 
     expect(componentCommits).not.toHaveBeenCalled();
@@ -320,7 +320,7 @@ describe("useUpdatableDisposableState", () => {
         <React.Suspense fallback="fallback">
           <ParentComponent />
         </React.Suspense>,
-        true
+        true,
       );
 
       expect(render).toHaveBeenCalledTimes(1);
@@ -354,7 +354,7 @@ describe("useUpdatableDisposableState", () => {
       expect(cleanup1).toHaveBeenCalledTimes(1);
       expect(render).toHaveBeenCalledTimes(3);
       expect(componentCommits).toHaveBeenCalledTimes(2);
-    }
+    },
   );
 
   test("it should properly clean up all items passed to setState during suspense on unmount", async () => {
@@ -391,7 +391,7 @@ describe("useUpdatableDisposableState", () => {
       <React.Suspense fallback="fallback">
         <ParentComponent shouldMountRef={shouldMountRef} />
       </React.Suspense>,
-      true
+      true,
     );
 
     expect(render).toHaveBeenCalledTimes(1);
@@ -454,7 +454,7 @@ describe("useUpdatableDisposableState", () => {
 
     await awaitableCreate(
       <ParentComponent shouldMountRef={shouldMountRef} />,
-      true
+      true,
     );
 
     expect(render).toHaveBeenCalledTimes(1);

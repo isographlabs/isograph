@@ -82,7 +82,7 @@ export function PreloadedPostsWrapper() {
     useUpdatableDisposableState<PromiseWrapper<Post[]>>();
   useEffect(() => {
     setRequestForPosts(
-      makeNetworkRequest("https://jsonplaceholder.typicode.com/posts")
+      makeNetworkRequest("https://jsonplaceholder.typicode.com/posts"),
     );
   }, [setRequestForPosts]);
 

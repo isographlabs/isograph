@@ -58,7 +58,7 @@ const setMainVersion = async () => {
     fs.writeFileSync(
       pkgJsonPath,
       JSON.stringify(packageJson, null, 2) + "\n",
-      "utf8"
+      "utf8",
     );
   });
 };

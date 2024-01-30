@@ -26,7 +26,7 @@ const cache: { [index: string]: ParentCache<any> } = {};
 
 function getOrCreateCache<T>(
   index: string,
-  factory: Factory<T>
+  factory: Factory<T>,
 ): ParentCache<T> {
   if (typeof window !== "undefined" && window.__LOG) {
     console.log("getting cache for", {
@@ -68,7 +68,7 @@ type IsoResolver = IsographEntrypoint<any, any, any>;
 
 export function getOrCreateCacheForArtifact<T>(
   artifact: IsographEntrypoint<any, any, T>,
-  variables: object
+  variables: object,
 ): ParentCache<PromiseWrapper<T>> {
   const cacheKey = artifact.queryText + JSON.stringify(stableCopy(variables));
   const factory: Factory<PromiseWrapper<T>> = () =>
@@ -85,7 +85,7 @@ export function setNetwork(newNetwork: typeof network) {
 
 export function makeNetworkRequest<T>(
   artifact: IsoResolver,
-  variables: object
+  variables: object,
 ): ItemCleanupPair<PromiseWrapper<T>> {
   if (typeof window !== "undefined" && window.__LOG) {
     console.log("make network request", artifact, variables);
@@ -103,10 +103,10 @@ export function makeNetworkRequest<T>(
         artifact.normalizationAst,
         networkResponse.data,
         variables,
-        artifact.nestedRefetchQueries
+        artifact.nestedRefetchQueries,
       );
       return networkResponse.data;
-    }
+    },
   );
 
   const wrapper = wrapPromise(promise);
@@ -180,14 +180,14 @@ function normalizeData(
   normalizationAst: NormalizationAst,
   networkResponse: NetworkResponseObject,
   variables: Object,
-  nestedRefetchQueries: RefetchQueryArtifactWrapper[]
+  nestedRefetchQueries: RefetchQueryArtifactWrapper[],
 ) {
   if (typeof window !== "undefined" && window.__LOG) {
     console.log(
       "about to normalize",
       normalizationAst,
       networkResponse,
-      variables
+      variables,
     );
   }
   normalizeDataIntoRecord(
@@ -196,7 +196,7 @@ function normalizeData(
     store.__ROOT,
     ROOT_ID,
     variables as any,
-    nestedRefetchQueries
+    nestedRefetchQueries,
   );
   if (typeof window !== "undefined" && window.__LOG) {
     console.log("after normalization", { store });
@@ -233,7 +233,7 @@ function normalizeDataIntoRecord(
   targetParentRecord: StoreRecord,
   targetParentRecordId: DataId,
   variables: { [index: string]: string },
-  nestedRefetchQueries: RefetchQueryArtifactWrapper[]
+  nestedRefetchQueries: RefetchQueryArtifactWrapper[],
 ) {
   for (const normalizationNode of normalizationAst) {
     switch (normalizationNode.kind) {
@@ -242,7 +242,7 @@ function normalizeDataIntoRecord(
           normalizationNode,
           networkResponseParentRecord,
           targetParentRecord,
-          variables
+          variables,
         );
         break;
       }
@@ -253,7 +253,7 @@ function normalizeDataIntoRecord(
           targetParentRecord,
           targetParentRecordId,
           variables,
-          nestedRefetchQueries
+          nestedRefetchQueries,
         );
         break;
       }
@@ -265,7 +265,7 @@ function normalizeScalarField(
   astNode: NormalizationScalarField,
   networkResponseParentRecord: NetworkResponseObject,
   targetStoreRecord: StoreRecord,
-  variables: { [index: string]: string }
+  variables: { [index: string]: string },
 ) {
   const networkResponseKey = getNetworkResponseKey(astNode);
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
@@ -290,7 +290,7 @@ function normalizeLinkedField(
   targetParentRecord: StoreRecord,
   targetParentRecordId: DataId,
   variables: { [index: string]: string },
-  nestedRefetchQueries: RefetchQueryArtifactWrapper[]
+  nestedRefetchQueries: RefetchQueryArtifactWrapper[],
 ) {
   const networkResponseKey = getNetworkResponseKey(astNode);
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
@@ -303,7 +303,7 @@ function normalizeLinkedField(
 
   if (isScalarButNotEmptyArray(networkResponseData)) {
     throw new Error(
-      "Unexpected scalar network response when normalizing a linked field"
+      "Unexpected scalar network response when normalizing a linked field",
     );
   }
 
@@ -318,7 +318,7 @@ function normalizeLinkedField(
         targetParentRecordId,
         variables,
         i,
-        nestedRefetchQueries
+        nestedRefetchQueries,
       );
       dataIds.push({ __link: newStoreRecordId });
     }
@@ -330,7 +330,7 @@ function normalizeLinkedField(
       targetParentRecordId,
       variables,
       null,
-      nestedRefetchQueries
+      nestedRefetchQueries,
     );
     targetParentRecord[parentRecordKey] = {
       __link: newStoreRecordId,
@@ -344,14 +344,14 @@ function normalizeNetworkResponseObject(
   targetParentRecordId: string,
   variables: { [index: string]: string },
   index: number | null,
-  nestedRefetchQueries: RefetchQueryArtifactWrapper[]
+  nestedRefetchQueries: RefetchQueryArtifactWrapper[],
 ): DataId /* The id of the modified or newly created item */ {
   const newStoreRecordId = getDataIdOfNetworkResponse(
     targetParentRecordId,
     networkResponseData,
     astNode,
     variables,
-    index
+    index,
   );
 
   const newStoreRecord = store[newStoreRecordId] ?? {};
@@ -363,14 +363,14 @@ function normalizeNetworkResponseObject(
     newStoreRecord,
     newStoreRecordId,
     variables,
-    nestedRefetchQueries
+    nestedRefetchQueries,
   );
 
   return newStoreRecordId;
 }
 
 function isScalarOrEmptyArray(
-  data: NonNullable<NetworkResponseValue>
+  data: NonNullable<NetworkResponseValue>,
 ): data is NetworkResponseScalarValue | NetworkResponseScalarValue[] {
   // N.B. empty arrays count as empty arrays of scalar fields.
   if (Array.isArray(data)) {
@@ -385,7 +385,7 @@ function isScalarOrEmptyArray(
 }
 
 function isScalarButNotEmptyArray(
-  data: NonNullable<NetworkResponseValue>
+  data: NonNullable<NetworkResponseValue>,
 ): data is NetworkResponseScalarValue | NetworkResponseScalarValue[] {
   // N.B. empty arrays count as empty arrays of linked fields.
   if (Array.isArray(data)) {
@@ -408,7 +408,7 @@ export function getParentRecordKey(
     | NormalizationScalarField
     | ReaderLinkedField
     | ReaderScalarField,
-  variables: { [index: string]: string }
+  variables: { [index: string]: string },
 ): string {
   let parentRecordKey = astNode.fieldName;
   const fieldParameters = astNode.arguments;
@@ -423,7 +423,7 @@ export function getParentRecordKey(
 
 function getStoreKeyChunkForArgumentValue(
   argumentValue: ArgumentValue,
-  variables: { [index: string]: string }
+  variables: { [index: string]: string },
 ) {
   switch (argumentValue.kind) {
     case "Literal": {
@@ -444,14 +444,14 @@ function getStoreKeyChunkForArgumentValue(
 
 function getStoreKeyChunkForArgument(
   argument: Argument,
-  variables: { [index: string]: string }
+  variables: { [index: string]: string },
 ) {
   const chunk = getStoreKeyChunkForArgumentValue(argument[1], variables);
   return `${FIRST_SPLIT_KEY}${argument[0]}${SECOND_SPLIT_KEY}${chunk}`;
 }
 
 function getNetworkResponseKey(
-  astNode: NormalizationLinkedField | NormalizationScalarField
+  astNode: NormalizationLinkedField | NormalizationScalarField,
 ): string {
   let networkResponseKey = astNode.fieldName;
   const fieldParameters = astNode.arguments;
@@ -489,7 +489,7 @@ function getDataIdOfNetworkResponse(
   dataToNormalize: NetworkResponseObject,
   astNode: NormalizationLinkedField | NormalizationScalarField,
   variables: { [index: string]: string },
-  index: number | null
+  index: number | null,
 ): DataId {
   // Check whether the dataToNormalize has an id field. If so, that is the key.
   // If not, we construct an id from the parentRecordId and the field parameters.

@@ -79,7 +79,7 @@ function HomeRouteLoader({
     iso<typeof HomeRouteEntrypoint>`
       entrypoint Query.HomeRoute
     `,
-    {}
+    {},
   );
 
   return read(queryReference)({ navigateTo });
@@ -96,7 +96,7 @@ function PetDetailRouteLoader({
     iso<typeof PetDetailRouteEntrypoint>`
       entrypoint Query.PetDetailRoute
     `,
-    { id: route.id }
+    { id: route.id },
   );
 
   return read(queryReference)({ navigateTo });

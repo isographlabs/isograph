@@ -56,7 +56,7 @@ export function LazyLoadPostsWrapper() {
 
 function PostsLazyLoader() {
   const cache = getOrCreateCacheForUrl<Post[]>(
-    "https://jsonplaceholder.typicode.com/posts"
+    "https://jsonplaceholder.typicode.com/posts",
   );
   const apiCall = useLazyDisposableState(cache);
   const data = useReadPromise(apiCall.state);
@@ -96,7 +96,7 @@ function PostCard({ post, user }: { post: Post; user?: User }) {
 
 function PostLazyLoader({ post }: { post: Post }) {
   const cache = getOrCreateCacheForUrl<User>(
-    `https://jsonplaceholder.typicode.com/users/${post.userId}`
+    `https://jsonplaceholder.typicode.com/users/${post.userId}`,
   );
   const apiCall = useLazyDisposableState(cache);
   const user = useReadPromise(apiCall.state);
@@ -129,7 +129,7 @@ function CommentsWrapper({ postId }: { postId: number }) {
 
 function CommentsLazyLoader({ postId }: { postId: number }) {
   const cache = getOrCreateCacheForUrl<Comment[]>(
-    `https://jsonplaceholder.typicode.com/post/${postId}/comments`
+    `https://jsonplaceholder.typicode.com/post/${postId}/comments`,
   );
   const apiCall = useLazyDisposableState(cache);
   const comments = useReadPromise(apiCall.state);

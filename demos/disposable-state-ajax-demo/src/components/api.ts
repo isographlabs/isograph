@@ -9,7 +9,7 @@ const cache: { [index: string]: ParentCache<any> } = {};
 
 function getOrCreateCache<T>(
   index: string,
-  factory: Factory<T>
+  factory: Factory<T>,
 ): ParentCache<T> {
   if (cache[index] == null) {
     cache[index] = new ParentCache(factory);
@@ -19,14 +19,14 @@ function getOrCreateCache<T>(
 }
 
 export function getOrCreateCacheForUrl<T extends object>(
-  url: string
+  url: string,
 ): ParentCache<PromiseWrapper<T>> {
   const factory: Factory<PromiseWrapper<T>> = () => makeNetworkRequest<T>(url);
   return getOrCreateCache<PromiseWrapper<T>>(url, factory);
 }
 
 export function makeNetworkRequest<T extends object>(
-  url: string
+  url: string,
 ): ItemCleanupPair<PromiseWrapper<T>> {
   let promise: Promise<T> = fetch(url).then((response) => response.json());
 
