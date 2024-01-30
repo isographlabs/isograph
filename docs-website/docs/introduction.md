@@ -56,11 +56,11 @@ So, if the compiler encounters `` iso`entrypoint Query.UserList `; ``, it would 
 For example, the data might be fetched during render as follows:
 
 ```js
-const UserListPageQuery = require("@iso/Query/UserList.isograph");
+const UserListPageEntrypoint = require("@iso/Query/UserList/entrypoint.isograph");
 
 function UserListPageRoute() {
   const queryVariables = {};
-  const { queryReference } = useLazyReference(
+  const { queryReference } = useLazyReference<typeof UserListPageEntrypoint>(
     iso`entrypoint Query.UserList`,
     queryVariables
   );

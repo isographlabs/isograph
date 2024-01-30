@@ -175,10 +175,7 @@ import React from "react";
 import { iso } from "@isograph/react";
 import { ResolverParameterType as EpisodeListParams } from "@iso/Root/EpisodeList/reader.isograph";
 
-export const EpisodeList = iso<
-  EpisodeListParams,
-  ReturnType<typeof EpisodeListComponent>
->`
+export const EpisodeList = iso<EpisodeListParams>`
   # Note: normally, the "root" field is called Query, but in the Star Wars API
   # it is called Root. Odd!
   Root.EpisodeList @component {
@@ -232,8 +229,8 @@ export default function EpisodeListRoute() {
 }
 
 function Inner() {
-  const { queryReference } = useLazyReference(
-    iso<typeof EpisodeListEntrypoint>`entrypoint Root.EpisodeList`,
+  const { queryReference } = useLazyReference<typeof EpisodeListEntrypoint>(
+    iso`entrypoint Root.EpisodeList`,
     {
       /* query variables */
     }
@@ -276,10 +273,7 @@ import React from "react";
 import { iso } from "@isograph/react";
 import { ResolverParameterType as CharacterSummaryParams } from "@iso/Person/CharacterSummary/reader.isograph";
 
-export const CharacterSummary = iso<
-  CharacterSummaryParams,
-  ReturnType<typeof CharacterSummaryComponent>
->`
+export const CharacterSummary = iso<CharacterSummaryParams>`
   Person.CharacterSummary @component {
     name,
     homeworld {
@@ -304,10 +298,7 @@ import React from "react";
 import { iso } from "@isograph/react";
 import { ResolverParameterType as EpisodeListParams } from "@iso/Root/EpisodeList/reader.isograph";
 
-export const EpisodeList = iso<
-  EpisodeListParams,
-  ReturnType<typeof EpisodeListComponent>
->`
+export const EpisodeList = iso<EpisodeListParams>`
   # Note: normally, the "root" field is called Query, but in the Star Wars API
   # it is called Root. Odd!
   Root.EpisodeList @component {
