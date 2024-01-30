@@ -58,7 +58,6 @@ jobs:
           path: target/${{ matrix.target.target }}/release/${{ matrix.target.build-name }}
           if-no-files-found: error
 
-  # TODO build all demos
   build-demos:
     name: Build demos
     runs-on: ubuntu-latest
@@ -136,10 +135,38 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  prettier:
+    name: Run prettier
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - name: Use Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Run prettier
+        run: pnpm run format-prettier
+      - name: 'Check working directory status'
+        run: './scripts/check-git-status.sh'
+
+  all-checks-passed:
+    name: All checks passed
+    runs-on: ubuntu-latest
+    needs: [build-js-packages, build-cli, build-demos, build-website, prettier]
+    steps:
+      - name: Do nothing
+        run: echo Isograph is awesome!
+
   deploy-website:
     name: Deploy website
     runs-on: ubuntu-latest
-    needs: [build-js-packages, build-cli, build-demos, build-website]
+    needs: [all-checks-passed]
     if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref == 'refs/heads/main' || github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
     defaults:
       run:
@@ -179,7 +206,7 @@ jobs:
     name: Release packages to NPM
     runs-on: macos-latest
     if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref == 'refs/heads/main' || github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
-    needs: [build-js-packages, build-cli, build-demos]
+    needs: [all-checks-passed]
     steps:
       - uses: actions/checkout@v2
       - uses: pnpm/action-setup@v2
