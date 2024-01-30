@@ -61,7 +61,7 @@ const config: Config = {
         name: 'keywords',
         content: 'Isograph, GraphQL, React, data, JavaScript, framework, compiler',
       },
-      { name: 'twitter:card', content: 'img/isograph_logo.png' },
+      { name: 'twitter:card', content: 'https://isograph.dev/img/isograph_logo.png' },
     ],
 
     navbar: {
