@@ -1,9 +1,11 @@
 import React from 'react';
-import { iso, read, useLazyReference } from '@isograph/react';
+import { IsographEntrypoint, iso, read, useLazyReference } from '@isograph/react';
 import { Container } from '@mui/material';
 
 import { ResolverParameterType as UserRouteComponentParams } from '@iso/Query/UserPage/reader.isograph';
 import { FullPageLoading, Route, type UserRoute as UserRouteType } from './GithubDemo';
+
+import Entrypoint from '@iso/Query/UserPage/entrypoint.isograph';
 
 export const UserPage = iso<UserRouteComponentParams>`
   field Query.UserPage($first: Int!, $userLogin: String!) @component {
@@ -32,10 +34,10 @@ export function UserRoute({
   route: UserRouteType;
   setRoute: (route: Route) => void;
 }) {
-  const { queryReference } = useLazyReference(iso`entrypoint Query.UserPage`, {
+  const { queryReference } = useLazyReference<typeof Entrypoint>(iso`entrypoint Query.UserPage`, {
     userLogin: route.userLogin,
     first: 20,
   });
-  const component = read(queryReference);
-  return component({ route, setRoute });
+  const Component = read(queryReference);
+  return <Component route={route} setRoute={setRoute} />;
 }

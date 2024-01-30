@@ -7,6 +7,7 @@ import {
 } from './GithubDemo';
 
 import { ResolverParameterType as PullRequestComponentProps } from '@iso/Query/PullRequest/reader.isograph';
+import Entrypoint from '@iso/Query/PullRequest/entrypoint.isograph';
 
 import { Container } from '@mui/material';
 
@@ -37,13 +38,16 @@ export function PullRequestRoute({
   route: PullRequestRouteType;
   setRoute: (route: Route) => void;
 }) {
-  const { queryReference } = useLazyReference(iso`entrypoint Query.PullRequest `, {
-    pullRequestNumber: route.pullRequestNumber,
-    repositoryName: route.repositoryName,
-    repositoryOwner: route.repositoryOwner,
-    last: 20,
-  });
+  const { queryReference } = useLazyReference<typeof Entrypoint>(
+    iso`entrypoint Query.PullRequest`,
+    {
+      pullRequestNumber: route.pullRequestNumber,
+      repositoryName: route.repositoryName,
+      repositoryOwner: route.repositoryOwner,
+      last: 20,
+    },
+  );
 
-  const data = read(queryReference);
-  return data({ route, setRoute });
+  const Component = read(queryReference);
+  return <Component route={route} setRoute={setRoute} />;
 }

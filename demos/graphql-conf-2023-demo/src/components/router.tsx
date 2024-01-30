@@ -59,14 +59,15 @@ export function FullPageLoading() {
 }
 
 function HomeRouteLoader({ navigateTo }: { navigateTo: (path: Route) => void }) {
-  const { queryReference } = useLazyReference(
-    iso<typeof HomeRouteEntrypoint>`
+  const { queryReference } = useLazyReference<typeof HomeRouteEntrypoint>(
+    iso`
       entrypoint Query.HomeRoute
     `,
     {},
   );
 
-  return read(queryReference)({ navigateTo });
+  const Component = read(queryReference);
+  return <Component navigateTo={navigateTo} />;
 }
 
 function PetDetailRouteLoader({
@@ -76,12 +77,13 @@ function PetDetailRouteLoader({
   navigateTo: (path: Route) => void;
   route: PetDetailRoute;
 }) {
-  const { queryReference } = useLazyReference(
-    iso<typeof PetDetailRouteEntrypoint>`
+  const { queryReference } = useLazyReference<typeof PetDetailRouteEntrypoint>(
+    iso`
       entrypoint Query.PetDetailRoute
     `,
     { id: route.id },
   );
 
-  return read(queryReference)({ navigateTo });
+  const Component = read(queryReference);
+  return <Component navigateTo={navigateTo} />;
 }

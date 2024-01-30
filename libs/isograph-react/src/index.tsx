@@ -172,20 +172,34 @@ export function iso<TResolverParameter>(
   };
 }
 
-export function useLazyReference<TReadFromStore extends Object, TResolverProps, TResolverResult>(
+type ExtractTReadFromStore<Type> = Type extends IsographEntrypoint<infer X, any, any> ? X : never;
+type ExtractResolverProps<Type> = Type extends IsographEntrypoint<any, infer X, any> ? X : never;
+type ExtractResolverResult<Type> = Type extends IsographEntrypoint<any, any, infer X> ? X : never;
+// Note: we cannot write TEntrypoint extends IsographEntrypoint<any, any, any>, or else
+// if we do not explicitly pass a type, the read out type will be any.
+// We cannot write TEntrypoint extends IsographEntrypoint<never, never, never>, or else
+// any actual Entrypoint we pass will not be valid.
+export function useLazyReference<TEntrypoint>(
   entrypoint:
-    | IsographEntrypoint<TReadFromStore, TResolverProps, TResolverResult>
+    | TEntrypoint
     // Temporarily, we need to allow useLazyReference to take the result of calling
     // iso`...`. At runtime, we confirm that the passed-in `iso` literal is actually
     // an entrypoint.
     | ((_: any) => any),
   variables: object,
 ): {
-  queryReference: FragmentReference<TReadFromStore, TResolverProps, TResolverResult>;
+  queryReference: FragmentReference<
+    ExtractTReadFromStore<TEntrypoint>,
+    ExtractResolverProps<TEntrypoint>,
+    ExtractResolverResult<TEntrypoint>
+  >;
 } {
   assertIsEntrypoint(entrypoint);
   // Typechecking fails here... TODO investigate
-  const cache = getOrCreateCacheForArtifact<TResolverResult>(entrypoint, variables);
+  const cache = getOrCreateCacheForArtifact<ExtractResolverResult<TEntrypoint>>(
+    entrypoint,
+    variables,
+  );
 
   // TODO add comment explaining why we never use this value
   // @ts-ignore
