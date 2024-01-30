@@ -69,11 +69,12 @@ import {
   useLazyReference,
   isoFetch,
 } from "@isograph/react";
+import Entrypoint from "@iso/Query/HomePage/entrypoint.isograph";
 
 export function HomePageRoute() {
   // Step 1: Make a network request (during render) for the
   // Query.HomePage client-defined field.
-  const { queryReference } = useLazyReference(
+  const { queryReference } = useLazyReference<typeof Entrypoint>(
     // Note that calling isoFetch here **generates** a query
     // at compile time!
     isoFetch${'`'}Query.HomePage${'`'},
@@ -101,7 +102,6 @@ export const HomePage = iso<
   // Step 2: Pass type parameters to iso. (This will not be
   // necessary soon.)
   HomePageComponentParams,
-  ReturnType<typeof HomePageComponent>
 >${'`'}
   # Step 3: Define a field named home_page_component on the
   # Query type, and tell the Isograph compiler that it is a
@@ -122,7 +122,7 @@ function HomePageComponent({ data }: HomePageComponentParams) {
   const viewer = data.viewer;
   return <>
     <h1>Hello {viewer?.first_name} {viewer?.last_name}!</h1>
-    {data.avatar_component({})}
+    <data.Avatar />
   </>
 }
   `,
@@ -131,19 +131,16 @@ import { iso } from "@isograph/react";
 import {
   ResolverParameterType as AvatarProps,
 } from "@iso/User/Avatar/reader.isograph";
-import Avatar from 'my-component-library';
+import MyComponentLibraryAvatar from 'my-component-library';
   
-export const Avatar = iso<
-  AvatarProps,
-  ReturnType<typeof AvatarComponent>,
->${'`'}
+export const Avatar = iso<AvatarProps>${'`'}
   User.Avatar @component {
     avatarUrl,
   }
 ${'`'}(AvatarComponent);
   
 function AvatarComponent(props: AvatarProps) {
-  return <Avatar url={props.data.avatarUrl} />
+  return <MyComponentLibraryAvatar url={props.data.avatarUrl} />
 }
   `,
   schema: `
