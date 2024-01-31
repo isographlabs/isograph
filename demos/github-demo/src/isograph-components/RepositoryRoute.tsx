@@ -6,14 +6,16 @@ import RepositoryPageEntrypoint from '@iso/Query/RepositoryPage/entrypoint.isogr
 
 import { FullPageLoading, Route, RepositoryRoute as RepositoryRouteType } from './GithubDemo';
 
-export const RepositoryPage = iso<RepositoryPageParams>`
-  field Query.RepositoryPage($repositoryName: String!, $repositoryOwner: String!, $first: Int!) @component {
+export const RepositoryPage = iso(`
+  field Query.RepositoryPage(
+    $repositoryName: String!,
+    $repositoryOwner: String!,
+    $first: Int!
+  ) @component {
     Header,
     RepositoryDetail,
   }
-`(RepositoryRouteComponent);
-
-function RepositoryRouteComponent({ data, route, setRoute }: RepositoryPageParams) {
+`)(function RepositoryRouteComponent({ data, route, setRoute }) {
   return (
     <>
       <data.Header route={route} setRoute={setRoute} />
@@ -24,7 +26,7 @@ function RepositoryRouteComponent({ data, route, setRoute }: RepositoryPageParam
       </Container>
     </>
   );
-}
+});
 
 export function RepositoryRoute({
   route,

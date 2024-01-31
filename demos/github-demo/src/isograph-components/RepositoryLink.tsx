@@ -1,10 +1,8 @@
 import { iso } from '@isograph/react';
 
-import type { ResolverParameterType as RepositoryLinkParams } from '@iso/Repository/RepositoryLink/reader.isograph';
-
 import { Link } from '@mui/material';
 
-export const RepositoryLink = iso<RepositoryLinkParams>`
+export const RepositoryLink = iso(`
   field Repository.RepositoryLink @component {
     id,
     name,
@@ -12,9 +10,7 @@ export const RepositoryLink = iso<RepositoryLinkParams>`
       login,
     },
   }
-`(RepositoryLinkComponent);
-
-function RepositoryLinkComponent(props: RepositoryLinkParams) {
+`)(function RepositoryLinkComponent(props) {
   return (
     <Link
       onClick={() =>
@@ -30,4 +26,4 @@ function RepositoryLinkComponent(props: RepositoryLinkParams) {
       {props.children}
     </Link>
   );
-}
+});
