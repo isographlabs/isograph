@@ -6,6 +6,7 @@
 
 ## V2 release
 
+- The store, etc. should be stored in context.
 - network error handling
 - components and "realized" resolvers, as well as ways to invalidate them
   - they could also be lazily calculated
@@ -18,6 +19,7 @@
 - Handle unions etc. correctly
 - Special fields (or syntax?) for type casts (i.e. type refinement)
 
+
 ## Feature backlog
 
 - garbage collection
@@ -27,7 +29,6 @@
 - Unwraps (i.e. `!`) exist in the syntax, but are unused
   - consider whether it is truly the case that there always is a linear way to unwrap a given field, or whether we should unify this with "execute this on the server" etc.
 - Resolvers are re-calculated every time. They should be cached in the store.
-- The store, etc. should be stored in context.
 - Resolvers return opaque objects and cannot be selected into. They should be extended to also allow the return of IDs, which can then be selected into.
 - Stateful resolvers?
   - This could be thought of as "realized" resolvers, which is to say there is overlap with better DevEx for components
@@ -52,13 +53,21 @@
 - There should be a cleaner separation between GraphQL and Isograph. In particular, we should load the GraphQL schema, but turn it into Isograph concepts, and only deal with Isograph concepts.
 - CLI should be separate crate than batch-compile; so should watch mode utils, so as to increase the speed of iteration if the dev is running builds.
 - CLI command to create missing directories (e.g. project_root).
+- do not panic when an unknown token is encountered
 
 ## Known bugs
 
 - If a useLazyReference commits then receives new props, it does not make a new network request.
 - if mutation primary field has a non-existent type, we panic, this should be an error
   - this is because we add the fields before we call Schema::validate_and_construct, where the error would naturally be found.
-  - is this fixed??
+  - e.g. change it to
+
+```graphql
+type SetBestFriendResponse {
+  pet: PetFoo!
+}
+```
+
 - error parsing config should not panic, but be a diagnostic
 
 ## Extended backlog
