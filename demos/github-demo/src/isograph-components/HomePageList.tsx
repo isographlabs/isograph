@@ -1,7 +1,7 @@
-import { iso } from "@isograph/react";
-import type { ResolverParameterType as HomePageListParams } from "@iso/Query/HomePageList/reader.isograph";
-import { RepoGitHubLink } from "./RepoGitHubLink";
-import { Button } from "@mui/material";
+import { iso } from '@isograph/react';
+import type { ResolverParameterType as HomePageListParams } from '@iso/Query/HomePageList/reader.isograph';
+import { RepoGitHubLink } from './RepoGitHubLink';
+import { Button } from '@mui/material';
 
 export const HomePageList = iso<HomePageListParams>`
   field Query.HomePageList($first: Int!) @component {

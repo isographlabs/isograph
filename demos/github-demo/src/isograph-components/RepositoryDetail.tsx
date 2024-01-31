@@ -1,6 +1,6 @@
-import { iso } from "@isograph/react";
-import type { ResolverParameterType as RepositoryDetailParams } from "@iso/Query/RepositoryDetail/reader.isograph";
-import { RepoGitHubLink } from "./RepoGitHubLink";
+import { iso } from '@isograph/react';
+import type { ResolverParameterType as RepositoryDetailParams } from '@iso/Query/RepositoryDetail/reader.isograph';
+import { RepoGitHubLink } from './RepoGitHubLink';
 
 export const RepositoryDetail = iso<RepositoryDetailParams>`
   field Query.RepositoryDetail @component {
@@ -30,11 +30,8 @@ function RepositoryDetailComponent(props: RepositoryDetailParams) {
       <h1>{props.data.repository?.nameWithOwner}</h1>
       {parent != null ? (
         <h3>
-          <small>Forked from</small>{" "}
-          <parent.RepositoryLink
-            setRoute={props.setRoute}
-            children={parent.nameWithOwner}
-          />
+          <small>Forked from</small>{' '}
+          <parent.RepositoryLink setRoute={props.setRoute} children={parent.nameWithOwner} />
         </h3>
       ) : null}
       <repository.pullRequests.PullRequestTable setRoute={props.setRoute} />

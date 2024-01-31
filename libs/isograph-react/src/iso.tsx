@@ -1,7 +1,7 @@
 export function iso<TResolverParameter>(
-  _queryText: TemplateStringsArray
+  _queryText: TemplateStringsArray,
 ): <TResolverReturn>(
-  x: (param: TResolverParameter) => TResolverReturn
+  x: (param: TResolverParameter) => TResolverReturn,
 ) => (param: TResolverParameter) => TResolverReturn {
   // The name `identity` here is a bit of a double entendre.
   // First, it is the identity function, constrained to operate
@@ -12,7 +12,7 @@ export function iso<TResolverParameter>(
   // TResolverParameter and TResolverReturn must be identical.
 
   return function identity<TResolverReturn>(
-    x: (param: TResolverParameter) => TResolverReturn
+    x: (param: TResolverParameter) => TResolverReturn,
   ): (param: TResolverParameter) => TResolverReturn {
     return x;
   };
