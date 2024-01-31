@@ -3,5 +3,9 @@
   "compilerOptions": {
     "baseUrl": "./",
   },
-  "include": ["./libs/**/*.ts", "libs/isograph-react/src/index.tsx", "libs/isograph-react/src/cache.tsx"],
+  "include": [
+    "./libs/**/*.ts",
+    "libs/isograph-react/src/index.tsx",
+    "libs/isograph-react/src/cache.tsx",
+  ],
 }
