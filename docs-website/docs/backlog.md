@@ -18,6 +18,7 @@
   - use serde for this?
 - Handle unions etc. correctly
 - Special fields (or syntax?) for type casts (i.e. type refinement)
+- subscriptions should not be a global
 
 
 ## Feature backlog
