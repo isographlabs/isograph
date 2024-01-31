@@ -6,7 +6,7 @@
 
 ## V2 release
 
-- network request handling
+- network error handling
 - components and "realized" resolvers, as well as ways to invalidate them
   - they could also be lazily calculated
   - may require garbage collection
