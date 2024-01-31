@@ -18,7 +18,11 @@ export const PullRequest = iso<PullRequestComponentProps>`
   }
 `(PullRequestComponentComponent);
 
-function PullRequestComponentComponent({ data, route, setRoute }: PullRequestComponentProps) {
+function PullRequestComponentComponent({
+  data,
+  route,
+  setRoute,
+}: PullRequestComponentProps) {
   return (
     <>
       <data.Header route={route} setRoute={setRoute} />

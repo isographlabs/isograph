@@ -26,15 +26,27 @@ export {
 export { iso } from './iso';
 
 // This type should be treated as an opaque type.
-export type IsographEntrypoint<TReadFromStore extends Object, TResolverProps, TResolverResult> = {
+export type IsographEntrypoint<
+  TReadFromStore extends Object,
+  TResolverProps,
+  TResolverResult,
+> = {
   kind: 'Entrypoint';
   queryText: string;
   normalizationAst: NormalizationAst;
-  readerArtifact: ReaderArtifact<TReadFromStore, TResolverProps, TResolverResult>;
+  readerArtifact: ReaderArtifact<
+    TReadFromStore,
+    TResolverProps,
+    TResolverResult
+  >;
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
-export type ReaderArtifact<TReadFromStore extends Object, TResolverProps, TResolverResult> = {
+export type ReaderArtifact<
+  TReadFromStore extends Object,
+  TResolverProps,
+  TResolverResult,
+> = {
   kind: 'ReaderArtifact';
   readerAst: ReaderAst<TReadFromStore>;
   resolver: (data: TResolverProps) => TResolverResult;
@@ -96,7 +108,9 @@ export type ReaderMutationField = {
   allowedVariables: string[];
 };
 
-export type NormalizationAstNode = NormalizationScalarField | NormalizationLinkedField;
+export type NormalizationAstNode =
+  | NormalizationScalarField
+  | NormalizationLinkedField;
 // @ts-ignore
 export type NormalizationAst = NormalizationAstNode[];
 
@@ -139,24 +153,45 @@ export type ArgumentValue =
       value: any;
     };
 
-export type FragmentReference<TReadFromStore extends Object, TResolverProps, TResolverResult> = {
+export type FragmentReference<
+  TReadFromStore extends Object,
+  TResolverProps,
+  TResolverResult,
+> = {
   kind: 'FragmentReference';
-  readerArtifact: ReaderArtifact<TReadFromStore, TResolverProps, TResolverResult>;
+  readerArtifact: ReaderArtifact<
+    TReadFromStore,
+    TResolverProps,
+    TResolverResult
+  >;
   root: DataId;
   variables: { [index: string]: string } | null;
   // TODO: We should instead have ReaderAst<TResolverProps>
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
-function assertIsEntrypoint<TReadFromStore extends Object, TResolverProps, TResolverResult>(
-  value: IsographEntrypoint<TReadFromStore, TResolverProps, TResolverResult> | typeof iso,
-): asserts value is IsographEntrypoint<TReadFromStore, TResolverProps, TResolverResult> {
+function assertIsEntrypoint<
+  TReadFromStore extends Object,
+  TResolverProps,
+  TResolverResult,
+>(
+  value:
+    | IsographEntrypoint<TReadFromStore, TResolverProps, TResolverResult>
+    | typeof iso,
+): asserts value is IsographEntrypoint<
+  TReadFromStore,
+  TResolverProps,
+  TResolverResult
+> {
   if (typeof value === 'function') throw new Error('Not a string');
 }
 
-type ExtractTReadFromStore<Type> = Type extends IsographEntrypoint<infer X, any, any> ? X : never;
-type ExtractResolverProps<Type> = Type extends IsographEntrypoint<any, infer X, any> ? X : never;
-type ExtractResolverResult<Type> = Type extends IsographEntrypoint<any, any, infer X> ? X : never;
+type ExtractTReadFromStore<Type> =
+  Type extends IsographEntrypoint<infer X, any, any> ? X : never;
+type ExtractResolverProps<Type> =
+  Type extends IsographEntrypoint<any, infer X, any> ? X : never;
+type ExtractResolverResult<Type> =
+  Type extends IsographEntrypoint<any, any, infer X> ? X : never;
 // Note: we cannot write TEntrypoint extends IsographEntrypoint<any, any, any>, or else
 // if we do not explicitly pass a type, the read out type will be any.
 // We cannot write TEntrypoint extends IsographEntrypoint<never, never, never>, or else
@@ -185,7 +220,8 @@ export function useLazyReference<TEntrypoint>(
 
   // TODO add comment explaining why we never use this value
   // @ts-ignore
-  const data = useLazyDisposableState<PromiseWrapper<TResolverResult>>(cache).state;
+  const data =
+    useLazyDisposableState<PromiseWrapper<TResolverResult>>(cache).state;
 
   return {
     queryReference: {
@@ -198,8 +234,16 @@ export function useLazyReference<TEntrypoint>(
   };
 }
 
-export function read<TReadFromStore extends Object, TResolverProps, TResolverResult>(
-  fragmentReference: FragmentReference<TReadFromStore, TResolverProps, TResolverResult>,
+export function read<
+  TReadFromStore extends Object,
+  TResolverProps,
+  TResolverResult,
+>(
+  fragmentReference: FragmentReference<
+    TReadFromStore,
+    TResolverProps,
+    TResolverResult
+  >,
 ): TResolverResult {
   const variant = fragmentReference.readerArtifact.variant;
   if (variant.kind === 'Eager') {
@@ -313,7 +357,12 @@ function readData<TReadFromStore>(
               results.push(null);
               continue;
             }
-            const result = readData(field.selections, link.__link, variables, nestedRefetchQueries);
+            const result = readData(
+              field.selections,
+              link.__link,
+              variables,
+              nestedRefetchQueries,
+            );
             if (result.kind === 'MissingData') {
               return {
                 kind: 'MissingData',
@@ -361,7 +410,12 @@ function readData<TReadFromStore>(
           break;
         }
         const targetId = link.__link;
-        const data = readData(field.selections, targetId, variables, nestedRefetchQueries);
+        const data = readData(
+          field.selections,
+          targetId,
+          variables,
+          nestedRefetchQueries,
+        );
         if (data.kind === 'MissingData') {
           return {
             kind: 'MissingData',
@@ -398,12 +452,15 @@ function readData<TReadFromStore>(
           const refetchQueryArtifact = refetchQuery.artifact;
           const allowedVariables = refetchQuery.allowedVariables;
 
-          target[field.alias] = field.readerArtifact.resolver(refetchQueryArtifact, {
-            ...data.data,
-            // TODO continue from here
-            // variables need to be filtered for what we need just for the refetch query
-            ...filterVariables(variables, allowedVariables),
-          });
+          target[field.alias] = field.readerArtifact.resolver(
+            refetchQueryArtifact,
+            {
+              ...data.data,
+              // TODO continue from here
+              // variables need to be filtered for what we need just for the refetch query
+              ...filterVariables(variables, allowedVariables),
+            },
+          );
         }
         break;
       }
@@ -490,9 +547,21 @@ function missingFieldHandler(
   variables: { [index: string]: any } | null,
 ): Link | undefined {
   if (customMissingFieldHandler != null) {
-    return customMissingFieldHandler(storeRecord, root, fieldName, arguments_, variables);
+    return customMissingFieldHandler(
+      storeRecord,
+      root,
+      fieldName,
+      arguments_,
+      variables,
+    );
   } else {
-    return defaultMissingFieldHandler(storeRecord, root, fieldName, arguments_, variables);
+    return defaultMissingFieldHandler(
+      storeRecord,
+      root,
+      fieldName,
+      arguments_,
+      variables,
+    );
   }
 }
 
@@ -514,7 +583,9 @@ export function defaultMissingFieldHandler(
   }
 }
 
-export function setMissingFieldHandler(handler: typeof defaultMissingFieldHandler) {
+export function setMissingFieldHandler(
+  handler: typeof defaultMissingFieldHandler,
+) {
   customMissingFieldHandler = handler;
 }
 

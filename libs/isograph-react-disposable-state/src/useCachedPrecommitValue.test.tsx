@@ -52,7 +52,10 @@ function promiseAndResolver() {
 // The fact that sometimes we need to render in concurrent mode and sometimes
 // not is a bit worrisome.
 async function awaitableCreate(Component, isConcurrent) {
-  const element = create(Component, isConcurrent ? { unstable_isConcurrent: true } : undefined);
+  const element = create(
+    Component,
+    isConcurrent ? { unstable_isConcurrent: true } : undefined,
+  );
   await shortPromise();
   return element;
 }
@@ -65,7 +68,10 @@ describe('useCachedPrecommitValue', () => {
       return pair;
     });
     const cache = new ParentCache(factory);
-    const getOrPopulateAndTemporaryRetain = vi.spyOn(cache, 'getOrPopulateAndTemporaryRetain');
+    const getOrPopulateAndTemporaryRetain = vi.spyOn(
+      cache,
+      'getOrPopulateAndTemporaryRetain',
+    );
 
     const componentCommits = vi.fn();
     const hookOnCommit = vi.fn();
@@ -189,7 +195,10 @@ describe('useCachedPrecommitValue', () => {
         return pair;
       });
       const cache = new ParentCache(factory);
-      const getOrPopulateAndTemporaryRetain = vi.spyOn(cache, 'getOrPopulateAndTemporaryRetain');
+      const getOrPopulateAndTemporaryRetain = vi.spyOn(
+        cache,
+        'getOrPopulateAndTemporaryRetain',
+      );
 
       const componentCommits = vi.fn();
       const hookOnCommit = vi.fn();
@@ -203,7 +212,9 @@ describe('useCachedPrecommitValue', () => {
         expect(factory).toHaveBeenCalledTimes(1);
 
         renderCount++;
-        expect(getOrPopulateAndTemporaryRetain).toHaveBeenCalledTimes(renderCount);
+        expect(getOrPopulateAndTemporaryRetain).toHaveBeenCalledTimes(
+          renderCount,
+        );
 
         React.useEffect(() => {
           componentCommits();
@@ -249,7 +260,10 @@ describe('useCachedPrecommitValue', () => {
       });
       const cache = new ParentCache(factory);
 
-      const getOrPopulateAndTemporaryRetain = vi.spyOn(cache, 'getOrPopulateAndTemporaryRetain');
+      const getOrPopulateAndTemporaryRetain = vi.spyOn(
+        cache,
+        'getOrPopulateAndTemporaryRetain',
+      );
 
       const componentCommits = vi.fn();
       const hookOnCommit = vi.fn();
@@ -318,8 +332,14 @@ describe('useCachedPrecommitValue', () => {
         return pair;
       });
       const cache = new ParentCache(factory);
-      const getOrPopulateAndTemporaryRetain = vi.spyOn(cache, 'getOrPopulateAndTemporaryRetain');
-      const getAndPermanentRetainIfPresent = vi.spyOn(cache, 'getAndPermanentRetainIfPresent');
+      const getOrPopulateAndTemporaryRetain = vi.spyOn(
+        cache,
+        'getOrPopulateAndTemporaryRetain',
+      );
+      const getAndPermanentRetainIfPresent = vi.spyOn(
+        cache,
+        'getAndPermanentRetainIfPresent',
+      );
 
       const componentCommits = vi.fn();
       const hookOnCommit = vi.fn();
@@ -333,7 +353,9 @@ describe('useCachedPrecommitValue', () => {
           componentCommits();
           expect(getOrPopulateAndTemporaryRetain).toHaveBeenCalledTimes(1);
           expect(getAndPermanentRetainIfPresent).toHaveBeenCalledTimes(1);
-          expect(getAndPermanentRetainIfPresent.mock.results[0].value).toBe(null);
+          expect(getAndPermanentRetainIfPresent.mock.results[0].value).toBe(
+            null,
+          );
           expect(factory).toHaveBeenCalledTimes(2);
           expect(cache.isEmpty()).toBe(true);
           expect(hookOnCommit).toHaveBeenCalledTimes(1);
@@ -403,7 +425,10 @@ describe('useCachedPrecommitValue', () => {
         return pair;
       });
       const cache = new ParentCache(factory);
-      const getAndPermanentRetainIfPresent = vi.spyOn(cache, 'getAndPermanentRetainIfPresent');
+      const getAndPermanentRetainIfPresent = vi.spyOn(
+        cache,
+        'getAndPermanentRetainIfPresent',
+      );
 
       const componentCommits = vi.fn();
       const hookOnCommit = vi.fn();
@@ -417,7 +442,9 @@ describe('useCachedPrecommitValue', () => {
           // Note that we called getOrPopulateAndTemporaryRetain during CodeExecutor, hence 2
           expect(getOrPopulateAndTemporaryRetain).toHaveBeenCalledTimes(2);
           expect(getAndPermanentRetainIfPresent).toHaveBeenCalledTimes(1);
-          expect(getAndPermanentRetainIfPresent.mock.results[0].value[0]).toBe(2);
+          expect(getAndPermanentRetainIfPresent.mock.results[0].value[0]).toBe(
+            2,
+          );
           expect(factory).toHaveBeenCalledTimes(2);
           expect(hookOnCommit).toHaveBeenCalledTimes(1);
           expect(hookOnCommit.mock.calls[0][0][0]).toBe(2);
@@ -426,7 +453,10 @@ describe('useCachedPrecommitValue', () => {
         return <div />;
       }
 
-      const getOrPopulateAndTemporaryRetain = vi.spyOn(cache, 'getOrPopulateAndTemporaryRetain');
+      const getOrPopulateAndTemporaryRetain = vi.spyOn(
+        cache,
+        'getOrPopulateAndTemporaryRetain',
+      );
 
       // wat is going on?
       //

@@ -1,5 +1,9 @@
 import { CacheItem, createTemporarilyRetainedCacheItem } from './CacheItem';
-import { CleanupFn, Factory, ItemCleanupPair } from '@isograph/disposable-types';
+import {
+  CleanupFn,
+  Factory,
+  ItemCleanupPair,
+} from '@isograph/disposable-types';
 
 // TODO convert cache impl to a getter and setter and free functions
 // TODO accept options that get passed to CacheItem
@@ -51,9 +55,8 @@ export class ParentCache<T> {
   }
 
   private __populateAndTemporaryRetain(): [CacheItem<T>, T, CleanupFn] {
-    const pair: ItemCleanupPair<CacheItem<T>> = createTemporarilyRetainedCacheItem(
-      this.__factory,
-      () => {
+    const pair: ItemCleanupPair<CacheItem<T>> =
+      createTemporarilyRetainedCacheItem(this.__factory, () => {
         // We are doing this check because we don't want to remove the cache item
         // if it is not the one that was created when the temporary retain was created.
         //
@@ -70,8 +73,7 @@ export class ParentCache<T> {
         if (this.__cacheItem === pair[0]) {
           this.empty();
         }
-      },
-    );
+      });
 
     // We deconstruct this here instead of at the definition site because otherwise,
     // typescript thinks that cacheItem is any, because it's referenced in the closure.

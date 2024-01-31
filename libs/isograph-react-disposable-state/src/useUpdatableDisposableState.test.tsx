@@ -1,7 +1,10 @@
 import { describe, test, vi, expect } from 'vitest';
 import React from 'react';
 import { create } from 'react-test-renderer';
-import { useUpdatableDisposableState, UNASSIGNED_STATE } from './useUpdatableDisposableState';
+import {
+  useUpdatableDisposableState,
+  UNASSIGNED_STATE,
+} from './useUpdatableDisposableState';
 
 function Suspender({ promise, isResolvedRef }) {
   if (!isResolvedRef.current) {
@@ -41,7 +44,10 @@ function promiseAndResolver() {
 // The fact that sometimes we need to render in concurrent mode and sometimes
 // not is a bit worrisome.
 async function awaitableCreate(Component, isConcurrent) {
-  const element = create(Component, isConcurrent ? { unstable_isConcurrent: true } : undefined);
+  const element = create(
+    Component,
+    isConcurrent ? { unstable_isConcurrent: true } : undefined,
+  );
   await shortPromise();
   return element;
 }
@@ -446,7 +452,10 @@ describe('useUpdatableDisposableState', () => {
 
     const shouldMountRef = { current: true };
 
-    await awaitableCreate(<ParentComponent shouldMountRef={shouldMountRef} />, true);
+    await awaitableCreate(
+      <ParentComponent shouldMountRef={shouldMountRef} />,
+      true,
+    );
 
     expect(render).toHaveBeenCalledTimes(1);
     expect(componentCommits).toHaveBeenCalledTimes(1);

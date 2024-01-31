@@ -22,7 +22,8 @@ function PetUpdaterComponent(props: PetUpdaterParams) {
   const [selected, setSelected] = useState<PetId | 'NONE'>('NONE');
   const [tagline, setTagline] = useState<string>(props.data.tagline);
 
-  const updateTagline = () => props.data.__set_pet_tagline({ input: { tagline } });
+  const updateTagline = () =>
+    props.data.__set_pet_tagline({ input: { tagline } });
 
   return (
     <>
@@ -43,7 +44,10 @@ function PetUpdaterComponent(props: PetUpdaterParams) {
       >
         <MenuItem value="NONE">Select new best friend</MenuItem>
         {props.data.potential_new_best_friends.map((potentialNewBestFriend) => (
-          <MenuItem value={potentialNewBestFriend.id} key={potentialNewBestFriend.id}>
+          <MenuItem
+            value={potentialNewBestFriend.id}
+            key={potentialNewBestFriend.id}
+          >
             {potentialNewBestFriend.name}
           </MenuItem>
         ))}

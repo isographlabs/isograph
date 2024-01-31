@@ -15,14 +15,17 @@ const result = configExplorer.searchSync();
 if (result) {
   IsographConfig = result.config;
 } else {
-  throw new Error('No config found. Do you have a isograph.config.json file somewhere?');
+  throw new Error(
+    'No config found. Do you have a isograph.config.json file somewhere?',
+  );
 }
 
 module.exports = function BabelPluginIsograph(context) {
   const { types: t } = context;
   if (!t) {
     throw new Error(
-      'BabelPluginIsograph: Expected plugin context to include "types", but got:' + String(context),
+      'BabelPluginIsograph: Expected plugin context to include "types", but got:' +
+        String(context),
     );
   }
 

@@ -14,19 +14,26 @@ function compileTag(t, path, config) {
       // No-op
       return false;
     } else {
-      throw new Error("Invalid iso tag usage. Expected 'entrypoint' or 'field'.");
+      throw new Error(
+        "Invalid iso tag usage. Expected 'entrypoint' or 'field'.",
+      );
     }
   }
 
   return false;
 }
 
-const typeAndFieldRegex = new RegExp('\\s*(entrypoint|field)\\s*([^\\.\\s]+)\\.([^\\s\\(]+)', 'm');
+const typeAndFieldRegex = new RegExp(
+  '\\s*(entrypoint|field)\\s*([^\\.\\s]+)\\.([^\\s\\(]+)',
+  'm',
+);
 
 function getTypeAndField(path) {
   const quasis = path.node.quasi.quasis;
   if (quasis.length !== 1) {
-    throw new Error('BabelPluginIsograph: Substitutions are not allowed in iso fragments.');
+    throw new Error(
+      'BabelPluginIsograph: Substitutions are not allowed in iso fragments.',
+    );
   }
 
   const content = path.node.quasi.quasis[0].value.raw;
@@ -52,11 +59,16 @@ function compileImportStatement(t, path, type, field, artifactType, config) {
 
   const fileToArtifactDir = pathModule.relative(folder, artifactDirectory);
   const artifactDirToArtifact = `/__isograph/${type}/${field}/${artifactType}.isograph.ts`;
-  const fileToArtifact = pathModule.join(fileToArtifactDir, artifactDirToArtifact);
+  const fileToArtifact = pathModule.join(
+    fileToArtifactDir,
+    artifactDirToArtifact,
+  );
 
   path.replaceWith(
     t.memberExpression(
-      t.CallExpression(t.Identifier('require'), [t.StringLiteral(fileToArtifact)]),
+      t.CallExpression(t.Identifier('require'), [
+        t.StringLiteral(fileToArtifact),
+      ]),
       t.Identifier('default'),
     ),
   );

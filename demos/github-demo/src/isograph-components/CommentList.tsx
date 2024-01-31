@@ -51,7 +51,8 @@ function CommentListComponent(props: CommentListProps) {
           {comment.bodyText}
           <p>
             <small>
-              {comment.author?.login} commented on {comment.formattedCommentCreationDate}
+              {comment.author?.login} commented on{' '}
+              {comment.formattedCommentCreationDate}
             </small>
           </p>
         </CardContent>

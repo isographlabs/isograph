@@ -1,4 +1,8 @@
-import { CleanupFn, Factory, ItemCleanupPair } from '@isograph/disposable-types';
+import {
+  CleanupFn,
+  Factory,
+  ItemCleanupPair,
+} from '@isograph/disposable-types';
 
 const DEFAULT_TEMPORARY_RETAIN_TIME = 5000;
 
@@ -103,7 +107,9 @@ export class CacheItem<T> {
     }
   }
 
-  permanentRetainIfNotDisposed(disposeOfTemporaryRetain: CleanupFn): ItemCleanupPair<T> | null {
+  permanentRetainIfNotDisposed(
+    disposeOfTemporaryRetain: CleanupFn,
+  ): ItemCleanupPair<T> | null {
     switch (this.__state.kind) {
       case 'InParentCacheAndNotDisposed': {
         let cleared = false;
@@ -127,7 +133,9 @@ export class CacheItem<T> {
               }
               case 'NotInParentCacheAndNotDisposed': {
                 this.__state.permanentRetainCount--;
-                this.__maybeExitNotInParentCacheAndNotDisposedState(this.__state);
+                this.__maybeExitNotInParentCacheAndNotDisposedState(
+                  this.__state,
+                );
                 return;
               }
               default: {
@@ -157,7 +165,9 @@ export class CacheItem<T> {
             switch (this.__state.kind) {
               case 'NotInParentCacheAndNotDisposed': {
                 this.__state.permanentRetainCount--;
-                this.__maybeExitNotInParentCacheAndNotDisposedState(this.__state);
+                this.__maybeExitNotInParentCacheAndNotDisposedState(
+                  this.__state,
+                );
                 return;
               }
               default: {
@@ -178,7 +188,10 @@ export class CacheItem<T> {
   }
 
   temporaryRetain(): CleanupFn {
-    type TemporaryRetainStatus = 'Uncleared' | 'ClearedByCallback' | 'ClearedByTimeout';
+    type TemporaryRetainStatus =
+      | 'Uncleared'
+      | 'ClearedByCallback'
+      | 'ClearedByTimeout';
 
     switch (this.__state.kind) {
       case 'InParentCacheAndNotDisposed': {
@@ -308,7 +321,9 @@ export class CacheItem<T> {
     }
   }
 
-  private __maybeExitInParentCacheAndNotDisposedState(state: InParentCacheAndNotDisposed<T>) {
+  private __maybeExitInParentCacheAndNotDisposedState(
+    state: InParentCacheAndNotDisposed<T>,
+  ) {
     if (state.temporaryRetainCount === 0 && state.permanentRetainCount === 0) {
       state.removeFromParentCache();
       state.disposeValue();
@@ -326,7 +341,9 @@ export class CacheItem<T> {
     }
   }
 
-  private __maybeExitNotInParentCacheAndNotDisposedState(state: NotInParentCacheAndNotDisposed<T>) {
+  private __maybeExitNotInParentCacheAndNotDisposedState(
+    state: NotInParentCacheAndNotDisposed<T>,
+  ) {
     if (state.permanentRetainCount === 0) {
       state.disposeValue();
       this.__state = {

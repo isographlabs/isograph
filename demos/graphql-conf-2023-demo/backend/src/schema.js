@@ -4,7 +4,11 @@ import fs from 'fs';
 const schemaContents = fs.readFileSync('./schema.graphql').toString();
 
 const picturesTogether = [
-  [null, 'http://localhost:3000/makayla_2.jpg', 'http://localhost:3000/makayla_3.jpg'],
+  [
+    null,
+    'http://localhost:3000/makayla_2.jpg',
+    'http://localhost:3000/makayla_3.jpg',
+  ],
 ];
 
 const checkins = [
@@ -73,7 +77,8 @@ export const schema = createSchema({
       potential_new_best_friends: (pet) =>
         pets.filter((otherPet) => {
           return (
-            otherPet.id !== pet.id && otherPet.id !== pet.best_friend_relationship?.best_friend
+            otherPet.id !== pet.id &&
+            otherPet.id !== pet.best_friend_relationship?.best_friend
           );
         }),
       checkins: (pet) => {
@@ -88,8 +93,14 @@ export const schema = createSchema({
     Mutation: {
       set_pet_best_friend: (_obj, params) => {
         const modifiedPet = pets[params.id];
-        const min = params.id < params.new_best_friend_id ? params.id : params.new_best_friend_id;
-        const max = params.id < params.new_best_friend_id ? params.new_best_friend_id : params.id;
+        const min =
+          params.id < params.new_best_friend_id
+            ? params.id
+            : params.new_best_friend_id;
+        const max =
+          params.id < params.new_best_friend_id
+            ? params.new_best_friend_id
+            : params.id;
 
         modifiedPet.best_friend_relationship = {
           best_friend: params.new_best_friend_id,

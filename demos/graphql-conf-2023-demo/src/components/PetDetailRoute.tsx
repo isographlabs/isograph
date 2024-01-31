@@ -15,7 +15,10 @@ export const PetDetailRoute = iso<PetDetailRouteParams>`
   }
 `(PetDetailRouteComponent);
 
-export function PetDetailRouteComponent({ data, navigateTo }: PetDetailRouteParams) {
+export function PetDetailRouteComponent({
+  data,
+  navigateTo,
+}: PetDetailRouteParams) {
   const { pet } = data;
   if (pet == null) {
     return <h1>Pet not found.</h1>;
@@ -23,7 +26,10 @@ export function PetDetailRouteComponent({ data, navigateTo }: PetDetailRoutePara
   return (
     <Container maxWidth="md">
       <h1>Pet Detail for {data.pet?.name}</h1>
-      <h3 onClick={() => navigateTo({ kind: 'Home' })} style={{ cursor: 'pointer' }}>
+      <h3
+        onClick={() => navigateTo({ kind: 'Home' })}
+        style={{ cursor: 'pointer' }}
+      >
         ← Home
       </h3>
       <React.Suspense fallback={<h2>Loading pet details...</h2>}>

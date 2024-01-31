@@ -1,4 +1,8 @@
-import { ReaderArtifact, RefetchQueryArtifactWrapper, readButDoNotEvaluate } from './index';
+import {
+  ReaderArtifact,
+  RefetchQueryArtifactWrapper,
+  readButDoNotEvaluate,
+} from './index';
 import { DataId, stableCopy } from './cache';
 
 type ComponentName = string;

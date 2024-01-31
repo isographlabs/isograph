@@ -22,7 +22,12 @@ function HeaderComponent(props: HeaderProps) {
     <>
       <AppBar position="fixed" color="primary" sx={{ p: 0.5 }}>
         <Container maxWidth="md">
-          <Grid container spacing={24} justifyContent="space-between" maxWidth="md">
+          <Grid
+            container
+            spacing={24}
+            justifyContent="space-between"
+            maxWidth="md"
+          >
             <Grid item xs={6} style={{ flex: 1 }}>
               <Buttons route={props.route} setRoute={props.setRoute} />
             </Grid>
@@ -39,7 +44,13 @@ function HeaderComponent(props: HeaderProps) {
   );
 }
 
-function Buttons({ route, setRoute }: { route: Route; setRoute: (route: Route) => void }) {
+function Buttons({
+  route,
+  setRoute,
+}: {
+  route: Route;
+  setRoute: (route: Route) => void;
+}) {
   const theme = useTheme();
   return (
     <>

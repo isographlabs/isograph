@@ -66,7 +66,9 @@ export function useUpdatableDisposableState<
   const undisposedICIs = useRef(new Set<ICI<T>>());
   const setStateCountRef = useRef(0);
 
-  const [stateICI, setStateICI] = useState<ICI<T> | UnassignedState>(UNASSIGNED_STATE);
+  const [stateICI, setStateICI] = useState<ICI<T> | UnassignedState>(
+    UNASSIGNED_STATE,
+  );
 
   const setStateAfterCommit = useCallback(
     (itemCleanupPair: ItemCleanupPair<T>) => {

@@ -1,7 +1,10 @@
 import React, { useEffect } from 'react';
 import NoSSR from 'react-no-ssr';
 
-import { UNASSIGNED_STATE, useUpdatableDisposableState } from '@isograph/react-disposable-state';
+import {
+  UNASSIGNED_STATE,
+  useUpdatableDisposableState,
+} from '@isograph/react-disposable-state';
 import { makeNetworkRequest } from './api';
 import { Comment, Post, User } from './networkTypes';
 import { PromiseWrapper, useReadPromise } from './PromiseWrapper';
@@ -78,7 +81,9 @@ export function PreloadedPostsWrapper() {
   const { state: requestForPosts, setState: setRequestForPosts } =
     useUpdatableDisposableState<PromiseWrapper<Post[]>>();
   useEffect(() => {
-    setRequestForPosts(makeNetworkRequest('https://jsonplaceholder.typicode.com/posts'));
+    setRequestForPosts(
+      makeNetworkRequest('https://jsonplaceholder.typicode.com/posts'),
+    );
   }, [setRequestForPosts]);
 
   if (requestForPosts === UNASSIGNED_STATE) {
@@ -94,7 +99,11 @@ export function PreloadedPostsWrapper() {
   );
 }
 
-function PreloadedPostsReader({ requestForPosts }: { requestForPosts: PromiseWrapper<Post[]> }) {
+function PreloadedPostsReader({
+  requestForPosts,
+}: {
+  requestForPosts: PromiseWrapper<Post[]>;
+}) {
   const data = useReadPromise(requestForPosts);
 
   return (
@@ -151,9 +160,9 @@ function CommentsWrapper({ postId }: { postId: number }) {
 
   function onMouseOver() {
     if (commentsWrapperState === UNASSIGNED_STATE) {
-      const [networkRequest, cleanupNetworkRequest] = makeNetworkRequest<Comment[]>(
-        `https://jsonplaceholder.typicode.com/post/${postId}/comments`,
-      );
+      const [networkRequest, cleanupNetworkRequest] = makeNetworkRequest<
+        Comment[]
+      >(`https://jsonplaceholder.typicode.com/post/${postId}/comments`);
       setCommentsWrapperState([
         {
           kind: 'LoadedNotRevealed',
@@ -166,9 +175,9 @@ function CommentsWrapper({ postId }: { postId: number }) {
 
   function onClick() {
     if (commentsWrapperState === UNASSIGNED_STATE) {
-      const [networkRequest, cleanupNetworkRequest] = makeNetworkRequest<Comment[]>(
-        `https://jsonplaceholder.typicode.com/post/${postId}/comments`,
-      );
+      const [networkRequest, cleanupNetworkRequest] = makeNetworkRequest<
+        Comment[]
+      >(`https://jsonplaceholder.typicode.com/post/${postId}/comments`);
       setCommentsWrapperState([
         {
           kind: 'LoadedRevealed',
@@ -206,7 +215,11 @@ function CommentsWrapper({ postId }: { postId: number }) {
   ) {
     return (
       <div className="d-grid mt-2">
-        <button className="btn btn-primary" onClick={onClick} onMouseOver={onMouseOver}>
+        <button
+          className="btn btn-primary"
+          onClick={onClick}
+          onMouseOver={onMouseOver}
+        >
           Fetch comments on hover, reveal comments on click
         </button>
       </div>
@@ -215,12 +228,18 @@ function CommentsWrapper({ postId }: { postId: number }) {
 
   return (
     <React.Suspense fallback={<h5 className="mt-2">Loading comments...</h5>}>
-      <CommentsReader requestForComments={commentsWrapperState.requestForComments} />
+      <CommentsReader
+        requestForComments={commentsWrapperState.requestForComments}
+      />
     </React.Suspense>
   );
 }
 
-function CommentsReader({ requestForComments }: { requestForComments: PromiseWrapper<Comment[]> }) {
+function CommentsReader({
+  requestForComments,
+}: {
+  requestForComments: PromiseWrapper<Comment[]>;
+}) {
   const comments = useReadPromise(requestForComments);
 
   return (

@@ -23,7 +23,10 @@ export const PetStatsCard = iso<PetStatsCardParams>`
 
 function PetStatsCardComponent(props: PetStatsCardParams) {
   return (
-    <Card variant="outlined" sx={{ width: 450, boxShadow: 3, cursor: 'pointer' }}>
+    <Card
+      variant="outlined"
+      sx={{ width: 450, boxShadow: 3, cursor: 'pointer' }}
+    >
       <CardContent>
         <h2>Stats</h2>
         <ul>

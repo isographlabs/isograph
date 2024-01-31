@@ -31,7 +31,13 @@ function HomePageComponent({ data, route, setRoute }: HomePageComponentParams) {
   );
 }
 
-export function HomeRoute({ route, setRoute }: { route: Route; setRoute: (route: Route) => void }) {
+export function HomeRoute({
+  route,
+  setRoute,
+}: {
+  route: Route;
+  setRoute: (route: Route) => void;
+}) {
   const [, setState] = useState({});
   useEffect(() => {
     return subscribe(() => setState({}));

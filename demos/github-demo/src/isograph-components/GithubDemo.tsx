@@ -55,13 +55,25 @@ export function FullPageLoading() {
   return <h1 className="mt-5">Loading...</h1>;
 }
 
-function Router({ route, setRoute }: { route: Route; setRoute: (route: Route) => void }) {
+function Router({
+  route,
+  setRoute,
+}: {
+  route: Route;
+  setRoute: (route: Route) => void;
+}) {
   console.log({ route });
   switch (route.kind) {
     case 'Home':
       return <HomeRoute route={route} setRoute={setRoute} />;
     case 'Repository':
-      return <RepositoryRoute route={route} setRoute={setRoute} key={route.repositoryId} />;
+      return (
+        <RepositoryRoute
+          route={route}
+          setRoute={setRoute}
+          key={route.repositoryId}
+        />
+      );
     case 'User':
       return <UserRoute route={route} setRoute={setRoute} />;
     case 'PullRequest':

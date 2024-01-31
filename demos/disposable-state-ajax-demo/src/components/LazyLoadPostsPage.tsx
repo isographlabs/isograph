@@ -55,7 +55,9 @@ export function LazyLoadPostsWrapper() {
 }
 
 function PostsLazyLoader() {
-  const cache = getOrCreateCacheForUrl<Post[]>('https://jsonplaceholder.typicode.com/posts');
+  const cache = getOrCreateCacheForUrl<Post[]>(
+    'https://jsonplaceholder.typicode.com/posts',
+  );
   const apiCall = useLazyDisposableState(cache);
   const data = useReadPromise(apiCall.state);
 
@@ -108,7 +110,10 @@ function CommentsWrapper({ postId }: { postId: number }) {
   if (!showComments) {
     return (
       <div className="d-grid mt-2">
-        <button className="btn btn-primary" onClick={() => setShowComments(true)}>
+        <button
+          className="btn btn-primary"
+          onClick={() => setShowComments(true)}
+        >
           Fetch comments using render-as-you-fetch
         </button>
       </div>

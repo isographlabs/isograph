@@ -43,12 +43,24 @@ export function GraphQLConfDemo(props: {}) {
   );
 }
 
-function Router({ route, setRoute }: { route: Route; setRoute: (route: Route) => void }) {
+function Router({
+  route,
+  setRoute,
+}: {
+  route: Route;
+  setRoute: (route: Route) => void;
+}) {
   switch (route.kind) {
     case 'Home':
       return <HomeRouteLoader navigateTo={setRoute} />;
     case 'PetDetail':
-      return <PetDetailRouteLoader navigateTo={setRoute} route={route} key={route.id} />;
+      return (
+        <PetDetailRouteLoader
+          navigateTo={setRoute}
+          route={route}
+          key={route.id}
+        />
+      );
     default:
       const exhaustiveCheck: never = route;
   }
@@ -58,7 +70,11 @@ export function FullPageLoading() {
   return <h1 className="mt-5">Loading...</h1>;
 }
 
-function HomeRouteLoader({ navigateTo }: { navigateTo: (path: Route) => void }) {
+function HomeRouteLoader({
+  navigateTo,
+}: {
+  navigateTo: (path: Route) => void;
+}) {
   const { queryReference } = useLazyReference<typeof HomeRouteEntrypoint>(
     iso`
       entrypoint Query.HomeRoute

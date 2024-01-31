@@ -31,7 +31,10 @@ function RepositoryDetailComponent(props: RepositoryDetailParams) {
       {parent != null ? (
         <h3>
           <small>Forked from</small>{' '}
-          <parent.RepositoryLink setRoute={props.setRoute} children={parent.nameWithOwner} />
+          <parent.RepositoryLink
+            setRoute={props.setRoute}
+            children={parent.nameWithOwner}
+          />
         </h3>
       ) : null}
       <repository.pullRequests.PullRequestTable setRoute={props.setRoute} />

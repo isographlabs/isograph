@@ -15,7 +15,8 @@ describe('ParentCache', () => {
     });
     const parentCache = new ParentCache<number>(factory);
 
-    const [_cacheItem, value, clearTemporaryRetain] = parentCache.getOrPopulateAndTemporaryRetain();
+    const [_cacheItem, value, clearTemporaryRetain] =
+      parentCache.getOrPopulateAndTemporaryRetain();
 
     expect(factory.mock.calls.length).toBe(1);
     assert(value === 1);

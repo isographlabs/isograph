@@ -1,4 +1,8 @@
-import { Factory, ItemCleanupPair, ParentCache } from '@isograph/react-disposable-state';
+import {
+  Factory,
+  ItemCleanupPair,
+  ParentCache,
+} from '@isograph/react-disposable-state';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import {
   Argument,
@@ -20,7 +24,10 @@ declare global {
 
 const cache: { [index: string]: ParentCache<any> } = {};
 
-function getOrCreateCache<T>(index: string, factory: Factory<T>): ParentCache<T> {
+function getOrCreateCache<T>(
+  index: string,
+  factory: Factory<T>,
+): ParentCache<T> {
   if (typeof window !== 'undefined' && window.__LOG) {
     console.log('getting cache for', {
       index,
@@ -64,7 +71,8 @@ export function getOrCreateCacheForArtifact<T>(
   variables: object,
 ): ParentCache<PromiseWrapper<T>> {
   const cacheKey = artifact.queryText + JSON.stringify(stableCopy(variables));
-  const factory: Factory<PromiseWrapper<T>> = () => makeNetworkRequest<T>(artifact, variables);
+  const factory: Factory<PromiseWrapper<T>> = () =>
+    makeNetworkRequest<T>(artifact, variables);
   return getOrCreateCache<PromiseWrapper<T>>(cacheKey, factory);
 }
 
@@ -86,18 +94,20 @@ export function makeNetworkRequest<T>(
     throw new Error('Network must be set before makeNetworkRequest is called');
   }
 
-  const promise = network(artifact.queryText, variables).then((networkResponse) => {
-    if (typeof window !== 'undefined' && window.__LOG) {
-      console.log('network response', artifact);
-    }
-    normalizeData(
-      artifact.normalizationAst,
-      networkResponse.data,
-      variables,
-      artifact.nestedRefetchQueries,
-    );
-    return networkResponse.data;
-  });
+  const promise = network(artifact.queryText, variables).then(
+    (networkResponse) => {
+      if (typeof window !== 'undefined' && window.__LOG) {
+        console.log('network response', artifact);
+      }
+      normalizeData(
+        artifact.normalizationAst,
+        networkResponse.data,
+        variables,
+        artifact.nestedRefetchQueries,
+      );
+      return networkResponse.data;
+    },
+  );
 
   const wrapper = wrapPromise(promise);
 
@@ -173,7 +183,12 @@ function normalizeData(
   nestedRefetchQueries: RefetchQueryArtifactWrapper[],
 ) {
   if (typeof window !== 'undefined' && window.__LOG) {
-    console.log('about to normalize', normalizationAst, networkResponse, variables);
+    console.log(
+      'about to normalize',
+      normalizationAst,
+      networkResponse,
+      variables,
+    );
   }
   normalizeDataIntoRecord(
     normalizationAst,
@@ -256,7 +271,10 @@ function normalizeScalarField(
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
   const parentRecordKey = getParentRecordKey(astNode, variables);
 
-  if (networkResponseData == null || isScalarOrEmptyArray(networkResponseData)) {
+  if (
+    networkResponseData == null ||
+    isScalarOrEmptyArray(networkResponseData)
+  ) {
     targetStoreRecord[parentRecordKey] = networkResponseData;
   } else {
     throw new Error('Unexpected object array when normalizing scalar');
@@ -284,7 +302,9 @@ function normalizeLinkedField(
   }
 
   if (isScalarButNotEmptyArray(networkResponseData)) {
-    throw new Error('Unexpected scalar network response when normalizing a linked field');
+    throw new Error(
+      'Unexpected scalar network response when normalizing a linked field',
+    );
   }
 
   if (Array.isArray(networkResponseData)) {
@@ -358,7 +378,9 @@ function isScalarOrEmptyArray(
     return (data as any).every((x: any) => isScalarOrEmptyArray(x));
   }
   const isScalarValue =
-    typeof data === 'string' || typeof data === 'number' || typeof data === 'boolean';
+    typeof data === 'string' ||
+    typeof data === 'number' ||
+    typeof data === 'boolean';
   return isScalarValue;
 }
 
@@ -374,7 +396,9 @@ function isScalarButNotEmptyArray(
     return (data as any).every((x: any) => isScalarOrEmptyArray(x));
   }
   const isScalarValue =
-    typeof data === 'string' || typeof data === 'number' || typeof data === 'boolean';
+    typeof data === 'string' ||
+    typeof data === 'number' ||
+    typeof data === 'boolean';
   return isScalarValue;
 }
 
@@ -418,7 +442,10 @@ function getStoreKeyChunkForArgumentValue(
   }
 }
 
-function getStoreKeyChunkForArgument(argument: Argument, variables: { [index: string]: string }) {
+function getStoreKeyChunkForArgument(
+  argument: Argument,
+  variables: { [index: string]: string },
+) {
   const chunk = getStoreKeyChunkForArgumentValue(argument[1], variables);
   return `${FIRST_SPLIT_KEY}${argument[0]}${SECOND_SPLIT_KEY}${chunk}`;
 }

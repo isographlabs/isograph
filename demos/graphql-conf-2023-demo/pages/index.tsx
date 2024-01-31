@@ -39,7 +39,13 @@ setMissingFieldHandler(
         variables,
       });
     }
-    const val = defaultMissingFieldHandler(storeRecord, root, fieldName, arguments_, variables);
+    const val = defaultMissingFieldHandler(
+      storeRecord,
+      root,
+      fieldName,
+      arguments_,
+      variables,
+    );
     if (val == undefined) {
       // This is the custom missing field handler
       //

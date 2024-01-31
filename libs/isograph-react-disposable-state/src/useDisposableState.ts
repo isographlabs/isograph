@@ -22,7 +22,8 @@ export function useDisposableState<T = never>(
     itemCleanupPairRef.current = pair;
   });
 
-  const { state: stateFromDisposableStateHook, setState } = useUpdatableDisposableState<T>();
+  const { state: stateFromDisposableStateHook, setState } =
+    useUpdatableDisposableState<T>();
 
   useEffect(
     function cleanupItemCleanupPairRefAfterSetState() {
@@ -64,7 +65,9 @@ export function useDisposableState<T = never>(
   // can still be assigned, during the render before the
   // cleanupItemCleanupPairRefAfterSetState effect is called.
   const state: T | undefined =
-    (stateFromDisposableStateHook != UNASSIGNED_STATE ? stateFromDisposableStateHook : null) ??
+    (stateFromDisposableStateHook != UNASSIGNED_STATE
+      ? stateFromDisposableStateHook
+      : null) ??
     itemCleanupPairRef.current?.[0] ??
     preCommitItem?.state;
 

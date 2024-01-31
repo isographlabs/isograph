@@ -5,7 +5,10 @@ describe('createReferenceCountedPointer', () => {
   describe('it should not dispose the underlying item until all outstanding pointers are disposed', () => {
     test('one pointer', () => {
       const disposeItem = vi.fn();
-      const [pointer, disposePointer] = createReferenceCountedPointer([1, disposeItem]);
+      const [pointer, disposePointer] = createReferenceCountedPointer([
+        1,
+        disposeItem,
+      ]);
       expect(disposeItem).not.toHaveBeenCalled();
       disposePointer();
       expect(disposeItem).toHaveBeenCalled();
@@ -13,7 +16,10 @@ describe('createReferenceCountedPointer', () => {
 
     test('linked list, FIFO', () => {
       const disposeItem = vi.fn();
-      const [pointer, disposePointer] = createReferenceCountedPointer([1, disposeItem]);
+      const [pointer, disposePointer] = createReferenceCountedPointer([
+        1,
+        disposeItem,
+      ]);
       const [pointer2, disposePointer2] = pointer.cloneIfNotDisposed()!;
       const [pointer3, disposePointer3] = pointer2.cloneIfNotDisposed()!;
       const [pointer4, disposePointer4] = pointer3.cloneIfNotDisposed()!;
@@ -28,7 +34,10 @@ describe('createReferenceCountedPointer', () => {
 
     test('linked list, LIFO', () => {
       const disposeItem = vi.fn();
-      const [pointer, disposePointer] = createReferenceCountedPointer([1, disposeItem]);
+      const [pointer, disposePointer] = createReferenceCountedPointer([
+        1,
+        disposeItem,
+      ]);
       const [pointer2, disposePointer2] = pointer.cloneIfNotDisposed()!;
       const [pointer3, disposePointer3] = pointer2.cloneIfNotDisposed()!;
       const [pointer4, disposePointer4] = pointer3.cloneIfNotDisposed()!;
@@ -43,7 +52,10 @@ describe('createReferenceCountedPointer', () => {
 
     test('linked list, mixed order', () => {
       const disposeItem = vi.fn();
-      const [pointer, disposePointer] = createReferenceCountedPointer([1, disposeItem]);
+      const [pointer, disposePointer] = createReferenceCountedPointer([
+        1,
+        disposeItem,
+      ]);
       const [pointer2, disposePointer2] = pointer.cloneIfNotDisposed()!;
       const [pointer3, disposePointer3] = pointer2.cloneIfNotDisposed()!;
       const [pointer4, disposePointer4] = pointer3.cloneIfNotDisposed()!;
@@ -58,7 +70,10 @@ describe('createReferenceCountedPointer', () => {
 
     test('DAG, from root', () => {
       const disposeItem = vi.fn();
-      const [pointer, disposePointer] = createReferenceCountedPointer([1, disposeItem]);
+      const [pointer, disposePointer] = createReferenceCountedPointer([
+        1,
+        disposeItem,
+      ]);
       const [pointerA, disposePointerA] = pointer.cloneIfNotDisposed()!;
       const [pointerA_1, disposePointerA_1] = pointerA.cloneIfNotDisposed()!;
       const [pointerA_2, disposePointerA_2] = pointerA.cloneIfNotDisposed()!;
@@ -79,7 +94,10 @@ describe('createReferenceCountedPointer', () => {
 
     test('DAG, from leaves', () => {
       const disposeItem = vi.fn();
-      const [pointer, disposePointer] = createReferenceCountedPointer([1, disposeItem]);
+      const [pointer, disposePointer] = createReferenceCountedPointer([
+        1,
+        disposeItem,
+      ]);
       const [pointerA, disposePointerA] = pointer.cloneIfNotDisposed()!;
       const [pointerA_1, disposePointerA_1] = pointerA.cloneIfNotDisposed()!;
       const [pointerA_2, disposePointerA_2] = pointerA.cloneIfNotDisposed()!;
@@ -100,7 +118,10 @@ describe('createReferenceCountedPointer', () => {
 
     test('DAG, random', () => {
       const disposeItem = vi.fn();
-      const [pointer, disposePointer] = createReferenceCountedPointer([1, disposeItem]);
+      const [pointer, disposePointer] = createReferenceCountedPointer([
+        1,
+        disposeItem,
+      ]);
       const [pointerA, disposePointerA] = pointer.cloneIfNotDisposed()!;
       const [pointerA_1, disposePointerA_1] = pointerA.cloneIfNotDisposed()!;
       const [pointerA_2, disposePointerA_2] = pointerA.cloneIfNotDisposed()!;
@@ -122,7 +143,10 @@ describe('createReferenceCountedPointer', () => {
 
   test('it should throw when disposed twice', () => {
     const disposeItem = vi.fn();
-    const [pointer, disposePointer] = createReferenceCountedPointer([1, disposeItem]);
+    const [pointer, disposePointer] = createReferenceCountedPointer([
+      1,
+      disposeItem,
+    ]);
     disposePointer();
     expect(() => {
       disposePointer();
@@ -131,14 +155,20 @@ describe('createReferenceCountedPointer', () => {
 
   test('it should return null when you attempt to retain a disposed pointer', () => {
     const disposeItem = vi.fn();
-    const [pointer, disposePointer] = createReferenceCountedPointer([1, disposeItem]);
+    const [pointer, disposePointer] = createReferenceCountedPointer([
+      1,
+      disposeItem,
+    ]);
     disposePointer();
     expect(pointer.cloneIfNotDisposed()).toBe(null);
   });
 
   test('it should expose the underlying object only when undisposed', () => {
     const disposeItem = vi.fn();
-    const [pointer, disposePointer] = createReferenceCountedPointer([1, disposeItem]);
+    const [pointer, disposePointer] = createReferenceCountedPointer([
+      1,
+      disposeItem,
+    ]);
     expect(pointer.getItemIfNotDisposed()).toBe(1);
     disposePointer();
     expect(pointer.getItemIfNotDisposed()).toBe(null);
@@ -146,7 +176,10 @@ describe('createReferenceCountedPointer', () => {
 
   test('it should accurately report its disposed status', () => {
     const disposeItem = vi.fn();
-    const [pointer, disposePointer] = createReferenceCountedPointer([1, disposeItem]);
+    const [pointer, disposePointer] = createReferenceCountedPointer([
+      1,
+      disposeItem,
+    ]);
     expect(pointer.isDisposed()).toBe(false);
     disposePointer();
     expect(pointer.isDisposed()).toBe(true);
@@ -154,7 +187,10 @@ describe('createReferenceCountedPointer', () => {
 
   test('disposable status is unaffected by the presence of other undisposed pointers', () => {
     const disposeItem = vi.fn();
-    const [pointer, disposePointer] = createReferenceCountedPointer([1, disposeItem]);
+    const [pointer, disposePointer] = createReferenceCountedPointer([
+      1,
+      disposeItem,
+    ]);
     const pointer2 = pointer.cloneIfNotDisposed();
     assert(pointer2 != null);
     expect(pointer2[0].isDisposed()).toBe(false);

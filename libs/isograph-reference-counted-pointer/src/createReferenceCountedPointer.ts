@@ -83,7 +83,9 @@ class RefCounter<T> {
       let disposed = false;
       const dispose = () => {
         if (disposed) {
-          throw new Error('Do not dispose an already-disposed ActiveReference.');
+          throw new Error(
+            'Do not dispose an already-disposed ActiveReference.',
+          );
         }
         disposed = true;
         if (activeReference.__original === null) {

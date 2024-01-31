@@ -4,7 +4,11 @@ import { Container } from '@mui/material';
 import { ResolverParameterType as RepositoryPageParams } from '@iso/Query/RepositoryPage/reader.isograph';
 import RepositoryPageEntrypoint from '@iso/Query/RepositoryPage/entrypoint.isograph';
 
-import { FullPageLoading, Route, RepositoryRoute as RepositoryRouteType } from './GithubDemo';
+import {
+  FullPageLoading,
+  Route,
+  RepositoryRoute as RepositoryRouteType,
+} from './GithubDemo';
 
 export const RepositoryPage = iso<RepositoryPageParams>`
   field Query.RepositoryPage($repositoryName: String!, $repositoryOwner: String!, $first: Int!) @component {
@@ -13,7 +17,11 @@ export const RepositoryPage = iso<RepositoryPageParams>`
   }
 `(RepositoryRouteComponent);
 
-function RepositoryRouteComponent({ data, route, setRoute }: RepositoryPageParams) {
+function RepositoryRouteComponent({
+  data,
+  route,
+  setRoute,
+}: RepositoryPageParams) {
   return (
     <>
       <data.Header route={route} setRoute={setRoute} />

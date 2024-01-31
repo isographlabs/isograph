@@ -18,7 +18,10 @@ function HomepageHeader() {
         <p className="hero__subtitle">{siteConfig.tagline}</p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '2em' }}>
           <div className={styles.buttons}>
-            <Link className="button button--secondary button--lg" to="/docs/quickstart">
+            <Link
+              className="button button--secondary button--lg"
+              to="/docs/quickstart"
+            >
               Quickstart
             </Link>
           </div>

@@ -1,5 +1,17 @@
-import { describe, assert, test, vi, beforeEach, afterEach, expect } from 'vitest';
-import { CacheItem, CacheItemState, createTemporarilyRetainedCacheItem } from './CacheItem';
+import {
+  describe,
+  assert,
+  test,
+  vi,
+  beforeEach,
+  afterEach,
+  expect,
+} from 'vitest';
+import {
+  CacheItem,
+  CacheItemState,
+  createTemporarilyRetainedCacheItem,
+} from './CacheItem';
 import { ItemCleanupPair } from '@isograph/disposable-types';
 
 function getState<T>(cacheItem: CacheItem<T>): CacheItemState<T> {
@@ -22,10 +34,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, _disposeTemporaryRetain] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, _disposeTemporaryRetain] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       expect(factory.mock.calls.length).toEqual(1);
 
@@ -47,10 +60,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       expect(factory.mock.calls.length).toEqual(1);
 
@@ -71,10 +85,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, _disposeTemporaryRetain] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, _disposeTemporaryRetain] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       expect(factory.mock.calls.length).toEqual(1);
 
@@ -95,10 +110,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       expect(factory.mock.calls.length).toEqual(1);
 
@@ -123,10 +139,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       expect(factory.mock.calls.length).toEqual(1);
 
@@ -152,18 +169,18 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       const mockedDisposeTemporaryRetain = vi.fn(disposeTemporaryRetain);
 
       expect(factory.mock.calls.length).toEqual(1);
 
-      const [item, _disposePermanentRetain] = cacheItem.permanentRetainIfNotDisposed(
-        mockedDisposeTemporaryRetain,
-      )!;
+      const [item, _disposePermanentRetain] =
+        cacheItem.permanentRetainIfNotDisposed(mockedDisposeTemporaryRetain)!;
 
       expect(item).toEqual(1);
       expect(mockedDisposeTemporaryRetain.mock.calls.length).toEqual(1);
@@ -186,10 +203,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       expect(factory.mock.calls.length).toEqual(1);
 
@@ -209,18 +227,18 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       const mockedDisposeTemporaryRetain = vi.fn(disposeTemporaryRetain);
 
       expect(factory.mock.calls.length).toEqual(1);
 
-      const [item, disposePermanentRetain] = cacheItem.permanentRetainIfNotDisposed(
-        mockedDisposeTemporaryRetain,
-      )!;
+      const [item, disposePermanentRetain] =
+        cacheItem.permanentRetainIfNotDisposed(mockedDisposeTemporaryRetain)!;
 
       disposePermanentRetain();
 
@@ -238,18 +256,18 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       const mockedDisposeTemporaryRetain = vi.fn(disposeTemporaryRetain);
 
       expect(factory.mock.calls.length).toEqual(1);
 
-      const [item, disposePermanentRetain] = cacheItem.permanentRetainIfNotDisposed(
-        mockedDisposeTemporaryRetain,
-      )!;
+      const [item, disposePermanentRetain] =
+        cacheItem.permanentRetainIfNotDisposed(mockedDisposeTemporaryRetain)!;
 
       disposePermanentRetain();
       expect(() => {
@@ -265,10 +283,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       expect(factory.mock.calls.length).toEqual(1);
 
@@ -278,7 +297,9 @@ describe('CacheItem', () => {
 
       assert(state.kind === 'NotInParentCacheAndDisposed');
 
-      assert(cacheItem.permanentRetainIfNotDisposed(disposeTemporaryRetain) === null);
+      assert(
+        cacheItem.permanentRetainIfNotDisposed(disposeTemporaryRetain) === null,
+      );
 
       expect(() => {
         cacheItem.permanentRetain();
@@ -293,10 +314,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain1] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain1] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       const [_value, disposeOfPermanentRetain1] =
         cacheItem.permanentRetainIfNotDisposed(disposeTemporaryRetain1)!;
@@ -316,10 +338,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, _disposeTemporaryRetain1] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, _disposeTemporaryRetain1] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       vi.advanceTimersByTime(1000);
 
@@ -346,10 +369,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain1] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain1] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       vi.advanceTimersByTime(1000);
       const _disposeTemporaryRetain2 = cacheItem.temporaryRetain();
@@ -375,10 +399,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain1] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain1] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       vi.advanceTimersByTime(1000);
       const _disposeTemporaryRetain2 = cacheItem.temporaryRetain();
@@ -398,10 +423,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain1] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain1] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       vi.advanceTimersByTime(1000);
       const disposeTemporaryRetain2 = cacheItem.temporaryRetain();
@@ -420,10 +446,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain1] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain1] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       const disposeTemporaryRetain2 = cacheItem.temporaryRetain();
       const state1 = getState(cacheItem);
@@ -445,10 +472,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain1] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain1] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       const disposeTemporaryRetain2 = cacheItem.temporaryRetain();
       const state1 = getState(cacheItem);
@@ -470,10 +498,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, _disposeTemporaryRetain1] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, _disposeTemporaryRetain1] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       vi.advanceTimersByTime(1000);
       const _disposeTemporaryRetain2 = cacheItem.temporaryRetain();
@@ -502,10 +531,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain1] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain1] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       vi.advanceTimersByTime(1000);
       const _disposeTemporaryRetain2 = cacheItem.temporaryRetain();
@@ -529,10 +559,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain1] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain1] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       vi.advanceTimersByTime(1000);
       const disposeTemporaryRetain2 = cacheItem.temporaryRetain();
@@ -560,10 +591,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain1] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain1] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       vi.advanceTimersByTime(1000);
       const _disposeTemporaryRetain2 = cacheItem.temporaryRetain();
@@ -591,10 +623,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain1] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain1] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       vi.advanceTimersByTime(1000);
       const _disposeTemporaryRetain2 = cacheItem.temporaryRetain();
@@ -618,10 +651,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain1] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain1] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       vi.advanceTimersByTime(1000);
       const _disposeTemporaryRetain2 = cacheItem.temporaryRetain();
@@ -644,10 +678,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain1] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain1] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       vi.advanceTimersByTime(1000);
       const disposeTemporaryRetain2 = cacheItem.temporaryRetain();
@@ -670,10 +705,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain1] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain1] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       vi.advanceTimersByTime(1000);
       const disposeTemporaryRetain2 = cacheItem.temporaryRetain();
@@ -696,10 +732,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain1] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain1] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       vi.advanceTimersByTime(1000);
       const _disposeTemporaryRetain2 = cacheItem.temporaryRetain();
@@ -724,10 +761,11 @@ describe('CacheItem', () => {
         const ret: ItemCleanupPair<number> = [1, disposeItem];
         return ret;
       });
-      const [cacheItem, disposeTemporaryRetain1] = createTemporarilyRetainedCacheItem<number>(
-        factory,
-        removeFromParentCache,
-      );
+      const [cacheItem, disposeTemporaryRetain1] =
+        createTemporarilyRetainedCacheItem<number>(
+          factory,
+          removeFromParentCache,
+        );
 
       vi.advanceTimersByTime(1000);
       const disposeTemporaryRetain2 = cacheItem.temporaryRetain();

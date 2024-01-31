@@ -65,13 +65,16 @@ export function useCachedPrecommitValue<T>(
     //
     // After the above, we have a non-disposed item and a cleanup function, which we
     // can pass to onCommit.
-    const undisposedPair = cacheItem.permanentRetainIfNotDisposed(disposeOfTemporaryRetain);
+    const undisposedPair = cacheItem.permanentRetainIfNotDisposed(
+      disposeOfTemporaryRetain,
+    );
     if (undisposedPair !== null) {
       onCommit(undisposedPair);
     } else {
       // The cache item we created during render has been disposed. Check if the parent
       // cache is populated.
-      const existingCacheItemCleanupPair = parentCache.getAndPermanentRetainIfPresent();
+      const existingCacheItemCleanupPair =
+        parentCache.getAndPermanentRetainIfPresent();
       if (existingCacheItemCleanupPair !== null) {
         onCommit(existingCacheItemCleanupPair);
       } else {
@@ -94,7 +97,8 @@ export function useCachedPrecommitValue<T>(
 
   // Safety: item is only safe to use (i.e. guaranteed not to have disposed)
   // during this tick.
-  const [cacheItem, item, disposeOfTemporaryRetain] = parentCache.getOrPopulateAndTemporaryRetain();
+  const [cacheItem, item, disposeOfTemporaryRetain] =
+    parentCache.getOrPopulateAndTemporaryRetain();
 
   return { state: item };
 }
