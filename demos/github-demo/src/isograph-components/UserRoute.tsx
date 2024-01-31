@@ -1,10 +1,5 @@
 import React from 'react';
-import {
-  IsographEntrypoint,
-  iso,
-  read,
-  useLazyReference,
-} from '@isograph/react';
+import { iso, useLazyReference, useRead } from '@isograph/react';
 import { Container } from '@mui/material';
 
 import { ResolverParameterType as UserRouteComponentParams } from '@iso/Query/UserPage/reader.isograph';
@@ -54,6 +49,6 @@ export function UserRoute({
       first: 20,
     },
   );
-  const Component = read(queryReference);
+  const Component = useRead(queryReference);
   return <Component route={route} setRoute={setRoute} />;
 }

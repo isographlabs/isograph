@@ -1,9 +1,11 @@
 import {
+  DataId,
   ReaderArtifact,
   RefetchQueryArtifactWrapper,
   readButDoNotEvaluate,
 } from './index';
-import { DataId, stableCopy } from './cache';
+import { stableCopy } from './cache';
+import { IsographEnvironment } from '../dist';
 
 type ComponentName = string;
 type StringifiedArgs = string;
@@ -13,6 +15,7 @@ const cachedComponentsById: {
   };
 } = {};
 export function getOrCreateCachedComponent(
+  environment: IsographEnvironment,
   root: DataId,
   componentName: string,
   readerArtifact: ReaderArtifact<any, any, any>,
@@ -28,7 +31,7 @@ export function getOrCreateCachedComponent(
     byArgs[stringifiedArgs] ??
     (() => {
       function Component(additionalRuntimeProps) {
-        const data = readButDoNotEvaluate({
+        const data = readButDoNotEvaluate(environment, {
           kind: 'FragmentReference',
           readerArtifact: readerArtifact,
           root,

@@ -1,6 +1,6 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
 import { makeNetworkRequest } from '@isograph/react';
-const resolver = (artifact, variables) => () => makeNetworkRequest(artifact, variables);
+const resolver = (environment, artifact, variables) => () => makeNetworkRequest(environment, artifact, variables);
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = any;

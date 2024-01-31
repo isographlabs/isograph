@@ -6,9 +6,9 @@ const includeReadOutData = (variables, readOutData) => {
 };
 
 import { makeNetworkRequest } from '@isograph/react';
-const resolver = (artifact, readOutData, filteredVariables) => (mutationParams) => {
+const resolver = (environment, artifact, readOutData, filteredVariables) => (mutationParams) => {
   const variables = includeReadOutData({...filteredVariables, ...mutationParams}, readOutData);
-  makeNetworkRequest(artifact, variables);
+  makeNetworkRequest(environment, artifact, variables);
 };
 
 

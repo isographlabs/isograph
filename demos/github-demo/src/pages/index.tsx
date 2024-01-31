@@ -1,7 +1,6 @@
 import Head from 'next/head';
 
 import { GithubDemo } from '@/isograph-components/GithubDemo';
-import { clearStore, setNetwork } from '@isograph/react';
 
 function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
   let promise = fetch('https://api.github.com/graphql', {
@@ -14,9 +13,12 @@ function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
   }).then((response) => response.json());
   return promise;
 }
-setNetwork(makeNetworkRequest);
 
 import { createTheme, ThemeProvider } from '@mui/material/styles';
+import {
+  IsographEnvironment,
+  IsographEnvironmentProvider,
+} from '@isograph/react';
 
 const theme = createTheme({
   palette: {
@@ -35,6 +37,14 @@ const theme = createTheme({
   },
 });
 
+const environment: IsographEnvironment = {
+  store: {
+    __ROOT: {},
+  },
+  missingFieldHandler: null,
+  networkFunction: makeNetworkRequest,
+};
+
 export default function Home() {
   return (
     <>
@@ -46,13 +56,10 @@ export default function Home() {
         />
       </Head>
       <ThemeProvider theme={theme}>
-        <GithubDemo />
+        <IsographEnvironmentProvider environment={environment}>
+          <GithubDemo />
+        </IsographEnvironmentProvider>
       </ThemeProvider>
     </>
   );
-}
-
-export async function getServerSideProps() {
-  clearStore();
-  return { props: {} };
 }

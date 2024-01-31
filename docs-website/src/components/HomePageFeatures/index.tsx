@@ -67,7 +67,7 @@ function Feature({ title, description }) {
 const CodeBlocks = {
   home_page: `
 import {
-  read,
+  useRead,
   useLazyReference,
   isoFetch,
 } from "@isograph/react";
@@ -86,7 +86,7 @@ export function HomePageRoute() {
   // Step 2: Attempt to read the query reference. This will
   // return the value of the Query.HomePage field
   // when the network request is complete.
-  const HomePage = read(queryReference);
+  const HomePage = useRead(queryReference);
 
   // Step 3: Render the resulting component.
   const additionalProps = {};

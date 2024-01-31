@@ -15,6 +15,13 @@ import {
   ReaderScalarField,
   RefetchQueryArtifactWrapper,
 } from './index';
+import {
+  DataId,
+  ROOT_ID,
+  StoreRecord,
+  Link,
+  type IsographEnvironment,
+} from './context';
 
 declare global {
   interface Window {
@@ -67,47 +74,39 @@ export function stableCopy<T>(value: T): T {
 type IsoResolver = IsographEntrypoint<any, any, any>;
 
 export function getOrCreateCacheForArtifact<T>(
+  environment: IsographEnvironment,
   artifact: IsographEntrypoint<any, any, T>,
   variables: object,
 ): ParentCache<PromiseWrapper<T>> {
   const cacheKey = artifact.queryText + JSON.stringify(stableCopy(variables));
   const factory: Factory<PromiseWrapper<T>> = () =>
-    makeNetworkRequest<T>(artifact, variables);
+    makeNetworkRequest<T>(environment, artifact, variables);
   return getOrCreateCache<PromiseWrapper<T>>(cacheKey, factory);
 }
 
-let network: ((queryText: string, variables: object) => Promise<any>) | null;
-
-// This is a hack until we store this in context somehow
-export function setNetwork(newNetwork: typeof network) {
-  network = newNetwork;
-}
-
 export function makeNetworkRequest<T>(
+  environment: IsographEnvironment,
   artifact: IsoResolver,
   variables: object,
 ): ItemCleanupPair<PromiseWrapper<T>> {
   if (typeof window !== 'undefined' && window.__LOG) {
     console.log('make network request', artifact, variables);
   }
-  if (network == null) {
-    throw new Error('Network must be set before makeNetworkRequest is called');
-  }
-
-  const promise = network(artifact.queryText, variables).then(
-    (networkResponse) => {
+  const promise = environment
+    .networkFunction(artifact.queryText, variables)
+    .then((networkResponse) => {
       if (typeof window !== 'undefined' && window.__LOG) {
         console.log('network response', artifact);
       }
       normalizeData(
+        environment,
         artifact.normalizationAst,
         networkResponse.data,
         variables,
         artifact.nestedRefetchQueries,
       );
       return networkResponse.data;
-    },
-  );
+    });
 
   const wrapper = wrapPromise(promise);
 
@@ -118,48 +117,6 @@ export function makeNetworkRequest<T>(
     },
   ];
   return response;
-}
-
-export type Link = {
-  __link: DataId;
-};
-export type DataTypeValue =
-  // N.B. undefined is here to support optional id's, but
-  // undefined should not *actually* be present in the store.
-  | undefined
-  // Singular scalar fields:
-  | number
-  | boolean
-  | string
-  | null
-  // Singular linked fields:
-  | Link
-  // Plural scalar and linked fields:
-  | DataTypeValue[];
-
-export type StoreRecord = {
-  [index: DataId | string]: DataTypeValue;
-  // TODO __typename?: T, which is restricted to being a concrete string
-  // TODO this shouldn't always be named id
-  id?: DataId;
-};
-
-export type DataId = string;
-
-export const ROOT_ID: DataId & '__ROOT' = '__ROOT';
-let store: {
-  [index: DataId]: StoreRecord | null;
-  __ROOT: StoreRecord;
-} = {
-  __ROOT: {},
-};
-export function getStore() {
-  return store;
-}
-export function clearStore() {
-  store = {
-    __ROOT: {},
-  };
 }
 
 type NetworkResponseScalarValue = string | number | boolean;
@@ -177,6 +134,7 @@ type NetworkResponseObject = {
 };
 
 function normalizeData(
+  environment: IsographEnvironment,
   normalizationAst: NormalizationAst,
   networkResponse: NetworkResponseObject,
   variables: Object,
@@ -191,15 +149,16 @@ function normalizeData(
     );
   }
   normalizeDataIntoRecord(
+    environment,
     normalizationAst,
     networkResponse,
-    store.__ROOT,
+    environment.store.__ROOT,
     ROOT_ID,
     variables as any,
     nestedRefetchQueries,
   );
   if (typeof window !== 'undefined' && window.__LOG) {
-    console.log('after normalization', { store });
+    console.log('after normalization', { store: environment.store });
   }
   callSubscriptions();
 }
@@ -228,6 +187,7 @@ function callSubscriptions() {
  * Mutate targetParentRecord according to the normalizationAst and networkResponseParentRecord.
  */
 function normalizeDataIntoRecord(
+  environment: IsographEnvironment,
   normalizationAst: NormalizationAst,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
@@ -248,6 +208,7 @@ function normalizeDataIntoRecord(
       }
       case 'Linked': {
         normalizeLinkedField(
+          environment,
           normalizationNode,
           networkResponseParentRecord,
           targetParentRecord,
@@ -285,6 +246,7 @@ function normalizeScalarField(
  * Mutate targetParentRecord with a given linked field ast node.
  */
 function normalizeLinkedField(
+  environment: IsographEnvironment,
   astNode: NormalizationLinkedField,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
@@ -309,10 +271,11 @@ function normalizeLinkedField(
 
   if (Array.isArray(networkResponseData)) {
     // TODO check astNode.plural or the like
-    const dataIds = [];
+    const dataIds: Link[] = [];
     for (let i = 0; i < networkResponseData.length; i++) {
       const networkResponseObject = networkResponseData[i];
       const newStoreRecordId = normalizeNetworkResponseObject(
+        environment,
         astNode,
         networkResponseObject,
         targetParentRecordId,
@@ -325,6 +288,7 @@ function normalizeLinkedField(
     targetParentRecord[parentRecordKey] = dataIds;
   } else {
     const newStoreRecordId = normalizeNetworkResponseObject(
+      environment,
       astNode,
       networkResponseData,
       targetParentRecordId,
@@ -339,6 +303,7 @@ function normalizeLinkedField(
 }
 
 function normalizeNetworkResponseObject(
+  environment: IsographEnvironment,
   astNode: NormalizationLinkedField,
   networkResponseData: NetworkResponseObject,
   targetParentRecordId: string,
@@ -354,10 +319,11 @@ function normalizeNetworkResponseObject(
     index,
   );
 
-  const newStoreRecord = store[newStoreRecordId] ?? {};
-  store[newStoreRecordId] = newStoreRecord;
+  const newStoreRecord = environment.store[newStoreRecordId] ?? {};
+  environment.store[newStoreRecordId] = newStoreRecord;
 
   normalizeDataIntoRecord(
+    environment,
     astNode.selections,
     networkResponseData,
     newStoreRecord,

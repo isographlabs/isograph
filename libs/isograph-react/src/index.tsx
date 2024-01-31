@@ -1,27 +1,36 @@
 import {
-  DataId,
-  StoreRecord,
-  DataTypeValue,
-  Link,
-  ROOT_ID,
   getOrCreateCacheForArtifact,
   onNextChange,
-  getStore,
   getParentRecordKey,
 } from './cache';
 import { useLazyDisposableState } from '@isograph/react-disposable-state';
 import { type PromiseWrapper } from './PromiseWrapper';
 import { getOrCreateCachedComponent } from './componentCache';
-
-export {
-  setNetwork,
-  makeNetworkRequest,
-  subscribe,
+import {
   DataId,
+  DataTypeValue,
+  IsographEnvironment,
   Link,
+  ROOT_ID,
   StoreRecord,
-  clearStore,
-} from './cache';
+  useIsographEnvironment,
+} from './context';
+
+export { makeNetworkRequest, subscribe } from './cache';
+export {
+  IsographEnvironmentContext,
+  ROOT_ID,
+  type DataId,
+  type DataTypeValue,
+  type IsographEnvironment,
+  IsographEnvironmentProvider,
+  type IsographEnvironmentProviderProps,
+  type IsographNetworkFunction,
+  type IsographStore,
+  type Link,
+  type StoreRecord,
+  useIsographEnvironment,
+} from './context';
 
 export { iso } from './iso';
 
@@ -177,7 +186,10 @@ function assertIsEntrypoint<
 >(
   value:
     | IsographEntrypoint<TReadFromStore, TResolverProps, TResolverResult>
-    | typeof iso,
+    | ((_: any) => any)
+    // Temporarily, allow any here. Once we automatically provide
+    // types to entrypoints, we probably don't need this.
+    | any,
 ): asserts value is IsographEntrypoint<
   TReadFromStore,
   TResolverProps,
@@ -211,9 +223,11 @@ export function useLazyReference<TEntrypoint>(
     ExtractResolverResult<TEntrypoint>
   >;
 } {
+  const environment = useIsographEnvironment();
   assertIsEntrypoint(entrypoint);
   // Typechecking fails here... TODO investigate
   const cache = getOrCreateCacheForArtifact<ExtractResolverResult<TEntrypoint>>(
+    environment,
     entrypoint,
     variables,
   );
@@ -234,7 +248,7 @@ export function useLazyReference<TEntrypoint>(
   };
 }
 
-export function read<
+export function useRead<
   TReadFromStore extends Object,
   TResolverProps,
   TResolverResult,
@@ -245,9 +259,26 @@ export function read<
     TResolverResult
   >,
 ): TResolverResult {
+  const environment = useIsographEnvironment();
+  return read(environment, fragmentReference);
+}
+
+export function read<
+  TReadFromStore extends Object,
+  TResolverProps,
+  TResolverResult,
+>(
+  environment: IsographEnvironment,
+  fragmentReference: FragmentReference<
+    TReadFromStore,
+    TResolverProps,
+    TResolverResult
+  >,
+): TResolverResult {
   const variant = fragmentReference.readerArtifact.variant;
   if (variant.kind === 'Eager') {
     const data = readData(
+      environment,
       fragmentReference.readerArtifact.readerAst,
       fragmentReference.root,
       fragmentReference.variables ?? {},
@@ -261,6 +292,7 @@ export function read<
   } else if (variant.kind === 'Component') {
     // @ts-ignore
     return getOrCreateCachedComponent(
+      environment,
       fragmentReference.root,
       variant.componentName,
       fragmentReference.readerArtifact,
@@ -273,9 +305,11 @@ export function read<
 }
 
 export function readButDoNotEvaluate<TReadFromStore extends Object>(
+  environment: IsographEnvironment,
   reference: FragmentReference<TReadFromStore, unknown, unknown>,
 ): TReadFromStore {
   const response = readData(
+    environment,
     reference.readerArtifact.readerAst,
     reference.root,
     reference.variables ?? {},
@@ -303,12 +337,13 @@ type ReadDataResult<TReadFromStore> =
     };
 
 function readData<TReadFromStore>(
+  environment: IsographEnvironment,
   ast: ReaderAst<TReadFromStore>,
   root: DataId,
   variables: { [index: string]: string },
   nestedRefetchQueries: RefetchQueryArtifactWrapper[],
 ): ReadDataResult<TReadFromStore> {
-  let storeRecord = getStore()[root];
+  let storeRecord = environment.store[root];
   if (storeRecord === undefined) {
     return { kind: 'MissingData', reason: 'No record for root ' + root };
   }
@@ -358,6 +393,7 @@ function readData<TReadFromStore>(
               continue;
             }
             const result = readData(
+              environment,
               field.selections,
               link.__link,
               variables,
@@ -384,6 +420,8 @@ function readData<TReadFromStore>(
         let link = assertLink(value);
         if (link === undefined) {
           // TODO make this configurable, and also generated and derived from the schema
+          const missingFieldHandler =
+            environment.missingFieldHandler ?? defaultMissingFieldHandler;
           const altLink = missingFieldHandler(
             storeRecord,
             root,
@@ -411,6 +449,7 @@ function readData<TReadFromStore>(
         }
         const targetId = link.__link;
         const data = readData(
+          environment,
           field.selections,
           targetId,
           variables,
@@ -428,6 +467,7 @@ function readData<TReadFromStore>(
       }
       case 'RefetchField': {
         const data = readData(
+          environment,
           field.readerArtifact.readerAst,
           root,
           variables,
@@ -453,6 +493,7 @@ function readData<TReadFromStore>(
           const allowedVariables = refetchQuery.allowedVariables;
 
           target[field.alias] = field.readerArtifact.resolver(
+            environment,
             refetchQueryArtifact,
             {
               ...data.data,
@@ -466,6 +507,7 @@ function readData<TReadFromStore>(
       }
       case 'MutationField': {
         const data = readData(
+          environment,
           field.readerArtifact.readerAst,
           root,
           variables,
@@ -491,6 +533,7 @@ function readData<TReadFromStore>(
           const allowedVariables = refetchQuery.allowedVariables;
 
           target[field.alias] = field.readerArtifact.resolver(
+            environment,
             refetchQueryArtifact,
             data.data,
             filterVariables(variables, allowedVariables),
@@ -507,6 +550,7 @@ function readData<TReadFromStore>(
         const variant = field.readerArtifact.variant;
         if (variant.kind === 'Eager') {
           const data = readData(
+            environment,
             field.readerArtifact.readerAst,
             root,
             variables,
@@ -523,6 +567,7 @@ function readData<TReadFromStore>(
           }
         } else if (variant.kind === 'Component') {
           target[field.alias] = getOrCreateCachedComponent(
+            environment,
             root,
             variant.componentName,
             field.readerArtifact,
@@ -537,37 +582,9 @@ function readData<TReadFromStore>(
   return { kind: 'Success', data: target as any };
 }
 
-let customMissingFieldHandler: typeof defaultMissingFieldHandler | null = null;
-
-function missingFieldHandler(
-  storeRecord: StoreRecord,
-  root: DataId,
-  fieldName: string,
-  arguments_: { [index: string]: any } | null,
-  variables: { [index: string]: any } | null,
-): Link | undefined {
-  if (customMissingFieldHandler != null) {
-    return customMissingFieldHandler(
-      storeRecord,
-      root,
-      fieldName,
-      arguments_,
-      variables,
-    );
-  } else {
-    return defaultMissingFieldHandler(
-      storeRecord,
-      root,
-      fieldName,
-      arguments_,
-      variables,
-    );
-  }
-}
-
 export function defaultMissingFieldHandler(
-  storeRecord: StoreRecord,
-  root: DataId,
+  _storeRecord: StoreRecord,
+  _root: DataId,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
   variables: { [index: string]: any } | null,
@@ -581,12 +598,6 @@ export function defaultMissingFieldHandler(
       return { __link: value };
     }
   }
-}
-
-export function setMissingFieldHandler(
-  handler: typeof defaultMissingFieldHandler,
-) {
-  customMissingFieldHandler = handler;
 }
 
 function assertLink(link: DataTypeValue): Link | undefined | null {

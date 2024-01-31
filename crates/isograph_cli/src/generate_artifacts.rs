@@ -1002,8 +1002,8 @@ fn generate_resolver_import_statement(
         }
         ResolverActionKind::RefetchField => ResolverImportStatement(
             "import { makeNetworkRequest } from '@isograph/react';\n\
-            const resolver = (artifact, variables) => () => \
-            makeNetworkRequest(artifact, variables);"
+            const resolver = (environment, artifact, variables) => () => \
+            makeNetworkRequest(environment, artifact, variables);"
                 .to_string(),
         ),
         ResolverActionKind::MutationField(ref m) => {
@@ -1012,10 +1012,10 @@ fn generate_resolver_import_statement(
             ResolverImportStatement(format!(
                 "{include_read_out_data}\n\
                 import {{ makeNetworkRequest }} from '@isograph/react';\n\
-                const resolver = (artifact, readOutData, filteredVariables) => (mutationParams) => {{\n\
+                const resolver = (environment, artifact, readOutData, filteredVariables) => (mutationParams) => {{\n\
                 {spaces}const variables = includeReadOutData({{...filteredVariables, \
                 ...mutationParams}}, readOutData);\n\
-                {spaces}makeNetworkRequest(artifact, variables);\n\
+                {spaces}makeNetworkRequest(environment, artifact, variables);\n\
             }};\n\
             "
             ))

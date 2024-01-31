@@ -3,10 +3,9 @@ import {
   DataId,
   Link,
   StoreRecord,
-  setMissingFieldHandler,
   defaultMissingFieldHandler,
-  setNetwork,
-  clearStore,
+  type IsographEnvironment,
+  IsographEnvironmentProvider,
 } from '@isograph/react';
 import { GraphQLConfDemo } from '@/src/components/router';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
@@ -21,44 +20,49 @@ function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
   }).then((response) => response.json());
   return promise;
 }
-setNetwork(makeNetworkRequest);
-setMissingFieldHandler(
-  (
-    storeRecord: StoreRecord,
-    root: DataId,
-    fieldName: string,
-    arguments_: { [index: string]: any } | null,
-    variables: { [index: string]: any } | null,
-  ): Link | undefined => {
-    if (typeof window !== 'undefined' && window.__LOG) {
-      console.log('Missing field handler called', {
-        storeRecord,
-        root,
-        fieldName,
-        arguments_,
-        variables,
-      });
-    }
-    const val = defaultMissingFieldHandler(
+const missingFieldHandler = (
+  storeRecord: StoreRecord,
+  root: DataId,
+  fieldName: string,
+  arguments_: { [index: string]: any } | null,
+  variables: { [index: string]: any } | null,
+): Link | undefined => {
+  if (typeof window !== 'undefined' && window.__LOG) {
+    console.log('Missing field handler called', {
       storeRecord,
       root,
       fieldName,
       arguments_,
       variables,
-    );
-    if (val == undefined) {
-      // This is the custom missing field handler
-      //
-      // N.B. this **not** correct. We need to pass the correct variables/args here.
-      // But it works for this demo.
-      if (fieldName === 'pet' && variables?.id != null && root === '__ROOT') {
-        return { __link: variables.id };
-      }
-    } else {
-      return val;
+    });
+  }
+  const val = defaultMissingFieldHandler(
+    storeRecord,
+    root,
+    fieldName,
+    arguments_,
+    variables,
+  );
+  if (val == undefined) {
+    // This is the custom missing field handler
+    //
+    // N.B. this **not** correct. We need to pass the correct variables/args here.
+    // But it works for this demo.
+    if (fieldName === 'pet' && variables?.id != null && root === '__ROOT') {
+      return { __link: variables.id };
     }
+  } else {
+    return val;
+  }
+};
+
+const environment: IsographEnvironment = {
+  store: {
+    __ROOT: {},
   },
-);
+  missingFieldHandler,
+  networkFunction: makeNetworkRequest,
+};
 
 export default function Home() {
   return (
@@ -68,7 +72,9 @@ export default function Home() {
         <meta name="description" content="Demo for GraphQL Conf 2023" />
       </Head>
       <ThemeProvider theme={theme}>
-        <GraphQLConfDemo />
+        <IsographEnvironmentProvider environment={environment}>
+          <GraphQLConfDemo />
+        </IsographEnvironmentProvider>
       </ThemeProvider>
     </>
   );
@@ -91,8 +97,3 @@ const theme = createTheme({
     },
   },
 });
-
-export async function getServerSideProps() {
-  clearStore();
-  return { props: {} };
-}

@@ -236,7 +236,7 @@ function Inner() {
     }
   );
 
-  const Component = read(queryReference);
+  const Component = useRead(queryReference);
   const additionalRenderProps = {};
   return <Component {...additionalRenderProps} />;
 }

@@ -6,6 +6,7 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "jsx": "react",
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
     "noUnusedLocals": true,
