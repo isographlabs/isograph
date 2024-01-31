@@ -22,10 +22,6 @@ export function GraphQLConfDemo(props: {}) {
   // here. Isograph will support more fine-grained re-rendering in
   // the future, and this will be done automatically as part of
   // useLazyReference.
-  const [, setState] = React.useState<object | void>();
-  React.useEffect(() => {
-    return subscribe(() => setState({}));
-  }, []);
 
   const [currentRoute, setCurrentRoute] = React.useState<Route>({
     kind: 'Home',

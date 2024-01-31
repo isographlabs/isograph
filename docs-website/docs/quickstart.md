@@ -130,29 +130,7 @@ You may need to provide a bearer token if you are using a public API, like that 
 
 ## Tell Isograph to re-render whenever new data is received
 
-Right now, there is no granular re-rendering in Isograph. (A lot of features are missing!) Instead, we add a hook at the root that re-renders the entire tree if anything changes in the Isograph store. This can go in the `App` component that is in `src/pages/_app.tsx`.
-
-```tsx
-import { useState } from "React";
-
-// ... setNetworkRequest code from the previous step goes here ...
-
-import "@/styles/globals.css";
-import type { AppProps } from "next/app";
-
-export default function App({ Component, pageProps }: AppProps) {
-  // N.B. we are rerendering the root component on any store change
-  // here. Isograph will support more fine-grained re-rendering in
-  // the future, and this will be done automatically as part of
-  // useLazyReference.
-  const [, setState] = useState<object | void>();
-  useEffect(() => {
-    return subscribe(() => setState({}));
-  }, []);
-
-  return <Component {...pageProps} />;
-}
-```
+TODO replace with Environment section
 
 ## Tell NextJS not to re-use values in the store when you refresh
 

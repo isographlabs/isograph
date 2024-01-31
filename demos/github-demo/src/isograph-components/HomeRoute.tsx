@@ -38,10 +38,6 @@ export function HomeRoute({
   route: Route;
   setRoute: (route: Route) => void;
 }) {
-  const [, setState] = useState({});
-  useEffect(() => {
-    return subscribe(() => setState({}));
-  }, []);
   const { queryReference } = useLazyReference<typeof HomePageEntrypoint>(
     iso`entrypoint Query.HomePage`,
     {
