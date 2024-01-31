@@ -96,7 +96,7 @@ impl<'source> PeekableLexer<'source> {
     pub fn parse_token_of_kind(
         &mut self,
         expected_kind: IsographLangTokenKind,
-    ) -> Result<WithSpan<IsographLangTokenKind>, WithSpan<LowLevelParseError>> {
+    ) -> LowLevelParseResult<WithSpan<IsographLangTokenKind>> {
         let found = self.peek();
         if found.item == expected_kind {
             Ok(self.parse_token())
@@ -116,7 +116,7 @@ impl<'source> PeekableLexer<'source> {
     pub fn parse_source_of_kind(
         &mut self,
         expected_kind: IsographLangTokenKind,
-    ) -> Result<WithSpan<&'source str>, WithSpan<LowLevelParseError>> {
+    ) -> LowLevelParseResult<WithSpan<&'source str>> {
         let kind = self.parse_token_of_kind(expected_kind)?;
 
         Ok(WithSpan::new(self.source(kind.span), kind.span))
@@ -125,7 +125,7 @@ impl<'source> PeekableLexer<'source> {
     pub fn parse_string_key_type<T: From<StringKey>>(
         &mut self,
         expected_kind: IsographLangTokenKind,
-    ) -> Result<WithSpan<T>, WithSpan<LowLevelParseError>> {
+    ) -> LowLevelParseResult<WithSpan<T>> {
         let kind = self.parse_token_of_kind(expected_kind)?;
         let source = self.source(kind.span).intern();
         Ok(WithSpan::new(source.into(), kind.span))
@@ -135,23 +135,29 @@ impl<'source> PeekableLexer<'source> {
     pub fn parse_matching_identifier(
         &mut self,
         identifier: &'static str,
-    ) -> Result<WithSpan<IsographLangTokenKind>, LowLevelParseError> {
+    ) -> LowLevelParseResult<WithSpan<IsographLangTokenKind>> {
         let peeked = self.peek();
         if peeked.item == IsographLangTokenKind::Identifier {
             let source = self.source(peeked.span);
             if source == identifier {
                 Ok(self.parse_token())
             } else {
-                Err(LowLevelParseError::ParseMatchingIdentifierError {
-                    expected_identifier: identifier,
-                    found_text: source.to_string(),
-                })
+                Err(WithSpan::new(
+                    LowLevelParseError::ParseMatchingIdentifierError {
+                        expected_identifier: identifier,
+                        found_text: source.to_string(),
+                    },
+                    peeked.span,
+                ))
             }
         } else {
-            Err(LowLevelParseError::ParseTokenKindError {
-                expected_kind: IsographLangTokenKind::Identifier,
-                found_kind: peeked.item,
-            })
+            Err(WithSpan::new(
+                LowLevelParseError::ParseTokenKindError {
+                    expected_kind: IsographLangTokenKind::Identifier,
+                    found_kind: peeked.item,
+                },
+                peeked.span,
+            ))
         }
     }
 
@@ -162,6 +168,8 @@ impl<'source> PeekableLexer<'source> {
         WithSpan::new(result, Span::new(start, end))
     }
 }
+
+type LowLevelParseResult<T> = Result<T, WithSpan<LowLevelParseError>>;
 
 /// Low-level errors. If peekable_lexer could be made generic (it can't because it needs to know
 /// about EOF), these would belong in a different crate than the parser itself.
