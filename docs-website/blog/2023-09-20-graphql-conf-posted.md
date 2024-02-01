@@ -1,5 +1,5 @@
 ---
-slug: graphql-conf-2023
+slug: pet
 title: GraphQL Conf 2023
 authors: robertbalicki
 tags: []

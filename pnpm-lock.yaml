@@ -122,7 +122,7 @@ importers:
         specifier: ^1.1.3
         version: 1.1.3
 
-  demos/graphql-conf-2023-demo:
+  demos/pet-demo:
     dependencies:
       '@emotion/react':
         specifier: ^11.11.1

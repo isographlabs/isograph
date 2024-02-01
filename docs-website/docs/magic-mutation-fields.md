@@ -41,7 +41,7 @@ type Pet {
 }
 ```
 
-> The schema in the [`demos/graphql-conf-2023-demo`](https://github.com/isographlabs/isograph/tree/main/demos/graphql-conf-2023-demo) is like this.
+> The schema in the [`demos/pet-demo`](https://github.com/isographlabs/isograph/tree/main/demos/pet-demo) is like this.
 
 We can add an `@exposeField` directive to the `Mutation` object to expose a magic mutation field as follows, by putting the following in our `schema-extension.graphql` file:
 
