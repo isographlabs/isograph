@@ -1,19 +1,11 @@
 import {
-  DataId,
   ReaderArtifact,
   RefetchQueryArtifactWrapper,
   readButDoNotEvaluate,
 } from './index';
 import { stableCopy } from './cache';
-import { IsographEnvironment } from '../dist';
+import { IsographEnvironment, DataId } from './IsographEnvironment';
 
-type ComponentName = string;
-type StringifiedArgs = string;
-const cachedComponentsById: {
-  [key: DataId]: {
-    [key: ComponentName]: { [key: StringifiedArgs]: React.FC<any> };
-  };
-} = {};
 export function getOrCreateCachedComponent(
   environment: IsographEnvironment,
   root: DataId,
@@ -22,6 +14,7 @@ export function getOrCreateCachedComponent(
   variables: { [key: string]: string },
   resolverRefetchQueries: RefetchQueryArtifactWrapper[],
 ) {
+  const cachedComponentsById = environment.componentCache;
   const stringifiedArgs = JSON.stringify(stableCopy(variables));
   cachedComponentsById[root] = cachedComponentsById[root] ?? {};
   const componentsByName = cachedComponentsById[root];

@@ -104,10 +104,17 @@ Isograph **will** generate a `__refetch` artifact for each type that has an `id:
 
 Isograph requires some initial setup to teach it how to make API calls to your GraphQL server. The GraphQL server we will hit is running at `https://swapi-graphql.netlify.app/.netlify/functions/index`.
 
-In our case, we can do that by adding the following to the top of our `src/pages/_app.tsx`:
+In our case, we can do that by change our `src/pages/_app.tsx` file to look like:
 
 ```tsx
-import { setNetwork } from '@isograph/react';
+import { useMemo } from 'react';
+import type { AppProps } from 'next/app';
+import {
+  createIsographEnvironment,
+  createIsographStore,
+  IsographEnvironmentProvider,
+} from '@isograph/react';
+
 function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
   let promise = fetch(
     'https://swapi-graphql.netlify.app/.netlify/functions/index',
@@ -121,28 +128,35 @@ function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
   ).then((response) => response.json());
   return promise;
 }
-setNetwork(makeNetworkRequest);
+
+export default function App({ Component, pageProps }: AppProps) {
+  const environment = useMemo(
+    () => createIsographEnvironment(createIsographStore(), makeNetworkRequest),
+    [],
+  );
+  return (
+    <IsographEnvironmentProvider environment={environment}>
+      <Component {...pageProps} />
+    </IsographEnvironmentProvider>
+  );
+}
 ```
+
+We're also creating the Isograph store in this step, which is the in-memory key-value store where Isograph keeps the network data you have received.
+
+:::warning
+With NextJS, it is **extremely important** to not create the environment at the top level (i.e. in module scope.) If you do this, **NextJS will reuse the environment across requests,** so different users will share the same environment!
+
+Create the environment during the render of a component is sufficient to avoid this. However, you should also memoize the creation of the environment so that if (for whatever reason), your `App` component re-renders, you do not recreate the environment, thus losing data.
+:::
 
 :::note
 You may need to provide a bearer token if you are using a public API, like that of GitHub. See [this GitHub demo](https://github.com/rbalicki2/github-isograph-demo/tree/885530d74d9b8fb374dfe7d0ebdab7185d207c3a/src/isograph-components/SetNetworkWrapper.tsx) for an example of how to do with a token that you receive from OAuth. See also the `[...nextauth].tsx` file in the same repo.
 :::
 
-## Tell Isograph to re-render whenever new data is received
-
-TODO replace with Environment section
-
-## Tell NextJS not to re-use values in the store when you refresh
-
-Add the following to each page (e.g. to `pages/index.tsx`). Otherwise, NextJS will reuse the value in the store for all network requests, which is a serious privacy liability.
-
-```tsx
-import { clearStore } from '@isograph/react';
-export async function getServerSideProps() {
-  clearStore();
-  return { props: {} };
-}
-```
+:::note
+This `IsographEnvironmentProvider` will re-render its children whenever new data is written into the Isograph store, so your components will always remain current with whatever data is in the store. In the future, re-renders will be more granular.
+:::
 
 ## Create isograph literals
 

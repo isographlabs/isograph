@@ -1,6 +1,6 @@
 import React from 'react';
 import { Container } from '@mui/material';
-import { subscribe, useLazyReference, useRead, iso } from '@isograph/react';
+import { useLazyReference, useRead, iso } from '@isograph/react';
 import HomeRouteEntrypoint from '@iso/Query/HomeRoute/entrypoint.isograph';
 import PetDetailRouteEntrypoint from '@iso/Query/PetDetailRoute/entrypoint.isograph';
 
@@ -18,11 +18,6 @@ export type PetDetailRoute = {
 };
 
 export function GraphQLConfDemo(props: {}) {
-  // N.B. we are rerendering the root component on any store change
-  // here. Isograph will support more fine-grained re-rendering in
-  // the future, and this will be done automatically as part of
-  // useLazyReference.
-
   const [currentRoute, setCurrentRoute] = React.useState<Route>({
     kind: 'Home',
   });
@@ -72,9 +67,7 @@ function HomeRouteLoader({
   navigateTo: (path: Route) => void;
 }) {
   const { queryReference } = useLazyReference<typeof HomeRouteEntrypoint>(
-    iso`
-      entrypoint Query.HomeRoute
-    `,
+    iso`entrypoint Query.HomeRoute`,
     {},
   );
 
@@ -90,9 +83,7 @@ function PetDetailRouteLoader({
   route: PetDetailRoute;
 }) {
   const { queryReference } = useLazyReference<typeof PetDetailRouteEntrypoint>(
-    iso`
-      entrypoint Query.PetDetailRoute
-    `,
+    iso`entrypoint Query.PetDetailRoute`,
     { id: route.id },
   );
 

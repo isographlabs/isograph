@@ -30,6 +30,8 @@ export {
   type Link,
   type StoreRecord,
   useIsographEnvironment,
+  createIsographEnvironment,
+  createIsographStore,
 } from './IsographEnvironment';
 
 export { iso } from './iso';
@@ -285,7 +287,7 @@ export function read<
       fragmentReference.nestedRefetchQueries,
     );
     if (data.kind === 'MissingData') {
-      throw onNextChange();
+      throw onNextChange(environment);
     } else {
       return fragmentReference.readerArtifact.resolver(data.data);
     }
@@ -319,7 +321,7 @@ export function readButDoNotEvaluate<TReadFromStore extends Object>(
     console.log('done reading', { response });
   }
   if (response.kind === 'MissingData') {
-    throw onNextChange();
+    throw onNextChange(environment);
   } else {
     return response.data;
   }

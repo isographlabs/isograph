@@ -29,24 +29,23 @@ declare global {
   }
 }
 
-const cache: { [index: string]: ParentCache<any> } = {};
-
 function getOrCreateCache<T>(
+  environment: IsographEnvironment,
   index: string,
   factory: Factory<T>,
 ): ParentCache<T> {
   if (typeof window !== 'undefined' && window.__LOG) {
     console.log('getting cache for', {
       index,
-      cache: Object.keys(cache),
-      found: !!cache[index],
+      cache: Object.keys(environment.suspenseCache),
+      found: !!environment.suspenseCache[index],
     });
   }
-  if (cache[index] == null) {
-    cache[index] = new ParentCache(factory);
+  if (environment.suspenseCache[index] == null) {
+    environment.suspenseCache[index] = new ParentCache(factory);
   }
 
-  return cache[index];
+  return environment.suspenseCache[index];
 }
 
 /**
@@ -81,7 +80,7 @@ export function getOrCreateCacheForArtifact<T>(
   const cacheKey = artifact.queryText + JSON.stringify(stableCopy(variables));
   const factory: Factory<PromiseWrapper<T>> = () =>
     makeNetworkRequest<T>(environment, artifact, variables);
-  return getOrCreateCache<PromiseWrapper<T>>(cacheKey, factory);
+  return getOrCreateCache<PromiseWrapper<T>>(environment, cacheKey, factory);
 }
 
 export function makeNetworkRequest<T>(
@@ -160,27 +159,28 @@ function normalizeData(
   if (typeof window !== 'undefined' && window.__LOG) {
     console.log('after normalization', { store: environment.store });
   }
-  callSubscriptions();
+  callSubscriptions(environment);
 }
 
-export function subscribe(callback: () => void): () => void {
-  subscriptions.add(callback);
-  return () => subscriptions.delete(callback);
+export function subscribe(
+  environment: IsographEnvironment,
+  callback: () => void,
+): () => void {
+  environment.subscriptions.add(callback);
+  return () => environment.subscriptions.delete(callback);
 }
 
-export function onNextChange(): Promise<void> {
+export function onNextChange(environment: IsographEnvironment): Promise<void> {
   return new Promise((resolve) => {
-    const unsubscribe = subscribe(() => {
+    const unsubscribe = subscribe(environment, () => {
       unsubscribe();
       resolve();
     });
   });
 }
 
-const subscriptions: Set<() => void> = new Set();
-
-function callSubscriptions() {
-  subscriptions.forEach((callback) => callback());
+function callSubscriptions(environment: IsographEnvironment) {
+  environment.subscriptions.forEach((callback) => callback());
 }
 
 /**

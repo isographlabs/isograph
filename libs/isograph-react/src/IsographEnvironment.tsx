@@ -1,14 +1,29 @@
 import { ReactNode, createContext, useContext } from 'react';
 import * as React from 'react';
 import { subscribe } from './cache';
+import { ParentCache } from '@isograph/isograph-react-disposable-state';
 
 export const IsographEnvironmentContext =
   createContext<IsographEnvironment | null>(null);
+
+type ComponentName = string;
+type StringifiedArgs = string;
+type ComponentCache = {
+  [key: DataId]: {
+    [key: ComponentName]: { [key: StringifiedArgs]: React.FC<any> };
+  };
+};
+
+export type Subscriptions = Set<() => void>;
+type SuspenseCache = { [index: string]: ParentCache<any> };
 
 export type IsographEnvironment = {
   store: IsographStore;
   networkFunction: IsographNetworkFunction;
   missingFieldHandler: MissingFieldHandler | null;
+  componentCache: ComponentCache;
+  subscriptions: Subscriptions;
+  suspenseCache: SuspenseCache;
 };
 
 export type MissingFieldHandler = (
@@ -68,7 +83,7 @@ export function IsographEnvironmentProvider({
 }: IsographEnvironmentProviderProps) {
   const [, setState] = React.useState<object | void>();
   React.useEffect(() => {
-    return subscribe(() => setState({}));
+    return subscribe(environment, () => setState({}));
   }, []);
 
   return (
@@ -98,6 +113,9 @@ export function createIsographEnvironment(
     store,
     networkFunction,
     missingFieldHandler: missingFieldHandler ?? null,
+    componentCache: {},
+    subscriptions: new Set(),
+    suspenseCache: {},
   };
 }
 

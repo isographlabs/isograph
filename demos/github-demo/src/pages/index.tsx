@@ -1,4 +1,11 @@
 import Head from 'next/head';
+import { useMemo } from 'react';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
+import {
+  createIsographEnvironment,
+  createIsographStore,
+  IsographEnvironmentProvider,
+} from '@isograph/react';
 
 import { GithubDemo } from '@/isograph-components/GithubDemo';
 
@@ -13,12 +20,6 @@ function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
   }).then((response) => response.json());
   return promise;
 }
-
-import { createTheme, ThemeProvider } from '@mui/material/styles';
-import {
-  IsographEnvironment,
-  IsographEnvironmentProvider,
-} from '@isograph/react';
 
 const theme = createTheme({
   palette: {
@@ -37,15 +38,10 @@ const theme = createTheme({
   },
 });
 
-const environment: IsographEnvironment = {
-  store: {
-    __ROOT: {},
-  },
-  missingFieldHandler: null,
-  networkFunction: makeNetworkRequest,
-};
-
 export default function Home() {
+  const environment = useMemo(() => {
+    return createIsographEnvironment(createIsographStore(), makeNetworkRequest);
+  }, []);
   return (
     <>
       <Head>

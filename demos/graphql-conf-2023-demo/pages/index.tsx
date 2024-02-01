@@ -4,11 +4,13 @@ import {
   Link,
   StoreRecord,
   defaultMissingFieldHandler,
-  type IsographEnvironment,
   IsographEnvironmentProvider,
+  createIsographEnvironment,
+  createIsographStore,
 } from '@isograph/react';
 import { GraphQLConfDemo } from '@/src/components/router';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
+import React from 'react';
 
 function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
   let promise = fetch('http://localhost:4000/graphql', {
@@ -56,15 +58,17 @@ const missingFieldHandler = (
   }
 };
 
-const environment: IsographEnvironment = {
-  store: {
-    __ROOT: {},
-  },
-  missingFieldHandler,
-  networkFunction: makeNetworkRequest,
-};
-
 export default function Home() {
+  const environment = React.useMemo(
+    () =>
+      createIsographEnvironment(
+        createIsographStore(),
+        makeNetworkRequest,
+        missingFieldHandler,
+      ),
+    [],
+  );
+
   return (
     <>
       <Head>
