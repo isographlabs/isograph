@@ -14,7 +14,7 @@ import {
   ROOT_ID,
   StoreRecord,
   useIsographEnvironment,
-} from './context';
+} from './IsographEnvironment';
 
 export { makeNetworkRequest, subscribe } from './cache';
 export {
@@ -30,7 +30,7 @@ export {
   type Link,
   type StoreRecord,
   useIsographEnvironment,
-} from './context';
+} from './IsographEnvironment';
 
 export { iso } from './iso';
 

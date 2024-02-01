@@ -88,3 +88,21 @@ export function useIsographEnvironment(): IsographEnvironment {
   }
   return context;
 }
+
+export function createIsographEnvironment(
+  store: IsographStore,
+  networkFunction: IsographNetworkFunction,
+  missingFieldHandler?: MissingFieldHandler,
+): IsographEnvironment {
+  return {
+    store,
+    networkFunction,
+    missingFieldHandler: missingFieldHandler ?? null,
+  };
+}
+
+export function createIsographStore() {
+  return {
+    [ROOT_ID]: {},
+  };
+}

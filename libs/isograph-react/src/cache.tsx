@@ -21,7 +21,7 @@ import {
   StoreRecord,
   Link,
   type IsographEnvironment,
-} from './context';
+} from './IsographEnvironment';
 
 declare global {
   interface Window {
