@@ -14,7 +14,7 @@ Next, add it to your `.babelrc`:
 
 ```js
 module.exports = {
-  plugins: ["@isograph"],
+  plugins: ['@isograph'],
 };
 ```
 

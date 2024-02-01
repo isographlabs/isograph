@@ -30,8 +30,8 @@ Install the babel plugin in your `.babelrc.js`. If this file does not exist (and
 
 ```js
 module.exports = {
-  presets: ["next/babel"],
-  plugins: ["@isograph"],
+  presets: ['next/babel'],
+  plugins: ['@isograph'],
 };
 ```
 
@@ -107,17 +107,17 @@ Isograph requires some initial setup to teach it how to make API calls to your G
 In our case, we can do that by adding the following to the top of our `src/pages/_app.tsx`:
 
 ```tsx
-import { setNetwork } from "@isograph/react";
+import { setNetwork } from '@isograph/react';
 function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
   let promise = fetch(
-    "https://swapi-graphql.netlify.app/.netlify/functions/index",
+    'https://swapi-graphql.netlify.app/.netlify/functions/index',
     {
-      method: "POST",
+      method: 'POST',
       headers: {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({ query: queryText, variables }),
-    }
+    },
   ).then((response) => response.json());
   return promise;
 }
@@ -137,7 +137,7 @@ TODO replace with Environment section
 Add the following to each page (e.g. to `pages/index.tsx`). Otherwise, NextJS will reuse the value in the store for all network requests, which is a serious privacy liability.
 
 ```tsx
-import { clearStore } from "@isograph/react";
+import { clearStore } from '@isograph/react';
 export async function getServerSideProps() {
   clearStore();
   return { props: {} };
@@ -149,9 +149,9 @@ export async function getServerSideProps() {
 **Finally**, we can get to writing some Isograph components. Let's define the Isograph resolver that "is" your home route component! Create a file in `src/components/EpisodeList.tsx` containing the following:
 
 ```tsx
-import React from "react";
-import { iso } from "@isograph/react";
-import { ResolverParameterType as EpisodeListParams } from "@iso/Root/EpisodeList/reader.isograph";
+import React from 'react';
+import { iso } from '@isograph/react';
+import { ResolverParameterType as EpisodeListParams } from '@iso/Root/EpisodeList/reader.isograph';
 
 export const EpisodeList = iso<EpisodeListParams>`
   # Note: normally, the "root" field is called Query, but in the Star Wars API
@@ -170,7 +170,7 @@ export const EpisodeList = iso<EpisodeListParams>`
 function EpisodeListComponent({ data }: EpisodeListParams) {
   const filmsSorted = data.allFilms?.films ?? [];
   filmsSorted.sort((film1, film2) =>
-    film1?.episodeID > film2?.episodeID ? 1 : -1
+    film1?.episodeID > film2?.episodeID ? 1 : -1,
   );
 
   return (
@@ -194,13 +194,13 @@ That's a lot of types! Soon, it won't be necessary to provide them.
 That Isograph component isn't doing much on its own. We need to provide a way to fetch its data and render the results. So, create a file at `src/components/EpisodeListRoute.tsx`, and make its contents:
 
 ```tsx
-import React from "react";
-import { iso, useLazyReference, read } from "@isograph/react";
-import EpisodeListEntrypoint from "@iso/Root/EpisodeList/entrypoint.isograph";
+import React from 'react';
+import { iso, useLazyReference, read } from '@isograph/react';
+import EpisodeListEntrypoint from '@iso/Root/EpisodeList/entrypoint.isograph';
 
 export default function EpisodeListRoute() {
   return (
-    <React.Suspense fallback={"Data is loading..."}>
+    <React.Suspense fallback={'Data is loading...'}>
       <Inner />
     </React.Suspense>
   );
@@ -211,7 +211,7 @@ function Inner() {
     iso`entrypoint Root.EpisodeList`,
     {
       /* query variables */
-    }
+    },
   );
 
   const Component = useRead(queryReference);
@@ -223,7 +223,7 @@ function Inner() {
 and change `pages/index.tsx` to be:
 
 ```tsx
-import EpisodeListRoute from "@/components/EpisodeListRoute";
+import EpisodeListRoute from '@/components/EpisodeListRoute';
 
 export default function Home() {
   return <EpisodeListRoute />;
@@ -247,9 +247,9 @@ In the network tab, you'll see a network request to `https://swapi-graphql.netli
 Next, you might create another Isograph component. For example, if you create a file `src/components/person_component.tsx` as:
 
 ```tsx
-import React from "react";
-import { iso } from "@isograph/react";
-import { ResolverParameterType as CharacterSummaryParams } from "@iso/Person/CharacterSummary/reader.isograph";
+import React from 'react';
+import { iso } from '@isograph/react';
+import { ResolverParameterType as CharacterSummaryParams } from '@iso/Person/CharacterSummary/reader.isograph';
 
 export const CharacterSummary = iso<CharacterSummaryParams>`
   Person.CharacterSummary @component {
@@ -272,9 +272,9 @@ function PersonComponentComponent({ data }: CharacterSummaryParams) {
 You might use this component by modifying `EpisodeList.tsx` to be the following. Note the two new sections:
 
 ```tsx
-import React from "react";
-import { iso } from "@isograph/react";
-import { ResolverParameterType as EpisodeListParams } from "@iso/Root/EpisodeList/reader.isograph";
+import React from 'react';
+import { iso } from '@isograph/react';
+import { ResolverParameterType as EpisodeListParams } from '@iso/Root/EpisodeList/reader.isograph';
 
 export const EpisodeList = iso<EpisodeListParams>`
   # Note: normally, the "root" field is called Query, but in the Star Wars API
@@ -300,7 +300,7 @@ export const EpisodeList = iso<EpisodeListParams>`
 function EpisodeListComponent({ data }: EpisodeListParams) {
   const filmsSorted = data.allFilms?.films ?? [];
   filmsSorted.sort((film1, film2) =>
-    film1?.episodeID > film2?.episodeID ? 1 : -1
+    film1?.episodeID > film2?.episodeID ? 1 : -1,
   );
 
   return (

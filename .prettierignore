@@ -2,6 +2,5 @@
 **/build/**
 **/target/**
 **/pnpm-lock.yaml
-**/*.md
 **/.docusaurus/**
 **/dist/**

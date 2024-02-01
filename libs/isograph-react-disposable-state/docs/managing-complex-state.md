@@ -61,7 +61,7 @@ const addItem2ToState = () => {
 
   // get a new active reference to the existing item1
   const [item1ActiveReference, disposeItem1ActiveReference] = nullthrows(
-    state[0].cloneIfNotDisposed()
+    state[0].cloneIfNotDisposed(),
   );
   setState([item1ActiveReference, item2ActiveReference], () => {
     disposeItem1ActiveReference();
@@ -94,7 +94,7 @@ const removeItem2FromState = () => {
 
   // get a new active reference to the existing item1
   const [item1ActiveReference, disposeItem1ActiveReference] = nullthrows(
-    state[0].cloneIfNotDisposed()
+    state[0].cloneIfNotDisposed(),
   );
   setState([item1ActiveReference], () => {
     disposeItem1ActiveReference();
@@ -133,12 +133,12 @@ For example:
   ```ts
   type MyState =
     | {
-        kind: "ConnectedToDatabase";
+        kind: 'ConnectedToDatabase';
         connectionToDatabase: ConnectionToDatabase;
         currentUserId: number;
       }
     | {
-        kind: "DisconnectedFromDatabase";
+        kind: 'DisconnectedFromDatabase';
       };
   ```
 

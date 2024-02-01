@@ -96,7 +96,7 @@ function PetTaglineInputComponent(props: PetUpdaterParams) {
         value={tagline}
         onChange={(e) => setTagline(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter") {
+          if (e.key === 'Enter') {
             updateTagline();
           }
         }}

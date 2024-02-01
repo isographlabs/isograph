@@ -14,7 +14,7 @@ The Isograph compiler generates artifacts in the `artifact_directory` folder. Th
 
 The reader artifact is generated at `TypeName/field_name/reader.isograph.ts`.
 
-A reader artifact contains an import of the resolver function (i.e. the `Query/HomePage/reader.isograph.ts` will contain an import of `` export const HomePage = iso` Query.HomePage { ... }`  ``) and the reader AST. It will als contain some types that ensure that whatever data is passed to the resolver function is accessed in a typesafe fashion.
+A reader artifact contains an import of the resolver function (i.e. the `Query/HomePage/reader.isograph.ts` will contain an import of ``export const HomePage = iso` Query.HomePage { ... }` ``) and the reader AST. It will als contain some types that ensure that whatever data is passed to the resolver function is accessed in a typesafe fashion.
 
 The reader AST is a data structure that is used to read out precisely the fields and resolvers that that resolver function selected.
 

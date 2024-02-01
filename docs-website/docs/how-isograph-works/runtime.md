@@ -19,7 +19,7 @@ You should also see [the quickstart guide](../../quickstart) for more one-time s
 
 In order to make a network request and read the results, the following occurs:
 
-- the developer calls `` const {queryReference} = useLazyReference<typeof HomePageEntrypoint>(iso`entrypoint Query.HomePage`); ``. This will make the network request when that component renders.
+- the developer calls ``const {queryReference} = useLazyReference<typeof HomePageEntrypoint>(iso`entrypoint Query.HomePage`);``. This will make the network request when that component renders.
   - The babel plugin changes the `iso` entrypoint call to a `require` call that imports the generated `Query/HomePage/entrypoint.isograph.ts` file.
 - The developer calls `const HomePage = useRead(queryReference);`. This will attempt to read the `Query.HomePage` resolver. This may suspend. In particular, if there isn't enough data in the store to read all of the data required by the `HomePage` resolver, the call to `read` will suspend.
   - It is a good practice to pass the `queryReference` to a child component, which is wrapped in a `<Suspense>` boundary. This isn't required for `useLazyReference` to work correctly, but it does eliminate some edge cases (namely, if the network response takes too long to come back), and does make refetching on error easier.

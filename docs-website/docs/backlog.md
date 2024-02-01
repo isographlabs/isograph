@@ -20,7 +20,6 @@
 - Special fields (or syntax?) for type casts (i.e. type refinement)
 - subscriptions should not be a global
 
-
 ## Feature backlog
 
 - garbage collection
