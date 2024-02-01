@@ -1,7 +1,7 @@
 import React from 'react';
 import { iso } from '@isograph/react';
 
-import { ResolverParameterType as PullRequestProps } from '@iso/PullRequest/PullRequestLink/reader.isograph';
+import { ResolverParameterType as PullRequestProps } from '@iso/PullRequest/PullRequestLink/reader';
 
 import { Link } from '@mui/material';
 

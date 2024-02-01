@@ -1,7 +1,7 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { UserPage as resolver } from '../../../isograph-components/UserRoute.tsx';
-import Query__Header, { ReadOutType as Query__Header__outputType } from '../Header/reader.isograph';
-import Query__UserDetail, { ReadOutType as Query__UserDetail__outputType } from '../UserDetail/reader.isograph';
+import { RepositoryPage as resolver } from '../../../isograph-components/RepositoryRoute.tsx';
+import Query__Header, { ReadOutType as Query__Header__outputType } from '../Header/reader';
+import Query__RepositoryDetail, { ReadOutType as Query__RepositoryDetail__outputType } from '../RepositoryDetail/reader';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
@@ -18,9 +18,9 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
   {
     kind: "Resolver",
-    alias: "UserDetail",
+    alias: "RepositoryDetail",
     arguments: null,
-    readerArtifact: Query__UserDetail,
+    readerArtifact: Query__RepositoryDetail,
     usedRefetchQueries: [],
   },
 ];
@@ -28,7 +28,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 export type ResolverParameterType = { data:
 {
   Header: Query__Header__outputType,
-  UserDetail: Query__UserDetail__outputType,
+  RepositoryDetail: Query__RepositoryDetail__outputType,
 },
 [index: string]: any };
 
@@ -39,7 +39,7 @@ const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOut
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
-  variant: { kind: "Component", componentName: "Query.UserPage" },
+  variant: { kind: "Component", componentName: "Query.RepositoryPage" },
 };
 
 export default artifact;

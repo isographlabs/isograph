@@ -437,9 +437,9 @@ impl ResolverTypeAndField {
             field_name,
         } = *self;
         if type_name != current_file_type_name {
-            format!("../../{type_name}/{field_name}/{}.isograph", *READER)
+            format!("../../{type_name}/{field_name}/{}", *READER)
         } else {
-            format!("../{field_name}/{}.isograph", *READER)
+            format!("../{field_name}/{}", *READER)
         }
     }
 }

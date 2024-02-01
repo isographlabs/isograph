@@ -1,6 +1,7 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Header as resolver } from '../../../isograph-components/header.tsx';
-import User__Avatar, { ReadOutType as User__Avatar__outputType } from '../../User/Avatar/reader.isograph';
+import { HomePageList as resolver } from '../../../isograph-components/HomePageList.tsx';
+import User__RepositoryList, { ReadOutType as User__RepositoryList__outputType } from '../../User/RepositoryList/reader';
+import User____refetch, { ReadOutType as User____refetch__outputType } from '../../User/__refetch/reader';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
@@ -16,16 +17,28 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     selections: [
       {
         kind: "Scalar",
+        fieldName: "login",
+        alias: null,
+        arguments: null,
+      },
+      {
+        kind: "Scalar",
         fieldName: "name",
         alias: null,
         arguments: null,
       },
       {
         kind: "Resolver",
-        alias: "Avatar",
+        alias: "RepositoryList",
         arguments: null,
-        readerArtifact: User__Avatar,
+        readerArtifact: User__RepositoryList,
         usedRefetchQueries: [],
+      },
+      {
+        kind: "RefetchField",
+        alias: "__refetch",
+        readerArtifact: User____refetch,
+        refetchQuery: 0,
       },
     ],
   },
@@ -34,8 +47,10 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 export type ResolverParameterType = { data:
 {
   viewer: {
+    login: string,
     name: (string | null),
-    Avatar: User__Avatar__outputType,
+    RepositoryList: User__RepositoryList__outputType,
+    __refetch: User____refetch__outputType,
   },
 },
 [index: string]: any };
@@ -47,7 +62,7 @@ const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOut
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
-  variant: { kind: "Component", componentName: "Query.Header" },
+  variant: { kind: "Component", componentName: "Query.HomePageList" },
 };
 
 export default artifact;

@@ -1,12 +1,15 @@
 import type {IsographEntrypoint, NormalizationAst, RefetchQueryArtifactWrapper} from '@isograph/react';
-import type {ReadFromStoreType, ResolverParameterType, ReadOutType} from './reader.isograph';
-import readerResolver from './reader.isograph';
-const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [];
+import type {ReadFromStoreType, ResolverParameterType, ReadOutType} from './reader';
+import readerResolver from './reader';
+import refetchQuery0 from './__refetch__0';
+const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [{ artifact: refetchQuery0, allowedVariables: ["first", ] }, ];
 
-const queryText = 'query UserPage ($first: Int!, $userLogin: String!) {\
-  user____login___v_userLogin: user(login: $userLogin) {\
-    id,\
+const queryText = 'query HomePage ($first: Int!) {\
+  viewer {\
+    login,\
+    avatarUrl,\
     name,\
+    id,\
     repositories____last___l_10: repositories(last: 10) {\
       edges {\
         node {\
@@ -30,32 +33,32 @@ const queryText = 'query UserPage ($first: Int!, $userLogin: String!) {\
       },\
     },\
   },\
-  viewer {\
-    id,\
-    avatarUrl,\
-    name,\
-  },\
 }';
 
 const normalizationAst: NormalizationAst = [
   {
     kind: "Linked",
-    fieldName: "user",
-    arguments: [
-      [
-        "login",
-        { kind: "Variable", name: "userLogin" },
-      ],
-    ],
+    fieldName: "viewer",
+    arguments: null,
     selections: [
       {
         kind: "Scalar",
-        fieldName: "id",
+        fieldName: "login",
+        arguments: null,
+      },
+      {
+        kind: "Scalar",
+        fieldName: "avatarUrl",
         arguments: null,
       },
       {
         kind: "Scalar",
         fieldName: "name",
+        arguments: null,
+      },
+      {
+        kind: "Scalar",
+        fieldName: "id",
         arguments: null,
       },
       {
@@ -164,28 +167,6 @@ const normalizationAst: NormalizationAst = [
             ],
           },
         ],
-      },
-    ],
-  },
-  {
-    kind: "Linked",
-    fieldName: "viewer",
-    arguments: null,
-    selections: [
-      {
-        kind: "Scalar",
-        fieldName: "id",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "avatarUrl",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "name",
-        arguments: null,
       },
     ],
   },

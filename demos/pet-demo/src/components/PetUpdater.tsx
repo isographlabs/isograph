@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { iso } from '@isograph/react';
 import { MenuItem, Select, Button, Input, Box } from '@mui/material';
 
-import { ResolverParameterType as PetUpdaterParams } from '@iso/Pet/PetUpdater/reader.isograph';
+import { ResolverParameterType as PetUpdaterParams } from '@iso/Pet/PetUpdater/reader';
 import { PetId } from './router';
 
 export const PetUpdater = iso<PetUpdaterParams>`

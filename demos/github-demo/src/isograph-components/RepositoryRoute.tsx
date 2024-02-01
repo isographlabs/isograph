@@ -1,8 +1,8 @@
 import React from 'react';
 import { iso, useLazyReference, useRead } from '@isograph/react';
 import { Container } from '@mui/material';
-import { ResolverParameterType as RepositoryPageParams } from '@iso/Query/RepositoryPage/reader.isograph';
-import RepositoryPageEntrypoint from '@iso/Query/RepositoryPage/entrypoint.isograph';
+import { ResolverParameterType as RepositoryPageParams } from '@iso/Query/RepositoryPage/reader';
+import RepositoryPageEntrypoint from '@iso/Query/RepositoryPage/entrypoint';
 
 import {
   FullPageLoading,

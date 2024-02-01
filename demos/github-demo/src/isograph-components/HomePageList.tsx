@@ -1,5 +1,5 @@
 import { iso } from '@isograph/react';
-import type { ResolverParameterType as HomePageListParams } from '@iso/Query/HomePageList/reader.isograph';
+import type { ResolverParameterType as HomePageListParams } from '@iso/Query/HomePageList/reader';
 import { RepoGitHubLink } from './RepoGitHubLink';
 import { Button } from '@mui/material';
 

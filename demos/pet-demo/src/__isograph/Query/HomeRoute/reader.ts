@@ -1,6 +1,6 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { UserDetail as resolver } from '../../../isograph-components/UserDetail.tsx';
-import User__RepositoryList, { ReadOutType as User__RepositoryList__outputType } from '../../User/RepositoryList/reader.isograph';
+import { HomeRoute as resolver } from '../../../components/HomeRoute.tsx';
+import Pet__PetSummaryCard, { ReadOutType as Pet__PetSummaryCard__outputType } from '../../Pet/PetSummaryCard/reader';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
@@ -10,26 +10,21 @@ export type ReadFromStoreType = ResolverParameterType;
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Linked",
-    fieldName: "user",
+    fieldName: "pets",
     alias: null,
-    arguments: [
-      [
-        "login",
-        { kind: "Variable", name: "userLogin" },
-      ],
-    ],
+    arguments: null,
     selections: [
       {
         kind: "Scalar",
-        fieldName: "name",
+        fieldName: "id",
         alias: null,
         arguments: null,
       },
       {
         kind: "Resolver",
-        alias: "RepositoryList",
+        alias: "PetSummaryCard",
         arguments: null,
-        readerArtifact: User__RepositoryList,
+        readerArtifact: Pet__PetSummaryCard,
         usedRefetchQueries: [],
       },
     ],
@@ -38,10 +33,10 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 
 export type ResolverParameterType = { data:
 {
-  user: ({
-    name: (string | null),
-    RepositoryList: User__RepositoryList__outputType,
-  } | null),
+  pets: ({
+    id: string,
+    PetSummaryCard: Pet__PetSummaryCard__outputType,
+  })[],
 },
 [index: string]: any };
 
@@ -52,7 +47,7 @@ const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOut
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
-  variant: { kind: "Component", componentName: "Query.UserDetail" },
+  variant: { kind: "Component", componentName: "Query.HomeRoute" },
 };
 
 export default artifact;

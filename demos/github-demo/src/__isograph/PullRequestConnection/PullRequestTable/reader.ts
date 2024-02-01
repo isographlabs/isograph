@@ -1,8 +1,8 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
 import { PullRequestTable as resolver } from '../../../isograph-components/PullRequestTable.tsx';
-import Actor__UserLink, { ReadOutType as Actor__UserLink__outputType } from '../../Actor/UserLink/reader.isograph';
-import PullRequest__PullRequestLink, { ReadOutType as PullRequest__PullRequestLink__outputType } from '../../PullRequest/PullRequestLink/reader.isograph';
-import PullRequest__createdAtFormatted, { ReadOutType as PullRequest__createdAtFormatted__outputType } from '../../PullRequest/createdAtFormatted/reader.isograph';
+import Actor__UserLink, { ReadOutType as Actor__UserLink__outputType } from '../../Actor/UserLink/reader';
+import PullRequest__PullRequestLink, { ReadOutType as PullRequest__PullRequestLink__outputType } from '../../PullRequest/PullRequestLink/reader';
+import PullRequest__createdAtFormatted, { ReadOutType as PullRequest__createdAtFormatted__outputType } from '../../PullRequest/createdAtFormatted/reader';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);

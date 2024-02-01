@@ -12,15 +12,15 @@ The Isograph compiler generates artifacts in the `artifact_directory` folder. Th
 
 ## Reader artifacts
 
-The reader artifact is generated at `TypeName/field_name/reader.isograph.ts`.
+The reader artifact is generated at `TypeName/field_name/reader.ts`.
 
-A reader artifact contains an import of the resolver function (i.e. the `Query/HomePage/reader.isograph.ts` will contain an import of ``export const HomePage = iso` Query.HomePage { ... }` ``) and the reader AST. It will als contain some types that ensure that whatever data is passed to the resolver function is accessed in a typesafe fashion.
+A reader artifact contains an import of the resolver function (i.e. the `Query/HomePage/reader.ts` will contain an import of ``export const HomePage = iso` Query.HomePage { ... }` ``) and the reader AST. It will als contain some types that ensure that whatever data is passed to the resolver function is accessed in a typesafe fashion.
 
 The reader AST is a data structure that is used to read out precisely the fields and resolvers that that resolver function selected.
 
 ## Entrypoint artifacts
 
-The entrypoint artifact is generated at `TypeName/field_name/entrypoint.isograph.ts`.
+The entrypoint artifact is generated at `TypeName/field_name/entrypoint.ts`.
 
 An entrypoint (e.g. `iso entrypoint Query.HomePage`) is always associated with a single field (for now, restricted to be the on the `Query` type). The entrypoint artifact contains:
 
@@ -34,7 +34,7 @@ Entrypoints are used to make network requests and write the data back to the Iso
 
 ## Refetch artifacts
 
-Refetch artifacts are generated at `TypeName/field_name/__refetch__${NUMBER}.isograph.ts`. They are used for `__refetch`'s **and** for magic mutation fields.
+Refetch artifacts are generated at `TypeName/field_name/__refetch__${NUMBER}.ts`. They are used for `__refetch`'s **and** for magic mutation fields.
 
 Refetch artifacts can be thought of as entrypoints for a sub-section of a query. They contain:
 

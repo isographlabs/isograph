@@ -166,7 +166,7 @@ checksum = "dc17e449bc7854c50b943d113a98bc0e01dc6585d2c66eaa09ca645ebd8a7e62"
 [[package]]
 name = "common"
 version = "0.0.0"
-source = "git+https://github.com/facebook/relay.git#f53a93272a1d756c60de795090fe70ca9532bb67#f53a93272a1d756c60de795090fe70ca9532bb67"
+source = "git+https://github.com/facebook/relay.git#f53a93272a1d756c60de795090fe70ca9532bb67#bbddbf3b97f374db099632c34b32e7abdee0f39a"
 dependencies = [
  "colored",
  "indexmap",
@@ -338,7 +338,7 @@ checksum = "4271d37baee1b8c7e4b708028c57d816cf9d2434acb33a549475f78c181f6253"
 [[package]]
 name = "graphql-syntax"
 version = "0.0.0"
-source = "git+https://github.com/facebook/relay.git#f53a93272a1d756c60de795090fe70ca9532bb67#f53a93272a1d756c60de795090fe70ca9532bb67"
+source = "git+https://github.com/facebook/relay.git#f53a93272a1d756c60de795090fe70ca9532bb67#bbddbf3b97f374db099632c34b32e7abdee0f39a"
 dependencies = [
  "common",
  "intern",
@@ -460,7 +460,7 @@ dependencies = [
 [[package]]
 name = "intern"
 version = "0.1.0"
-source = "git+https://github.com/facebook/relay.git#f53a93272a1d756c60de795090fe70ca9532bb67#f53a93272a1d756c60de795090fe70ca9532bb67"
+source = "git+https://github.com/facebook/relay.git#f53a93272a1d756c60de795090fe70ca9532bb67#bbddbf3b97f374db099632c34b32e7abdee0f39a"
 dependencies = [
  "fnv",
  "hashbrown 0.12.3",

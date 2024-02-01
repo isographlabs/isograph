@@ -165,7 +165,7 @@ This `IsographEnvironmentProvider` will re-render its children whenever new data
 ```tsx
 import React from 'react';
 import { iso } from '@isograph/react';
-import { ResolverParameterType as EpisodeListParams } from '@iso/Root/EpisodeList/reader.isograph';
+import { ResolverParameterType as EpisodeListParams } from '@iso/Root/EpisodeList/reader';
 
 export const EpisodeList = iso<EpisodeListParams>`
   # Note: normally, the "root" field is called Query, but in the Star Wars API
@@ -210,7 +210,7 @@ That Isograph component isn't doing much on its own. We need to provide a way to
 ```tsx
 import React from 'react';
 import { iso, useLazyReference, read } from '@isograph/react';
-import EpisodeListEntrypoint from '@iso/Root/EpisodeList/entrypoint.isograph';
+import EpisodeListEntrypoint from '@iso/Root/EpisodeList/entrypoint';
 
 export default function EpisodeListRoute() {
   return (
@@ -263,7 +263,7 @@ Next, you might create another Isograph component. For example, if you create a 
 ```tsx
 import React from 'react';
 import { iso } from '@isograph/react';
-import { ResolverParameterType as CharacterSummaryParams } from '@iso/Person/CharacterSummary/reader.isograph';
+import { ResolverParameterType as CharacterSummaryParams } from '@iso/Person/CharacterSummary/reader';
 
 export const CharacterSummary = iso<CharacterSummaryParams>`
   Person.CharacterSummary @component {
@@ -288,7 +288,7 @@ You might use this component by modifying `EpisodeList.tsx` to be the following.
 ```tsx
 import React from 'react';
 import { iso } from '@isograph/react';
-import { ResolverParameterType as EpisodeListParams } from '@iso/Root/EpisodeList/reader.isograph';
+import { ResolverParameterType as EpisodeListParams } from '@iso/Root/EpisodeList/reader';
 
 export const EpisodeList = iso<EpisodeListParams>`
   # Note: normally, the "root" field is called Query, but in the Star Wars API

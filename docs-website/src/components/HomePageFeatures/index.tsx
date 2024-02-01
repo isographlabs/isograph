@@ -71,7 +71,7 @@ import {
   useLazyReference,
   isoFetch,
 } from "@isograph/react";
-import Entrypoint from "@iso/Query/HomePage/entrypoint.isograph";
+import Entrypoint from "@iso/Query/HomePage/entrypoint";
 
 export function HomePageRoute() {
   // Step 1: Make a network request (during render) for the
@@ -97,7 +97,7 @@ export function HomePageRoute() {
 import { iso } from "@isograph/react";
 import {
   ResolverParameterType as HomePageComponentParams,
-} from "@iso/Query/HomePage/reader.isograph";
+} from "@iso/Query/HomePage/reader";
 
 // Step 1: Export the home_page_component and call iso
 export const HomePage = iso<
@@ -132,7 +132,7 @@ function HomePageComponent({ data }: HomePageComponentParams) {
 import { iso } from "@isograph/react";
 import {
   ResolverParameterType as AvatarProps,
-} from "@iso/User/Avatar/reader.isograph";
+} from "@iso/User/Avatar/reader";
 import MyComponentLibraryAvatar from 'my-component-library';
   
 export const Avatar = iso<AvatarProps>${'`'}

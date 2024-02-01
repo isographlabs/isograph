@@ -43,10 +43,8 @@ pub(crate) fn write_to_disk<'schema>(
             }
         })?;
 
-        let absolute_file_path = absolute_directory.join(&format!(
-            "{}.isograph.ts",
-            path_and_content.file_name_prefix
-        ));
+        let absolute_file_path =
+            absolute_directory.join(&format!("{}.ts", path_and_content.file_name_prefix));
         let mut file = File::create(&absolute_file_path).map_err(|e| {
             GenerateArtifactsError::UnableToWriteToArtifactFile {
                 path: absolute_file_path.clone(),

@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { iso, useRead, useLazyReference, subscribe } from '@isograph/react';
 import { Container } from '@mui/material';
 
-import { ResolverParameterType as HomePageComponentParams } from '@iso/Query/HomePage/reader.isograph';
-import HomePageEntrypoint from '@iso/Query/HomePage/entrypoint.isograph';
+import { ResolverParameterType as HomePageComponentParams } from '@iso/Query/HomePage/reader';
+import HomePageEntrypoint from '@iso/Query/HomePage/entrypoint';
 
 import { FullPageLoading, Route } from './GithubDemo';
 import { RepoGitHubLink } from './RepoGitHubLink';

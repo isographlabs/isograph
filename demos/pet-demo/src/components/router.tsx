@@ -1,8 +1,8 @@
 import React from 'react';
 import { Container } from '@mui/material';
 import { useLazyReference, useRead, iso } from '@isograph/react';
-import HomeRouteEntrypoint from '@iso/Query/HomeRoute/entrypoint.isograph';
-import PetDetailRouteEntrypoint from '@iso/Query/PetDetailRoute/entrypoint.isograph';
+import HomeRouteEntrypoint from '@iso/Query/HomeRoute/entrypoint';
+import PetDetailRouteEntrypoint from '@iso/Query/PetDetailRoute/entrypoint';
 
 export type PetId = string;
 

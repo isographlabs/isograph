@@ -6,8 +6,8 @@ import {
   Route,
 } from './GithubDemo';
 
-import { ResolverParameterType as PullRequestComponentProps } from '@iso/Query/PullRequest/reader.isograph';
-import Entrypoint from '@iso/Query/PullRequest/entrypoint.isograph';
+import { ResolverParameterType as PullRequestComponentProps } from '@iso/Query/PullRequest/reader';
+import Entrypoint from '@iso/Query/PullRequest/entrypoint';
 
 import { Container } from '@mui/material';
 

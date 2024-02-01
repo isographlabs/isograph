@@ -18,7 +18,7 @@ It is then used via adding the following to your `.babelrc.js`:
 
 ## Behavior
 
-The babel plugin will replace calls to `iso` entrypoint with require calls to the appropriate `entrypoint.isograph.js` file.
+The babel plugin will replace calls to `iso` entrypoint with require calls to the appropriate `entrypoint.js` file.
 
 ## Requirements
 

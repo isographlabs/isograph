@@ -2,14 +2,14 @@ import React from 'react';
 import { iso, useLazyReference, useRead } from '@isograph/react';
 import { Container } from '@mui/material';
 
-import { ResolverParameterType as UserRouteComponentParams } from '@iso/Query/UserPage/reader.isograph';
+import { ResolverParameterType as UserRouteComponentParams } from '@iso/Query/UserPage/reader';
 import {
   FullPageLoading,
   Route,
   type UserRoute as UserRouteType,
 } from './GithubDemo';
 
-import Entrypoint from '@iso/Query/UserPage/entrypoint.isograph';
+import Entrypoint from '@iso/Query/UserPage/entrypoint';
 
 export const UserPage = iso<UserRouteComponentParams>`
   field Query.UserPage($first: Int!, $userLogin: String!) @component {

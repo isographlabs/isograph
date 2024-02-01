@@ -1,6 +1,6 @@
 import type {IsographEntrypoint, NormalizationAst, RefetchQueryArtifactWrapper} from '@isograph/react';
-import type {ReadFromStoreType, ResolverParameterType, ReadOutType} from './reader.isograph';
-import readerResolver from './reader.isograph';
+import type {ReadFromStoreType, ResolverParameterType, ReadOutType} from './reader';
+import readerResolver from './reader';
 const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [];
 
 const queryText = 'query RepositoryPage ($repositoryName: String!, $repositoryOwner: String!, $first: Int!) {\

@@ -1,9 +1,9 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
 import { PetDetailRoute as resolver } from '../../../components/PetDetailRoute.tsx';
-import Pet__PetBestFriendCard, { ReadOutType as Pet__PetBestFriendCard__outputType } from '../../Pet/PetBestFriendCard/reader.isograph';
-import Pet__PetCheckinsCard, { ReadOutType as Pet__PetCheckinsCard__outputType } from '../../Pet/PetCheckinsCard/reader.isograph';
-import Pet__PetPhraseCard, { ReadOutType as Pet__PetPhraseCard__outputType } from '../../Pet/PetPhraseCard/reader.isograph';
-import Pet__PetTaglineCard, { ReadOutType as Pet__PetTaglineCard__outputType } from '../../Pet/PetTaglineCard/reader.isograph';
+import Pet__PetBestFriendCard, { ReadOutType as Pet__PetBestFriendCard__outputType } from '../../Pet/PetBestFriendCard/reader';
+import Pet__PetCheckinsCard, { ReadOutType as Pet__PetCheckinsCard__outputType } from '../../Pet/PetCheckinsCard/reader';
+import Pet__PetPhraseCard, { ReadOutType as Pet__PetPhraseCard__outputType } from '../../Pet/PetPhraseCard/reader';
+import Pet__PetTaglineCard, { ReadOutType as Pet__PetTaglineCard__outputType } from '../../Pet/PetTaglineCard/reader';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);

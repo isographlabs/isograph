@@ -1,6 +1,6 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { HomeRoute as resolver } from '../../../components/HomeRoute.tsx';
-import Pet__PetSummaryCard, { ReadOutType as Pet__PetSummaryCard__outputType } from '../../Pet/PetSummaryCard/reader.isograph';
+import { UserDetail as resolver } from '../../../isograph-components/UserDetail.tsx';
+import User__RepositoryList, { ReadOutType as User__RepositoryList__outputType } from '../../User/RepositoryList/reader';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
@@ -10,21 +10,26 @@ export type ReadFromStoreType = ResolverParameterType;
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
     kind: "Linked",
-    fieldName: "pets",
+    fieldName: "user",
     alias: null,
-    arguments: null,
+    arguments: [
+      [
+        "login",
+        { kind: "Variable", name: "userLogin" },
+      ],
+    ],
     selections: [
       {
         kind: "Scalar",
-        fieldName: "id",
+        fieldName: "name",
         alias: null,
         arguments: null,
       },
       {
         kind: "Resolver",
-        alias: "PetSummaryCard",
+        alias: "RepositoryList",
         arguments: null,
-        readerArtifact: Pet__PetSummaryCard,
+        readerArtifact: User__RepositoryList,
         usedRefetchQueries: [],
       },
     ],
@@ -33,10 +38,10 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 
 export type ResolverParameterType = { data:
 {
-  pets: ({
-    id: string,
-    PetSummaryCard: Pet__PetSummaryCard__outputType,
-  })[],
+  user: ({
+    name: (string | null),
+    RepositoryList: User__RepositoryList__outputType,
+  } | null),
 },
 [index: string]: any };
 
@@ -47,7 +52,7 @@ const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOut
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
-  variant: { kind: "Component", componentName: "Query.HomeRoute" },
+  variant: { kind: "Component", componentName: "Query.UserDetail" },
 };
 
 export default artifact;

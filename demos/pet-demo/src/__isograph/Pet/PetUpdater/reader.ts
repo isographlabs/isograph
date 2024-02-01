@@ -1,7 +1,7 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
 import { PetUpdater as resolver } from '../../../components/PetUpdater.tsx';
-import Pet____set_pet_best_friend, { ReadOutType as Pet____set_pet_best_friend__outputType } from '../__set_pet_best_friend/reader.isograph';
-import Pet____set_pet_tagline, { ReadOutType as Pet____set_pet_tagline__outputType } from '../__set_pet_tagline/reader.isograph';
+import Pet____set_pet_best_friend, { ReadOutType as Pet____set_pet_best_friend__outputType } from '../__set_pet_best_friend/reader';
+import Pet____set_pet_tagline, { ReadOutType as Pet____set_pet_tagline__outputType } from '../__set_pet_tagline/reader';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);

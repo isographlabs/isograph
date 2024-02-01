@@ -58,7 +58,7 @@ function compileImportStatement(t, path, type, field, artifactType, config) {
   const artifactDirectory = pathModule.join(cwd, config.artifact_directory);
 
   const fileToArtifactDir = pathModule.relative(folder, artifactDirectory);
-  const artifactDirToArtifact = `/__isograph/${type}/${field}/${artifactType}.isograph.ts`;
+  const artifactDirToArtifact = `/__isograph/${type}/${field}/${artifactType}.ts`;
   const fileToArtifact = pathModule.join(
     fileToArtifactDir,
     artifactDirToArtifact,

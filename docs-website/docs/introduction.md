@@ -56,7 +56,7 @@ So, if the compiler encounters ``iso`entrypoint Query.UserList `;``, it would ge
 For example, the data might be fetched during render as follows:
 
 ```js
-const UserListPageEntrypoint = require('@iso/Query/UserList/entrypoint.isograph');
+const UserListPageEntrypoint = require('@iso/Query/UserList/entrypoint');
 
 function UserListPageRoute() {
   const queryVariables = {};

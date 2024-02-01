@@ -20,8 +20,8 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
         format!(
             "import type {{IsographEntrypoint, \
             NormalizationAst, RefetchQueryArtifactWrapper}} from '@isograph/react';\n\
-            import type {{ReadFromStoreType, ResolverParameterType, ReadOutType}} from './reader.isograph';\n\
-            import readerResolver from './reader.isograph';\n\
+            import type {{ReadFromStoreType, ResolverParameterType, ReadOutType}} from './reader';\n\
+            import readerResolver from './reader';\n\
             {refetch_query_artifact_import}\n\n\
             const queryText = '{query_text}';\n\n\
             const normalizationAst: NormalizationAst = {normalization_ast};\n\

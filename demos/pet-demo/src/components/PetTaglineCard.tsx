@@ -2,7 +2,7 @@ import React from 'react';
 import { iso } from '@isograph/react';
 import { Card, CardContent } from '@mui/material';
 
-import { ResolverParameterType as PetTaglineCardParams } from '@iso/Pet/PetTaglineCard/reader.isograph';
+import { ResolverParameterType as PetTaglineCardParams } from '@iso/Pet/PetTaglineCard/reader';
 
 export const PetTaglineCard = iso<PetTaglineCardParams>`
 field Pet.PetTaglineCard @component {

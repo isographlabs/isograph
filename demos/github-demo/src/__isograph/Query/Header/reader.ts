@@ -1,7 +1,6 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { HomePageList as resolver } from '../../../isograph-components/HomePageList.tsx';
-import User__RepositoryList, { ReadOutType as User__RepositoryList__outputType } from '../../User/RepositoryList/reader.isograph';
-import User____refetch, { ReadOutType as User____refetch__outputType } from '../../User/__refetch/reader.isograph';
+import { Header as resolver } from '../../../isograph-components/header.tsx';
+import User__Avatar, { ReadOutType as User__Avatar__outputType } from '../../User/Avatar/reader';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
@@ -17,28 +16,16 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
     selections: [
       {
         kind: "Scalar",
-        fieldName: "login",
-        alias: null,
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
         fieldName: "name",
         alias: null,
         arguments: null,
       },
       {
         kind: "Resolver",
-        alias: "RepositoryList",
+        alias: "Avatar",
         arguments: null,
-        readerArtifact: User__RepositoryList,
+        readerArtifact: User__Avatar,
         usedRefetchQueries: [],
-      },
-      {
-        kind: "RefetchField",
-        alias: "__refetch",
-        readerArtifact: User____refetch,
-        refetchQuery: 0,
       },
     ],
   },
@@ -47,10 +34,8 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
 export type ResolverParameterType = { data:
 {
   viewer: {
-    login: string,
     name: (string | null),
-    RepositoryList: User__RepositoryList__outputType,
-    __refetch: User____refetch__outputType,
+    Avatar: User__Avatar__outputType,
   },
 },
 [index: string]: any };
@@ -62,7 +47,7 @@ const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOut
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
-  variant: { kind: "Component", componentName: "Query.HomePageList" },
+  variant: { kind: "Component", componentName: "Query.Header" },
 };
 
 export default artifact;

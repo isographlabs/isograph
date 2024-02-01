@@ -674,7 +674,7 @@ fn generate_refetch_query_artifact_imports(
         root_refetched_paths.iter().enumerate()
     {
         output.push_str(&format!(
-            "import refetchQuery{} from './__refetch__{}.isograph';\n",
+            "import refetchQuery{} from './__refetch__{}';\n",
             query_index, query_index,
         ));
         let variable_names_str = variable_names_to_string(&variables);
