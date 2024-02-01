@@ -34,7 +34,7 @@ const FeatureList = [
     ),
   },
   {
-    title: 'Tremendous stability',
+    title: 'Build with confidence',
     description: (
       <>
         <div>
