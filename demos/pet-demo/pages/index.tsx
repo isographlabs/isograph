@@ -1,74 +1,8 @@
 import Head from 'next/head';
-import {
-  DataId,
-  Link,
-  StoreRecord,
-  defaultMissingFieldHandler,
-  IsographEnvironmentProvider,
-  createIsographEnvironment,
-  createIsographStore,
-} from '@isograph/react';
 import { GraphQLConfDemo } from '@/src/components/router';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import React from 'react';
-
-function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
-  let promise = fetch('http://localhost:4000/graphql', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query: queryText, variables }),
-  }).then((response) => response.json());
-  return promise;
-}
-const missingFieldHandler = (
-  storeRecord: StoreRecord,
-  root: DataId,
-  fieldName: string,
-  arguments_: { [index: string]: any } | null,
-  variables: { [index: string]: any } | null,
-): Link | undefined => {
-  if (typeof window !== 'undefined' && window.__LOG) {
-    console.log('Missing field handler called', {
-      storeRecord,
-      root,
-      fieldName,
-      arguments_,
-      variables,
-    });
-  }
-  const val = defaultMissingFieldHandler(
-    storeRecord,
-    root,
-    fieldName,
-    arguments_,
-    variables,
-  );
-  if (val == undefined) {
-    // This is the custom missing field handler
-    //
-    // N.B. this **not** correct. We need to pass the correct variables/args here.
-    // But it works for this demo.
-    if (fieldName === 'pet' && variables?.id != null && root === '__ROOT') {
-      return { __link: variables.id };
-    }
-  } else {
-    return val;
-  }
-};
 
 export default function Home() {
-  const environment = React.useMemo(
-    () =>
-      createIsographEnvironment(
-        createIsographStore(),
-        makeNetworkRequest,
-        missingFieldHandler,
-      ),
-    [],
-  );
-
   return (
     <>
       <Head>
@@ -76,9 +10,7 @@ export default function Home() {
         <meta name="description" content="Demo for GraphQL Conf 2023" />
       </Head>
       <ThemeProvider theme={theme}>
-        <IsographEnvironmentProvider environment={environment}>
-          <GraphQLConfDemo />
-        </IsographEnvironmentProvider>
+        <GraphQLConfDemo />
       </ThemeProvider>
     </>
   );
