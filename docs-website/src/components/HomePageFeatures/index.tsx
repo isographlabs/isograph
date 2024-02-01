@@ -69,7 +69,7 @@ const CodeBlocks = {
 import {
   useRead,
   useLazyReference,
-  isoFetch,
+  iso,
 } from "@isograph/react";
 import Entrypoint from "@iso/Query/HomePage/entrypoint";
 
@@ -77,9 +77,9 @@ export function HomePageRoute() {
   // Step 1: Make a network request (during render) for the
   // Query.HomePage client-defined field.
   const { queryReference } = useLazyReference<typeof Entrypoint>(
-    // Note that calling isoFetch here **generates** a query
-    // at compile time!
-    isoFetch${'`'}Query.HomePage${'`'},
+    // Note that this call to iso causes the compiler to generate
+    // a query at compile time!
+    iso${'`'}entrypoint Query.HomePage${'`'},
     { /* Query variables */ }
   );
   
