@@ -233,7 +233,6 @@ export function useLazyReference<TEntrypoint>(
   // Typechecking fails here... TODO investigate
   const cache = getOrCreateCacheForArtifact<ExtractResolverResult<TEntrypoint>>(
     environment,
-    // @ts-expect-error
     entrypoint,
     variables,
   );
