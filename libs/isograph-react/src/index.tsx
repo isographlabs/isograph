@@ -203,7 +203,7 @@ function assertIsEntrypoint<
   if (typeof value === 'function') throw new Error('Not a string');
 }
 
-type ExtractTReadFromStore<Type> =
+type ExtractReadFromStore<Type> =
   Type extends IsographEntrypoint<infer X, any, any> ? X : never;
 type ExtractResolverProps<Type> =
   Type extends IsographEntrypoint<any, infer X, any> ? X : never;
@@ -223,17 +223,19 @@ export function useLazyReference<TEntrypoint>(
   variables: { [key: string]: Variable },
 ): {
   queryReference: FragmentReference<
-    ExtractTReadFromStore<TEntrypoint>,
+    ExtractReadFromStore<TEntrypoint>,
     ExtractResolverProps<TEntrypoint>,
     ExtractResolverResult<TEntrypoint>
   >;
 } {
   const environment = useIsographEnvironment();
-  assertIsEntrypoint(entrypoint);
-  // Typechecking fails here... TODO investigate
+  assertIsEntrypoint<
+    ExtractReadFromStore<TEntrypoint>,
+    ExtractResolverProps<TEntrypoint>,
+    ExtractResolverResult<TEntrypoint>
+  >(entrypoint);
   const cache = getOrCreateCacheForArtifact<ExtractResolverResult<TEntrypoint>>(
     environment,
-    // @ts-expect-error
     entrypoint,
     variables,
   );
@@ -248,8 +250,6 @@ export function useLazyReference<TEntrypoint>(
   return {
     queryReference: {
       kind: 'FragmentReference',
-      // This cannot be fixed until iso has generated types
-      // @ts-expect-error
       readerArtifact: entrypoint.readerArtifact,
       root: ROOT_ID,
       variables,
