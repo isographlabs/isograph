@@ -6,7 +6,6 @@
 
 ## V2 release
 
-- The store, etc. should be stored in context.
 - network error handling
 - components and "realized" resolvers, as well as ways to invalidate them
   - they could also be lazily calculated
@@ -18,7 +17,6 @@
   - use serde for this?
 - Handle unions etc. correctly
 - Special fields (or syntax?) for type casts (i.e. type refinement)
-- subscriptions should not be a global
 
 ## Feature backlog
 
@@ -36,10 +34,10 @@
 - Defer, etc.
 - Pagination.
 - Types for variables
-- Inferred types for iso params w/iso overload
 - typed IDs
-- special fetch fields
 - consider resolvers that return functions only read data when called, i.e. do not eagerly read. Consider whether this can be achieved with omitting a !, i.e. foo_resolver! returns TReadFromStore, foo_resolver returns a `ReadDataResult TReadFromStore`
+- refetch and mutation fields should return something you can suspend on or whatnot.
+- queries in flight as store fields for suspense
 
 ## Cleanup backlog
 
@@ -89,8 +87,6 @@ type SetBestFriendResponse {
 - Compile to non-GraphQL
 - Actually validate variables
 - Persisted queries
-- Suspense/response for mutations/refetch
-  - this probably means we need mutations to be part of a stateful component
 - Strongly typed ID fields
 - Custom normalizers
   - Garbage collection for custom normalizers by type
@@ -144,8 +140,8 @@ type SetBestFriendResponse {
 - Rationalize WithSpan vs WithLocation
 - Display multiple errors, parse etc. in parallel
 - Do not look in artifact_directory, if project_root contains artifact_directory
-- Do not require that the exported name of an iso is anything in particular.
-  - Can we make the transform add an export if none is found?? Probably!
+- Can we make the babel transform export the iso literal if no export is found?? Probably!
+  - What about unit tests? Should they be able to import these? Maybe? But probably only through isograph, right?
 - SWC plugin
 - plugin options to point to config
 - Namespaces and components installable from external libraries
