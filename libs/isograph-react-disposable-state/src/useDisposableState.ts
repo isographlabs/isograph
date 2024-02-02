@@ -81,6 +81,8 @@ export function useDisposableState<T = never>(
 function tsTests() {
   let x: any;
   const a = useDisposableState(x);
+  // This should be a compiler error, because the generic is inferred to be of
+  // type never. TODO determine why this doesn't break the build!
   // @ts-expect-error
   a.setState(['asdf', () => {}]);
   // @ts-expect-error

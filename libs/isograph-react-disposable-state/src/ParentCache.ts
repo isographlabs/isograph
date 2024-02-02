@@ -79,7 +79,7 @@ export class ParentCache<T> {
     // typescript thinks that cacheItem is any, because it's referenced in the closure.
     const [cacheItem, disposeTemporaryRetain] = pair;
     this.__cacheItem = cacheItem;
-    return [cacheItem, this.__cacheItem.getValue(), disposeTemporaryRetain];
+    return [cacheItem, cacheItem.getValue(), disposeTemporaryRetain];
   }
 
   empty() {

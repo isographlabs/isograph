@@ -7,7 +7,7 @@
   "author": "Isograph Labs",
   "license": "MIT",
   "scripts": {
-    "compile": "rm -rf dist/* && (tsc -p tsconfig.pkg.json || exit 0)",
+    "compile": "rm -rf dist/* && tsc -p tsconfig.pkg.json",
     "compile-watch": "tsc -p tsconfig.pkg.json --watch",
     "test": "echo no tests yet",
     "test-watch": "vitest watch",

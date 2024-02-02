@@ -23,7 +23,7 @@ export function getOrCreateCachedComponent(
   byArgs[stringifiedArgs] =
     byArgs[stringifiedArgs] ??
     (() => {
-      function Component(additionalRuntimeProps) {
+      function Component(additionalRuntimeProps: { [key: string]: any }) {
         const data = readButDoNotEvaluate(environment, {
           kind: 'FragmentReference',
           readerArtifact: readerArtifact,
