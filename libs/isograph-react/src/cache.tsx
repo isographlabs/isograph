@@ -402,7 +402,8 @@ function getStoreKeyChunkForArgumentValue(
     }
     default: {
       // TODO configure eslint to allow unused vars starting with _
-      let _: never = argumentValue;
+      // @ts-expect-error
+      const _: never = argumentValue;
       throw new Error('Unexpected case');
     }
   }
@@ -435,6 +436,7 @@ function getNetworkResponseKey(
           break;
         }
         default: {
+          // @ts-expect-error
           let _: never = argumentValue;
           throw new Error('Unexpected case');
         }

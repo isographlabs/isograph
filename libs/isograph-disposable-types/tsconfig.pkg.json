@@ -3,7 +3,9 @@
   "compilerOptions": {
     "outDir": "./dist/",
     "rootDir": "./src/",
-    "declaration": true
+    "declaration": true,
+    "jsx": "react",
+    "lib": ["es2017", "DOM"]
   },
-  "include": ["src/**/*.ts"]
+  "include": ["./**/*.ts"]
 }

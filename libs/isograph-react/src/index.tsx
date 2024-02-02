@@ -164,6 +164,9 @@ export type ArgumentValue =
       value: any;
     };
 
+// TODO type this better
+type Variable = any;
+
 export type FragmentReference<
   TReadFromStore extends Object,
   TResolverProps,
@@ -176,7 +179,7 @@ export type FragmentReference<
     TResolverResult
   >;
   root: DataId;
-  variables: { [index: string]: string } | null;
+  variables: { [index: string]: Variable } | null;
   // TODO: We should instead have ReaderAst<TResolverProps>
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
@@ -217,7 +220,7 @@ export function useLazyReference<TEntrypoint>(
     // iso`...`. At runtime, we confirm that the passed-in `iso` literal is actually
     // an entrypoint.
     | ((_: any) => any),
-  variables: object,
+  variables: { [key: string]: Variable },
 ): {
   queryReference: FragmentReference<
     ExtractTReadFromStore<TEntrypoint>,
@@ -230,6 +233,7 @@ export function useLazyReference<TEntrypoint>(
   // Typechecking fails here... TODO investigate
   const cache = getOrCreateCacheForArtifact<ExtractResolverResult<TEntrypoint>>(
     environment,
+    // @ts-expect-error
     entrypoint,
     variables,
   );
@@ -237,11 +241,15 @@ export function useLazyReference<TEntrypoint>(
   // TODO add comment explaining why we never use this value
   // @ts-ignore
   const data =
-    useLazyDisposableState<PromiseWrapper<TResolverResult>>(cache).state;
+    useLazyDisposableState<PromiseWrapper<ExtractResolverResult<TEntrypoint>>>(
+      cache,
+    ).state;
 
   return {
     queryReference: {
       kind: 'FragmentReference',
+      // This cannot be fixed until iso has generated types
+      // @ts-expect-error
       readerArtifact: entrypoint.readerArtifact,
       root: ROOT_ID,
       variables,
@@ -289,6 +297,7 @@ export function read<
     if (data.kind === 'MissingData') {
       throw onNextChange(environment);
     } else {
+      // @ts-expect-error This not properly typed yet
       return fragmentReference.readerArtifact.resolver(data.data);
     }
   } else if (variant.kind === 'Component') {
@@ -496,6 +505,8 @@ function readData<TReadFromStore>(
 
           target[field.alias] = field.readerArtifact.resolver(
             environment,
+            // resolvers for refetch fields take 3 args, and this is not reflected in types
+            // @ts-expect-error
             refetchQueryArtifact,
             {
               ...data.data,
@@ -536,6 +547,7 @@ function readData<TReadFromStore>(
 
           target[field.alias] = field.readerArtifact.resolver(
             environment,
+            // @ts-expect-error
             refetchQueryArtifact,
             data.data,
             filterVariables(variables, allowedVariables),
