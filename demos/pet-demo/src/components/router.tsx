@@ -45,13 +45,7 @@ function Router({
     case 'Home':
       return <HomeRouteLoader navigateTo={setRoute} />;
     case 'PetDetail':
-      return (
-        <PetDetailRouteLoader
-          navigateTo={setRoute}
-          route={route}
-          key={route.id}
-        />
-      );
+      return <PetDetailRouteLoader navigateTo={setRoute} route={route} />;
     default:
       const exhaustiveCheck: never = route;
   }
