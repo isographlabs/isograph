@@ -32,10 +32,10 @@ jobs:
             os: macos-latest
             build-name: isograph_cli
             artifact-name: isograph_cli-macos-arm64
-          # - target: x86_64-pc-windows-msvc
-          #   os: windows-latest
-          #   build-name: isograph_cli.exe
-          #   artifact-name: isograph_cli-bin-win-x64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            build-name: isograph_cli.exe
+            artifact-name: isograph_cli-bin-win-x64
     runs-on: ${{ matrix.target.os }}
     steps:
       - uses: actions/checkout@v2
