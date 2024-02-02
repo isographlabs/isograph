@@ -22,7 +22,7 @@ export const formattedCommentCreationDate = iso<IssueCommentProps>`
 
 export const CommentList = iso<CommentListProps>`
   field PullRequest.CommentList @component {
-    comments(last: $last,) {
+    comments(last: $last) {
       edges {
         node {
           id,
