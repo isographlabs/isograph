@@ -10,14 +10,13 @@ const FeatureList = [
     description: (
       <>
         <div>
-          Isograph eliminates the boilerplate of working with GraphQL. No more
-          fussing with props and fragment references — Isograph does all of that
-          for you.
+          Define a component and the fields it needs. Isograph takes care of the
+          rest.
         </div>
         <br />
         <div>
-          All you need to do is to define a component and the fields it needs.
-          Isograph takes care of the rest.
+          Rendering a subcomponent? Just select it, and don't worry about
+          passing any data — Isograph wires everything up for you.
         </div>
       </>
     ),
@@ -30,6 +29,8 @@ const FeatureList = [
           Isograph gives you great performance out of the box &mdash; like a
           single query per view that fetches exactly the right fields.
         </div>
+        <br />
+        <div>Say goodbye to under- and over-fetching.</div>
       </>
     ),
   },
@@ -38,9 +39,8 @@ const FeatureList = [
     description: (
       <>
         <div>
-          Local reasoning is enough to ensure application stability, because the
-          data one component requests cannot affect the data another component
-          receives. So engineers can feel safe moving fast.
+          The fields one component selects do not affect the data another
+          component receives. So engineers can feel safe moving fast.
         </div>
         <br />
         <div>
@@ -99,13 +99,13 @@ import {
   ResolverParameterType as HomePageComponentParams,
 } from "@iso/Query/HomePage/reader";
 
-// Step 1: Export the home_page_component and call iso
+// Step 1: Export the HomePage and call iso
 export const HomePage = iso<
   // Step 2: Pass type parameters to iso. (This will not be
   // necessary soon.)
   HomePageComponentParams,
 >${'`'}
-  # Step 3: Define a field named home_page_component on the
+  # Step 3: Define a field named HomePage on the
   # Query type, and tell the Isograph compiler that it is a
   # React @component
   Query.HomePage @component {
