@@ -43,21 +43,25 @@ export type CacheItemOptions = {
 // TODO convert cacheitem impl to a getter and setter and free functions
 
 /**
+ * CacheItem:
+ *
+ * Terminology:
  * - TRC = Temporary Retain Count
  * - PRC = Permanent Retain Count
  *
- * Rules:
- * - In parent cache <=> TRC > 0
- * - Removed from parent cache <=> TRC === 0
- * - In parent cache => not disposed
- * - Disposed => removed from parent cache + PRC === 0
- *
  * A CacheItem<T> can be in three states:
- * - Removed from the parent cache, item disposed, TRC === 0, PRC === 0
- * - Removed from the parent cache, item not disposed, PRC > 0, TRC === 0
- * - In parent cache, item not disposed, TRC > 0, PRC >= 0
+ *   In parent cache? | Item disposed? | TRC | PRC | Name
+ *   -----------------+----------------+-----+-----+-------------------------------
+ *   In parent cache  | Not disposed   | >0  | >=0 | InParentCacheAndNotDisposed
+ *   Removed          | Not disposed   |  0  |  >0 | NotInParentCacheAndNotDisposed
+ *   Removed          | Disposed       |  0  |   0 | NotInParentCacheAndNotDisposed
  *
- * Valid transitions are:
+ * A cache item can only move down rows. As in, if its in the parent cache,
+ * it can be removed. It can never be replaced in the parent cache. (If a
+ * parent cache becomes full again, it will contain a new CacheItem.) The
+ * contained item can be disposed, but never un-disposed.
+ *
+ * So, the valid transitions are:
  * - InParentCacheAndNotDisposed => NotInParentCacheAndNotDisposed
  * - InParentCacheAndNotDisposed => NotInParentCacheAndDisposed
  * - NotInParentCacheAndNotDisposed => NotInParentCacheAndDisposed
