@@ -18,6 +18,7 @@
     "paths": {
       "@/*": ["./src/*"],
       "@iso/*": ["./src/__isograph/*"],
+      "@iso": ["./src/__isograph/iso.ts"],
     },
     "disableSourceOfProjectReferenceRedirect": false,
   },

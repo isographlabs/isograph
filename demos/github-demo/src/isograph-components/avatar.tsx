@@ -1,4 +1,4 @@
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import { ResolverParameterType as AvatarProps } from '@iso/User/Avatar/reader';
 import { Avatar as MuiAvatar } from '@mui/material';
 

@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 
 import { ResolverParameterType as CommentListProps } from '@iso/PullRequest/CommentList/reader';
 import { ResolverParameterType as IssueCommentProps } from '@iso/IssueComment/formattedCommentCreationDate/reader';

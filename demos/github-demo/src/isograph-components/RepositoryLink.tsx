@@ -1,4 +1,4 @@
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 
 import type { ResolverParameterType as RepositoryLinkParams } from '@iso/Repository/RepositoryLink/reader';
 

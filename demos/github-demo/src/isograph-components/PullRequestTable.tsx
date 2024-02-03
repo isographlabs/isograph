@@ -1,4 +1,4 @@
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import type { ResolverParameterType as PullRequestTableParams } from '@iso/PullRequestConnection/PullRequestTable/reader';
 import type { ResolverParameterType as CreatedAtFormattedType } from '@iso/PullRequest/createdAtFormatted/reader';
 

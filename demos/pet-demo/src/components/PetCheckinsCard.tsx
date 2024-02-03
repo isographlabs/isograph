@@ -1,10 +1,10 @@
 import React from 'react';
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import { Card, CardContent } from '@mui/material';
 
 import { ResolverParameterType as PetCheckinsCardParams } from '@iso/Pet/PetCheckinsCard/reader';
 
-export const PetCheckinsCard = iso<PetCheckinsCardParams>`
+export const PetCheckinsCard = iso(`
   field Pet.PetCheckinsCard @component {
     id,
     checkins {
@@ -13,7 +13,7 @@ export const PetCheckinsCard = iso<PetCheckinsCardParams>`
       time,
     },
   }
-`(PetCheckinsCardComponent);
+`)(PetCheckinsCardComponent);
 
 function PetCheckinsCardComponent(props: PetCheckinsCardParams) {
   return (

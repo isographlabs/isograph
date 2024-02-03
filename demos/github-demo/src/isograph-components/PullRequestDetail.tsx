@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import { ResolverParameterType as PullRequestDetailsProps } from '@iso/Query/PullRequestDetail/reader';
 
 import { Card, CardContent } from '@mui/material';

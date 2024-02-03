@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import { MenuItem, Select, Button, Input, Box } from '@mui/material';
 
 import { ResolverParameterType as PetUpdaterParams } from '@iso/Pet/PetUpdater/reader';
 import { PetId } from './router';
 
-export const PetUpdater = iso<PetUpdaterParams>`
+export const PetUpdater = iso(`
   field Pet.PetUpdater @component {
     __set_pet_best_friend,
     potential_new_best_friends {
@@ -16,7 +16,7 @@ export const PetUpdater = iso<PetUpdaterParams>`
     __set_pet_tagline,
     tagline,
   }
-`(PetUpdaterComponent);
+`)(PetUpdaterComponent);
 
 function PetUpdaterComponent(props: PetUpdaterParams) {
   const [selected, setSelected] = useState<PetId | 'NONE'>('NONE');

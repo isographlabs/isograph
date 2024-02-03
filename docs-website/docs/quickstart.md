@@ -164,7 +164,7 @@ This `IsographEnvironmentProvider` will re-render its children whenever new data
 
 ```tsx
 import React from 'react';
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import { ResolverParameterType as EpisodeListParams } from '@iso/Root/EpisodeList/reader';
 
 // Note: normally, the "root" field is called Query, but in the Star Wars
@@ -266,7 +266,7 @@ A key principle of React is that you can divide your components into subcomponen
 
 ```tsx
 import React from 'react';
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import { ResolverParameterType as CharacterSummaryParams } from '@iso/Person/CharacterSummary/reader';
 
 export const CharacterSummary = iso<CharacterSummaryParams>`
@@ -291,7 +291,7 @@ You might use this component by modifying `EpisodeList.tsx` to be the following.
 
 ```tsx
 import React from 'react';
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import { ResolverParameterType as EpisodeListParams } from '@iso/Root/EpisodeList/reader';
 
 // Note: normally, the "root" field is called Query, but in the Star Wars

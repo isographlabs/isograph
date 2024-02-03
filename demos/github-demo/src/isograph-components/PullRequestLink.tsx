@@ -1,5 +1,5 @@
 import React from 'react';
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 
 import { ResolverParameterType as PullRequestProps } from '@iso/PullRequest/PullRequestLink/reader';
 

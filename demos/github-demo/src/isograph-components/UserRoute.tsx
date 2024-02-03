@@ -1,17 +1,17 @@
-import React from 'react';
-import { iso, useLazyReference, useRead } from '@isograph/react';
-import { Container } from '@mui/material';
+import React from "react";
+import { useLazyReference, useRead } from "@isograph/react";
+import { Container } from "@mui/material";
 
-import { ResolverParameterType as UserRouteComponentParams } from '@iso/Query/UserPage/reader';
+import { ResolverParameterType as UserRouteComponentParams } from "@iso/Query/UserPage/reader";
 import {
   FullPageLoading,
   Route,
   type UserRoute as UserRouteType,
-} from './GithubDemo';
+} from "./GithubDemo";
 
-import Entrypoint from '@iso/Query/UserPage/entrypoint';
+import Entrypoint from "@iso/Query/UserPage/entrypoint";
 
-export const UserPage = iso<UserRouteComponentParams>`
+export const UserPage = iso`
   field Query.UserPage($first: Int!, $userLogin: String!) @component {
     Header,
     UserDetail,
@@ -47,7 +47,7 @@ export function UserRoute({
     {
       userLogin: route.userLogin,
       first: 20,
-    },
+    }
   );
   const Component = useRead(queryReference);
   return <Component route={route} setRoute={setRoute} />;
