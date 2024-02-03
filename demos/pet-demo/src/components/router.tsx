@@ -1,7 +1,7 @@
 import React from 'react';
 import { Container } from '@mui/material';
 import { useLazyReference, useRead } from '@isograph/react';
-import {iso } from '@iso';
+import { iso } from '@iso';
 import HomeRouteEntrypoint from '@iso/Query/HomeRoute/entrypoint';
 import PetDetailRouteEntrypoint from '@iso/Query/PetDetailRoute/entrypoint';
 

@@ -1,20 +1,20 @@
-"use strict";
+'use strict';
 
-const pathModule = require("path");
+const pathModule = require('path');
 
 function compileTag(t, path, config) {
   const callee = path.node.callee;
-  if (t.isIdentifier(callee) && callee.name === "iso" && path.node.arguments) {
+  if (t.isIdentifier(callee) && callee.name === 'iso' && path.node.arguments) {
     const { keyword, type, field } = getTypeAndField(path);
-    if (keyword === "entrypoint") {
+    if (keyword === 'entrypoint') {
       // This throws if the tag is invalid
-      compileImportStatement(t, path, type, field, "entrypoint", config);
-    } else if (keyword === "field") {
+      compileImportStatement(t, path, type, field, 'entrypoint', config);
+    } else if (keyword === 'field') {
       // No-op
       return false;
     } else {
       throw new Error(
-        "Invalid iso tag usage. Expected 'entrypoint' or 'field'."
+        "Invalid iso tag usage. Expected 'entrypoint' or 'field'.",
       );
     }
   }
@@ -22,15 +22,15 @@ function compileTag(t, path, config) {
 }
 
 const typeAndFieldRegex = new RegExp(
-  "\\s*(entrypoint|field)\\s*([^\\.\\s]+)\\.([^\\s\\(]+)",
-  "m"
+  '\\s*(entrypoint|field)\\s*([^\\.\\s]+)\\.([^\\s\\(]+)',
+  'm',
 );
 
 function getTypeAndField(path) {
   const quasis = path.node.arguments[0].quasis;
   if (quasis.length !== 1) {
     throw new Error(
-      "BabelPluginIsograph: Substitutions are not allowed in iso fragments."
+      'BabelPluginIsograph: Substitutions are not allowed in iso fragments.',
     );
   }
 
@@ -43,7 +43,7 @@ function getTypeAndField(path) {
 
   if (keyword == null || type == null || field == null) {
     throw new Error(
-      "Malformed iso literal. I hope the iso compiler failed to accept this literal!"
+      'Malformed iso literal. I hope the iso compiler failed to accept this literal!',
     );
   }
   return { keyword, type, field };
@@ -59,16 +59,16 @@ function compileImportStatement(t, path, type, field, artifactType, config) {
   const artifactDirToArtifact = `/__isograph/${type}/${field}/${artifactType}.ts`;
   const fileToArtifact = pathModule.join(
     fileToArtifactDir,
-    artifactDirToArtifact
+    artifactDirToArtifact,
   );
 
   path.replaceWith(
     t.memberExpression(
-      t.CallExpression(t.Identifier("require"), [
+      t.CallExpression(t.Identifier('require'), [
         t.StringLiteral(fileToArtifact),
       ]),
-      t.Identifier("default")
-    )
+      t.Identifier('default'),
+    ),
   );
 }
 
