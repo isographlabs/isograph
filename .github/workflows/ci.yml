@@ -101,6 +101,8 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Run unit tests
+        run: pnpm -r test
       - name: Build
         run: pnpm -r compile
 
