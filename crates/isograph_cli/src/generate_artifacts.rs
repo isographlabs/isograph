@@ -136,6 +136,7 @@ T
     let fields_overload = schema
         .resolvers
         .iter()
+        .filter(|resolver| matches!(resolver.action_kind, ResolverActionKind::NamedImport(_)))
         .map(|schema_resolver| build_iso_overload_for_schema_resolver(schema_resolver));
     for (import, field_overload) in fields_overload {
         imports.push_str(&import);
@@ -148,14 +149,6 @@ T
     content.push_str(
         "
 export function iso(_queryText: string): IdentityWithParam<any> {
-  // The name `identity` here is a bit of a double entendre.
-  // First, it is the identity function, constrained to operate
-  // on a very specific type. Thus, the value of b Declare`...`(
-  // someFunction) is someFunction. But furthermore, if one
-  // write b Declare`...` and passes no function, the resolver itself
-  // is the identity function. At that point, the types
-  // TResolverParameter and TResolverReturn must be identical.
-
   return function identity<TResolverReturn>(
     x: (param: any) => TResolverReturn,
   ): (param: any) => TResolverReturn {
