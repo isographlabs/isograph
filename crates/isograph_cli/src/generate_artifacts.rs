@@ -67,16 +67,15 @@ pub(crate) fn generate_and_write_artifacts(
 fn build_iso_overload_for_entrypoint<'schema>(
     resolver_field_id: ResolverFieldId,
     schema: &'schema ValidatedSchema,
-) -> String {
+) -> (String, String) {
     let resolver = schema.resolver(resolver_field_id);
     let mut s: String = "".to_string();
     let import = format!(
-        "import {} from '../__isograph/{}/{}/entrypoint.ts'\n",
+        "import entrypoint_{} from '../__isograph/{}/{}/entrypoint.ts'\n",
         resolver.type_and_field.underscore_separated(),
         resolver.type_and_field.type_name,
         resolver.type_and_field.field_name,
     );
-    s.push_str(import.as_str());
     let formatted_field = format!(
         "entrypoint {}.{}",
         resolver.type_and_field.type_name, resolver.type_and_field.field_name
@@ -84,14 +83,14 @@ fn build_iso_overload_for_entrypoint<'schema>(
     s.push_str(&format!(
         "export function iso<T>(
             param: T & MatchesWhitespaceAndString<'{}', T>
-        ): IdentityWithParam<field_{}>;\n",
+        ): IdentityWithParam<typeof entrypoint_{}>;\n",
         formatted_field,
         resolver.type_and_field.underscore_separated(),
     ));
-    s
+    (import, s)
 }
 
-fn build_iso_overload_for_schema_resolver(resolver: &ValidatedSchemaResolver) -> String {
+fn build_iso_overload_for_schema_resolver(resolver: &ValidatedSchemaResolver) -> (String, String) {
     let mut s: String = "".to_string();
     let import = format!(
         "import {{ ResolverParameterType as field_{} }} from './{}/{}/reader.ts'\n",
@@ -99,7 +98,6 @@ fn build_iso_overload_for_schema_resolver(resolver: &ValidatedSchemaResolver) ->
         resolver.type_and_field.type_name,
         resolver.type_and_field.field_name,
     );
-    s.push_str(import.as_str());
     let formatted_field = format!(
         "field {}.{}",
         resolver.type_and_field.type_name, resolver.type_and_field.field_name
@@ -111,40 +109,63 @@ fn build_iso_overload_for_schema_resolver(resolver: &ValidatedSchemaResolver) ->
         formatted_field,
         resolver.type_and_field.underscore_separated(),
     ));
-    s
+    (import, s)
 }
 
 fn build_iso_overload<'schema>(schema: &'schema ValidatedSchema) -> PathAndContent {
-    let mut content: String = String::from(
+    let mut imports = "".to_string();
+    let mut content = String::from(
         "type IdentityWithParam<TParam> = <TResolverReturn>(
-            x: (param: TParam) => TResolverReturn
-        ) => (param: TParam) => TResolverReturn;
+    x: (param: TParam) => TResolverReturn
+) => (param: TParam) => TResolverReturn;
 
-      type WhitespaceCharacter = ' ' | '\n';
-      type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
-        ? Whitespace<In>
-        : In;
-      
-      type MatchesWhitespaceAndString<
-        TString extends string,
-        T
-      > = Whitespace<T> extends `${TString}${string}` ? T : never;
-    ",
+type WhitespaceCharacter = ' ' | '\\n';
+type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
+? Whitespace<In>
+: In;
+
+type MatchesWhitespaceAndString<
+TString extends string,
+T
+> = Whitespace<T> extends `${TString}${string}` ? T : never;",
     );
-    let entrypoint_overloads = schema
+    let entrypoints_overload = schema
         .entrypoints
         .iter()
-        .map(|resolver_field_id| build_iso_overload_for_entrypoint(*resolver_field_id, schema))
-        .collect::<Vec<_>>();
+        .map(|resolver_field_id| build_iso_overload_for_entrypoint(*resolver_field_id, schema));
     let fields_overload = schema
         .resolvers
         .iter()
-        .map(|schema_resolver| build_iso_overload_for_schema_resolver(schema_resolver))
-        .collect::<Vec<_>>();
-    content.push_str(&entrypoint_overloads.join("\n"));
-    content.push_str(&fields_overload.join("\n"));
+        .map(|schema_resolver| build_iso_overload_for_schema_resolver(schema_resolver));
+    for (import, field_overload) in fields_overload {
+        imports.push_str(&import);
+        content.push_str(&field_overload);
+    }
+    for (import, entrypoint_overload) in entrypoints_overload {
+        imports.push_str(&import);
+        content.push_str(&entrypoint_overload);
+    }
+    content.push_str(
+        "
+export function iso(_queryText: string): IdentityWithParam<any> {
+  // The name `identity` here is a bit of a double entendre.
+  // First, it is the identity function, constrained to operate
+  // on a very specific type. Thus, the value of b Declare`...`(
+  // someFunction) is someFunction. But furthermore, if one
+  // write b Declare`...` and passes no function, the resolver itself
+  // is the identity function. At that point, the types
+  // TResolverParameter and TResolverReturn must be identical.
+
+  return function identity<TResolverReturn>(
+    x: (param: any) => TResolverReturn,
+  ): (param: any) => TResolverReturn {
+    return x;
+  };
+}",
+    );
+    imports.push_str(&content);
     PathAndContent {
-        file_content: content,
+        file_content: imports,
         relative_directory: PathBuf::new(),
         file_name_prefix: "iso".intern().into(),
     }

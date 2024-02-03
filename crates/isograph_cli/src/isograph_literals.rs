@@ -75,7 +75,7 @@ pub(crate) static ISOGRAPH_FOLDER: &'static str = "__isograph";
 lazy_static! {
     // This is regex is inadequate, as iso<typeof foo`...`> is invalid, and
     // it's certainly possible to want that.
-    static ref EXTRACT_ISO_LITERAL: Regex = Regex::new(r"(export const ([^ ]+) =\s+)?iso(<[^`]+>)?`([^`]+)`(\()?").unwrap();
+    static ref EXTRACT_ISO_LITERAL: Regex = Regex::new(r"(export const ([^ ]+) =\s+)?iso\(?(<[^`]+>)?`([^`]+)`\)?(\()?").unwrap();
 }
 
 pub(crate) struct IsoLiteralExtraction<'a> {
