@@ -5,7 +5,7 @@ In this quickstart guide, we will add Isograph to an existing NextJS project. We
 :::note
 This is the process for adding Isograph to an existing **NextJS project**. However, it shouldn't be that different to add it to a project in another framework.
 
-If you don't have a NextJS project handy, you can follow the instructions [here](https://nextjs.org/docs/getting-started/installation) and proceed with this quickstart!
+If you don't have a NextJS project handy, run `npx create-next-app@latest` and proceed with this quickstart! (In this example, we're using the `src` directory and not using the App Router.)
 
 This currently requires NextJS to be run with Babel and for React to be run in React strict mode.
 :::
@@ -45,7 +45,7 @@ And add an alias to your `tsconfig.json`. The alias should point to wherever you
 
 ## Disable React strict mode
 
-Isograph is currently incompatible with React strict mode. Being compatible with strict mode means that (during dev), queries must be fetched twice. This restriction will eventually be listed. For now, disable strict mode.
+If you are using NextJS with the `app` router, you must disable strict mode in your `next.config.js` file.
 
 ```js
 // next.config.js
