@@ -94,7 +94,7 @@ fn build_iso_overload_for_entrypoint<'schema>(
 fn build_iso_overload_for_schema_resolver(resolver: &ValidatedSchemaResolver) -> String {
     let mut s: String = "".to_string();
     let import = format!(
-        "import {{ ResolverParameterType as field_{} }} from '../__isograph/{}/{}/reader.ts'\n",
+        "import {{ ResolverParameterType as field_{} }} from './{}/{}/reader.ts'\n",
         resolver.type_and_field.underscore_separated(),
         resolver.type_and_field.type_name,
         resolver.type_and_field.field_name,
