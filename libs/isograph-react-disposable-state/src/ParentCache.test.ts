@@ -4,36 +4,40 @@ import { ItemCleanupPair } from '@isograph/disposable-types';
 import { CacheItem } from './CacheItem';
 
 function getValue<T>(cache: ParentCache<T>): CacheItem<T> | null {
-  return (cache as any).__item as CacheItem<T> | null;
+  return (cache as any).__cacheItem as CacheItem<T> | null;
 }
 
 describe('ParentCache', () => {
-  test('Populated, emptied, repopulated cache is not re-emptied by original temporary retain being disposed', () => {
-    const factory = vi.fn(() => {
-      const pair: ItemCleanupPair<number> = [1, vi.fn()];
-      return pair;
-    });
-    const parentCache = new ParentCache<number>(factory);
+  test(
+    'Populated, emptied, repopulated cache is not ' +
+      're-emptied by original temporary retain being disposed',
+    () => {
+      const factory = vi.fn(() => {
+        const pair: ItemCleanupPair<number> = [1, vi.fn()];
+        return pair;
+      });
+      const parentCache = new ParentCache<number>(factory);
 
-    const [_cacheItem, value, clearTemporaryRetain] =
+      const [_cacheItem, value, clearTemporaryRetain] =
+        parentCache.getOrPopulateAndTemporaryRetain();
+
+      expect(factory.mock.calls.length).toBe(1);
+      assert(value === 1);
+      assert(getValue(parentCache) != null, 'Parent cache should not be empty');
+
+      parentCache.empty();
+      assert(getValue(parentCache) === null);
+
       parentCache.getOrPopulateAndTemporaryRetain();
+      expect(factory.mock.calls.length).toBe(2);
 
-    expect(factory.mock.calls.length).toBe(1);
-    assert(value === 1);
-    assert(getValue(parentCache) != null);
+      assert(getValue(parentCache) != null);
 
-    parentCache.empty();
-    assert(getValue(parentCache) === null);
+      clearTemporaryRetain();
 
-    parentCache.getOrPopulateAndTemporaryRetain();
-    expect(factory.mock.calls.length).toBe(2);
-
-    assert(getValue(parentCache) != null);
-
-    clearTemporaryRetain();
-
-    assert(getValue(parentCache) != null);
-  });
+      assert(getValue(parentCache) != null);
+    },
+  );
 
   test('Clearing the only temporary retain removes the item from the parent cache', () => {
     const factory = vi.fn(() => {

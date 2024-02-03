@@ -7,7 +7,7 @@ import { create } from 'react-test-renderer';
 import { CacheItem, CacheItemState } from './CacheItem';
 
 function getItem<T>(cache: ParentCache<T>): CacheItem<T> | null {
-  return (cache as any).__item;
+  return (cache as any).__cacheItem;
 }
 
 function getState<T>(cacheItem: CacheItem<T>): CacheItemState<T> {
@@ -512,9 +512,8 @@ describe('useCachedPrecommitValue', () => {
   );
 
   test(
-    'If the component unmounts before committing, ' +
-      'the item will remain in the parent cache, ' +
-      'temporarily retained',
+    'After render but before commit, the item will ' +
+      'be in the parent cache, temporarily retained',
     async () => {
       const disposeItem = vi.fn();
       const factory = vi.fn(() => {
@@ -541,35 +540,20 @@ describe('useCachedPrecommitValue', () => {
       // wat is going on?
       //
       // We want to test a scenario where the component unmounts before committing.
+      // However, we cannot distinguish between an unmount before commit and a
+      // render and a commit that hasn't happened yet.
       //
-      // The subcomponents are rendered in order: TestComponent followed by CodeExecutor.
-      // So, during CodeExecutor, we trigger a state update that causes the ParentComponent
-      // to not render the children.
-      function CodeExecutor() {
-        setShowChildren(false);
-        return null;
-      }
+      // This can be simulated with suspense.
+      //
+      // This test and 'on initial render, it should call getOrPopulateAndTemporaryRetain'
+      // can be merged
 
-      let setShowChildren;
-      function ParentComponent({ children }) {
-        const [showChildren, _setShowChildren] = React.useState(true);
-        setShowChildren = _setShowChildren;
-
-        if (showChildren) {
-          return children;
-        } else {
-          return null;
-        }
-      }
-
+      const { promise, isResolvedRef } = promiseAndResolver();
       const element = await awaitableCreate(
-        <ParentComponent>
+        <React.Suspense fallback={null}>
           <TestComponent />
-          <CodeExecutor />
-        </ParentComponent>,
-        // If we're not in concurrent mode, TestComponent will mount before
-        // unmounting. This perhaps is a bug in react-test-renderer. Regardless,
-        // we're not interested in that scenario.
+          <Suspender promise={promise} isResolvedRef={isResolvedRef} />
+        </React.Suspense>,
         true,
       );
 
