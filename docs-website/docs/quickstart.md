@@ -7,7 +7,7 @@ This is the process for adding Isograph to an existing **NextJS project**. Howev
 
 If you don't have a NextJS project handy, run `npx create-next-app@latest` and proceed with this quickstart! (In this example, we're using the `src` directory and not using the App Router.)
 
-This currently requires NextJS to be run with Babel and for React to be run in React strict mode.
+This currently requires NextJS to be run with Babel and for React not to be run in strict mode.
 :::
 
 ## Install the compiler, babel plugin and runtime
@@ -45,7 +45,7 @@ And add an alias to your `tsconfig.json`. The alias should point to wherever you
 
 ## Disable React strict mode
 
-If you are using NextJS with the `app` router, you must disable strict mode in your `next.config.js` file.
+NextJS defaults to using strict mode. For Isograph to work, you must disable strict mode in your `next.config.js` file:
 
 ```js
 // next.config.js
@@ -158,19 +158,19 @@ You may need to provide a bearer token if you are using a public API, like that 
 This `IsographEnvironmentProvider` will re-render its children whenever new data is written into the Isograph store, so your components will always remain current with whatever data is in the store. In the future, re-renders will be more granular.
 :::
 
-## Create isograph literals
+## Create an Episode List component
 
-**Finally**, we can get to writing some Isograph components. Let's define the Isograph resolver that "is" your home route component! Create a file in `src/components/EpisodeList.tsx` containing the following:
+**Finally**, we can get to writing some Isograph components. Let's define the Isograph client field that "is" your app! Create a file in `src/components/EpisodeList.tsx` containing the following:
 
 ```tsx
 import React from 'react';
 import { iso } from '@isograph/react';
 import { ResolverParameterType as EpisodeListParams } from '@iso/Root/EpisodeList/reader';
 
+// Note: normally, the "root" field is called Query, but in the Star Wars
+// GraphQL schema it is called Root. Odd!
 export const EpisodeList = iso<EpisodeListParams>`
-  # Note: normally, the "root" field is called Query, but in the Star Wars API
-  # it is called Root. Odd!
-  Root.EpisodeList @component {
+  field Root.EpisodeList @component {
     allFilms {
       films {
         id,
@@ -183,33 +183,37 @@ export const EpisodeList = iso<EpisodeListParams>`
 
 function EpisodeListComponent({ data }: EpisodeListParams) {
   const filmsSorted = data.allFilms?.films ?? [];
-  filmsSorted.sort((film1, film2) =>
-    film1?.episodeID > film2?.episodeID ? 1 : -1,
-  );
+  filmsSorted.sort((film1, film2) => {
+    if (film1?.episodeID == null || film2?.episodeID == null) {
+      throw new Error(
+        'This API does not return null films or null episode IDs.',
+      );
+    }
+    return film1.episodeID > film2.episodeID ? 1 : -1;
+  });
 
   return (
-    <ul>
+    <>
+      <h1>Star Wars film archive</h1>
       {filmsSorted.map((film) => (
-        <li>
-          Episode {film.episodeID}: {film.title}
-        </li>
+        <React.Fragment key={film?.id}>
+          <h2>
+            Episode {film?.episodeID}: {film?.title}
+          </h2>
+        </React.Fragment>
       ))}
-    </ul>
+    </>
   );
 }
 ```
 
-:::note
-That's a lot of types! Soon, it won't be necessary to provide them.
-:::
-
-## Fetch that Isograph component:
+## Fetch that Episode List
 
 That Isograph component isn't doing much on its own. We need to provide a way to fetch its data and render the results. So, create a file at `src/components/EpisodeListRoute.tsx`, and make its contents:
 
 ```tsx
 import React from 'react';
-import { iso, useLazyReference, read } from '@isograph/react';
+import { iso, useLazyReference, useRead } from '@isograph/react';
 import EpisodeListEntrypoint from '@iso/Root/EpisodeList/entrypoint';
 
 export default function EpisodeListRoute() {
@@ -234,7 +238,7 @@ function Inner() {
 }
 ```
 
-and change `pages/index.tsx` to be:
+and change `src/pages/index.tsx` to be:
 
 ```tsx
 import EpisodeListRoute from '@/components/EpisodeListRoute';
@@ -258,7 +262,7 @@ In the network tab, you'll see a network request to `https://swapi-graphql.netli
 
 ## Add a subcomponent
 
-Next, you might create another Isograph component. For example, if you create a file `src/components/person_component.tsx` as:
+A key principle of React is that you can divide your components into subcomponents. Let's do that! For example, create `src/components/CharacterSummary.tsx` containing:
 
 ```tsx
 import React from 'react';
@@ -266,7 +270,7 @@ import { iso } from '@isograph/react';
 import { ResolverParameterType as CharacterSummaryParams } from '@iso/Person/CharacterSummary/reader';
 
 export const CharacterSummary = iso<CharacterSummaryParams>`
-  Person.CharacterSummary @component {
+  field Person.CharacterSummary @component {
     name,
     homeworld {
       name,
@@ -274,11 +278,11 @@ export const CharacterSummary = iso<CharacterSummaryParams>`
   }
 `(CharacterSummaryComponent);
 
-function PersonComponentComponent({ data }: CharacterSummaryParams) {
+function CharacterSummaryComponent({ data }: CharacterSummaryParams) {
   return (
-    <>
+    <li>
       {data.name}, from the planet {data.homeworld?.name}
-    </>
+    </li>
   );
 }
 ```
@@ -290,10 +294,10 @@ import React from 'react';
 import { iso } from '@isograph/react';
 import { ResolverParameterType as EpisodeListParams } from '@iso/Root/EpisodeList/reader';
 
+// Note: normally, the "root" field is called Query, but in the Star Wars
+// GraphQL schema it is called Root. Odd!
 export const EpisodeList = iso<EpisodeListParams>`
-  # Note: normally, the "root" field is called Query, but in the Star Wars API
-  # it is called Root. Odd!
-  Root.EpisodeList @component {
+  field Root.EpisodeList @component {
     allFilms {
       films {
         id,
@@ -313,27 +317,37 @@ export const EpisodeList = iso<EpisodeListParams>`
 
 function EpisodeListComponent({ data }: EpisodeListParams) {
   const filmsSorted = data.allFilms?.films ?? [];
-  filmsSorted.sort((film1, film2) =>
-    film1?.episodeID > film2?.episodeID ? 1 : -1,
-  );
+  filmsSorted.sort((film1, film2) => {
+    if (film1?.episodeID == null || film2?.episodeID == null) {
+      throw new Error(
+        'This API does not return null films or null episode IDs.',
+      );
+    }
+    return film1.episodeID > film2.episodeID ? 1 : -1;
+  });
 
   return (
-    <ul>
+    <>
+      <h1>Star Wars film archive</h1>
       {filmsSorted.map((film) => (
-        <li>
-          Episode {film.episodeID}: {film.title}
+        <React.Fragment key={film?.id}>
+          <h2>
+            Episode {film?.episodeID}: {film?.title}
+          </h2>
           {/*
            THE FOLLOWING IS NEW
           */}
           <div style={{ marginLeft: 20 }}>
             Featuring
-            {film?.characterConnection?.characters?.map((character) => {
-              return <character.CharacterSummary />;
-            })}
+            <ul>
+              {film?.characterConnection?.characters?.map((character) => {
+                return <character.CharacterSummary />;
+              })}
+            </ul>
           </div>
-        </li>
+        </React.Fragment>
       ))}
-    </ul>
+    </>
   );
 }
 ```

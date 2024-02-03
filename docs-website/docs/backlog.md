@@ -41,6 +41,7 @@
 
 ## Cleanup backlog
 
+- only generate resolvers if they're reachable. Maybe warn if user-created resolvers are not reachable.
 - Typegen code is a mess
 - JS code needs structure, etc.
 - `HACK__merge_linked_fields` is indicative of the fact that merged linked fields should contain hashmaps of key => merged item, instead of vectors of merged items.
