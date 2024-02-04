@@ -2,6 +2,8 @@
 
 In this quickstart guide, we will add Isograph to an existing NextJS project. We will use the free and publicly available [Star Wars GraphQL API](https://studio.apollographql.com/public/star-wars-swapi/variant/current/home).
 
+You can view the end result of following this quickstart guide in [this repository](https://github.com/isographlabs/quickstart).
+
 :::note
 This is the process for adding Isograph to an existing **NextJS project**. However, it shouldn't be that different to add it to a project in another framework.
 
@@ -154,10 +156,6 @@ Create the environment during the render of a component is sufficient to avoid t
 You may need to provide a bearer token if you are using a public API, like that of GitHub. See [this GitHub demo](https://github.com/rbalicki2/github-isograph-demo/tree/885530d74d9b8fb374dfe7d0ebdab7185d207c3a/src/isograph-components/SetNetworkWrapper.tsx) for an example of how to do with a token that you receive from OAuth. See also the `[...nextauth].tsx` file in the same repo.
 :::
 
-:::note
-This `IsographEnvironmentProvider` will re-render its children whenever new data is written into the Isograph store, so your components will always remain current with whatever data is in the store. In the future, re-renders will be more granular.
-:::
-
 ## Create an Episode List component
 
 **Finally**, we can get to writing some Isograph components. Let's define the Isograph client field that "is" your app! Create a file in `src/components/EpisodeList.tsx` containing the following:
@@ -307,6 +305,7 @@ export const EpisodeList = iso<EpisodeListParams>`
         # THIS IS NEW
         characterConnection {
           characters {
+            id,
             CharacterSummary,
           },
         },
@@ -341,7 +340,7 @@ function EpisodeListComponent({ data }: EpisodeListParams) {
             Featuring
             <ul>
               {film?.characterConnection?.characters?.map((character) => {
-                return <character.CharacterSummary />;
+                return <character.CharacterSummary key={character.id} />;
               })}
             </ul>
           </div>
