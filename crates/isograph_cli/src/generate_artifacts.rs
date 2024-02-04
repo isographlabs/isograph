@@ -83,7 +83,7 @@ fn build_iso_overload_for_entrypoint<'schema>(
     s.push_str(&format!(
         "export function iso<T>(
             param: T & MatchesWhitespaceAndString<'{}', T>
-        ): IdentityWithParam<typeof entrypoint_{}>;\n",
+        ): typeof entrypoint_{};\n",
         formatted_field,
         resolver.type_and_field.underscore_separated(),
     ));
@@ -127,7 +127,7 @@ type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
 type MatchesWhitespaceAndString<
 TString extends string,
 T
-> = Whitespace<T> extends `${TString}${string}` ? T : never;",
+> = Whitespace<T> extends `${TString}${string}` ? T : never;\n",
     );
     let entrypoints_overload = schema
         .entrypoints
