@@ -2,7 +2,7 @@
 
 > Select your components like you select your fields — with GraphQL!
 
-- Read the [docs](https://isograph.dev/docs/) and in particular the [quickstart guide](https://isograph.dev/docs/quickstart/).
+- Read the [docs](https://isograph.dev/docs/), especially the [quickstart guide](https://isograph.dev/docs/quickstart/).
 - Watch the [talk at GraphQL Conf](https://www.youtube.com/watch?v=gO65JJRqjuc).
 - Join the discord: https://discord.gg/Q2c5tM5T8A (#isograph channel on the GraphQL discord.)
 - [Follow the official Twitter account](https://twitter.com/isographlabs).

@@ -28,6 +28,7 @@ const sidebars: SidebarsConfig = {
         'how-isograph-works/babel-plugin',
       ],
     },
+    'development-workflow',
     'backlog',
   ],
 };
