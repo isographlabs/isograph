@@ -27,6 +27,11 @@ const typeAndFieldRegex = new RegExp(
 );
 
 function getTypeAndField(path) {
+  if (path.node.arguments.length !== 1) {
+    throw new Error(
+      `BabelPluginIsograph: Iso invocation require one parameter, found ${path.node.arguments.length}`,
+    );
+  }
   const quasis = path.node.arguments[0].quasis;
   if (quasis.length !== 1) {
     throw new Error(
