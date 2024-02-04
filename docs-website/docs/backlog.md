@@ -43,6 +43,7 @@
 
 - only generate resolvers if they're reachable. Maybe warn if user-created resolvers are not reachable.
 - Typegen code is a mess
+  - Rename ResolverParameterType to TypeNameFieldNameParameter or something
 - JS code needs structure, etc.
 - `HACK__merge_linked_fields` is indicative of the fact that merged linked fields should contain hashmaps of key => merged item, instead of vectors of merged items.
 - Objects which do not have IDs should be merged into their parent object in the store.
@@ -77,7 +78,27 @@ type SetBestFriendResponse {
 - Preloaded queries
 - Fetch/cache policies
 - Granular re-renders
-- Ability to select fewer or extra fields on mutation and refetch fields
+- Ability to select fewer or extra fields on mutation and refetch fields, e.g.
+
+```
+# Disallow +/- if = is used
+# maybe = is implied
+set_foo +{
+  additional_field
+} -{
+  extraneous_field
+} ={
+  only_field
+}
+
+# or its on the field level
+set_foo {
+  +additional_field
+  -extraneous_field
+  -* # clear all fields
+}
+```
+
 - Defer/stream
 - Subscriptions
 - Interfaces/unions
