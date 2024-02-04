@@ -226,7 +226,7 @@ export default function EpisodeListRoute() {
 
 function Inner() {
   const { queryReference } = useLazyReference<typeof EpisodeListEntrypoint>(
-    iso`entrypoint Root.EpisodeList`,
+    iso(`entrypoint Root.EpisodeList`),
     {
       /* query variables */
     },
