@@ -2,6 +2,8 @@
 
 In this quickstart guide, we will add Isograph to an existing NextJS project. We will use the free and publicly available [Star Wars GraphQL API](https://studio.apollographql.com/public/star-wars-swapi/variant/current/home).
 
+You can view the end result of following this quickstart guide in [this repository](https://github.com/isographlabs/quickstart).
+
 :::note
 This is the process for adding Isograph to an existing **NextJS project**. However, it shouldn't be that different to add it to a project in another framework.
 
@@ -151,11 +153,7 @@ Create the environment during the render of a component is sufficient to avoid t
 :::
 
 :::note
-You may need to provide a bearer token if you are using a public API, like that of GitHub. See [this GitHub demo](https://github.com/rbalicki2/github-isograph-demo/tree/885530d74d9b8fb374dfe7d0ebdab7185d207c3a/src/isograph-components/SetNetworkWrapper.tsx) for an example of how to do with a token that you receive from OAuth. See also the `[...nextauth].tsx` file in the same repo.
-:::
-
-:::note
-This `IsographEnvironmentProvider` will re-render its children whenever new data is written into the Isograph store, so your components will always remain current with whatever data is in the store. In the future, re-renders will be more granular.
+You may need to provide a bearer token if you are using a public API, such as the GitHub API. See [this GitHub demo](https://github.com/rbalicki2/github-isograph-demo/tree/885530d74d9b8fb374dfe7d0ebdab7185d207c3a/src/isograph-components/SetNetworkWrapper.tsx) for an example of how to do with a token that you receive from OAuth. See also the `[...nextauth].tsx` file in the same repo.
 :::
 
 ## Create an Episode List component
@@ -169,7 +167,7 @@ import { ResolverParameterType as EpisodeListParams } from '@iso/Root/EpisodeLis
 
 // Note: normally, the "root" field is called Query, but in the Star Wars
 // GraphQL schema it is called Root. Odd!
-export const EpisodeList = iso<EpisodeListParams>`
+export const EpisodeList = iso`
   field Root.EpisodeList @component {
     allFilms {
       films {
@@ -307,6 +305,7 @@ export const EpisodeList = iso<EpisodeListParams>`
         # THIS IS NEW
         characterConnection {
           characters {
+            id,
             CharacterSummary,
           },
         },
@@ -341,7 +340,7 @@ function EpisodeListComponent({ data }: EpisodeListParams) {
             Featuring
             <ul>
               {film?.characterConnection?.characters?.map((character) => {
-                return <character.CharacterSummary />;
+                return <character.CharacterSummary key={character.id} />;
               })}
             </ul>
           </div>

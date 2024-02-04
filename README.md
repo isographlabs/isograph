@@ -2,7 +2,7 @@
 
 > Select your components like you select your fields — with GraphQL!
 
-- Read the [docs](https://isograph.dev/docs/) and in particular the [quickstart guide](https://isograph.dev/docs/quickstart/).
+- Read the [docs](https://isograph.dev/docs/), especially the [quickstart guide](https://isograph.dev/docs/quickstart/).
 - Watch the [talk at GraphQL Conf](https://www.youtube.com/watch?v=gO65JJRqjuc).
 - Join the discord: https://discord.gg/Q2c5tM5T8A (#isograph channel on the GraphQL discord.)
 - [Follow the official Twitter account](https://twitter.com/isographlabs).
@@ -103,30 +103,30 @@ input SetUserNameParams {
 }
 
 type SetUserNameResponse {
-  updated_foo: User!
+  updated_user: User!
 }
 
 type Mutation
   @exposeField(
     field: "set_user_name" # expose this field
-    path: "updated_foo" # on the type at this path (relative to the response object)
+    path: "updated_user" # on the type at this path (relative to the response object)
     field_map: [{ from: "id", to: "id" }] # mapping these fields
   ) {
   set_user_name(input: SetUserNameParams!): SetUserNameResponse!
 }
 ```
 
-In the above example, the `set_foo` field will be made available on every `User` object, under the key `__set_user_name` (this will be customizable.) So, one could write a resolver:
+In the above example, the `set_user_name` field will be made available on every `User` object, under the key `set_user_name` (this will be customizable.) So, one could write a resolver:
 
 ```js
 export const UpdateUserNameButton = iso(`
   User.UpdateUserNameButton {
-    __set_foo,
+    set_user_name,
   }
 `)(({ data: { __set_user_name } }) => {
   return (
-    <div onClick={() => __set_user_name({ input: { new_name: 'Superman' } })}>
-      Name me Superman
+    <div onClick={() => set_user_name({ input: { new_name: 'Maybe' } })}>
+      Call me, maybe
     </div>
   );
 });

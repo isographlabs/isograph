@@ -1,6 +1,5 @@
 import { ReactNode, createContext, useContext } from 'react';
 import * as React from 'react';
-import { subscribe } from './cache';
 import { ParentCache } from '@isograph/isograph-react-disposable-state';
 
 export const IsographEnvironmentContext =
@@ -81,11 +80,6 @@ export function IsographEnvironmentProvider({
   environment,
   children,
 }: IsographEnvironmentProviderProps) {
-  const [, setState] = React.useState<object | void>();
-  React.useEffect(() => {
-    return subscribe(environment, () => setState({}));
-  }, []);
-
   return (
     <IsographEnvironmentContext.Provider value={environment}>
       {children}

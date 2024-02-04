@@ -2,6 +2,7 @@ import {
   getOrCreateCacheForArtifact,
   onNextChange,
   getParentRecordKey,
+  subscribe,
 } from './cache';
 import { useLazyDisposableState } from '@isograph/react-disposable-state';
 import { type PromiseWrapper } from './PromiseWrapper';
@@ -15,6 +16,7 @@ import {
   StoreRecord,
   useIsographEnvironment,
 } from './IsographEnvironment';
+import { useEffect, useState } from 'react';
 
 export { makeNetworkRequest, subscribe } from './cache';
 export {
@@ -268,6 +270,14 @@ export function useRead<
   >,
 ): TResolverResult {
   const environment = useIsographEnvironment();
+
+  const [, setState] = useState<object | void>();
+  useEffect(() => {
+    return subscribe(environment, () => {
+      return setState({});
+    });
+  }, []);
+
   return read(environment, fragmentReference);
 }
 

@@ -1,6 +1,6 @@
 import type {IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst} from '@isograph/react';
-const queryText = 'mutation Pet__set_pet_tagline ($input: SetPetTaglineParams!) {\
-set_pet_tagline____input___v_input: set_pet_tagline(input: $input) {\
+const queryText = 'mutation Petset_pet_tagline ($input: SetPetTaglineParams!) {\
+t_pet_tagline____input___v_input: t_pet_tagline(input: $input) {\
 pet { \
   id,\
   best_friend_relationship {\
@@ -27,7 +27,7 @@ pet { \
 
 const normalizationAst: NormalizationAst = [{
   kind: "Linked",
-  fieldName: "set_pet_tagline",
+  fieldName: "t_pet_tagline",
   arguments: [
     [
       "input",
