@@ -10,7 +10,7 @@ license = "MIT"
 common_lang_types = { path = "../common_lang_types" }
 isograph_lang_types = { path = "../isograph_lang_types" }
 graphql_lang_types = { path = "../graphql_lang_types" }
-intern = { git = "https://github.com/facebook/relay.git#f53a93272a1d756c60de795090fe70ca9532bb67" }
+intern = { git = "https://github.com/facebook/relay.git", rev = "e5839e889bce8f51b1bd121f7cec9fda348f1094" }
 thiserror = "1.0.40"
 lazy_static = "1.4"
 colorize = "0.1.0"
