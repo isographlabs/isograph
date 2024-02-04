@@ -9,7 +9,7 @@ import {
   TableRow,
 } from '@mui/material';
 
-export const RepositoryList = iso<UserRepositoryListParams>`
+export const RepositoryList = iso(`
   field User.RepositoryList @component {
     repositories(last: 10) {
       edges {
@@ -31,7 +31,7 @@ export const RepositoryList = iso<UserRepositoryListParams>`
       },
     },
   }
-`(UserRepositoryListComponent);
+`)(UserRepositoryListComponent);
 
 function UserRepositoryListComponent(props: UserRepositoryListParams) {
   const repositories = [...props.data.repositories.edges].reverse();

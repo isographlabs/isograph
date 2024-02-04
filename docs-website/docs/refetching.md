@@ -13,15 +13,12 @@ This is a quite restrictive choice, and more customizability needs to be introdu
 You might use this field like:
 
 ```tsx
-export const PetRefetchButton = iso<
-  PetRefetchButtonParams,
-  ReturnType<typeof PetRefetchButtonComponent>
->`
-  Pet.PetRefetchButton @component {
+export const PetRefetchButton = iso(`
+  field Pet.PetRefetchButton @component {
     name,
     __refetch,
   }
-`(PetRefetchButtonComponent);
+`)(PetRefetchButtonComponent);
 ```
 
 When read out, the `__refetch` field is a function that when called will make a network request to refetch the field. (Also, in the future, you will be able to do things like get the status of the mutation, suspend on it, etc. For now, it just triggers a mutation in the background.)

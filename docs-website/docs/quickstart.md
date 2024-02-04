@@ -267,14 +267,14 @@ import React from 'react';
 import { iso } from '@iso';
 import { ResolverParameterType as CharacterSummaryParams } from '@iso/Person/CharacterSummary/reader';
 
-export const CharacterSummary = iso<CharacterSummaryParams>`
+export const CharacterSummary = iso(`
   field Person.CharacterSummary @component {
     name,
     homeworld {
       name,
     },
   }
-`(CharacterSummaryComponent);
+`)(CharacterSummaryComponent);
 
 function CharacterSummaryComponent({ data }: CharacterSummaryParams) {
   return (
@@ -294,7 +294,7 @@ import { ResolverParameterType as EpisodeListParams } from '@iso/Root/EpisodeLis
 
 // Note: normally, the "root" field is called Query, but in the Star Wars
 // GraphQL schema it is called Root. Odd!
-export const EpisodeList = iso<EpisodeListParams>`
+export const EpisodeList = iso(`
   field Root.EpisodeList @component {
     allFilms {
       films {
@@ -312,7 +312,7 @@ export const EpisodeList = iso<EpisodeListParams>`
       },
     },
   }
-`(EpisodeListComponent);
+`)(EpisodeListComponent);
 
 function EpisodeListComponent({ data }: EpisodeListParams) {
   const filmsSorted = data.allFilms?.films ?? [];
