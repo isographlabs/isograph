@@ -1,8 +1,9 @@
 import React from 'react';
-import { iso, useLazyReference, useRead } from '@isograph/react';
+import { useLazyReference, useRead } from '@isograph/react';
 import { Container } from '@mui/material';
 import { ResolverParameterType as RepositoryPageParams } from '@iso/Query/RepositoryPage/reader';
 import RepositoryPageEntrypoint from '@iso/Query/RepositoryPage/entrypoint';
+import { iso } from '@iso';
 
 import {
   FullPageLoading,
@@ -10,12 +11,12 @@ import {
   RepositoryRoute as RepositoryRouteType,
 } from './GithubDemo';
 
-export const RepositoryPage = iso<RepositoryPageParams>`
+export const RepositoryPage = iso(`
   field Query.RepositoryPage($repositoryName: String!, $repositoryOwner: String!, $first: Int!) @component {
     Header,
     RepositoryDetail,
   }
-`(RepositoryRouteComponent);
+`)(RepositoryRouteComponent);
 
 function RepositoryRouteComponent({
   data,
@@ -42,7 +43,7 @@ export function RepositoryRoute({
   setRoute: (route: Route) => void;
 }) {
   const { queryReference } = useLazyReference<typeof RepositoryPageEntrypoint>(
-    iso`entrypoint Query.RepositoryPage`,
+    iso(`entrypoint Query.RepositoryPage`),
     {
       repositoryName: route.repositoryName,
       repositoryOwner: route.repositoryOwner,

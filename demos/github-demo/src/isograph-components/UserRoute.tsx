@@ -8,15 +8,16 @@ import {
   Route,
   type UserRoute as UserRouteType,
 } from './GithubDemo';
+import { iso } from '@iso';
 
 import Entrypoint from '@iso/Query/UserPage/entrypoint';
 
-export const UserPage = iso`
+export const UserPage = iso(`
   field Query.UserPage($first: Int!, $userLogin: String!) @component {
     Header,
     UserDetail,
   }
-`(UserRouteComponentComponent);
+`)(UserRouteComponentComponent);
 
 function UserRouteComponentComponent({
   data,
@@ -43,7 +44,7 @@ export function UserRoute({
   setRoute: (route: Route) => void;
 }) {
   const { queryReference } = useLazyReference<typeof Entrypoint>(
-    iso`entrypoint Query.UserPage`,
+    iso(`entrypoint Query.UserPage`),
     {
       userLogin: route.userLogin,
       first: 20,

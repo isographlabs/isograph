@@ -215,7 +215,7 @@ export function useLazyReference<TEntrypoint>(
   entrypoint:
     | TEntrypoint
     // Temporarily, we need to allow useLazyReference to take the result of calling
-    // iso`...`. At runtime, we confirm that the passed-in `iso` literal is actually
+    // iso(`...`. At runtime, we confirm that the passed-in `iso(` literal is actually
     // an entrypoint.
     | ((_: any) => any),
   variables: { [key: string]: Variable },

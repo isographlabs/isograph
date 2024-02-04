@@ -76,7 +76,7 @@ export const PetTaglineInput = iso<
     __set_pet_tagline,
     tagline,
   }
-`(PetTaglineInputComponent);
+`)(PetTaglineInputComponent);
 ```
 
 When read out, the field is a function that when called will make a network request for the mutation. (Also, in the future, you will be able to do things like get the status of the mutation, suspend on it, etc. For now, it just triggers a mutation in the background.)

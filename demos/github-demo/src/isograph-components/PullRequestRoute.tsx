@@ -1,22 +1,23 @@
 import React from 'react';
-import { iso, useLazyReference, useRead } from '@isograph/react';
+import { useLazyReference, useRead } from '@isograph/react';
 import {
   FullPageLoading,
   type PullRequestRoute as PullRequestRouteType,
   Route,
 } from './GithubDemo';
+import { iso } from '@iso';
 
 import { ResolverParameterType as PullRequestComponentProps } from '@iso/Query/PullRequest/reader';
 import Entrypoint from '@iso/Query/PullRequest/entrypoint';
 
 import { Container } from '@mui/material';
 
-export const PullRequest = iso<PullRequestComponentProps>`
+export const PullRequest = iso(`
   field Query.PullRequest($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!) @component {
     Header,
     PullRequestDetail,
   }
-`(PullRequestComponentComponent);
+`)(PullRequestComponentComponent);
 
 function PullRequestComponentComponent({
   data,
@@ -43,7 +44,7 @@ export function PullRequestRoute({
   setRoute: (route: Route) => void;
 }) {
   const { queryReference } = useLazyReference<typeof Entrypoint>(
-    iso`entrypoint Query.PullRequest`,
+    iso(`entrypoint Query.PullRequest`),
     {
       pullRequestNumber: route.pullRequestNumber,
       repositoryName: route.repositoryName,

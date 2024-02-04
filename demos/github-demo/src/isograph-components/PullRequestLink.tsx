@@ -5,7 +5,7 @@ import { ResolverParameterType as PullRequestProps } from '@iso/PullRequest/Pull
 
 import { Link } from '@mui/material';
 
-export const PullRequestLink = iso<PullRequestProps>`
+export const PullRequestLink = iso(`
   field PullRequest.PullRequestLink @component {
     number,
     repository {
@@ -15,7 +15,7 @@ export const PullRequestLink = iso<PullRequestProps>`
       },
     },
   }
-`(PullRequestLinkComponent);
+`)(PullRequestLinkComponent);
 
 function PullRequestLinkComponent(props: PullRequestProps) {
   return (

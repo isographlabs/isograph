@@ -6,7 +6,7 @@ This page is intended to serve as a guide to learning about the Isograph compile
 
 ## Big picture
 
-After installing the compiler with `yarn install --dev @isograph/compiler@main`, `yarn run iso` will run the compiler. It has two modes: batch mode and watch mode.
+After installing the compiler with `yarn install --dev @isograph/compiler@main`, `yarn run iso(` will run the compiler. It has two modes: batch mode and watch mode.
 
 ### Batch mode
 
@@ -16,7 +16,7 @@ At a very high level, the Isograph compiler does the following:
 
 - It will parse [the Isograph config file](../../isograph-config).
 - It will parse and validate the GraphQL schema.
-- It will parse and validate `iso` literals.
+- It will parse and validate `iso(` literals.
 - It will generate artifacts.
 
 If during any of these steps, one or more validation errors are generated, the compiler will print those errors and not continue compiling.
@@ -45,7 +45,7 @@ The isograph compiler contains the following crates. The most important ones are
 - 🟢 `isograph_cli`: The package which exposes the CLI for the Isograph compiler. It also includes the artifact generation code.
 - 🟢 `isograph_lang_parser`: An LL(1) parser for Isograph literals
 - `isograph_lang_types`: Some common types.
-- 🟢 `isograph_schema`: The in-memory representation of the Isograph schema. This includes server fields and fields generated from `iso` literals. It should probably not include representations of `iso` entrypoints, but currently does.
+- 🟢 `isograph_schema`: The in-memory representation of the Isograph schema. This includes server fields and fields generated from `iso(` literals. It should probably not include representations of `iso(` entrypoints, but currently does.
 - `string_key_newtype`: A library for generating typesafe newtype wrappers around `StringKey` types.
 - `u32_newtypes`: A library for generating typesafe newtype wrappers around `u32` types.
 
@@ -88,14 +88,14 @@ type Bar {
 
 In this case, we cannot validate that either object is valid, until we have created both `Foo` and `Bar`, meaning we have to create both objects in an unvalidated state.
 
-Likewise, `iso` literals can reference each other, so we must also do a two-pass
+Likewise, `iso(` literals can reference each other, so we must also do a two-pass
 
 ### Validation pipeline
 
 Ideally and in the long term, we want the following validation pipeline. During some steps, the generic type associated with the schema will change:
 
 :::warning
-The types in this list are simplified and a bit idealized. For example, there is no enum named `FieldValidation`, and the unvalidated resolver field generic type is actually `()`, because the field name is always stored on the field.
+The types in this list are simplified and a bit idealized. For example, there is no enum named `FieldValidation`, and the unvalidated resolver field generic type is actually `)()`, because the field name is always stored on the field.
 :::
 
 #### GraphQL schema validation

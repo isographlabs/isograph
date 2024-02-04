@@ -1,6 +1,6 @@
 # `@isograph/compiler`
 
-This package installs the Isograph compiler under the `yarn iso` command.
+This package installs the Isograph compiler under the `yarn iso(` command.
 
 ## Usage
 
