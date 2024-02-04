@@ -73,7 +73,7 @@ export const PetTaglineInput = iso<
   ReturnType<typeof PetTaglineInputComponent>
 >`
   Pet.PetTaglineInput @component {
-    __set_pet_tagline,
+    set_pet_tagline,
     tagline,
   }
 `(PetTaglineInputComponent);
@@ -88,7 +88,7 @@ function PetTaglineInputComponent(props: PetUpdaterParams) {
   const [tagline, setTagline] = useState<string>(props.data.tagline);
 
   const updateTagline = () =>
-    props.data.__set_pet_tagline({ input: { tagline } });
+    props.data.set_pet_tagline({ input: { tagline } });
 
   return (
     <>

@@ -7,13 +7,13 @@ import { PetId } from './router';
 
 export const PetUpdater = iso<PetUpdaterParams>`
   field Pet.PetUpdater @component {
-    __set_pet_best_friend,
+    set_pet_best_friend,
     potential_new_best_friends {
       id,
       name,
     },
 
-    __set_pet_tagline,
+    set_pet_tagline,
     tagline,
   }
 `(PetUpdaterComponent);
@@ -23,7 +23,7 @@ function PetUpdaterComponent(props: PetUpdaterParams) {
   const [tagline, setTagline] = useState<string>(props.data.tagline);
 
   const updateTagline = () =>
-    props.data.__set_pet_tagline({ input: { tagline } });
+    props.data.set_pet_tagline({ input: { tagline } });
 
   return (
     <>
@@ -36,7 +36,7 @@ function PetUpdaterComponent(props: PetUpdaterParams) {
             if (value === 'NONE') {
               return;
             }
-            props.data.__set_pet_best_friend({
+            props.data.set_pet_best_friend({
               new_best_friend_id: value,
             });
           }

@@ -167,7 +167,7 @@ import { ResolverParameterType as EpisodeListParams } from '@iso/Root/EpisodeLis
 
 // Note: normally, the "root" field is called Query, but in the Star Wars
 // GraphQL schema it is called Root. Odd!
-export const EpisodeList = iso<EpisodeListParams>`
+export const EpisodeList = iso`
   field Root.EpisodeList @component {
     allFilms {
       films {

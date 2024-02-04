@@ -128,7 +128,7 @@ impl UnvalidatedSchema {
             // We should find a way to make WithLocation not impl Display, while also making
             // errors containing WithLocation<...> easy to work with.
             // TODO "expose as" optional field
-            let magic_mutation_field_name = format!("__{}", mutation_field_name).intern().into();
+            let magic_mutation_field_name = mutation_field_name;
 
             // payload object is the object type of the mutation field, e.g. SetBestFriendResponse
             let payload_object = self.schema_data.object(mutation_field_object_id);
@@ -258,7 +258,7 @@ impl UnvalidatedSchema {
             type_and_field: ResolverTypeAndField {
                 // TODO make this zero cost?
                 type_name: inner_type_name.lookup().intern().into(), // e.g. Pet
-                field_name: magic_mutation_field_name,               // __set_pet_best_friend
+                field_name: magic_mutation_field_name,               // set_pet_best_friend
             },
             parent_object_id: resolver_parent_object_id,
             action_kind: ResolverActionKind::MutationField(MutationFieldResolverActionKindInfo {
