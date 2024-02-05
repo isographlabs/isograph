@@ -21,14 +21,10 @@ This will install a NextJS app in this folder. Run it with `npm run dev`.
 ## Install the compiler, Babel plugin and runtime
 
 ```sh
-yarn add --dev @isograph/compiler@main
-yarn add --dev @isograph/babel-plugin@main
-yarn add @isograph/react@main
+yarn add --dev @isograph/compiler
+yarn add --dev @isograph/babel-plugin
+yarn add @isograph/react
 ```
-
-:::info
-For now, you must install the `@main` versions of the packages.
-:::
 
 Installing the compiler also adds the command `yarn iso` and `yarn iso --watch`. But hang tight — before this command works, you'll need to create a folder, download your schema and create an `isograph.config.json` file!
 

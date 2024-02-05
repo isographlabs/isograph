@@ -6,7 +6,7 @@ This page is intended to serve as a guide to learning about the Isograph compile
 
 ## Big picture
 
-After installing the compiler with `yarn install --dev @isograph/compiler@main`, `yarn run iso` will run the compiler. It has two modes: batch mode and watch mode.
+After installing the compiler with `yarn install --dev @isograph/compiler`, `yarn run iso` will run the compiler. It has two modes: batch mode and watch mode.
 
 ### Batch mode
 
