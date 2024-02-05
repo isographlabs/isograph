@@ -166,11 +166,11 @@ checksum = "dc17e449bc7854c50b943d113a98bc0e01dc6585d2c66eaa09ca645ebd8a7e62"
 [[package]]
 name = "common"
 version = "0.0.0"
-source = "git+https://github.com/facebook/relay.git#f53a93272a1d756c60de795090fe70ca9532bb67#e5839e889bce8f51b1bd121f7cec9fda348f1094"
+source = "git+https://github.com/facebook/relay.git?rev=e5839e889bce8f51b1bd121f7cec9fda348f1094#e5839e889bce8f51b1bd121f7cec9fda348f1094"
 dependencies = [
  "colored",
  "indexmap",
- "intern 0.1.0 (git+https://github.com/facebook/relay.git#f53a93272a1d756c60de795090fe70ca9532bb67)",
+ "intern",
  "log",
  "lsp-types",
  "md-5",
@@ -184,7 +184,7 @@ dependencies = [
 name = "common_lang_types"
 version = "0.0.4"
 dependencies = [
- "intern 0.1.0 (git+https://github.com/facebook/relay.git?rev=e5839e889bce8f51b1bd121f7cec9fda348f1094)",
+ "intern",
  "string_key_newtype",
 ]
 
@@ -338,10 +338,10 @@ checksum = "4271d37baee1b8c7e4b708028c57d816cf9d2434acb33a549475f78c181f6253"
 [[package]]
 name = "graphql-syntax"
 version = "0.0.0"
-source = "git+https://github.com/facebook/relay.git#f53a93272a1d756c60de795090fe70ca9532bb67#e5839e889bce8f51b1bd121f7cec9fda348f1094"
+source = "git+https://github.com/facebook/relay.git?rev=e5839e889bce8f51b1bd121f7cec9fda348f1094#e5839e889bce8f51b1bd121f7cec9fda348f1094"
 dependencies = [
  "common",
- "intern 0.1.0 (git+https://github.com/facebook/relay.git#f53a93272a1d756c60de795090fe70ca9532bb67)",
+ "intern",
  "logos",
  "serde",
  "thiserror",
@@ -352,7 +352,7 @@ name = "graphql_lang_types"
 version = "0.0.4"
 dependencies = [
  "common_lang_types",
- "intern 0.1.0 (git+https://github.com/facebook/relay.git?rev=e5839e889bce8f51b1bd121f7cec9fda348f1094)",
+ "intern",
  "strum",
 ]
 
@@ -363,7 +363,7 @@ dependencies = [
  "common_lang_types",
  "graphql-syntax",
  "graphql_lang_types",
- "intern 0.1.0 (git+https://github.com/facebook/relay.git?rev=e5839e889bce8f51b1bd121f7cec9fda348f1094)",
+ "intern",
  "logos",
  "thiserror",
 ]
@@ -474,22 +474,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "intern"
-version = "0.1.0"
-source = "git+https://github.com/facebook/relay.git#f53a93272a1d756c60de795090fe70ca9532bb67#e5839e889bce8f51b1bd121f7cec9fda348f1094"
-dependencies = [
- "fnv",
- "hashbrown 0.12.3",
- "indexmap",
- "once_cell",
- "parking_lot",
- "serde",
- "serde_bytes",
- "serde_derive",
- "smallvec",
-]
-
-[[package]]
 name = "inventory"
 version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -503,7 +487,7 @@ dependencies = [
  "common_lang_types",
  "graphql_lang_types",
  "graphql_schema_parser",
- "intern 0.1.0 (git+https://github.com/facebook/relay.git?rev=e5839e889bce8f51b1bd121f7cec9fda348f1094)",
+ "intern",
  "isograph_lang_parser",
  "isograph_lang_types",
  "isograph_schema",
@@ -526,7 +510,7 @@ version = "0.0.4"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
- "intern 0.1.0 (git+https://github.com/facebook/relay.git?rev=e5839e889bce8f51b1bd121f7cec9fda348f1094)",
+ "intern",
  "isograph_lang_types",
  "logos",
  "thiserror",
@@ -538,7 +522,7 @@ version = "0.0.4"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
- "intern 0.1.0 (git+https://github.com/facebook/relay.git?rev=e5839e889bce8f51b1bd121f7cec9fda348f1094)",
+ "intern",
  "u32_newtypes",
 ]
 
@@ -549,7 +533,7 @@ dependencies = [
  "colorize",
  "common_lang_types",
  "graphql_lang_types",
- "intern 0.1.0 (git+https://github.com/facebook/relay.git?rev=e5839e889bce8f51b1bd121f7cec9fda348f1094)",
+ "intern",
  "isograph_lang_types",
  "lazy_static",
  "thiserror",
@@ -1021,7 +1005,7 @@ dependencies = [
 name = "string_key_newtype"
 version = "0.0.4"
 dependencies = [
- "intern 0.1.0 (git+https://github.com/facebook/relay.git?rev=e5839e889bce8f51b1bd121f7cec9fda348f1094)",
+ "intern",
 ]
 
 [[package]]
