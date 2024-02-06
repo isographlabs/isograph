@@ -43,7 +43,7 @@ impl UnvalidatedSchema {
     /// Add magical mutation fields.
     ///
     /// Using the MagicMutationFieldInfo (derived from @exposeField directives),
-    /// add a magical field to TargetType whose name is __ + mutation_name, which:
+    /// add a magical field to TargetType whose name is the mutation_name, which:
     /// - executes the mutation
     /// - has the mutation's arguments (except those from field_map)
     /// - then acts as a __refetch field on that TargetType, i.e. refetches all the fields
