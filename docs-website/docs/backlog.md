@@ -3,9 +3,7 @@
 ## Top QOL priorities
 
 - iso overload in files
-- id: ID error should be overridden with schema extension config
 - discord link in header
-- disallow descriptions
 
 ## V2 release
 
