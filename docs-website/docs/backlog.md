@@ -3,7 +3,6 @@
 ## Top QOL priorities
 
 - iso overload in files
-- discord link in header
 
 ## V2 release
 
