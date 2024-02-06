@@ -243,7 +243,7 @@ impl UnvalidatedSchema {
 
         self.resolvers.push(SchemaResolver {
             description,
-            // __set_pet_best_friend
+            // set_pet_best_friend
             name: magic_mutation_field_name,
             id: next_resolver_id,
             selection_set_and_unwraps: Some((fields.to_vec(), vec![])),

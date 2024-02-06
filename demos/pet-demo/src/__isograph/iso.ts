@@ -1,7 +1,4 @@
-import { ResolverParameterType as field_Pet____refetch } from './Pet/__refetch/reader.ts'
-import { ResolverParameterType as field_Checkin____refetch } from './Checkin/__refetch/reader.ts'
-import { ResolverParameterType as field_Pet____set_pet_tagline } from './Pet/__set_pet_tagline/reader.ts'
-import { ResolverParameterType as field_Pet____set_pet_best_friend } from './Pet/__set_pet_best_friend/reader.ts'
+import type {IsographEntrypoint} from '@isograph/react';
 import { ResolverParameterType as field_Pet__PetBestFriendCard } from './Pet/PetBestFriendCard/reader.ts'
 import { ResolverParameterType as field_Pet__PetTaglineCard } from './Pet/PetTaglineCard/reader.ts'
 import { ResolverParameterType as field_Pet__PetUpdater } from './Pet/PetUpdater/reader.ts'
@@ -25,18 +22,7 @@ type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
 type MatchesWhitespaceAndString<
 TString extends string,
 T
-> = Whitespace<T> extends `${TString}${string}` ? T : never;export function iso<T>(
-            param: T & MatchesWhitespaceAndString<'field Pet.__refetch', T>
-        ): IdentityWithParam<field_Pet____refetch>;
-export function iso<T>(
-            param: T & MatchesWhitespaceAndString<'field Checkin.__refetch', T>
-        ): IdentityWithParam<field_Checkin____refetch>;
-export function iso<T>(
-            param: T & MatchesWhitespaceAndString<'field Pet.__set_pet_tagline', T>
-        ): IdentityWithParam<field_Pet____set_pet_tagline>;
-export function iso<T>(
-            param: T & MatchesWhitespaceAndString<'field Pet.__set_pet_best_friend', T>
-        ): IdentityWithParam<field_Pet____set_pet_best_friend>;
+> = Whitespace<T> extends `${TString}${string}` ? T : never;
 export function iso<T>(
             param: T & MatchesWhitespaceAndString<'field Pet.PetBestFriendCard', T>
         ): IdentityWithParam<field_Pet__PetBestFriendCard>;
@@ -66,20 +52,12 @@ export function iso<T>(
         ): IdentityWithParam<field_Pet__PetStatsCard>;
 export function iso<T>(
             param: T & MatchesWhitespaceAndString<'entrypoint Query.HomeRoute', T>
-        ): IdentityWithParam<typeof entrypoint_Query__HomeRoute>;
+        ): typeof entrypoint_Query__HomeRoute;
 export function iso<T>(
             param: T & MatchesWhitespaceAndString<'entrypoint Query.PetDetailRoute', T>
-        ): IdentityWithParam<typeof entrypoint_Query__PetDetailRoute>;
+        ): typeof entrypoint_Query__PetDetailRoute;
 
-export function iso(_queryText: string): IdentityWithParam<any> {
-  // The name `identity` here is a bit of a double entendre.
-  // First, it is the identity function, constrained to operate
-  // on a very specific type. Thus, the value of b Declare`...`(
-  // someFunction) is someFunction. But furthermore, if one
-  // write b Declare`...` and passes no function, the resolver itself
-  // is the identity function. At that point, the types
-  // TResolverParameter and TResolverReturn must be identical.
-
+export function iso(_queryText: string): IdentityWithParam<any> | IsographEntrypoint<any, any, any>{
   return function identity<TResolverReturn>(
     x: (param: any) => TResolverReturn,
   ): (param: any) => TResolverReturn {

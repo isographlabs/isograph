@@ -123,7 +123,7 @@ export const UpdateUserNameButton = iso(`
   User.UpdateUserNameButton {
     set_user_name,
   }
-`)(({ data: { __set_user_name } }) => {
+`)(({ data: { set_user_name } }) => {
   return (
     <div onClick={() => set_user_name({ input: { new_name: 'Maybe' } })}>
       Call me, maybe

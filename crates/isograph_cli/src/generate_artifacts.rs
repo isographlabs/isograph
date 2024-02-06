@@ -113,7 +113,7 @@ fn build_iso_overload_for_schema_resolver(resolver: &ValidatedSchemaResolver) ->
 }
 
 fn build_iso_overload<'schema>(schema: &'schema ValidatedSchema) -> PathAndContent {
-    let mut imports = "".to_string();
+    let mut imports = "import type {IsographEntrypoint} from '@isograph/react';\n".to_string();
     let mut content = String::from(
         "type IdentityWithParam<TParam> = <TResolverReturn>(
     x: (param: TParam) => TResolverReturn
@@ -148,7 +148,7 @@ T
     }
     content.push_str(
         "
-export function iso(_queryText: string): IdentityWithParam<any> {
+export function iso(_queryText: string): IdentityWithParam<any> | IsographEntrypoint<any, any, any>{
   return function identity<TResolverReturn>(
     x: (param: any) => TResolverReturn,
   ): (param: any) => TResolverReturn {
