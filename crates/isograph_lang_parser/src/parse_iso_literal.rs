@@ -116,7 +116,7 @@ fn parse_resolver_declaration<'a>(
 ) -> ParseResultWithSpan<WithSpan<ResolverDeclaration>> {
     let resolver_declaration = tokens
         .with_span(|tokens| {
-            let description = parse_optional_description(tokens);
+            let _description = parse_optional_description(tokens)?;
             let parent_type = tokens
                 .parse_string_key_type(IsographLangTokenKind::Identifier)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
@@ -152,7 +152,6 @@ fn parse_resolver_declaration<'a>(
             // --------------------
 
             Ok(ResolverDeclaration {
-                description,
                 parent_type,
                 resolver_field_name,
                 selection_set_and_unwraps,

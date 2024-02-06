@@ -34,6 +34,9 @@ pub enum IsographLiteralParseError {
 
     #[error("Expected a valid value, like $foo or 42")]
     ExpectedNonConstantValue,
+
+    #[error("Descriptions are currently disallowed")]
+    DescriptionsAreDisallowed,
 }
 
 impl From<LowLevelParseError> for IsographLiteralParseError {

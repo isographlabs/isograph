@@ -101,7 +101,7 @@ impl UnvalidatedSchema {
         }
 
         self.resolvers.push(SchemaResolver {
-            description: resolver_declaration.item.description.map(|d| d.item),
+            description: None,
             name,
             id: next_resolver_id,
             selection_set_and_unwraps: resolver_declaration.item.selection_set_and_unwraps,
