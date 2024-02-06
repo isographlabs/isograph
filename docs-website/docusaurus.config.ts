@@ -83,8 +83,8 @@ const config: Config = {
         },
         { to: '/blog', label: 'Blog', position: 'left' },
         {
-          href: 'https://discord.gg/Q2c5tM5T8A',
-          label: 'Discord (#isograph channel)',
+          href: 'https://discord.gg/kDCcN3EDR6',
+          label: 'Discord',
           position: 'right',
         },
         {
