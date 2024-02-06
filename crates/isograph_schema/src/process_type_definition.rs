@@ -783,14 +783,19 @@ fn set_and_validate_id_field(
             }
             Ok(())
         }
-        None => Err(WithLocation::new(
-            ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {
-                strong_field_name: "id",
-                parent_type: parent_type_name,
-            },
-            // TODO this might show the wrong span?
-            field.location,
-        )),
+        None => {
+            options.on_invalid_id_type.on_failure(|| {
+                WithLocation::new(
+                    ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {
+                        strong_field_name: "id",
+                        parent_type: parent_type_name,
+                    },
+                    // TODO this shows the wrong span?
+                    field.location,
+                )
+            })?;
+            Ok(())
+        }
     }
 }
 
