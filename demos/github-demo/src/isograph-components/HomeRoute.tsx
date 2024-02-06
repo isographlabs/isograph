@@ -1,11 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useRead, useLazyReference, subscribe } from '@isograph/react';
 
 import { iso } from '@iso';
 import { Container } from '@mui/material';
-
-import { ResolverParameterType as HomePageComponentParams } from '@iso/Query/HomePage/reader';
-import HomePageEntrypoint from '@iso/Query/HomePage/entrypoint';
 
 import { FullPageLoading, Route } from './GithubDemo';
 import { RepoGitHubLink } from './RepoGitHubLink';
@@ -15,9 +12,7 @@ export const HomePage = iso(`
     Header,
     HomePageList,
   }
-`)(HomePageComponent);
-
-function HomePageComponent({ data, route, setRoute }: HomePageComponentParams) {
+`)(function HomePageComponent({ data, route, setRoute }) {
   return (
     <>
       <data.Header route={route} setRoute={setRoute} />
@@ -31,7 +26,7 @@ function HomePageComponent({ data, route, setRoute }: HomePageComponentParams) {
       </Container>
     </>
   );
-}
+});
 
 export function HomeRoute({
   route,
@@ -40,7 +35,7 @@ export function HomeRoute({
   route: Route;
   setRoute: (route: Route) => void;
 }) {
-  const { queryReference } = useLazyReference<typeof HomePageEntrypoint>(
+  const { queryReference } = useLazyReference(
     iso(`entrypoint Query.HomePage`),
     {
       first: 15,

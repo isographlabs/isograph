@@ -1,5 +1,4 @@
 import { iso } from '@iso';
-import { ResolverParameterType as AvatarProps } from '@iso/User/Avatar/reader';
 import { Avatar as MuiAvatar } from '@mui/material';
 
 export const Avatar = iso(`
@@ -7,8 +6,6 @@ export const Avatar = iso(`
     name,
     avatarUrl,
   }
-`)(AvatarComponent);
-
-function AvatarComponent(props: AvatarProps) {
+`)(function AvatarComponent(props) {
   return <MuiAvatar alt={props.data.name ?? ''} src={props.data.avatarUrl} />;
-}
+});

@@ -1,5 +1,4 @@
 import { iso } from '@iso';
-import type { ResolverParameterType as UserRepositoryListParams } from '@iso/User/RepositoryList/reader';
 
 import {
   Table,
@@ -31,9 +30,7 @@ export const RepositoryList = iso(`
       },
     },
   }
-`)(UserRepositoryListComponent);
-
-function UserRepositoryListComponent(props: UserRepositoryListParams) {
+`)(function UserRepositoryListComponent(props) {
   const repositories = [...props.data.repositories.edges].reverse();
   return (
     <Table>
@@ -70,4 +67,4 @@ function UserRepositoryListComponent(props: UserRepositoryListParams) {
       </TableBody>
     </Table>
   );
-}
+});

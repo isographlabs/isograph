@@ -1,7 +1,5 @@
 import { iso } from '@iso';
 
-import type { ResolverParameterType as RepositoryLinkParams } from '@iso/Repository/RepositoryLink/reader';
-
 import { Link } from '@mui/material';
 
 export const RepositoryLink = iso(`
@@ -12,9 +10,7 @@ export const RepositoryLink = iso(`
       login,
     },
   }
-`)(RepositoryLinkComponent);
-
-function RepositoryLinkComponent(props: RepositoryLinkParams) {
+`)(function RepositoryLinkComponent(props) {
   return (
     <Link
       onClick={() =>
@@ -30,4 +26,4 @@ function RepositoryLinkComponent(props: RepositoryLinkParams) {
       {props.children}
     </Link>
   );
-}
+});

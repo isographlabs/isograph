@@ -2,8 +2,6 @@ import React from 'react';
 import { iso } from '@iso';
 import { Card, CardContent } from '@mui/material';
 
-import { ResolverParameterType as PetCheckinsCardParams } from '@iso/Pet/PetCheckinsCard/reader';
-
 export const PetCheckinsCard = iso(`
   field Pet.PetCheckinsCard @component {
     id,
@@ -13,9 +11,7 @@ export const PetCheckinsCard = iso(`
       time,
     },
   }
-`)(PetCheckinsCardComponent);
-
-function PetCheckinsCardComponent(props: PetCheckinsCardParams) {
+`)(function PetCheckinsCardComponent(props) {
   return (
     <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
       <CardContent>
@@ -30,4 +26,4 @@ function PetCheckinsCardComponent(props: PetCheckinsCardParams) {
       </CardContent>
     </Card>
   );
-}
+});

@@ -60,10 +60,10 @@ const UserListPageEntrypoint = require('@iso/Query/UserList/entrypoint');
 
 function UserListPageRoute() {
   const queryVariables = {};
-  const { queryReference } =
-    useLazyReference <
-    typeof UserListPageEntrypoint >
-    (iso(`entrypoint Query.UserList`), queryVariables);
+  const { queryReference } = useLazyReference(
+    iso(`entrypoint Query.UserList`),
+    queryVariables,
+  );
 
   const additionalRenderProps = {};
   const Component = useRead(queryReference);

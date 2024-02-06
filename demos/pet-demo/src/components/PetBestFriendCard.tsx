@@ -2,8 +2,6 @@ import React from 'react';
 import { iso } from '@iso';
 import { Avatar, Card, CardContent, Stack } from '@mui/material';
 
-import { ResolverParameterType as PetBestFriendCardParams } from '@iso/Pet/PetBestFriendCard/reader';
-
 export const PetBestFriendCard = iso(`
   field Pet.PetBestFriendCard @component {
     id,
@@ -17,9 +15,7 @@ export const PetBestFriendCard = iso(`
       },
     },
   }
-`)(PetBestFriendCardComponent);
-
-function PetBestFriendCardComponent(props: PetBestFriendCardParams) {
+`)(function PetBestFriendCardComponent(props) {
   const bestFriendRelationship = props.data.best_friend_relationship;
   if (!bestFriendRelationship) {
     return (
@@ -53,4 +49,4 @@ function PetBestFriendCardComponent(props: PetBestFriendCardParams) {
       </CardContent>
     </Card>
   );
-}
+});

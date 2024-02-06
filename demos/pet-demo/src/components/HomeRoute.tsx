@@ -1,7 +1,6 @@
 import React from 'react';
 import { iso } from '@iso';
 import { Container, Stack } from '@mui/material';
-import { ResolverParameterType as HomeRouteParams } from '@iso/Query/HomeRoute/reader';
 
 export const HomeRoute = iso(`
   field Query.HomeRoute @component {
@@ -10,9 +9,7 @@ export const HomeRoute = iso(`
       PetSummaryCard,
     },
   }
-`)(HomeRouteComponent);
-
-function HomeRouteComponent(props: HomeRouteParams) {
+`)(function HomeRouteComponent(props) {
   return (
     <Container maxWidth="md">
       <h1>Robert's Pet List 3000</h1>
@@ -23,4 +20,4 @@ function HomeRouteComponent(props: HomeRouteParams) {
       </Stack>
     </Container>
   );
-}
+});

@@ -3,7 +3,6 @@ import { useLazyReference, useRead } from '@isograph/react';
 import { iso } from '@iso';
 import { Container } from '@mui/material';
 
-import { ResolverParameterType as UserRouteComponentParams } from '@iso/Query/UserPage/reader';
 import {
   FullPageLoading,
   Route,
@@ -17,13 +16,7 @@ export const UserPage = iso(`
     Header,
     UserDetail,
   }
-`)(UserRouteComponentComponent);
-
-function UserRouteComponentComponent({
-  data,
-  route,
-  setRoute,
-}: UserRouteComponentParams) {
+`)(function UserRouteComponentComponent({ data, route, setRoute }) {
   return (
     <>
       <data.Header route={route} setRoute={setRoute} />
@@ -34,7 +27,7 @@ function UserRouteComponentComponent({
       </Container>
     </>
   );
-}
+});
 
 export function UserRoute({
   route,

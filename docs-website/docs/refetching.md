@@ -26,6 +26,8 @@ When read out, the `__refetch` field is a function that when called will make a 
 You might use it as follows:
 
 ```tsx
+// Note: if you inline this function into the iso literal, you will not have to
+// annotate the type of props
 function PetRefetcherButtonComponent(props: PetRefetchButtonParams) {
   return (
     <Button onClick={() => props.data.__refetch()}>

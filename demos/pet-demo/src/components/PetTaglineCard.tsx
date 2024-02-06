@@ -2,16 +2,12 @@ import React from 'react';
 import { iso } from '@iso';
 import { Card, CardContent } from '@mui/material';
 
-import { ResolverParameterType as PetTaglineCardParams } from '@iso/Pet/PetTaglineCard/reader';
-
 export const PetTaglineCard = iso(`
 field Pet.PetTaglineCard @component {
   id,
   tagline,
 }
-`)(PetTaglineCardComponent);
-
-function PetTaglineCardComponent(props: PetTaglineCardParams) {
+`)(function PetTaglineCardComponent(props) {
   return (
     <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
       <CardContent>
@@ -20,4 +16,4 @@ function PetTaglineCardComponent(props: PetTaglineCardParams) {
       </CardContent>
     </Card>
   );
-}
+});

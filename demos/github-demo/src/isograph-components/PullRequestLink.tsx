@@ -1,8 +1,6 @@
 import React from 'react';
 import { iso } from '@iso';
 
-import { ResolverParameterType as PullRequestProps } from '@iso/PullRequest/PullRequestLink/reader';
-
 import { Link } from '@mui/material';
 
 export const PullRequestLink = iso(`
@@ -15,9 +13,7 @@ export const PullRequestLink = iso(`
       },
     },
   }
-`)(PullRequestLinkComponent);
-
-function PullRequestLinkComponent(props: PullRequestProps) {
+`)(function PullRequestLinkComponent(props) {
   return (
     <Link
       onClick={() =>
@@ -33,4 +29,4 @@ function PullRequestLinkComponent(props: PullRequestProps) {
       {props.children}
     </Link>
   );
-}
+});

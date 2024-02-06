@@ -1,5 +1,4 @@
 import { iso } from '@iso';
-import type { ResolverParameterType as HomePageListParams } from '@iso/Query/HomePageList/reader';
 import { RepoGitHubLink } from './RepoGitHubLink';
 import { Button } from '@mui/material';
 
@@ -12,9 +11,7 @@ export const HomePageList = iso(`
       __refetch,
     },
   }
-`)(HomePageListComponent);
-
-function HomePageListComponent(props: HomePageListParams) {
+`)(function HomePageListComponent(props) {
   return (
     <>
       <RepoGitHubLink filePath="demos/github-demo/src/isograph-components/HomePage.tsx">
@@ -27,4 +24,4 @@ function HomePageListComponent(props: HomePageListParams) {
       <props.data.viewer.RepositoryList setRoute={props.setRoute} />
     </>
   );
-}
+});

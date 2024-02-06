@@ -1,6 +1,4 @@
 import { iso } from '@iso';
-import type { ResolverParameterType as PullRequestTableParams } from '@iso/PullRequestConnection/PullRequestTable/reader';
-import type { ResolverParameterType as CreatedAtFormattedType } from '@iso/PullRequest/createdAtFormatted/reader';
 
 import {
   Table,
@@ -41,9 +39,7 @@ export const PullRequestTable = iso(`
       },
     },
   }
-`)(PullRequestTableComponent);
-
-function PullRequestTableComponent(props: PullRequestTableParams) {
+`)(function PullRequestTableComponent(props) {
   const reversedPullRequests = [...props.data.edges].reverse();
   return (
     <>
@@ -90,4 +86,4 @@ function PullRequestTableComponent(props: PullRequestTableParams) {
       </Table>
     </>
   );
-}
+});

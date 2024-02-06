@@ -68,10 +68,7 @@ Now, this field (prefixed with two underscores) is available on the `Pet` object
 You might select it like
 
 ```tsx
-export const PetTaglineInput = iso<
-  PetTaglineInputParameters,
-  ReturnType<typeof PetTaglineInputComponent>
->`
+export const PetTaglineInput = iso`
   Pet.PetTaglineInput @component {
     set_pet_tagline,
     tagline,
@@ -84,6 +81,8 @@ When read out, the field is a function that when called will make a network requ
 You might use it as follows:
 
 ```tsx
+// Note: if you inline this function into the iso literal, you will not have to
+// annotate the type of props
 function PetTaglineInputComponent(props: PetUpdaterParams) {
   const [tagline, setTagline] = useState<string>(props.data.tagline);
 

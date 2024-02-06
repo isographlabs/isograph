@@ -1,5 +1,4 @@
 import { iso } from '@iso';
-import type { ResolverParameterType as RepositoryDetailParams } from '@iso/Query/RepositoryDetail/reader';
 import { RepoGitHubLink } from './RepoGitHubLink';
 
 export const RepositoryDetail = iso(`
@@ -16,9 +15,7 @@ export const RepositoryDetail = iso(`
       },
     },
   }
-`)(RepositoryDetailComponent);
-
-function RepositoryDetailComponent(props: RepositoryDetailParams) {
+`)(function RepositoryDetailComponent(props) {
   const parent = props.data.repository?.parent;
   const repository = props.data.repository;
   if (repository == null) return null;
@@ -41,4 +38,4 @@ function RepositoryDetailComponent(props: RepositoryDetailParams) {
       {/* <div>Stargazer count: {props.data.repository?.stargazerCount}</div> */}
     </>
   );
-}
+});

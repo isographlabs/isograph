@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { iso } from '@iso';
 import { MenuItem, Select, Button, Input, Box } from '@mui/material';
 
-import { ResolverParameterType as PetUpdaterParams } from '@iso/Pet/PetUpdater/reader';
 import { PetId } from './router';
 
 export const PetUpdater = iso(`
@@ -16,9 +15,7 @@ export const PetUpdater = iso(`
     set_pet_tagline,
     tagline,
   }
-`)(PetUpdaterComponent);
-
-function PetUpdaterComponent(props: PetUpdaterParams) {
+`)(function PetUpdaterComponent(props) {
   const [selected, setSelected] = useState<PetId | 'NONE'>('NONE');
   const [tagline, setTagline] = useState<string>(props.data.tagline);
 
@@ -69,4 +66,4 @@ function PetUpdaterComponent(props: PetUpdaterParams) {
       </Box>
     </>
   );
-}
+});

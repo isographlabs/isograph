@@ -1,16 +1,12 @@
 import { iso } from '@iso';
 
-import type { ResolverParameterType as UserLinkParams } from '@iso/Actor/UserLink/reader';
-
 import { Link } from '@mui/material';
 
 export const UserLink = iso(`
   field Actor.UserLink @component {
     login,
   }
-`)(UserLinkComponent);
-
-function UserLinkComponent(props: UserLinkParams) {
+`)(function UserLinkComponent(props) {
   return (
     <Link
       onClick={() =>
@@ -24,4 +20,4 @@ function UserLinkComponent(props: UserLinkParams) {
       {props.children}
     </Link>
   );
-}
+});

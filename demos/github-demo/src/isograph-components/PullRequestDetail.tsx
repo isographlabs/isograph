@@ -1,7 +1,6 @@
 import React from 'react';
 
 import { iso } from '@iso';
-import { ResolverParameterType as PullRequestDetailsProps } from '@iso/Query/PullRequestDetail/reader';
 
 import { Card, CardContent } from '@mui/material';
 import { RepoGitHubLink } from './RepoGitHubLink';
@@ -16,9 +15,7 @@ export const PullRequestDetail = iso(`
       },
     },
   }
-`)(PullRequestDetailComponent);
-
-function PullRequestDetailComponent(props: PullRequestDetailsProps) {
+`)(function PullRequestDetailComponent(props) {
   const repository = props.data.repository;
   if (repository === null) {
     return <h1>Repository not found</h1>;
@@ -47,4 +44,4 @@ function PullRequestDetailComponent(props: PullRequestDetailsProps) {
       <pullRequest.CommentList route={props.route} setRoute={props.setRoute} />
     </>
   );
-}
+});

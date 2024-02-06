@@ -1,7 +1,6 @@
 import React from 'react';
 import { iso } from '@iso';
 import { Container, Stack } from '@mui/material';
-import { ResolverParameterType as PetDetailRouteParams } from '@iso/Query/PetDetailRoute/reader';
 
 export const PetDetailRoute = iso(`
   field Query.PetDetailRoute($id: ID!) @component {
@@ -13,12 +12,7 @@ export const PetDetailRoute = iso(`
       PetTaglineCard,
     },
   }
-`)(PetDetailRouteComponent);
-
-export function PetDetailRouteComponent({
-  data,
-  navigateTo,
-}: PetDetailRouteParams) {
+`)(function PetDetailRouteComponent({ data, navigateTo }) {
   const { pet } = data;
   if (pet == null) {
     return <h1>Pet not found.</h1>;
@@ -45,4 +39,4 @@ export function PetDetailRouteComponent({
       </React.Suspense>
     </Container>
   );
-}
+});

@@ -2,7 +2,6 @@ import React from 'react';
 import { useLazyReference, useRead } from '@isograph/react';
 import { iso } from '@iso';
 import { Container } from '@mui/material';
-import { ResolverParameterType as RepositoryPageParams } from '@iso/Query/RepositoryPage/reader';
 import RepositoryPageEntrypoint from '@iso/Query/RepositoryPage/entrypoint';
 
 import {
@@ -16,13 +15,7 @@ export const RepositoryPage = iso(`
     Header,
     RepositoryDetail,
   }
-`)(RepositoryRouteComponent);
-
-function RepositoryRouteComponent({
-  data,
-  route,
-  setRoute,
-}: RepositoryPageParams) {
+`)(function RepositoryRouteComponent({ data, route, setRoute }) {
   return (
     <>
       <data.Header route={route} setRoute={setRoute} />
@@ -33,7 +26,7 @@ function RepositoryRouteComponent({
       </Container>
     </>
   );
-}
+});
 
 export function RepositoryRoute({
   route,

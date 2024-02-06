@@ -1,5 +1,4 @@
 import { iso } from '@iso';
-import type { ResolverParameterType as UserDetailParams } from '@iso/Query/UserDetail/reader';
 import { RepoGitHubLink } from './RepoGitHubLink';
 
 export const UserDetail = iso(`
@@ -9,9 +8,7 @@ export const UserDetail = iso(`
       RepositoryList,
     },
   }
-`)(UserDetailComponent);
-
-function UserDetailComponent(props: UserDetailParams) {
+`)(function UserDetailComponent(props) {
   console.log('user detail props.data:', props.data);
   const user = props.data.user;
   if (user == null) {
@@ -27,4 +24,4 @@ function UserDetailComponent(props: UserDetailParams) {
       <user.RepositoryList setRoute={props.setRoute} />
     </>
   );
-}
+});

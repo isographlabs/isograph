@@ -7,7 +7,6 @@ import {
   Route,
 } from './GithubDemo';
 
-import { ResolverParameterType as PullRequestComponentProps } from '@iso/Query/PullRequest/reader';
 import Entrypoint from '@iso/Query/PullRequest/entrypoint';
 
 import { Container } from '@mui/material';
@@ -17,13 +16,7 @@ export const PullRequest = iso(`
     Header,
     PullRequestDetail,
   }
-`)(PullRequestComponentComponent);
-
-function PullRequestComponentComponent({
-  data,
-  route,
-  setRoute,
-}: PullRequestComponentProps) {
+`)(function PullRequestComponentComponent({ data, route, setRoute }) {
   return (
     <>
       <data.Header route={route} setRoute={setRoute} />
@@ -34,7 +27,7 @@ function PullRequestComponentComponent({
       </Container>
     </>
   );
-}
+});
 
 export function PullRequestRoute({
   route,

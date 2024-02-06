@@ -1,6 +1,5 @@
 import Image from 'next/image';
 import { iso } from '@iso';
-import { ResolverParameterType as HeaderProps } from '@iso/Query/Header/reader';
 
 import { AppBar, Button, Grid, Container } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
@@ -15,9 +14,7 @@ export const Header = iso(`
       Avatar,
     },
   }
-`)(HeaderComponent);
-
-function HeaderComponent(props: HeaderProps) {
+`)(function HeaderComponent(props) {
   return (
     <>
       <AppBar position="fixed" color="primary" sx={{ p: 0.5 }}>
@@ -42,7 +39,7 @@ function HeaderComponent(props: HeaderProps) {
       <div style={{ height: 48 }} />
     </>
   );
-}
+});
 
 function Buttons({
   route,

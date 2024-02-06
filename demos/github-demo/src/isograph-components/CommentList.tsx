@@ -2,9 +2,6 @@ import React from 'react';
 
 import { iso } from '@iso';
 
-import { ResolverParameterType as CommentListProps } from '@iso/PullRequest/CommentList/reader';
-import { ResolverParameterType as IssueCommentProps } from '@iso/IssueComment/formattedCommentCreationDate/reader';
-
 import { Card, CardContent } from '@mui/material';
 
 export const formattedCommentCreationDate = iso(`
@@ -35,9 +32,7 @@ export const CommentList = iso(`
       },
     },
   }
-`)(CommentListComponent);
-
-function CommentListComponent(props: CommentListProps) {
+`)(function CommentListComponent(props) {
   const comments = [...props.data.comments.edges].reverse();
 
   return comments.map((commentNode) => {
@@ -59,4 +54,4 @@ function CommentListComponent(props: CommentListProps) {
       </Card>
     );
   });
-}
+});

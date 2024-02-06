@@ -163,7 +163,6 @@ You may need to provide a bearer token if you are using a public API, such as th
 ```tsx
 import React from 'react';
 import { iso } from '@iso';
-import { ResolverParameterType as EpisodeListParams } from '@iso/Root/EpisodeList/reader';
 
 // Note: normally, the "root" field is called Query, but in the Star Wars
 // GraphQL schema it is called Root. Odd!
@@ -177,9 +176,7 @@ export const EpisodeList = iso`
       },
     },
   }
-`(EpisodeListComponent);
-
-function EpisodeListComponent({ data }: EpisodeListParams) {
+`(function EpisodeListComponent({ data }) {
   const filmsSorted = data.allFilms?.films ?? [];
   filmsSorted.sort((film1, film2) => {
     if (film1?.episodeID == null || film2?.episodeID == null) {
@@ -202,7 +199,7 @@ function EpisodeListComponent({ data }: EpisodeListParams) {
       ))}
     </>
   );
-}
+});
 ```
 
 ## Fetch that Episode List
@@ -223,7 +220,7 @@ export default function EpisodeListRoute() {
 }
 
 function Inner() {
-  const { queryReference } = useLazyReference<typeof EpisodeListEntrypoint>(
+  const { queryReference } = useLazyReference(
     iso(`entrypoint Root.EpisodeList`),
     {
       /* query variables */
@@ -265,7 +262,6 @@ A key principle of React is that you can divide your components into subcomponen
 ```tsx
 import React from 'react';
 import { iso } from '@iso';
-import { ResolverParameterType as CharacterSummaryParams } from '@iso/Person/CharacterSummary/reader';
 
 export const CharacterSummary = iso(`
   field Person.CharacterSummary @component {
@@ -274,15 +270,13 @@ export const CharacterSummary = iso(`
       name,
     },
   }
-`)(CharacterSummaryComponent);
-
-function CharacterSummaryComponent({ data }: CharacterSummaryParams) {
+`)(function CharacterSummaryComponent({ data }) {
   return (
     <li>
       {data.name}, from the planet {data.homeworld?.name}
     </li>
   );
-}
+});
 ```
 
 You might use this component by modifying `EpisodeList.tsx` to be the following. Note the two new sections:
@@ -290,7 +284,6 @@ You might use this component by modifying `EpisodeList.tsx` to be the following.
 ```tsx
 import React from 'react';
 import { iso } from '@iso';
-import { ResolverParameterType as EpisodeListParams } from '@iso/Root/EpisodeList/reader';
 
 // Note: normally, the "root" field is called Query, but in the Star Wars
 // GraphQL schema it is called Root. Odd!
@@ -312,9 +305,7 @@ export const EpisodeList = iso(`
       },
     },
   }
-`)(EpisodeListComponent);
-
-function EpisodeListComponent({ data }: EpisodeListParams) {
+`)(function EpisodeListComponent({ data }) {
   const filmsSorted = data.allFilms?.films ?? [];
   filmsSorted.sort((film1, film2) => {
     if (film1?.episodeID == null || film2?.episodeID == null) {
@@ -348,7 +339,7 @@ function EpisodeListComponent({ data }: EpisodeListParams) {
       ))}
     </>
   );
-}
+});
 ```
 
 Now, if you refresh, you'll see a list of Star Wars characters that show up in each movie! Wow!
