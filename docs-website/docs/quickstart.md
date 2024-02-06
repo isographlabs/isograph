@@ -162,7 +162,7 @@ You may need to provide a bearer token if you are using a public API, such as th
 
 ```tsx
 import React from 'react';
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import { ResolverParameterType as EpisodeListParams } from '@iso/Root/EpisodeList/reader';
 
 // Note: normally, the "root" field is called Query, but in the Star Wars
@@ -224,7 +224,7 @@ export default function EpisodeListRoute() {
 
 function Inner() {
   const { queryReference } = useLazyReference<typeof EpisodeListEntrypoint>(
-    iso`entrypoint Root.EpisodeList`,
+    iso(`entrypoint Root.EpisodeList`),
     {
       /* query variables */
     },
@@ -264,17 +264,17 @@ A key principle of React is that you can divide your components into subcomponen
 
 ```tsx
 import React from 'react';
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import { ResolverParameterType as CharacterSummaryParams } from '@iso/Person/CharacterSummary/reader';
 
-export const CharacterSummary = iso<CharacterSummaryParams>`
+export const CharacterSummary = iso(`
   field Person.CharacterSummary @component {
     name,
     homeworld {
       name,
     },
   }
-`(CharacterSummaryComponent);
+`)(CharacterSummaryComponent);
 
 function CharacterSummaryComponent({ data }: CharacterSummaryParams) {
   return (
@@ -289,12 +289,12 @@ You might use this component by modifying `EpisodeList.tsx` to be the following.
 
 ```tsx
 import React from 'react';
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import { ResolverParameterType as EpisodeListParams } from '@iso/Root/EpisodeList/reader';
 
 // Note: normally, the "root" field is called Query, but in the Star Wars
 // GraphQL schema it is called Root. Odd!
-export const EpisodeList = iso<EpisodeListParams>`
+export const EpisodeList = iso(`
   field Root.EpisodeList @component {
     allFilms {
       films {
@@ -312,7 +312,7 @@ export const EpisodeList = iso<EpisodeListParams>`
       },
     },
   }
-`(EpisodeListComponent);
+`)(EpisodeListComponent);
 
 function EpisodeListComponent({ data }: EpisodeListParams) {
   const filmsSorted = data.allFilms?.films ?? [];

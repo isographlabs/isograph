@@ -1,9 +1,9 @@
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import type { ResolverParameterType as HomePageListParams } from '@iso/Query/HomePageList/reader';
 import { RepoGitHubLink } from './RepoGitHubLink';
 import { Button } from '@mui/material';
 
-export const HomePageList = iso<HomePageListParams>`
+export const HomePageList = iso(`
   field Query.HomePageList($first: Int!) @component {
     viewer {
       login,
@@ -12,7 +12,7 @@ export const HomePageList = iso<HomePageListParams>`
       __refetch,
     },
   }
-`(HomePageListComponent);
+`)(HomePageListComponent);
 
 function HomePageListComponent(props: HomePageListParams) {
   return (

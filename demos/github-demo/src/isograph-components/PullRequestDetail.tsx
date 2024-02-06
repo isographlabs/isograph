@@ -1,12 +1,12 @@
 import React from 'react';
 
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import { ResolverParameterType as PullRequestDetailsProps } from '@iso/Query/PullRequestDetail/reader';
 
 import { Card, CardContent } from '@mui/material';
 import { RepoGitHubLink } from './RepoGitHubLink';
 
-export const PullRequestDetail = iso<PullRequestDetailsProps>`
+export const PullRequestDetail = iso(`
   field Query.PullRequestDetail @component {
     repository(owner: $repositoryOwner, name: $repositoryName) {
       pullRequest(number: $pullRequestNumber) {
@@ -16,7 +16,7 @@ export const PullRequestDetail = iso<PullRequestDetailsProps>`
       },
     },
   }
-`(PullRequestDetailComponent);
+`)(PullRequestDetailComponent);
 
 function PullRequestDetailComponent(props: PullRequestDetailsProps) {
   const repository = props.data.repository;

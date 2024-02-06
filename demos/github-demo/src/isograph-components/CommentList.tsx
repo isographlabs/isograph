@@ -1,17 +1,17 @@
 import React from 'react';
 
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 
 import { ResolverParameterType as CommentListProps } from '@iso/PullRequest/CommentList/reader';
 import { ResolverParameterType as IssueCommentProps } from '@iso/IssueComment/formattedCommentCreationDate/reader';
 
 import { Card, CardContent } from '@mui/material';
 
-export const formattedCommentCreationDate = iso<IssueCommentProps>`
+export const formattedCommentCreationDate = iso(`
   field IssueComment.formattedCommentCreationDate {
     createdAt,
   }
-`((props) => {
+`)((props) => {
   const date = new Date(props.createdAt);
   return date.toLocaleDateString('en-us', {
     year: 'numeric',
@@ -20,7 +20,7 @@ export const formattedCommentCreationDate = iso<IssueCommentProps>`
   });
 });
 
-export const CommentList = iso<CommentListProps>`
+export const CommentList = iso(`
   field PullRequest.CommentList @component {
     comments(last: $last) {
       edges {
@@ -35,7 +35,7 @@ export const CommentList = iso<CommentListProps>`
       },
     },
   }
-`(CommentListComponent);
+`)(CommentListComponent);
 
 function CommentListComponent(props: CommentListProps) {
   const comments = [...props.data.comments.edges].reverse();

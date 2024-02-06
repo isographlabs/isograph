@@ -16,8 +16,8 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    DefinedTypeId, NonConstantValue, Selection, SelectionFieldArgument, ServerFieldSelection,
-    VariableDefinition,
+    DefinedTypeId, NonConstantValue, ResolverFieldId, Selection, SelectionFieldArgument,
+    ServerFieldSelection, VariableDefinition,
 };
 use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_resolver,
@@ -64,16 +64,116 @@ pub(crate) fn generate_and_write_artifacts(
     Ok(artifact_count)
 }
 
+fn build_iso_overload_for_entrypoint<'schema>(
+    resolver_field_id: ResolverFieldId,
+    schema: &'schema ValidatedSchema,
+) -> (String, String) {
+    let resolver = schema.resolver(resolver_field_id);
+    let mut s: String = "".to_string();
+    let import = format!(
+        "import entrypoint_{} from '../__isograph/{}/{}/entrypoint.ts'\n",
+        resolver.type_and_field.underscore_separated(),
+        resolver.type_and_field.type_name,
+        resolver.type_and_field.field_name,
+    );
+    let formatted_field = format!(
+        "entrypoint {}.{}",
+        resolver.type_and_field.type_name, resolver.type_and_field.field_name
+    );
+    s.push_str(&format!(
+        "export function iso<T>(
+            param: T & MatchesWhitespaceAndString<'{}', T>
+        ): typeof entrypoint_{};\n",
+        formatted_field,
+        resolver.type_and_field.underscore_separated(),
+    ));
+    (import, s)
+}
+
+fn build_iso_overload_for_schema_resolver(resolver: &ValidatedSchemaResolver) -> (String, String) {
+    let mut s: String = "".to_string();
+    let import = format!(
+        "import {{ ResolverParameterType as field_{} }} from './{}/{}/reader.ts'\n",
+        resolver.type_and_field.underscore_separated(),
+        resolver.type_and_field.type_name,
+        resolver.type_and_field.field_name,
+    );
+    let formatted_field = format!(
+        "field {}.{}",
+        resolver.type_and_field.type_name, resolver.type_and_field.field_name
+    );
+    s.push_str(&format!(
+        "export function iso<T>(
+            param: T & MatchesWhitespaceAndString<'{}', T>
+        ): IdentityWithParam<field_{}>;\n",
+        formatted_field,
+        resolver.type_and_field.underscore_separated(),
+    ));
+    (import, s)
+}
+
+fn build_iso_overload<'schema>(schema: &'schema ValidatedSchema) -> PathAndContent {
+    let mut imports = "import type {IsographEntrypoint} from '@isograph/react';\n".to_string();
+    let mut content = String::from(
+        "type IdentityWithParam<TParam> = <TResolverReturn>(
+    x: (param: TParam) => TResolverReturn
+) => (param: TParam) => TResolverReturn;
+
+type WhitespaceCharacter = ' ' | '\\n';
+type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
+? Whitespace<In>
+: In;
+
+type MatchesWhitespaceAndString<
+TString extends string,
+T
+> = Whitespace<T> extends `${TString}${string}` ? T : never;\n",
+    );
+    let entrypoints_overload = schema
+        .entrypoints
+        .iter()
+        .map(|resolver_field_id| build_iso_overload_for_entrypoint(*resolver_field_id, schema));
+    let fields_overload = schema
+        .resolvers
+        .iter()
+        .filter(|resolver| matches!(resolver.action_kind, ResolverActionKind::NamedImport(_)))
+        .map(|schema_resolver| build_iso_overload_for_schema_resolver(schema_resolver));
+    for (import, field_overload) in fields_overload {
+        imports.push_str(&import);
+        content.push_str(&field_overload);
+    }
+    for (import, entrypoint_overload) in entrypoints_overload {
+        imports.push_str(&import);
+        content.push_str(&entrypoint_overload);
+    }
+    content.push_str(
+        "
+export function iso(_queryText: string): IdentityWithParam<any> | IsographEntrypoint<any, any, any>{
+  return function identity<TResolverReturn>(
+    x: (param: any) => TResolverReturn,
+  ): (param: any) => TResolverReturn {
+    return x;
+  };
+}",
+    );
+    imports.push_str(&content);
+    PathAndContent {
+        file_content: imports,
+        relative_directory: PathBuf::new(),
+        file_name_prefix: "iso".intern().into(),
+    }
+}
+
 fn get_artifact_path_and_contents<'schema>(
     schema: &'schema ValidatedSchema,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
 ) -> impl Iterator<Item = PathAndContent> + 'schema {
     let artifact_infos = get_artifact_infos(schema, project_root, artifact_directory);
-
     artifact_infos
         .into_iter()
         .map(ArtifactInfo::to_path_and_content)
+        .chain(std::iter::once(build_iso_overload(schema)))
 }
 
 /// get all artifacts that we must generate according to the following rough plan:

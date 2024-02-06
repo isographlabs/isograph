@@ -1,16 +1,16 @@
 import React from 'react';
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import { Container, Stack } from '@mui/material';
 import { ResolverParameterType as HomeRouteParams } from '@iso/Query/HomeRoute/reader';
 
-export const HomeRoute = iso<HomeRouteParams>`
+export const HomeRoute = iso(`
   field Query.HomeRoute @component {
     pets {
       id,
       PetSummaryCard,
     },
   }
-`(HomeRouteComponent);
+`)(HomeRouteComponent);
 
 function HomeRouteComponent(props: HomeRouteParams) {
   return (

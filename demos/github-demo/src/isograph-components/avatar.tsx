@@ -1,13 +1,13 @@
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import { ResolverParameterType as AvatarProps } from '@iso/User/Avatar/reader';
 import { Avatar as MuiAvatar } from '@mui/material';
 
-export const Avatar = iso<AvatarProps>`
+export const Avatar = iso(`
   field User.Avatar @component {
     name,
     avatarUrl,
   }
-`(AvatarComponent);
+`)(AvatarComponent);
 
 function AvatarComponent(props: AvatarProps) {
   return <MuiAvatar alt={props.data.name ?? ''} src={props.data.avatarUrl} />;

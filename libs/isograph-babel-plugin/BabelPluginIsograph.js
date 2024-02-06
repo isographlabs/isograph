@@ -30,7 +30,7 @@ module.exports = function BabelPluginIsograph(context) {
   }
 
   const visitor = {
-    TaggedTemplateExpression(path) {
+    CallExpression(path) {
       compileTag(t, path, IsographConfig);
     },
   };

@@ -1,9 +1,9 @@
 import React from 'react';
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import { Container, Stack } from '@mui/material';
 import { ResolverParameterType as PetDetailRouteParams } from '@iso/Query/PetDetailRoute/reader';
 
-export const PetDetailRoute = iso<PetDetailRouteParams>`
+export const PetDetailRoute = iso(`
   field Query.PetDetailRoute($id: ID!) @component {
     pet(id: $id) {
       name,
@@ -13,7 +13,7 @@ export const PetDetailRoute = iso<PetDetailRouteParams>`
       PetTaglineCard,
     },
   }
-`(PetDetailRouteComponent);
+`)(PetDetailRouteComponent);
 
 export function PetDetailRouteComponent({
   data,

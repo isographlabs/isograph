@@ -1,14 +1,14 @@
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 
 import type { ResolverParameterType as UserLinkParams } from '@iso/Actor/UserLink/reader';
 
 import { Link } from '@mui/material';
 
-export const UserLink = iso<UserLinkParams>`
+export const UserLink = iso(`
   field Actor.UserLink @component {
     login,
   }
-`(UserLinkComponent);
+`)(UserLinkComponent);
 
 function UserLinkComponent(props: UserLinkParams) {
   return (

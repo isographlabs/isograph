@@ -16,7 +16,7 @@ At a very high level, the Isograph compiler does the following:
 
 - It will parse [the Isograph config file](../../isograph-config).
 - It will parse and validate the GraphQL schema.
-- It will parse and validate `iso` literals.
+- It will parse and validate `iso` invocations.
 - It will generate artifacts.
 
 If during any of these steps, one or more validation errors are generated, the compiler will print those errors and not continue compiling.
@@ -45,7 +45,7 @@ The isograph compiler contains the following crates. The most important ones are
 - 🟢 `isograph_cli`: The package which exposes the CLI for the Isograph compiler. It also includes the artifact generation code.
 - 🟢 `isograph_lang_parser`: An LL(1) parser for Isograph literals
 - `isograph_lang_types`: Some common types.
-- 🟢 `isograph_schema`: The in-memory representation of the Isograph schema. This includes server fields and fields generated from `iso` literals. It should probably not include representations of `iso` entrypoints, but currently does.
+- 🟢 `isograph_schema`: The in-memory representation of the Isograph schema. This includes server fields and fields generated from `iso` invocations. It should probably not include representations of `iso` entrypoints, but currently does.
 - `string_key_newtype`: A library for generating typesafe newtype wrappers around `StringKey` types.
 - `u32_newtypes`: A library for generating typesafe newtype wrappers around `u32` types.
 

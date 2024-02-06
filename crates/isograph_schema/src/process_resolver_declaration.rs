@@ -143,7 +143,7 @@ pub enum ProcessResolverDeclarationError {
     },
 
     #[error(
-        "Resolvers with @component must have associated javascript (i.e. iso`...` must be called as a function, as in iso`...`(MyComponent))"
+        "Resolvers with @component must have associated javascript (i.e. iso(`...`) must be called as a function, as in iso(`...`)(MyComponent))"
     )]
     // TODO add parent type and resolver field name
     ComponentResolverMissingJsFunction,

@@ -1,10 +1,10 @@
 import React from 'react';
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import { Avatar, Card, CardContent, Stack } from '@mui/material';
 
 import { ResolverParameterType as PetBestFriendCardParams } from '@iso/Pet/PetBestFriendCard/reader';
 
-export const PetBestFriendCard = iso<PetBestFriendCardParams>`
+export const PetBestFriendCard = iso(`
   field Pet.PetBestFriendCard @component {
     id,
     PetUpdater,
@@ -17,7 +17,7 @@ export const PetBestFriendCard = iso<PetBestFriendCardParams>`
       },
     },
   }
-`(PetBestFriendCardComponent);
+`)(PetBestFriendCardComponent);
 
 function PetBestFriendCardComponent(props: PetBestFriendCardParams) {
   const bestFriendRelationship = props.data.best_friend_relationship;

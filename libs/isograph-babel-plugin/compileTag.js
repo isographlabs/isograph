@@ -3,9 +3,8 @@
 const pathModule = require('path');
 
 function compileTag(t, path, config) {
-  const tag = path.get('tag');
-
-  if (tag.isIdentifier({ name: 'iso' })) {
+  const callee = path.node.callee;
+  if (t.isIdentifier(callee) && callee.name === 'iso' && path.node.arguments) {
     const { keyword, type, field } = getTypeAndField(path);
     if (keyword === 'entrypoint') {
       // This throws if the tag is invalid
@@ -19,7 +18,6 @@ function compileTag(t, path, config) {
       );
     }
   }
-
   return false;
 }
 
@@ -29,14 +27,19 @@ const typeAndFieldRegex = new RegExp(
 );
 
 function getTypeAndField(path) {
-  const quasis = path.node.quasi.quasis;
+  if (path.node.arguments.length !== 1) {
+    throw new Error(
+      `BabelPluginIsograph: Iso invocation require one parameter, found ${path.node.arguments.length}`,
+    );
+  }
+  const quasis = path.node.arguments[0].quasis;
   if (quasis.length !== 1) {
     throw new Error(
       'BabelPluginIsograph: Substitutions are not allowed in iso fragments.',
     );
   }
 
-  const content = path.node.quasi.quasis[0].value.raw;
+  const content = quasis[0].value.raw;
   const typeAndField = typeAndFieldRegex.exec(content);
 
   const keyword = typeAndField[1];

@@ -1,15 +1,15 @@
 import React from 'react';
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import { Card, CardContent } from '@mui/material';
 
 import { ResolverParameterType as PetPhraseCardParams } from '@iso/Pet/PetPhraseCard/reader';
 
-export const PetPhraseCard = iso<PetPhraseCardParams>`
+export const PetPhraseCard = iso(`
 field Pet.PetPhraseCard @component {
   id,
   favorite_phrase,
 }
-`(PetPhraseCardComponent);
+`)(PetPhraseCardComponent);
 
 function PetPhraseCardComponent(props: PetPhraseCardParams) {
   return (

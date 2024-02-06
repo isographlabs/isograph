@@ -14,12 +14,12 @@
 Isograph is a framework for building React applications that are backed by GraphQL data. In Isograph, components that read data can be selected from the graph, and automatically have the data they require passed in. Consider this example avatar component:
 
 ```js
-export const Avatar = iso`
+export const Avatar = iso(`
   User.Avatar @component {
     name,
     avatar_url,
   }
-`(function AvatarComponent({ data, ...otherRuntimeProps }) {
+`)(function AvatarComponent({ data, ...otherRuntimeProps }) {
   return <CircleImage image={data.avatar_url} />;
 });
 ```
@@ -27,7 +27,7 @@ export const Avatar = iso`
 This avatar component is available on any GraphQL User. You might use this avatar component in another component, such as a button that navigates to a given user's profile.
 
 ```js
-export const UserProfileButton = iso`
+export const UserProfileButton = iso(`
   User.UserProfileButton @component {
     Avatar,
 
@@ -35,7 +35,7 @@ export const UserProfileButton = iso`
     id,
     name,
   }
-`(function UserProfileButtonComponent({ data }) {
+`)(function UserProfileButtonComponent({ data }) {
   return (
     <Button onClick={() => navigateToUserProfile(data.id)}>
       {data.name}
@@ -51,7 +51,7 @@ These calls to `iso` define resolvers, which are functions from graph data (such
 
 At the root of each page, you will define an entrypoint with `iso`. Isograph's compiler finds and processes all the entrypoints in your codebase, and will generate the appropriate GraphQL query.
 
-So, if the compiler encounters ``iso`entrypoint Query.UserList `;``, it would generate a query that would fetch all the server fields needed for the `Query.UserList` resolver and all of the resolvers that it references. Then, when the user navigates to the user list page, that query would be executed.
+So, if the compiler encounters ``iso(`entrypoint Query.UserList `);``, it would generate a query that would fetch all the server fields needed for the `Query.UserList` resolver and all of the resolvers that it references. Then, when the user navigates to the user list page, that query would be executed.
 
 For example, the data might be fetched during render as follows:
 
@@ -63,7 +63,7 @@ function UserListPageRoute() {
   const { queryReference } =
     useLazyReference <
     typeof UserListPageEntrypoint >
-    (iso`entrypoint Query.UserList`, queryVariables);
+    (iso(`entrypoint Query.UserList`), queryVariables);
 
   const additionalRenderProps = {};
   const Component = read(queryReference);
@@ -119,11 +119,11 @@ type Mutation
 In the above example, the `set_user_name` field will be made available on every `User` object, under the key `set_user_name` (this will be customizable.) So, one could write a resolver:
 
 ```js
-export const UpdateUserNameButton = iso`
+export const UpdateUserNameButton = iso(`
   User.UpdateUserNameButton {
     set_user_name,
   }
-`(({ data: { set_user_name } }) => {
+`)(({ data: { set_user_name } }) => {
   return (
     <div onClick={() => set_user_name({ input: { new_name: 'Maybe' } })}>
       Call me, maybe

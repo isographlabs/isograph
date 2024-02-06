@@ -36,8 +36,6 @@ export {
   createIsographStore,
 } from './IsographEnvironment';
 
-export { iso } from './iso';
-
 // This type should be treated as an opaque type.
 export type IsographEntrypoint<
   TReadFromStore extends Object,

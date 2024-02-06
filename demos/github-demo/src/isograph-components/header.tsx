@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import { ResolverParameterType as HeaderProps } from '@iso/Query/Header/reader';
 
 import { AppBar, Button, Grid, Container } from '@mui/material';
@@ -8,14 +8,14 @@ import { Route } from './GithubDemo';
 
 import logo from './svgs/dark-logo.svg';
 
-export const Header = iso<HeaderProps>`
+export const Header = iso(`
   field Query.Header @component {
     viewer {
       name,
       Avatar,
     },
   }
-`(HeaderComponent);
+`)(HeaderComponent);
 
 function HeaderComponent(props: HeaderProps) {
   return (

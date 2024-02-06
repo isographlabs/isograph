@@ -1,4 +1,4 @@
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import type { ResolverParameterType as PullRequestTableParams } from '@iso/PullRequestConnection/PullRequestTable/reader';
 import type { ResolverParameterType as CreatedAtFormattedType } from '@iso/PullRequest/createdAtFormatted/reader';
 
@@ -10,11 +10,11 @@ import {
   TableRow,
 } from '@mui/material';
 
-export const createdAtFormatted = iso<CreatedAtFormattedType>`
+export const createdAtFormatted = iso(`
   field PullRequest.createdAtFormatted {
     createdAt,
   }
-`((props) => {
+`)((props) => {
   const date = new Date(props.createdAt);
   return date.toLocaleDateString('en-us', {
     year: 'numeric',
@@ -23,7 +23,7 @@ export const createdAtFormatted = iso<CreatedAtFormattedType>`
   });
 });
 
-export const PullRequestTable = iso<PullRequestTableParams>`
+export const PullRequestTable = iso(`
   field PullRequestConnection.PullRequestTable @component {
     edges {
       node {
@@ -41,7 +41,7 @@ export const PullRequestTable = iso<PullRequestTableParams>`
       },
     },
   }
-`(PullRequestTableComponent);
+`)(PullRequestTableComponent);
 
 function PullRequestTableComponent(props: PullRequestTableParams) {
   const reversedPullRequests = [...props.data.edges].reverse();

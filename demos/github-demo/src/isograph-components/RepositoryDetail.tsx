@@ -1,8 +1,8 @@
-import { iso } from '@isograph/react';
+import { iso } from '@iso';
 import type { ResolverParameterType as RepositoryDetailParams } from '@iso/Query/RepositoryDetail/reader';
 import { RepoGitHubLink } from './RepoGitHubLink';
 
-export const RepositoryDetail = iso<RepositoryDetailParams>`
+export const RepositoryDetail = iso(`
   field Query.RepositoryDetail @component {
     repository(name: $repositoryName, owner: $repositoryOwner) {
       nameWithOwner,
@@ -16,7 +16,7 @@ export const RepositoryDetail = iso<RepositoryDetailParams>`
       },
     },
   }
-`(RepositoryDetailComponent);
+`)(RepositoryDetailComponent);
 
 function RepositoryDetailComponent(props: RepositoryDetailParams) {
   const parent = props.data.repository?.parent;

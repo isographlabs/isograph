@@ -135,11 +135,11 @@ import {
 } from "@iso/User/Avatar/reader";
 import MyComponentLibraryAvatar from 'my-component-library';
   
-export const Avatar = iso<AvatarProps>${'`'}
+export const Avatar = iso(${'`'}
   User.Avatar @component {
     avatarUrl,
   }
-${'`'}(AvatarComponent);
+${'`'})(AvatarComponent);
   
 function AvatarComponent(props: AvatarProps) {
   return <MyComponentLibraryAvatar url={props.data.avatarUrl} />
