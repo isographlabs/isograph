@@ -166,7 +166,7 @@ import { iso } from '@iso';
 
 // Note: normally, the "root" field is called Query, but in the Star Wars
 // GraphQL schema it is called Root. Odd!
-export const EpisodeList = iso`
+export const EpisodeList = iso(`
   field Root.EpisodeList @component {
     allFilms {
       films {
@@ -176,7 +176,7 @@ export const EpisodeList = iso`
       },
     },
   }
-`(function EpisodeListComponent({ data }) {
+`)(function EpisodeListComponent({ data }) {
   const filmsSorted = data.allFilms?.films ?? [];
   filmsSorted.sort((film1, film2) => {
     if (film1?.episodeID == null || film2?.episodeID == null) {
