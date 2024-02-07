@@ -1,4 +1,5 @@
 use std::{
+    cmp::Ordering,
     collections::{hash_map::Entry, HashMap},
     fmt::{self, Debug, Display},
     io,
@@ -16,8 +17,8 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    DefinedTypeId, NonConstantValue, ResolverFieldId, Selection, SelectionFieldArgument,
-    ServerFieldSelection, VariableDefinition,
+    DefinedTypeId, NonConstantValue, Selection, SelectionFieldArgument, ServerFieldSelection,
+    VariableDefinition,
 };
 use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_resolver,
@@ -65,10 +66,8 @@ pub(crate) fn generate_and_write_artifacts(
 }
 
 fn build_iso_overload_for_entrypoint<'schema>(
-    resolver_field_id: ResolverFieldId,
-    schema: &'schema ValidatedSchema,
+    resolver: &ValidatedSchemaResolver,
 ) -> (String, String) {
-    let resolver = schema.resolver(resolver_field_id);
     let mut s: String = "".to_string();
     let import = format!(
         "import entrypoint_{} from '../__isograph/{}/{}/entrypoint.ts'\n",
@@ -81,16 +80,19 @@ fn build_iso_overload_for_entrypoint<'schema>(
         resolver.type_and_field.type_name, resolver.type_and_field.field_name
     );
     s.push_str(&format!(
-        "export function iso<T>(
-            param: T & MatchesWhitespaceAndString<'{}', T>
-        ): typeof entrypoint_{};\n",
+        "
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'{}', T>
+): typeof entrypoint_{};\n",
         formatted_field,
         resolver.type_and_field.underscore_separated(),
     ));
     (import, s)
 }
 
-fn build_iso_overload_for_schema_resolver(resolver: &ValidatedSchemaResolver) -> (String, String) {
+fn build_iso_overload_for_client_defined_field(
+    resolver: &ValidatedSchemaResolver,
+) -> (String, String) {
     let mut s: String = "".to_string();
     let import = format!(
         "import {{ ResolverParameterType as field_{} }} from './{}/{}/reader.ts'\n",
@@ -103,9 +105,10 @@ fn build_iso_overload_for_schema_resolver(resolver: &ValidatedSchemaResolver) ->
         resolver.type_and_field.type_name, resolver.type_and_field.field_name
     );
     s.push_str(&format!(
-        "export function iso<T>(
-            param: T & MatchesWhitespaceAndString<'{}', T>
-        ): IdentityWithParam<field_{}>;\n",
+        "
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'{}', T>
+): IdentityWithParam<field_{}>;\n",
         formatted_field,
         resolver.type_and_field.underscore_separated(),
     ));
@@ -115,37 +118,38 @@ fn build_iso_overload_for_schema_resolver(resolver: &ValidatedSchemaResolver) ->
 fn build_iso_overload<'schema>(schema: &'schema ValidatedSchema) -> PathAndContent {
     let mut imports = "import type {IsographEntrypoint} from '@isograph/react';\n".to_string();
     let mut content = String::from(
-        "type IdentityWithParam<TParam> = <TResolverReturn>(
-    x: (param: TParam) => TResolverReturn
+        "
+type IdentityWithParam<TParam> = <TResolverReturn>(
+  x: (param: TParam) => TResolverReturn
 ) => (param: TParam) => TResolverReturn;
 
 type WhitespaceCharacter = ' ' | '\\n';
 type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
-? Whitespace<In>
-: In;
+  ? Whitespace<In>
+  : In;
 
 type MatchesWhitespaceAndString<
-TString extends string,
-T
+  TString extends string,
+  T
 > = Whitespace<T> extends `${TString}${string}` ? T : never;\n",
     );
-    let entrypoints_overload = schema
-        .entrypoints
-        .iter()
-        .map(|resolver_field_id| build_iso_overload_for_entrypoint(*resolver_field_id, schema));
-    let fields_overload = schema
-        .resolvers
-        .iter()
-        .filter(|resolver| matches!(resolver.action_kind, ResolverActionKind::NamedImport(_)))
-        .map(|schema_resolver| build_iso_overload_for_schema_resolver(schema_resolver));
-    for (import, field_overload) in fields_overload {
-        imports.push_str(&import);
-        content.push_str(&field_overload);
-    }
-    for (import, entrypoint_overload) in entrypoints_overload {
+
+    let entrypoint_overloads = sorted_entrypoints(schema)
+        .into_iter()
+        .map(build_iso_overload_for_entrypoint);
+    for (import, entrypoint_overload) in entrypoint_overloads {
         imports.push_str(&import);
         content.push_str(&entrypoint_overload);
     }
+
+    let client_defined_field_overloads = sorted_client_defined_fields(schema)
+        .into_iter()
+        .map(build_iso_overload_for_client_defined_field);
+    for (import, field_overload) in client_defined_field_overloads {
+        imports.push_str(&import);
+        content.push_str(&field_overload);
+    }
+
     content.push_str(
         "
 export function iso(_queryText: string): IdentityWithParam<any> | IsographEntrypoint<any, any, any>{
@@ -162,6 +166,52 @@ export function iso(_queryText: string): IdentityWithParam<any> | IsographEntryp
         relative_directory: PathBuf::new(),
         file_name_prefix: "iso".intern().into(),
     }
+}
+
+fn sorted_entrypoints(schema: &ValidatedSchema) -> Vec<&ValidatedSchemaResolver> {
+    let mut entrypoints = schema
+        .entrypoints
+        .iter()
+        .map(|resolver_field_id| schema.resolver(*resolver_field_id))
+        .collect::<Vec<_>>();
+    entrypoints.sort_by(|resolver_1, resolver_2| {
+        match resolver_1
+            .type_and_field
+            .type_name
+            .cmp(&resolver_2.type_and_field.type_name)
+        {
+            Ordering::Less => Ordering::Less,
+            Ordering::Greater => Ordering::Greater,
+            Ordering::Equal => resolver_1
+                .type_and_field
+                .field_name
+                .cmp(&resolver_2.type_and_field.field_name),
+        }
+    });
+    entrypoints
+}
+
+fn sorted_client_defined_fields(schema: &ValidatedSchema) -> Vec<&ValidatedSchemaResolver> {
+    let mut fields = schema
+        .resolvers
+        .iter()
+        .filter(|resolver| matches!(resolver.action_kind, ResolverActionKind::NamedImport(_)))
+        .collect::<Vec<_>>();
+    fields.sort_by(|resolver_1, resolver_2| {
+        match resolver_1
+            .type_and_field
+            .type_name
+            .cmp(&resolver_2.type_and_field.type_name)
+        {
+            Ordering::Less => Ordering::Less,
+            Ordering::Greater => Ordering::Greater,
+            Ordering::Equal => resolver_1
+                .type_and_field
+                .field_name
+                .cmp(&resolver_2.type_and_field.field_name),
+        }
+    });
+    fields
 }
 
 fn get_artifact_path_and_contents<'schema>(
