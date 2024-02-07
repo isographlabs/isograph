@@ -1,9 +1,5 @@
 # Backlog
 
-## Top QOL priorities
-
-- iso overload in files
-
 ## V2 release
 
 - network error handling
