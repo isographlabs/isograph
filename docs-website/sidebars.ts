@@ -18,6 +18,7 @@ const sidebars: SidebarsConfig = {
     'isograph-config',
     'refetching',
     'magic-mutation-fields',
+    'faq',
     {
       type: 'category',
       label: 'How Isograph works',

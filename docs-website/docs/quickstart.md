@@ -1,18 +1,24 @@
+import DataTypeSrc from './assets/data-type.png';
+
 # Quickstart guide
 
-In this quickstart guide, we will add Isograph to an existing NextJS project. We will use the free and publicly available [Star Wars GraphQL API](https://studio.apollographql.com/public/star-wars-swapi/variant/current/home).
+In this quickstart guide, we will create a new NextJS project and add Isograph to it. We will use the free and publicly available [Star Wars GraphQL API](https://studio.apollographql.com/public/star-wars-swapi/variant/current/home).
 
 You can view the end result of following this quickstart guide in [this repository](https://github.com/isographlabs/quickstart).
 
-:::note
-This is the process for adding Isograph to an existing **NextJS project**. However, it shouldn't be that different to add it to a project in another framework.
+## Install NextJS
 
-If you don't have a NextJS project handy, run `npx create-next-app@latest` and proceed with this quickstart! (In this example, we're using the `src` directory and not using the App Router.)
+In a newly-created empty directory, run:
 
-This currently requires NextJS to be run with Babel and for React not to be run in strict mode.
-:::
+```sh
+npx create-next-app@latest . \
+  --ts --eslint --no-app --src-dir \
+  --no-tailwind --import-alias "@/*"
+```
 
-## Install the compiler, babel plugin and runtime
+This will install a NextJS app in this folder. Run it with `npm run dev`.
+
+## Install the compiler, Babel plugin and runtime
 
 ```sh
 yarn add --dev @isograph/compiler@main
@@ -24,11 +30,11 @@ yarn add @isograph/react@main
 For now, you must install the `@main` versions of the packages.
 :::
 
-Installing the compiler also adds the command `yarn iso` and `yarn iso --watch`. But hang tight — before this command works, you'll need to set up some folders, download your schema and create an `isograph.config.json` file!
+Installing the compiler also adds the command `yarn iso` and `yarn iso --watch`. But hang tight — before this command works, you'll need to create a folder, download your schema and create an `isograph.config.json` file!
 
-## Install the babel plugin and add a recommended alias
+## Create a `.babelrc.js` file to enable Babel
 
-Install the babel plugin in your `.babelrc.js`. If this file does not exist (and it is not usually created in a new NextJS project), you can use the following:
+To enable Babel and the Isograph Babel plugin, create a `.babelrc.js` with the following contents:
 
 ```js
 module.exports = {
@@ -37,28 +43,13 @@ module.exports = {
 };
 ```
 
-And add an alias to your `tsconfig.json`. The alias should point to wherever your `artifact_directory` is located, followed by `__isograph/*`. So, if our `artifact_directory` is `./src`, we would define the alias to be `./src/__isograph/*`. (See the `isograph.config.json` step.)
-
-```json
-"paths": {
-  "@iso/*": ["./src/__isograph/*"]
-},
-```
-
-## Disable React strict mode
-
-NextJS defaults to using strict mode. For Isograph to work, you must disable strict mode in your `next.config.js` file:
-
-```js
-// next.config.js
-const nextConfig = {
-  reactStrictMode: false,
-};
-```
+:::note What about SWC?
+Isograph currently requires a Babel plugin, but there is an [open, good first issue](https://github.com/isographlabs/isograph/issues/13) to make it work with SWC.
+:::
 
 ## Create an `isograph.config.json` file
 
-Create an `isograph.config.json` file. Example contents:
+Create an `isograph.config.json` file. You can use the following for this quickstart:
 
 ```json
 {
@@ -68,18 +59,34 @@ Create an `isograph.config.json` file. Example contents:
 }
 ```
 
-Then, create the `project_root` directory, e.g.:
+## Add aliases to your `tsconfig.json` file
 
-```sh
-mkdir -p src/components
+Add two aliases to your `tsconfig.json`. These alias should point to wherever your `artifact_directory` is located, followed by `__isograph/*` and `__isograph/iso.ts`. Example:
+
+```json
+"paths": {
+  "@iso/*": ["./src/__isograph/*"],
+  "@iso": ["./src/__isograph/iso.ts"]
+},
 ```
 
 :::note
-Note that (for now!) the `artifact_directory` should not be within the `project_root`, as this causes an infinite build-rebuild loop. This is fixable.
+We won't be using the first alias in this demo, but it is a best practice for Isograph projects.
 :::
 
-:::note
-Isograph generates relative paths, so it doesn't really matter where you put your `artifact_directory`, as long as it isn't within your `project_root`.
+## Disable React strict mode
+
+NextJS defaults to using strict mode. Isograph is currently incompatible with strict mode. Disable strict mode in your `next.config.js` file as follows:
+
+```js
+// next.config.js
+const nextConfig = {
+  reactStrictMode: false,
+};
+```
+
+:::note Why is this necessary?
+See [this FAQ item](/docs/faq/#why-does-isograph-not-support-strict-mode/) for an explanation of why this is necessary.
 :::
 
 ## Download the schema
@@ -90,19 +97,29 @@ Download your GraphQL schema and put it in `./schema.graphql`:
 curl https://raw.githubusercontent.com/graphql/swapi-graphql/master/schema.graphql > ./schema.graphql
 ```
 
-## Run the isograph compiler in watch mode
+## Run the Isograph compiler in watch mode
 
 ```sh
 yarn iso --watch
 ```
 
-The compiler will start running, but since we haven't written any isograph literals, it won't do much.
+The compiler will start running, but since we haven't written any Isograph literals, it won't do much.
 
 :::note
-Isograph **will** generate a `__refetch` artifact for each type that has an `id: ID!` field.
+The Isograph compiler can be a bit finicky, especially if you're still learning the syntax. If the process stops, don't panic — just fix the error and restart the compiler.
 :::
 
-## Teach isograph about your GraphQL server
+:::warning TODO
+
+A note for folks who are reading this before the release.
+
+- The `project_root` directory must exist, e.g. run `mkdir -p src/components`
+- do not nest your `artifact_directory` inside of your `project_root`
+- `yarn iso --watch` will create a bunch of files right now. That's expected.
+
+:::
+
+## Teach Isograph about your GraphQL server
 
 Isograph requires some initial setup to teach it how to make API calls to your GraphQL server. The GraphQL server we will hit is running at `https://swapi-graphql.netlify.app/.netlify/functions/index`.
 
@@ -144,30 +161,41 @@ export default function App({ Component, pageProps }: AppProps) {
 }
 ```
 
-We're also creating the Isograph store in this step, which is the in-memory key-value store where Isograph keeps the network data you have received.
+In this step, we created some context that holds the Isograph environment. The Isograph environment contains the data that we have received from the network. It also knows how to make network requests ot the GraphQL backend.
 
-:::warning
-With NextJS, it is **extremely important** to not create the environment at the top level (i.e. in module scope.) If you do this, **NextJS will reuse the environment across requests,** so different users will share the same environment!
+## Create the `Root.HomePage` component
 
-Create the environment during the render of a component is sufficient to avoid this. However, you should also memoize the creation of the environment so that if (for whatever reason), your `App` component re-renders, you do not recreate the environment, thus losing data.
-:::
+**Finally**, we can get to building our first client field, the `Root.HomePage` component!
 
-:::note
-You may need to provide a bearer token if you are using a public API, such as the GitHub API. See [this GitHub demo](https://github.com/rbalicki2/github-isograph-demo/tree/885530d74d9b8fb374dfe7d0ebdab7185d207c3a/src/isograph-components/SetNetworkWrapper.tsx) for an example of how to do with a token that you receive from OAuth. See also the `[...nextauth].tsx` file in the same repo.
-:::
+An Isograph app will be almost entirely made up of client fields. There are two important important facts about client fields that you should know:
 
-## Create an Episode List component
+- they can reference each other. In this quickstart, `Root.HomePage` will reference `Film.FilmSummary`.
+- they can return arbitrary values. In this quickstart, both fields will return React elements. A field that return a React elements is called a _client component field_.
 
-**Finally**, we can get to writing some Isograph components. Let's define the Isograph client field that "is" your app! Create a file in `src/components/EpisodeList.tsx` containing the following:
+So, let's define our first field, `Root.HomePage`. Let's start by making sure that `yarn iso --watch` is running and then creating a file (e.g. `src/components/EpisodeList.tsx`) containing the following:
 
 ```tsx
 import React from 'react';
 import { iso } from '@iso';
 
-// Note: normally, the "root" field is called Query, but in the Star Wars
-// GraphQL schema it is called Root. Odd!
-export const EpisodeList = iso(`
-  field Root.EpisodeList @component {
+export const HomePage = iso(`
+  field Root.HomePage @component {}
+`)(function HomePageComponent(props) {
+  return 'Hello from the home page!';
+});
+```
+
+That's it! That's our first Isograph component. Let's break down what we just did.
+
+- We defined a field named `HomePage` on the type `Root`, which our GraphQL schema has defined as our query "root operation type".
+- We wrote `@component` to tell the Isograph compiler that this field is a component.
+- Then, we passed a simple React component to this `iso` literal.
+
+Let's proceed by **selecting some fields**. Modify the export as follows:
+
+```tsx
+export const HomePage = iso(`
+  field Root.HomePage @component {
     allFilms {
       films {
         id,
@@ -176,174 +204,210 @@ export const EpisodeList = iso(`
       },
     },
   }
-`)(function EpisodeListComponent({ data }) {
-  const filmsSorted = data.allFilms?.films ?? [];
-  filmsSorted.sort((film1, film2) => {
-    if (film1?.episodeID == null || film2?.episodeID == null) {
-      throw new Error(
-        'This API does not return null films or null episode IDs.',
-      );
-    }
-    return film1.episodeID > film2.episodeID ? 1 : -1;
-  });
+`)(function HomePageComponent(props) {
+  return 'Hello from the home page!';
+});
+```
+
+Now, when the component is called, the `props` argument will include a `data` property whose type is:
+
+```tsx
+type Data = {
+  allFilms: {
+    films: ({
+      id: string;
+      title: string | null;
+      episodeID: number | null;
+    } | null)[];
+  } | null;
+};
+```
+
+Every time you save, the Isograph compiler will recompile everything, including re-generating the type of the iso function. This means that TypeScript knows the type of the `props` parameter:
+
+<img src={DataTypeSrc} height="308" />
+
+Let's complete this component by returning a list of the films, their titles and episode names. The entire file should now look like:
+
+```tsx
+import React from 'react';
+import { iso } from '@iso';
+
+export const HomePage = iso(`
+  field Root.HomePage @component {
+    allFilms {
+      films {
+        id,
+        title,
+        episodeID,
+      },
+    },
+  }
+`)(function HomePageComponent(props) {
+  const films = useMemo(
+    () =>
+      (props.data.allFilms?.films ?? []).toSorted((film1, film2) => {
+        if (film1?.episodeID == null || film2?.episodeID == null) {
+          throw new Error(
+            'This API should not return null films or null episode IDs.',
+          );
+        }
+        return film1.episodeID > film2.episodeID ? 1 : -1;
+      }),
+    [data.allFilms?.films],
+  );
 
   return (
     <>
-      <h1>Star Wars film archive</h1>
-      {filmsSorted.map((film) => (
-        <React.Fragment key={film?.id}>
-          <h2>
-            Episode {film?.episodeID}: {film?.title}
-          </h2>
-        </React.Fragment>
+      <h1>Star Wars Film Archive</h1>
+      {films.map((film) => (
+        <h2 key={film.id}>
+          Episode {film.episodeID}: {film.title}
+        </h2>
       ))}
     </>
   );
 });
 ```
 
-## Fetch that Episode List
+## Make a network request for the data that that component needs
 
-That Isograph component isn't doing much on its own. We need to provide a way to fetch its data and render the results. So, create a file at `src/components/EpisodeListRoute.tsx`, and make its contents:
+That Isograph component isn't doing much on its own. We need to fetch the server fields it requested.
+
+In order to fetch the data, Isograph requires that you define an entrypoint. An entrypoint definition might look like ``iso(`entrypoint Root.HomePage`)``. When the Isograph compiler encounters an entrypoint definition, it generates a GraphQL query for all of the fields reachable from that field:
+
+```graphql
+query HomePage {
+  allFilms {
+    films {
+      id
+      episodeID
+      title
+    }
+  }
+}
+```
+
+So, create a file at `src/components/HomePageRoute.tsx`, and make its contents:
 
 ```tsx
 import React from 'react';
-import { iso, useLazyReference, useRead } from '@isograph/react';
-import EpisodeListEntrypoint from '@iso/Root/EpisodeList/entrypoint';
+import { useLazyReference } from '@isograph/react';
+import { iso } from '@iso';
 
-export default function EpisodeListRoute() {
-  return (
-    <React.Suspense fallback={'Data is loading...'}>
-      <Inner />
-    </React.Suspense>
-  );
-}
-
-function Inner() {
-  const { queryReference } = useLazyReference(
-    iso(`entrypoint Root.EpisodeList`),
-    {
-      /* query variables */
-    },
-  );
-
-  const Component = useRead(queryReference);
-  const additionalRenderProps = {};
-  return <Component {...additionalRenderProps} />;
+export default function HomePageRoute() {
+  const { queryReference } = useLazyReference(iso(`entrypoint Root.HomePage`), {
+    /* query variables */
+  });
+  return null;
 }
 ```
 
 and change `src/pages/index.tsx` to be:
 
 ```tsx
-import EpisodeListRoute from '@/components/EpisodeListRoute';
+import HomePageRoute from '@/components/HomePageRoute';
 
 export default function Home() {
-  return <EpisodeListRoute />;
+  return <HomePageRoute />;
 }
 ```
 
-## Run the NextJS app
+The `useLazyReference` function will **make a network request** when it is first rendered.
 
-Start the NextJS app with
+So, whenever we render the `HomePageRoute` component, the Isograph runtime will make a network request for all the fields selected by the `Root.HomePage` component. Try it! If you navigate to `localhost:3000` and open the network tab, you'll see a network request that returns the fields we requested!
 
+## Render the component
+
+Now, we still need to render our `Query.HomePage` component. In order to do this, we call `useRead` to read the query reference.
+
+```tsx
+import React from 'react';
+import { useLazyReference, useRead } from '@isograph/react';
+import { iso } from '@iso';
+
+export default function HomePageRoute() {
+  const { queryReference } = useLazyReference(iso(`entrypoint Root.HomePage`), {
+    /* query variables */
+  });
+  const Component = useRead(queryReference);
+  return <Component />;
+}
 ```
-yarn run dev
-```
 
-Now, open your browser to `localhost:3000` and see the list of Star Wars episodes! Congratulations!
-
-In the network tab, you'll see a network request to `https://swapi-graphql.netlify.app/.netlify/functions/index`, the response of which contains a list of Star Wars movies!
+Nice! Look at that beautiful list of Star Wars episodes!
 
 ## Add a subcomponent
 
-A key principle of React is that you can divide your components into subcomponents. Let's do that! For example, create `src/components/CharacterSummary.tsx` containing:
+A key principle of React is that you can divide your components into subcomponents. Let's do that! For example, create `src/components/EpisodeTitle.tsx` containing:
 
 ```tsx
 import React from 'react';
 import { iso } from '@iso';
 
-export const CharacterSummary = iso(`
-  field Person.CharacterSummary @component {
-    name,
-    homeworld {
-      name,
-    },
+export const EpisodeTitle = iso(`
+  field Film.EpisodeTitle @component {
+    title,
+    episodeID,
   }
-`)(function CharacterSummaryComponent({ data }) {
+`)(function EpisodeTitleComponent({ data }) {
   return (
-    <li>
-      {data.name}, from the planet {data.homeworld?.name}
-    </li>
+    <h2>
+      Episode {data.episodeID}: {data.title}
+    </h2>
   );
 });
 ```
 
-You might use this component by modifying `EpisodeList.tsx` to be the following. Note the two new sections:
+Let's use this component by modifying `HomePage.tsx` to be the following. Note the two new sections:
 
 ```tsx
 import React from 'react';
 import { iso } from '@iso';
 
-// Note: normally, the "root" field is called Query, but in the Star Wars
-// GraphQL schema it is called Root. Odd!
-export const EpisodeList = iso(`
-  field Root.EpisodeList @component {
+export const HomePage = iso(`
+  field Root.HomePage @component {
     allFilms {
       films {
         id,
-        title,
-        episodeID,
 
         # THIS IS NEW
-        characterConnection {
-          characters {
-            id,
-            CharacterSummary,
-          },
-        },
+        EpisodeTitle,
       },
     },
   }
-`)(function EpisodeListComponent({ data }) {
-  const filmsSorted = data.allFilms?.films ?? [];
-  filmsSorted.sort((film1, film2) => {
-    if (film1?.episodeID == null || film2?.episodeID == null) {
-      throw new Error(
-        'This API does not return null films or null episode IDs.',
-      );
-    }
-    return film1.episodeID > film2.episodeID ? 1 : -1;
-  });
+`)(function HomePageComponent(props) {
+  const films = useMemo(
+    () =>
+      (props.data.allFilms?.films ?? []).toSorted((film1, film2) => {
+        if (film1?.episodeID == null || film2?.episodeID == null) {
+          throw new Error(
+            'This API should not return null films or null episode IDs.',
+          );
+        }
+        return film1.episodeID > film2.episodeID ? 1 : -1;
+      }),
+    [data.allFilms?.films],
+  );
 
   return (
     <>
-      <h1>Star Wars film archive</h1>
-      {filmsSorted.map((film) => (
-        <React.Fragment key={film?.id}>
-          <h2>
-            Episode {film?.episodeID}: {film?.title}
-          </h2>
-          {/*
-           THE FOLLOWING IS NEW
-          */}
-          <div style={{ marginLeft: 20 }}>
-            Featuring
-            <ul>
-              {film?.characterConnection?.characters?.map((character) => {
-                return <character.CharacterSummary key={character.id} />;
-              })}
-            </ul>
-          </div>
-        </React.Fragment>
+      <h1>Star Wars Film Archive</h1>
+      {films.map((film) => (
+        // THIS IS ALSO NEW
+        <film.EpisodeTitle key={film.id} />
       ))}
     </>
   );
 });
 ```
 
-Now, if you refresh, you'll see a list of Star Wars characters that show up in each movie! Wow!
+Now, if you refresh, you'll see a list of Star Wars characters that show up in each movie! 🎉
 
 ## Congratulations
 
 Congratulations! You just built your first Isograph app.
+
+Want more? Try extracting the sorted list of films into its own client field (no need to use `@component` for this one.) Use hooks in your components (they work!) Check out the [magic mutation fields](/docs/magic-mutation-fields/) documentation to learn about how Isograph lets you update your data.
+
+Or, [join the Discord](https://discord.gg/kDCcN3EDR6)!

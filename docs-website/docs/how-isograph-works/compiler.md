@@ -37,7 +37,7 @@ Since watch mode is a simple wrapper around batch mode, the rest of this documen
 
 ## Crates
 
-The isograph compiler contains the following crates. The most important ones are marked with a 🟢:
+The Isograph compiler contains the following crates. The most important ones are marked with a 🟢:
 
 - `common_lang_types`
 - `graphql_lang_types`: GraphQL types that are also used by Isograph. (This is a smell. These types should only be used by `graphql_schema_parser`.)

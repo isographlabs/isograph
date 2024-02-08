@@ -159,7 +159,7 @@ set_foo {
 - Display multiple errors, parse etc. in parallel
 - Do not look in artifact_directory, if project_root contains artifact_directory
 - Can we make the babel transform export the iso literal if no export is found?? Probably!
-  - What about unit tests? Should they be able to import these? Maybe? But probably only through isograph, right?
+  - What about unit tests? Should they be able to import these? Maybe? But probably only through Isograph, right?
 - SWC plugin
 - plugin options to point to config
 - Namespaces and components installable from external libraries

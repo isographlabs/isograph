@@ -73,13 +73,12 @@ import {
 } from "@isograph/react";
 
 export function HomePageRoute() {
-  // Step 1: Make a network request (during render) for the
-  // Query.HomePage client-defined field.
+  // Step 1: When this component renders, make a network request
+  // for the Query.HomePage client-defined field.
   const { queryReference } = useLazyReference(
-    // Note that this call to iso causes the compiler to generate
-    // a query at compile time!
-    iso${'`'}entrypoint Query.HomePage${'`'},
-    { /* Query variables */ }
+    // The "entrypoint" keyword here instructs the Isograph compiler
+    // to generate a GraphQL query at compile time.
+    iso${'`'}entrypoint Query.HomePage${'`'}
   );
   
   // Step 2: Attempt to read the query reference. This will
@@ -88,8 +87,7 @@ export function HomePageRoute() {
   const HomePage = useRead(queryReference);
 
   // Step 3: Render the resulting component.
-  const additionalProps = {};
-  return <HomePage {...additionalProps} />;
+  return <HomePage />;
 }
   `,
   home_page_component: `
@@ -100,7 +98,7 @@ export const HomePage = iso${'`'}
   # Step 3: Define a field named HomePage on the
   # Query type, and tell the Isograph compiler that it is a
   # React @component
-  Query.HomePage @component {
+  field Query.HomePage @component {
     # Step 4: Select whatever fields you'll need, including
     # other client-defined fields like Avatar.
     viewer {
@@ -128,7 +126,7 @@ export const Avatar = iso(${'`'}
   User.Avatar @component {
     avatarUrl,
   }
-${'`'})(function AvatarComponent(props: AvatarProps) {
+${'`'})(function AvatarComponent(props) {
   return <MyComponentLibraryAvatar url={props.data.avatarUrl} />
 })
   `,
