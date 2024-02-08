@@ -1,5 +1,5 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { PetDetailRoute as resolver } from '../../../components/PetDetailRoute.tsx';
+import { PetDetailRoute as resolver } from '../../../PetDetailRoute.tsx';
 import Pet__PetBestFriendCard, { ReadOutType as Pet__PetBestFriendCard__outputType } from '../../Pet/PetBestFriendCard/reader';
 import Pet__PetCheckinsCard, { ReadOutType as Pet__PetCheckinsCard__outputType } from '../../Pet/PetCheckinsCard/reader';
 import Pet__PetPhraseCard, { ReadOutType as Pet__PetPhraseCard__outputType } from '../../Pet/PetPhraseCard/reader';

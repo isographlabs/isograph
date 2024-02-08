@@ -1,5 +1,5 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { PetUpdater as resolver } from '../../../components/PetUpdater.tsx';
+import { PetUpdater as resolver } from '../../../PetUpdater.tsx';
 import Pet__set_pet_best_friend, { ReadOutType as Pet__set_pet_best_friend__outputType } from '../set_pet_best_friend/reader';
 import Pet__set_pet_tagline, { ReadOutType as Pet__set_pet_tagline__outputType } from '../set_pet_tagline/reader';
 
