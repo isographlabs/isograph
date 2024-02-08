@@ -40,24 +40,21 @@ pub(crate) fn create_config(mut config_location: PathBuf) -> CompilerConfig {
     config_location.pop();
     let config_dir = config_location;
 
-    std::fs::create_dir_all(config_dir.join(&config_parsed.artifact_directory))
-        .expect("Unable to create artifact directory");
+    let artifact_dir = config_dir.join(&config_parsed.artifact_directory);
+    std::fs::create_dir_all(&artifact_dir).expect("Unable to create artifact directory");
+
+    let project_root_dir = config_dir.join(&config_parsed.project_root);
+    std::fs::create_dir_all(&project_root_dir).expect("Unable to create project root directory");
 
     CompilerConfig {
-        project_root: config_dir
-            .join(&config_parsed.project_root)
-            .canonicalize()
-            .expect(&format!(
-                "Unable to canonicalize project root. Does {:?} exist?",
-                config_parsed.project_root
-            )),
-        artifact_directory: config_dir
-            .join(&config_parsed.artifact_directory)
-            .canonicalize()
-            .expect(&format!(
-                "Unable to canonicalize artifact directory. Does {:?} exist?",
-                config_parsed.artifact_directory
-            )),
+        project_root: project_root_dir.canonicalize().expect(&format!(
+            "Unable to canonicalize project root at {:?}.",
+            config_parsed.project_root
+        )),
+        artifact_directory: artifact_dir.canonicalize().expect(&format!(
+            "Unable to canonicalize artifact directory at {:?}.",
+            config_parsed.artifact_directory
+        )),
         schema: config_dir
             .join(&config_parsed.schema)
             .canonicalize()
