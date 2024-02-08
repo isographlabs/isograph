@@ -17,8 +17,8 @@
     "allowImportingTsExtensions": true,
     "paths": {
       "@/*": ["./src/*"],
-      "@iso/*": ["./src/__isograph/*"],
-      "@iso": ["./src/__isograph/iso.ts"],
+      "@iso/*": ["./src/isograph-components/__isograph/*"],
+      "@iso": ["./src/isograph-components/__isograph/iso.ts"],
     },
     "disableSourceOfProjectReferenceRedirect": false,
   },
