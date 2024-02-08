@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use isograph_schema::{CompilerConfig, ConfigOptions, OptionalValidationLevel};
 use serde::Deserialize;
 
+use crate::isograph_literals::ISOGRAPH_FOLDER;
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ConfigFile {
@@ -40,7 +42,9 @@ pub(crate) fn create_config(mut config_location: PathBuf) -> CompilerConfig {
     config_location.pop();
     let config_dir = config_location;
 
-    let artifact_dir = config_dir.join(&config_parsed.artifact_directory);
+    let artifact_dir = config_dir
+        .join(&config_parsed.artifact_directory)
+        .join(&*ISOGRAPH_FOLDER);
     std::fs::create_dir_all(&artifact_dir).expect("Unable to create artifact directory");
 
     let project_root_dir = config_dir.join(&config_parsed.project_root);

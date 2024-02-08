@@ -1138,12 +1138,23 @@ fn generate_resolver_import_statement(
 ) -> ResolverImportStatement {
     match resolver_action_kind {
         ResolverActionKind::NamedImport((name, path)) => {
-            let path_to_artifact = project_root
+            let path_to_resolver = project_root
                 .join(PathBuf::from_str(path.lookup()).expect(
                     "paths should be legal here. This is indicative of a bug in Isograph.",
                 ));
             let relative_path =
-                pathdiff::diff_paths(path_to_artifact, artifact_directory.join("a/b/c"))
+                // artifact directory includes __isograph, so artifact_directory.join("Type/Field")
+                // is a directory "two levels deep" within the artifact_directory.
+                //
+                // So diff_paths(path_to_resolver, artifact_directory.join("Type/Field"))
+                // is a lazy way of saying "make a relative path from two levels deep in the artifact
+                // dir to the resolver".
+                //
+                // Since we will always go ../../../ the Type/Field part will never show up
+                // in the output.
+                //
+                // Anyway, TODO do better.
+                pathdiff::diff_paths(path_to_resolver, artifact_directory.join("Type/Field"))
                     .expect("Relative path should work");
             ResolverImportStatement(format!(
                 "import {{ {name} as resolver }} from '{}';",

@@ -4,17 +4,12 @@ use std::{
     path::PathBuf,
 };
 
-use crate::{
-    generate_artifacts::{GenerateArtifactsError, PathAndContent},
-    isograph_literals::ISOGRAPH_FOLDER,
-};
+use crate::generate_artifacts::{GenerateArtifactsError, PathAndContent};
 
 pub(crate) fn write_to_disk<'schema>(
     paths_and_contents: impl Iterator<Item = PathAndContent>,
     artifact_directory: &PathBuf,
 ) -> Result<usize, GenerateArtifactsError> {
-    let artifact_directory = artifact_directory.join(ISOGRAPH_FOLDER);
-
     if artifact_directory.exists() {
         fs::remove_dir_all(&artifact_directory).map_err(|e| {
             GenerateArtifactsError::UnableToDeleteDirectory {
