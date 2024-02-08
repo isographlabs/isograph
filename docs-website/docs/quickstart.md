@@ -113,14 +113,6 @@ The compiler will start running, but since we haven't written any Isograph liter
 The Isograph compiler can be a bit finicky, especially if you're still learning the syntax. If the process stops, don't panic — just fix the error and restart the compiler.
 :::
 
-:::warning TODO
-
-A note for folks who are reading this before the release.
-
-- `yarn iso --watch` will create a bunch of files right now. That's expected.
-
-:::
-
 ## Teach Isograph how to make network requests
 
 Isograph requires some initial setup to teach it how to make API calls to your GraphQL server. The GraphQL server we will hit is running at `https://swapi-graphql.netlify.app/.netlify/functions/index`.
