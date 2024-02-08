@@ -11,7 +11,8 @@ struct ConfigFile {
     /// The relative path to the folder where the compiler should look for Isograph literals
     pub project_root: PathBuf,
     /// The relative path to the folder where the compiler should create artifacts
-    pub artifact_directory: PathBuf,
+    /// Defaults to the project_root directory.
+    pub artifact_directory: Option<PathBuf>,
     /// The relative path to the GraphQL schema
     pub schema: PathBuf,
     /// The relative path to schema extensions
@@ -31,7 +32,7 @@ pub(crate) fn create_config(mut config_location: PathBuf) -> CompilerConfig {
                 panic!("Expected config to be found at {}", loc)
             }
             None => {
-                panic!("Expectd config to be found.")
+                panic!("Expected config to be found.")
             }
         },
     };
@@ -43,7 +44,12 @@ pub(crate) fn create_config(mut config_location: PathBuf) -> CompilerConfig {
     let config_dir = config_location;
 
     let artifact_dir = config_dir
-        .join(&config_parsed.artifact_directory)
+        .join(
+            config_parsed
+                .artifact_directory
+                .as_ref()
+                .unwrap_or(&config_parsed.project_root),
+        )
         .join(&*ISOGRAPH_FOLDER);
     std::fs::create_dir_all(&artifact_dir).expect("Unable to create artifact directory");
 
