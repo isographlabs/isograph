@@ -32,7 +32,7 @@ For now, you must install the `@main` versions of the packages.
 
 Installing the compiler also adds the command `yarn iso` and `yarn iso --watch`. But hang tight — before this command works, you'll need to create a folder, download your schema and create an `isograph.config.json` file!
 
-## Create a `.babelrc.js` file to enable Babel
+## Create a `.babelrc.js`
 
 To enable Babel and the Isograph Babel plugin, create a `.babelrc.js` with the following contents:
 
@@ -47,7 +47,7 @@ module.exports = {
 Isograph currently requires a Babel plugin, but there is an [open, good first issue](https://github.com/isographlabs/isograph/issues/13) to make it work with SWC.
 :::
 
-## Create an `isograph.config.json` file
+## Create an `isograph.config.json`
 
 Create an `isograph.config.json` file. You can use the following for this quickstart:
 
@@ -59,7 +59,7 @@ Create an `isograph.config.json` file. You can use the following for this quicks
 }
 ```
 
-## Add aliases to your `tsconfig.json` file
+## Add aliases to `tsconfig.json`
 
 Add two aliases to your `tsconfig.json`. These alias should point to wherever your `artifact_directory` is located, followed by `__isograph/*` and `__isograph/iso.ts`. Example:
 
@@ -97,7 +97,7 @@ Download your GraphQL schema and put it in `./schema.graphql`:
 curl https://raw.githubusercontent.com/graphql/swapi-graphql/master/schema.graphql > ./schema.graphql
 ```
 
-## Run the Isograph compiler in watch mode
+## Run the compiler in watch mode
 
 ```sh
 yarn iso --watch
@@ -113,13 +113,12 @@ The Isograph compiler can be a bit finicky, especially if you're still learning 
 
 A note for folks who are reading this before the release.
 
-- The `project_root` directory must exist, e.g. run `mkdir -p src/components`
 - do not nest your `artifact_directory` inside of your `project_root`
 - `yarn iso --watch` will create a bunch of files right now. That's expected.
 
 :::
 
-## Teach Isograph about your GraphQL server
+## Teach Isograph how to make network requests
 
 Isograph requires some initial setup to teach it how to make API calls to your GraphQL server. The GraphQL server we will hit is running at `https://swapi-graphql.netlify.app/.netlify/functions/index`.
 
@@ -280,7 +279,7 @@ export const HomePage = iso(`
 });
 ```
 
-## Make a network request for the data that that component needs
+## Make a network request for the data that the `Root.HomePage` component needs
 
 That Isograph component isn't doing much on its own. We need to fetch the server fields it requested.
 
