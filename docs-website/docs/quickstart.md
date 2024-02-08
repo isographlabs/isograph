@@ -54,14 +54,18 @@ Create an `isograph.config.json` file. You can use the following for this quicks
 ```json
 {
   "project_root": "./src/components",
-  "artifact_directory": "./src",
+  "artifact_directory": "./src/components",
   "schema": "./schema.graphql"
 }
 ```
 
+:::note
+The `artifact_directory` field is optional, and defaults to the `project_root`. Feel free to skip it.
+:::
+
 ## Add aliases to `tsconfig.json`
 
-Add two aliases to your `tsconfig.json`. These alias should point to wherever your `artifact_directory` is located, followed by `__isograph/*` and `__isograph/iso.ts`. Example:
+Add two aliases to your `tsconfig.json`. These alias should point to `artifact_directory`, followed by `__isograph/*` and `__isograph/iso.ts`. Example:
 
 ```json
 "paths": {
