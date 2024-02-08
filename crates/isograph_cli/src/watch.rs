@@ -4,7 +4,7 @@ use notify::{Error, RecommendedWatcher, RecursiveMode, Watcher};
 use notify_debouncer_full::{
     new_debouncer, DebounceEventResult, DebouncedEvent, Debouncer, FileIdMap,
 };
-use std::time::Duration;
+use std::{path::PathBuf, time::Duration};
 use tokio::{runtime::Handle, sync::mpsc::Receiver, task::JoinError};
 
 use crate::batch_compile::compile_and_print;
@@ -35,9 +35,14 @@ pub(crate) async fn handle_watch_command(
     tokio::spawn(async move {
         while let Some(res) = rx.recv().await {
             match res {
-                Ok(_events) => {
-                    eprintln!("{}", "File changes detected.".cyan());
-                    let _ = compile_and_print(&config);
+                Ok(events) => {
+                    if any_modified_path_is_outside_artifact_directory(
+                        &events,
+                        &config.artifact_directory,
+                    ) {
+                        eprintln!("{}", "File changes detected.".cyan());
+                        let _ = compile_and_print(&config);
+                    }
                 }
                 Err(errors) => return Err(errors),
             }
@@ -45,6 +50,22 @@ pub(crate) async fn handle_watch_command(
         Ok(())
     })
     .await
+}
+
+fn any_modified_path_is_outside_artifact_directory(
+    events: &[DebouncedEvent],
+    artifact_directory: &PathBuf,
+) -> bool {
+    for event in events.iter() {
+        for watched_path in event.paths.iter() {
+            // These paths are canonicalized, so it is sufficient
+            // to check starts_with
+            if !watched_path.starts_with(artifact_directory) {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 fn create_debounced_file_watcher() -> (

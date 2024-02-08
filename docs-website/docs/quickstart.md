@@ -113,7 +113,6 @@ The Isograph compiler can be a bit finicky, especially if you're still learning 
 
 A note for folks who are reading this before the release.
 
-- do not nest your `artifact_directory` inside of your `project_root`
 - `yarn iso --watch` will create a bunch of files right now. That's expected.
 
 :::
