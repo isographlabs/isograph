@@ -27,5 +27,6 @@ An example (complete) Isograph config is as follows:
 
 - All paths are relative.
 - `schema` and `schema_extensions` take relative paths to files, not to folders.
-- Only `project_root`, `artifact_directory` and `schema` are required.
+- Only `project_root` and `schema` are required.
 - Valid values for `on_invalid_id_type` are `ignore`, `warning` and `error`.
+- `artifact_directory` defaults to `project_root`.
