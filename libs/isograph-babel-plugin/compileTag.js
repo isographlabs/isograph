@@ -62,10 +62,18 @@ function compileImportStatement(t, path, type, field, artifactType, config) {
 
   const fileToArtifactDir = pathModule.relative(folder, artifactDirectory);
   const artifactDirToArtifact = `/__isograph/${type}/${field}/${artifactType}.ts`;
-  const fileToArtifact = pathModule.join(
+  let fileToArtifact = pathModule.join(
     fileToArtifactDir,
     artifactDirToArtifact,
   );
+
+  // If we do not have to traverse upward, e.g. if the resolver is in
+  // src/HomePage, and the artifact directory is src/, then fileToArtifact
+  // will start with a /. require('/...') is not good, as that is treated
+  // as an absolute path. Or something. It should instead be './...'.
+  if (fileToArtifact.startsWith('/')) {
+    fileToArtifact = '.' + fileToArtifact;
+  }
 
   path.replaceWith(
     t.memberExpression(
