@@ -69,8 +69,8 @@ Add two aliases to your `tsconfig.json`. These alias should point to `artifact_d
 
 ```json
 "paths": {
-  "@iso/*": ["./src/__isograph/*"],
-  "@iso": ["./src/__isograph/iso.ts"]
+  "@iso/*": ["./src/components/__isograph/*"],
+  "@iso": ["./src/components/__isograph/iso.ts"]
 },
 ```
 
