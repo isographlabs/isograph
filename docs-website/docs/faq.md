@@ -18,8 +18,14 @@ Create the environment during the render of a component is sufficient to avoid t
 
 ## What if I want to run Isograph without Babel?
 
+The only thing the Babel plugin does is replace calls to ``iso(`entrypoint Type.FieldName`)`` with a `require` call to the default export of the `Type/FieldName/entrypoint.ts` file. If you instead import that yourself, Isograph continues to work.
+
+The Babel plugin does not modify ``iso(`field ...`)`` literals.
+
 ## How do I authenticate with an external API?
 
 You may need to provide a bearer token if you are using a public API, such as the GitHub API. See [this GitHub demo](https://github.com/rbalicki2/github-isograph-demo/tree/885530d74d9b8fb374dfe7d0ebdab7185d207c3a/src/isograph-components/SetNetworkWrapper.tsx) for an example of how to do with a token that you receive from OAuth. See also the `[...nextauth].tsx` file in the same repo.
 
 ## Why is there special handling of `@component`?
+
+## How do IDs work?

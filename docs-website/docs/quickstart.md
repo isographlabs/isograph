@@ -166,7 +166,7 @@ An Isograph app will be almost entirely made up of client fields. There are two 
 - they can reference each other. In this quickstart, `Root.HomePage` will reference `Film.FilmSummary`.
 - they can return arbitrary values. In this quickstart, both fields will return React elements. A field that return a React elements is called a _client component field_.
 
-So, let's define our first field, `Root.HomePage`. Let's start by making sure that `yarn iso --watch` is running and then creating a file (e.g. `src/components/EpisodeList.tsx`) containing the following:
+So, let's define our first field, `Root.HomePage`. Let's start by making sure that `yarn iso --watch` is running and then creating a file (e.g. `src/components/HomePage.tsx`) containing the following:
 
 ```tsx
 import React from 'react';
@@ -181,7 +181,7 @@ export const HomePage = iso(`
 
 That's it! That's our first Isograph component. Let's break down what we just did.
 
-- We defined a field named `HomePage` on the type `Root`, which our GraphQL schema has defined as our query "root operation type".
+- We defined a field named `HomePage` on the [type `Root`](https://github.com/isographlabs/quickstart/blob/master/schema.graphql#L643-L662), which our GraphQL schema has defined as our query ["root operation type"](https://github.com/isographlabs/quickstart/blob/master/schema.graphql#L2).
 - We wrote `@component` to tell the Isograph compiler that this field is a component.
 - Then, we passed a simple React component to this `iso` literal.
 
@@ -323,7 +323,7 @@ So, whenever we render the `HomePageRoute` component, the Isograph runtime will 
 
 ## Render the component
 
-Now, we still need to render our `Query.HomePage` component. In order to do this, we call `useRead` to read the query reference.
+Now, we still need to render our `Query.HomePage` component. In order to do this, we call `useRead` to read the query reference. This gives us the value of that field (i.e. a component), which we can render.
 
 ```tsx
 import React from 'react';
@@ -334,8 +334,8 @@ export default function HomePageRoute() {
   const { queryReference } = useLazyReference(iso(`entrypoint Root.HomePage`), {
     /* query variables */
   });
-  const Component = useRead(queryReference);
-  return <Component />;
+  const HomePage = useRead(queryReference);
+  return <HomePage />;
 }
 ```
 
@@ -414,7 +414,7 @@ export const HomePage = iso(`
 });
 ```
 
-Now, if you refresh, you'll see a list of Star Wars characters that show up in each movie! 🎉
+Now, if you refresh, the UI will be divided into subcomponents and look exactly the same! Nice! 🎉
 
 ## Congratulations
 
