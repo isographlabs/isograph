@@ -74,7 +74,7 @@ fn visit_dirs_skipping_isograph(dir: &Path, cb: &mut dyn FnMut(&DirEntry)) -> io
 pub(crate) static ISOGRAPH_FOLDER: &'static str = "__isograph";
 lazy_static! {
     static ref EXTRACT_ISO_LITERAL: Regex =
-        Regex::new(r"(export const ([^ ]+) =\s+)?iso\((<[^`]+>)?`([^`]+)`\)(\()?").unwrap();
+        Regex::new(r"(export const ([^ ]+) =\s+)?iso\(`([^`]+)`\)(\()?").unwrap();
 }
 
 pub(crate) struct IsoLiteralExtraction<'a> {
@@ -91,12 +91,12 @@ pub(crate) fn extract_iso_literal_from_file_content<'a>(
         .captures_iter(content)
         .into_iter()
         .map(|captures| {
-            let iso_literal_match = captures.get(4).unwrap();
+            let iso_literal_match = captures.get(3).unwrap();
             IsoLiteralExtraction {
                 const_export_name: captures.get(1).map(|_| captures.get(2).unwrap().as_str()),
                 iso_literal_text: iso_literal_match.as_str(),
                 iso_literal_start_index: iso_literal_match.start(),
-                has_associated_js_function: captures.get(5).is_some(),
+                has_associated_js_function: captures.get(4).is_some(),
             }
         })
 }
