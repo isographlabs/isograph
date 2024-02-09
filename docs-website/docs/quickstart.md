@@ -32,21 +32,6 @@ For now, you must install the `@main` versions of the packages.
 
 Installing the compiler also adds the command `yarn iso` and `yarn iso --watch`. But hang tight — before this command works, you'll need to create a folder, download your schema and create an `isograph.config.json` file!
 
-## Create a `.babelrc.js`
-
-To enable Babel and the Isograph Babel plugin, create a `.babelrc.js` with the following contents:
-
-```js
-module.exports = {
-  presets: ['next/babel'],
-  plugins: ['@isograph'],
-};
-```
-
-:::note What about SWC?
-Isograph currently requires a Babel plugin, but there is an [open, good first issue](https://github.com/isographlabs/isograph/issues/13) to make it work with SWC.
-:::
-
 ## Create an `isograph.config.json`
 
 Create an `isograph.config.json` file. You can use the following for this quickstart:
@@ -91,6 +76,21 @@ const nextConfig = {
 
 :::note Why is this necessary?
 See [this FAQ item](/docs/faq/#why-does-isograph-not-support-strict-mode/) for an explanation of why this is necessary.
+:::
+
+## Create a `.babelrc.js`
+
+To enable Babel and the Isograph Babel plugin, create a `.babelrc.js` with the following contents:
+
+```js
+module.exports = {
+  presets: ['next/babel'],
+  plugins: ['@isograph'],
+};
+```
+
+:::note What about SWC?
+Isograph currently requires a Babel plugin, but there is an [open, good first issue](https://github.com/isographlabs/isograph/issues/13) to make it work with SWC.
 :::
 
 ## Download the schema
