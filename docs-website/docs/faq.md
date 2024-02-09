@@ -29,3 +29,15 @@ You may need to provide a bearer token if you are using a public API, such as th
 ## Why is there special handling of `@component`?
 
 ## How do IDs work?
+
+## How do I suppress errors using the "on_invalid_type_id" config parameter?
+
+If you see an error like:
+
+```
+Unable to create schema.
+Reason: The id field on "Pet" must have type "ID!".
+This error can be suppressed using the "on_invalid_type_id" config parameter.
+```
+
+Then, you can suppress this error by adding `options: { on_invalid_type_id: "ignore" }` to your `isograph.config.json` file.

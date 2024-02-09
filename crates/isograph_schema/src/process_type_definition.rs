@@ -850,7 +850,10 @@ pub enum ProcessTypeDefinitionError {
     )]
     TypenameCannotBeDefined { parent_type: IsographObjectTypeName },
 
-    #[error("The {strong_field_name} field on \"{parent_type}\" must have type \"ID!\".")]
+    #[error(
+        "The {strong_field_name} field on \"{parent_type}\" must have type \"ID!\".\n\
+    This error can be suppressed using the \"on_invalid_type_id\" config parameter."
+    )]
     IdFieldMustBeNonNullIdType {
         parent_type: IsographObjectTypeName,
         strong_field_name: &'static str,
