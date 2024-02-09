@@ -1,15 +1,15 @@
 import type {IsographEntrypoint} from '@isograph/react';
-import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint.ts'
-import entrypoint_Query__PetDetailRoute from '../__isograph/Query/PetDetailRoute/entrypoint.ts'
-import { ResolverParameterType as field_Pet__PetBestFriendCard } from './Pet/PetBestFriendCard/reader.ts'
-import { ResolverParameterType as field_Pet__PetCheckinsCard } from './Pet/PetCheckinsCard/reader.ts'
-import { ResolverParameterType as field_Pet__PetPhraseCard } from './Pet/PetPhraseCard/reader.ts'
-import { ResolverParameterType as field_Pet__PetStatsCard } from './Pet/PetStatsCard/reader.ts'
-import { ResolverParameterType as field_Pet__PetSummaryCard } from './Pet/PetSummaryCard/reader.ts'
-import { ResolverParameterType as field_Pet__PetTaglineCard } from './Pet/PetTaglineCard/reader.ts'
-import { ResolverParameterType as field_Pet__PetUpdater } from './Pet/PetUpdater/reader.ts'
-import { ResolverParameterType as field_Query__HomeRoute } from './Query/HomeRoute/reader.ts'
-import { ResolverParameterType as field_Query__PetDetailRoute } from './Query/PetDetailRoute/reader.ts'
+import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint'
+import entrypoint_Query__PetDetailRoute from '../__isograph/Query/PetDetailRoute/entrypoint'
+import { ResolverParameterType as field_Pet__PetBestFriendCard } from './Pet/PetBestFriendCard/reader'
+import { ResolverParameterType as field_Pet__PetCheckinsCard } from './Pet/PetCheckinsCard/reader'
+import { ResolverParameterType as field_Pet__PetPhraseCard } from './Pet/PetPhraseCard/reader'
+import { ResolverParameterType as field_Pet__PetStatsCard } from './Pet/PetStatsCard/reader'
+import { ResolverParameterType as field_Pet__PetSummaryCard } from './Pet/PetSummaryCard/reader'
+import { ResolverParameterType as field_Pet__PetTaglineCard } from './Pet/PetTaglineCard/reader'
+import { ResolverParameterType as field_Pet__PetUpdater } from './Pet/PetUpdater/reader'
+import { ResolverParameterType as field_Query__HomeRoute } from './Query/HomeRoute/reader'
+import { ResolverParameterType as field_Query__PetDetailRoute } from './Query/PetDetailRoute/reader'
 
 type IdentityWithParam<TParam> = <TResolverReturn>(
   x: (param: TParam) => TResolverReturn

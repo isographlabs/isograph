@@ -70,7 +70,7 @@ fn build_iso_overload_for_entrypoint<'schema>(
 ) -> (String, String) {
     let mut s: String = "".to_string();
     let import = format!(
-        "import entrypoint_{} from '../__isograph/{}/{}/entrypoint.ts'\n",
+        "import entrypoint_{} from '../__isograph/{}/{}/entrypoint'\n",
         resolver.type_and_field.underscore_separated(),
         resolver.type_and_field.type_name,
         resolver.type_and_field.field_name,
@@ -95,7 +95,7 @@ fn build_iso_overload_for_client_defined_field(
 ) -> (String, String) {
     let mut s: String = "".to_string();
     let import = format!(
-        "import {{ ResolverParameterType as field_{} }} from './{}/{}/reader.ts'\n",
+        "import {{ ResolverParameterType as field_{} }} from './{}/{}/reader'\n",
         resolver.type_and_field.underscore_separated(),
         resolver.type_and_field.type_name,
         resolver.type_and_field.field_name,
