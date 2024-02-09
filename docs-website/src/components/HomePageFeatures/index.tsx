@@ -69,8 +69,8 @@ const CodeBlocks = {
 import {
   useRead,
   useLazyReference,
-  iso,
 } from "@isograph/react";
+import { iso } from "@iso";
 
 export function HomePageRoute() {
   // Step 1: When this component renders, make a network request
