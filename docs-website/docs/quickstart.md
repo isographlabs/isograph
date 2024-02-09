@@ -120,7 +120,7 @@ Isograph requires some initial setup to teach it how to make API calls to your G
 In our case, we can do that by change our `src/pages/_app.tsx` file to look like:
 
 ```tsx
-import { useMemo } from 'react';
+import { useMemo, Suspense } from 'react';
 import type { AppProps } from 'next/app';
 import {
   createIsographEnvironment,
@@ -149,13 +149,21 @@ export default function App({ Component, pageProps }: AppProps) {
   );
   return (
     <IsographEnvironmentProvider environment={environment}>
-      <Component {...pageProps} />
+      <Suspense fallback="loading">
+        <Component {...pageProps} />
+      </Suspense>
     </IsographEnvironmentProvider>
   );
 }
 ```
 
 In this step, we created some context that holds the Isograph environment. The Isograph environment contains the data that we have received from the network. It also knows how to make network requests ot the GraphQL backend.
+
+:::note Why are we wrapping `Component` in a suspense boundary?
+We're also wrapping the inner `<Component />` in a suspense boundary. This is because later, we will render `<HomePage />`. This component will suspend if data is missing due to missing data. When the network request completes and the component unsuspends, we will re-render `App` anew.
+
+This will recreate the environment, meaning that we'll find that that data is missing, and re-suspend, causing an infinite loop! 😢
+:::
 
 ## Create the `Root.HomePage` component
 

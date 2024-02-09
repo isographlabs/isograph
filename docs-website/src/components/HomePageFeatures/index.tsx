@@ -105,18 +105,16 @@ export const HomePage = iso${'`'}
       first_name
       last_name
       Avatar
-    },
+    }
   }
-${'`'}(HomePageComponent);
-
-function HomePageComponent({ data }: HomePageComponentParams) {
+${'`'}(function HomePageComponent({ data }) {
   // Step 5: Render your component
   const viewer = data.viewer;
   return <>
     <h1>Hello {viewer?.first_name} {viewer?.last_name}!</h1>
     <data.Avatar />
   </>
-}
+});
   `,
   avatar_component: `
 import { iso } from "@isograph/react";
