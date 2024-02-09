@@ -403,18 +403,12 @@ fn get_artifact_for_mutation_field<'schema>(
 
     let parent_object = schema.schema_data.object(parent_id);
 
-    // HACK
-    // TODO pass the non-magical name
-    let mutation_field_name = magic_mutation_field_name.lookup()[2..].to_string();
-    // END HACK
-
     let query_text = generate_mutation_query_text(
         parent_object,
         schema,
         &merged_selection_set,
         variable_definitions,
         magic_mutation_field_name,
-        &mutation_field_name,
         mutation_primary_field_name,
         mutation_field_arguments,
         requires_refinement,
@@ -427,7 +421,7 @@ fn get_artifact_for_mutation_field<'schema>(
     let normalization_ast = NormalizationAst(format!(
         "[{{\n\
         {space_2}kind: \"Linked\",\n\
-        {space_2}fieldName: \"{mutation_field_name}\",\n\
+        {space_2}fieldName: \"{magic_mutation_field_name}\",\n\
         {space_2}arguments: {arguments},\n\
         {space_2}selections: [\n\
         {space_4}{{\n\
@@ -486,7 +480,6 @@ fn generate_mutation_query_text<'schema>(
     merged_selection_set: &MergedSelectionSet,
     mut variable_definitions: Vec<WithSpan<ValidatedVariableDefinition>>,
     magic_mutation_field_name: SelectableFieldName,
-    mutation_field_name: &str,
     mutation_primary_field_name: SelectableFieldName,
     mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
     requires_refinement: RequiresRefinement,
@@ -526,12 +519,12 @@ fn generate_mutation_query_text<'schema>(
     let mutation_field_arguments = get_serialized_arguments_for_query_text(&mutation_parameters);
 
     let aliased_mutation_field_name =
-        get_aliased_mutation_field_name(&mutation_field_name, &mutation_parameters);
+        get_aliased_mutation_field_name(magic_mutation_field_name, &mutation_parameters);
 
     let parent_object_name = parent_object_type.name;
     query_text.push_str(&format!(
         "mutation {parent_object_name}{magic_mutation_field_name} {variable_text} {{\\\n\
-        {aliased_mutation_field_name}: {mutation_field_name}{mutation_field_arguments} {{\\\n\
+        {aliased_mutation_field_name}: {magic_mutation_field_name}{mutation_field_arguments} {{\\\n\
         {mutation_primary_field_name} {{ \\\n",
     ));
 
@@ -548,7 +541,7 @@ fn generate_mutation_query_text<'schema>(
 }
 
 fn get_aliased_mutation_field_name(
-    name: &str,
+    name: SelectableFieldName,
     parameters: &[WithLocation<SelectionFieldArgument>],
 ) -> String {
     let mut s = name.to_string();
