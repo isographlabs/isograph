@@ -123,7 +123,7 @@ type IdentityWithParam<TParam> = <TResolverReturn>(
   x: (param: TParam) => TResolverReturn
 ) => (param: TParam) => TResolverReturn;
 
-type WhitespaceCharacter = ' ' | '\\n';
+type WhitespaceCharacter = ' ' | '\\t' | '\\n';
 type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
   ? Whitespace<In>
   : In;
@@ -154,9 +154,9 @@ type MatchesWhitespaceAndString<
         "
 export function iso(_queryText: string): IdentityWithParam<any> | IsographEntrypoint<any, any, any>{
   return function identity<TResolverReturn>(
-    x: (param: any) => TResolverReturn,
+    clientFieldOrEntrypoint: (param: any) => TResolverReturn,
   ): (param: any) => TResolverReturn {
-    return x;
+    return clientFieldOrEntrypoint;
   };
 }",
     );
