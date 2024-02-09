@@ -852,7 +852,7 @@ pub enum ProcessTypeDefinitionError {
 
     #[error(
         "The {strong_field_name} field on \"{parent_type}\" must have type \"ID!\".\n\
-    This error can be suppressed using the \"on_invalid_type_id\" config parameter."
+    This error can be suppressed using the \"on_invalid_id_type\" config parameter."
     )]
     IdFieldMustBeNonNullIdType {
         parent_type: IsographObjectTypeName,

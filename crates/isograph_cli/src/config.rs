@@ -90,7 +90,7 @@ pub(crate) fn create_config(mut config_location: PathBuf) -> CompilerConfig {
 }
 
 #[derive(Deserialize, Default)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 struct ConfigFileOptions {
     on_invalid_id_type: ConfigFileOptionalValidationLevel,
 }
