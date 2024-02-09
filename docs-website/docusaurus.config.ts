@@ -111,7 +111,7 @@ const config: Config = {
           items: [
             {
               label: 'Discord (go to the #isograph channel)',
-              href: 'https://discord.gg/Q2c5tM5T8A',
+              href: 'https://discord.gg/kDCcN3EDR6',
             },
             {
               label: 'Twitter',
