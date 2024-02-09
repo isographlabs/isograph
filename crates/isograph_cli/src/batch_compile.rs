@@ -279,6 +279,7 @@ fn process_iso_literal_extraction(
         iso_literal_start_index,
         has_associated_js_function,
         const_export_name,
+        has_paren,
     } = iso_literal_extraction;
     let text_source = TextSource {
         path: file_name,
@@ -287,6 +288,13 @@ fn process_iso_literal_extraction(
             (iso_literal_start_index + iso_literal_text.len()) as u32,
         )),
     };
+
+    if !has_paren {
+        return Err(WithLocation::new(
+            IsographLiteralParseError::ExpectedParenthesesAroundIsoLiteral,
+            Location::new(text_source, Span::todo_generated()),
+        ));
+    }
 
     // TODO return errors if any occurred, otherwise Ok
     let iso_literal_extraction_result = parse_iso_literal(

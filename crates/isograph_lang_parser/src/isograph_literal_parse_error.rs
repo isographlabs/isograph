@@ -46,6 +46,12 @@ pub enum IsographLiteralParseError {
         select any fields, write an empty selection set: {{}}"
     )]
     ExpectedSelectionSet,
+
+    #[error(
+        "You must call the iso function with parentheses. \"iso`...`\" is \
+        not supported."
+    )]
+    ExpectedParenthesesAroundIsoLiteral,
 }
 
 impl From<LowLevelParseError> for IsographLiteralParseError {
