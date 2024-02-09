@@ -182,13 +182,36 @@ fn sorted_entrypoints(schema: &ValidatedSchema) -> Vec<&ValidatedSchemaResolver>
         {
             Ordering::Less => Ordering::Less,
             Ordering::Greater => Ordering::Greater,
-            Ordering::Equal => resolver_1
-                .type_and_field
-                .field_name
-                .cmp(&resolver_2.type_and_field.field_name),
+            Ordering::Equal => sort_field_name(
+                resolver_1.type_and_field.field_name,
+                resolver_2.type_and_field.field_name,
+            ),
         }
     });
     entrypoints
+}
+
+fn sort_field_name(field_1: SelectableFieldName, field_2: SelectableFieldName) -> Ordering {
+    // We cannot alphabetically sort by field_name. This is because
+    // if Query.Foo comes before Query.FooBar in the generated iso.ts,
+    // then the iso literal containing field Query.FooBar will be
+    // matched with the overload for Query.Foo, which is incorrect.
+    //
+    // So, instead, we must sort alphabetically, except if a field
+    // starts with the other field; then the longer field comes first.
+    //
+    // TODO confirm that this is a stable sort. It should be, I think!
+
+    let field_1 = field_1.lookup();
+    let field_2 = field_2.lookup();
+
+    if field_1.starts_with(field_2) {
+        Ordering::Less
+    } else if field_2.starts_with(field_1) {
+        Ordering::Greater
+    } else {
+        field_1.cmp(&field_2)
+    }
 }
 
 fn sorted_client_defined_fields(schema: &ValidatedSchema) -> Vec<&ValidatedSchemaResolver> {
@@ -205,10 +228,10 @@ fn sorted_client_defined_fields(schema: &ValidatedSchema) -> Vec<&ValidatedSchem
         {
             Ordering::Less => Ordering::Less,
             Ordering::Greater => Ordering::Greater,
-            Ordering::Equal => resolver_1
-                .type_and_field
-                .field_name
-                .cmp(&resolver_2.type_and_field.field_name),
+            Ordering::Equal => sort_field_name(
+                resolver_1.type_and_field.field_name,
+                resolver_2.type_and_field.field_name,
+            ),
         }
     });
     fields

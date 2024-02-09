@@ -10,10 +10,10 @@ import { ResolverParameterType as field_PullRequest__PullRequestLink } from './P
 import { ResolverParameterType as field_PullRequest__createdAtFormatted } from './PullRequest/createdAtFormatted/reader.ts'
 import { ResolverParameterType as field_PullRequestConnection__PullRequestTable } from './PullRequestConnection/PullRequestTable/reader.ts'
 import { ResolverParameterType as field_Query__Header } from './Query/Header/reader.ts'
-import { ResolverParameterType as field_Query__HomePage } from './Query/HomePage/reader.ts'
 import { ResolverParameterType as field_Query__HomePageList } from './Query/HomePageList/reader.ts'
-import { ResolverParameterType as field_Query__PullRequest } from './Query/PullRequest/reader.ts'
+import { ResolverParameterType as field_Query__HomePage } from './Query/HomePage/reader.ts'
 import { ResolverParameterType as field_Query__PullRequestDetail } from './Query/PullRequestDetail/reader.ts'
+import { ResolverParameterType as field_Query__PullRequest } from './Query/PullRequest/reader.ts'
 import { ResolverParameterType as field_Query__RepositoryDetail } from './Query/RepositoryDetail/reader.ts'
 import { ResolverParameterType as field_Query__RepositoryPage } from './Query/RepositoryPage/reader.ts'
 import { ResolverParameterType as field_Query__UserDetail } from './Query/UserDetail/reader.ts'
@@ -81,20 +81,20 @@ export function iso<T>(
 ): IdentityWithParam<field_Query__Header>;
 
 export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'field Query.HomePage', T>
-): IdentityWithParam<field_Query__HomePage>;
-
-export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.HomePageList', T>
 ): IdentityWithParam<field_Query__HomePageList>;
 
 export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'field Query.PullRequest', T>
-): IdentityWithParam<field_Query__PullRequest>;
+  param: T & MatchesWhitespaceAndString<'field Query.HomePage', T>
+): IdentityWithParam<field_Query__HomePage>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.PullRequestDetail', T>
 ): IdentityWithParam<field_Query__PullRequestDetail>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.PullRequest', T>
+): IdentityWithParam<field_Query__PullRequest>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.RepositoryDetail', T>
