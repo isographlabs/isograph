@@ -133,8 +133,7 @@ fn parse_resolver_declaration<'a>(
 
             let directives = parse_directives(tokens)?;
 
-            let selection_set_and_unwraps =
-                parse_optional_selection_set_and_unwraps(tokens, text_source)?;
+            let selection_set_and_unwraps = parse_selection_set_and_unwraps(tokens, text_source)?;
 
             let const_export_name = const_export_name.ok_or_else(|| {
                 WithSpan::new(
@@ -166,7 +165,8 @@ fn parse_resolver_declaration<'a>(
     resolver_declaration
 }
 
-fn parse_optional_selection_set_and_unwraps<'a>(
+// Note: for now, top-level selection sets are required
+fn parse_selection_set_and_unwraps<'a>(
     tokens: &mut PeekableLexer<'a>,
     text_source: TextSource,
 ) -> ParseResultWithSpan<Option<(Vec<WithSpan<UnvalidatedSelection>>, Vec<WithSpan<Unwrap>>)>> {
@@ -176,7 +176,10 @@ fn parse_optional_selection_set_and_unwraps<'a>(
             let unwraps = parse_unwraps(tokens);
             Ok(Some((selection_set, unwraps)))
         }
-        None => Ok(None),
+        None => Err(WithSpan::new(
+            IsographLiteralParseError::ExpectedSelectionSet,
+            Span::new(0, 0),
+        )),
     }
 }
 

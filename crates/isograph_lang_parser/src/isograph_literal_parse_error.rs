@@ -40,6 +40,12 @@ pub enum IsographLiteralParseError {
 
     #[error("Expected a comma or linebreak")]
     ExpectedCommaOrLineBreak,
+
+    #[error(
+        "Selection sets are required. If you do not want to \
+        select any fields, write an empty selection set: {{}}"
+    )]
+    ExpectedSelectionSet,
 }
 
 impl From<LowLevelParseError> for IsographLiteralParseError {
