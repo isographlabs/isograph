@@ -9,8 +9,8 @@ import { RepoGitHubLink } from './RepoGitHubLink';
 
 export const HomePage = iso(`
   field Query.HomePage($first: Int!) @component {
-    Header,
-    HomePageList,
+    Header
+    HomePageList
   }
 `)(function HomePageComponent({ data, route, setRoute }) {
   return (

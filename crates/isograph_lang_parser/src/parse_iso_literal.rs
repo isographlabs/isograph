@@ -222,6 +222,23 @@ fn parse_delimited_list<'a, TResult>(
     Ok(items)
 }
 
+fn parse_comma_or_line_break<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResultWithSpan<()> {
+    let comma = tokens.parse_token_of_kind(IsographLangTokenKind::Comma);
+    if comma.is_err() {
+        let white_space_text = tokens.source(tokens.white_space_span());
+        if white_space_text.contains('\n') {
+            Ok(())
+        } else {
+            Err(WithSpan::new(
+                IsographLiteralParseError::ExpectedCommaOrLineBreak,
+                tokens.peek().span,
+            ))
+        }
+    } else {
+        Ok(())
+    }
+}
+
 fn parse_selection<'a>(
     tokens: &mut PeekableLexer<'a>,
     text_source: TextSource,
@@ -241,9 +258,7 @@ fn parse_selection<'a>(
             let unwraps = parse_unwraps(tokens);
 
             // commas are required
-            tokens
-                .parse_token_of_kind(IsographLangTokenKind::Comma)
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+            parse_comma_or_line_break(tokens)?;
 
             let selection = match selection_set {
                 Some(selection_set) => Selection::ServerField(ServerFieldSelection::LinkedField(

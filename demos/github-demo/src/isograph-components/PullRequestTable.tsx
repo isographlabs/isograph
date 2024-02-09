@@ -10,7 +10,7 @@ import {
 
 export const createdAtFormatted = iso(`
   field PullRequest.createdAtFormatted {
-    createdAt,
+    createdAt
   }
 `)((props) => {
   const date = new Date(props.createdAt);
@@ -25,19 +25,19 @@ export const PullRequestTable = iso(`
   field PullRequestConnection.PullRequestTable @component {
     edges {
       node {
-        id,
-        PullRequestLink,
-        number,
-        title,
+        id
+        PullRequestLink
+        number
+        title
         author {
-          UserLink,
-          login,
-        },
-        closed,
-        totalCommentsCount,
-        createdAtFormatted,
-      },
-    },
+          UserLink
+          login
+        }
+        closed
+        totalCommentsCount
+        createdAtFormatted
+      }
+    }
   }
 `)(function PullRequestTableComponent(props) {
   const reversedPullRequests = [...props.data.edges].reverse();

@@ -4,16 +4,16 @@ import { RepoGitHubLink } from './RepoGitHubLink';
 export const RepositoryDetail = iso(`
   field Query.RepositoryDetail @component {
     repository(name: $repositoryName, owner: $repositoryOwner) {
-      nameWithOwner,
+      nameWithOwner
       parent {
-        RepositoryLink,
-        nameWithOwner,
-      },
+        RepositoryLink
+        nameWithOwner
+      }
 
       pullRequests(last: $first) {
-        PullRequestTable,
-      },
-    },
+        PullRequestTable
+      }
+    }
   }
 `)(function RepositoryDetailComponent(props) {
   const parent = props.data.repository?.parent;

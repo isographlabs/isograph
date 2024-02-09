@@ -9,11 +9,11 @@ export const PullRequestDetail = iso(`
   field Query.PullRequestDetail @component {
     repository(owner: $repositoryOwner, name: $repositoryName) {
       pullRequest(number: $pullRequestNumber) {
-        title,
-        bodyHTML,
-        CommentList,
-      },
-    },
+        title
+        bodyHTML
+        CommentList
+      }
+    }
   }
 `)(function PullRequestDetailComponent(props) {
   const repository = props.data.repository;

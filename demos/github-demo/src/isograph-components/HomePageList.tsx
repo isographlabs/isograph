@@ -5,11 +5,11 @@ import { Button } from '@mui/material';
 export const HomePageList = iso(`
   field Query.HomePageList($first: Int!) @component {
     viewer {
-      login,
-      name,
-      RepositoryList,
-      __refetch,
-    },
+      login
+      name
+      RepositoryList
+      __refetch
+    }
   }
 `)(function HomePageListComponent(props) {
   return (

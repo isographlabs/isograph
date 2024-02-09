@@ -4,18 +4,18 @@ import { Card, CardContent } from '@mui/material';
 
 export const PetStatsCard = iso(`
   field Pet.PetStatsCard @component {
-    id,
-    nickname,
-    __refetch,
-    age,
+    id
+    nickname
+    __refetch
+    age
     stats {
-      weight,
-      intelligence,
-      cuteness,
-      hunger,
-      sociability,
-      energy,
-    },
+      weight
+      intelligence
+      cuteness
+      hunger
+      sociability
+      energy
+    }
   }
 `)(function PetStatsCardComponent(props) {
   return (

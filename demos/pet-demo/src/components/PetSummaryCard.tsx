@@ -4,10 +4,10 @@ import { Avatar, Card, CardContent, Stack } from '@mui/material';
 
 export const PetSummaryCard = iso(`
   field Pet.PetSummaryCard @component {
-    id,
-    name,
-    picture,
-    tagline,
+    id
+    name
+    picture
+    tagline
   }
 `)(function PetSummaryCardComponent(props) {
   return (

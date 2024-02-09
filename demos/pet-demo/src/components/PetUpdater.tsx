@@ -6,14 +6,14 @@ import { PetId } from './router';
 
 export const PetUpdater = iso(`
   field Pet.PetUpdater @component {
-    set_pet_best_friend,
+    set_pet_best_friend
     potential_new_best_friends {
-      id,
-      name,
+      id
+      name
     },
 
-    set_pet_tagline,
-    tagline,
+    set_pet_tagline
+    tagline
   }
 `)(function PetUpdaterComponent(props) {
   const [selected, setSelected] = useState<PetId | 'NONE'>('NONE');

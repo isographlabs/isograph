@@ -10,9 +10,9 @@ import logo from './svgs/dark-logo.svg';
 export const Header = iso(`
   field Query.Header @component {
     viewer {
-      name,
-      Avatar,
-    },
+      name
+      Avatar
+    }
   }
 `)(function HeaderComponent(props) {
   return (

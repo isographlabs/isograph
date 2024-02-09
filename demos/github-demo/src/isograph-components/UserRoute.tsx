@@ -13,8 +13,8 @@ import Entrypoint from '@iso/Query/UserPage/entrypoint';
 
 export const UserPage = iso(`
   field Query.UserPage($first: Int!, $userLogin: String!) @component {
-    Header,
-    UserDetail,
+    Header
+    UserDetail
   }
 `)(function UserRouteComponentComponent({ data, route, setRoute }) {
   return (

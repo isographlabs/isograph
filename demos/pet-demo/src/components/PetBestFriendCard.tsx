@@ -4,16 +4,16 @@ import { Avatar, Card, CardContent, Stack } from '@mui/material';
 
 export const PetBestFriendCard = iso(`
   field Pet.PetBestFriendCard @component {
-    id,
-    PetUpdater,
+    id
+    PetUpdater
     best_friend_relationship {
-      picture_together,
+      picture_together
       best_friend {
-        id,
-        name,
-        picture,
-      },
-    },
+        id
+        name
+        picture
+      }
+    }
   }
 `)(function PetBestFriendCardComponent(props) {
   const bestFriendRelationship = props.data.best_friend_relationship;

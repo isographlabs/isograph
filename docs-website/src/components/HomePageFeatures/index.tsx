@@ -102,9 +102,9 @@ export const HomePage = iso${'`'}
     # Step 4: Select whatever fields you'll need, including
     # other client-defined fields like Avatar.
     viewer {
-      first_name,
-      last_name,
-      Avatar,
+      first_name
+      last_name
+      Avatar
     },
   }
 ${'`'}(HomePageComponent);
@@ -124,7 +124,7 @@ import MyComponentLibraryAvatar from 'my-component-library';
   
 export const Avatar = iso(${'`'}
   User.Avatar @component {
-    avatarUrl,
+    avatarUrl
   }
 ${'`'})(function AvatarComponent(props) {
   return <MyComponentLibraryAvatar url={props.data.avatarUrl} />

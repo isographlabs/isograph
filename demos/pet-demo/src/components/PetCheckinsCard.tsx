@@ -4,12 +4,12 @@ import { Card, CardContent } from '@mui/material';
 
 export const PetCheckinsCard = iso(`
   field Pet.PetCheckinsCard @component {
-    id,
+    id
     checkins {
-      id,
-      location,
-      time,
-    },
+      id
+      location
+      time
+    }
   }
 `)(function PetCheckinsCardComponent(props) {
   return (

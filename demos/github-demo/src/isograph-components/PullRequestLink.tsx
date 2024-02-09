@@ -5,13 +5,13 @@ import { Link } from '@mui/material';
 
 export const PullRequestLink = iso(`
   field PullRequest.PullRequestLink @component {
-    number,
+    number
     repository {
-      name,
+      name
       owner {
-        login,
-      },
-    },
+        login
+      }
+    }
   }
 `)(function PullRequestLinkComponent(props) {
   return (

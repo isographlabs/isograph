@@ -4,9 +4,9 @@ import { RepoGitHubLink } from './RepoGitHubLink';
 export const UserDetail = iso(`
   field Query.UserDetail @component {
     user(login: $userLogin) {
-      name,
-      RepositoryList,
-    },
+      name
+      RepositoryList
+    }
   }
 `)(function UserDetailComponent(props) {
   console.log('user detail props.data:', props.data);

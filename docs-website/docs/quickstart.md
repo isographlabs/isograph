@@ -192,11 +192,11 @@ export const HomePage = iso(`
   field Root.HomePage @component {
     allFilms {
       films {
-        id,
-        title,
-        episodeID,
-      },
-    },
+        id
+        title
+        episodeID
+      }
+    }
   }
 `)(function HomePageComponent(props) {
   return 'Hello from the home page!';
@@ -241,11 +241,11 @@ export const HomePage = iso(`
   field Root.HomePage @component {
     allFilms {
       films {
-        id,
-        title,
-        episodeID,
-      },
-    },
+        id
+        title
+        episodeID
+      }
+    }
   }
 `)(function HomePageComponent(props) {
   const films = useMemo(
@@ -351,8 +351,8 @@ import { iso } from '@iso';
 
 export const EpisodeTitle = iso(`
   field Film.EpisodeTitle @component {
-    title,
-    episodeID,
+    title
+    episodeID
   }
 `)(function EpisodeTitleComponent({ data }) {
   return (
@@ -383,11 +383,11 @@ export const HomePage = iso(`
   field Root.HomePage @component {
     allFilms {
       films {
-        id,
-        episodeID,
-        EpisodeTitle,
-      },
-    },
+        id
+        episodeID
+        EpisodeTitle
+      }
+    }
   }
 `)(function HomePageComponent(props) {
   const films = useMemo(

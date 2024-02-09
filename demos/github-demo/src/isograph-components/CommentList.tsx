@@ -6,7 +6,7 @@ import { Card, CardContent } from '@mui/material';
 
 export const formattedCommentCreationDate = iso(`
   field IssueComment.formattedCommentCreationDate {
-    createdAt,
+    createdAt
   }
 `)((props) => {
   const date = new Date(props.createdAt);
@@ -22,15 +22,15 @@ export const CommentList = iso(`
     comments(last: $last) {
       edges {
         node {
-          id,
-          bodyText,
-          formattedCommentCreationDate,
+          id
+          bodyText
+          formattedCommentCreationDate
           author {
-            login,
-          },
-        },
-      },
-    },
+            login
+          }
+        }
+      }
+    }
   }
 `)(function CommentListComponent(props) {
   const comments = [...props.data.comments.edges].reverse();

@@ -5,9 +5,9 @@ import { Container, Stack } from '@mui/material';
 export const HomeRoute = iso(`
   field Query.HomeRoute @component {
     pets {
-      id,
-      PetSummaryCard,
-    },
+      id
+      PetSummaryCard
+    }
   }
 `)(function HomeRouteComponent(props) {
   return (

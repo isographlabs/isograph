@@ -167,6 +167,10 @@ impl<'source> PeekableLexer<'source> {
         let end = self.end_index_of_last_parsed_token;
         WithSpan::new(result, Span::new(start, end))
     }
+
+    pub fn white_space_span(&self) -> Span {
+        Span::new(self.end_index_of_last_parsed_token, self.peek().span.start)
+    }
 }
 
 type LowLevelParseResult<T> = Result<T, WithSpan<LowLevelParseError>>;

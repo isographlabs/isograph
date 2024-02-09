@@ -12,8 +12,8 @@ import {
 
 export const RepositoryPage = iso(`
   field Query.RepositoryPage($repositoryName: String!, $repositoryOwner: String!, $first: Int!) @component {
-    Header,
-    RepositoryDetail,
+    Header
+    RepositoryDetail
   }
 `)(function RepositoryRouteComponent({ data, route, setRoute }) {
   return (

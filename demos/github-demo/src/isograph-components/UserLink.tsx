@@ -4,7 +4,7 @@ import { Link } from '@mui/material';
 
 export const UserLink = iso(`
   field Actor.UserLink @component {
-    login,
+    login
   }
 `)(function UserLinkComponent(props) {
   return (

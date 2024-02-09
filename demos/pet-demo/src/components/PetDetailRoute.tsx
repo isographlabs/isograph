@@ -5,12 +5,12 @@ import { Container, Stack } from '@mui/material';
 export const PetDetailRoute = iso(`
   field Query.PetDetailRoute($id: ID!) @component {
     pet(id: $id) {
-      name,
-      PetCheckinsCard,
-      PetBestFriendCard,
-      PetPhraseCard,
-      PetTaglineCard,
-    },
+      name
+      PetCheckinsCard
+      PetBestFriendCard
+      PetPhraseCard
+      PetTaglineCard
+    }
   }
 `)(function PetDetailRouteComponent({ data, navigateTo }) {
   const { pet } = data;

@@ -4,11 +4,11 @@ import { Link } from '@mui/material';
 
 export const RepositoryLink = iso(`
   field Repository.RepositoryLink @component {
-    id,
-    name,
+    id
+    name
     owner {
-      login,
-    },
+      login
+    }
   }
 `)(function RepositoryLinkComponent(props) {
   return (

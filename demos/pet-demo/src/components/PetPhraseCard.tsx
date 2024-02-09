@@ -4,8 +4,8 @@ import { Card, CardContent } from '@mui/material';
 
 export const PetPhraseCard = iso(`
 field Pet.PetPhraseCard @component {
-  id,
-  favorite_phrase,
+  id
+  favorite_phrase
 }
 `)(function PetPhraseCardComponent(props) {
   return (

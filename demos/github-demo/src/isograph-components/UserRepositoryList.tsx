@@ -13,22 +13,22 @@ export const RepositoryList = iso(`
     repositories(last: 10) {
       edges {
         node {
-          id,
-          RepositoryLink,
-          name,
-          nameWithOwner,
-          description,
-          forkCount,
+          id
+          RepositoryLink
+          name
+          nameWithOwner
+          description
+          forkCount
           pullRequests(first: $first) {
-            totalCount,
-          },
-          stargazerCount,
+            totalCount
+          }
+          stargazerCount
           watchers(first: $first) {
-            totalCount,
-          },
-        },
-      },
-    },
+            totalCount
+          }
+        }
+      }
+    }
   }
 `)(function UserRepositoryListComponent(props) {
   const repositories = [...props.data.repositories.edges].reverse();
