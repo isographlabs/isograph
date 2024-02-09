@@ -124,7 +124,7 @@ export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field User.RepositoryList', T>
 ): IdentityWithParam<field_User__RepositoryList>;
 
-export function iso(_queryText: string): IdentityWithParam<any> | IsographEntrypoint<any, any, any>{
+export function iso(_isographLiteralText: string): IdentityWithParam<any> | IsographEntrypoint<any, any, any>{
   return function identity<TResolverReturn>(
     clientFieldOrEntrypoint: (param: any) => TResolverReturn,
   ): (param: any) => TResolverReturn {
