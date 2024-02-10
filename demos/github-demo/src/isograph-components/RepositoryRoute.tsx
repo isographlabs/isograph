@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLazyReference, useRead } from '@isograph/react';
+import { useLazyReference, useResult } from '@isograph/react';
 import { iso } from '@iso';
 import { Container } from '@mui/material';
 import RepositoryPageEntrypoint from '@iso/Query/RepositoryPage/entrypoint';
@@ -47,6 +47,6 @@ export function RepositoryRoute({
     queryReference,
     name: route.repositoryName,
   });
-  const Component = useRead(queryReference);
+  const Component = useResult(queryReference);
   return <Component route={route} setRoute={setRoute} />;
 }

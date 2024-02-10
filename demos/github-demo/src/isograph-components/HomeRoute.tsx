@@ -1,5 +1,5 @@
 import React from 'react';
-import { useRead, useLazyReference, subscribe } from '@isograph/react';
+import { useResult, useLazyReference, subscribe } from '@isograph/react';
 
 import { iso } from '@iso';
 import { Container } from '@mui/material';
@@ -41,6 +41,6 @@ export function HomeRoute({
       first: 15,
     },
   );
-  const Component = useRead(queryReference);
+  const Component = useResult(queryReference);
   return <Component route={route} setRoute={setRoute} />;
 }
