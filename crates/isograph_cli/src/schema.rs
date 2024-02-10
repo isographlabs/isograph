@@ -28,7 +28,7 @@ pub(crate) fn read_schema_file(path: &PathBuf) -> Result<String, BatchCompileErr
     })?;
 
     let contents = std::str::from_utf8(&contents)
-        .map_err(|message| BatchCompileError::UnableToConvertToString { message })?
+        .map_err(BatchCompileError::from)?
         .to_owned();
 
     Ok(contents)

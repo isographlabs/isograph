@@ -13,7 +13,9 @@ use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
 };
 use isograph_lang_types::{EntrypointTypeAndField, ResolverDeclaration};
-use isograph_schema::{CompilerConfig, ProcessResolverDeclarationError, Schema, UnvalidatedSchema};
+use isograph_schema::{
+    CompilerConfig, ProcessResolverDeclarationError, Schema, UnvalidatedSchema, ValidateSchemaError,
+};
 use pretty_duration::pretty_duration;
 use thiserror::Error;
 
@@ -339,16 +341,14 @@ pub(crate) enum BatchCompileError {
         message: std::io::Error,
     },
 
-    #[error("Unable to traverse directory.\nReason: {message}")]
-    UnableToTraverseDirectory { message: std::io::Error },
+    #[error("Unable to traverse directory.\nReason: {0}")]
+    UnableToTraverseDirectory(#[from] std::io::Error),
 
-    #[error("Unable to convert schema to string.\nReason: {message}")]
-    UnableToConvertToString { message: std::str::Utf8Error },
+    #[error("Unable to convert schema to string.\nReason: {0}")]
+    UnableToConvertToString(#[from] std::str::Utf8Error),
 
-    #[error("Unable to parse schema.\n\n{message}")]
-    UnableToParseSchema {
-        message: WithLocation<SchemaParseError>,
-    },
+    #[error("Unable to parse schema.\n\n{0}")]
+    UnableToParseSchema(#[from] WithLocation<SchemaParseError>),
 
     #[error(
         "{}{}",
@@ -359,10 +359,8 @@ pub(crate) enum BatchCompileError {
         messages: Vec<WithLocation<IsographLiteralParseError>>,
     },
 
-    #[error("Unable to create schema.\nReason: {message}")]
-    UnableToCreateSchema {
-        message: WithLocation<isograph_schema::ProcessTypeDefinitionError>,
-    },
+    #[error("Unable to create schema.\nReason: {0}")]
+    UnableToCreateSchema(#[from] WithLocation<isograph_schema::ProcessTypeDefinitionError>),
 
     #[error(
         "{}{}",
@@ -377,15 +375,13 @@ pub(crate) enum BatchCompileError {
         messages: Vec<WithLocation<isograph_schema::ProcessResolverDeclarationError>>,
     },
 
-    #[error("Error when processing an entrypoint declaration.\nReason: {message}")]
-    ErrorWhenProcessingEntrypointDeclaration {
-        message: WithLocation<isograph_schema::ValidateEntrypointDeclarationError>,
-    },
+    #[error("Error when processing an entrypoint declaration.\nReason: {0}")]
+    ErrorWhenProcessingEntrypointDeclaration(
+        #[from] WithLocation<isograph_schema::ValidateEntrypointDeclarationError>,
+    ),
 
-    #[error("Unable to strip prefix.\nReason: {message}")]
-    UnableToStripPrefix {
-        message: std::path::StripPrefixError,
-    },
+    #[error("Unable to strip prefix.\nReason: {0}")]
+    UnableToStripPrefix(#[from] std::path::StripPrefixError),
 
     #[error(
         "{} when validating schema, client fields and entrypoint declarations.{}",
@@ -396,14 +392,8 @@ pub(crate) enum BatchCompileError {
         messages: Vec<WithLocation<isograph_schema::ValidateSchemaError>>,
     },
 
-    #[error("Unable to print.\nReason: {message}")]
-    UnableToPrint { message: GenerateArtifactsError },
-}
-
-impl From<WithLocation<SchemaParseError>> for BatchCompileError {
-    fn from(message: WithLocation<SchemaParseError>) -> Self {
-        BatchCompileError::UnableToParseSchema { message }
-    }
+    #[error("Unable to print.\nReason: {0}")]
+    UnableToPrint(#[from] GenerateArtifactsError),
 }
 
 impl From<Vec<WithLocation<IsographLiteralParseError>>> for BatchCompileError {
@@ -412,40 +402,14 @@ impl From<Vec<WithLocation<IsographLiteralParseError>>> for BatchCompileError {
     }
 }
 
-impl From<WithLocation<isograph_schema::ProcessTypeDefinitionError>> for BatchCompileError {
-    fn from(message: WithLocation<isograph_schema::ProcessTypeDefinitionError>) -> Self {
-        BatchCompileError::UnableToCreateSchema { message }
-    }
-}
-
-impl From<Vec<WithLocation<isograph_schema::ProcessResolverDeclarationError>>>
-    for BatchCompileError
-{
-    fn from(messages: Vec<WithLocation<isograph_schema::ProcessResolverDeclarationError>>) -> Self {
-        BatchCompileError::ErrorWhenProcessingResolverDeclaration { messages }
-    }
-}
-
-impl From<WithLocation<isograph_schema::ValidateEntrypointDeclarationError>> for BatchCompileError {
-    fn from(message: WithLocation<isograph_schema::ValidateEntrypointDeclarationError>) -> Self {
-        BatchCompileError::ErrorWhenProcessingEntrypointDeclaration { message }
-    }
-}
-
-impl From<std::path::StripPrefixError> for BatchCompileError {
-    fn from(message: std::path::StripPrefixError) -> Self {
-        BatchCompileError::UnableToStripPrefix { message }
-    }
-}
-
-impl From<Vec<WithLocation<isograph_schema::ValidateSchemaError>>> for BatchCompileError {
-    fn from(messages: Vec<WithLocation<isograph_schema::ValidateSchemaError>>) -> Self {
+impl From<Vec<WithLocation<ValidateSchemaError>>> for BatchCompileError {
+    fn from(messages: Vec<WithLocation<ValidateSchemaError>>) -> Self {
         BatchCompileError::UnableToValidateSchema { messages }
     }
 }
 
-impl From<GenerateArtifactsError> for BatchCompileError {
-    fn from(message: GenerateArtifactsError) -> Self {
-        BatchCompileError::UnableToPrint { message }
+impl From<Vec<WithLocation<ProcessResolverDeclarationError>>> for BatchCompileError {
+    fn from(messages: Vec<WithLocation<ProcessResolverDeclarationError>>) -> Self {
+        BatchCompileError::ErrorWhenProcessingResolverDeclaration { messages }
     }
 }

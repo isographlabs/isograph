@@ -33,7 +33,7 @@ pub(crate) fn read_files_in_folder(
                 })?;
 
             let contents = std::str::from_utf8(&contents)
-                .map_err(|message| BatchCompileError::UnableToConvertToString { message })?
+                .map_err(BatchCompileError::from)?
                 .to_owned();
 
             Ok((
@@ -50,7 +50,7 @@ fn read_dir_recursive(root_js_path: &PathBuf) -> Result<Vec<PathBuf>, BatchCompi
     visit_dirs_skipping_isograph(&root_js_path, &mut |dir_entry| {
         paths.push(dir_entry.path());
     })
-    .map_err(|e| BatchCompileError::UnableToTraverseDirectory { message: e })?;
+    .map_err(BatchCompileError::from)?;
 
     Ok(paths)
 }
