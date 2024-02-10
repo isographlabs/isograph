@@ -154,11 +154,7 @@ enum NormalizationKey {
 }
 
 #[derive(Debug)]
-pub enum ArtifactQueueItem<'schema> {
-    Reader(&'schema ValidatedSchemaResolver),
-    Entrypoint {
-        top_level_resolver: &'schema ValidatedSchemaResolver,
-    },
+pub enum ArtifactQueueItem {
     RefetchField(RefetchFieldResolverInfo),
     MutationField(MutationFieldResolverInfo),
 }
@@ -187,6 +183,8 @@ pub struct MutationFieldResolverInfo {
     pub root_fetchable_field: SelectableFieldName,
     // TODO wrap in a newtype
     pub refetch_query_index: usize,
+    // TODO make MutationFieldResolverInfo and RefetchFieldResolverInfo
+    // the same struct, with everything below wrapped in an option:
     // Mutation name
     pub mutation_field_name: SelectableFieldName,
     pub mutation_primary_field_name: SelectableFieldName,
@@ -203,14 +201,19 @@ struct MergeTraversalState<'a> {
     resolver: &'a ValidatedSchemaResolver,
     paths_to_refetch_fields: Vec<(PathToRefetchField, ObjectId, ResolverVariant)>,
     current_path: PathToRefetchField,
+    encountered_resolver_ids: &'a mut HashSet<ResolverFieldId>,
 }
 
 impl<'a> MergeTraversalState<'a> {
-    pub fn new(resolver: &'a ValidatedSchemaResolver) -> Self {
+    pub fn new(
+        resolver: &'a ValidatedSchemaResolver,
+        encountered_resolver_ids: &'a mut HashSet<ResolverFieldId>,
+    ) -> Self {
         Self {
             resolver,
             paths_to_refetch_fields: Default::default(),
             current_path: Default::default(),
+            encountered_resolver_ids,
         }
     }
 }
@@ -228,11 +231,13 @@ pub fn create_merged_selection_set(
     schema: &ValidatedSchema,
     parent_type: &ValidatedSchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
-    artifact_queue: &mut Vec<ArtifactQueueItem<'_>>,
+    artifact_queue: &mut Vec<ArtifactQueueItem>,
+    encountered_resolver_ids: &mut HashSet<ResolverFieldId>,
     // N.B. we call this for non-fetchable resolvers now, but that is a smell
     root_fetchable_resolver: &ValidatedSchemaResolver,
 ) -> (MergedSelectionSet, Vec<RootRefetchedPath>) {
-    let mut merge_traversal_state = MergeTraversalState::new(root_fetchable_resolver);
+    let mut merge_traversal_state =
+        MergeTraversalState::new(root_fetchable_resolver, encountered_resolver_ids);
     let merged_selection_set = create_merged_selection_set_with_merge_traversal_state(
         schema,
         parent_type,
@@ -376,6 +381,9 @@ fn merge_selections_into_set(
                             merge_scalar_server_field(scalar_field, merged_selection_map, span);
                         }
                         DefinedField::ResolverField(resolver_field_id) => {
+                            merge_traversal_state
+                                .encountered_resolver_ids
+                                .insert(*resolver_field_id);
                             merge_scalar_resolver_field(
                                 parent_type,
                                 schema,

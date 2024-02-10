@@ -1,6 +1,6 @@
 use std::{
     cmp::Ordering,
-    collections::{hash_map::Entry, HashMap},
+    collections::{hash_map::Entry, HashMap, HashSet},
     fmt::{self, Debug, Display},
     io,
     path::PathBuf,
@@ -17,8 +17,8 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    DefinedTypeId, NonConstantValue, Selection, SelectionFieldArgument, ServerFieldSelection,
-    VariableDefinition,
+    DefinedTypeId, NonConstantValue, ResolverFieldId, Selection, SelectionFieldArgument,
+    ServerFieldSelection, VariableDefinition,
 };
 use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_resolver,
@@ -249,78 +249,65 @@ fn get_artifact_path_and_contents<'schema>(
         .chain(std::iter::once(build_iso_overload(schema)))
 }
 
-/// get all artifacts that we must generate according to the following rough plan:
-/// - initially, we know we must generate artifacts for each resolver
-/// - we must also generate an artifact for each refetch field/magic mutation we
-///   encounter while generating an artifact for an entrypoint
+/// Get all artifacts according to the following scheme:
+/// - Add all the entrypoints to the queue
+/// - While generating merged selection sets for entrypoints, if we encounter:
+///   - a client field, add it the queue (but only once per client field.)
+///   - a refetch field/magic mutation field, add it to the queue
+/// Keep processing artifacts until the queue is empty.
 ///
-/// We do this by keeping a queue of artifacts to generate, and adding to the queue
-/// as we process entrypoints.
+/// TODO The artifact queue abstraction doesn't make much sense here.
 fn get_artifact_infos<'schema>(
     schema: &'schema ValidatedSchema,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
 ) -> Vec<ArtifactInfo<'schema>> {
-    let mut artifact_queue: Vec<_> =
-        schema
-            .resolvers
-            .iter()
-            .map(ArtifactQueueItem::Reader)
-            .chain(schema.entrypoints.iter().map(|resolver_field_id| {
-                ArtifactQueueItem::Entrypoint {
-                    top_level_resolver: schema.resolver(*resolver_field_id),
-                }
-            }))
-            .collect();
+    let mut artifact_queue = vec![];
+    let mut encountered_resolvers_ids = HashSet::new();
+    let mut artifact_infos = vec![];
 
-    let mut artifacts = vec![];
-    while let Some(queue_item) = artifact_queue.pop() {
-        artifacts.push(generate_artifact(
-            queue_item,
+    for resolver_field_id in schema.entrypoints.iter() {
+        artifact_infos.push(ArtifactInfo::Entrypoint(generate_entrypoint_artifact(
             schema,
+            *resolver_field_id,
             &mut artifact_queue,
-            project_root,
-            artifact_directory,
-        ));
+            &mut encountered_resolvers_ids,
+        )));
+
+        // We also need to generate reader artifacts for the entrypoint resolvers themselves
+        encountered_resolvers_ids.insert(*resolver_field_id);
     }
 
-    artifacts
-}
-
-fn generate_artifact<'schema>(
-    queue_item: ArtifactQueueItem<'schema>,
-    schema: &'schema ValidatedSchema,
-    // As we process reader artifacts, we can also encounter refetch and mutation
-    // fields. If so, we add them to the artifact queue.
-    artifact_queue: &mut Vec<ArtifactQueueItem<'schema>>,
-    project_root: &PathBuf,
-    artifact_directory: &PathBuf,
-) -> ArtifactInfo<'schema> {
-    match queue_item {
-        ArtifactQueueItem::Reader(resolver) => ArtifactInfo::Reader(generate_reader_artifact(
+    for encountered_resolver_id in encountered_resolvers_ids {
+        let encountered_resolver = schema.resolver(encountered_resolver_id);
+        artifact_infos.push(ArtifactInfo::Reader(generate_reader_artifact(
             schema,
-            resolver,
+            encountered_resolver,
             project_root,
             artifact_directory,
-        )),
-        ArtifactQueueItem::Entrypoint { top_level_resolver } => ArtifactInfo::Entrypoint(
-            generate_entrypoint_artifact(schema, top_level_resolver, artifact_queue),
-        ),
-        ArtifactQueueItem::RefetchField(refetch_info) => {
-            get_artifact_for_refetch_field(schema, refetch_info)
-        }
-        ArtifactQueueItem::MutationField(mutation_info) => {
-            get_artifact_for_mutation_field(schema, mutation_info)
-        }
+        )))
     }
+
+    for queue_item in artifact_queue {
+        artifact_infos.push(ArtifactInfo::RefetchQuery(match queue_item {
+            ArtifactQueueItem::RefetchField(refetch_info) => {
+                get_artifact_for_refetch_field(schema, refetch_info)
+            }
+            ArtifactQueueItem::MutationField(mutation_info) => {
+                get_artifact_for_mutation_field(schema, mutation_info)
+            }
+        }))
+    }
+
+    artifact_infos
 }
 
 // N.B. this was originally copied from generate_entrypoint_artifact,
 // and it could use some de-duplication
-fn get_artifact_for_refetch_field<'schema>(
-    schema: &'schema ValidatedSchema,
+fn get_artifact_for_refetch_field(
+    schema: &ValidatedSchema,
     refetch_info: RefetchFieldResolverInfo,
-) -> ArtifactInfo<'schema> {
+) -> RefetchArtifactInfo {
     let RefetchFieldResolverInfo {
         merged_selection_set,
         refetch_field_parent_id: parent_id,
@@ -353,19 +340,19 @@ fn get_artifact_for_refetch_field<'schema>(
     ));
     // ------- END HACK -------
 
-    ArtifactInfo::RefetchQuery(RefetchArtifactInfo {
+    RefetchArtifactInfo {
         normalization_ast,
         query_text,
         root_fetchable_field,
         root_fetchable_field_parent_object: root_parent_object,
         refetch_query_index,
-    })
+    }
 }
 
 fn get_artifact_for_mutation_field<'schema>(
     schema: &'schema ValidatedSchema,
-    refetch_info: MutationFieldResolverInfo,
-) -> ArtifactInfo<'schema> {
+    mutation_info: MutationFieldResolverInfo,
+) -> RefetchArtifactInfo {
     let MutationFieldResolverInfo {
         merged_selection_set,
         refetch_field_parent_id: parent_id,
@@ -378,7 +365,7 @@ fn get_artifact_for_mutation_field<'schema>(
         mutation_field_arguments,
         requires_refinement,
         ..
-    } = refetch_info;
+    } = mutation_info;
 
     let arguments = get_serialized_field_arguments(
         &mutation_field_arguments
@@ -434,13 +421,13 @@ fn get_artifact_for_mutation_field<'schema>(
         }}]",
     ));
 
-    ArtifactInfo::RefetchQuery(RefetchArtifactInfo {
+    RefetchArtifactInfo {
         normalization_ast,
         query_text,
         root_fetchable_field,
         root_fetchable_field_parent_object: root_parent_object,
         refetch_query_index,
-    })
+    }
 }
 
 fn generate_refetchable_query_text<'schema>(
@@ -557,9 +544,11 @@ fn get_aliased_mutation_field_name(
 
 fn generate_entrypoint_artifact<'schema>(
     schema: &'schema ValidatedSchema,
-    top_level_resolver: &ValidatedSchemaResolver,
-    artifact_queue: &mut Vec<ArtifactQueueItem<'schema>>,
+    resolver_field_id: ResolverFieldId,
+    artifact_queue: &mut Vec<ArtifactQueueItem>,
+    encountered_resolvers_ids: &mut HashSet<ResolverFieldId>,
 ) -> EntrypointArtifactInfo<'schema> {
+    let top_level_resolver = schema.resolver(resolver_field_id);
     if let Some((ref selection_set, _)) = top_level_resolver.selection_set_and_unwraps {
         let query_name = top_level_resolver.name.into();
 
@@ -573,6 +562,7 @@ fn generate_entrypoint_artifact<'schema>(
                 .into(),
             selection_set,
             artifact_queue,
+            encountered_resolvers_ids,
             &top_level_resolver,
         );
 
@@ -624,7 +614,8 @@ fn generate_reader_artifact<'schema>(
             selection_set,
             // TODO this is obviously a smell
             &mut vec![],
-            &resolver,
+            &mut HashSet::new(),
+            resolver,
         );
 
         let reader_ast = generate_reader_ast(
