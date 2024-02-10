@@ -59,7 +59,7 @@ pub(crate) fn compile_and_print(
             eprintln!(
                     "{}",
                     format!(
-                        "Successfully compiled {} resolvers and {} entrypoints, and wrote {} artifacts, in {}.\n",
+                        "Successfully compiled {} client fields and {} entrypoints, and wrote {} artifacts, in {}.\n",
                         stats.iso_resolver_count,
                         stats.entrypoint_count,
                         stats.total_artifacts_written,
@@ -367,9 +367,9 @@ pub(crate) enum BatchCompileError {
     #[error(
         "{}{}",
         if messages.len() == 1 {
-            "Error when processing a resolver declaration:"
+            "Error when processing a client field declaration:"
         } else {
-            "Errors when processing resolver declarations:"
+            "Errors when processing client field declarations:"
         },
         messages.into_iter().map(|x| format!("\n\n{x}")).collect::<String>()
     )]
@@ -377,9 +377,9 @@ pub(crate) enum BatchCompileError {
         messages: Vec<WithLocation<isograph_schema::ProcessResolverDeclarationError>>,
     },
 
-    #[error("Error when processing a resolver fetch declaration.\nReason: {message}")]
-    ErrorWhenProcessingResolverFetchDeclaration {
-        message: WithLocation<isograph_schema::ValidateResolverFetchDeclarationError>,
+    #[error("Error when processing an entrypoint declaration.\nReason: {message}")]
+    ErrorWhenProcessingEntrypointDeclaration {
+        message: WithLocation<isograph_schema::ValidateEntrypointDeclarationError>,
     },
 
     #[error("Unable to strip prefix.\nReason: {message}")]
@@ -388,7 +388,7 @@ pub(crate) enum BatchCompileError {
     },
 
     #[error(
-        "{} when validating schema, resolvers and fetch declarations.{}",
+        "{} when validating schema, client fields and entrypoint declarations.{}",
         if messages.len() == 1 { "Error" } else { "Errors" },
         messages.into_iter().map(|x| format!("\n\n{x}")).collect::<String>()
     )]
@@ -426,11 +426,9 @@ impl From<Vec<WithLocation<isograph_schema::ProcessResolverDeclarationError>>>
     }
 }
 
-impl From<WithLocation<isograph_schema::ValidateResolverFetchDeclarationError>>
-    for BatchCompileError
-{
-    fn from(message: WithLocation<isograph_schema::ValidateResolverFetchDeclarationError>) -> Self {
-        BatchCompileError::ErrorWhenProcessingResolverFetchDeclaration { message }
+impl From<WithLocation<isograph_schema::ValidateEntrypointDeclarationError>> for BatchCompileError {
+    fn from(message: WithLocation<isograph_schema::ValidateEntrypointDeclarationError>) -> Self {
+        BatchCompileError::ErrorWhenProcessingEntrypointDeclaration { message }
     }
 }
 

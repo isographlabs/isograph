@@ -12,7 +12,7 @@ impl UnvalidatedSchema {
         &self,
         text_source: TextSource,
         entrypoint_type_and_field: WithSpan<EntrypointTypeAndField>,
-    ) -> Result<ResolverFieldId, WithLocation<ValidateResolverFetchDeclarationError>> {
+    ) -> Result<ResolverFieldId, WithLocation<ValidateEntrypointDeclarationError>> {
         let parent_object_id = self
             .validate_parent_object_id(entrypoint_type_and_field.item.parent_type, text_source)?;
         let resolver_field_id = self.validate_resolver_field(
@@ -28,13 +28,13 @@ impl UnvalidatedSchema {
         &self,
         parent_type: WithSpan<UnvalidatedTypeName>,
         text_source: TextSource,
-    ) -> Result<ObjectId, WithLocation<ValidateResolverFetchDeclarationError>> {
+    ) -> Result<ObjectId, WithLocation<ValidateEntrypointDeclarationError>> {
         let parent_type_id = self
             .schema_data
             .defined_types
             .get(&parent_type.item.into())
             .ok_or(WithLocation::new(
-                ValidateResolverFetchDeclarationError::ParentTypeNotDefined {
+                ValidateEntrypointDeclarationError::ParentTypeNotDefined {
                     parent_type_name: parent_type.item,
                 },
                 Location::new(text_source, parent_type.span),
@@ -49,13 +49,13 @@ impl UnvalidatedSchema {
                 // know how to fetch (e.g. viewer, an item implementing Node, etc.)
                 // should be fetchable.
                 let query_id = self.query_type_id.ok_or(WithLocation::new(
-                    ValidateResolverFetchDeclarationError::RootQueryTypeMustExist,
+                    ValidateEntrypointDeclarationError::RootQueryTypeMustExist,
                     Location::generated(),
                 ))?;
 
                 if query_id != *object_id {
                     Err(WithLocation::new(
-                        ValidateResolverFetchDeclarationError::NonFetchableParentType {
+                        ValidateEntrypointDeclarationError::NonFetchableParentType {
                             parent_type_name: parent_type.item,
                         },
                         Location::new(text_source, parent_type.span),
@@ -67,7 +67,7 @@ impl UnvalidatedSchema {
             DefinedTypeId::Scalar(scalar_id) => {
                 let scalar_name = self.schema_data.scalars[scalar_id.as_usize()].name;
                 Err(WithLocation::new(
-                    ValidateResolverFetchDeclarationError::InvalidParentType {
+                    ValidateEntrypointDeclarationError::InvalidParentType {
                         parent_type: "scalar",
                         parent_type_name: scalar_name.item.into(),
                     },
@@ -82,7 +82,7 @@ impl UnvalidatedSchema {
         field_name: WithSpan<ScalarFieldName>,
         text_source: TextSource,
         parent_object_id: ObjectId,
-    ) -> Result<ResolverFieldId, WithLocation<ValidateResolverFetchDeclarationError>> {
+    ) -> Result<ResolverFieldId, WithLocation<ValidateEntrypointDeclarationError>> {
         let parent_object = self.schema_data.object(parent_object_id);
 
         match parent_object
@@ -91,7 +91,7 @@ impl UnvalidatedSchema {
         {
             Some(defined_field) => match defined_field {
                 DefinedField::ServerField(_) => Err(WithLocation::new(
-                    ValidateResolverFetchDeclarationError::FieldMustBeResolverField {
+                    ValidateEntrypointDeclarationError::FieldMustBeResolverField {
                         parent_type_name: parent_object.name,
                         resolver_field_name: field_name.item,
                     },
@@ -100,7 +100,7 @@ impl UnvalidatedSchema {
                 DefinedField::ResolverField(resolver_field_id) => Ok(*resolver_field_id),
             },
             None => Err(WithLocation::new(
-                ValidateResolverFetchDeclarationError::ResolverFieldMustExist {
+                ValidateEntrypointDeclarationError::ResolverFieldMustExist {
                     parent_type_name: parent_object.name,
                     resolver_field_name: field_name.item,
                 },
@@ -111,7 +111,7 @@ impl UnvalidatedSchema {
 }
 
 #[derive(Error, Debug)]
-pub enum ValidateResolverFetchDeclarationError {
+pub enum ValidateEntrypointDeclarationError {
     #[error("`{parent_type_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {
         parent_type_name: UnvalidatedTypeName,
@@ -140,7 +140,7 @@ pub enum ValidateResolverFetchDeclarationError {
     },
 
     // N.B. We could conceivably support fetching server fields, though!
-    #[error("The field `{parent_type_name}.{resolver_field_name}` is a server field. It must be a resolver field.")]
+    #[error("The field `{parent_type_name}.{resolver_field_name}` is a server field. It must be a client defined field.")]
     FieldMustBeResolverField {
         parent_type_name: IsographObjectTypeName,
         resolver_field_name: ScalarFieldName,

@@ -15,7 +15,7 @@ use crate::{
     Schema, SchemaData, SchemaIdField, SchemaObject, SchemaResolver, SchemaServerField,
     SchemaValidationState, UnvalidatedLinkedFieldSelection, UnvalidatedSchema,
     UnvalidatedSchemaData, UnvalidatedSchemaField, UnvalidatedSchemaObject,
-    UnvalidatedSchemaResolver, UnvalidatedSchemaServerField, ValidateResolverFetchDeclarationError,
+    UnvalidatedSchemaResolver, UnvalidatedSchemaServerField, ValidateEntrypointDeclarationError,
 };
 
 pub type ValidatedSchemaServerField = SchemaServerField<TypeAnnotation<DefinedTypeId>>;
@@ -78,7 +78,9 @@ impl ValidatedSchema {
                 .validate_entrypoint_type_and_field(*text_source, *entrypoint_type_and_field)
                 .map_err(|e| {
                     WithLocation::new(
-                        ValidateSchemaError::ErrorValidatingResolverFetch { message: e.item },
+                        ValidateSchemaError::ErrorValidatingEntrypointDeclaration {
+                            message: e.item,
+                        },
                         e.location,
                     )
                 }) {
@@ -460,9 +462,9 @@ fn validate_selections_error_to_validate_schema_error(
 ) -> WithLocation<ValidateSchemaError> {
     err.map(|item| match item {
         ValidateSelectionsError::FieldDoesNotExist(field_parent_type_name, field_name) => {
-            ValidateSchemaError::ResolverSelectionFieldDoesNotExist {
-                resolver_parent_type_name: parent_object.name,
-                resolver_field_name,
+            ValidateSchemaError::ClientFieldSelectionFieldDoesNotExist {
+                client_field_parent_type_name: parent_object.name,
+                client_field_name: resolver_field_name,
                 field_parent_type_name,
                 field_name,
             }
@@ -472,9 +474,9 @@ fn validate_selections_error_to_validate_schema_error(
             field_name,
             target_type,
             target_type_name,
-        } => ValidateSchemaError::ResolverSelectionFieldIsNotScalar {
-            resolver_parent_type_name: parent_object.name,
-            resolver_field_name,
+        } => ValidateSchemaError::ClientFieldSelectionFieldIsNotScalar {
+            client_field_parent_type_name: parent_object.name,
+            client_field_name: resolver_field_name,
             field_parent_type_name: parent_type_name,
             field_name,
             field_type: target_type,
@@ -485,9 +487,9 @@ fn validate_selections_error_to_validate_schema_error(
             field_name,
             target_type,
             target_type_name,
-        } => ValidateSchemaError::ResolverSelectionFieldIsScalar {
-            resolver_parent_type_name: parent_object.name,
-            resolver_field_name,
+        } => ValidateSchemaError::ClientFieldSelectionFieldIsScalar {
+            client_field_parent_type_name: parent_object.name,
+            client_field_name: resolver_field_name,
             field_parent_type_name,
             field_name,
             field_type: target_type,
@@ -496,9 +498,9 @@ fn validate_selections_error_to_validate_schema_error(
         ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsResolver {
             field_parent_type_name,
             field_name,
-        } => ValidateSchemaError::ResolverSelectionFieldIsResolver {
-            resolver_parent_type_name: parent_object.name,
-            resolver_field_name,
+        } => ValidateSchemaError::ClientFieldSelectionFieldIsResolver {
+            client_field_parent_type_name: parent_object.name,
+            client_field_name: field_name,
             field_parent_type_name,
             field_name,
         },
@@ -758,25 +760,25 @@ pub enum ValidateSchemaError {
     },
 
     #[error(
-        "In the resolver `{resolver_parent_type_name}.{resolver_field_name}`, \
+        "In the client field `{client_field_parent_type_name}.{client_field_name}`, \
         the field `{field_parent_type_name}.{field_name}` is selected, but that \
         field does not exist on `{field_parent_type_name}`"
     )]
-    ResolverSelectionFieldDoesNotExist {
-        resolver_parent_type_name: IsographObjectTypeName,
-        resolver_field_name: SelectableFieldName,
+    ClientFieldSelectionFieldDoesNotExist {
+        client_field_parent_type_name: IsographObjectTypeName,
+        client_field_name: SelectableFieldName,
         field_parent_type_name: IsographObjectTypeName,
         field_name: SelectableFieldName,
     },
 
     #[error(
-        "In the resolver `{resolver_parent_type_name}.{resolver_field_name}`, \
+        "In the client field `{client_field_parent_type_name}.{client_field_name}`, \
         the field `{field_parent_type_name}.{field_name}` is selected as a scalar, \
         but that field's type is `{target_type_name}`, which is {field_type}."
     )]
-    ResolverSelectionFieldIsNotScalar {
-        resolver_parent_type_name: IsographObjectTypeName,
-        resolver_field_name: SelectableFieldName,
+    ClientFieldSelectionFieldIsNotScalar {
+        client_field_parent_type_name: IsographObjectTypeName,
+        client_field_name: SelectableFieldName,
         field_parent_type_name: IsographObjectTypeName,
         field_name: SelectableFieldName,
         field_type: &'static str,
@@ -784,13 +786,13 @@ pub enum ValidateSchemaError {
     },
 
     #[error(
-        "In the resolver `{resolver_parent_type_name}.{resolver_field_name}`, \
+        "In the client field `{client_field_parent_type_name}.{client_field_name}`, \
         the field `{field_parent_type_name}.{field_name}` is selected as a linked field, \
         but that field's type is `{target_type_name}`, which is {field_type}."
     )]
-    ResolverSelectionFieldIsScalar {
-        resolver_parent_type_name: IsographObjectTypeName,
-        resolver_field_name: SelectableFieldName,
+    ClientFieldSelectionFieldIsScalar {
+        client_field_parent_type_name: IsographObjectTypeName,
+        client_field_name: SelectableFieldName,
         field_parent_type_name: IsographObjectTypeName,
         field_name: SelectableFieldName,
         field_type: &'static str,
@@ -798,25 +800,15 @@ pub enum ValidateSchemaError {
     },
 
     #[error(
-        "In the resolver `{resolver_parent_type_name}.{resolver_field_name}`, the \
+        "In the client field `{client_field_parent_type_name}.{client_field_name}`, the \
         field `{field_parent_type_name}.{field_name}` is selected as a linked field, \
-        but that field is a resolver, which can only be selected as a scalar."
+        but that field is a client field, which can only be selected as a scalar."
     )]
-    ResolverSelectionFieldIsResolver {
-        resolver_parent_type_name: IsographObjectTypeName,
-        resolver_field_name: SelectableFieldName,
+    ClientFieldSelectionFieldIsResolver {
+        client_field_parent_type_name: IsographObjectTypeName,
+        client_field_name: SelectableFieldName,
         field_parent_type_name: IsographObjectTypeName,
         field_name: SelectableFieldName,
-    },
-
-    #[error(
-        "The field `{parent_type_name}.{field_name}` has type `{field_type}`, \
-        which is an InputObject. It should be an output type."
-    )]
-    FieldTypenameIsInputObject {
-        parent_type_name: IsographObjectTypeName,
-        field_name: SelectableFieldName,
-        field_type: UnvalidatedTypeName,
     },
 
     #[error(
@@ -830,8 +822,8 @@ pub enum ValidateSchemaError {
     },
 
     #[error("Error when validating iso entrypoint calls.\nMessage: {message}")]
-    ErrorValidatingResolverFetch {
-        message: ValidateResolverFetchDeclarationError,
+    ErrorValidatingEntrypointDeclaration {
+        message: ValidateEntrypointDeclarationError,
     },
 }
 
