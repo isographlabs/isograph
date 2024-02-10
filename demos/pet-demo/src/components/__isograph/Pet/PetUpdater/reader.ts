@@ -6,7 +6,7 @@ import Pet__set_pet_tagline, { ReadOutType as Pet__set_pet_tagline__outputType }
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
 
-export type ReadFromStoreType = ResolverParameterType;
+export type ReadFromStoreType = Pet__PetUpdater__param;
 
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
@@ -49,7 +49,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
 ];
 
-export type ResolverParameterType = { data:
+export type Pet__PetUpdater__param = { data:
 {
   set_pet_best_friend: Pet__set_pet_best_friend__outputType,
   potential_new_best_friends: ({
@@ -64,7 +64,7 @@ export type ResolverParameterType = { data:
 // The type, when returned from the resolver
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
-const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
+const artifact: ReaderArtifact<ReadFromStoreType, Pet__PetUpdater__param, ReadOutType> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,

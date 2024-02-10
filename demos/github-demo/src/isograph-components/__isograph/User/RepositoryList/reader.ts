@@ -5,7 +5,7 @@ import Repository__RepositoryLink, { ReadOutType as Repository__RepositoryLink__
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
 
-export type ReadFromStoreType = ResolverParameterType;
+export type ReadFromStoreType = User__RepositoryList__param;
 
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
@@ -120,7 +120,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
 ];
 
-export type ResolverParameterType = { data:
+export type User__RepositoryList__param = { data:
 {
   repositories: {
     edges: (({
@@ -147,7 +147,7 @@ export type ResolverParameterType = { data:
 // The type, when returned from the resolver
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
-const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
+const artifact: ReaderArtifact<ReadFromStoreType, User__RepositoryList__param, ReadOutType> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,

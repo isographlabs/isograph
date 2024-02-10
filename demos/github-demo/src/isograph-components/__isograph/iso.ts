@@ -3,24 +3,24 @@ import entrypoint_Query__HomePage from '../__isograph/Query/HomePage/entrypoint'
 import entrypoint_Query__PullRequest from '../__isograph/Query/PullRequest/entrypoint'
 import entrypoint_Query__RepositoryPage from '../__isograph/Query/RepositoryPage/entrypoint'
 import entrypoint_Query__UserPage from '../__isograph/Query/UserPage/entrypoint'
-import { ResolverParameterType as field_Actor__UserLink } from './Actor/UserLink/reader'
-import { ResolverParameterType as field_IssueComment__formattedCommentCreationDate } from './IssueComment/formattedCommentCreationDate/reader'
-import { ResolverParameterType as field_PullRequest__CommentList } from './PullRequest/CommentList/reader'
-import { ResolverParameterType as field_PullRequest__PullRequestLink } from './PullRequest/PullRequestLink/reader'
-import { ResolverParameterType as field_PullRequest__createdAtFormatted } from './PullRequest/createdAtFormatted/reader'
-import { ResolverParameterType as field_PullRequestConnection__PullRequestTable } from './PullRequestConnection/PullRequestTable/reader'
-import { ResolverParameterType as field_Query__Header } from './Query/Header/reader'
-import { ResolverParameterType as field_Query__HomePageList } from './Query/HomePageList/reader'
-import { ResolverParameterType as field_Query__HomePage } from './Query/HomePage/reader'
-import { ResolverParameterType as field_Query__PullRequestDetail } from './Query/PullRequestDetail/reader'
-import { ResolverParameterType as field_Query__PullRequest } from './Query/PullRequest/reader'
-import { ResolverParameterType as field_Query__RepositoryDetail } from './Query/RepositoryDetail/reader'
-import { ResolverParameterType as field_Query__RepositoryPage } from './Query/RepositoryPage/reader'
-import { ResolverParameterType as field_Query__UserDetail } from './Query/UserDetail/reader'
-import { ResolverParameterType as field_Query__UserPage } from './Query/UserPage/reader'
-import { ResolverParameterType as field_Repository__RepositoryLink } from './Repository/RepositoryLink/reader'
-import { ResolverParameterType as field_User__Avatar } from './User/Avatar/reader'
-import { ResolverParameterType as field_User__RepositoryList } from './User/RepositoryList/reader'
+import { Actor__UserLink__param } from './Actor/UserLink/reader'
+import { IssueComment__formattedCommentCreationDate__param } from './IssueComment/formattedCommentCreationDate/reader'
+import { PullRequest__CommentList__param } from './PullRequest/CommentList/reader'
+import { PullRequest__PullRequestLink__param } from './PullRequest/PullRequestLink/reader'
+import { PullRequest__createdAtFormatted__param } from './PullRequest/createdAtFormatted/reader'
+import { PullRequestConnection__PullRequestTable__param } from './PullRequestConnection/PullRequestTable/reader'
+import { Query__Header__param } from './Query/Header/reader'
+import { Query__HomePageList__param } from './Query/HomePageList/reader'
+import { Query__HomePage__param } from './Query/HomePage/reader'
+import { Query__PullRequestDetail__param } from './Query/PullRequestDetail/reader'
+import { Query__PullRequest__param } from './Query/PullRequest/reader'
+import { Query__RepositoryDetail__param } from './Query/RepositoryDetail/reader'
+import { Query__RepositoryPage__param } from './Query/RepositoryPage/reader'
+import { Query__UserDetail__param } from './Query/UserDetail/reader'
+import { Query__UserPage__param } from './Query/UserPage/reader'
+import { Repository__RepositoryLink__param } from './Repository/RepositoryLink/reader'
+import { User__Avatar__param } from './User/Avatar/reader'
+import { User__RepositoryList__param } from './User/RepositoryList/reader'
 
 type IdentityWithParam<TParam> = <TResolverReturn>(
   x: (param: TParam) => TResolverReturn
@@ -54,75 +54,75 @@ export function iso<T>(
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Actor.UserLink', T>
-): IdentityWithParam<field_Actor__UserLink>;
+): IdentityWithParam<Actor__UserLink__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field IssueComment.formattedCommentCreationDate', T>
-): IdentityWithParam<field_IssueComment__formattedCommentCreationDate>;
+): IdentityWithParam<IssueComment__formattedCommentCreationDate__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field PullRequest.CommentList', T>
-): IdentityWithParam<field_PullRequest__CommentList>;
+): IdentityWithParam<PullRequest__CommentList__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field PullRequest.PullRequestLink', T>
-): IdentityWithParam<field_PullRequest__PullRequestLink>;
+): IdentityWithParam<PullRequest__PullRequestLink__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field PullRequest.createdAtFormatted', T>
-): IdentityWithParam<field_PullRequest__createdAtFormatted>;
+): IdentityWithParam<PullRequest__createdAtFormatted__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field PullRequestConnection.PullRequestTable', T>
-): IdentityWithParam<field_PullRequestConnection__PullRequestTable>;
+): IdentityWithParam<PullRequestConnection__PullRequestTable__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.Header', T>
-): IdentityWithParam<field_Query__Header>;
+): IdentityWithParam<Query__Header__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.HomePageList', T>
-): IdentityWithParam<field_Query__HomePageList>;
+): IdentityWithParam<Query__HomePageList__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.HomePage', T>
-): IdentityWithParam<field_Query__HomePage>;
+): IdentityWithParam<Query__HomePage__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.PullRequestDetail', T>
-): IdentityWithParam<field_Query__PullRequestDetail>;
+): IdentityWithParam<Query__PullRequestDetail__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.PullRequest', T>
-): IdentityWithParam<field_Query__PullRequest>;
+): IdentityWithParam<Query__PullRequest__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.RepositoryDetail', T>
-): IdentityWithParam<field_Query__RepositoryDetail>;
+): IdentityWithParam<Query__RepositoryDetail__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.RepositoryPage', T>
-): IdentityWithParam<field_Query__RepositoryPage>;
+): IdentityWithParam<Query__RepositoryPage__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.UserDetail', T>
-): IdentityWithParam<field_Query__UserDetail>;
+): IdentityWithParam<Query__UserDetail__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.UserPage', T>
-): IdentityWithParam<field_Query__UserPage>;
+): IdentityWithParam<Query__UserPage__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Repository.RepositoryLink', T>
-): IdentityWithParam<field_Repository__RepositoryLink>;
+): IdentityWithParam<Repository__RepositoryLink__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field User.Avatar', T>
-): IdentityWithParam<field_User__Avatar>;
+): IdentityWithParam<User__Avatar__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field User.RepositoryList', T>
-): IdentityWithParam<field_User__RepositoryList>;
+): IdentityWithParam<User__RepositoryList__param>;
 
 export function iso(_isographLiteralText: string): IdentityWithParam<any> | IsographEntrypoint<any, any, any>{
   return function identity<TResolverReturn>(

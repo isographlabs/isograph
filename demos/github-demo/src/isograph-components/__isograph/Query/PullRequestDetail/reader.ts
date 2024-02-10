@@ -5,7 +5,7 @@ import PullRequest__CommentList, { ReadOutType as PullRequest__CommentList__outp
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
 
-export type ReadFromStoreType = ResolverParameterType;
+export type ReadFromStoreType = Query__PullRequestDetail__param;
 
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
@@ -60,7 +60,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
 ];
 
-export type ResolverParameterType = { data:
+export type Query__PullRequestDetail__param = { data:
 {
   repository: ({
     pullRequest: ({
@@ -75,7 +75,7 @@ export type ResolverParameterType = { data:
 // The type, when returned from the resolver
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
-const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
+const artifact: ReaderArtifact<ReadFromStoreType, Query__PullRequestDetail__param, ReadOutType> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
