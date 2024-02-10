@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLazyReference, useRead } from '@isograph/react';
+import { useLazyReference, useResult } from '@isograph/react';
 import { iso } from '@iso';
 import {
   FullPageLoading,
@@ -46,6 +46,6 @@ export function PullRequestRoute({
     },
   );
 
-  const Component = useRead(queryReference);
+  const Component = useResult(queryReference);
   return <Component route={route} setRoute={setRoute} />;
 }

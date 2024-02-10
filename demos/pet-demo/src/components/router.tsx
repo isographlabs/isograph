@@ -1,6 +1,6 @@
 import React from 'react';
 import { Container } from '@mui/material';
-import { useLazyReference, useRead } from '@isograph/react';
+import { useLazyReference, useResult } from '@isograph/react';
 import { iso } from '@iso';
 import HomeRouteEntrypoint from '@iso/Query/HomeRoute/entrypoint';
 import PetDetailRouteEntrypoint from '@iso/Query/PetDetailRoute/entrypoint';
@@ -66,7 +66,7 @@ function HomeRouteLoader({
     {},
   );
 
-  const Component = useRead(queryReference);
+  const Component = useResult(queryReference);
   return <Component navigateTo={navigateTo} />;
 }
 
@@ -82,6 +82,6 @@ function PetDetailRouteLoader({
     { id: route.id },
   );
 
-  const Component = useRead(queryReference);
+  const Component = useResult(queryReference);
   return <Component navigateTo={navigateTo} />;
 }

@@ -258,7 +258,7 @@ export function useLazyReference<TEntrypoint>(
   };
 }
 
-export function useRead<
+export function useResult<
   TReadFromStore extends Object,
   TResolverProps,
   TResolverResult,

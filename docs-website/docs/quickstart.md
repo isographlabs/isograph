@@ -331,18 +331,18 @@ So, whenever we render the `HomePageRoute` component, the Isograph runtime will 
 
 ## Render the component
 
-Now, we still need to render our `Query.HomePage` component. In order to do this, we call `useRead` to read the query reference. This gives us the value of that field (i.e. a component), which we can render.
+Now, we still need to render our `Query.HomePage` component. In order to do this, we call `useResult` to read the query reference. This gives us the value of that field (i.e. a component), which we can render.
 
 ```tsx
 import React from 'react';
-import { useLazyReference, useRead } from '@isograph/react';
+import { useLazyReference, useResult } from '@isograph/react';
 import { iso } from '@iso';
 
 export default function HomePageRoute() {
   const { queryReference } = useLazyReference(iso(`entrypoint Root.HomePage`), {
     /* query variables */
   });
-  const HomePage = useRead(queryReference);
+  const HomePage = useResult(queryReference);
   return <HomePage />;
 }
 ```

@@ -66,7 +66,7 @@ function UserListPageRoute() {
   );
 
   const additionalRenderProps = {};
-  const Component = useRead(queryReference);
+  const Component = useResult(queryReference);
   return <Component {...additionalRenderProps} />;
 }
 ```
