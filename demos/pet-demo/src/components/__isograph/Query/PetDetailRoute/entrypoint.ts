@@ -1,5 +1,5 @@
 import type {IsographEntrypoint, NormalizationAst, RefetchQueryArtifactWrapper} from '@isograph/react';
-import type {ReadFromStoreType, ResolverParameterType, ReadOutType} from './reader';
+import type {ReadFromStoreType, Query__PetDetailRoute__param, ReadOutType} from './reader';
 import readerResolver from './reader';
 import refetchQuery0 from './__refetch__0';
 import refetchQuery1 from './__refetch__1';
@@ -138,7 +138,7 @@ const normalizationAst: NormalizationAst = [
     ],
   },
 ];
-const artifact: IsographEntrypoint<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
+const artifact: IsographEntrypoint<ReadFromStoreType, Query__PetDetailRoute__param, ReadOutType> = {
   kind: "Entrypoint",
   queryText,
   normalizationAst,
