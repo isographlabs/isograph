@@ -63,25 +63,25 @@ impl<'schema> ReaderArtifactInfo<'schema> {
         let read_out_type_text = get_read_out_type_text(resolver_read_out_type);
 
         // We are not modeling this well, I think.
+        let parent_name = parent_type.name;
         let variant = match resolver_variant {
             ResolverVariant::Component => {
-                let parent_name = parent_type.name;
                 format!("{{ kind: \"Component\", componentName: \"{parent_name}.{resolver_field_name}\" }}")
             }
             _ => "{ kind: \"Eager\" }".to_string(),
         };
-
+        let reader_param_type = format!("{parent_name}__{resolver_field_name}__param");
         format!(
             "import type {{ReaderArtifact, ReaderAst}} from '@isograph/react';\n\
             {resolver_import_statement}\n\
             {nested_resolver_import_statement}\n\
             {read_out_type_text}\n\n\
-            export type ReadFromStoreType = ResolverParameterType;\n\n\
+            export type ReadFromStoreType = {reader_param_type};\n\n\
             const readerAst: ReaderAst<ReadFromStoreType> = {reader_ast};\n\n\
-            export type ResolverParameterType = {resolver_parameter_type};\n\n\
+            export type {reader_param_type} = {resolver_parameter_type};\n\n\
             // The type, when returned from the resolver\n\
             export type ResolverReturnType = {resolver_return_type};\n\n\
-            const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOutType> = {{\n\
+            const artifact: ReaderArtifact<ReadFromStoreType, {reader_param_type}, ReadOutType> = {{\n\
             {}kind: \"ReaderArtifact\",\n\
             {}resolver: resolver as any,\n\
             {}readerAst,\n\

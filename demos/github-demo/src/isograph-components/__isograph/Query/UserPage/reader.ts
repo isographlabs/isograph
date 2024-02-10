@@ -6,7 +6,7 @@ import Query__UserDetail, { ReadOutType as Query__UserDetail__outputType } from 
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
 
-export type ReadFromStoreType = ResolverParameterType;
+export type ReadFromStoreType = Query__UserPage__param;
 
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
@@ -25,7 +25,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
 ];
 
-export type ResolverParameterType = { data:
+export type Query__UserPage__param = { data:
 {
   Header: Query__Header__outputType,
   UserDetail: Query__UserDetail__outputType,
@@ -35,7 +35,7 @@ export type ResolverParameterType = { data:
 // The type, when returned from the resolver
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
-const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
+const artifact: ReaderArtifact<ReadFromStoreType, Query__UserPage__param, ReadOutType> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,

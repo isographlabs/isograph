@@ -4,7 +4,7 @@ import { PullRequestLink as resolver } from '../../../PullRequestLink.tsx';
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
 
-export type ReadFromStoreType = ResolverParameterType;
+export type ReadFromStoreType = PullRequest__PullRequestLink__param;
 
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
@@ -43,7 +43,7 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
 ];
 
-export type ResolverParameterType = { data:
+export type PullRequest__PullRequestLink__param = { data:
 {
   number: number,
   repository: {
@@ -58,7 +58,7 @@ export type ResolverParameterType = { data:
 // The type, when returned from the resolver
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
-const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
+const artifact: ReaderArtifact<ReadFromStoreType, PullRequest__PullRequestLink__param, ReadOutType> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,

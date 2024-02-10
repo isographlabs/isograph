@@ -4,7 +4,7 @@ import { createdAtFormatted as resolver } from '../../../PullRequestTable.tsx';
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = ResolverReturnType;
 
-export type ReadFromStoreType = ResolverParameterType;
+export type ReadFromStoreType = PullRequest__createdAtFormatted__param;
 
 const readerAst: ReaderAst<ReadFromStoreType> = [
   {
@@ -15,14 +15,14 @@ const readerAst: ReaderAst<ReadFromStoreType> = [
   },
 ];
 
-export type ResolverParameterType = {
+export type PullRequest__createdAtFormatted__param = {
   createdAt: string,
 };
 
 // The type, when returned from the resolver
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
-const artifact: ReaderArtifact<ReadFromStoreType, ResolverParameterType, ReadOutType> = {
+const artifact: ReaderArtifact<ReadFromStoreType, PullRequest__createdAtFormatted__param, ReadOutType> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
