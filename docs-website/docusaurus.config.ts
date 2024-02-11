@@ -2,6 +2,9 @@ import { themes as prismThemes } from 'prism-react-renderer';
 import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
+const lightTheme = prismThemes.github;
+lightTheme.plain.backgroundColor = 'rgba(0, 0, 0, 0.02)';
+
 const config: Config = {
   title: 'Isograph',
   tagline: 'Select your components like you select your data — with GraphQL!',
@@ -34,17 +37,9 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
-          // // Please change this to your repo.
-          // // Remove this to remove the "edit this page" links.
-          // editUrl:
-          //   "https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/",
         },
         blog: {
-          // showReadingTime: true,
-          // // Please change this to your repo.
-          // // Remove this to remove the "edit this page" links.
-          // editUrl:
-          //   "https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/",
+          showReadingTime: false,
         },
         theme: {
           customCss: './src/css/custom.css',
@@ -104,13 +99,17 @@ const config: Config = {
               label: 'Tutorial',
               to: '/docs/introduction',
             },
+            {
+              label: 'Quickstart',
+              to: '/docs/quickstart',
+            },
           ],
         },
         {
           title: 'Community',
           items: [
             {
-              label: 'Discord (go to the #isograph channel)',
+              label: 'Discord',
               href: 'https://discord.gg/kDCcN3EDR6',
             },
             {
@@ -136,7 +135,7 @@ const config: Config = {
       copyright: `Copyright © ${new Date().getFullYear()} Isograph Labs.`,
     },
     prism: {
-      theme: prismThemes.github,
+      theme: lightTheme,
       darkTheme: prismThemes.dracula,
     },
   } satisfies Preset.ThemeConfig,

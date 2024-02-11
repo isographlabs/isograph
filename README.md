@@ -1,17 +1,21 @@
 # Isograph
 
-> Select your components like you select your fields — with GraphQL!
+The framework for teams that move fast — without breaking things.
 
 - Read the [docs](https://isograph.dev/docs/), especially the [quickstart guide](https://isograph.dev/docs/quickstart/).
 - Watch the [talk at GraphQL Conf](https://www.youtube.com/watch?v=gO65JJRqjuc).
 - Join the [Discord](https://discord.gg/kDCcN3EDR6).
 - [Follow the official Twitter account](https://twitter.com/isographlabs).
 
+## What is Isograph?
+
+Isograph is a UI framework for building React apps that are powered by GraphQL data. It has ambitions to be a framework for apps powered by data.
+
 ## About Isograph: Fetching data and app structure
 
 ### What is Isograph, and what are resolvers?
 
-Isograph is a framework for building React applications that are backed by GraphQL data. In Isograph, components that read data can be selected from the graph, and automatically have the data they require passed in. Consider this example avatar component:
+Isograph is a framework for building React applications that are backed by GraphQL data. In Isograph, components that read data can be selected from the graph, and automatically have the data they require passed in. Consider this example Avatar component:
 
 ```js
 export const Avatar = iso(`

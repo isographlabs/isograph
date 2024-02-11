@@ -6,20 +6,36 @@
 
 /* You can override the default Infima variables here. */
 :root {
-  --ifm-color-primary: #4393b0;
+  --ifm-color-primary: #4e9ebc;
+  --ifm-black: #124659;
+  --ifm-alt-background: #f5fafc;
+  --ifm-alt-background-border: #d6dee1;
+  --ifm-kicker: rgba(63, 73, 90, 0.8);
   /* --ifm-color-primary-dark: #29784c;
   --ifm-color-primary-darker: #277148;
   --ifm-color-primary-darkest: #205d3b;
   --ifm-color-primary-light: #33925d;
   --ifm-color-primary-lighter: #359962;
   --ifm-color-primary-lightest: #3cad6e; */
+  --ifm-h2-font-size: 2.5rem;
+  --ifm-h3-font-size: 1.4rem;
   --ifm-code-font-size: 95%;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+  --prism-background-color: #000 !important;
+
+  font-family: Maison;
+  font-size: 18px;
 }
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
 [data-theme='dark'] {
   --ifm-color-primary: #258fb5;
+  --ifm-black: #0e3544;
+  /* --ifm-black: black; */
+  --ifm-kicker: rgba(255, 255, 255, 0.6);
+  --ifm-alt-background: #2f2f32;
+  --ifm-alt-background-border: #424248;
+
   /* --ifm-color-primary-dark: #21af90;
   --ifm-color-primary-darker: #1fa588;
   --ifm-color-primary-darkest: #1a8870;
@@ -27,4 +43,74 @@
   --ifm-color-primary-lighter: #32d8b4;
   --ifm-color-primary-lightest: #4fddbf; */
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
+
+@font-face {
+  font-family: GTEesti;
+  src: url('/fonts/GTEestiDisplay-Bold.woff2');
+}
+
+@font-face {
+  font-family: Maison;
+  src: url('/fonts/MaisonNeue-Book.woff2');
+  font-weight: 400;
+}
+
+@font-face {
+  font-family: Maison;
+  src: url('/fonts/MaisonNeue-Medium.woff2');
+  font-weight: 500;
+}
+
+@font-face {
+  font-family: Maison;
+  src: url('/fonts/MaisonNeue-Demi.woff2');
+  font-weight: 600;
+}
+
+@font-face {
+  font-family: Maison;
+  src: url('/fonts/MaisonNeue-Bold.woff2');
+  font-weight: 700;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: GTEesti;
+}
+
+.kicker {
+  text-align: center;
+  text-transform: uppercase;
+  font-size: 0.6em;
+  letter-spacing: 2.2px;
+  margin-bottom: 1.5em;
+  font-weight: 600;
+  color: var(--ifm-kicker);
+}
+
+.margin-bottom--lg {
+  margin-bottom: 3rem !important;
+}
+.bordered-codeblock {
+  border: 1px solid var(--ifm-alt-background-border);
+}
+
+.alt-background {
+  padding-top: 1px;
+  background-color: var(--ifm-alt-background);
+  border-top: 1px solid var(--ifm-alt-background-border);
+  border-bottom: 1px solid var(--ifm-alt-background-border);
+}
+
+.narrow-columns p {
+  font-size: 0.9em;
+}
+
+@media screen and (max-width: 996px) {
+  .wideBr {
+    display: none;
+  }
 }
