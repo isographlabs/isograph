@@ -26,7 +26,7 @@ export default function () {
           <p>
             Or, maybe you'll restructure your app to make parts less
             interdependent. Each view will fetch its own data, leading to data
-            being loaded redundantly and a jarring loading experience. Or your
+            being loaded redundantly and a chaotic loading experience. Or your
             query declarations will be append-only.{' '}
             <b>Your app will slow to a crawl</b>.
           </p>

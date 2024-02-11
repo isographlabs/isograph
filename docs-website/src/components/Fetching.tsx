@@ -15,7 +15,8 @@ export default function () {
           <div className="col col--5">
             <p>
               Those components aren't doing much on their own. Somehow, we need
-              to actually get the data and render the component!
+              to make a network request for the data and render the{' '}
+              <code>PetList</code> component.
             </p>
             <p>
               We start by writing <code>iso(`entrypoint Query.PetList`)</code>.
