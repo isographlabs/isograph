@@ -91,7 +91,7 @@ export function HomePageRoute() {
 }
   `,
   home_page_component: `
-import { iso } from "@isograph/react";
+import { iso } from "@iso";
 
 // Step 1: Export the HomePage and call iso
 export const HomePage = iso${'`'}
@@ -117,7 +117,7 @@ ${'`'}(function HomePageComponent({ data }) {
 });
   `,
   avatar_component: `
-import { iso } from "@isograph/react";
+import { iso } from "@iso";
 import MyComponentLibraryAvatar from 'my-component-library';
   
 export const Avatar = iso(${'`'}
