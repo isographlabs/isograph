@@ -13,20 +13,14 @@ export default function IntroducingIsograph() {
         </div>
         <div className="row">
           <div className="col col--8 col--offset-2">
-            <p
-              className="text--center margin-bottom--lg"
-              style={{ fontSize: '1.2em', fontWeight: 500 }}
-            >
+            <p className="text--center-wide margin-bottom--lg callout-1">
               Isograph is an opinionated framework for building interactive,
               data-driven apps. It&nbsp;makes heavy use of its compiler and of
               generated code to enable developers to quickly and confidently
               build stable and performant apps, while providing an amazing
               developer experience.
             </p>
-            <p
-              className="text--center"
-              style={{ fontSize: '1.35em', fontWeight: 700 }}
-            >
+            <p className="text--center-wide callout-2">
               Developers define components and the data they need.
               Isograph&nbsp;takes&nbsp;care&nbsp;of&nbsp;the&nbsp;rest.
             </p>

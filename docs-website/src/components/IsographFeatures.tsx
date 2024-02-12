@@ -15,7 +15,7 @@ export default function () {
 
         <div className="row narrow-columns">
           <div className="col col--4">
-            <div className="text--center padding-horiz--md">
+            <div className="text--center-wide padding-horiz--md-wide">
               <h3>Local reasoning</h3>
               <p>
                 When we say "Isograph takes care of the rest", we
@@ -35,7 +35,7 @@ export default function () {
             </div>
           </div>
           <div className="col col--4">
-            <div className="text--center padding-horiz--md">
+            <div className="text--center-wide padding-horiz--md-wide">
               <h3>Unparalleled performance</h3>
               <p>
                 On every save, the Isograph compiler generates queries that
@@ -50,7 +50,7 @@ export default function () {
             </div>
           </div>
           <div className="col col--4">
-            <div className="text--center padding-horiz--md">
+            <div className="text--center-wide padding-horiz--md-wide">
               <h3>Build with confidence</h3>
               <p>
                 Isograph components are truly independent. Changes to one don't

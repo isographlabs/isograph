@@ -31,7 +31,7 @@ export default function () {
               query declarations will be append-only.{' '}
               <b>Your app will slow to a crawl</b>.
             </p>
-            <h3 className="text--center">
+            <h3 className="text--center-wide">
               Either way, your competitors will eat your lunch.
             </h3>
           </div>

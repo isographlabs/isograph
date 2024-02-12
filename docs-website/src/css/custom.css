@@ -128,6 +128,9 @@ h4 {
   .narrow-columns p {
     font-size: 1em;
   }
+  .narrow-columns h3 {
+    margin-top: 1em;
+  }
 }
 
 @media screen and (max-width: 996px) {
@@ -151,5 +154,46 @@ h4 {
 @media screen and (max-width: 500px) {
   .why-built {
     font-size: 2em;
+  }
+}
+
+.text--center-wide {
+  text-align: center;
+}
+@media screen and (max-width: 500px) {
+  .text--center-wide {
+    text-align: left;
+  }
+}
+
+.callout-1 {
+  font-size: 1.2em;
+  font-weight: 500;
+}
+@media screen and (max-width: 500px) {
+  .callout-1 {
+    font-size: 1em;
+    font-weight: 400;
+  }
+}
+
+.callout-2 {
+  font-size: 1.35em;
+  font-weight: 700;
+}
+
+@media screen and (max-width: 500px) {
+  .callout-2 {
+    font-size: 1.2em;
+    font-weight: 600;
+  }
+}
+
+.padding-horiz--md-wide {
+  padding-left: 1rem !important;
+}
+@media screen and (max-width: 500px) {
+  .padding-horiz--md-wide {
+    padding-left: 0 !important;
   }
 }
