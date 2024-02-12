@@ -18,8 +18,8 @@ export default function () {
             <div className="text--center padding-horiz--md">
               <h3>Local reasoning</h3>
               <p>
-                When we say "Isograph takes care of the rest", we really mean
-                it.
+                When we say "Isograph takes care of the rest", we
+                really&nbsp;mean&nbsp;it.
               </p>
               <p>
                 If you alter a component, there's no need to update query
@@ -29,8 +29,8 @@ export default function () {
               </p>
               <p>
                 So, developers can make changes to individual files without
-                reasoning about the rest of the app. Iteration speed remains
-                high.
+                reasoning about the rest of the app. Iteration
+                speed&nbsp;remains&nbsp;high.
               </p>
             </div>
           </div>
@@ -40,7 +40,7 @@ export default function () {
               <p>
                 On every save, the Isograph compiler generates queries that
                 provide exactly the data needed by a view. Say goodbye to under-
-                and over-fetching.
+                and&nbsp;over-fetching.
               </p>
               <p>
                 So as engineers add features or refactor components, no work is
@@ -57,12 +57,12 @@ export default function () {
                 affect the data that other components receive, and there are no
                 common files (such as loaders or query declarations) where all
                 changes must be coordinated. This is what makes apps built with
-                Isograph stable, even as the apps evolve over time.
+                Isograph stable, even as the apps evolve&nbsp;over&nbsp;time.
               </p>
               <p>
                 But Isograph goes further: it ensures that after mutations, all
-                needed fields are refetched, meaning your app remains in a
-                consistent state.
+                needed fields are refetched, meaning your app remains in
+                a&nbsp;consistent&nbsp;state.
               </p>
             </div>
           </div>

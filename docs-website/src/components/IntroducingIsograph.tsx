@@ -5,11 +5,9 @@ export default function IntroducingIsograph() {
         <div className="row">
           <div className="col">
             {/* <div className="kicker">Who will save us?</div> */}
-            <h1
-              className="text--center margin-bottom--lg"
-              style={{ fontSize: '4em' }}
-            >
-              Introducing <span className="isograph-name">Isograph</span>
+            <h1 className="text--center margin-bottom--lg why-built">
+              That's why we built{' '}
+              <span className="isograph-name">Isograph</span>
             </h1>
           </div>
         </div>

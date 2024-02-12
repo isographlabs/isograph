@@ -5,7 +5,9 @@ export default function YoutubeEmbed() {
         <div className="row">
           <div className="col col--8 col--offset-2">
             {/* <div className="kicker">Tell me more!</div> */}
-            <h2 className="text--center">Watch the talk at GraphQL Conf</h2>
+            <h2 className="text--center">
+              Watch the talk at GraphQL&nbsp;Conf
+            </h2>
           </div>
         </div>
         <div className="row">

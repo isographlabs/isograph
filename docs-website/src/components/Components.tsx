@@ -6,7 +6,7 @@ export default function () {
       <div className="container">
         <div className="row">
           <div className="col">
-            {/* <div className="kicker">Components all the way down</div> */}
+            <div className="kicker">I'm ready to learn more</div>
             <h2 className="text--center  margin-bottom--lg">
               Defining Isograph components
             </h2>

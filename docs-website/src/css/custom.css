@@ -120,6 +120,12 @@ h4 {
 .narrow-columns p {
   font-size: 0.9em;
 }
+@media screen and (max-width: 996px) {
+  .narrow-columns p {
+    font-size: 1em;
+  }
+}
+
 
 @media screen and (max-width: 996px) {
   .wide-br {
@@ -129,4 +135,13 @@ h4 {
 
 .isograph-name {
   color: var(--ifm-color-primary-text);
+}
+
+.why-built {
+  font-size: 4em;
+}
+@media screen and (max-width: 996px) {
+  .why-built {
+    font-size: 3em;
+  }
 }
