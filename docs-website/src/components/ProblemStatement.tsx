@@ -16,8 +16,8 @@ export default function () {
           <div className="col col--8 col--offset-2">
             <p>
               As your team grows, effective coordination and communication will
-              become harder. No one will understand system end-to-end, and no
-              one will be able to guarantee that innocent-looking changes are
+              become harder. No one will understand the system end-to-end, and
+              no one will be able to guarantee that innocent-looking changes are
               safe to land. <b>Your app will be chronically unstable</b>.
             </p>
             <p>
