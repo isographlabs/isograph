@@ -4,10 +4,10 @@ export default function () {
       <div className="container">
         <div className="row">
           <div className="col">
-            <div className="kicker">What can a poor boy do?</div>
-            <h2 className="text--center  margin-bottom--lg">
+            {/* <div className="kicker">What can a poor boy do?</div> */}
+            <h2 className="text--center margin-bottom--lg">
               With Isograph, there's no tradeoff between{' '}
-              <br className="wideBr" />
+              <br className="wide-br" />
               velocity, stability and&nbsp;performance
             </h2>
           </div>
@@ -18,13 +18,14 @@ export default function () {
             <div className="text--center padding-horiz--md">
               <h3>Local reasoning</h3>
               <p>
-                Engineers define components and the data they need. Isograph
-                takes care of the rest.
+                When we say "Isograph takes care of the rest", we really mean
+                it.
               </p>
               <p>
                 If you alter a component, there's no need to update query
                 declarations or modify other files to ensure that the data makes
-                it to the component. Isograph does that&nbsp;for&nbsp;you.
+                it to the component. Isograph's compiler does
+                that&nbsp;for&nbsp;you.
               </p>
               <p>
                 So, developers can make changes to individual files without

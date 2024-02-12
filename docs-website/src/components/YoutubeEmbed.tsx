@@ -4,7 +4,7 @@ export default function YoutubeEmbed() {
       <div className="container padding-bottom--xl padding-top--xl">
         <div className="row">
           <div className="col col--8 col--offset-2">
-            <div className="kicker">Tell me more!</div>
+            {/* <div className="kicker">Tell me more!</div> */}
             <h2 className="text--center">Watch the talk at GraphQL Conf</h2>
           </div>
         </div>

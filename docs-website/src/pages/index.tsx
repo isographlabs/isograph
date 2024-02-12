@@ -7,6 +7,7 @@ import HomepageHeader from '../components/Header';
 import Components from '../components/Components';
 import Fetching from '../components/Fetching';
 import IsIsographRightForMe from '../components/IsIsographRightForMe';
+import IntroducingIsograph from '../components/IntroducingIsograph';
 
 export default function Home(): JSX.Element {
   return (
@@ -17,6 +18,7 @@ export default function Home(): JSX.Element {
       <HomepageHeader />
       <main>
         <ProblemStatement />
+        <IntroducingIsograph />
         <IsographFeatures />
         <YoutubeEmbed />
         <Components />

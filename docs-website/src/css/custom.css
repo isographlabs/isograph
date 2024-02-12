@@ -7,10 +7,13 @@
 /* You can override the default Infima variables here. */
 :root {
   --ifm-color-primary: #4e9ebc;
+  --ifm-color-primary-text: #3caed7;
   --ifm-black: #124659;
   --ifm-alt-background: #f5fafc;
   --ifm-alt-background-border: #d6dee1;
   --ifm-kicker: rgba(63, 73, 90, 0.8);
+  /* --ifm-alt-background-2: #d5e2e7; */
+  --ifm-alt-background-2: white;
   /* --ifm-color-primary-dark: #29784c;
   --ifm-color-primary-darker: #277148;
   --ifm-color-primary-darkest: #205d3b;
@@ -35,6 +38,7 @@
   --ifm-kicker: rgba(255, 255, 255, 0.6);
   --ifm-alt-background: #2f2f32;
   --ifm-alt-background-border: #424248;
+  --ifm-alt-background-2: #010304;
 
   /* --ifm-color-primary-dark: #21af90;
   --ifm-color-primary-darker: #1fa588;
@@ -105,12 +109,24 @@ h4 {
   border-bottom: 1px solid var(--ifm-alt-background-border);
 }
 
+.alt-background-2 {
+  padding-top: 1px;
+  background-color: var(--ifm-alt-background-2);
+  border-top: 1px solid var(--ifm-alt-background-border);
+  border-bottom: 1px solid var(--ifm-alt-background-border);
+
+}
+
 .narrow-columns p {
   font-size: 0.9em;
 }
 
 @media screen and (max-width: 996px) {
-  .wideBr {
+  .wide-br {
     display: none;
   }
+}
+
+.isograph-name {
+  color: var(--ifm-color-primary-text);
 }
