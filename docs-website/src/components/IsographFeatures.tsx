@@ -18,8 +18,9 @@ export default function () {
             <div className="text--center-wide padding-horiz--md-wide">
               <h3>Local reasoning</h3>
               <p>
-                When we say "Isograph takes care of the rest", we
-                really&nbsp;mean&nbsp;it.
+                Developers can make changes to individual files without
+                reasoning about the rest of the app. Iteration
+                speed&nbsp;remains&nbsp;high.
               </p>
               <p>
                 If you alter a component, there's no need to update query
@@ -28,9 +29,8 @@ export default function () {
                 that&nbsp;for&nbsp;you.
               </p>
               <p>
-                So, developers can make changes to individual files without
-                reasoning about the rest of the app. Iteration
-                speed&nbsp;remains&nbsp;high.
+                So, when we say "Isograph takes care of the rest", we
+                really&nbsp;mean&nbsp;it.
               </p>
             </div>
           </div>
