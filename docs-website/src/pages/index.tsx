@@ -12,8 +12,8 @@ import IntroducingIsograph from '../components/IntroducingIsograph';
 export default function Home(): JSX.Element {
   return (
     <Layout
-      title={`Isograph — select your components like you select your fields: with GraphQL`}
-      description="Isograph, the framework for building data-driven apps"
+      title={`Isograph, the UI framework for teams that move fast without breaking things`}
+      description="Isograph, the UI framework for teams that move fast without breaking things"
     >
       <HomepageHeader />
       <main>
