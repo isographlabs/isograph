@@ -166,3 +166,4 @@ set_foo {
 - npx way to install Isograph in an existing library
 - periodic refetch (live queries)
 - router example and integration
+- directive on scalar that affects the JS representation of scalars
