@@ -29,6 +29,11 @@
   font-family: Maison;
   font-size: 18px;
 }
+@media screen and (max-width: 996px) {
+  :root {
+    --ifm-h2-font-size: 2rem;
+  }
+}
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
 [data-theme='dark'] {
@@ -114,7 +119,6 @@ h4 {
   background-color: var(--ifm-alt-background-2);
   border-top: 1px solid var(--ifm-alt-background-border);
   border-bottom: 1px solid var(--ifm-alt-background-border);
-
 }
 
 .narrow-columns p {
@@ -125,7 +129,6 @@ h4 {
     font-size: 1em;
   }
 }
-
 
 @media screen and (max-width: 996px) {
   .wide-br {
@@ -143,5 +146,10 @@ h4 {
 @media screen and (max-width: 996px) {
   .why-built {
     font-size: 3em;
+  }
+}
+@media screen and (max-width: 500px) {
+  .why-built {
+    font-size: 2em;
   }
 }
