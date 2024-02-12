@@ -19,18 +19,15 @@ export default function () {
               <h3>Local reasoning</h3>
               <p>
                 Developers can make changes to individual files without
-                reasoning about the rest of the app. Iteration
-                speed&nbsp;remains&nbsp;high.
+                reasoning about the rest of the app. If you alter a component,
+                there's no need to update query declarations or modify other
+                files to ensure that the data makes it to the component &mdash;
+                the compiler does that&nbsp;for&nbsp;you.
               </p>
               <p>
-                If you alter a component, there's no need to update query
-                declarations or modify other files to ensure that the data makes
-                it to the component. Isograph's compiler does
-                that&nbsp;for&nbsp;you.
-              </p>
-              <p>
-                So, when we say "Isograph takes care of the rest", we
-                really&nbsp;mean&nbsp;it.
+                We lean into Isograph's compiler and into generated files so
+                that you can focus on what matters&nbsp;&mdash;&nbsp;shipping
+                features and iterating.
               </p>
             </div>
           </div>
