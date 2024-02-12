@@ -7,7 +7,7 @@ export default function () {
         <div className="row">
           <div className="col">
             <div className="kicker">Ask your doctor</div>
-            <h2 className="text--center-wide margin-bottom--lg">
+            <h2 className="text--center margin-bottom--lg">
               Is Isograph right for&nbsp;me?
             </h2>
           </div>
