@@ -1,6 +1,6 @@
 {
   "name": "@isograph/react-disposable-state",
-  "version": "0.0.4",
+  "version": "0.1.0",
   "description": "Primitives for managing disposable state in React",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -16,7 +16,7 @@
     "prepack": "yarn run compile"
   },
   "dependencies": {
-    "@isograph/disposable-types": "0.0.4",
+    "@isograph/disposable-types": "0.1.0",
     "react": "^18.2.0"
   },
   "devDependencies": {
