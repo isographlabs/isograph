@@ -11,7 +11,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/isographlabs/isograph",
+    "url": "git+https://github.com/isographlabs/isograph.git",
     "directory": "libs/isograph-babel-plugin"
   },
   "dependencies": {
