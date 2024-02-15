@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      react-twitter-embed:
+        specifier: ^4.0.4
+        version: 4.0.4(react-dom@18.2.0)(react@18.2.0)
     devDependencies:
       gulp:
         specifier: 4.0.2
@@ -12324,6 +12328,18 @@ packages:
       react-dom: 18.2.0(react@18.2.0)
     dev: false
 
+  /react-twitter-embed@4.0.4(react-dom@18.2.0)(react@18.2.0):
+    resolution: {integrity: sha512-2JIL7qF+U62zRzpsh6SZDXNI3hRNVYf5vOZ1WRcMvwKouw+xC00PuFaD0aEp2wlyGaZ+f4x2VvX+uDadFQ3HVA==}
+    engines: {node: '>=10'}
+    peerDependencies:
+      react: ^16.0.0 || ^17.0.0 || ^18.0.0
+      react-dom: ^16.0.0 || ^17.0.0 || ^18.0.0
+    dependencies:
+      react: 18.2.0
+      react-dom: 18.2.0(react@18.2.0)
+      scriptjs: 2.5.9
+    dev: false
+
   /react@18.2.0:
     resolution: {integrity: sha512-/3IjMdb2L9QbBdWiW5e3P2/npwMBaU9mHCSCUzNln0ZCYbcfTsGbTJrU/kGemdH2IWmB2ioZ+zkxtmq6g09fGQ==}
     engines: {node: '>=0.10.0'}
@@ -12836,6 +12852,10 @@ packages:
       ajv: 8.12.0
       ajv-formats: 2.1.1(ajv@8.12.0)
       ajv-keywords: 5.1.0(ajv@8.12.0)
+    dev: false
+
+  /scriptjs@2.5.9:
+    resolution: {integrity: sha512-qGVDoreyYiP1pkQnbnFAUIS5AjenNwwQBdl7zeos9etl+hYKWahjRTfzAZZYBv5xNHx7vNKCmaLDQZ6Fr2AEXg==}
     dev: false
 
   /search-insights@2.13.0:
