@@ -11,8 +11,8 @@ export default function Home(): JSX.Element {
       <main>
         <div
           style={{
-            display: 'flex',
             flexDirection: 'row',
+            display: 'flex',
             justifyContent: 'center',
           }}
         >
