@@ -243,7 +243,7 @@ importers:
   libs/isograph-react:
     dependencies:
       '@isograph/disposable-types':
-        specifier: 0.0.4
+        specifier: 0.1.0
         version: link:../isograph-disposable-types
       '@isograph/react-disposable-state':
         specifier: '*'
@@ -268,7 +268,7 @@ importers:
   libs/isograph-react-disposable-state:
     dependencies:
       '@isograph/disposable-types':
-        specifier: 0.0.4
+        specifier: 0.1.0
         version: link:../isograph-disposable-types
       react:
         specifier: ^18.2.0
@@ -290,7 +290,7 @@ importers:
   libs/isograph-reference-counted-pointer:
     dependencies:
       '@isograph/disposable-types':
-        specifier: 0.0.4
+        specifier: 0.1.0
         version: link:../isograph-disposable-types
       react:
         specifier: ^18.2.0
