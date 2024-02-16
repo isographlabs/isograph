@@ -19,7 +19,7 @@ Isograph is a framework for building React applications that are backed by Graph
 
 ```js
 export const Avatar = iso(`
-  User.Avatar @component {
+  field User.Avatar @component {
     name
     avatar_url
   }
@@ -32,7 +32,7 @@ This avatar component is available on any GraphQL User. You might use this avata
 
 ```js
 export const UserProfileButton = iso(`
-  User.UserProfileButton @component {
+  field User.UserProfileButton @component {
     Avatar
 
     # you can also select server fields, like in regular GraphQL:
@@ -124,7 +124,7 @@ In the above example, the `set_user_name` field will be made available on every 
 
 ```js
 export const UpdateUserNameButton = iso(`
-  User.UpdateUserNameButton {
+  field User.UpdateUserNameButton {
     set_user_name
   }
 `)(({ data: { set_user_name } }) => {
