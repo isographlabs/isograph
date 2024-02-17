@@ -2,6 +2,7 @@
   "name": "@isograph/compiler",
   "version": "0.1.0",
   "description": "Installs the `yarn iso` command, which runs the Isograph compiler.",
+  "homepage": "https://isograph.dev",
   "main": "index.js",
   "bin": {
     "iso": "cli.js"

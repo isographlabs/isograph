@@ -2,6 +2,7 @@
   "name": "@isograph/disposable-types",
   "version": "0.1.0",
   "description": "Common types for disposable items",
+  "homepage": "https://isograph.dev",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "author": "Isograph Labs",
