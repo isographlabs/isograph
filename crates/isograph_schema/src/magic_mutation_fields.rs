@@ -1,7 +1,7 @@
 use common_lang_types::{
     DescriptionValue, DirectiveArgumentName, DirectiveName, EmbeddedLocation,
     IsographObjectTypeName, Location, SelectableFieldName, Span, StringLiteralValue, TextSource,
-    UnvalidatedTypeName, ValueKeyName, WithEmbeddedLocation, WithLocation, WithSpan,
+    ValueKeyName, WithEmbeddedLocation, WithLocation, WithSpan,
 };
 use graphql_lang_types::{ConstantValue, GraphQLDirective, GraphQLInputValueDefinition};
 use intern::{string_key::Intern, Lookup};
@@ -142,7 +142,7 @@ impl UnvalidatedSchema {
                 .encountered_fields
                 .get(&path_selectable_field_name);
 
-            let (resolver_parent_object_id, inner_type_name) = match primary_field {
+            let (resolver_parent_object_id, maybe_abstract_parent_type_name) = match primary_field {
                 Some(DefinedField::ServerField(server_field)) => {
                     // This is the parent type name (Pet)
                     let inner = server_field.inner();
@@ -213,7 +213,22 @@ impl UnvalidatedSchema {
                     path_selectable_field_name,
                     &mutation_field_arguments,
                     &mutation_field_args_without_id,
-                    inner_type_name,
+                    // This is not ideal. This causes us to import the concrete mutation field reader
+                    // in the generated reader for the parent reader, meaning that multiple different
+                    // concrete types using the same (abstract) mutation field will import separate,
+                    // effectively identical readers (e.g. Repository/addStar/reader and
+                    // Topic/addStar/reader). If we import the abstract one, that would be more efficient.
+                    //
+                    // However, we do not mark the abstract one as "reached" if it is reached on a concrete
+                    // object, and thus don't generate a reader artifact (e.g. Starrable/addStar/reader)
+                    // for the abstract mutation field.
+                    if let RequiresRefinement::Yes(concrete_type_to_refine_to) = requires_refinement
+                    {
+                        concrete_type_to_refine_to
+                    } else {
+                        // TODO make this zero cost
+                        maybe_abstract_parent_type_name.lookup().intern().into()
+                    },
                     object_id,
                     field_map_items,
                     payload_object_name,
@@ -233,7 +248,7 @@ impl UnvalidatedSchema {
         path_selectable_field_name: SelectableFieldName,
         mutation_field_arguments: &[WithLocation<GraphQLInputValueDefinition>],
         mutation_field_args_without_id: &[WithLocation<GraphQLInputValueDefinition>],
-        inner_type_name: UnvalidatedTypeName,
+        parent_object_type_name: IsographObjectTypeName,
         resolver_parent_object_id: ObjectId,
         field_map_items: &[FieldMapItem],
         payload_object_name: IsographObjectTypeName,
@@ -257,8 +272,8 @@ impl UnvalidatedSchema {
             variable_definitions: vec![],
             type_and_field: ResolverTypeAndField {
                 // TODO make this zero cost?
-                type_name: inner_type_name.lookup().intern().into(), // e.g. Pet
-                field_name: magic_mutation_field_name,               // set_pet_best_friend
+                type_name: parent_object_type_name,    // e.g. Pet
+                field_name: magic_mutation_field_name, // set_pet_best_friend
             },
             parent_object_id: resolver_parent_object_id,
             action_kind: ResolverActionKind::MutationField(MutationFieldResolverActionKindInfo {
