@@ -5,6 +5,6 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
-intern = { git = "https://github.com/facebook/relay.git", rev = "e5839e889bce8f51b1bd121f7cec9fda348f1094" }
+intern = { git = "https://github.com/facebook/relay.git", tag = "v16.2.0" }
 common_lang_types = { path = "../common_lang_types" }
 strum = { version="0.25.0", features=["derive"] }

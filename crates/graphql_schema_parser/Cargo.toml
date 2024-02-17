@@ -5,8 +5,8 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
-graphql-syntax = { git = "https://github.com/facebook/relay.git", rev = "e5839e889bce8f51b1bd121f7cec9fda348f1094" }
-intern = { git = "https://github.com/facebook/relay.git", rev = "e5839e889bce8f51b1bd121f7cec9fda348f1094" }
+graphql-syntax = { git = "https://github.com/facebook/relay.git", tag = "v16.2.0" }
+intern = { git = "https://github.com/facebook/relay.git", tag = "v16.2.0" }
 graphql_lang_types = { path = "../graphql_lang_types" }
 common_lang_types = { path = "../common_lang_types" }
 logos = "0.12"
