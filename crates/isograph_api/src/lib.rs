@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use isograph_schema::{CompilerConfig, ConfigOptions, OptionalValidationLevel};
 use serde::Deserialize;
 
-use crate::isograph_literals::ISOGRAPH_FOLDER;
+pub static ISOGRAPH_FOLDER: &'static str = "__isograph";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -24,7 +24,7 @@ struct ConfigFile {
     pub options: ConfigFileOptions,
 }
 
-pub(crate) fn create_config(mut config_location: PathBuf) -> CompilerConfig {
+pub fn create_config(mut config_location: PathBuf) -> CompilerConfig {
     let config_contents = match std::fs::read_to_string(&config_location) {
         Ok(contents) => contents,
         Err(_) => match config_location.to_str() {
