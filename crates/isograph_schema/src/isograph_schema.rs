@@ -2,9 +2,8 @@ use std::{collections::HashMap, fmt::Debug};
 
 use common_lang_types::{
     ConstExportName, DescriptionValue, FieldArgumentName, HasName, InputTypeName,
-    InterfaceTypeName, IsographObjectTypeName, JavascriptName, LinkedFieldName,
-    ResolverDefinitionPath, ScalarTypeName, SelectableFieldName, UnvalidatedTypeName, WithLocation,
-    WithSpan,
+    InterfaceTypeName, IsographObjectTypeName, JavascriptName, ResolverDefinitionPath,
+    ScalarTypeName, SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInputObjectTypeDefinition,
@@ -507,16 +506,15 @@ pub struct PathToRefetchField {
     pub linked_fields: Vec<NameAndArguments>,
 }
 
-#[allow(unused)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct NameAndArguments {
-    pub name: LinkedFieldName,
+    pub name: SelectableFieldName,
     pub arguments: Vec<ArgumentKeyAndValue>,
 }
 
 pub fn into_name_and_arguments<T, U>(field: &LinkedFieldSelection<T, U>) -> NameAndArguments {
     NameAndArguments {
-        name: field.name.item,
+        name: field.name.item.into(),
         arguments: field
             .arguments
             .iter()

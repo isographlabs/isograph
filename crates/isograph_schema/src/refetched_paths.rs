@@ -48,7 +48,7 @@ pub fn refetched_paths_with_path(
                 },
                 ServerFieldSelection::LinkedField(linked_field_selection) => {
                     path.push(NameAndArguments {
-                        name: linked_field_selection.name.item,
+                        name: linked_field_selection.name.item.into(),
                         arguments: linked_field_selection
                             .arguments
                             .iter()

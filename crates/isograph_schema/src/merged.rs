@@ -5,8 +5,7 @@ use std::collections::{
 
 use common_lang_types::{
     IsographObjectTypeName, LinkedFieldAlias, LinkedFieldName, Location, ScalarFieldAlias,
-    ScalarFieldName, SelectableFieldName, ServerFieldNormalizationKey, Span, VariableName,
-    WithLocation, WithSpan,
+    ScalarFieldName, SelectableFieldName, Span, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::{string_key::Intern, Lookup};
@@ -125,7 +124,8 @@ fn find_by_path(
                 if let MergedServerFieldSelection::LinkedField(linked_field) =
                     &linked_field_selection.item
                 {
-                    if linked_field.name.item == item.name {
+                    let linked_field_name: SelectableFieldName = linked_field.name.item.into();
+                    if linked_field_name == item.name {
                         return Some(linked_field);
                     }
                 }
@@ -146,11 +146,11 @@ impl Into<Vec<WithSpan<MergedServerFieldSelection>>> for MergedSelectionSet {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy, PartialOrd, Ord, Hash)]
+#[derive(Debug, Eq, PartialEq, Clone, PartialOrd, Ord, Hash)]
 enum NormalizationKey {
     // __typename,
     Id,
-    ServerField(ServerFieldNormalizationKey),
+    ServerField(NameAndArguments),
 }
 
 #[derive(Debug)]
@@ -395,17 +395,15 @@ fn merge_selections_into_set(
                     };
                 }
                 ServerFieldSelection::LinkedField(new_linked_field) => {
-                    let normalization_key = NormalizationKey::ServerField(
-                        HACK_combine_name_and_variables_into_normalization_alias(
-                            new_linked_field.name.item.into(),
-                            &new_linked_field.arguments,
-                        ),
-                    );
+                    let normalization_key = NormalizationKey::ServerField(name_and_arguments(
+                        new_linked_field.name.item.into(),
+                        &new_linked_field.arguments,
+                    ));
                     merge_traversal_state
                         .current_path
                         .linked_fields
                         .push(NameAndArguments {
-                            name: new_linked_field.name.item,
+                            name: new_linked_field.name.item.into(),
                             arguments: new_linked_field
                                 .arguments
                                 .iter()
@@ -563,11 +561,10 @@ fn merge_scalar_server_field(
     merged_selection_set: &mut MergedSelectionMap,
     span: Span,
 ) {
-    let normalization_key =
-        NormalizationKey::ServerField(HACK_combine_name_and_variables_into_normalization_alias(
-            scalar_field.name.item.into(),
-            &scalar_field.arguments,
-        ));
+    let normalization_key = NormalizationKey::ServerField(name_and_arguments(
+        scalar_field.name.item.into(),
+        &scalar_field.arguments,
+    ));
     match merged_selection_set.entry(normalization_key) {
         Entry::Occupied(occupied) => {
             match occupied.get().item {
@@ -593,26 +590,19 @@ fn merge_scalar_server_field(
     }
 }
 
-/// In order to avoid requiring a normalization AST, we write the variables
-/// used in the alias. Once we have a normalization AST, we can remove this.
-#[allow(non_snake_case)]
-fn HACK_combine_name_and_variables_into_normalization_alias(
+fn name_and_arguments(
     name: SelectableFieldName,
     arguments: &[WithLocation<SelectionFieldArgument>],
-) -> ServerFieldNormalizationKey {
-    if arguments.is_empty() {
-        name.into()
-    } else {
-        let mut alias_str = name.to_string();
-
-        for argument in arguments {
-            alias_str.push_str(&format!(
-                "__{}_{}",
-                argument.item.name.item,
-                &argument.item.value.item.to_alias_str_chunk()
-            ));
-        }
-        alias_str.intern().into()
+) -> NameAndArguments {
+    NameAndArguments {
+        name,
+        arguments: arguments
+            .iter()
+            .map(|selection_field_argument| ArgumentKeyAndValue {
+                key: selection_field_argument.item.name.item,
+                value: selection_field_argument.item.value.item.clone(),
+            })
+            .collect(),
     }
 }
 
@@ -633,12 +623,10 @@ fn HACK__merge_linked_fields(
             MergedServerFieldSelection::ScalarField(scalar_field) => {
                 // N.B. if you have a field named "id" which is a linked field, this will probably
                 // work incorrectly!
-                let normalization_key = NormalizationKey::ServerField(
-                    HACK_combine_name_and_variables_into_normalization_alias(
-                        scalar_field.name.item.into(),
-                        &scalar_field.arguments,
-                    ),
-                );
+                let normalization_key = NormalizationKey::ServerField(name_and_arguments(
+                    scalar_field.name.item.into(),
+                    &scalar_field.arguments,
+                ));
 
                 merged_selection_set.insert(
                     normalization_key,
@@ -649,12 +637,10 @@ fn HACK__merge_linked_fields(
                 )
             }
             MergedServerFieldSelection::LinkedField(linked_field) => {
-                let normalization_key = NormalizationKey::ServerField(
-                    HACK_combine_name_and_variables_into_normalization_alias(
-                        linked_field.name.item.into(),
-                        &linked_field.arguments,
-                    ),
-                );
+                let normalization_key = NormalizationKey::ServerField(name_and_arguments(
+                    linked_field.name.item.into(),
+                    &linked_field.arguments,
+                ));
                 merged_selection_set.insert(
                     normalization_key,
                     WithSpan::new(
