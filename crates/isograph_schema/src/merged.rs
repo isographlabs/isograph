@@ -210,13 +210,13 @@ struct MergeTraversalState<'a> {
     /// needed for each refetch query. At this point, we have enough information
     /// to generate the refetch query.
     current_path: PathToRefetchField,
-    encountered_resolver_ids: &'a mut HashSet<ResolverFieldId>,
+    encountered_resolver_ids: Option<&'a mut HashSet<ResolverFieldId>>,
 }
 
 impl<'a> MergeTraversalState<'a> {
     pub fn new(
         resolver: &'a ValidatedSchemaResolver,
-        encountered_resolver_ids: &'a mut HashSet<ResolverFieldId>,
+        encountered_resolver_ids: Option<&'a mut HashSet<ResolverFieldId>>,
     ) -> Self {
         Self {
             resolver,
@@ -231,8 +231,9 @@ pub fn create_merged_selection_set(
     schema: &ValidatedSchema,
     parent_type: &ValidatedSchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
+    // TODO consider ways to get rid of these parameters.
     artifact_queue: Option<&mut Vec<ArtifactQueueItem>>,
-    encountered_resolver_ids: &mut HashSet<ResolverFieldId>,
+    encountered_resolver_ids: Option<&mut HashSet<ResolverFieldId>>,
     // N.B. we call this for non-fetchable resolvers now, but that is a smell
     root_fetchable_resolver: &ValidatedSchemaResolver,
 ) -> (MergedSelectionSet, Vec<RootRefetchedPath>) {
@@ -423,9 +424,11 @@ fn merge_selections_into_set(
                             merge_scalar_server_field(scalar_field, merged_selection_map, span);
                         }
                         DefinedField::ResolverField(resolver_field_id) => {
-                            merge_traversal_state
-                                .encountered_resolver_ids
-                                .insert(*resolver_field_id);
+                            if let Some(ref mut encountered_resolver_ids) =
+                                merge_traversal_state.encountered_resolver_ids
+                            {
+                                encountered_resolver_ids.insert(*resolver_field_id);
+                            }
                             merge_scalar_resolver_field(
                                 parent_type,
                                 schema,

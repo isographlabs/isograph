@@ -562,7 +562,7 @@ fn generate_entrypoint_artifact<'schema>(
                 .into(),
             selection_set,
             Some(artifact_queue),
-            encountered_resolvers_ids,
+            Some(encountered_resolvers_ids),
             &top_level_resolver,
         );
 
@@ -613,8 +613,7 @@ fn generate_reader_artifact<'schema>(
                 .into(),
             selection_set,
             None,
-            // TODO this is obviously a smell
-            &mut HashSet::new(),
+            None,
             resolver,
         );
 
