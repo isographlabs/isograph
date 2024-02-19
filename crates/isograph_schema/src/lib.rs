@@ -1,3 +1,4 @@
+mod add_fields_to_subtypes;
 mod argument_map;
 mod compilation_options;
 mod isograph_schema;

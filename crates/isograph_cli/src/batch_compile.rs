@@ -144,13 +144,7 @@ pub(crate) fn handle_compile_command(
         // - process parsed literals
         // - validate resolvers
         if let Some(mutation_id) = &original_outcome.root_types.mutation {
-            schema.create_magic_mutation_fields(
-                *mutation_id,
-                config.options,
-                &original_outcome
-                    .type_refinement_maps
-                    .supertype_to_subtype_map,
-            )?;
+            schema.create_magic_mutation_fields(*mutation_id, config.options)?;
         }
 
         let canonicalized_root_path = {
@@ -177,6 +171,12 @@ pub(crate) fn handle_compile_command(
             &mut schema,
             parsed_resolvers,
             parsed_entrypoints,
+        )?;
+
+        schema.add_fields_to_subtypes(
+            &original_outcome
+                .type_refinement_maps
+                .supertype_to_subtype_map,
         )?;
 
         let validated_schema = Schema::validate_and_construct(schema)?;

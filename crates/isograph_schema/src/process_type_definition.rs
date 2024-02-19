@@ -824,8 +824,11 @@ pub enum ProcessTypeDefinitionError {
         parent_type: IsographObjectTypeName,
     },
 
-    #[error("Due to a mutation, Isograph attempted to create a field named \"{field_name}\" on type \"{parent_type}\", but a field with that name already exists.")]
-    MutationFieldIsDuplicate {
+    #[error(
+        "The Isograph compiler attempted to create a field named \
+    \"{field_name}\" on type \"{parent_type}\", but a field with that name already exists."
+    )]
+    FieldExistsOnSubtype {
         field_name: SelectableFieldName,
         parent_type: IsographObjectTypeName,
     },

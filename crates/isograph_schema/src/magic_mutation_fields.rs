@@ -14,7 +14,7 @@ use crate::{
     ArgumentMap, ConfigOptions, DefinedField, FieldMapItem, MutationFieldResolverActionKindInfo,
     MutationFieldResolverVariant, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
     ProcessedFieldMapItem, ResolverActionKind, ResolverTypeAndField, ResolverVariant,
-    SchemaResolver, TypeRefinementMap, UnvalidatedSchema,
+    SchemaResolver, UnvalidatedSchema,
 };
 use lazy_static::lazy_static;
 
@@ -55,7 +55,6 @@ impl UnvalidatedSchema {
         &mut self,
         mutation_id: ObjectId,
         options: ConfigOptions,
-        supertype_to_subtype_map: &TypeRefinementMap,
     ) -> ProcessTypeDefinitionResult<()> {
         // TODO don't clone if possible
         let mutation_object = self.schema_data.object(mutation_id);
@@ -79,7 +78,6 @@ impl UnvalidatedSchema {
                 magic_mutation_info,
                 mutation_object_name,
                 options,
-                supertype_to_subtype_map,
             )?;
         }
 
@@ -91,7 +89,6 @@ impl UnvalidatedSchema {
         magic_mutation_info: &MagicMutationFieldInfo,
         mutation_object_name: IsographObjectTypeName,
         options: ConfigOptions,
-        supertype_to_subtype_map: &TypeRefinementMap,
     ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
         let MagicMutationFieldInfo {
             path,
@@ -232,23 +229,12 @@ impl UnvalidatedSchema {
                 magic_mutation_field_resolver_id,
                 payload_object_name,
             )?;
-
-            if let Some(subtypes) = supertype_to_subtype_map.get(&maybe_abstract_parent_object_id) {
-                for subtype_object_id in subtypes {
-                    self.insert_resolver_field_on_object(
-                        magic_mutation_field_name,
-                        *subtype_object_id,
-                        magic_mutation_field_resolver_id,
-                        payload_object_name,
-                    )?;
-                }
-            }
         }
         Ok(())
     }
 
     // TODO this should be defined elsewhere, probably
-    fn insert_resolver_field_on_object(
+    pub fn insert_resolver_field_on_object(
         &mut self,
         magic_mutation_field_name: SelectableFieldName,
         resolver_parent_object_id: ObjectId,
@@ -266,7 +252,7 @@ impl UnvalidatedSchema {
         {
             return Err(WithLocation::new(
                 // TODO use a more generic error message when making this
-                ProcessTypeDefinitionError::MutationFieldIsDuplicate {
+                ProcessTypeDefinitionError::FieldExistsOnSubtype {
                     field_name: magic_mutation_field_name,
                     parent_type: payload_object_name,
                 },
