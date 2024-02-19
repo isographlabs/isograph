@@ -4,9 +4,7 @@ import { formattedCommentCreationDate as resolver } from '../../../CommentList.t
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = ReturnType<typeof resolver>;
 
-export type ReadFromStoreType = IssueComment__formattedCommentCreationDate__param;
-
-const readerAst: ReaderAst<ReadFromStoreType> = [
+const readerAst: ReaderAst<IssueComment__formattedCommentCreationDate__param> = [
   {
     kind: "Scalar",
     fieldName: "createdAt",
@@ -19,7 +17,11 @@ export type IssueComment__formattedCommentCreationDate__param = {
   createdAt: string,
 };
 
-const artifact: ReaderArtifact<ReadFromStoreType, IssueComment__formattedCommentCreationDate__param, ReadOutType> = {
+const artifact: ReaderArtifact<
+  IssueComment__formattedCommentCreationDate__param,
+  IssueComment__formattedCommentCreationDate__param,
+  ReadOutType
+> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,

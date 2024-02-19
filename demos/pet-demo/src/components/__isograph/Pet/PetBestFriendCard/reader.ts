@@ -5,9 +5,7 @@ import Pet__PetUpdater, { ReadOutType as Pet__PetUpdater__outputType } from '../
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
 
-export type ReadFromStoreType = Pet__PetBestFriendCard__param;
-
-const readerAst: ReaderAst<ReadFromStoreType> = [
+const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
   {
     kind: "Scalar",
     fieldName: "id",
@@ -78,7 +76,11 @@ export type Pet__PetBestFriendCard__param = { data:
 },
 [index: string]: any };
 
-const artifact: ReaderArtifact<ReadFromStoreType, Pet__PetBestFriendCard__param, ReadOutType> = {
+const artifact: ReaderArtifact<
+  Pet__PetBestFriendCard__param,
+  Pet__PetBestFriendCard__param,
+  ReadOutType
+> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,

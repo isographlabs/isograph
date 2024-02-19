@@ -5,9 +5,7 @@ const resolver = (environment, artifact, variables) => () => makeNetworkRequest(
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = any;
 
-export type ReadFromStoreType = User____refetch__param;
-
-const readerAst: ReaderAst<ReadFromStoreType> = [
+const readerAst: ReaderAst<User____refetch__param> = [
   {
     kind: "Scalar",
     fieldName: "id",
@@ -23,7 +21,11 @@ export type User____refetch__param = {
 // The type, when returned from the resolver
 export type ResolverReturnType = ReturnType<typeof resolver>;
 
-const artifact: ReaderArtifact<ReadFromStoreType, User____refetch__param, ReadOutType> = {
+const artifact: ReaderArtifact<
+  User____refetch__param,
+  User____refetch__param,
+  ReadOutType
+> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,

@@ -6,9 +6,7 @@ import Pet__set_pet_tagline, { ReadOutType as Pet__set_pet_tagline__outputType }
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
 
-export type ReadFromStoreType = Pet__PetUpdater__param;
-
-const readerAst: ReaderAst<ReadFromStoreType> = [
+const readerAst: ReaderAst<Pet__PetUpdater__param> = [
   {
     kind: "MutationField",
     alias: "set_pet_best_friend",
@@ -61,7 +59,11 @@ export type Pet__PetUpdater__param = { data:
 },
 [index: string]: any };
 
-const artifact: ReaderArtifact<ReadFromStoreType, Pet__PetUpdater__param, ReadOutType> = {
+const artifact: ReaderArtifact<
+  Pet__PetUpdater__param,
+  Pet__PetUpdater__param,
+  ReadOutType
+> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,

@@ -85,21 +85,21 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             {resolver_import_statement}\n\
             {nested_resolver_import_statement}\n\
             {read_out_type_text}\n\n\
-            export type ReadFromStoreType = {reader_param_type};\n\n\
-            const readerAst: ReaderAst<ReadFromStoreType> = {reader_ast};\n\n\
+            const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
             export type {reader_param_type} = {resolver_parameter_type};\n\n\
             {resolver_return_type}\
-            const artifact: ReaderArtifact<ReadFromStoreType, {reader_param_type}, ReadOutType> = {{\n\
+            const artifact: ReaderArtifact<\n\
+            {}{reader_param_type},\n\
+            {}{reader_param_type},\n\
+            {}ReadOutType\n\
+            > = {{\n\
             {}kind: \"ReaderArtifact\",\n\
             {}resolver: resolver as any,\n\
             {}readerAst,\n\
             {}variant: {variant},\n\
             }};\n\n\
             export default artifact;\n",
-            "  ",
-            "  ",
-            "  ",
-            "  ",
+            "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     }
 }

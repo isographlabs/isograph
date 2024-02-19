@@ -8,9 +8,7 @@ import Pet__PetTaglineCard, { ReadOutType as Pet__PetTaglineCard__outputType } f
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
 
-export type ReadFromStoreType = Query__PetDetailRoute__param;
-
-const readerAst: ReaderAst<ReadFromStoreType> = [
+const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
   {
     kind: "Linked",
     fieldName: "pet",
@@ -72,7 +70,11 @@ export type Query__PetDetailRoute__param = { data:
 },
 [index: string]: any };
 
-const artifact: ReaderArtifact<ReadFromStoreType, Query__PetDetailRoute__param, ReadOutType> = {
+const artifact: ReaderArtifact<
+  Query__PetDetailRoute__param,
+  Query__PetDetailRoute__param,
+  ReadOutType
+> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,

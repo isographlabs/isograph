@@ -7,9 +7,7 @@ import PullRequest__createdAtFormatted, { ReadOutType as PullRequest__createdAtF
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
 
-export type ReadFromStoreType = PullRequestConnection__PullRequestTable__param;
-
-const readerAst: ReaderAst<ReadFromStoreType> = [
+const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
   {
     kind: "Linked",
     fieldName: "edges",
@@ -113,7 +111,11 @@ export type PullRequestConnection__PullRequestTable__param = { data:
 },
 [index: string]: any };
 
-const artifact: ReaderArtifact<ReadFromStoreType, PullRequestConnection__PullRequestTable__param, ReadOutType> = {
+const artifact: ReaderArtifact<
+  PullRequestConnection__PullRequestTable__param,
+  PullRequestConnection__PullRequestTable__param,
+  ReadOutType
+> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,

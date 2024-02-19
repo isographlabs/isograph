@@ -6,9 +6,7 @@ import User____refetch, { ReadOutType as User____refetch__outputType } from '../
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
 
-export type ReadFromStoreType = Query__HomePageList__param;
-
-const readerAst: ReaderAst<ReadFromStoreType> = [
+const readerAst: ReaderAst<Query__HomePageList__param> = [
   {
     kind: "Linked",
     fieldName: "viewer",
@@ -55,7 +53,11 @@ export type Query__HomePageList__param = { data:
 },
 [index: string]: any };
 
-const artifact: ReaderArtifact<ReadFromStoreType, Query__HomePageList__param, ReadOutType> = {
+const artifact: ReaderArtifact<
+  Query__HomePageList__param,
+  Query__HomePageList__param,
+  ReadOutType
+> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,

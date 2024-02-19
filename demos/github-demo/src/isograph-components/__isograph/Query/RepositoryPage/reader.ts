@@ -6,9 +6,7 @@ import Query__RepositoryDetail, { ReadOutType as Query__RepositoryDetail__output
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
 
-export type ReadFromStoreType = Query__RepositoryPage__param;
-
-const readerAst: ReaderAst<ReadFromStoreType> = [
+const readerAst: ReaderAst<Query__RepositoryPage__param> = [
   {
     kind: "Resolver",
     alias: "Header",
@@ -32,7 +30,11 @@ export type Query__RepositoryPage__param = { data:
 },
 [index: string]: any };
 
-const artifact: ReaderArtifact<ReadFromStoreType, Query__RepositoryPage__param, ReadOutType> = {
+const artifact: ReaderArtifact<
+  Query__RepositoryPage__param,
+  Query__RepositoryPage__param,
+  ReadOutType
+> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,

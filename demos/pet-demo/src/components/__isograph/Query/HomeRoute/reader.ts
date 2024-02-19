@@ -5,9 +5,7 @@ import Pet__PetSummaryCard, { ReadOutType as Pet__PetSummaryCard__outputType } f
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
 
-export type ReadFromStoreType = Query__HomeRoute__param;
-
-const readerAst: ReaderAst<ReadFromStoreType> = [
+const readerAst: ReaderAst<Query__HomeRoute__param> = [
   {
     kind: "Linked",
     fieldName: "pets",
@@ -40,7 +38,11 @@ export type Query__HomeRoute__param = { data:
 },
 [index: string]: any };
 
-const artifact: ReaderArtifact<ReadFromStoreType, Query__HomeRoute__param, ReadOutType> = {
+const artifact: ReaderArtifact<
+  Query__HomeRoute__param,
+  Query__HomeRoute__param,
+  ReadOutType
+> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,

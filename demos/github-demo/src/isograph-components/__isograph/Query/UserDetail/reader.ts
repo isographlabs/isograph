@@ -5,9 +5,7 @@ import User__RepositoryList, { ReadOutType as User__RepositoryList__outputType }
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
 
-export type ReadFromStoreType = Query__UserDetail__param;
-
-const readerAst: ReaderAst<ReadFromStoreType> = [
+const readerAst: ReaderAst<Query__UserDetail__param> = [
   {
     kind: "Linked",
     fieldName: "user",
@@ -45,7 +43,11 @@ export type Query__UserDetail__param = { data:
 },
 [index: string]: any };
 
-const artifact: ReaderArtifact<ReadFromStoreType, Query__UserDetail__param, ReadOutType> = {
+const artifact: ReaderArtifact<
+  Query__UserDetail__param,
+  Query__UserDetail__param,
+  ReadOutType
+> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,

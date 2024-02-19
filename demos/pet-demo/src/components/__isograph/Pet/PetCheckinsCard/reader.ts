@@ -4,9 +4,7 @@ import { PetCheckinsCard as resolver } from '../../../PetCheckinsCard.tsx';
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
 
-export type ReadFromStoreType = Pet__PetCheckinsCard__param;
-
-const readerAst: ReaderAst<ReadFromStoreType> = [
+const readerAst: ReaderAst<Pet__PetCheckinsCard__param> = [
   {
     kind: "Scalar",
     fieldName: "id",
@@ -52,7 +50,11 @@ export type Pet__PetCheckinsCard__param = { data:
 },
 [index: string]: any };
 
-const artifact: ReaderArtifact<ReadFromStoreType, Pet__PetCheckinsCard__param, ReadOutType> = {
+const artifact: ReaderArtifact<
+  Pet__PetCheckinsCard__param,
+  Pet__PetCheckinsCard__param,
+  ReadOutType
+> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,

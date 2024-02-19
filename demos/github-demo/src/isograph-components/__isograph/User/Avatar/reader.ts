@@ -4,9 +4,7 @@ import { Avatar as resolver } from '../../../avatar.tsx';
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
 
-export type ReadFromStoreType = User__Avatar__param;
-
-const readerAst: ReaderAst<ReadFromStoreType> = [
+const readerAst: ReaderAst<User__Avatar__param> = [
   {
     kind: "Scalar",
     fieldName: "name",
@@ -28,7 +26,11 @@ export type User__Avatar__param = { data:
 },
 [index: string]: any };
 
-const artifact: ReaderArtifact<ReadFromStoreType, User__Avatar__param, ReadOutType> = {
+const artifact: ReaderArtifact<
+  User__Avatar__param,
+  User__Avatar__param,
+  ReadOutType
+> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,

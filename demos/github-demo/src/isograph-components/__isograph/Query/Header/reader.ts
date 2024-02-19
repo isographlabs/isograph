@@ -5,9 +5,7 @@ import User__Avatar, { ReadOutType as User__Avatar__outputType } from '../../Use
 // the type, when read out (either via useLazyReference or via graph)
 export type ReadOutType = (React.FC<any>);
 
-export type ReadFromStoreType = Query__Header__param;
-
-const readerAst: ReaderAst<ReadFromStoreType> = [
+const readerAst: ReaderAst<Query__Header__param> = [
   {
     kind: "Linked",
     fieldName: "viewer",
@@ -40,7 +38,11 @@ export type Query__Header__param = { data:
 },
 [index: string]: any };
 
-const artifact: ReaderArtifact<ReadFromStoreType, Query__Header__param, ReadOutType> = {
+const artifact: ReaderArtifact<
+  Query__Header__param,
+  Query__Header__param,
+  ReadOutType
+> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
   readerAst,
