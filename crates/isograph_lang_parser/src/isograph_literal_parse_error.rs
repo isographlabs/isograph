@@ -1,4 +1,4 @@
-use common_lang_types::{ScalarFieldName, WithLocation, WithSpan};
+use common_lang_types::{FieldNameOrAlias, ScalarFieldName, WithLocation, WithSpan};
 use thiserror::Error;
 
 use super::peekable_lexer::LowLevelParseError;
@@ -49,9 +49,15 @@ pub enum IsographLiteralParseError {
 
     #[error(
         "You must call the iso function with parentheses. \"iso`...`\" is \
-        not supported."
+        not supported"
     )]
     ExpectedParenthesesAroundIsoLiteral,
+
+    #[error(
+        "A field with name or alias `{name_or_alias}` has already been defined in \
+        this client field declaration"
+    )]
+    DuplicateNameOrAlias { name_or_alias: FieldNameOrAlias },
 }
 
 impl From<LowLevelParseError> for IsographLiteralParseError {

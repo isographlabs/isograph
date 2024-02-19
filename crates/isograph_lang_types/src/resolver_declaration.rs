@@ -118,6 +118,13 @@ impl<TScalarField, TLinkedField> ServerFieldSelection<TScalarField, TLinkedField
             }
         }
     }
+
+    pub fn name_or_alias(&self) -> WithLocation<FieldNameOrAlias> {
+        match self {
+            ServerFieldSelection::ScalarField(scalar_field) => scalar_field.name_or_alias(),
+            ServerFieldSelection::LinkedField(linked_field) => linked_field.name_or_alias(),
+        }
+    }
 }
 
 impl<TScalarField, TLinkedField> HasName for ServerFieldSelection<TScalarField, TLinkedField> {

@@ -1,4 +1,4 @@
-use std::ops::ControlFlow;
+use std::{collections::HashSet, ops::ControlFlow};
 
 use common_lang_types::{
     Location, ResolverDefinitionPath, ScalarFieldName, SelectableFieldName, Span, StringKeyNewtype,
@@ -192,12 +192,33 @@ fn parse_optional_selection_set<'a>(
         return Ok(None);
     }
 
+    let mut encountered_names_or_aliases = HashSet::new();
     let mut selections = vec![];
     while tokens
         .parse_token_of_kind(IsographLangTokenKind::CloseBrace)
         .is_err()
     {
-        selections.push(parse_selection(tokens, text_source)?);
+        let selection = parse_selection(tokens, text_source)?;
+        match &selection.item {
+            Selection::ServerField(server_field_selection) => {
+                let selection_name_or_alias = server_field_selection.name_or_alias().item;
+                if !encountered_names_or_aliases.insert(selection_name_or_alias) {
+                    // We have already encountered this name or alias, so we emit
+                    // an error.
+                    // TODO should SelectionSet be a HashMap<FieldNameOrAlias, ...> instead of
+                    // a Vec??
+                    // TODO find a way to include the location of the previous field with matching
+                    // name or alias
+                    return Err(WithSpan::new(
+                        IsographLiteralParseError::DuplicateNameOrAlias {
+                            name_or_alias: selection_name_or_alias,
+                        },
+                        selection.span,
+                    ));
+                }
+            }
+        }
+        selections.push(selection);
     }
     Ok(Some(selections))
 }
