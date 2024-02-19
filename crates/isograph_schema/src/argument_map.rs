@@ -12,10 +12,11 @@ use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{DefinedTypeId, ObjectId, ServerFieldId};
 
 use crate::{
-    ConfigOptions, FieldMapItem, IsographObjectTypeDefinition, ProcessObjectTypeDefinitionOutcome,
+    FieldMapItem, IsographObjectTypeDefinition, ProcessObjectTypeDefinitionOutcome,
     ProcessTypeDefinitionError, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
     UnvalidatedSchema,
 };
+use isograph_config::ConfigOptions;
 
 pub(crate) struct ArgumentMap {
     arguments: Vec<WithLocation<PotentiallyModifiedArgument>>,

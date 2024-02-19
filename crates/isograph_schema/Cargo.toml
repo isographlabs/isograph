@@ -9,6 +9,7 @@ license = "MIT"
 [dependencies]
 common_lang_types = { path = "../common_lang_types" }
 isograph_lang_types = { path = "../isograph_lang_types" }
+isograph_config = { path = "../isograph_config" }
 graphql_lang_types = { path = "../graphql_lang_types" }
 intern = { git = "https://github.com/facebook/relay.git", tag = "v16.2.0" }
 thiserror = "1.0.40"

@@ -10,8 +10,10 @@ use isograph_lang_types::{
     ServerFieldSelection,
 };
 
+use isograph_config::ConfigOptions;
+
 use crate::{
-    ArgumentMap, ConfigOptions, DefinedField, FieldMapItem, MutationFieldResolverActionKindInfo,
+    ArgumentMap, DefinedField, FieldMapItem, MutationFieldResolverActionKindInfo,
     MutationFieldResolverVariant, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
     ProcessedFieldMapItem, ResolverActionKind, ResolverTypeAndField, ResolverVariant,
     SchemaResolver, UnvalidatedSchema,

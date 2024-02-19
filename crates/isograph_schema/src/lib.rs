@@ -1,6 +1,5 @@
 mod add_fields_to_subtypes;
 mod argument_map;
-mod compilation_options;
 mod isograph_schema;
 mod magic_mutation_fields;
 mod merged;
@@ -13,7 +12,7 @@ mod validate_resolver_fetch;
 mod validate_schema;
 
 use argument_map::*;
-pub use compilation_options::*;
+
 pub use isograph_schema::*;
 pub use magic_mutation_fields::*;
 pub use merged::*;

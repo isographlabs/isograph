@@ -1,5 +1,5 @@
 use colored::Colorize;
-use isograph_schema::CompilerConfig;
+use isograph_config::CompilerConfig;
 use notify::{Error, RecommendedWatcher, RecursiveMode, Watcher};
 use notify_debouncer_full::{
     new_debouncer, DebounceEventResult, DebouncedEvent, Debouncer, FileIdMap,
