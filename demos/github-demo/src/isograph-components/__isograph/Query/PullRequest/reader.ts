@@ -1,10 +1,10 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
 import { PullRequest as resolver } from '../../../PullRequestRoute.tsx';
-import Query__Header, { ReadOutType as Query__Header__outputType } from '../Header/reader';
-import Query__PullRequestDetail, { ReadOutType as Query__PullRequestDetail__outputType } from '../PullRequestDetail/reader';
+import Query__Header, { Query__Header__outputType} from '../Header/reader';
+import Query__PullRequestDetail, { Query__PullRequestDetail__outputType} from '../PullRequestDetail/reader';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = (React.FC<any>);
+export type Query__PullRequest__outputType = (React.FC<any>);
 
 const readerAst: ReaderAst<Query__PullRequest__param> = [
   {
@@ -33,7 +33,7 @@ export type Query__PullRequest__param = { data:
 const artifact: ReaderArtifact<
   Query__PullRequest__param,
   Query__PullRequest__param,
-  ReadOutType
+  Query__PullRequest__outputType
 > = {
   kind: "ReaderArtifact",
   resolver: resolver as any,

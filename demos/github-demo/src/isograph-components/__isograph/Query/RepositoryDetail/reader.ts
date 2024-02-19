@@ -1,10 +1,10 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
 import { RepositoryDetail as resolver } from '../../../RepositoryDetail.tsx';
-import PullRequestConnection__PullRequestTable, { ReadOutType as PullRequestConnection__PullRequestTable__outputType } from '../../PullRequestConnection/PullRequestTable/reader';
-import Repository__RepositoryLink, { ReadOutType as Repository__RepositoryLink__outputType } from '../../Repository/RepositoryLink/reader';
+import PullRequestConnection__PullRequestTable, { PullRequestConnection__PullRequestTable__outputType} from '../../PullRequestConnection/PullRequestTable/reader';
+import Repository__RepositoryLink, { Repository__RepositoryLink__outputType} from '../../Repository/RepositoryLink/reader';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = (React.FC<any>);
+export type Query__RepositoryDetail__outputType = (React.FC<any>);
 
 const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
   {
@@ -92,7 +92,7 @@ export type Query__RepositoryDetail__param = { data:
 const artifact: ReaderArtifact<
   Query__RepositoryDetail__param,
   Query__RepositoryDetail__param,
-  ReadOutType
+  Query__RepositoryDetail__outputType
 > = {
   kind: "ReaderArtifact",
   resolver: resolver as any,

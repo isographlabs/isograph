@@ -1,9 +1,9 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
 import { Header as resolver } from '../../../header.tsx';
-import User__Avatar, { ReadOutType as User__Avatar__outputType } from '../../User/Avatar/reader';
+import User__Avatar, { User__Avatar__outputType} from '../../User/Avatar/reader';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = (React.FC<any>);
+export type Query__Header__outputType = (React.FC<any>);
 
 const readerAst: ReaderAst<Query__Header__param> = [
   {
@@ -41,7 +41,7 @@ export type Query__Header__param = { data:
 const artifact: ReaderArtifact<
   Query__Header__param,
   Query__Header__param,
-  ReadOutType
+  Query__Header__outputType
 > = {
   kind: "ReaderArtifact",
   resolver: resolver as any,

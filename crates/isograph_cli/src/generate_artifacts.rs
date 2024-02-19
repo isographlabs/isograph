@@ -1032,8 +1032,7 @@ fn write_query_types_from_selection(
                         match nested_resolver_imports.entry(resolver.type_and_field) {
                             Entry::Occupied(mut occupied) => {
                                 occupied.get_mut().types.push(ResolverImportType {
-                                    original: ResolverImportName("ReadOutType".to_string()),
-                                    alias: ResolverImportAlias(format!(
+                                    globally_unique_type_name: ResolverImportName(format!(
                                         "{}__outputType",
                                         resolver.type_and_field.underscore_separated()
                                     )),
@@ -1043,8 +1042,7 @@ fn write_query_types_from_selection(
                                 vacant.insert(ResolverImport {
                                     default_import: false,
                                     types: vec![ResolverImportType {
-                                        original: ResolverImportName("ReadOutType".to_string()),
-                                        alias: ResolverImportAlias(format!(
+                                        globally_unique_type_name: ResolverImportName(format!(
                                             "{}__outputType",
                                             resolver.type_and_field.underscore_separated()
                                         )),
@@ -1232,13 +1230,8 @@ pub(crate) struct ResolverImportName(pub String);
 derive_display!(ResolverImportName);
 
 #[derive(Debug)]
-pub(crate) struct ResolverImportAlias(pub String);
-derive_display!(ResolverImportAlias);
-
-#[derive(Debug)]
 pub struct ResolverImportType {
-    pub(crate) original: ResolverImportName,
-    pub(crate) alias: ResolverImportAlias,
+    pub(crate) globally_unique_type_name: ResolverImportName,
 }
 #[derive(Debug)]
 pub struct ResolverImport {

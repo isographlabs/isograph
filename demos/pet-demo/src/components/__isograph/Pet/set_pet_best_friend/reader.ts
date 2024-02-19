@@ -12,7 +12,7 @@ const resolver = (environment, artifact, readOutData, filteredVariables) => (mut
 
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = (params: any) => void;
+export type Pet__set_pet_best_friend__outputType = (params: any) => void;
 
 const readerAst: ReaderAst<Pet__set_pet_best_friend__param> = [
   {
@@ -33,7 +33,7 @@ export type ResolverReturnType = any;
 const artifact: ReaderArtifact<
   Pet__set_pet_best_friend__param,
   Pet__set_pet_best_friend__param,
-  ReadOutType
+  Pet__set_pet_best_friend__outputType
 > = {
   kind: "ReaderArtifact",
   resolver: resolver as any,

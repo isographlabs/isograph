@@ -3,7 +3,7 @@ import { makeNetworkRequest } from '@isograph/react';
 const resolver = (environment, artifact, variables) => () => makeNetworkRequest(environment, artifact, variables);
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = () => void;
+export type User____refetch__outputType = () => void;
 
 const readerAst: ReaderAst<User____refetch__param> = [
   {
@@ -24,7 +24,7 @@ export type ResolverReturnType = ReturnType<typeof resolver>;
 const artifact: ReaderArtifact<
   User____refetch__param,
   User____refetch__param,
-  ReadOutType
+  User____refetch__outputType
 > = {
   kind: "ReaderArtifact",
   resolver: resolver as any,

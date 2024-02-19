@@ -1,10 +1,10 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
 import { HomePage as resolver } from '../../../HomeRoute.tsx';
-import Query__Header, { ReadOutType as Query__Header__outputType } from '../Header/reader';
-import Query__HomePageList, { ReadOutType as Query__HomePageList__outputType } from '../HomePageList/reader';
+import Query__Header, { Query__Header__outputType} from '../Header/reader';
+import Query__HomePageList, { Query__HomePageList__outputType} from '../HomePageList/reader';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = (React.FC<any>);
+export type Query__HomePage__outputType = (React.FC<any>);
 
 const readerAst: ReaderAst<Query__HomePage__param> = [
   {
@@ -33,7 +33,7 @@ export type Query__HomePage__param = { data:
 const artifact: ReaderArtifact<
   Query__HomePage__param,
   Query__HomePage__param,
-  ReadOutType
+  Query__HomePage__outputType
 > = {
   kind: "ReaderArtifact",
   resolver: resolver as any,

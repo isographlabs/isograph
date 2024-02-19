@@ -2,7 +2,7 @@ import type {ReaderArtifact, ReaderAst} from '@isograph/react';
 import { PetSummaryCard as resolver } from '../../../PetSummaryCard.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type ReadOutType = (React.FC<any>);
+export type Pet__PetSummaryCard__outputType = (React.FC<any>);
 
 const readerAst: ReaderAst<Pet__PetSummaryCard__param> = [
   {
@@ -43,7 +43,7 @@ export type Pet__PetSummaryCard__param = { data:
 const artifact: ReaderArtifact<
   Pet__PetSummaryCard__param,
   Pet__PetSummaryCard__param,
-  ReadOutType
+  Pet__PetSummaryCard__outputType
 > = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
