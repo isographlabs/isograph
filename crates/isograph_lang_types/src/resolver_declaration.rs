@@ -1,5 +1,3 @@
-use std::fmt;
-
 use common_lang_types::{
     ConstExportName, FieldArgumentName, FieldNameOrAlias, HasName, IsographDirectiveName,
     LinkedFieldAlias, LinkedFieldName, ResolverDefinitionPath, ScalarFieldAlias, ScalarFieldName,
@@ -243,15 +241,6 @@ impl NonConstantValue {
             NonConstantValue::Variable(name) => format!("v_{}", name),
             // l for literal, i.e. this is shared with others
             NonConstantValue::Integer(int_value) => format!("l_{}", int_value),
-        }
-    }
-}
-
-impl fmt::Display for NonConstantValue {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            NonConstantValue::Variable(name) => write!(f, "${}", name),
-            NonConstantValue::Integer(int_value) => write!(f, "{}", int_value),
         }
     }
 }

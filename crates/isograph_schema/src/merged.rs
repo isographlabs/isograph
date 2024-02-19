@@ -200,6 +200,15 @@ pub struct MutationFieldResolverInfo {
 struct MergeTraversalState<'a> {
     resolver: &'a ValidatedSchemaResolver,
     paths_to_refetch_fields: Vec<(PathToRefetchField, ObjectId, ResolverVariant)>,
+    /// As we traverse selection sets, we need to keep track of the path we have
+    /// taken so far. This is because when we encounter a refetch query, we need
+    /// to take note of the path we took to reach that query, but continue
+    /// generating the merged selection set.
+    ///
+    /// Finally, once we have completed generating the merged selection set,
+    /// we re-traverse the paths to get the complete merged selection sets
+    /// needed for each refetch query. At this point, we have enough information
+    /// to generate the refetch query.
     current_path: PathToRefetchField,
     encountered_resolver_ids: &'a mut HashSet<ResolverFieldId>,
 }
@@ -218,15 +227,6 @@ impl<'a> MergeTraversalState<'a> {
     }
 }
 
-/// As we traverse selection sets, we need to keep track of the path we have
-/// taken so far. This is because when we encounter a refetch query, we need
-/// to take note of the path we took to reach that query, but continue
-/// generating the merged selection set.
-///
-/// Finally, once we have completed generating the merged selection set,
-/// we re-traverse the paths to get the complete merged selection sets
-/// needed for each refetch query. At this point, we have enough information
-/// to generate the refetch query.
 pub fn create_merged_selection_set(
     schema: &ValidatedSchema,
     parent_type: &ValidatedSchemaObject,
@@ -609,7 +609,7 @@ fn HACK_combine_name_and_variables_into_normalization_alias(
             alias_str.push_str(&format!(
                 "__{}_{}",
                 argument.item.name.item,
-                &argument.item.value.item.to_string()[1..]
+                &argument.item.value.item.to_alias_str_chunk()
             ));
         }
         alias_str.intern().into()
