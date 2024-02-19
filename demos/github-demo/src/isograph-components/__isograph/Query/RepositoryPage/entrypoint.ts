@@ -39,6 +39,8 @@ const queryText = 'query RepositoryPage ($repositoryName: String!, $repositoryOw
         },\
       },\
     },\
+    stargazerCount,\
+    viewerHasStarred,\
   },\
   viewer {\
     id,\
@@ -213,6 +215,16 @@ const normalizationAst: NormalizationAst = [
             ],
           },
         ],
+      },
+      {
+        kind: "Scalar",
+        fieldName: "stargazerCount",
+        arguments: null,
+      },
+      {
+        kind: "Scalar",
+        fieldName: "viewerHasStarred",
+        arguments: null,
       },
     ],
   },

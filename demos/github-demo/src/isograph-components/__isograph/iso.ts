@@ -19,6 +19,7 @@ import { Query__RepositoryPage__param } from './Query/RepositoryPage/reader'
 import { Query__UserDetail__param } from './Query/UserDetail/reader'
 import { Query__UserPage__param } from './Query/UserPage/reader'
 import { Repository__RepositoryLink__param } from './Repository/RepositoryLink/reader'
+import { Starrable__IsStarred__param } from './Starrable/IsStarred/reader'
 import { User__Avatar__param } from './User/Avatar/reader'
 import { User__RepositoryList__param } from './User/RepositoryList/reader'
 
@@ -115,6 +116,10 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Repository.RepositoryLink', T>
 ): IdentityWithParam<Repository__RepositoryLink__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Starrable.IsStarred', T>
+): IdentityWithParam<Starrable__IsStarred__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field User.Avatar', T>
