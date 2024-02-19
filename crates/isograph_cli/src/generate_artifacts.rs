@@ -747,7 +747,7 @@ pub(crate) struct ReaderArtifactInfo<'schema> {
     pub resolver_read_out_type: ResolverReadOutType,
     pub reader_ast: ReaderAst,
     pub resolver_parameter_type: ResolverParameterType,
-    pub resolver_return_type: ResolverReturnType,
+    pub resolver_return_type: Option<ResolverReturnType>,
     pub resolver_import_statement: ResolverImportStatement,
     pub resolver_variant: ResolverVariant,
 }
@@ -1623,7 +1623,9 @@ fn generate_read_out_type(resolver_definition: &ValidatedSchemaResolver) -> Reso
     match &resolver_definition.variant {
         variant => match variant {
             ResolverVariant::Component => ResolverReadOutType("(React.FC<any>)".to_string()),
-            ResolverVariant::Eager => ResolverReadOutType("ResolverReturnType".to_string()),
+            ResolverVariant::Eager => {
+                ResolverReadOutType("ReturnType<typeof resolver>".to_string())
+            }
             ResolverVariant::RefetchField => ResolverReadOutType("any".to_string()),
             ResolverVariant::MutationField(_) => ResolverReadOutType("any".to_string()),
         },
@@ -1632,13 +1634,14 @@ fn generate_read_out_type(resolver_definition: &ValidatedSchemaResolver) -> Reso
 
 fn generate_resolver_return_type_declaration(
     action_kind: &ResolverActionKind,
-) -> ResolverReturnType {
+) -> Option<ResolverReturnType> {
     match action_kind {
-        ResolverActionKind::NamedImport(_) | ResolverActionKind::RefetchField => {
-            ResolverReturnType("ReturnType<typeof resolver>".to_string())
-        }
+        ResolverActionKind::NamedImport(_) => None,
+        ResolverActionKind::RefetchField => Some(ResolverReturnType(
+            "ReturnType<typeof resolver>".to_string(),
+        )),
         // TODO what should this be
-        ResolverActionKind::MutationField(_) => ResolverReturnType("any".to_string()),
+        ResolverActionKind::MutationField(_) => Some(ResolverReturnType("any".to_string())),
     }
 }
 

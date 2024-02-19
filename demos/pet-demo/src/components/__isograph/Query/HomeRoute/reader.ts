@@ -40,9 +40,6 @@ export type Query__HomeRoute__param = { data:
 },
 [index: string]: any };
 
-// The type, when returned from the resolver
-export type ResolverReturnType = ReturnType<typeof resolver>;
-
 const artifact: ReaderArtifact<ReadFromStoreType, Query__HomeRoute__param, ReadOutType> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,

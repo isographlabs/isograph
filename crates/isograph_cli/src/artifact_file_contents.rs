@@ -63,6 +63,14 @@ impl<'schema> ReaderArtifactInfo<'schema> {
         );
         let read_out_type_text = get_read_out_type_text(resolver_read_out_type);
 
+        let resolver_return_type = match resolver_return_type {
+            Some(return_type) => format!(
+                "// The type, when returned from the resolver\n\
+                export type ResolverReturnType = {return_type};\n\n"
+            ),
+            None => "".to_string(),
+        };
+
         // We are not modeling this well, I think.
         let parent_name = parent_type.name;
         let variant = match resolver_variant {
@@ -80,8 +88,7 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             export type ReadFromStoreType = {reader_param_type};\n\n\
             const readerAst: ReaderAst<ReadFromStoreType> = {reader_ast};\n\n\
             export type {reader_param_type} = {resolver_parameter_type};\n\n\
-            // The type, when returned from the resolver\n\
-            export type ResolverReturnType = {resolver_return_type};\n\n\
+            {resolver_return_type}\
             const artifact: ReaderArtifact<ReadFromStoreType, {reader_param_type}, ReadOutType> = {{\n\
             {}kind: \"ReaderArtifact\",\n\
             {}resolver: resolver as any,\n\
@@ -178,5 +185,9 @@ fn write_resolver_import(
 }
 
 fn get_read_out_type_text(read_out_type: ResolverReadOutType) -> String {
-    format!("// the type, when read out (either via useLazyReference or via graph)\nexport type ReadOutType = {};", read_out_type)
+    format!(
+        "// the type, when read out (either via useLazyReference or via graph)\n\
+        export type ReadOutType = {};",
+        read_out_type
+    )
 }

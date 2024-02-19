@@ -45,9 +45,6 @@ export type Repository__RepositoryLink__param = { data:
 },
 [index: string]: any };
 
-// The type, when returned from the resolver
-export type ResolverReturnType = ReturnType<typeof resolver>;
-
 const artifact: ReaderArtifact<ReadFromStoreType, Repository__RepositoryLink__param, ReadOutType> = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
