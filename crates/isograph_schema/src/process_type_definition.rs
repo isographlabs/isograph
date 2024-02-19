@@ -1,5 +1,11 @@
 use std::collections::{hash_map::Entry, HashMap};
 
+use crate::{
+    DefinedField, EncounteredRootTypes, IsographObjectTypeDefinition, ProcessedRootTypes,
+    ResolverActionKind, ResolverTypeAndField, ResolverVariant, RootTypes, Schema, SchemaObject,
+    SchemaResolver, SchemaScalar, SchemaServerField, UnvalidatedObjectFieldInfo, UnvalidatedSchema,
+    UnvalidatedSchemaField, UnvalidatedSchemaResolver, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
+};
 use common_lang_types::{
     IsographObjectTypeName, Location, ObjectTypeName, ScalarTypeName, SelectableFieldName, Span,
     StringLiteralValue, UnvalidatedTypeName, WithLocation, WithSpan,
@@ -11,20 +17,13 @@ use graphql_lang_types::{
     RootOperationKind, TypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
+use isograph_config::ConfigOptions;
 use isograph_lang_types::{
     DefinedTypeId, ObjectId, ResolverFieldId, ScalarFieldSelection, Selection, ServerFieldId,
     ServerFieldSelection, ServerIdFieldId,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
-
-use crate::{
-    ConfigOptions, DefinedField, EncounteredRootTypes, IsographObjectTypeDefinition,
-    ProcessedRootTypes, ResolverActionKind, ResolverTypeAndField, ResolverVariant, RootTypes,
-    Schema, SchemaObject, SchemaResolver, SchemaScalar, SchemaServerField,
-    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
-    UnvalidatedSchemaResolver, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
-};
 
 lazy_static! {
     static ref QUERY_TYPE: IsographObjectTypeName = "Query".intern().into();

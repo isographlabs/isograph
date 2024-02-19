@@ -9,7 +9,7 @@ mod write_artifacts;
 
 use batch_compile::compile_and_print;
 use colored::Colorize;
-use isograph_api::create_config;
+use isograph_config::create_config;
 use opt::CliOptions;
 use structopt::StructOpt;
 use watch::handle_watch_command;

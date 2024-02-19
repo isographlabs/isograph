@@ -488,6 +488,7 @@ dependencies = [
  "graphql_lang_types",
  "graphql_schema_parser",
  "intern",
+ "isograph_config",
  "isograph_lang_parser",
  "isograph_lang_types",
  "isograph_schema",
@@ -497,11 +498,19 @@ dependencies = [
  "pathdiff",
  "pretty-duration",
  "regex",
- "serde",
- "serde_json",
  "structopt",
  "thiserror",
  "tokio",
+]
+
+[[package]]
+name = "isograph_config"
+version = "0.1.0"
+dependencies = [
+ "colorize",
+ "common_lang_types",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -534,6 +543,7 @@ dependencies = [
  "common_lang_types",
  "graphql_lang_types",
  "intern",
+ "isograph_config",
  "isograph_lang_types",
  "lazy_static",
  "thiserror",

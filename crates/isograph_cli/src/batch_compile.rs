@@ -9,12 +9,13 @@ use common_lang_types::{
 };
 use graphql_schema_parser::{parse_schema, parse_schema_extensions, SchemaParseError};
 use intern::string_key::Intern;
+use isograph_config::CompilerConfig;
 use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
 };
 use isograph_lang_types::{EntrypointTypeAndField, ResolverDeclaration};
 use isograph_schema::{
-    CompilerConfig, ProcessResolverDeclarationError, Schema, UnvalidatedSchema, ValidateSchemaError,
+    ProcessResolverDeclarationError, Schema, UnvalidatedSchema, ValidateSchemaError,
 };
 use pretty_duration::pretty_duration;
 use thiserror::Error;
