@@ -304,8 +304,19 @@ pub fn create_merged_selection_set(
                                 mutation_primary_field_name,
                                 mutation_field_arguments,
                                 filtered_mutation_field_arguments: _,
-                                requires_refinement,
+                                mutation_primary_field_return_type_object_id,
                             }) => {
+                                let requires_refinement =
+                                    if mutation_primary_field_return_type_object_id
+                                        == refetch_field_parent_id
+                                    {
+                                        RequiresRefinement::No
+                                    } else {
+                                        RequiresRefinement::Yes(
+                                            schema.schema_data.object(refetch_field_parent_id).name,
+                                        )
+                                    };
+
                                 artifact_queue.push(ArtifactQueueItem::MutationField(
                                     MutationFieldResolverInfo {
                                         merged_selection_set: nested_merged_selection_set,
@@ -584,7 +595,7 @@ fn merge_scalar_resolver_field(
         mutation_field_arguments,
         filtered_mutation_field_arguments,
         mutation_field_name: _,
-        requires_refinement,
+        mutation_primary_field_return_type_object_id,
     }) = &resolver_field.variant
     {
         merge_traversal_state.paths_to_refetch_fields.push((
@@ -595,7 +606,8 @@ fn merge_scalar_resolver_field(
                 mutation_primary_field_name: *mutation_primary_field_name,
                 mutation_field_arguments: mutation_field_arguments.clone(),
                 filtered_mutation_field_arguments: filtered_mutation_field_arguments.clone(),
-                requires_refinement: *requires_refinement,
+                mutation_primary_field_return_type_object_id:
+                    *mutation_primary_field_return_type_object_id,
             }),
         ));
     }

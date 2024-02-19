@@ -11,8 +11,7 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    magic_mutation_fields::RequiresRefinement, DefinedField, ResolverActionKind,
-    ResolverTypeAndField, SchemaResolver, UnvalidatedSchema,
+    DefinedField, ResolverActionKind, ResolverTypeAndField, SchemaResolver, UnvalidatedSchema,
 };
 
 impl UnvalidatedSchema {
@@ -153,9 +152,9 @@ pub enum ProcessResolverDeclarationError {
 pub struct MutationFieldResolverVariant {
     pub mutation_field_name: SelectableFieldName,
     pub mutation_primary_field_name: SelectableFieldName,
+    pub mutation_primary_field_return_type_object_id: ObjectId,
     pub mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
     pub filtered_mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
-    pub requires_refinement: RequiresRefinement,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

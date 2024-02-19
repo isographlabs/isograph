@@ -1,12 +1,13 @@
 use common_lang_types::{
-    DescriptionValue, DirectiveArgumentName, DirectiveName, EmbeddedLocation,
-    IsographObjectTypeName, Location, SelectableFieldName, Span, StringLiteralValue, TextSource,
-    ValueKeyName, WithEmbeddedLocation, WithLocation, WithSpan,
+    DirectiveArgumentName, DirectiveName, EmbeddedLocation, IsographObjectTypeName, Location,
+    SelectableFieldName, Span, StringLiteralValue, TextSource, ValueKeyName, WithEmbeddedLocation,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{ConstantValue, GraphQLDirective, GraphQLInputValueDefinition};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    DefinedTypeId, ObjectId, ScalarFieldSelection, Selection, ServerFieldId, ServerFieldSelection,
+    DefinedTypeId, ObjectId, ResolverFieldId, ScalarFieldSelection, Selection, ServerFieldId,
+    ServerFieldSelection,
 };
 
 use crate::{
@@ -142,29 +143,31 @@ impl UnvalidatedSchema {
                 .encountered_fields
                 .get(&path_selectable_field_name);
 
-            let (resolver_parent_object_id, maybe_abstract_parent_type_name) = match primary_field {
-                Some(DefinedField::ServerField(server_field)) => {
-                    // This is the parent type name (Pet)
-                    let inner = server_field.inner();
+            let (maybe_abstract_parent_object_id, maybe_abstract_parent_type_name) =
+                match primary_field {
+                    Some(DefinedField::ServerField(server_field)) => {
+                        // This is the parent type name (Pet)
+                        let inner = server_field.inner();
 
-                    // TODO validate that the payload object has no plural fields in between
+                        // TODO validate that the payload object has no plural fields in between
 
-                    let primary_type = self.schema_data.defined_types.get(inner).clone();
+                        let primary_type = self.schema_data.defined_types.get(inner).clone();
 
-                    if let Some(DefinedTypeId::Object(resolver_parent_object_id)) = primary_type {
-                        Ok((*resolver_parent_object_id, *inner))
-                    } else {
-                        Err(WithLocation::new(
-                            ProcessTypeDefinitionError::InvalidMutationField,
-                            Location::generated(),
-                        ))
+                        if let Some(DefinedTypeId::Object(resolver_parent_object_id)) = primary_type
+                        {
+                            Ok((*resolver_parent_object_id, *inner))
+                        } else {
+                            Err(WithLocation::new(
+                                ProcessTypeDefinitionError::InvalidMutationField,
+                                Location::generated(),
+                            ))
+                        }
                     }
-                }
-                _ => Err(WithLocation::new(
-                    ProcessTypeDefinitionError::InvalidMutationField,
-                    Location::generated(),
-                )),
-            }?;
+                    _ => Err(WithLocation::new(
+                        ProcessTypeDefinitionError::InvalidMutationField,
+                        Location::generated(),
+                    )),
+                }?;
 
             let fields = processed_field_map_items
                 .iter()
@@ -193,104 +196,76 @@ impl UnvalidatedSchema {
                 })
                 .collect::<Vec<_>>();
 
-            let mut object_ids = vec![(resolver_parent_object_id, RequiresRefinement::No)];
-            if let Some(subtypes) = supertype_to_subtype_map.get(&resolver_parent_object_id) {
-                object_ids.extend(subtypes.into_iter().map(|object_id| {
-                    (
-                        *object_id,
-                        // TODO we should store this information on object_ids to begin with...
-                        // we probably have it already
-                        RequiresRefinement::Yes(self.schema_data.object(*object_id).name),
-                    )
-                }));
-            }
-
-            for (object_id, requires_refinement) in object_ids {
-                self.create_magic_mutation_field_on_object(
-                    &fields,
-                    description,
-                    magic_mutation_field_name,
-                    path_selectable_field_name,
-                    &mutation_field_arguments,
-                    &mutation_field_args_without_id,
-                    // This is not ideal. This causes us to import the concrete mutation field reader
-                    // in the generated reader for the parent reader, meaning that multiple different
-                    // concrete types using the same (abstract) mutation field will import separate,
-                    // effectively identical readers (e.g. Repository/addStar/reader and
-                    // Topic/addStar/reader). If we import the abstract one, that would be more efficient.
-                    //
-                    // However, we do not mark the abstract one as "reached" if it is reached on a concrete
-                    // object, and thus don't generate a reader artifact (e.g. Starrable/addStar/reader)
-                    // for the abstract mutation field.
-                    if let RequiresRefinement::Yes(concrete_type_to_refine_to) = requires_refinement
-                    {
-                        concrete_type_to_refine_to
-                    } else {
-                        // TODO make this zero cost
-                        maybe_abstract_parent_type_name.lookup().intern().into()
+            let magic_mutation_field_resolver_id = self.resolvers.len().into();
+            let magic_mutation_field_resolver = SchemaResolver {
+                description,
+                // set_pet_best_friend
+                name: magic_mutation_field_name,
+                id: magic_mutation_field_resolver_id,
+                selection_set_and_unwraps: Some((fields.to_vec(), vec![])),
+                variant: ResolverVariant::MutationField(MutationFieldResolverVariant {
+                    mutation_field_name: magic_mutation_field_name,
+                    mutation_primary_field_name: path_selectable_field_name,
+                    mutation_field_arguments: mutation_field_arguments.to_vec(),
+                    filtered_mutation_field_arguments: mutation_field_args_without_id.to_vec(),
+                    mutation_primary_field_return_type_object_id: maybe_abstract_parent_object_id,
+                }),
+                variable_definitions: vec![],
+                type_and_field: ResolverTypeAndField {
+                    // TODO make this zero cost?
+                    type_name: maybe_abstract_parent_type_name.lookup().intern().into(), // e.g. Pet
+                    field_name: magic_mutation_field_name, // set_pet_best_friend
+                },
+                parent_object_id: maybe_abstract_parent_object_id,
+                action_kind: ResolverActionKind::MutationField(
+                    MutationFieldResolverActionKindInfo {
+                        // TODO don't clone
+                        field_map: field_map_items.to_vec(),
                     },
-                    object_id,
-                    field_map_items,
-                    payload_object_name,
-                    requires_refinement,
-                )?;
+                ),
+            };
+            self.resolvers.push(magic_mutation_field_resolver);
+
+            self.insert_resolver_field_on_object(
+                magic_mutation_field_name,
+                maybe_abstract_parent_object_id,
+                magic_mutation_field_resolver_id,
+                payload_object_name,
+            )?;
+
+            if let Some(subtypes) = supertype_to_subtype_map.get(&maybe_abstract_parent_object_id) {
+                for subtype_object_id in subtypes {
+                    self.insert_resolver_field_on_object(
+                        magic_mutation_field_name,
+                        *subtype_object_id,
+                        magic_mutation_field_resolver_id,
+                        payload_object_name,
+                    )?;
+                }
             }
         }
         Ok(())
     }
 
-    // TODO clean up these arguments!!
-    fn create_magic_mutation_field_on_object(
+    // TODO this should be defined elsewhere, probably
+    fn insert_resolver_field_on_object(
         &mut self,
-        fields: &[WithSpan<Selection<(), ()>>],
-        description: Option<DescriptionValue>,
         magic_mutation_field_name: SelectableFieldName,
-        path_selectable_field_name: SelectableFieldName,
-        mutation_field_arguments: &[WithLocation<GraphQLInputValueDefinition>],
-        mutation_field_args_without_id: &[WithLocation<GraphQLInputValueDefinition>],
-        parent_object_type_name: IsographObjectTypeName,
         resolver_parent_object_id: ObjectId,
-        field_map_items: &[FieldMapItem],
+        resolver_id: ResolverFieldId,
         payload_object_name: IsographObjectTypeName,
-        requires_refinement: RequiresRefinement,
     ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
-        let next_resolver_id = self.resolvers.len().into();
-
-        self.resolvers.push(SchemaResolver {
-            description,
-            // set_pet_best_friend
-            name: magic_mutation_field_name,
-            id: next_resolver_id,
-            selection_set_and_unwraps: Some((fields.to_vec(), vec![])),
-            variant: ResolverVariant::MutationField(MutationFieldResolverVariant {
-                mutation_field_name: magic_mutation_field_name,
-                mutation_primary_field_name: path_selectable_field_name,
-                mutation_field_arguments: mutation_field_arguments.to_vec(),
-                filtered_mutation_field_arguments: mutation_field_args_without_id.to_vec(),
-                requires_refinement,
-            }),
-            variable_definitions: vec![],
-            type_and_field: ResolverTypeAndField {
-                // TODO make this zero cost?
-                type_name: parent_object_type_name,    // e.g. Pet
-                field_name: magic_mutation_field_name, // set_pet_best_friend
-            },
-            parent_object_id: resolver_parent_object_id,
-            action_kind: ResolverActionKind::MutationField(MutationFieldResolverActionKindInfo {
-                // TODO don't clone
-                field_map: field_map_items.to_vec(),
-            }),
-        });
         let resolver_parent = self.schema_data.object_mut(resolver_parent_object_id);
         if resolver_parent
             .encountered_fields
             .insert(
                 magic_mutation_field_name,
-                DefinedField::ResolverField(next_resolver_id),
+                DefinedField::ResolverField(resolver_id),
             )
             .is_some()
         {
             return Err(WithLocation::new(
+                // TODO use a more generic error message when making this
                 ProcessTypeDefinitionError::MutationFieldIsDuplicate {
                     field_name: magic_mutation_field_name,
                     parent_type: payload_object_name,
@@ -299,7 +274,7 @@ impl UnvalidatedSchema {
                 Location::generated(),
             ));
         }
-        resolver_parent.resolvers.push(next_resolver_id);
+        resolver_parent.resolvers.push(resolver_id);
 
         Ok(())
     }
