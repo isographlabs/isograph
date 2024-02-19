@@ -1626,8 +1626,10 @@ fn generate_read_out_type(resolver_definition: &ValidatedSchemaResolver) -> Reso
             ResolverVariant::Eager => {
                 ResolverReadOutType("ReturnType<typeof resolver>".to_string())
             }
-            ResolverVariant::RefetchField => ResolverReadOutType("any".to_string()),
-            ResolverVariant::MutationField(_) => ResolverReadOutType("any".to_string()),
+            ResolverVariant::RefetchField => ResolverReadOutType("() => void".to_string()),
+            ResolverVariant::MutationField(_) => {
+                ResolverReadOutType("(params: any) => void".to_string())
+            }
         },
     }
 }
