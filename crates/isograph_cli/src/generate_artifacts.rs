@@ -561,7 +561,7 @@ fn generate_entrypoint_artifact<'schema>(
                 .object(schema.query_type_id.expect("expect query type to exist"))
                 .into(),
             selection_set,
-            artifact_queue,
+            Some(artifact_queue),
             encountered_resolvers_ids,
             &top_level_resolver,
         );
@@ -612,8 +612,8 @@ fn generate_reader_artifact<'schema>(
                 .object(schema.query_type_id.expect("expect query type to exist"))
                 .into(),
             selection_set,
+            None,
             // TODO this is obviously a smell
-            &mut vec![],
             &mut HashSet::new(),
             resolver,
         );
