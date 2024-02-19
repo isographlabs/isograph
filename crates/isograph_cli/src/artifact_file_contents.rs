@@ -17,16 +17,16 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             query_name,
             parent_type,
         } = self;
-        let entrypoint_params_typename = format!("{}__{}", parent_type.name, query_name);
+        let entrypoint_params_typename = format!("{}__{}__param", parent_type.name, query_name);
         format!(
             "import type {{IsographEntrypoint, \
             NormalizationAst, RefetchQueryArtifactWrapper}} from '@isograph/react';\n\
-            import type {{ReadFromStoreType, {entrypoint_params_typename}__param, ReadOutType}} from './reader';\n\
+            import type {{{entrypoint_params_typename}, ReadOutType}} from './reader';\n\
             import readerResolver from './reader';\n\
             {refetch_query_artifact_import}\n\n\
             const queryText = '{query_text}';\n\n\
             const normalizationAst: NormalizationAst = {normalization_ast};\n\
-            const artifact: IsographEntrypoint<ReadFromStoreType, {entrypoint_params_typename}__param, ReadOutType> = {{\n\
+            const artifact: IsographEntrypoint<{entrypoint_params_typename}, {entrypoint_params_typename}, ReadOutType> = {{\n\
             {}kind: \"Entrypoint\",\n\
             {}queryText,\n\
             {}normalizationAst,\n\
