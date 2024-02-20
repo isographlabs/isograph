@@ -18,6 +18,7 @@ import {
 } from './IsographEnvironment';
 import { useEffect, useState } from 'react';
 
+export { type PromiseWrapper } from './PromiseWrapper';
 export { makeNetworkRequest, subscribe } from './cache';
 export {
   IsographEnvironmentContext,
@@ -35,6 +36,8 @@ export {
   createIsographEnvironment,
   createIsographStore,
 } from './IsographEnvironment';
+export { useImperativeReference } from './useImperativeReference';
+export { EntrypointReader } from './EntrypointReader';
 
 // This type should be treated as an opaque type.
 export type IsographEntrypoint<
@@ -203,11 +206,11 @@ function assertIsEntrypoint<
   if (typeof value === 'function') throw new Error('Not a string');
 }
 
-type ExtractReadFromStore<Type> =
+export type ExtractReadFromStore<Type> =
   Type extends IsographEntrypoint<infer X, any, any> ? X : never;
-type ExtractResolverProps<Type> =
+export type ExtractResolverProps<Type> =
   Type extends IsographEntrypoint<any, infer X, any> ? X : never;
-type ExtractResolverResult<Type> =
+export type ExtractResolverResult<Type> =
   Type extends IsographEntrypoint<any, any, infer X> ? X : never;
 // Note: we cannot write TEntrypoint extends IsographEntrypoint<any, any, any>, or else
 // if we do not explicitly pass a type, the read out type will be any.
@@ -217,7 +220,7 @@ export function useLazyReference<TEntrypoint>(
   entrypoint:
     | TEntrypoint
     // Temporarily, we need to allow useLazyReference to take the result of calling
-    // iso`...`. At runtime, we confirm that the passed-in `iso` literal is actually
+    // iso(`...`). At runtime, we confirm that the passed-in `iso` literal is actually
     // an entrypoint.
     | ((_: any) => any),
   variables: { [key: string]: Variable },
