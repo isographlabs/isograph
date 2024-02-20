@@ -1,5 +1,24 @@
 # Backlog
 
+## Top mid-term runtime priorities
+
+- preloaded queries w/dispose
+- garbage collection & retention
+- subscriptions & granular rerendering
+
+## Top mid-term compiler/syntax priorities
+
+- Support for selecting arbitrary mutation fields
+- Support for adding/removing fields from mutation field selections
+- @exposeAs
+- asFoo typecast linked fields
+  - Or syntax: bar: `as Foo { ... }`? This can always be added on afterward after some thought.
+
+## Top implementation detail priorities
+
+- serde deserializer for ConstantValue
+- enable unit tests for react-disposable-state
+
 ## V2 release
 
 - network error handling
@@ -9,8 +28,6 @@
 - cleanup types
 - error handling
 - validate no unknown directives left over
-- exposeAs as param
-  - use serde for this?
 - Handle unions etc. correctly
 - Special fields (or syntax?) for type casts (i.e. type refinement)
 
@@ -37,7 +54,6 @@
 
 ## Cleanup backlog
 
-- only generate resolvers if they're reachable. Maybe warn if user-created resolvers are not reachable.
 - Typegen code is a mess
   - Rename ResolverParameterType to TypeNameFieldNameParameter or something
 - JS code needs structure, etc.
@@ -103,6 +119,7 @@ set_foo {
 - Pagination
 - Compile to non-GraphQL
 - Actually validate variables
+- Typegen for types of component's other props, somehow. Maybe have a second param that is typed.
 - Persisted queries
 - Strongly typed ID fields
 - Custom normalizers
@@ -111,7 +128,6 @@ set_foo {
 - Lazy normalization ASTs
 - Fetching off of typed IDs
 - Stateful resolvers
-- Compiler executable for ~Mac~/Windows/~Linux~
 - Unit tests
 - E2E tests
 - Network request errors
@@ -142,7 +158,6 @@ set_foo {
 - Injectable code for @component
   - Structure the compiler such that the injectable code can live in the React-specific CLI layer
 - Isograph dev tools
-- Experiment with context and JSX for @component
 - Vue/Svelte/etc. integration
 - Compile compiler to Wasm
 - IR explorer
@@ -152,12 +167,8 @@ set_foo {
 - Statically prune inaccessible branches
 - TypeScript errors in emitted artifacts
 - Better repr. of nullable types in compiler
-- Babel integration for iso literal values
-- Typescript integration for type inference of iso literals
 - Parallelize artifact gen
 - Rationalize WithSpan vs WithLocation
-- Display multiple errors, parse etc. in parallel
-- Do not look in artifact_directory, if project_root contains artifact_directory
 - Can we make the babel transform export the iso literal if no export is found?? Probably!
   - What about unit tests? Should they be able to import these? Maybe? But probably only through Isograph, right?
 - SWC plugin
@@ -167,3 +178,4 @@ set_foo {
 - periodic refetch (live queries)
 - router example and integration
 - directive on scalar that affects the JS representation of scalars
+- ability to pass a parameter down to the child, e.g. an abstract component can read from its concrete parent an object that implements a given interface. e.g. in order to implement Node, you must implement an id field.
