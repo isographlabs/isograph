@@ -1,5 +1,6 @@
 import type {ReaderArtifact, ReaderAst} from '@isograph/react';
 import { PetSummaryCard as resolver } from '../../../PetSummaryCard.tsx';
+import Pet__FavoritePhraseLoader, { Pet__FavoritePhraseLoader__outputType} from '../FavoritePhraseLoader/reader';
 
 // the type, when read out (either via useLazyReference or via graph)
 export type Pet__PetSummaryCard__outputType = (React.FC<any>);
@@ -29,6 +30,13 @@ const readerAst: ReaderAst<Pet__PetSummaryCard__param> = [
     alias: null,
     arguments: null,
   },
+  {
+    kind: "Resolver",
+    alias: "FavoritePhraseLoader",
+    arguments: null,
+    readerArtifact: Pet__FavoritePhraseLoader,
+    usedRefetchQueries: [],
+  },
 ];
 
 export type Pet__PetSummaryCard__param = { data:
@@ -37,6 +45,7 @@ export type Pet__PetSummaryCard__param = { data:
   name: string,
   picture: string,
   tagline: string,
+  FavoritePhraseLoader: Pet__FavoritePhraseLoader__outputType,
 },
 [index: string]: any };
 

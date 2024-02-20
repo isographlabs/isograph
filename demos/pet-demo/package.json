@@ -13,6 +13,7 @@
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "@isograph/react": "*",
+    "@isograph/react-disposable-state": "*",
     "@mui/material": "^5.14.8",
     "@types/node": "20.6.0",
     "@types/react": "18.2.21",
