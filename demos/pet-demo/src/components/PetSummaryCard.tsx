@@ -12,14 +12,11 @@ export const PetSummaryCard = iso(`
   }
 `)(function PetSummaryCardComponent(props) {
   return (
-    <Card
-      variant="outlined"
-      sx={{ width: 450, boxShadow: 3, cursor: 'pointer' }}
-    >
+    <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
       <CardContent>
         <Stack direction="row" spacing={4}>
           <Avatar
-            sx={{ height: 100, width: 100 }}
+            sx={{ height: 100, width: 100, cursor: 'pointer' }}
             src={props.data.picture}
             onClick={() =>
               props.navigateTo({ kind: 'PetDetail', id: props.data.id })
