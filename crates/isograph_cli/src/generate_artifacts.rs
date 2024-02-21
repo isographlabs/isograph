@@ -215,11 +215,7 @@ fn sort_field_name(field_1: SelectableFieldName, field_2: SelectableFieldName) -
 }
 
 fn sorted_client_defined_fields(schema: &ValidatedSchema) -> Vec<&ValidatedSchemaResolver> {
-    let mut fields = schema
-        .resolvers
-        .iter()
-        .filter(|resolver| matches!(resolver.action_kind, ResolverActionKind::NamedImport(_)))
-        .collect::<Vec<_>>();
+    let mut fields = client_defined_fields(schema).collect::<Vec<_>>();
     fields.sort_by(|resolver_1, resolver_2| {
         match resolver_1
             .type_and_field
@@ -235,6 +231,15 @@ fn sorted_client_defined_fields(schema: &ValidatedSchema) -> Vec<&ValidatedSchem
         }
     });
     fields
+}
+
+fn client_defined_fields<'a>(
+    schema: &'a ValidatedSchema,
+) -> impl Iterator<Item = &'a ValidatedSchemaResolver> + 'a {
+    schema
+        .resolvers
+        .iter()
+        .filter(|resolver| matches!(resolver.action_kind, ResolverActionKind::NamedImport(_)))
 }
 
 fn get_artifact_path_and_contents<'schema>(
@@ -256,6 +261,12 @@ fn get_artifact_path_and_contents<'schema>(
 ///   - a refetch field/magic mutation field, add it to the queue
 /// Keep processing artifacts until the queue is empty.
 ///
+/// We *also* need to generate all (type) artifacts for all client-defined resolvers,
+/// (i.e. including unreachable ones), because they are referenced in iso.ts.
+/// So we separately add those to the encountered_resolvers_ids set and generate full
+/// artifacts. In the future, we should just generate types for these resolvers, not
+/// readers, etc.
+///
 /// TODO The artifact queue abstraction doesn't make much sense here.
 fn get_artifact_infos<'schema>(
     schema: &'schema ValidatedSchema,
@@ -276,6 +287,23 @@ fn get_artifact_infos<'schema>(
 
         // We also need to generate reader artifacts for the entrypoint resolvers themselves
         encountered_resolvers_ids.insert(*resolver_field_id);
+    }
+
+    for client_defined_field in client_defined_fields(schema) {
+        if encountered_resolvers_ids.insert(client_defined_field.id) {
+            // What are we doing here?
+            // We are generating, and throwing away, an entrypoint artifact. This has the effect of
+            // encountering selected __refetch fields. Refetch fields reachable from orphaned
+            // client fields still need reader (well... type) artifacts generated.
+            //
+            // Anyway, this sucks and should be improved.
+            let _ = generate_entrypoint_artifact(
+                schema,
+                client_defined_field.id,
+                &mut vec![],
+                &mut encountered_resolvers_ids,
+            );
+        }
     }
 
     for encountered_resolver_id in encountered_resolvers_ids {
