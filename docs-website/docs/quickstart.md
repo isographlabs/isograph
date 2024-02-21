@@ -46,13 +46,17 @@ The `artifact_directory` field is optional, and defaults to the `project_root`. 
 
 ## Add aliases to `tsconfig.json`
 
-Add two aliases to your `tsconfig.json`. These alias should point to `artifact_directory`, followed by `__isograph/*` and `__isograph/iso.ts`. Example:
+Add two aliases to your `tsconfig.json`'s `compilerOptions` field. These alias should point to `artifact_directory`, followed by `__isograph/*` and `__isograph/iso.ts`. Here is a snippet of a `tsconfig` showing the `paths` field, correctly set up for this quickstart:
 
 ```json
-"paths": {
-  "@iso/*": ["./src/components/__isograph/*"],
-  "@iso": ["./src/components/__isograph/iso.ts"]
-},
+{
+  "compilerOptions": {
+    "paths": {
+      "@iso/*": ["./src/components/__isograph/*"],
+      "@iso": ["./src/components/__isograph/iso.ts"]
+    }
+  }
+}
 ```
 
 :::note
