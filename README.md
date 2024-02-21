@@ -2,7 +2,7 @@
 
 The framework for teams that move fast — without breaking things.
 
-- Read the [docs](https://isograph.dev/docs/), especially the [quickstart guide](https://isograph.dev/docs/quickstart/).
+- Read the [docs](https://isograph.dev/docs/introduction), especially the [quickstart guide](https://isograph.dev/docs/quickstart/).
 - Watch the [talk at GraphQL Conf](https://www.youtube.com/watch?v=gO65JJRqjuc).
 - Join the [Discord](https://discord.gg/kDCcN3EDR6).
 - [Follow the official Twitter account](https://twitter.com/isographlabs).
