@@ -546,6 +546,7 @@ dependencies = [
  "isograph_config",
  "isograph_lang_types",
  "lazy_static",
+ "serde",
  "thiserror",
 ]
 

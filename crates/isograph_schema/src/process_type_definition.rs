@@ -938,4 +938,7 @@ pub enum ProcessTypeDefinitionError {
 
     #[error("Root types must be objects. This type is a scalar.")]
     RootTypeMustBeObject,
+
+    #[error("Failed to deserialize from Serde ")]
+    FailedToDeserialize,
 }

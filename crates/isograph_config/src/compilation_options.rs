@@ -185,3 +185,9 @@ fn create_optional_validation_level(
         ConfigFileOptionalValidationLevel::Error => OptionalValidationLevel::Error,
     }
 }
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Foo {
+    bar: String,
+}
