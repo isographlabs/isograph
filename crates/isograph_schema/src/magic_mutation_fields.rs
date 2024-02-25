@@ -1,15 +1,23 @@
+use std::marker::PhantomData;
+
 use common_lang_types::{
     DirectiveArgumentName, DirectiveName, IsographObjectTypeName, Location, SelectableFieldName,
     Span, StringLiteralValue, ValueKeyName, WithEmbeddedLocation, WithLocation, WithSpan,
 };
-use graphql_lang_types::{ConstantValue, GraphQLDirective, GraphQLInputValueDefinition};
+use graphql_lang_types::{
+    ConstantValue, GraphQLDirective, GraphQLInputValueDefinition, NameValuePair, ValueType,
+};
 use intern::{string_key::Intern, Lookup};
+use isograph_config::ConfigOptions;
 use isograph_lang_types::{
     ClientFieldId, DefinedTypeId, ObjectId, ScalarFieldSelection, Selection, ServerFieldId,
     ServerFieldSelection,
 };
-
-use isograph_config::ConfigOptions;
+use serde::de::value::SeqDeserializer;
+use serde::de::MapAccess;
+use serde::de::{self, IntoDeserializer};
+use serde::Deserialize;
+use serde::{self, Deserializer};
 
 use crate::{
     ArgumentMap, DefinedField, FieldMapItem, MutationFieldResolverActionKindInfo,
@@ -27,11 +35,21 @@ lazy_static! {
     static ref FROM_VALUE_KEY_NAME: ValueKeyName = "from".intern().into();
     static ref TO_VALUE_KEY_NAME: ValueKeyName = "to".intern().into();
 }
-
+#[derive(Deserialize, Eq, PartialEq, Debug)]
 pub struct MagicMutationFieldInfo {
+    #[serde(deserialize_with = "deserialize_stringliteral")]
     path: StringLiteralValue,
     field_map: Vec<FieldMapItem>,
+    #[serde(deserialize_with = "deserialize_stringliteral")]
     field: StringLiteralValue,
+}
+
+fn deserialize_stringliteral<'de, D>(deserializer: D) -> Result<StringLiteralValue, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = String::deserialize(deserializer)?;
+    Ok(StringLiteralValue::from(value.intern()))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -495,4 +513,305 @@ fn skip_arguments_contained_in_field_map(
         argument_map.into_arguments(schema, options),
         processed_field_map_items,
     ))
+}
+
+#[derive(Debug)]
+struct GraphQLDirectiveDeserializer<'a> {
+    directive: &'a GraphQLDirective<ConstantValue>,
+}
+fn from_graph_ql_directive<'a, T: Deserialize<'a>>(
+    directive: &'a GraphQLDirective<ConstantValue>,
+) -> ProcessTypeDefinitionResult<T> {
+    T::deserialize(GraphQLDirectiveDeserializer { directive })
+        .map_err(|err| WithLocation::new(err, Location::generated()))
+}
+
+impl de::Error for ProcessTypeDefinitionError {
+    fn custom<T>(msg: T) -> Self
+    where
+        T: core::fmt::Display,
+    {
+        ProcessTypeDefinitionError::FailedToDeserialize(msg.to_string())
+    }
+}
+
+impl<'a, 'de> Deserializer<'de> for GraphQLDirectiveDeserializer<'a> {
+    type Error = ProcessTypeDefinitionError;
+
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        visitor.visit_map(NameValuePairVec {
+            arguments: self.directive.arguments.clone(),
+            field_idx: 0,
+            marker: PhantomData,
+        })
+    }
+
+    serde::forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+        bytes byte_buf option unit unit_struct newtype_struct seq tuple
+        tuple_struct map struct enum identifier ignored_any
+    }
+}
+#[derive(Debug)]
+struct GraphQLDirectiveMapAccess<'a> {
+    directive: &'a GraphQLDirective<ConstantValue>,
+    field_idx: usize,
+}
+
+struct NameValuePairVec<'a, T> {
+    arguments: Vec<NameValuePair<T, ConstantValue>>,
+    field_idx: usize,
+    marker: PhantomData<&'a ()>,
+}
+
+impl<'a, 'de, T: ToString> MapAccess<'de> for NameValuePairVec<'a, T> {
+    type Error = ProcessTypeDefinitionError;
+
+    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
+    where
+        K: de::DeserializeSeed<'de>,
+    {
+        print!("Deserializing field at idx {}", self.field_idx);
+        if let Some(name_value_pair) = self.arguments.get(self.field_idx) {
+            return seed
+                .deserialize(NameSerializer { name_value_pair })
+                .map(Some);
+        }
+        Ok(None)
+    }
+
+    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::DeserializeSeed<'de>,
+    {
+        match self.arguments.get(self.field_idx) {
+            Some(name_value_pair) => {
+                self.field_idx += 1;
+                seed.deserialize(ValueSerializer { name_value_pair })
+            }
+            _ => Err(ProcessTypeDefinitionError::FailedToDeserialize(format!(
+                "Called deserialization of field value for a field with idx {} that doesn't exist",
+                self.field_idx
+            ))),
+        }
+    }
+}
+
+// impl<'a, 'de> MapAccess<'de> for GraphQLDirectiveMapAccess<'a> {
+//     type Error = ProcessTypeDefinitionError;
+
+//     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
+//     where
+//         K: de::DeserializeSeed<'de>,
+//     {
+//         if let Some(name_value_pair) = self.directive.arguments.get(self.field_idx) {
+//             return seed
+//                 .deserialize(NameSerializer { name_value_pair })
+//                 .map(Some);
+//         }
+//         Ok(None)
+//     }
+
+//     fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
+//     where
+//         V: de::DeserializeSeed<'de>,
+//     {
+//         match self.directive.arguments.get(self.field_idx) {
+//             Some(name_value_pair) => seed.deserialize(ValueSerializer { name_value_pair }),
+//             _ => Err(ProcessTypeDefinitionError::FailedToDeserialize(format!(
+//                 "Called deserialization of field value for a field with idx {} that doesn't exist",
+//                 self.field_idx
+//             ))),
+//         }
+//     }
+// }
+
+struct NameSerializer<'a, TName, TValue: ValueType> {
+    name_value_pair: &'a NameValuePair<TName, TValue>,
+}
+
+struct ValueSerializer<'a, TName, TValue: ValueType> {
+    name_value_pair: &'a NameValuePair<TName, TValue>,
+}
+
+impl<'a, 'de, TName: ToString, TValue: ValueType> Deserializer<'de>
+    for NameSerializer<'a, TName, TValue>
+{
+    type Error = ProcessTypeDefinitionError;
+
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        visitor.visit_string(self.name_value_pair.name.item.to_string())
+    }
+
+    fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        visitor.visit_string(self.name_value_pair.name.item.to_string())
+    }
+
+    serde::forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+        bytes byte_buf option unit unit_struct newtype_struct seq tuple
+        tuple_struct map struct enum ignored_any
+    }
+}
+
+pub struct ConstantValueDeserializer<'de> {
+    value: ConstantValue,
+    marker: PhantomData<&'de ()>,
+}
+
+impl<'de> IntoDeserializer<'de, ProcessTypeDefinitionError> for ConstantValue {
+    type Deserializer = ConstantValueDeserializer<'de>;
+
+    fn into_deserializer(self) -> Self::Deserializer {
+        ConstantValueDeserializer {
+            value: self,
+            marker: PhantomData,
+        }
+    }
+}
+
+impl<'a, 'de> Deserializer<'de> for ConstantValueDeserializer<'de> {
+    type Error = ProcessTypeDefinitionError;
+
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self.value {
+            ConstantValue::Boolean(bool) => visitor.visit_bool(bool),
+            ConstantValue::Enum(enum_literal) => visitor.visit_string(enum_literal.to_string()),
+            ConstantValue::Float(float_value) => visitor.visit_f64(float_value.as_float()),
+            ConstantValue::Int(i_64) => visitor.visit_i64(i_64),
+            ConstantValue::String(string) => visitor.visit_string(string.to_string()),
+            ConstantValue::Null => visitor.visit_none(),
+            ConstantValue::List(seq) => {
+                let values: Vec<ConstantValue> = seq.into_iter().map(|entry| entry.item).collect();
+                let seq_access = SeqDeserializer::new(values.into_iter());
+                visitor.visit_seq(seq_access)
+            }
+            ConstantValue::Object(obj) => {
+                let serializer = NameValuePairVec {
+                    arguments: obj,
+                    field_idx: 0,
+                    marker: PhantomData,
+                };
+                visitor.visit_map(serializer)
+            }
+        }
+    }
+
+    serde::forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+        bytes byte_buf option unit unit_struct newtype_struct seq tuple
+        tuple_struct map struct enum ignored_any identifier
+    }
+}
+
+impl<'a, 'de, TName> Deserializer<'de> for ValueSerializer<'a, TName, ConstantValue> {
+    type Error = ProcessTypeDefinitionError;
+
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        let deserializer = ConstantValueDeserializer {
+            value: self.name_value_pair.value.item.clone(),
+            marker: PhantomData,
+        };
+        deserializer.deserialize_any(visitor)
+    }
+
+    serde::forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+        bytes byte_buf option unit unit_struct newtype_struct seq tuple
+        tuple_struct map struct enum ignored_any identifier
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    use common_lang_types::TextSource;
+    use graphql_lang_types::{
+        ConstantValue, GraphQLDirective, GraphQLTypeSystemExtension,
+        GraphQLTypeSystemExtensionOrDefinition,
+    };
+    use graphql_schema_parser::*;
+    use intern::string_key::Intern;
+    use std::error::Error;
+
+    fn unwrap_directive(
+        extension_or_definition: GraphQLTypeSystemExtensionOrDefinition,
+    ) -> Result<Vec<GraphQLDirective<ConstantValue>>, Box<dyn Error>> {
+        if let GraphQLTypeSystemExtensionOrDefinition::Extension(extension) =
+            extension_or_definition
+        {
+            let GraphQLTypeSystemExtension::ObjectTypeExtension(object_type_extension) = extension;
+            return Ok(object_type_extension.directives.clone());
+        }
+        Err("unexpected structure of directive".into())
+    }
+
+    #[test]
+    fn test_magic_mutation_deserialization() -> Result<(), Box<dyn Error>> {
+        let source = "extend type Mutation
+        @exposeField(
+          field: \"set_pet_tagline\"
+          path: \"pet\"
+          field_map: [{ from: \"id\", to: \"input.id\" }]
+        )
+        @exposeField(
+          field: \"set_pet_best_friend\"
+          path: \"pet\"
+          field_map: [{ from: \"id\", to: \"id\" }]
+        )";
+        let text_source = TextSource {
+            path: "dummy".intern().into(),
+            span: None,
+        };
+        let document = parse_schema_extensions(source, text_source).map_err(|e| e.item)?;
+        let directives = document
+            .0
+            .into_iter()
+            .map(|dir| unwrap_directive(dir.item))
+            .collect::<Result<Vec<_>, _>>()?;
+        let directives: Vec<GraphQLDirective<ConstantValue>> =
+            directives.into_iter().flatten().collect();
+
+        let magic_mutations: Result<Vec<MagicMutationFieldInfo>, _> = directives
+            .into_iter()
+            .map(|directive| from_graph_ql_directive::<MagicMutationFieldInfo>(&directive))
+            .collect();
+        let magic_mutations = magic_mutations?;
+        let set_tagline_mutation = MagicMutationFieldInfo {
+            path: StringLiteralValue::from("pet".intern()),
+            field_map: vec![FieldMapItem {
+                from: StringLiteralValue::from("id".intern()),
+                to: StringLiteralValue::from("input.id".intern()),
+            }],
+            field: StringLiteralValue::from("set_pet_tagline".intern()),
+        };
+        let set_pet_best_friend = MagicMutationFieldInfo {
+            path: StringLiteralValue::from("pet".intern()),
+            field_map: vec![FieldMapItem {
+                from: StringLiteralValue::from("id".intern()),
+                to: StringLiteralValue::from("id".intern()),
+            }],
+            field: StringLiteralValue::from("set_pet_best_friend".intern()),
+        };
+        assert_eq!(magic_mutations[0], set_tagline_mutation);
+        assert_eq!(magic_mutations[1], set_pet_best_friend);
+        Ok(())
+    }
 }

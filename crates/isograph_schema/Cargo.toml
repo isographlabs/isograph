@@ -15,3 +15,7 @@ intern = { git = "https://github.com/facebook/relay.git", tag = "v16.2.0" }
 thiserror = "1.0.40"
 lazy_static = "1.4"
 colorize = "0.1.0"
+serde = "1.0.197"
+
+[dev-dependencies]
+graphql_schema_parser = { path  = "../graphql_schema_parser"}
