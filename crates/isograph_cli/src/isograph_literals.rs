@@ -21,27 +21,40 @@ pub(crate) fn read_files_in_folder(
 
     read_dir_recursive(&canonicalized_root_path)?
         .into_iter()
-        .map(|path| {
-            // This isn't ideal. We can avoid a clone if we changed .map_err to match
-            let path_2 = path.clone();
-
-            // N.B. we have previously ensured that path is a file
-            let contents =
-                std::fs::read(&path).map_err(|message| BatchCompileError::UnableToReadFile {
-                    path: path_2,
-                    message,
-                })?;
-
-            let contents = std::str::from_utf8(&contents)
-                .map_err(BatchCompileError::from)?
-                .to_owned();
-
-            Ok((
-                path.strip_prefix(&canonicalized_root_path)?.to_path_buf(),
-                contents,
-            ))
-        })
+        .filter(has_valid_extension)
+        .map(|path| read_file(path, canonicalized_root_path))
         .collect()
+}
+
+fn has_valid_extension(path: &PathBuf) -> bool {
+    let extension = path.extension().and_then(|x| x.to_str());
+    match extension {
+        Some("ts") | Some("tsx") | Some("js") | Some("jsx") => true,
+        _ => false,
+    }
+}
+
+fn read_file(
+    path: PathBuf,
+    canonicalized_root_path: &PathBuf,
+) -> Result<(PathBuf, String), BatchCompileError> {
+    // This isn't ideal. We can avoid a clone if we changed .map_err to match
+    let path_2 = path.clone();
+
+    // N.B. we have previously ensured that path is a file
+    let contents = std::fs::read(&path).map_err(|message| BatchCompileError::UnableToReadFile {
+        path: path_2,
+        message,
+    })?;
+
+    let contents = std::str::from_utf8(&contents)
+        .map_err(BatchCompileError::from)?
+        .to_owned();
+
+    Ok((
+        path.strip_prefix(&canonicalized_root_path)?.to_path_buf(),
+        contents,
+    ))
 }
 
 fn read_dir_recursive(root_js_path: &PathBuf) -> Result<Vec<PathBuf>, BatchCompileError> {
