@@ -1,5 +1,6 @@
 use std::{
     path::PathBuf,
+    str::Utf8Error,
     time::{Duration, Instant},
 };
 
@@ -345,9 +346,6 @@ pub(crate) enum BatchCompileError {
     #[error("Unable to traverse directory.\nReason: {0}")]
     UnableToTraverseDirectory(#[from] std::io::Error),
 
-    #[error("Unable to convert schema to string.\nReason: {0}")]
-    UnableToConvertToString(#[from] std::str::Utf8Error),
-
     #[error("Unable to parse schema.\n\n{0}")]
     UnableToParseSchema(#[from] WithLocation<SchemaParseError>),
 
@@ -395,6 +393,9 @@ pub(crate) enum BatchCompileError {
 
     #[error("Unable to print.\nReason: {0}")]
     UnableToPrint(#[from] GenerateArtifactsError),
+
+    #[error("Unable to convert file {path:?} to utf8.\nDetailed reason: {reason}")]
+    UnableToConvertToString { path: PathBuf, reason: Utf8Error },
 }
 
 impl From<Vec<WithLocation<IsographLiteralParseError>>> for BatchCompileError {

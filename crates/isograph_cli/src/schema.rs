@@ -22,13 +22,16 @@ pub(crate) fn read_schema_file(path: &PathBuf) -> Result<String, BatchCompileErr
 
     let contents = std::fs::read(canonicalized_existing_path.clone()).map_err(|message| {
         BatchCompileError::UnableToReadFile {
-            path: canonicalized_existing_path,
+            path: canonicalized_existing_path.clone(),
             message,
         }
     })?;
 
     let contents = std::str::from_utf8(&contents)
-        .map_err(BatchCompileError::from)?
+        .map_err(|e| BatchCompileError::UnableToConvertToString {
+            path: canonicalized_existing_path.clone(),
+            reason: e,
+        })?
         .to_owned();
 
     Ok(contents)

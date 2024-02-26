@@ -48,7 +48,10 @@ fn read_file(
     })?;
 
     let contents = std::str::from_utf8(&contents)
-        .map_err(BatchCompileError::from)?
+        .map_err(|e| BatchCompileError::UnableToConvertToString {
+            path: path.clone(),
+            reason: e,
+        })?
         .to_owned();
 
     Ok((
