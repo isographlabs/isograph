@@ -1,8 +1,4 @@
 import type {IsographEntrypoint} from '@isograph/react';
-import entrypoint_Query__HomePage from '../__isograph/Query/HomePage/entrypoint'
-import entrypoint_Query__PullRequest from '../__isograph/Query/PullRequest/entrypoint'
-import entrypoint_Query__RepositoryPage from '../__isograph/Query/RepositoryPage/entrypoint'
-import entrypoint_Query__UserPage from '../__isograph/Query/UserPage/entrypoint'
 import { Actor__UserLink__param } from './Actor/UserLink/reader'
 import { IssueComment__formattedCommentCreationDate__param } from './IssueComment/formattedCommentCreationDate/reader'
 import { PullRequest__CommentList__param } from './PullRequest/CommentList/reader'
@@ -22,6 +18,10 @@ import { Repository__RepositoryLink__param } from './Repository/RepositoryLink/r
 import { Starrable__IsStarred__param } from './Starrable/IsStarred/reader'
 import { User__Avatar__param } from './User/Avatar/reader'
 import { User__RepositoryList__param } from './User/RepositoryList/reader'
+import entrypoint_Query__HomePage from '../__isograph/Query/HomePage/entrypoint'
+import entrypoint_Query__PullRequest from '../__isograph/Query/PullRequest/entrypoint'
+import entrypoint_Query__RepositoryPage from '../__isograph/Query/RepositoryPage/entrypoint'
+import entrypoint_Query__UserPage from '../__isograph/Query/UserPage/entrypoint'
 
 type IdentityWithParam<TParam> = <TResolverReturn>(
   x: (param: TParam) => TResolverReturn
@@ -36,22 +36,6 @@ type MatchesWhitespaceAndString<
   TString extends string,
   T
 > = Whitespace<T> extends `${TString}${string}` ? T : never;
-
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'entrypoint Query.HomePage', T>
-): typeof entrypoint_Query__HomePage;
-
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'entrypoint Query.PullRequest', T>
-): typeof entrypoint_Query__PullRequest;
-
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'entrypoint Query.RepositoryPage', T>
-): typeof entrypoint_Query__RepositoryPage;
-
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'entrypoint Query.UserPage', T>
-): typeof entrypoint_Query__UserPage;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Actor.UserLink', T>
@@ -128,6 +112,22 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field User.RepositoryList', T>
 ): IdentityWithParam<User__RepositoryList__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.HomePage', T>
+): typeof entrypoint_Query__HomePage;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.PullRequest', T>
+): typeof entrypoint_Query__PullRequest;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.RepositoryPage', T>
+): typeof entrypoint_Query__RepositoryPage;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.UserPage', T>
+): typeof entrypoint_Query__UserPage;
 
 export function iso(_isographLiteralText: string): IdentityWithParam<any> | IsographEntrypoint<any, any, any>{
   return function identity<TResolverReturn>(

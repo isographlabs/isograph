@@ -1,7 +1,4 @@
 import type {IsographEntrypoint} from '@isograph/react';
-import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint'
-import entrypoint_Query__PetDetailRoute from '../__isograph/Query/PetDetailRoute/entrypoint'
-import entrypoint_Query__PetFavoritePhrase from '../__isograph/Query/PetFavoritePhrase/entrypoint'
 import { Pet__FavoritePhraseLoader__param } from './Pet/FavoritePhraseLoader/reader'
 import { Pet__PetBestFriendCard__param } from './Pet/PetBestFriendCard/reader'
 import { Pet__PetCheckinsCard__param } from './Pet/PetCheckinsCard/reader'
@@ -13,6 +10,9 @@ import { Pet__PetUpdater__param } from './Pet/PetUpdater/reader'
 import { Query__HomeRoute__param } from './Query/HomeRoute/reader'
 import { Query__PetDetailRoute__param } from './Query/PetDetailRoute/reader'
 import { Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/reader'
+import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint'
+import entrypoint_Query__PetDetailRoute from '../__isograph/Query/PetDetailRoute/entrypoint'
+import entrypoint_Query__PetFavoritePhrase from '../__isograph/Query/PetFavoritePhrase/entrypoint'
 
 type IdentityWithParam<TParam> = <TResolverReturn>(
   x: (param: TParam) => TResolverReturn
@@ -27,18 +27,6 @@ type MatchesWhitespaceAndString<
   TString extends string,
   T
 > = Whitespace<T> extends `${TString}${string}` ? T : never;
-
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'entrypoint Query.HomeRoute', T>
-): typeof entrypoint_Query__HomeRoute;
-
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'entrypoint Query.PetDetailRoute', T>
-): typeof entrypoint_Query__PetDetailRoute;
-
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'entrypoint Query.PetFavoritePhrase', T>
-): typeof entrypoint_Query__PetFavoritePhrase;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.FavoritePhraseLoader', T>
@@ -83,6 +71,18 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.PetFavoritePhrase', T>
 ): IdentityWithParam<Query__PetFavoritePhrase__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.HomeRoute', T>
+): typeof entrypoint_Query__HomeRoute;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.PetDetailRoute', T>
+): typeof entrypoint_Query__PetDetailRoute;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.PetFavoritePhrase', T>
+): typeof entrypoint_Query__PetFavoritePhrase;
 
 export function iso(_isographLiteralText: string): IdentityWithParam<any> | IsographEntrypoint<any, any, any>{
   return function identity<TResolverReturn>(

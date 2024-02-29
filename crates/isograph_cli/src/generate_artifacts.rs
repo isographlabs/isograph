@@ -134,20 +134,20 @@ type MatchesWhitespaceAndString<
 > = Whitespace<T> extends `${TString}${string}` ? T : never;\n",
     );
 
-    let entrypoint_overloads = sorted_entrypoints(schema)
-        .into_iter()
-        .map(build_iso_overload_for_entrypoint);
-    for (import, entrypoint_overload) in entrypoint_overloads {
-        imports.push_str(&import);
-        content.push_str(&entrypoint_overload);
-    }
-
     let client_defined_field_overloads = sorted_client_defined_fields(schema)
         .into_iter()
         .map(build_iso_overload_for_client_defined_field);
     for (import, field_overload) in client_defined_field_overloads {
         imports.push_str(&import);
         content.push_str(&field_overload);
+    }
+
+    let entrypoint_overloads = sorted_entrypoints(schema)
+        .into_iter()
+        .map(build_iso_overload_for_entrypoint);
+    for (import, entrypoint_overload) in entrypoint_overloads {
+        imports.push_str(&import);
+        content.push_str(&entrypoint_overload);
     }
 
     content.push_str(
