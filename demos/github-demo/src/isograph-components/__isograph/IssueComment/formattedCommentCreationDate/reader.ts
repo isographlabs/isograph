@@ -1,4 +1,4 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
 import { formattedCommentCreationDate as resolver } from '../../../CommentList.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)

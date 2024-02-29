@@ -14,7 +14,16 @@ export const Header = iso(`
       Avatar
     }
   }
-`)(function HeaderComponent(props) {
+`)(function HeaderComponent(
+  data,
+  {
+    route,
+    setRoute,
+  }: {
+    route: Route;
+    setRoute: (route: Route) => void;
+  },
+) {
   return (
     <>
       <AppBar position="fixed" color="primary" sx={{ p: 0.5 }}>
@@ -26,11 +35,11 @@ export const Header = iso(`
             maxWidth="md"
           >
             <Grid item xs={6} style={{ flex: 1 }}>
-              <Buttons route={props.route} setRoute={props.setRoute} />
+              <Buttons route={route} setRoute={setRoute} />
             </Grid>
             <Grid item xs={6}>
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <props.data.viewer.Avatar />
+                <data.viewer.Avatar />
               </div>
             </Grid>
           </Grid>

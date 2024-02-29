@@ -15,8 +15,8 @@ export const PullRequestDetail = iso(`
       }
     }
   }
-`)(function PullRequestDetailComponent(props) {
-  const repository = props.data.repository;
+`)(function PullRequestDetailComponent(data) {
+  const repository = data.repository;
   if (repository === null) {
     return <h1>Repository not found</h1>;
   }
@@ -41,7 +41,7 @@ export const PullRequestDetail = iso(`
       </Card>
 
       <h2>Comments</h2>
-      <pullRequest.CommentList route={props.route} setRoute={props.setRoute} />
+      <pullRequest.CommentList />
     </>
   );
 });

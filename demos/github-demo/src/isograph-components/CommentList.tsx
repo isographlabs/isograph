@@ -32,8 +32,8 @@ export const CommentList = iso(`
       }
     }
   }
-`)(function CommentListComponent(props) {
-  const comments = [...props.data.comments.edges].reverse();
+`)(function CommentListComponent(data) {
+  const comments = [...data.comments.edges].reverse();
 
   return comments.map((commentNode) => {
     const comment = commentNode?.node;

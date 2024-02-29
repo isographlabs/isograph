@@ -1,12 +1,13 @@
 import { iso } from '@iso';
 import { RepoGitHubLink } from './RepoGitHubLink';
+import { Route } from './GithubDemo';
 
 export const IsStarred = iso(`
   field Starrable.IsStarred @component {
     stargazerCount
     viewerHasStarred
   }
-`)(({ data }) => {
+`)((data) => {
   return (
     <p>
       This item has been starred {data.stargazerCount} times,{' '}
@@ -30,28 +31,30 @@ export const RepositoryDetail = iso(`
       }
     }
   }
-`)(function RepositoryDetailComponent(props) {
-  const parent = props.data.repository?.parent;
-  const repository = props.data.repository;
+`)(function RepositoryDetailComponent(
+  data,
+  { setRoute }: { setRoute: (route: Route) => void },
+) {
+  const parent = data.repository?.parent;
+  const repository = data.repository;
   if (repository == null) return null;
   return (
     <>
       <RepoGitHubLink filePath="demos/github-demo/src/isograph-components/RepositoryDetail.tsx">
         Repository Detail Component
       </RepoGitHubLink>
-      <h1>{props.data.repository?.nameWithOwner}</h1>
+      <h1>{data.repository?.nameWithOwner}</h1>
       {parent != null ? (
         <h3>
           <small>Forked from</small>{' '}
           <parent.RepositoryLink
-            setRoute={props.setRoute}
+            setRoute={setRoute}
             children={parent.nameWithOwner}
           />
         </h3>
       ) : null}
       <repository.IsStarred />
-      <repository.pullRequests.PullRequestTable setRoute={props.setRoute} />
-      {/* <div>Stargazer count: {props.data.repository?.stargazerCount}</div> */}
+      <repository.pullRequests.PullRequestTable setRoute={setRoute} />
     </>
   );
 });

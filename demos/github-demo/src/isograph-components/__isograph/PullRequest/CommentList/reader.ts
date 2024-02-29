@@ -1,9 +1,9 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
 import { CommentList as resolver } from '../../../CommentList.tsx';
 import IssueComment__formattedCommentCreationDate, { IssueComment__formattedCommentCreationDate__outputType} from '../../IssueComment/formattedCommentCreationDate/reader';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type PullRequest__CommentList__outputType = (React.FC<any>);
+export type PullRequest__CommentList__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
 
 const readerAst: ReaderAst<PullRequest__CommentList__param> = [
   {
@@ -70,8 +70,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
   },
 ];
 
-export type PullRequest__CommentList__param = { data:
-{
+export type PullRequest__CommentList__param = {
   comments: {
     edges: (({
       node: ({
@@ -84,8 +83,7 @@ export type PullRequest__CommentList__param = { data:
       } | null),
     } | null))[],
   },
-},
-[index: string]: any };
+};
 
 const artifact: ReaderArtifact<
   PullRequest__CommentList__param,

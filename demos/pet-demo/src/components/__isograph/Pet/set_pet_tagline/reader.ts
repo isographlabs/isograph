@@ -1,4 +1,4 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
 const includeReadOutData = (variables, readOutData) => {
   variables.input = variables.input ?? {};
   variables.input.id = readOutData.id;

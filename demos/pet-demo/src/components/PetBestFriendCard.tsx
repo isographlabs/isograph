@@ -15,13 +15,13 @@ export const PetBestFriendCard = iso(`
       }
     }
   }
-`)(function PetBestFriendCardComponent(props) {
-  const bestFriendRelationship = props.data.best_friend_relationship;
+`)(function PetBestFriendCardComponent(data) {
+  const bestFriendRelationship = data.best_friend_relationship;
   if (!bestFriendRelationship) {
     return (
       <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
         <CardContent>
-          <props.data.PetUpdater parentId={props.data.id} />
+          <data.PetUpdater />
         </CardContent>
       </Card>
     );
@@ -40,7 +40,7 @@ export const PetBestFriendCard = iso(`
               <h2>Best friend: {bestFriendRelationship.best_friend.name}</h2>
             </div>
           </Stack>
-          <props.data.PetUpdater parentId={props.data.id} />
+          <data.PetUpdater />
           <img
             src={bestFriendRelationship.picture_together ?? undefined}
             style={{ maxWidth: 400 }}

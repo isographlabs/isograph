@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { ReactNode } from 'react';
 import { iso } from '@iso';
 
 import { Link } from '@mui/material';
+import { Route } from './GithubDemo';
 
 export const PullRequestLink = iso(`
   field PullRequest.PullRequestLink @component {
@@ -13,20 +14,29 @@ export const PullRequestLink = iso(`
       }
     }
   }
-`)(function PullRequestLinkComponent(props) {
+`)(function PullRequestLinkComponent(
+  data,
+  {
+    setRoute,
+    children,
+  }: {
+    setRoute: (route: Route) => void;
+    children: ReactNode;
+  },
+) {
   return (
     <Link
       onClick={() =>
-        props.setRoute({
+        setRoute({
           kind: 'PullRequest',
-          pullRequestNumber: props.data.number,
-          repositoryName: props.data.repository.name,
-          repositoryOwner: props.data.repository.owner.login,
+          pullRequestNumber: data.number,
+          repositoryName: data.repository.name,
+          repositoryOwner: data.repository.owner.login,
         })
       }
       style={{ cursor: 'pointer' }}
     >
-      {props.children}
+      {children}
     </Link>
   );
 });

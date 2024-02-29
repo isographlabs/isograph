@@ -1,6 +1,8 @@
 import { iso } from '@iso';
 
 import { Link } from '@mui/material';
+import { Route } from './GithubDemo';
+import { ReactNode } from 'react';
 
 export const RepositoryLink = iso(`
   field Repository.RepositoryLink @component {
@@ -10,20 +12,29 @@ export const RepositoryLink = iso(`
       login
     }
   }
-`)(function RepositoryLinkComponent(props) {
+`)(function RepositoryLinkComponent(
+  data,
+  {
+    setRoute,
+    children,
+  }: {
+    setRoute: (route: Route) => void;
+    children: ReactNode;
+  },
+) {
   return (
     <Link
       onClick={() =>
-        props.setRoute({
+        setRoute({
           kind: 'Repository',
-          repositoryName: props.data.name,
-          repositoryOwner: props.data.owner.login,
-          repositoryId: props.data.id,
+          repositoryName: data.name,
+          repositoryOwner: data.owner.login,
+          repositoryId: data.id,
         })
       }
       style={{ cursor: 'pointer' }}
     >
-      {props.children}
+      {children}
     </Link>
   );
 });

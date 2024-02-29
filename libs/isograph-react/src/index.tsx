@@ -56,6 +56,8 @@ export type IsographEntrypoint<
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
+// TODO this should probably be at least three distinct types, for @component,
+// non-@component and refetch resolvers
 export type ReaderArtifact<
   TReadFromStore extends Object,
   TResolverProps,
@@ -63,7 +65,7 @@ export type ReaderArtifact<
 > = {
   kind: 'ReaderArtifact';
   readerAst: ReaderAst<TReadFromStore>;
-  resolver: (data: TResolverProps) => TResolverResult;
+  resolver: (data: TResolverProps, runtimeProps: any) => TResolverResult;
   variant: ReaderResolverVariant;
 };
 
@@ -76,6 +78,9 @@ export type ReaderAstNode =
 
 // @ts-ignore
 export type ReaderAst<TReadFromStore> = ReaderAstNode[];
+
+export type ExtractSecondParam<T extends (arg1: any, arg2: any) => any> =
+  T extends (arg1: any, arg2: infer P) => any ? P : never;
 
 export type ReaderScalarField = {
   kind: 'Scalar';
@@ -517,8 +522,8 @@ function readData<TReadFromStore>(
           target[field.alias] = field.readerArtifact.resolver(
             environment,
             // resolvers for refetch fields take 3 args, and this is not reflected in types
-            // @ts-expect-error
             refetchQueryArtifact,
+            // @ts-expect-error
             {
               ...data.data,
               // TODO continue from here
@@ -558,8 +563,8 @@ function readData<TReadFromStore>(
 
           target[field.alias] = field.readerArtifact.resolver(
             environment,
-            // @ts-expect-error
             refetchQueryArtifact,
+            // @ts-expect-error
             data.data,
             filterVariables(variables, allowedVariables),
           );
@@ -588,6 +593,7 @@ function readData<TReadFromStore>(
               nestedReason: data,
             };
           } else {
+            // @ts-expect-error
             target[field.alias] = field.readerArtifact.resolver(data.data);
           }
         } else if (variant.kind === 'Component') {

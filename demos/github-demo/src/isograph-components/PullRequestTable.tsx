@@ -7,6 +7,7 @@ import {
   TableHead,
   TableRow,
 } from '@mui/material';
+import { Route } from './GithubDemo';
 
 export const createdAtFormatted = iso(`
   field PullRequest.createdAtFormatted {
@@ -39,8 +40,15 @@ export const PullRequestTable = iso(`
       }
     }
   }
-`)(function PullRequestTableComponent(props) {
-  const reversedPullRequests = [...props.data.edges].reverse();
+`)(function PullRequestTableComponent(
+  data,
+  {
+    setRoute,
+  }: {
+    setRoute: (route: Route) => void;
+  },
+) {
+  const reversedPullRequests = [...data.edges].reverse();
   return (
     <>
       <h2>Pull Requests</h2>
@@ -65,14 +73,14 @@ export const PullRequestTable = iso(`
               <TableRow key={node.id}>
                 <TableCell>
                   <small>
-                    <node.PullRequestLink setRoute={props.setRoute}>
+                    <node.PullRequestLink setRoute={setRoute}>
                       {node.number}
                     </node.PullRequestLink>
                   </small>
                 </TableCell>
                 <TableCell>{node.title}</TableCell>
                 <TableCell>
-                  <author.UserLink setRoute={props.setRoute}>
+                  <author.UserLink setRoute={setRoute}>
                     {node.author?.login}
                   </author.UserLink>
                 </TableCell>

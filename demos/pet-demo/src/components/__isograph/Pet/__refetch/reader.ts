@@ -1,4 +1,4 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
 import { makeNetworkRequest } from '@isograph/react';
 const resolver = (environment, artifact, variables) => () => makeNetworkRequest(environment, artifact, variables);
 

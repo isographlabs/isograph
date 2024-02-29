@@ -1,6 +1,7 @@
 import React from 'react';
 import { iso } from '@iso';
 import { Container, Stack } from '@mui/material';
+import { Route } from './router';
 
 export const PetDetailRoute = iso(`
   field Query.PetDetailRoute($id: ID!) @component {
@@ -12,7 +13,10 @@ export const PetDetailRoute = iso(`
       PetTaglineCard
     }
   }
-`)(function PetDetailRouteComponent({ data, navigateTo }) {
+`)(function PetDetailRouteComponent(
+  data,
+  { navigateTo }: { navigateTo: (nextRoute: Route) => void },
+) {
   const { pet } = data;
   if (pet == null) {
     return <h1>Pet not found.</h1>;
@@ -28,7 +32,7 @@ export const PetDetailRoute = iso(`
       </h3>
       <React.Suspense fallback={<h2>Loading pet details...</h2>}>
         <Stack direction="row" spacing={4}>
-          <pet.PetCheckinsCard navigateTo={navigateTo} />
+          <pet.PetCheckinsCard />
           <Stack direction="column" spacing={4}>
             <pet.PetBestFriendCard />
 

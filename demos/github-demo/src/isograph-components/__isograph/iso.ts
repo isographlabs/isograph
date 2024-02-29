@@ -26,6 +26,9 @@ import entrypoint_Query__UserPage from '../__isograph/Query/UserPage/entrypoint'
 type IdentityWithParam<TParam> = <TResolverReturn>(
   x: (param: TParam) => TResolverReturn
 ) => (param: TParam) => TResolverReturn;
+type IdentityWithParamComponent<TParam> = <TResolverReturn, TSecondParam = {}>(
+  x: (data: TParam, secondParam: TSecondParam) => TResolverReturn
+) => (data: TParam, secondParam: TSecondParam) => TResolverReturn;
 
 type WhitespaceCharacter = ' ' | '\t' | '\n';
 type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
@@ -39,7 +42,7 @@ type MatchesWhitespaceAndString<
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Actor.UserLink', T>
-): IdentityWithParam<Actor__UserLink__param>;
+): IdentityWithParamComponent<Actor__UserLink__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field IssueComment.formattedCommentCreationDate', T>
@@ -47,11 +50,11 @@ export function iso<T>(
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field PullRequest.CommentList', T>
-): IdentityWithParam<PullRequest__CommentList__param>;
+): IdentityWithParamComponent<PullRequest__CommentList__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field PullRequest.PullRequestLink', T>
-): IdentityWithParam<PullRequest__PullRequestLink__param>;
+): IdentityWithParamComponent<PullRequest__PullRequestLink__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field PullRequest.createdAtFormatted', T>
@@ -59,59 +62,59 @@ export function iso<T>(
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field PullRequestConnection.PullRequestTable', T>
-): IdentityWithParam<PullRequestConnection__PullRequestTable__param>;
+): IdentityWithParamComponent<PullRequestConnection__PullRequestTable__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.Header', T>
-): IdentityWithParam<Query__Header__param>;
+): IdentityWithParamComponent<Query__Header__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.HomePageList', T>
-): IdentityWithParam<Query__HomePageList__param>;
+): IdentityWithParamComponent<Query__HomePageList__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.HomePage', T>
-): IdentityWithParam<Query__HomePage__param>;
+): IdentityWithParamComponent<Query__HomePage__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.PullRequestDetail', T>
-): IdentityWithParam<Query__PullRequestDetail__param>;
+): IdentityWithParamComponent<Query__PullRequestDetail__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.PullRequest', T>
-): IdentityWithParam<Query__PullRequest__param>;
+): IdentityWithParamComponent<Query__PullRequest__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.RepositoryDetail', T>
-): IdentityWithParam<Query__RepositoryDetail__param>;
+): IdentityWithParamComponent<Query__RepositoryDetail__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.RepositoryPage', T>
-): IdentityWithParam<Query__RepositoryPage__param>;
+): IdentityWithParamComponent<Query__RepositoryPage__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.UserDetail', T>
-): IdentityWithParam<Query__UserDetail__param>;
+): IdentityWithParamComponent<Query__UserDetail__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.UserPage', T>
-): IdentityWithParam<Query__UserPage__param>;
+): IdentityWithParamComponent<Query__UserPage__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Repository.RepositoryLink', T>
-): IdentityWithParam<Repository__RepositoryLink__param>;
+): IdentityWithParamComponent<Repository__RepositoryLink__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Starrable.IsStarred', T>
-): IdentityWithParam<Starrable__IsStarred__param>;
+): IdentityWithParamComponent<Starrable__IsStarred__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field User.Avatar', T>
-): IdentityWithParam<User__Avatar__param>;
+): IdentityWithParamComponent<User__Avatar__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field User.RepositoryList', T>
-): IdentityWithParam<User__RepositoryList__param>;
+): IdentityWithParamComponent<User__RepositoryList__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.HomePage', T>
@@ -129,7 +132,11 @@ export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.UserPage', T>
 ): typeof entrypoint_Query__UserPage;
 
-export function iso(_isographLiteralText: string): IdentityWithParam<any> | IsographEntrypoint<any, any, any>{
+export function iso(_isographLiteralText: string):
+  | IdentityWithParam<any>
+  | IdentityWithParamComponent<any>
+  | IsographEntrypoint<any, any, any>
+{
   return function identity<TResolverReturn>(
     clientFieldOrEntrypoint: (param: any) => TResolverReturn,
   ): (param: any) => TResolverReturn {

@@ -17,7 +17,7 @@ export const PetStatsCard = iso(`
       energy
     }
   }
-`)(function PetStatsCardComponent(props) {
+`)(function PetStatsCardComponent(data) {
   return (
     <Card
       variant="outlined"
@@ -26,12 +26,12 @@ export const PetStatsCard = iso(`
       <CardContent>
         <h2>Stats</h2>
         <ul>
-          <li>Weight: {props.data.stats.weight}</li>
-          <li>Intelligence: {props.data.stats.intelligence}</li>
-          <li>Cuteness: {props.data.stats.cuteness}</li>
-          <li>Hunger: {props.data.stats.hunger}</li>
-          <li>Sociability: {props.data.stats.sociability}</li>
-          <li>Energy: {props.data.stats.energy}</li>
+          <li>Weight: {data.stats.weight}</li>
+          <li>Intelligence: {data.stats.intelligence}</li>
+          <li>Cuteness: {data.stats.cuteness}</li>
+          <li>Hunger: {data.stats.hunger}</li>
+          <li>Sociability: {data.stats.sociability}</li>
+          <li>Energy: {data.stats.energy}</li>
         </ul>
       </CardContent>
     </Card>

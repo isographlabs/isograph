@@ -1,8 +1,8 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
 import { Avatar as resolver } from '../../../avatar.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type User__Avatar__outputType = (React.FC<any>);
+export type User__Avatar__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
 
 const readerAst: ReaderAst<User__Avatar__param> = [
   {
@@ -19,12 +19,10 @@ const readerAst: ReaderAst<User__Avatar__param> = [
   },
 ];
 
-export type User__Avatar__param = { data:
-{
+export type User__Avatar__param = {
   name: (string | null),
   avatarUrl: string,
-},
-[index: string]: any };
+};
 
 const artifact: ReaderArtifact<
   User__Avatar__param,

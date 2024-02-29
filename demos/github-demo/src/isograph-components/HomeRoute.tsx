@@ -12,7 +12,16 @@ export const HomePage = iso(`
     Header
     HomePageList
   }
-`)(function HomePageComponent({ data, route, setRoute }) {
+`)(function HomePageComponent(
+  data,
+  {
+    route,
+    setRoute,
+  }: {
+    route: Route;
+    setRoute: (route: Route) => void;
+  },
+) {
   return (
     <>
       <data.Header route={route} setRoute={setRoute} />
@@ -21,7 +30,7 @@ export const HomePage = iso(`
           Home Page Route
         </RepoGitHubLink>
         <React.Suspense fallback={<FullPageLoading />}>
-          <data.HomePageList route={route} setRoute={setRoute} />
+          <data.HomePageList setRoute={setRoute} />
         </React.Suspense>
       </Container>
     </>

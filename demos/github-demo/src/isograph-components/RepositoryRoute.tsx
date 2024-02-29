@@ -14,7 +14,16 @@ export const RepositoryPage = iso(`
     Header
     RepositoryDetail
   }
-`)(function RepositoryRouteComponent({ data, route, setRoute }) {
+`)(function RepositoryRouteComponent(
+  data,
+  {
+    route,
+    setRoute,
+  }: {
+    route: Route;
+    setRoute: (route: Route) => void;
+  },
+) {
   return (
     <>
       <data.Header route={route} setRoute={setRoute} />

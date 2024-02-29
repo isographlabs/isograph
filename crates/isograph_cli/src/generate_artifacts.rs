@@ -104,14 +104,25 @@ fn build_iso_overload_for_client_defined_field(
         "field {}.{}",
         resolver.type_and_field.type_name, resolver.type_and_field.field_name
     );
-    s.push_str(&format!(
-        "
+    if matches!(resolver.variant, ResolverVariant::Component) {
+        s.push_str(&format!(
+            "
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'{}', T>
+): IdentityWithParamComponent<{}__param>;\n",
+            formatted_field,
+            resolver.type_and_field.underscore_separated(),
+        ));
+    } else {
+        s.push_str(&format!(
+            "
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
 ): IdentityWithParam<{}__param>;\n",
-        formatted_field,
-        resolver.type_and_field.underscore_separated(),
-    ));
+            formatted_field,
+            resolver.type_and_field.underscore_separated(),
+        ));
+    }
     (import, s)
 }
 
@@ -122,6 +133,9 @@ fn build_iso_overload<'schema>(schema: &'schema ValidatedSchema) -> PathAndConte
 type IdentityWithParam<TParam> = <TResolverReturn>(
   x: (param: TParam) => TResolverReturn
 ) => (param: TParam) => TResolverReturn;
+type IdentityWithParamComponent<TParam> = <TResolverReturn, TSecondParam = {}>(
+  x: (data: TParam, secondParam: TSecondParam) => TResolverReturn
+) => (data: TParam, secondParam: TSecondParam) => TResolverReturn;
 
 type WhitespaceCharacter = ' ' | '\\t' | '\\n';
 type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
@@ -152,7 +166,11 @@ type MatchesWhitespaceAndString<
 
     content.push_str(
         "
-export function iso(_isographLiteralText: string): IdentityWithParam<any> | IsographEntrypoint<any, any, any>{
+export function iso(_isographLiteralText: string):
+  | IdentityWithParam<any>
+  | IdentityWithParamComponent<any>
+  | IsographEntrypoint<any, any, any>
+{
   return function identity<TResolverReturn>(
     clientFieldOrEntrypoint: (param: any) => TResolverReturn,
   ): (param: any) => TResolverReturn {
@@ -1003,10 +1021,9 @@ fn generate_resolver_parameter_type(
 
     if variant == &ResolverVariant::Component {
         resolver_parameter_type = format!(
-            "{{ data:\n{}{},\n{}[index: string]: any }}",
+            "{}{}",
             "  ".repeat(indentation_level as usize),
             resolver_parameter_type,
-            "  ".repeat(indentation_level as usize)
         );
     }
 
@@ -1643,7 +1660,9 @@ fn get_nested_refetch_query_text(
 fn generate_read_out_type(resolver_definition: &ValidatedSchemaResolver) -> ResolverReadOutType {
     match &resolver_definition.variant {
         variant => match variant {
-            ResolverVariant::Component => ResolverReadOutType("(React.FC<any>)".to_string()),
+            ResolverVariant::Component => {
+                ResolverReadOutType("(React.FC<ExtractSecondParam<typeof resolver>>)".to_string())
+            }
             ResolverVariant::Eager => {
                 ResolverReadOutType("ReturnType<typeof resolver>".to_string())
             }

@@ -7,7 +7,7 @@ export const FavoritePhraseLoader = iso(`
   field Pet.FavoritePhraseLoader @component {
     id
   }
-`)(({ data }) => {
+`)((data) => {
   const { queryReference, loadQueryReference } = useImperativeReference(
     iso(`entrypoint Query.PetFavoritePhrase`),
   );
@@ -34,7 +34,7 @@ export const PetFavoritePhrase = iso(`
       favorite_phrase
     }
   }
-`)(({ data }) => {
+`)((data) => {
   const pet = data.pet;
   if (pet == null) return;
   return (

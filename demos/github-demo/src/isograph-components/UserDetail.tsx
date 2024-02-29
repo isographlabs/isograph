@@ -1,5 +1,6 @@
 import { iso } from '@iso';
 import { RepoGitHubLink } from './RepoGitHubLink';
+import { Route } from './GithubDemo';
 
 export const UserDetail = iso(`
   field Query.UserDetail @component {
@@ -8,9 +9,15 @@ export const UserDetail = iso(`
       RepositoryList
     }
   }
-`)(function UserDetailComponent(props) {
-  console.log('user detail props.data:', props.data);
-  const user = props.data.user;
+`)(function UserDetailComponent(
+  data,
+  {
+    setRoute,
+  }: {
+    setRoute: (route: Route) => void;
+  },
+) {
+  const user = data.user;
   if (user == null) {
     return <h1>user not found</h1>;
   }
@@ -21,7 +28,7 @@ export const UserDetail = iso(`
         User Detail Component
       </RepoGitHubLink>
       <h1>{user.name}</h1>
-      <user.RepositoryList setRoute={props.setRoute} />
+      <user.RepositoryList setRoute={setRoute} />
     </>
   );
 });

@@ -15,7 +15,6 @@ export type Route =
 
 export type UserRoute = {
   kind: 'User';
-  userId: string;
   userLogin: string;
 };
 

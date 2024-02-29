@@ -1,9 +1,9 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
 import { PullRequestDetail as resolver } from '../../../PullRequestDetail.tsx';
 import PullRequest__CommentList, { PullRequest__CommentList__outputType} from '../../PullRequest/CommentList/reader';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type Query__PullRequestDetail__outputType = (React.FC<any>);
+export type Query__PullRequestDetail__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
 
 const readerAst: ReaderAst<Query__PullRequestDetail__param> = [
   {
@@ -58,8 +58,7 @@ const readerAst: ReaderAst<Query__PullRequestDetail__param> = [
   },
 ];
 
-export type Query__PullRequestDetail__param = { data:
-{
+export type Query__PullRequestDetail__param = {
   repository: ({
     pullRequest: ({
       title: string,
@@ -67,8 +66,7 @@ export type Query__PullRequestDetail__param = { data:
       CommentList: PullRequest__CommentList__outputType,
     } | null),
   } | null),
-},
-[index: string]: any };
+};
 
 const artifact: ReaderArtifact<
   Query__PullRequestDetail__param,

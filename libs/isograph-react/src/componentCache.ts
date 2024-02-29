@@ -32,10 +32,7 @@ export function getOrCreateCachedComponent(
           nestedRefetchQueries: resolverRefetchQueries,
         });
 
-        return readerArtifact.resolver({
-          data,
-          ...additionalRuntimeProps,
-        });
+        return readerArtifact.resolver(data, additionalRuntimeProps);
       }
       Component.displayName = `${componentName} (id: ${root}) @component`;
       return Component;

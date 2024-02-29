@@ -11,13 +11,13 @@ export const PetCheckinsCard = iso(`
       time
     }
   }
-`)(function PetCheckinsCardComponent(props) {
+`)(function PetCheckinsCardComponent(data) {
   return (
     <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
       <CardContent>
         <h2>Check-ins</h2>
         <ul>
-          {props.data.checkins.map((checkin) => (
+          {data.checkins.map((checkin) => (
             <li key={checkin.id}>
               <b>{checkin.location}</b> at {checkin.time}
             </li>

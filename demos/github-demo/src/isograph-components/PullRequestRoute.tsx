@@ -14,13 +14,22 @@ export const PullRequest = iso(`
     Header
     PullRequestDetail
   }
-`)(function PullRequestComponentComponent({ data, route, setRoute }) {
+`)(function PullRequestComponentComponent(
+  data,
+  {
+    route,
+    setRoute,
+  }: {
+    route: Route;
+    setRoute: (route: Route) => void;
+  },
+) {
   return (
     <>
       <data.Header route={route} setRoute={setRoute} />
       <Container maxWidth="md">
         <React.Suspense fallback={<FullPageLoading />}>
-          <data.PullRequestDetail route={route} setRoute={setRoute} />
+          <data.PullRequestDetail />
         </React.Suspense>
       </Container>
     </>

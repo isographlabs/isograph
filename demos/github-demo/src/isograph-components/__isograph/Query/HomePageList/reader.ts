@@ -1,10 +1,10 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
 import { HomePageList as resolver } from '../../../HomePageList.tsx';
 import User__RepositoryList, { User__RepositoryList__outputType} from '../../User/RepositoryList/reader';
 import User____refetch, { User____refetch__outputType} from '../../User/__refetch/reader';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type Query__HomePageList__outputType = (React.FC<any>);
+export type Query__HomePageList__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
 
 const readerAst: ReaderAst<Query__HomePageList__param> = [
   {
@@ -42,16 +42,14 @@ const readerAst: ReaderAst<Query__HomePageList__param> = [
   },
 ];
 
-export type Query__HomePageList__param = { data:
-{
+export type Query__HomePageList__param = {
   viewer: {
     login: string,
     name: (string | null),
     RepositoryList: User__RepositoryList__outputType,
     __refetch: User____refetch__outputType,
   },
-},
-[index: string]: any };
+};
 
 const artifact: ReaderArtifact<
   Query__HomePageList__param,

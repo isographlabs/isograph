@@ -95,7 +95,7 @@ impl<'schema> ReaderArtifactInfo<'schema> {
         let reader_param_type = format!("{parent_name}__{resolver_field_name}__param");
         let reader_output_type = format!("{parent_name}__{resolver_field_name}__outputType");
         format!(
-            "import type {{ReaderArtifact, ReaderAst}} from '@isograph/react';\n\
+            "import type {{ReaderArtifact, ReaderAst, ExtractSecondParam}} from '@isograph/react';\n\
             {resolver_import_statement}\n\
             {nested_resolver_import_statement}\n\
             {read_out_type_text}\n\n\

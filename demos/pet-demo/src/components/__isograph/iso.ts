@@ -17,6 +17,9 @@ import entrypoint_Query__PetFavoritePhrase from '../__isograph/Query/PetFavorite
 type IdentityWithParam<TParam> = <TResolverReturn>(
   x: (param: TParam) => TResolverReturn
 ) => (param: TParam) => TResolverReturn;
+type IdentityWithParamComponent<TParam> = <TResolverReturn, TSecondParam = {}>(
+  x: (data: TParam, secondParam: TSecondParam) => TResolverReturn
+) => (data: TParam, secondParam: TSecondParam) => TResolverReturn;
 
 type WhitespaceCharacter = ' ' | '\t' | '\n';
 type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
@@ -30,47 +33,47 @@ type MatchesWhitespaceAndString<
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.FavoritePhraseLoader', T>
-): IdentityWithParam<Pet__FavoritePhraseLoader__param>;
+): IdentityWithParamComponent<Pet__FavoritePhraseLoader__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.PetBestFriendCard', T>
-): IdentityWithParam<Pet__PetBestFriendCard__param>;
+): IdentityWithParamComponent<Pet__PetBestFriendCard__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.PetCheckinsCard', T>
-): IdentityWithParam<Pet__PetCheckinsCard__param>;
+): IdentityWithParamComponent<Pet__PetCheckinsCard__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.PetPhraseCard', T>
-): IdentityWithParam<Pet__PetPhraseCard__param>;
+): IdentityWithParamComponent<Pet__PetPhraseCard__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.PetStatsCard', T>
-): IdentityWithParam<Pet__PetStatsCard__param>;
+): IdentityWithParamComponent<Pet__PetStatsCard__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.PetSummaryCard', T>
-): IdentityWithParam<Pet__PetSummaryCard__param>;
+): IdentityWithParamComponent<Pet__PetSummaryCard__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.PetTaglineCard', T>
-): IdentityWithParam<Pet__PetTaglineCard__param>;
+): IdentityWithParamComponent<Pet__PetTaglineCard__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.PetUpdater', T>
-): IdentityWithParam<Pet__PetUpdater__param>;
+): IdentityWithParamComponent<Pet__PetUpdater__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.HomeRoute', T>
-): IdentityWithParam<Query__HomeRoute__param>;
+): IdentityWithParamComponent<Query__HomeRoute__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.PetDetailRoute', T>
-): IdentityWithParam<Query__PetDetailRoute__param>;
+): IdentityWithParamComponent<Query__PetDetailRoute__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.PetFavoritePhrase', T>
-): IdentityWithParam<Query__PetFavoritePhrase__param>;
+): IdentityWithParamComponent<Query__PetFavoritePhrase__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.HomeRoute', T>
@@ -84,7 +87,11 @@ export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.PetFavoritePhrase', T>
 ): typeof entrypoint_Query__PetFavoritePhrase;
 
-export function iso(_isographLiteralText: string): IdentityWithParam<any> | IsographEntrypoint<any, any, any>{
+export function iso(_isographLiteralText: string):
+  | IdentityWithParam<any>
+  | IdentityWithParamComponent<any>
+  | IsographEntrypoint<any, any, any>
+{
   return function identity<TResolverReturn>(
     clientFieldOrEntrypoint: (param: any) => TResolverReturn,
   ): (param: any) => TResolverReturn {

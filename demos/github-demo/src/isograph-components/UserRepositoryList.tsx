@@ -7,6 +7,7 @@ import {
   TableHead,
   TableRow,
 } from '@mui/material';
+import { Route } from './GithubDemo';
 
 export const RepositoryList = iso(`
   field User.RepositoryList @component {
@@ -30,8 +31,11 @@ export const RepositoryList = iso(`
       }
     }
   }
-`)(function UserRepositoryListComponent(props) {
-  const repositories = [...props.data.repositories.edges].reverse();
+`)(function UserRepositoryListComponent(
+  data,
+  { setRoute }: { setRoute: (route: Route) => void },
+) {
+  const repositories = [...data.repositories.edges].reverse();
   return (
     <Table>
       <TableHead>
@@ -53,7 +57,7 @@ export const RepositoryList = iso(`
             <TableRow key={node.id}>
               <TableCell>
                 <node.RepositoryLink
-                  setRoute={props.setRoute}
+                  setRoute={setRoute}
                   children={node.nameWithOwner}
                 />
               </TableCell>

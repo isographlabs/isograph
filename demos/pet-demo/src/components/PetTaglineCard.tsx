@@ -7,12 +7,12 @@ field Pet.PetTaglineCard @component {
   id
   tagline
 }
-`)(function PetTaglineCardComponent(props) {
+`)(function PetTaglineCardComponent(data) {
   return (
     <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
       <CardContent>
         <h2>Tagline</h2>
-        <p>"{props.data.tagline}"</p>
+        <p>"{data.tagline}"</p>
       </CardContent>
     </Card>
   );

@@ -1,8 +1,8 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
 import { FavoritePhraseLoader as resolver } from '../../../FavoritePhrase.tsx';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type Pet__FavoritePhraseLoader__outputType = (React.FC<any>);
+export type Pet__FavoritePhraseLoader__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
 
 const readerAst: ReaderAst<Pet__FavoritePhraseLoader__param> = [
   {
@@ -13,11 +13,9 @@ const readerAst: ReaderAst<Pet__FavoritePhraseLoader__param> = [
   },
 ];
 
-export type Pet__FavoritePhraseLoader__param = { data:
-{
+export type Pet__FavoritePhraseLoader__param = {
   id: string,
-},
-[index: string]: any };
+};
 
 const artifact: ReaderArtifact<
   Pet__FavoritePhraseLoader__param,

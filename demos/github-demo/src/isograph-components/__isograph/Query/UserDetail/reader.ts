@@ -1,9 +1,9 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
 import { UserDetail as resolver } from '../../../UserDetail.tsx';
 import User__RepositoryList, { User__RepositoryList__outputType} from '../../User/RepositoryList/reader';
 
 // the type, when read out (either via useLazyReference or via graph)
-export type Query__UserDetail__outputType = (React.FC<any>);
+export type Query__UserDetail__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
 
 const readerAst: ReaderAst<Query__UserDetail__param> = [
   {
@@ -34,14 +34,12 @@ const readerAst: ReaderAst<Query__UserDetail__param> = [
   },
 ];
 
-export type Query__UserDetail__param = { data:
-{
+export type Query__UserDetail__param = {
   user: ({
     name: (string | null),
     RepositoryList: User__RepositoryList__outputType,
   } | null),
-},
-[index: string]: any };
+};
 
 const artifact: ReaderArtifact<
   Query__UserDetail__param,
