@@ -115,7 +115,6 @@ export type ReaderMutationField = {
   // TODO this bad modeling. A mutation field cannot have variant: "Component" (I think)
   readerArtifact: ReaderArtifact<any, any>;
   refetchQuery: number;
-  allowedVariables: string[];
 };
 
 export type NormalizationAstNode =
