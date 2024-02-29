@@ -380,7 +380,7 @@ fn get_artifact_for_refetch_field(
 
     let normalization_ast = NormalizationAst(format!(
         "[{{ kind: \"Linked\", fieldName: \"node\", \
-        alias: null, arguments: [{{ argumentName: \"id\", variableName: \"id\" }}], \
+        arguments: [[ \"id\", {{ kind: \"Variable\", name: \"id\" }}]], \
         selections: {} }}]",
         generate_normalization_ast(schema, &merged_selection_set, 0).0,
     ));
@@ -1210,24 +1210,34 @@ fn generate_resolver_import_statement(
                 relative_path.to_str().expect("This path should be stringifiable. This probably is indicative of a bug in Relay.")
             ))
         }
-        ResolverActionKind::RefetchField => ResolverImportStatement(
-            "import { makeNetworkRequest } from '@isograph/react';\n\
-            const resolver = (environment, artifact, variables) => () => \
-            makeNetworkRequest(environment, artifact, variables);"
-                .to_string(),
-        ),
+        ResolverActionKind::RefetchField => ResolverImportStatement(format!(
+            "import {{ makeNetworkRequest, type IsographEnvironment, type IsographEntrypoint }} from '@isograph/react';\n\
+                const resolver = (\n\
+                {}environment: IsographEnvironment,\n\
+                {}artifact: IsographEntrypoint<any, any>,\n\
+                {}variables: any\n\
+                ) => () => \
+                makeNetworkRequest(environment, artifact, variables);",
+            "  ", "  ", "  "
+        )),
         ResolverActionKind::MutationField(ref m) => {
             let spaces = "  ";
             let include_read_out_data = get_read_out_data(&m.field_map);
             ResolverImportStatement(format!(
                 "{include_read_out_data}\n\
-                import {{ makeNetworkRequest }} from '@isograph/react';\n\
-                const resolver = (environment, artifact, readOutData, filteredVariables) => (mutationParams) => {{\n\
+                import {{ makeNetworkRequest, type IsographEnvironment, type IsographEntrypoint }} from '@isograph/react';\n\
+                const resolver = (\n\
+                {}environment: IsographEnvironment,\n\
+                {}artifact: IsographEntrypoint<any, any>,\n\
+                {}readOutData: any,\n\
+                {}filteredVariables: any\n\
+                ) => (mutationParams: any) => {{\n\
                 {spaces}const variables = includeReadOutData({{...filteredVariables, \
                 ...mutationParams}}, readOutData);\n\
                 {spaces}makeNetworkRequest(environment, artifact, variables);\n\
             }};\n\
-            "
+            ",
+                "  ", "  ", "  ", "  "
             ))
         }
     }
@@ -1235,7 +1245,7 @@ fn generate_resolver_import_statement(
 
 fn get_read_out_data(field_map: &[FieldMapItem]) -> String {
     let spaces = "  ";
-    let mut s = "const includeReadOutData = (variables, readOutData) => {\n".to_string();
+    let mut s = "const includeReadOutData = (variables: any, readOutData: any) => {\n".to_string();
 
     for item in field_map.iter() {
         // This is super hacky and due to the fact that argument names and field names are

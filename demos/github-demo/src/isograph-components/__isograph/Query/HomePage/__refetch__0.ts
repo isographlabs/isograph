@@ -28,7 +28,7 @@ const queryText = 'query User_refetch ($first: Int!, $id: ID!) { node____id___id
   },\
 }}}';
 
-const normalizationAst: NormalizationAst = [{ kind: "Linked", fieldName: "node", alias: null, arguments: [{ argumentName: "id", variableName: "id" }], selections: [
+const normalizationAst: NormalizationAst = [{ kind: "Linked", fieldName: "node", arguments: [[ "id", { kind: "Variable", name: "id" }]], selections: [
   {
     kind: "Scalar",
     fieldName: "login",

@@ -1,6 +1,10 @@
 import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
-import { makeNetworkRequest } from '@isograph/react';
-const resolver = (environment, artifact, variables) => () => makeNetworkRequest(environment, artifact, variables);
+import { makeNetworkRequest, type IsographEnvironment, type IsographEntrypoint } from '@isograph/react';
+const resolver = (
+  environment: IsographEnvironment,
+  artifact: IsographEntrypoint<any, any>,
+  variables: any
+) => () => makeNetworkRequest(environment, artifact, variables);
 
 // the type, when read out (either via useLazyReference or via graph)
 export type User____refetch__outputType = () => void;
