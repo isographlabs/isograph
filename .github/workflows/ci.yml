@@ -90,6 +90,32 @@ jobs:
       - name: 'Check working directory status'
         run: './scripts/check-git-status.sh'
 
+  typecheck-demos:
+    name: Typecheck Demos
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - folder: github-demo
+          - folder: pet-demo
+    steps:
+      - uses: actions/checkout@v2
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - name: Use Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      # TODO reuse some artifacts or something, we're doing this in multiple steps
+      - name: Build JS files
+        run: pnpm -r compile
+      - name: Typecheck
+        run: cd ./demos/${{ matrix.target.folder }} && yarn tsc
+
   build-js-packages:
     name: Build js packages
     runs-on: ubuntu-latest
@@ -188,6 +214,7 @@ jobs:
         build-website,
         prettier,
         rustfmt,
+        typecheck-demos,
       ]
     steps:
       - name: Do nothing

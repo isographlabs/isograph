@@ -5,6 +5,7 @@ import { AppBar, Button, Grid, Container } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { Route } from './GithubDemo';
 
+// @ts-ignore on CI, this fails to typecheck
 import logo from './svgs/dark-logo.svg';
 
 export const Header = iso(`
