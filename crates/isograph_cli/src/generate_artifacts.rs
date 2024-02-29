@@ -169,7 +169,7 @@ type MatchesWhitespaceAndString<
 export function iso(_isographLiteralText: string):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
-  | IsographEntrypoint<any, any, any>
+  | IsographEntrypoint<any, any>
 {
   return function identity<TResolverReturn>(
     clientFieldOrEntrypoint: (param: any) => TResolverReturn,
