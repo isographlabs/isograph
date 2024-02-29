@@ -19,6 +19,10 @@
 - serde deserializer for ConstantValue
 - enable unit tests for react-disposable-state
 
+## Top cleanup priorities
+
+- useLazyReference should refetch when props change
+
 ## V2 release
 
 - network error handling
