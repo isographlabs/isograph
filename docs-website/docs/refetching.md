@@ -27,13 +27,10 @@ You might use it as follows:
 
 ```tsx
 // Note: if you inline this function into the iso literal, you will not have to
-// annotate the type of props
-function PetRefetcherButtonComponent(props: PetRefetchButtonParams) {
-  return (
-    <Button onClick={() => props.data.__refetch()}>
-      Refetch {props.data.name}
-    </Button>
-  );
+// annotate the type of props. But if it is separate, TypeScript will complain that
+// it doesn't know the type of the data param.
+function PetRefetcherButtonComponent(data: PetRefetchButtonParams) {
+  return <Button onClick={() => data.__refetch()}>Refetch {data.name}</Button>;
 }
 ```
 

@@ -19,7 +19,7 @@ export const Avatar = iso(`
     name,
     avatar_url,
   }
-`)(function AvatarComponent({ data, ...otherRuntimeProps }) {
+`)(function AvatarComponent(data, otherRuntimeProps) {
   return <CircleImage image={data.avatar_url} />;
 });
 ```
@@ -35,7 +35,7 @@ export const UserProfileButton = iso(`
     id,
     name,
   }
-`)(function UserProfileButtonComponent({ data }) {
+`)(function UserProfileButtonComponent(data) {
   return (
     <Button onClick={() => navigateToUserProfile(data.id)}>
       {data.name}

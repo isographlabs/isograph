@@ -82,12 +82,12 @@ You might use it as follows:
 
 ```tsx
 // Note: if you inline this function into the iso literal, you will not have to
-// annotate the type of props
-function PetTaglineInputComponent(props: PetUpdaterParams) {
-  const [tagline, setTagline] = useState<string>(props.data.tagline);
+// annotate the type of props. If it is defined separately, TypeScript will probably
+// complain that it doesn't know what the type of data is.
+function PetTaglineInputComponent(data) {
+  const [tagline, setTagline] = useState<string>(data.tagline);
 
-  const updateTagline = () =>
-    props.data.set_pet_tagline({ input: { tagline } });
+  const updateTagline = () => data.set_pet_tagline({ input: { tagline } });
 
   return (
     <>

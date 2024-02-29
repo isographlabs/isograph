@@ -23,7 +23,7 @@ export const Avatar = iso(`
     name
     avatar_url
   }
-`)(function AvatarComponent({ data, ...otherRuntimeProps }) {
+`)(function AvatarComponent(data, otherRuntimeProps) {
   return <CircleImage image={data.avatar_url} />;
 });
 ```
@@ -39,7 +39,7 @@ export const UserProfileButton = iso(`
     id
     name
   }
-`)(function UserProfileButtonComponent({ data }) {
+`)(function UserProfileButtonComponent(data) {
   return (
     <Button onClick={() => navigateToUserProfile(data.id)}>
       {data.name}
@@ -49,7 +49,7 @@ export const UserProfileButton = iso(`
 });
 ```
 
-These calls to `iso` define resolvers, which are functions from graph data (such as the user's name) to an arbitrary value. With Isograph, it's resolvers all the way down — your entire app can be built in this way!
+These calls to `iso` define client fields, which are functions from graph data (such as the user's name) to an arbitrary value. With Isograph, it's resolvers all the way down — your entire app can be built in this way!
 
 ### How does Isograph fetch data?
 
@@ -127,9 +127,9 @@ export const UpdateUserNameButton = iso(`
   field User.UpdateUserNameButton {
     set_user_name
   }
-`)(({ data: { set_user_name } }) => {
+`)((data) => {
   return (
-    <div onClick={() => set_user_name({ input: { new_name: 'Maybe' } })}>
+    <div onClick={() => data.set_user_name({ input: { new_name: 'Maybe' } })}>
       Call me, maybe
     </div>
   );

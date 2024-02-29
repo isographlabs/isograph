@@ -182,7 +182,7 @@ import { iso } from '@iso';
 
 export const HomePage = iso(`
   field Root.HomePage @component {}
-`)(function HomePageComponent(props) {
+`)(function HomePageComponent(data) {
   return 'Hello from the home page!';
 });
 ```
@@ -206,12 +206,12 @@ export const HomePage = iso(`
       }
     }
   }
-`)(function HomePageComponent(props) {
+`)(function HomePageComponent(data) {
   return 'Hello from the home page!';
 });
 ```
 
-Now, when the component is called, the `props` argument will include a `data` property whose type is:
+Now, when the component is called, the first argument (`data`) will have type:
 
 ```tsx
 type Data = {
@@ -225,7 +225,7 @@ type Data = {
 };
 ```
 
-Every time you save, the Isograph compiler will recompile everything, including re-generating the type of the iso function. This means that TypeScript knows the type of the `props` parameter:
+Every time you save, the Isograph compiler will recompile everything, including re-generating the type of the iso function. This means that TypeScript knows the type of the `data` parameter without you having to do anything!
 
 <img src={DataTypeSrc} height="308" />
 
@@ -255,10 +255,10 @@ export const HomePage = iso(`
       }
     }
   }
-`)(function HomePageComponent(props) {
+`)(function HomePageComponent(data) {
   const films = useMemo(
     () =>
-      toSorted(props.data.allFilms?.films ?? [], (film1, film2) => {
+      toSorted(data.allFilms?.films ?? [], (film1, film2) => {
         if (film1?.episodeID == null || film2?.episodeID == null) {
           throw new Error(
             'This API should not return null films or null episode IDs.',
@@ -266,7 +266,7 @@ export const HomePage = iso(`
         }
         return film1.episodeID > film2.episodeID ? 1 : -1;
       }).filter(nonNullable),
-    [props.data.allFilms?.films],
+    [data.allFilms?.films],
   );
 
   return (
@@ -362,7 +362,7 @@ export const EpisodeTitle = iso(`
     title
     episodeID
   }
-`)(function EpisodeTitleComponent({ data }) {
+`)(function EpisodeTitleComponent(data) {
   return (
     <h2>
       Episode {data.episodeID}: {data.title}
@@ -397,10 +397,10 @@ export const HomePage = iso(`
       }
     }
   }
-`)(function HomePageComponent(props) {
+`)(function HomePageComponent(data) {
   const films = useMemo(
     () =>
-      toSorted(props.data.allFilms?.films ?? [], (film1, film2) => {
+      toSorted(data.allFilms?.films ?? [], (film1, film2) => {
         if (film1?.episodeID == null || film2?.episodeID == null) {
           throw new Error(
             'This API should not return null films or null episode IDs.',
@@ -408,7 +408,7 @@ export const HomePage = iso(`
         }
         return film1.episodeID > film2.episodeID ? 1 : -1;
       }).filter(nonNullable),
-    [props.data.allFilms?.films],
+    [data.allFilms?.films],
   );
 
   return (
