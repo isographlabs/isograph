@@ -7,8 +7,6 @@ import {
   Route,
 } from './GithubDemo';
 
-import Entrypoint from '@iso/Query/PullRequest/entrypoint';
-
 import { Container } from '@mui/material';
 
 export const PullRequest = iso(`
@@ -36,7 +34,7 @@ export function PullRequestRoute({
   route: PullRequestRouteType;
   setRoute: (route: Route) => void;
 }) {
-  const { queryReference } = useLazyReference<typeof Entrypoint>(
+  const { queryReference } = useLazyReference(
     iso(`entrypoint Query.PullRequest`),
     {
       pullRequestNumber: route.pullRequestNumber,

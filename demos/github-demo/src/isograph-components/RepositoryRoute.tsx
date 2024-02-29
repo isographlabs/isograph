@@ -2,7 +2,6 @@ import React from 'react';
 import { useLazyReference, useResult } from '@isograph/react';
 import { iso } from '@iso';
 import { Container } from '@mui/material';
-import RepositoryPageEntrypoint from '@iso/Query/RepositoryPage/entrypoint';
 
 import {
   FullPageLoading,
@@ -35,7 +34,7 @@ export function RepositoryRoute({
   route: RepositoryRouteType;
   setRoute: (route: Route) => void;
 }) {
-  const { queryReference } = useLazyReference<typeof RepositoryPageEntrypoint>(
+  const { queryReference } = useLazyReference(
     iso(`entrypoint Query.RepositoryPage`),
     {
       repositoryName: route.repositoryName,
