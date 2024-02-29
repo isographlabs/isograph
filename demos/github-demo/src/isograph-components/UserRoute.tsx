@@ -14,7 +14,16 @@ export const UserPage = iso(`
     Header
     UserDetail
   }
-`)(function UserRouteComponentComponent({ data, route, setRoute }) {
+`)(function UserRouteComponentComponent(
+  data,
+  {
+    route,
+    setRoute,
+  }: {
+    route: Route;
+    setRoute: (newRoute: Route) => void;
+  },
+) {
   return (
     <>
       <data.Header route={route} setRoute={setRoute} />
