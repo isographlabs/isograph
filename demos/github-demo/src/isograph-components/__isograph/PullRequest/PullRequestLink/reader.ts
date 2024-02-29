@@ -53,7 +53,6 @@ export type PullRequest__PullRequestLink__param = {
 
 const artifact: ReaderArtifact<
   PullRequest__PullRequestLink__param,
-  PullRequest__PullRequestLink__param,
   PullRequest__PullRequestLink__outputType
 > = {
   kind: "ReaderArtifact",

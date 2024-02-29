@@ -53,7 +53,6 @@ export type Query__HomePageList__param = {
 
 const artifact: ReaderArtifact<
   Query__HomePageList__param,
-  Query__HomePageList__param,
   Query__HomePageList__outputType
 > = {
   kind: "ReaderArtifact",

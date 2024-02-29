@@ -23,7 +23,6 @@ export type ResolverReturnType = ReturnType<typeof resolver>;
 
 const artifact: ReaderArtifact<
   User____refetch__param,
-  User____refetch__param,
   User____refetch__outputType
 > = {
   kind: "ReaderArtifact",

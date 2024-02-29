@@ -26,7 +26,6 @@ export type Starrable__IsStarred__param = {
 
 const artifact: ReaderArtifact<
   Starrable__IsStarred__param,
-  Starrable__IsStarred__param,
   Starrable__IsStarred__outputType
 > = {
   kind: "ReaderArtifact",

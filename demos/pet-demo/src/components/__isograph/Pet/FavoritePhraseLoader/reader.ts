@@ -19,7 +19,6 @@ export type Pet__FavoritePhraseLoader__param = {
 
 const artifact: ReaderArtifact<
   Pet__FavoritePhraseLoader__param,
-  Pet__FavoritePhraseLoader__param,
   Pet__FavoritePhraseLoader__outputType
 > = {
   kind: "ReaderArtifact",

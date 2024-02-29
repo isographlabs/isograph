@@ -41,7 +41,6 @@ export type Query__PetFavoritePhrase__param = {
 
 const artifact: ReaderArtifact<
   Query__PetFavoritePhrase__param,
-  Query__PetFavoritePhrase__param,
   Query__PetFavoritePhrase__outputType
 > = {
   kind: "ReaderArtifact",

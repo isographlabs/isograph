@@ -159,7 +159,6 @@ const normalizationAst: NormalizationAst = [
 ];
 const artifact: IsographEntrypoint<
   Query__PullRequest__param,
-  Query__PullRequest__param,
   Query__PullRequest__outputType
 > = {
   kind: "Entrypoint",

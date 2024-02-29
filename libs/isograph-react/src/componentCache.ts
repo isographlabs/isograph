@@ -10,7 +10,7 @@ export function getOrCreateCachedComponent(
   environment: IsographEnvironment,
   root: DataId,
   componentName: string,
-  readerArtifact: ReaderArtifact<any, any, any>,
+  readerArtifact: ReaderArtifact<any, any>,
   variables: { [key: string]: string },
   resolverRefetchQueries: RefetchQueryArtifactWrapper[],
 ) {

@@ -19,7 +19,6 @@ export type Actor__UserLink__param = {
 
 const artifact: ReaderArtifact<
   Actor__UserLink__param,
-  Actor__UserLink__param,
   Actor__UserLink__outputType
 > = {
   kind: "ReaderArtifact",

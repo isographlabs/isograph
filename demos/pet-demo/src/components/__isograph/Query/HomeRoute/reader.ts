@@ -38,7 +38,6 @@ export type Query__HomeRoute__param = {
 
 const artifact: ReaderArtifact<
   Query__HomeRoute__param,
-  Query__HomeRoute__param,
   Query__HomeRoute__outputType
 > = {
   kind: "ReaderArtifact",

@@ -49,7 +49,6 @@ export type Pet__PetSummaryCard__param = {
 
 const artifact: ReaderArtifact<
   Pet__PetSummaryCard__param,
-  Pet__PetSummaryCard__param,
   Pet__PetSummaryCard__outputType
 > = {
   kind: "ReaderArtifact",

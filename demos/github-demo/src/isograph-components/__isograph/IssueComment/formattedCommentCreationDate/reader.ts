@@ -19,7 +19,6 @@ export type IssueComment__formattedCommentCreationDate__param = {
 
 const artifact: ReaderArtifact<
   IssueComment__formattedCommentCreationDate__param,
-  IssueComment__formattedCommentCreationDate__param,
   IssueComment__formattedCommentCreationDate__outputType
 > = {
   kind: "ReaderArtifact",

@@ -70,7 +70,6 @@ export type Query__PetDetailRoute__param = {
 
 const artifact: ReaderArtifact<
   Query__PetDetailRoute__param,
-  Query__PetDetailRoute__param,
   Query__PetDetailRoute__outputType
 > = {
   kind: "ReaderArtifact",

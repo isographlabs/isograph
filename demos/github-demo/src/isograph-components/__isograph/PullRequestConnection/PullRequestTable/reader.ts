@@ -111,7 +111,6 @@ export type PullRequestConnection__PullRequestTable__param = {
 
 const artifact: ReaderArtifact<
   PullRequestConnection__PullRequestTable__param,
-  PullRequestConnection__PullRequestTable__param,
   PullRequestConnection__PullRequestTable__outputType
 > = {
   kind: "ReaderArtifact",

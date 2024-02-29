@@ -6,7 +6,6 @@ import {
   type IsographEntrypoint,
   type FragmentReference,
   ExtractReadFromStore,
-  ExtractResolverProps,
   ExtractResolverResult,
   ROOT_ID,
   useIsographEnvironment,
@@ -14,14 +13,13 @@ import {
 } from './index';
 
 export function useImperativeReference<
-  TEntrypoint extends IsographEntrypoint<any, any, any>,
+  TEntrypoint extends IsographEntrypoint<any, any>,
 >(
   entrypoint: TEntrypoint,
 ): {
   queryReference:
     | FragmentReference<
         ExtractReadFromStore<TEntrypoint>,
-        ExtractResolverProps<TEntrypoint>,
         ExtractResolverResult<TEntrypoint>
       >
     | UnassignedState;
@@ -31,7 +29,6 @@ export function useImperativeReference<
     useUpdatableDisposableState<
       FragmentReference<
         ExtractReadFromStore<TEntrypoint>,
-        ExtractResolverProps<TEntrypoint>,
         ExtractResolverResult<TEntrypoint>
       >
     >();

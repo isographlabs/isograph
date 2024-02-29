@@ -142,7 +142,6 @@ export type User__RepositoryList__param = {
 
 const artifact: ReaderArtifact<
   User__RepositoryList__param,
-  User__RepositoryList__param,
   User__RepositoryList__outputType
 > = {
   kind: "ReaderArtifact",

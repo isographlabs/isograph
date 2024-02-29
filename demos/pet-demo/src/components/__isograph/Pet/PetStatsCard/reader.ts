@@ -93,7 +93,6 @@ export type Pet__PetStatsCard__param = {
 
 const artifact: ReaderArtifact<
   Pet__PetStatsCard__param,
-  Pet__PetStatsCard__param,
   Pet__PetStatsCard__outputType
 > = {
   kind: "ReaderArtifact",

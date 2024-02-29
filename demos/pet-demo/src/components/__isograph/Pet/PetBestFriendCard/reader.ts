@@ -76,7 +76,6 @@ export type Pet__PetBestFriendCard__param = {
 
 const artifact: ReaderArtifact<
   Pet__PetBestFriendCard__param,
-  Pet__PetBestFriendCard__param,
   Pet__PetBestFriendCard__outputType
 > = {
   kind: "ReaderArtifact",

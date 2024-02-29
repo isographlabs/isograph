@@ -26,7 +26,6 @@ export type Pet__PetTaglineCard__param = {
 
 const artifact: ReaderArtifact<
   Pet__PetTaglineCard__param,
-  Pet__PetTaglineCard__param,
   Pet__PetTaglineCard__outputType
 > = {
   kind: "ReaderArtifact",

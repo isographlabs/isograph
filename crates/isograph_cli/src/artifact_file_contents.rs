@@ -30,7 +30,6 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             const normalizationAst: NormalizationAst = {normalization_ast};\n\
             const artifact: IsographEntrypoint<\n\
             {}{entrypoint_params_typename},\n\
-            {}{entrypoint_params_typename},\n\
             {}{entrypoint_output_type_name}\n\
             > = {{\n\
             {}kind: \"Entrypoint\",\n\
@@ -40,7 +39,6 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             {}readerArtifact: readerResolver,\n\
             }};\n\n\
             export default artifact;\n",
-            "  ",
             "  ",
             "  ",
             "  ",
@@ -104,7 +102,6 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             {resolver_return_type}\
             const artifact: ReaderArtifact<\n\
             {}{reader_param_type},\n\
-            {}{reader_param_type},\n\
             {}{reader_output_type}\n\
             > = {{\n\
             {}kind: \"ReaderArtifact\",\n\
@@ -113,7 +110,12 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             {}variant: {variant},\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ", "  ",
+            "  ",
+            "  ",
+            "  ",
+            "  ",
+            "  ",
+            "  ",
         )
     }
 }

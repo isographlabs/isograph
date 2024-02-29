@@ -59,7 +59,6 @@ export type Pet__PetUpdater__param = {
 
 const artifact: ReaderArtifact<
   Pet__PetUpdater__param,
-  Pet__PetUpdater__param,
   Pet__PetUpdater__outputType
 > = {
   kind: "ReaderArtifact",

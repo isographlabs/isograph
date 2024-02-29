@@ -33,7 +33,6 @@ export type ResolverReturnType = any;
 
 const artifact: ReaderArtifact<
   Pet__set_pet_tagline__param,
-  Pet__set_pet_tagline__param,
   Pet__set_pet_tagline__outputType
 > = {
   kind: "ReaderArtifact",

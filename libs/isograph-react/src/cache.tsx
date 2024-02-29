@@ -70,11 +70,11 @@ export function stableCopy<T>(value: T): T {
   return stable as any;
 }
 
-type IsoResolver = IsographEntrypoint<any, any, any>;
+type IsoResolver = IsographEntrypoint<any, any>;
 
 export function getOrCreateCacheForArtifact<T>(
   environment: IsographEnvironment,
-  artifact: IsographEntrypoint<any, any, T>,
+  artifact: IsographEntrypoint<any, T>,
   variables: object,
 ): ParentCache<PromiseWrapper<T>> {
   const cacheKey = artifact.queryText + JSON.stringify(stableCopy(variables));

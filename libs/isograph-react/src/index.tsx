@@ -42,30 +42,21 @@ export { EntrypointReader } from './EntrypointReader';
 // This type should be treated as an opaque type.
 export type IsographEntrypoint<
   TReadFromStore extends Object,
-  TResolverProps,
   TResolverResult,
 > = {
   kind: 'Entrypoint';
   queryText: string;
   normalizationAst: NormalizationAst;
-  readerArtifact: ReaderArtifact<
-    TReadFromStore,
-    TResolverProps,
-    TResolverResult
-  >;
+  readerArtifact: ReaderArtifact<TReadFromStore, TResolverResult>;
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
 // TODO this should probably be at least three distinct types, for @component,
 // non-@component and refetch resolvers
-export type ReaderArtifact<
-  TReadFromStore extends Object,
-  TResolverProps,
-  TResolverResult,
-> = {
+export type ReaderArtifact<TReadFromStore extends Object, TResolverResult> = {
   kind: 'ReaderArtifact';
   readerAst: ReaderAst<TReadFromStore>;
-  resolver: (data: TResolverProps, runtimeProps: any) => TResolverResult;
+  resolver: (data: TReadFromStore, runtimeProps: any) => TResolverResult;
   variant: ReaderResolverVariant;
 };
 
@@ -105,7 +96,7 @@ export type ReaderResolverVariant =
 export type ReaderResolverField = {
   kind: 'Resolver';
   alias: string;
-  readerArtifact: ReaderArtifact<any, any, any>;
+  readerArtifact: ReaderArtifact<any, any>;
   arguments: Arguments | null;
   usedRefetchQueries: number[];
 };
@@ -114,7 +105,7 @@ export type ReaderRefetchField = {
   kind: 'RefetchField';
   alias: string;
   // TODO this bad modeling. A refetch field cannot have variant: "Component" (I think)
-  readerArtifact: ReaderArtifact<any, any, any>;
+  readerArtifact: ReaderArtifact<any, any>;
   refetchQuery: number;
 };
 
@@ -122,7 +113,7 @@ export type ReaderMutationField = {
   kind: 'MutationField';
   alias: string;
   // TODO this bad modeling. A mutation field cannot have variant: "Component" (I think)
-  readerArtifact: ReaderArtifact<any, any, any>;
+  readerArtifact: ReaderArtifact<any, any>;
   refetchQuery: number;
   allowedVariables: string[];
 };
@@ -177,46 +168,31 @@ type Variable = any;
 
 export type FragmentReference<
   TReadFromStore extends Object,
-  TResolverProps,
   TResolverResult,
 > = {
   kind: 'FragmentReference';
-  readerArtifact: ReaderArtifact<
-    TReadFromStore,
-    TResolverProps,
-    TResolverResult
-  >;
+  readerArtifact: ReaderArtifact<TReadFromStore, TResolverResult>;
   root: DataId;
   variables: { [index: string]: Variable } | null;
   // TODO: We should instead have ReaderAst<TResolverProps>
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
-function assertIsEntrypoint<
-  TReadFromStore extends Object,
-  TResolverProps,
-  TResolverResult,
->(
+function assertIsEntrypoint<TReadFromStore extends Object, TResolverResult>(
   value:
-    | IsographEntrypoint<TReadFromStore, TResolverProps, TResolverResult>
+    | IsographEntrypoint<TReadFromStore, TResolverResult>
     | ((_: any) => any)
     // Temporarily, allow any here. Once we automatically provide
     // types to entrypoints, we probably don't need this.
     | any,
-): asserts value is IsographEntrypoint<
-  TReadFromStore,
-  TResolverProps,
-  TResolverResult
-> {
+): asserts value is IsographEntrypoint<TReadFromStore, TResolverResult> {
   if (typeof value === 'function') throw new Error('Not a string');
 }
 
 export type ExtractReadFromStore<Type> =
-  Type extends IsographEntrypoint<infer X, any, any> ? X : never;
-export type ExtractResolverProps<Type> =
-  Type extends IsographEntrypoint<any, infer X, any> ? X : never;
+  Type extends IsographEntrypoint<infer X, any> ? X : never;
 export type ExtractResolverResult<Type> =
-  Type extends IsographEntrypoint<any, any, infer X> ? X : never;
+  Type extends IsographEntrypoint<any, infer X> ? X : never;
 // Note: we cannot write TEntrypoint extends IsographEntrypoint<any, any, any>, or else
 // if we do not explicitly pass a type, the read out type will be any.
 // We cannot write TEntrypoint extends IsographEntrypoint<never, never, never>, or else
@@ -232,14 +208,12 @@ export function useLazyReference<TEntrypoint>(
 ): {
   queryReference: FragmentReference<
     ExtractReadFromStore<TEntrypoint>,
-    ExtractResolverProps<TEntrypoint>,
     ExtractResolverResult<TEntrypoint>
   >;
 } {
   const environment = useIsographEnvironment();
   assertIsEntrypoint<
     ExtractReadFromStore<TEntrypoint>,
-    ExtractResolverProps<TEntrypoint>,
     ExtractResolverResult<TEntrypoint>
   >(entrypoint);
   const cache = getOrCreateCacheForArtifact<ExtractResolverResult<TEntrypoint>>(
@@ -266,16 +240,8 @@ export function useLazyReference<TEntrypoint>(
   };
 }
 
-export function useResult<
-  TReadFromStore extends Object,
-  TResolverProps,
-  TResolverResult,
->(
-  fragmentReference: FragmentReference<
-    TReadFromStore,
-    TResolverProps,
-    TResolverResult
-  >,
+export function useResult<TReadFromStore extends Object, TResolverResult>(
+  fragmentReference: FragmentReference<TReadFromStore, TResolverResult>,
 ): TResolverResult {
   const environment = useIsographEnvironment();
 
@@ -289,17 +255,9 @@ export function useResult<
   return read(environment, fragmentReference);
 }
 
-export function read<
-  TReadFromStore extends Object,
-  TResolverProps,
-  TResolverResult,
->(
+export function read<TReadFromStore extends Object, TResolverResult>(
   environment: IsographEnvironment,
-  fragmentReference: FragmentReference<
-    TReadFromStore,
-    TResolverProps,
-    TResolverResult
-  >,
+  fragmentReference: FragmentReference<TReadFromStore, TResolverResult>,
 ): TResolverResult {
   const variant = fragmentReference.readerArtifact.variant;
   if (variant.kind === 'Eager') {
@@ -333,7 +291,7 @@ export function read<
 
 export function readButDoNotEvaluate<TReadFromStore extends Object>(
   environment: IsographEnvironment,
-  reference: FragmentReference<TReadFromStore, unknown, unknown>,
+  reference: FragmentReference<TReadFromStore, unknown>,
 ): TReadFromStore {
   const response = readData(
     environment,

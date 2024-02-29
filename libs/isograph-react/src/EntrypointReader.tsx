@@ -1,18 +1,16 @@
 import * as React from 'react';
 import {
   ExtractReadFromStore,
-  ExtractResolverProps,
   IsographEntrypoint,
   type FragmentReference,
   useResult,
 } from './index';
 
 export function EntrypointReader<
-  TEntrypoint extends IsographEntrypoint<any, any, React.FC<any>>,
+  TEntrypoint extends IsographEntrypoint<any, React.FC<any>>,
 >(props: {
   queryReference: FragmentReference<
     ExtractReadFromStore<TEntrypoint>,
-    ExtractResolverProps<TEntrypoint>,
     React.FC<any>
   >;
   additionalProps?: any | void;

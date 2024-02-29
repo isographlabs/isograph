@@ -26,7 +26,6 @@ export type User__Avatar__param = {
 
 const artifact: ReaderArtifact<
   User__Avatar__param,
-  User__Avatar__param,
   User__Avatar__outputType
 > = {
   kind: "ReaderArtifact",

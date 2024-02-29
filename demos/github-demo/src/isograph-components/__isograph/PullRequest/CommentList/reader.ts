@@ -87,7 +87,6 @@ export type PullRequest__CommentList__param = {
 
 const artifact: ReaderArtifact<
   PullRequest__CommentList__param,
-  PullRequest__CommentList__param,
   PullRequest__CommentList__outputType
 > = {
   kind: "ReaderArtifact",

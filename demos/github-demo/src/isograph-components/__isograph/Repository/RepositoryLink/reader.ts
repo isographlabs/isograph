@@ -43,7 +43,6 @@ export type Repository__RepositoryLink__param = {
 
 const artifact: ReaderArtifact<
   Repository__RepositoryLink__param,
-  Repository__RepositoryLink__param,
   Repository__RepositoryLink__outputType
 > = {
   kind: "ReaderArtifact",

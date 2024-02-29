@@ -32,7 +32,6 @@ export type ResolverReturnType = any;
 
 const artifact: ReaderArtifact<
   Pet__set_pet_best_friend__param,
-  Pet__set_pet_best_friend__param,
   Pet__set_pet_best_friend__outputType
 > = {
   kind: "ReaderArtifact",

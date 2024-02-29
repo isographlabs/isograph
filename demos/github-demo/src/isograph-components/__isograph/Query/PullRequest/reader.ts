@@ -30,7 +30,6 @@ export type Query__PullRequest__param = {
 
 const artifact: ReaderArtifact<
   Query__PullRequest__param,
-  Query__PullRequest__param,
   Query__PullRequest__outputType
 > = {
   kind: "ReaderArtifact",

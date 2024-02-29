@@ -43,7 +43,6 @@ export type Query__UserDetail__param = {
 
 const artifact: ReaderArtifact<
   Query__UserDetail__param,
-  Query__UserDetail__param,
   Query__UserDetail__outputType
 > = {
   kind: "ReaderArtifact",

@@ -19,7 +19,6 @@ export type PullRequest__createdAtFormatted__param = {
 
 const artifact: ReaderArtifact<
   PullRequest__createdAtFormatted__param,
-  PullRequest__createdAtFormatted__param,
   PullRequest__createdAtFormatted__outputType
 > = {
   kind: "ReaderArtifact",

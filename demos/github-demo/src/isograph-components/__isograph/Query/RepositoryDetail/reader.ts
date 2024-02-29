@@ -98,7 +98,6 @@ export type Query__RepositoryDetail__param = {
 
 const artifact: ReaderArtifact<
   Query__RepositoryDetail__param,
-  Query__RepositoryDetail__param,
   Query__RepositoryDetail__outputType
 > = {
   kind: "ReaderArtifact",

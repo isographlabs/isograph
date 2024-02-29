@@ -38,7 +38,6 @@ export type Query__Header__param = {
 
 const artifact: ReaderArtifact<
   Query__Header__param,
-  Query__Header__param,
   Query__Header__outputType
 > = {
   kind: "ReaderArtifact",

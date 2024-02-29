@@ -30,7 +30,6 @@ export type Query__RepositoryPage__param = {
 
 const artifact: ReaderArtifact<
   Query__RepositoryPage__param,
-  Query__RepositoryPage__param,
   Query__RepositoryPage__outputType
 > = {
   kind: "ReaderArtifact",

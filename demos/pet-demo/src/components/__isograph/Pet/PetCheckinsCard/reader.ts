@@ -50,7 +50,6 @@ export type Pet__PetCheckinsCard__param = {
 
 const artifact: ReaderArtifact<
   Pet__PetCheckinsCard__param,
-  Pet__PetCheckinsCard__param,
   Pet__PetCheckinsCard__outputType
 > = {
   kind: "ReaderArtifact",
