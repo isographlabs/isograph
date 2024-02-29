@@ -18,6 +18,10 @@ type IdentityWithParam<TParam> = <TResolverReturn>(
   x: (param: TParam) => TResolverReturn
 ) => (param: TParam) => TResolverReturn;
 
+type IdentityWithParam2<TParam> = <TResolverReturn, TSecondProps>(
+  x: (param: TParam, otherProps: TSecondProps) => TResolverReturn
+) => (param: TParam, otherProps: TSecondProps) => TResolverReturn;
+
 type WhitespaceCharacter = ' ' | '\t' | '\n';
 type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
   ? Whitespace<In>
@@ -27,6 +31,11 @@ type MatchesWhitespaceAndString<
   TString extends string,
   T
 > = Whitespace<T> extends `${TString}${string}` ? T : never;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Pet.PetUpdater', T>
+// ): IdentityWithParam<Pet__PetUpdater__param>;
+): IdentityWithParam2<Pet__PetUpdater__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.HomeRoute', T>
@@ -67,10 +76,6 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.PetTaglineCard', T>
 ): IdentityWithParam<Pet__PetTaglineCard__param>;
-
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'field Pet.PetUpdater', T>
-): IdentityWithParam<Pet__PetUpdater__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.HomeRoute', T>

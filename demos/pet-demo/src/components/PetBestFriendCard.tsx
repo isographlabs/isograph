@@ -21,7 +21,7 @@ export const PetBestFriendCard = iso(`
     return (
       <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
         <CardContent>
-          <props.data.PetUpdater parentId={props.data.id} />
+          <props.data.PetUpdater bar={props.data.id} />
         </CardContent>
       </Card>
     );
