@@ -138,7 +138,8 @@ const normalizationAst: NormalizationAst = [
     ],
   },
 ];
-const artifact: IsographEntrypoint<Query__PetDetailRoute__param,
+const artifact: IsographEntrypoint<
+  Query__PetDetailRoute__param,
   Query__PetDetailRoute__param,
   Query__PetDetailRoute__outputType
 > = {

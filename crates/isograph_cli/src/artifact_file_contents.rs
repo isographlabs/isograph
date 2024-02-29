@@ -28,7 +28,8 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             {refetch_query_artifact_import}\n\n\
             const queryText = '{query_text}';\n\n\
             const normalizationAst: NormalizationAst = {normalization_ast};\n\
-            const artifact: IsographEntrypoint<{entrypoint_params_typename},\n\
+            const artifact: IsographEntrypoint<\n\
+            {}{entrypoint_params_typename},\n\
             {}{entrypoint_params_typename},\n\
             {}{entrypoint_output_type_name}\n\
             > = {{\n\
@@ -39,6 +40,7 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             {}readerArtifact: readerResolver,\n\
             }};\n\n\
             export default artifact;\n",
+            "  ",
             "  ",
             "  ",
             "  ",

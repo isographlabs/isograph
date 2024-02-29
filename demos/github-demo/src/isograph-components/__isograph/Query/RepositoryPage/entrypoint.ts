@@ -251,7 +251,8 @@ const normalizationAst: NormalizationAst = [
     ],
   },
 ];
-const artifact: IsographEntrypoint<Query__RepositoryPage__param,
+const artifact: IsographEntrypoint<
+  Query__RepositoryPage__param,
   Query__RepositoryPage__param,
   Query__RepositoryPage__outputType
 > = {

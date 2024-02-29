@@ -41,7 +41,8 @@ const normalizationAst: NormalizationAst = [
     ],
   },
 ];
-const artifact: IsographEntrypoint<Query__HomeRoute__param,
+const artifact: IsographEntrypoint<
+  Query__HomeRoute__param,
   Query__HomeRoute__param,
   Query__HomeRoute__outputType
 > = {
