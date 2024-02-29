@@ -120,7 +120,6 @@ export type ReaderMutationField = {
 export type NormalizationAstNode =
   | NormalizationScalarField
   | NormalizationLinkedField;
-// @ts-ignore
 export type NormalizationAst = NormalizationAstNode[];
 
 export type NormalizationScalarField = {

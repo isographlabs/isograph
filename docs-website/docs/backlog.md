@@ -59,7 +59,6 @@
 ## Cleanup backlog
 
 - Typegen code is a mess
-  - Rename ResolverParameterType to TypeNameFieldNameParameter or something
 - JS code needs structure, etc.
 - `HACK__merge_linked_fields` is indicative of the fact that merged linked fields should contain hashmaps of key => merged item, instead of vectors of merged items.
 - Objects which do not have IDs should be merged into their parent object in the store.
