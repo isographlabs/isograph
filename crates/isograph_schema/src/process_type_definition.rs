@@ -571,10 +571,27 @@ impl UnvalidatedSchema {
 pub struct FieldMapItem {
     // TODO eventually, we want to support . syntax here, too
     pub from: StringLiteralValue,
-    /// Everything that is before the first . in the to field
-    pub to_argument_name: WithSpan<StringLiteralValue>,
-    /// Everything after the first ., split on .
-    pub to_field_names: Vec<WithSpan<StringLiteralValue>>,
+    pub to: StringLiteralValue,
+}
+
+pub struct SplitToArg {
+    pub to_argument_name: StringLiteralValue,
+    pub to_field_names: Vec<StringLiteralValue>,
+}
+
+impl FieldMapItem {
+    pub fn split_to_arg(&self) -> SplitToArg {
+        let mut split = self.to.lookup().split('.');
+        let to_argument_name = split.next().expect(
+            "Expected at least one item returned \
+                by split. This is indicative of a bug in Isograph.",
+        );
+
+        SplitToArg {
+            to_argument_name: to_argument_name.intern().into(),
+            to_field_names: split.into_iter().map(|x| x.intern().into()).collect(),
+        }
+    }
 }
 
 /// Returns the resolvers for a schema object that we know up-front (before processing
@@ -885,7 +902,7 @@ pub enum ProcessTypeDefinitionError {
     // TODO include which fields were unused
     #[error("Not all fields specified as 'to' fields in the @exposeField directive field_map were found \
         on the mutation field. Unused fields: {}",
-        unused_field_map_items.iter().map(|x| format!("'{}'", x.to_argument_name)).collect::<Vec<_>>().join(", ")
+        unused_field_map_items.iter().map(|x| format!("'{}'", x.split_to_arg().to_argument_name)).collect::<Vec<_>>().join(", ")
     )]
     NotAllToFieldsUsed {
         unused_field_map_items: Vec<FieldMapItem>,

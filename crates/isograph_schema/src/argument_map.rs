@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use common_lang_types::{
     DescriptionValue, InputValueName, IsographObjectTypeName, Location, SelectableFieldName, Span,
-    StringLiteralValue, TextSource, WithLocation, WithSpan,
+    StringLiteralValue, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInputValueDefinition,
@@ -40,9 +40,9 @@ impl ArgumentMap {
         primary_type_name: IsographObjectTypeName,
         mutation_object_name: IsographObjectTypeName,
         mutation_field_name: SelectableFieldName,
-        text_source: TextSource,
         schema: &mut UnvalidatedSchema,
     ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem> {
+        let split_to_arg = field_map_item.split_to_arg();
         let (index_of_argument, argument) = self
             .arguments
             .iter_mut()
@@ -54,7 +54,7 @@ impl ArgumentMap {
                         modified_argument.name.item
                     }
                 };
-                name.lookup() == field_map_item.to_argument_name.item.lookup()
+                name.lookup() == split_to_arg.to_argument_name.lookup()
             })
             .ok_or_else(|| {
                 WithLocation::new(
@@ -62,21 +62,18 @@ impl ArgumentMap {
                         primary_type_name,
                         mutation_object_name,
                         mutation_field_name,
-                        field_name: field_map_item.to_argument_name.item.lookup().to_string(),
+                        field_name: split_to_arg.to_argument_name.lookup().to_string(),
                     },
-                    Location::new(text_source, field_map_item.to_argument_name.span),
+                    Location::generated(),
                 )
             })?;
 
         // TODO avoid matching twice?
         let location = argument.location;
 
-        let to_field_names = &field_map_item.to_field_names;
-        let to_argument_name = &field_map_item.to_argument_name;
-
         let processed_field_map_item = match &mut argument.item {
             PotentiallyModifiedArgument::Unmodified(unmodified_argument) => {
-                match to_field_names.split_first() {
+                match split_to_arg.to_field_names.split_first() {
                     None => {
                         match schema
                             .schema_data
@@ -87,9 +84,12 @@ impl ArgumentMap {
                                 DefinedTypeId::Object(_) => return Err(WithLocation::new(
                                     ProcessTypeDefinitionError::PrimaryDirectiveCannotRemapObject {
                                         primary_type_name,
-                                        field_name: to_argument_name.item.lookup().to_string(),
+                                        field_name: split_to_arg
+                                            .to_argument_name
+                                            .lookup()
+                                            .to_string(),
                                     },
-                                    Location::new(text_source, to_argument_name.span),
+                                    Location::generated(),
                                 )),
                                 DefinedTypeId::Scalar(_) => {}
                             },
@@ -108,13 +108,8 @@ impl ArgumentMap {
                         let mut arg =
                             ModifiedArgument::from_unmodified(unmodified_argument, schema);
 
-                        let _processed_field_map_item = arg.remove_to_field(
-                            schema,
-                            first,
-                            rest,
-                            primary_type_name,
-                            text_source,
-                        )?;
+                        let _processed_field_map_item =
+                            arg.remove_to_field(schema, *first, rest, primary_type_name)?;
 
                         *argument =
                             WithLocation::new(PotentiallyModifiedArgument::Modified(arg), location);
@@ -125,7 +120,7 @@ impl ArgumentMap {
                 }
             }
             PotentiallyModifiedArgument::Modified(modified) => {
-                let to_field_names = &field_map_item.to_field_names;
+                let to_field_names = &split_to_arg.to_field_names;
                 match to_field_names.split_first() {
                     None => {
                         // TODO encode this in the type system.
@@ -134,19 +129,13 @@ impl ArgumentMap {
                         return Err(WithLocation::new(
                             ProcessTypeDefinitionError::PrimaryDirectiveCannotRemapObject {
                                 primary_type_name,
-                                field_name: to_argument_name.item.to_string(),
+                                field_name: split_to_arg.to_argument_name.to_string(),
                             },
-                            Location::new(text_source, field_map_item.to_argument_name.span),
+                            Location::generated(),
                         ));
                     }
                     Some((first, rest)) => {
-                        modified.remove_to_field(
-                            schema,
-                            first,
-                            rest,
-                            primary_type_name,
-                            text_source,
-                        )?;
+                        modified.remove_to_field(schema, *first, rest, primary_type_name)?;
                         // TODO WAT
                         ProcessedFieldMapItem(field_map_item.clone())
                     }
@@ -307,8 +296,8 @@ pub(crate) enum PotentiallyModifiedField {
 impl PotentiallyModifiedField {
     fn remove_to_field(
         &mut self,
-        _first: &WithSpan<StringLiteralValue>,
-        _rest: &[WithSpan<StringLiteralValue>],
+        _first: StringLiteralValue,
+        _rest: &[StringLiteralValue],
     ) -> ProcessTypeDefinitionResult<IsEmpty> {
         unimplemented!("Removing to fields from PotentiallyModifiedField")
     }
@@ -388,14 +377,13 @@ impl ModifiedArgument {
     pub fn remove_to_field(
         &mut self,
         schema: &UnvalidatedSchema,
-        first: &WithSpan<StringLiteralValue>,
-        rest: &[WithSpan<StringLiteralValue>],
+        first: StringLiteralValue,
+        rest: &[StringLiteralValue],
         primary_type_name: IsographObjectTypeName,
-        text_source: TextSource,
     ) -> ProcessTypeDefinitionResult<()> {
         let argument_object = self.object.inner_mut();
 
-        let key = first.item.lookup().intern().into();
+        let key = first.lookup().intern().into();
         let _ = match argument_object
             .field_map
             // TODO make this a no-op
@@ -404,7 +392,7 @@ impl ModifiedArgument {
             Some(field) => {
                 match rest.split_first() {
                     Some((first, rest)) => {
-                        match field.remove_to_field(first, rest)? {
+                        match field.remove_to_field(*first, rest)? {
                             IsEmpty::IsEmpty => {
                                 // The field's object has no remaining fields (except for __typename),
                                 // so we remove the item from the parent.
@@ -436,7 +424,7 @@ impl ModifiedArgument {
                                                     primary_type_name,
                                                     field_name: key.to_string(),
                                                 },
-                                                Location::new(text_source, first.span),
+                                                Location::generated(),
                                             ));
                                         }
                                         DefinedTypeId::Scalar(_scalar_id) => {
@@ -458,7 +446,7 @@ impl ModifiedArgument {
                                         primary_type_name,
                                         field_name: key.to_string(),
                                     },
-                                    Location::new(text_source, first.span),
+                                    Location::generated(),
                                 ));
                             }
                         }
@@ -469,9 +457,9 @@ impl ModifiedArgument {
                 return Err(WithLocation::new(
                     ProcessTypeDefinitionError::PrimaryDirectiveFieldNotFound {
                         primary_type_name,
-                        field_name: first.item,
+                        field_name: first,
                     },
-                    Location::new(text_source, first.span),
+                    Location::generated(),
                 ))
             }
         };

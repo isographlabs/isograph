@@ -1250,15 +1250,16 @@ fn get_read_out_data(field_map: &[FieldMapItem]) -> String {
     for item in field_map.iter() {
         // This is super hacky and due to the fact that argument names and field names are
         // treated differently, because that's how it is in the GraphQL spec.
-        let mut path_segments = Vec::with_capacity(1 + item.to_field_names.len());
-        path_segments.push(&item.to_argument_name);
-        path_segments.extend(item.to_field_names.iter());
+        let split_to_arg = item.split_to_arg();
+        let mut path_segments = Vec::with_capacity(1 + split_to_arg.to_field_names.len());
+        path_segments.push(split_to_arg.to_argument_name);
+        path_segments.extend(split_to_arg.to_field_names.into_iter());
 
         let last_index = path_segments.len() - 1;
         let mut path_so_far = "".to_string();
         for (index, path_segment) in path_segments.into_iter().enumerate() {
             let is_last = last_index == index;
-            let path_segment_item = path_segment.item;
+            let path_segment_item = path_segment;
 
             if is_last {
                 let from_value = item.from;

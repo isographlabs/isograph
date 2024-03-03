@@ -1,7 +1,6 @@
 use common_lang_types::{
-    DirectiveArgumentName, DirectiveName, EmbeddedLocation, IsographObjectTypeName, Location,
-    SelectableFieldName, Span, StringLiteralValue, TextSource, ValueKeyName, WithEmbeddedLocation,
-    WithLocation, WithSpan,
+    DirectiveArgumentName, DirectiveName, IsographObjectTypeName, Location, SelectableFieldName,
+    Span, StringLiteralValue, ValueKeyName, WithEmbeddedLocation, WithLocation, WithSpan,
 };
 use graphql_lang_types::{ConstantValue, GraphQLDirective, GraphQLInputValueDefinition};
 use intern::{string_key::Intern, Lookup};
@@ -65,28 +64,19 @@ impl UnvalidatedSchema {
         let magic_mutation_infos = mutation_object
             .directives
             .iter()
-            .map(|d| match self.extract_magic_mutation_field_info(d) {
-                Ok(magic_mutation_info) => match magic_mutation_info {
-                    Some(magic_mutation_info) => {
-                        Ok(Some((d.name.location.text_source, magic_mutation_info)))
-                    }
-                    None => Ok(None),
-                },
-                Err(e) => Err(e),
-            })
+            .map(|d| self.extract_magic_mutation_field_info(d))
             .collect::<Result<Vec<_>, _>>()?;
         let magic_mutation_infos = magic_mutation_infos
             .into_iter()
             .flatten()
             .collect::<Vec<_>>();
 
-        for (text_source, magic_mutation_info) in magic_mutation_infos.iter() {
+        for magic_mutation_info in magic_mutation_infos.iter() {
             self.create_new_magic_mutation_field(
                 magic_mutation_info,
                 mutation_object_name,
                 mutation_id,
                 options,
-                *text_source,
             )?;
         }
 
@@ -99,7 +89,6 @@ impl UnvalidatedSchema {
         mutation_object_name: IsographObjectTypeName,
         mutation_id: ObjectId,
         options: ConfigOptions,
-        text_source: TextSource,
     ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
         let MagicMutationFieldInfo {
             path,
@@ -131,7 +120,6 @@ impl UnvalidatedSchema {
                     mutation_field_name,
                     // TODO don't clone
                     field_map.clone(),
-                    text_source,
                     options,
                 )?;
 
@@ -459,56 +447,16 @@ fn parse_field_map_val(
                     )
                 })?;
 
-            // This is weirdly low-level!
-            let span = match to.value.location {
-                Location::Embedded(EmbeddedLocation {
-                    text_source: _,
-                    span,
-                }) => span,
-                Location::Generated => {
-                    panic!("TODO make this an error; location should not be generated here.")
-                }
-            };
-            let to_arg = match to.value.item {
-                ConstantValue::String(s) => Ok(s),
-                _ => Err(WithLocation::new(
+            let to_arg = to.value.item.as_string().ok_or_else(|| {
+                WithLocation::new(
                     ProcessTypeDefinitionError::InvalidFieldMap,
                     argument_value.location,
-                )),
-            }?;
-            let mut split = to_arg.lookup().split('.');
-            let to_argument_name = split.next().expect(
-                "Expected at least one item returned \
-                by split. This is indicative of a bug in Isograph.",
-            );
-            let account_for_quote = 1;
-            let account_for_period = 1;
-
-            let mut offset: u32 =
-                to_argument_name.len() as u32 + account_for_quote + account_for_period;
-            let to_argument_name = WithSpan::new(
-                to_argument_name.intern().into(),
-                Span::new(
-                    span.start + account_for_quote,
-                    span.start + account_for_quote + to_argument_name.len() as u32,
-                ),
-            );
+                )
+            })?;
 
             Ok(FieldMapItem {
                 from: from_arg,
-                to_argument_name,
-                to_field_names: split
-                    .into_iter()
-                    .map(|split_item| {
-                        let len = split_item.len() as u32;
-                        let old_offset = offset;
-                        offset = old_offset + len + account_for_period;
-                        WithSpan::new(
-                            split_item.intern().into(),
-                            Span::new(span.start + old_offset, span.start + old_offset + len),
-                        )
-                    })
-                    .collect(),
+                to: to_arg,
             })
         })
         .collect::<Result<Vec<_>, _>>()
@@ -522,7 +470,6 @@ fn skip_arguments_contained_in_field_map(
     mutation_object_name: IsographObjectTypeName,
     mutation_field_name: SelectableFieldName,
     field_map_items: Vec<FieldMapItem>,
-    text_source: TextSource,
     options: ConfigOptions,
 ) -> ProcessTypeDefinitionResult<(
     Vec<WithLocation<GraphQLInputValueDefinition>>,
@@ -540,7 +487,6 @@ fn skip_arguments_contained_in_field_map(
             primary_type_name,
             mutation_object_name,
             mutation_field_name,
-            text_source,
             schema,
         )?);
     }
