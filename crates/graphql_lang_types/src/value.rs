@@ -17,6 +17,15 @@ pub enum ConstantValue {
     Object(Vec<NameValuePair<ValueKeyName, ConstantValue>>),
 }
 
+impl ConstantValue {
+    pub fn as_string(&self) -> Option<StringLiteralValue> {
+        match self {
+            ConstantValue::String(s) => Some(*s),
+            _ => None,
+        }
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Value {

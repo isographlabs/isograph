@@ -31,8 +31,8 @@ lazy_static! {
 
 pub struct MagicMutationFieldInfo {
     path: StringLiteralValue,
-    field_map_items: Vec<FieldMapItem>,
-    field_id: ServerFieldId,
+    field_map: Vec<FieldMapItem>,
+    field: StringLiteralValue,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -65,17 +65,15 @@ impl UnvalidatedSchema {
         let magic_mutation_infos = mutation_object
             .directives
             .iter()
-            .map(
-                |d| match self.extract_magic_mutation_field_info(d, mutation_id) {
-                    Ok(magic_mutation_info) => match magic_mutation_info {
-                        Some(magic_mutation_info) => {
-                            Ok(Some((d.name.location.text_source, magic_mutation_info)))
-                        }
-                        None => Ok(None),
-                    },
-                    Err(e) => Err(e),
+            .map(|d| match self.extract_magic_mutation_field_info(d) {
+                Ok(magic_mutation_info) => match magic_mutation_info {
+                    Some(magic_mutation_info) => {
+                        Ok(Some((d.name.location.text_source, magic_mutation_info)))
+                    }
+                    None => Ok(None),
                 },
-            )
+                Err(e) => Err(e),
+            })
             .collect::<Result<Vec<_>, _>>()?;
         let magic_mutation_infos = magic_mutation_infos
             .into_iter()
@@ -86,6 +84,7 @@ impl UnvalidatedSchema {
             self.create_new_magic_mutation_field(
                 magic_mutation_info,
                 mutation_object_name,
+                mutation_id,
                 options,
                 *text_source,
             )?;
@@ -98,15 +97,19 @@ impl UnvalidatedSchema {
         &mut self,
         magic_mutation_info: &MagicMutationFieldInfo,
         mutation_object_name: IsographObjectTypeName,
+        mutation_id: ObjectId,
         options: ConfigOptions,
         text_source: TextSource,
     ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
         let MagicMutationFieldInfo {
             path,
-            field_map_items,
-            field_id,
+            field_map,
+            field,
         } = magic_mutation_info;
-        let mutation_field = self.field(*field_id);
+
+        let field_id = self.parse_field(*field, mutation_id)?;
+
+        let mutation_field = self.field(field_id);
         let mutation_field_payload_type_name = *mutation_field.associated_data.inner();
         let mutation_field_name = mutation_field.name.item;
         let mutation_field_arguments = mutation_field.arguments.clone();
@@ -127,7 +130,7 @@ impl UnvalidatedSchema {
                     mutation_object_name,
                     mutation_field_name,
                     // TODO don't clone
-                    field_map_items.clone(),
+                    field_map.clone(),
                     text_source,
                     options,
                 )?;
@@ -227,7 +230,7 @@ impl UnvalidatedSchema {
                 action_kind: ResolverActionKind::MutationField(
                     MutationFieldResolverActionKindInfo {
                         // TODO don't clone
-                        field_map: field_map_items.to_vec(),
+                        field_map: field_map.to_vec(),
                     },
                 ),
             };
@@ -278,12 +281,9 @@ impl UnvalidatedSchema {
     fn extract_magic_mutation_field_info(
         &self,
         d: &GraphQLDirective<ConstantValue>,
-        mutation_id: ObjectId,
     ) -> ProcessTypeDefinitionResult<Option<MagicMutationFieldInfo>> {
         if d.name.item == *EXPOSE_FIELD_DIRECTIVE {
-            Ok(Some(
-                self.validate_magic_mutation_directive(d, mutation_id)?,
-            ))
+            Ok(Some(self.validate_magic_mutation_directive(d)?))
         } else {
             Ok(None)
         }
@@ -292,7 +292,6 @@ impl UnvalidatedSchema {
     fn validate_magic_mutation_directive(
         &self,
         d: &GraphQLDirective<ConstantValue>,
-        mutation_id: ObjectId,
     ) -> ProcessTypeDefinitionResult<MagicMutationFieldInfo> {
         if d.arguments.len() != 3 {
             return Err(WithEmbeddedLocation::new(
@@ -338,9 +337,9 @@ impl UnvalidatedSchema {
                 .into_with_location()
             })?;
 
-        let field_map_items = parse_field_map_val(&field_map.value)?;
+        let field_map = parse_field_map_val(&field_map.value)?;
 
-        let field = d
+        let field_argument = d
             .arguments
             .iter()
             .find(|d| d.name.item == *FIELD_DIRECTIVE_ARGUMENT)
@@ -353,31 +352,29 @@ impl UnvalidatedSchema {
                 .into_with_location()
             })?;
 
-        let field_id = self.parse_field(&field.value, mutation_id)?;
+        let field = field_argument.value.item.as_string().ok_or_else(|| {
+            WithLocation::new(
+                ProcessTypeDefinitionError::InvalidField,
+                Location::generated(),
+            )
+        })?;
 
         Ok(MagicMutationFieldInfo {
             path: path_val,
-            field_map_items,
-            field_id,
+            field_map,
+            field,
         })
     }
 
     fn parse_field(
         &self,
-        field_arg: &WithLocation<ConstantValue>,
+        field_arg: StringLiteralValue,
         mutation_id: ObjectId,
     ) -> ProcessTypeDefinitionResult<ServerFieldId> {
         let mutation = self.schema_data.object(mutation_id);
 
-        let field_arg_name = match field_arg.item {
-            // TODO make this no op
-            ConstantValue::String(s) => Ok(s.lookup().intern().into()),
-            _ => Err(WithLocation::new(
-                ProcessTypeDefinitionError::InvalidField,
-                // TODO
-                Location::generated(),
-            )),
-        }?;
+        // TODO make this a no-op
+        let field_arg = field_arg.lookup().intern().into();
 
         // TODO avoid a linear scan?
         let field_id = mutation
@@ -385,7 +382,7 @@ impl UnvalidatedSchema {
             .iter()
             .find_map(|field_id| {
                 let server_field = self.field(*field_id);
-                if server_field.name.item == field_arg_name {
+                if server_field.name.item == field_arg {
                     Some(*field_id)
                 } else {
                     None
