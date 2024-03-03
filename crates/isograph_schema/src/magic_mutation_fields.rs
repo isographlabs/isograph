@@ -32,7 +32,6 @@ lazy_static! {
 pub struct MagicMutationFieldInfo {
     path: StringLiteralValue,
     field_map_items: Vec<FieldMapItem>,
-    text_source: TextSource,
     field_id: ServerFieldId,
 }
 
@@ -66,20 +65,29 @@ impl UnvalidatedSchema {
         let magic_mutation_infos = mutation_object
             .directives
             .iter()
-            .map(|d| {
-                self.extract_magic_mutation_field_info(d, d.name.location.text_source, mutation_id)
-            })
+            .map(
+                |d| match self.extract_magic_mutation_field_info(d, mutation_id) {
+                    Ok(magic_mutation_info) => match magic_mutation_info {
+                        Some(magic_mutation_info) => {
+                            Ok(Some((d.name.location.text_source, magic_mutation_info)))
+                        }
+                        None => Ok(None),
+                    },
+                    Err(e) => Err(e),
+                },
+            )
             .collect::<Result<Vec<_>, _>>()?;
         let magic_mutation_infos = magic_mutation_infos
             .into_iter()
             .flatten()
             .collect::<Vec<_>>();
 
-        for magic_mutation_info in magic_mutation_infos.iter() {
+        for (text_source, magic_mutation_info) in magic_mutation_infos.iter() {
             self.create_new_magic_mutation_field(
                 magic_mutation_info,
                 mutation_object_name,
                 options,
+                *text_source,
             )?;
         }
 
@@ -91,11 +99,11 @@ impl UnvalidatedSchema {
         magic_mutation_info: &MagicMutationFieldInfo,
         mutation_object_name: IsographObjectTypeName,
         options: ConfigOptions,
+        text_source: TextSource,
     ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
         let MagicMutationFieldInfo {
             path,
             field_map_items,
-            text_source,
             field_id,
         } = magic_mutation_info;
         let mutation_field = self.field(*field_id);
@@ -120,7 +128,7 @@ impl UnvalidatedSchema {
                     mutation_field_name,
                     // TODO don't clone
                     field_map_items.clone(),
-                    *text_source,
+                    text_source,
                     options,
                 )?;
 
@@ -270,15 +278,12 @@ impl UnvalidatedSchema {
     fn extract_magic_mutation_field_info(
         &self,
         d: &GraphQLDirective<ConstantValue>,
-        text_source: TextSource,
         mutation_id: ObjectId,
     ) -> ProcessTypeDefinitionResult<Option<MagicMutationFieldInfo>> {
         if d.name.item == *EXPOSE_FIELD_DIRECTIVE {
-            Ok(Some(self.validate_magic_mutation_directive(
-                d,
-                text_source,
-                mutation_id,
-            )?))
+            Ok(Some(
+                self.validate_magic_mutation_directive(d, mutation_id)?,
+            ))
         } else {
             Ok(None)
         }
@@ -287,7 +292,6 @@ impl UnvalidatedSchema {
     fn validate_magic_mutation_directive(
         &self,
         d: &GraphQLDirective<ConstantValue>,
-        text_source: TextSource,
         mutation_id: ObjectId,
     ) -> ProcessTypeDefinitionResult<MagicMutationFieldInfo> {
         if d.arguments.len() != 3 {
@@ -354,7 +358,6 @@ impl UnvalidatedSchema {
         Ok(MagicMutationFieldInfo {
             path: path_val,
             field_map_items,
-            text_source,
             field_id,
         })
     }
