@@ -8,4 +8,3 @@ license = "MIT"
 intern = { git = "https://github.com/facebook/relay.git", tag = "v16.2.0" }
 common_lang_types = { path = "../common_lang_types" }
 strum = { version="0.25.0", features=["derive"] }
-
