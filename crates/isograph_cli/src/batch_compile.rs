@@ -102,7 +102,7 @@ pub(crate) fn handle_compile_command(
         let type_system_document = parse_schema(&content, schema_text_source)
             .map_err(|with_span| with_span.to_with_location(schema_text_source))?;
 
-        let type_extension_document = config
+        let type_extension_documents = config
             .schema_extensions
             .iter()
             .map(|schema_extension_path| {
@@ -115,9 +115,10 @@ pub(crate) fn handle_compile_command(
                     span: None,
                 };
                 let extension_content = read_schema_file(schema_extension_path)?;
-                let extension = parse_schema_extensions(&extension_content, extension_text_source)
-                    .map_err(|with_span| with_span.to_with_location(extension_text_source))?;
-                Ok(extension)
+                let type_extension_document =
+                    parse_schema_extensions(&extension_content, extension_text_source)
+                        .map_err(|with_span| with_span.to_with_location(extension_text_source))?;
+                Ok(type_extension_document)
             })
             .collect::<Result<Vec<_>, BatchCompileError>>()?;
 
@@ -129,7 +130,7 @@ pub(crate) fn handle_compile_command(
         // TODO validate here! We should not allow a situation in which a base schema is invalid,
         // but is made valid by the presence of schema extensions.
 
-        for extension_document in type_extension_document {
+        for extension_document in type_extension_documents {
             let _extension_outcome = schema
                 .process_graphql_type_extension_document(extension_document, config.options)?;
             // TODO extend the process_graphql_outcome.type_refinement_map and the one
