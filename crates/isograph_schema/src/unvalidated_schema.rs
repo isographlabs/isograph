@@ -6,7 +6,7 @@ use common_lang_types::{
 use graphql_lang_types::TypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    DefinedTypeId, EntrypointTypeAndField, LinkedFieldSelection, ResolverFieldId, ScalarId,
+    ClientFieldId, DefinedTypeId, EntrypointTypeAndField, LinkedFieldSelection, ScalarId,
 };
 
 use crate::{
@@ -42,7 +42,7 @@ pub type UnvalidatedSchemaObject =
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
 /// resolver.)
 pub type UnvalidatedObjectFieldInfo =
-    DefinedField<TypeAnnotation<UnvalidatedTypeName>, ResolverFieldId>;
+    DefinedField<TypeAnnotation<UnvalidatedTypeName>, ClientFieldId>;
 
 pub(crate) type UnvalidatedSchemaData =
     SchemaData<<UnvalidatedSchemaState as SchemaValidationState>::EncounteredField>;

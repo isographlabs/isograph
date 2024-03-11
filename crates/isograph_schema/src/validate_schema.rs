@@ -4,7 +4,7 @@ use common_lang_types::{
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, NamedTypeAnnotation, TypeAnnotation};
 use isograph_lang_types::{
-    DefinedTypeId, LinkedFieldSelection, ObjectId, ResolverFieldId, ScalarFieldSelection, ScalarId,
+    ClientFieldId, DefinedTypeId, LinkedFieldSelection, ObjectId, ScalarFieldSelection, ScalarId,
     Selection, ServerFieldId, UnvalidatedScalarFieldSelection, UnvalidatedSelection,
     VariableDefinition,
 };
@@ -41,7 +41,7 @@ pub type ValidatedSchemaResolver = SchemaResolver<
 >;
 
 /// The validated defined field that shows up in the TScalarField generic.
-pub type ValidatedDefinedField = DefinedField<ServerFieldId, ResolverFieldId>;
+pub type ValidatedDefinedField = DefinedField<ServerFieldId, ClientFieldId>;
 
 pub type ValidatedSchemaObject =
     SchemaObject<<ValidatedSchemaState as SchemaValidationState>::EncounteredField>;
@@ -61,7 +61,7 @@ impl SchemaValidationState for ValidatedSchemaState {
     type ResolverSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
     type ResolverVariableDefinitionAssociatedData = DefinedTypeId;
     type EncounteredField = ValidatedDefinedField;
-    type Entrypoint = ResolverFieldId;
+    type Entrypoint = ClientFieldId;
 }
 
 pub type ValidatedSchema = Schema<ValidatedSchemaState>;

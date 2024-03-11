@@ -5,7 +5,7 @@ use common_lang_types::{
 use graphql_lang_types::{ConstantValue, GraphQLDirective, GraphQLInputValueDefinition};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    DefinedTypeId, ObjectId, ResolverFieldId, ScalarFieldSelection, Selection, ServerFieldId,
+    ClientFieldId, DefinedTypeId, ObjectId, ScalarFieldSelection, Selection, ServerFieldId,
     ServerFieldSelection,
 };
 
@@ -239,7 +239,7 @@ impl UnvalidatedSchema {
         &mut self,
         magic_mutation_field_name: SelectableFieldName,
         resolver_parent_object_id: ObjectId,
-        resolver_id: ResolverFieldId,
+        resolver_id: ClientFieldId,
         payload_object_name: IsographObjectTypeName,
     ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
         let resolver_parent = self.schema_data.object_mut(resolver_parent_object_id);

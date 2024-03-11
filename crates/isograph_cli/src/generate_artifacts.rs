@@ -17,7 +17,7 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    DefinedTypeId, NonConstantValue, ResolverFieldId, Selection, SelectionFieldArgument,
+    ClientFieldId, DefinedTypeId, NonConstantValue, Selection, SelectionFieldArgument,
     ServerFieldSelection, VariableDefinition,
 };
 use isograph_schema::{
@@ -590,9 +590,9 @@ fn get_aliased_mutation_field_name(
 
 fn generate_entrypoint_artifact<'schema>(
     schema: &'schema ValidatedSchema,
-    resolver_field_id: ResolverFieldId,
+    resolver_field_id: ClientFieldId,
     artifact_queue: &mut Vec<ArtifactQueueItem>,
-    encountered_resolvers_ids: &mut HashSet<ResolverFieldId>,
+    encountered_resolvers_ids: &mut HashSet<ClientFieldId>,
 ) -> EntrypointArtifactInfo<'schema> {
     let top_level_resolver = schema.resolver(resolver_field_id);
     if let Some((ref selection_set, _)) = top_level_resolver.selection_set_and_unwraps {

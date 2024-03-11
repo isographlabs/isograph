@@ -19,7 +19,7 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_config::ConfigOptions;
 use isograph_lang_types::{
-    DefinedTypeId, ObjectId, ResolverFieldId, ScalarFieldSelection, Selection, ServerFieldId,
+    ClientFieldId, DefinedTypeId, ObjectId, ScalarFieldSelection, Selection, ServerFieldId,
     ServerFieldSelection, ServerIdFieldId,
 };
 use lazy_static::lazy_static;
@@ -603,7 +603,7 @@ fn get_resolvers_for_schema_object(
     schema_resolvers: &mut Vec<UnvalidatedSchemaResolver>,
     parent_object_id: ObjectId,
     type_definition: &IsographObjectTypeDefinition,
-) -> Vec<ResolverFieldId> {
+) -> Vec<ClientFieldId> {
     if let Some(_id_field_id) = id_field_id {
         let next_resolver_id = schema_resolvers.len().into();
         let id_field_selection = WithSpan::new(

@@ -12,7 +12,7 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    DefinedTypeId, LinkedFieldSelection, NonConstantValue, ObjectId, ResolverFieldId, ScalarId,
+    ClientFieldId, DefinedTypeId, LinkedFieldSelection, NonConstantValue, ObjectId, ScalarId,
     Selection, ServerFieldId, ServerIdFieldId, Unwrap, VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -149,7 +149,7 @@ impl<TValidation: SchemaValidationState> Schema<TValidation> {
     /// Get a reference to a given resolver by its id.
     pub fn resolver(
         &self,
-        resolver_field_id: ResolverFieldId,
+        resolver_field_id: ClientFieldId,
     ) -> &SchemaResolver<
         TValidation::ResolverSelectionScalarFieldAssociatedData,
         TValidation::ResolverSelectionLinkedFieldAssociatedData,
@@ -340,7 +340,7 @@ pub struct SchemaObject<TEncounteredField> {
     /// to something else.
     pub id_field: Option<ServerIdFieldId>,
     pub server_fields: Vec<ServerFieldId>,
-    pub resolvers: Vec<ResolverFieldId>,
+    pub resolvers: Vec<ClientFieldId>,
     pub encountered_fields: HashMap<SelectableFieldName, TEncounteredField>,
 }
 
@@ -467,7 +467,7 @@ pub struct SchemaResolver<
     pub description: Option<DescriptionValue>,
     // TODO make this a ResolverName that can be converted into a SelectableFieldName
     pub name: SelectableFieldName,
-    pub id: ResolverFieldId,
+    pub id: ClientFieldId,
     // TODO it makes no sense for a resolver to not select fields!
     // Why not just make it a global function at that point? Who knows.
     // Unless you'll eventually select fields?

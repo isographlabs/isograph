@@ -7,7 +7,7 @@ u32_newtype!(ServerIdFieldId);
 
 u32_conversion!(from: ServerIdFieldId, to: ServerFieldId);
 
-u32_newtype!(ResolverFieldId);
+u32_newtype!(ClientFieldId);
 
 u32_newtype!(ObjectId);
 

@@ -10,7 +10,7 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    DefinedTypeId, ObjectId, ResolverFieldId, ScalarFieldSelection, Selection,
+    ClientFieldId, DefinedTypeId, ObjectId, ScalarFieldSelection, Selection,
     SelectionFieldArgument, ServerFieldSelection, VariableDefinition,
 };
 
@@ -210,13 +210,13 @@ struct MergeTraversalState<'a> {
     /// needed for each refetch query. At this point, we have enough information
     /// to generate the refetch query.
     current_path: PathToRefetchField,
-    encountered_resolver_ids: Option<&'a mut HashSet<ResolverFieldId>>,
+    encountered_resolver_ids: Option<&'a mut HashSet<ClientFieldId>>,
 }
 
 impl<'a> MergeTraversalState<'a> {
     pub fn new(
         resolver: &'a ValidatedSchemaResolver,
-        encountered_resolver_ids: Option<&'a mut HashSet<ResolverFieldId>>,
+        encountered_resolver_ids: Option<&'a mut HashSet<ClientFieldId>>,
     ) -> Self {
         Self {
             resolver,
@@ -233,7 +233,7 @@ pub fn create_merged_selection_set(
     validated_selections: &[WithSpan<ValidatedSelection>],
     // TODO consider ways to get rid of these parameters.
     artifact_queue: Option<&mut Vec<ArtifactQueueItem>>,
-    encountered_resolver_ids: Option<&mut HashSet<ResolverFieldId>>,
+    encountered_resolver_ids: Option<&mut HashSet<ClientFieldId>>,
     // N.B. we call this for non-fetchable resolvers now, but that is a smell
     root_fetchable_resolver: &ValidatedSchemaResolver,
 ) -> (MergedSelectionSet, Vec<RootRefetchedPath>) {
@@ -568,7 +568,7 @@ fn merge_scalar_resolver_field(
     schema: &ValidatedSchema,
     merged_selection_map: &mut MergedSelectionMap,
     merge_traversal_state: &mut MergeTraversalState<'_>,
-    resolver_field_id: ResolverFieldId,
+    resolver_field_id: ClientFieldId,
 ) {
     let resolver_field = schema.resolver(resolver_field_id);
     if let Some((ref selection_set, _)) = resolver_field.selection_set_and_unwraps {

@@ -2,7 +2,7 @@ use common_lang_types::{
     IsographObjectTypeName, Location, ScalarFieldName, TextSource, UnvalidatedTypeName,
     WithLocation, WithSpan,
 };
-use isograph_lang_types::{DefinedTypeId, EntrypointTypeAndField, ObjectId, ResolverFieldId};
+use isograph_lang_types::{ClientFieldId, DefinedTypeId, EntrypointTypeAndField, ObjectId};
 use thiserror::Error;
 
 use crate::{DefinedField, UnvalidatedSchema};
@@ -12,7 +12,7 @@ impl UnvalidatedSchema {
         &self,
         text_source: TextSource,
         entrypoint_type_and_field: WithSpan<EntrypointTypeAndField>,
-    ) -> Result<ResolverFieldId, WithLocation<ValidateEntrypointDeclarationError>> {
+    ) -> Result<ClientFieldId, WithLocation<ValidateEntrypointDeclarationError>> {
         let parent_object_id = self
             .validate_parent_object_id(entrypoint_type_and_field.item.parent_type, text_source)?;
         let resolver_field_id = self.validate_resolver_field(
@@ -82,7 +82,7 @@ impl UnvalidatedSchema {
         field_name: WithSpan<ScalarFieldName>,
         text_source: TextSource,
         parent_object_id: ObjectId,
-    ) -> Result<ResolverFieldId, WithLocation<ValidateEntrypointDeclarationError>> {
+    ) -> Result<ClientFieldId, WithLocation<ValidateEntrypointDeclarationError>> {
         let parent_object = self.schema_data.object(parent_object_id);
 
         match parent_object
