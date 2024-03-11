@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use common_lang_types::{
     DirectiveArgumentName, DirectiveName, IsographObjectTypeName, Location, SelectableFieldName,
     Span, StringLiteralValue, ValueKeyName, WithEmbeddedLocation, WithLocation, WithSpan,
@@ -289,87 +287,10 @@ impl UnvalidatedSchema {
         d: &GraphQLDirective<ConstantValue>,
     ) -> ProcessTypeDefinitionResult<Option<MagicMutationFieldInfo>> {
         if d.name.item == *EXPOSE_FIELD_DIRECTIVE {
-            Ok(Some(self.validate_magic_mutation_directive(d)?))
+            Ok(from_graph_ql_directive(d).ok())
         } else {
             Ok(None)
         }
-    }
-
-    fn validate_magic_mutation_directive(
-        &self,
-        d: &GraphQLDirective<ConstantValue>,
-    ) -> ProcessTypeDefinitionResult<MagicMutationFieldInfo> {
-        if d.arguments.len() != 3 {
-            return Err(WithEmbeddedLocation::new(
-                ProcessTypeDefinitionError::InvalidPrimaryDirectiveArgumentCount,
-                // This is wrong, the arguments should have a span, or the whole thing should have a span
-                d.name.location,
-            )
-            .into_with_location());
-        }
-
-        let path = d
-            .arguments
-            .iter()
-            .find(|d| d.name.item == *PATH_DIRECTIVE_ARGUMENT)
-            .ok_or_else(|| {
-                WithEmbeddedLocation::new(
-                    ProcessTypeDefinitionError::MissingPathArg,
-                    // This is wrong, the arguments should have a span, or the whole thing should have a span
-                    d.name.location,
-                )
-                .into_with_location()
-            })?;
-        let path_val = match path.value.item {
-            ConstantValue::String(s) => Ok(s),
-            _ => Err(WithEmbeddedLocation::new(
-                ProcessTypeDefinitionError::PathValueShouldBeString,
-                // This is wrong, the arguments should have a span, or the whole thing should have a span
-                d.name.location,
-            )
-            .into_with_location()),
-        }?;
-
-        let field_map = d
-            .arguments
-            .iter()
-            .find(|d| d.name.item == *FIELD_MAP_DIRECTIVE_ARGUMENT)
-            .ok_or_else(|| {
-                WithEmbeddedLocation::new(
-                    ProcessTypeDefinitionError::MissingFieldMapArg,
-                    // This is wrong, the arguments should have a span, or the whole thing should have a span
-                    d.name.location,
-                )
-                .into_with_location()
-            })?;
-
-        let field_map = parse_field_map_val(&field_map.value)?;
-
-        let field_argument = d
-            .arguments
-            .iter()
-            .find(|d| d.name.item == *FIELD_DIRECTIVE_ARGUMENT)
-            .ok_or_else(|| {
-                WithEmbeddedLocation::new(
-                    ProcessTypeDefinitionError::MissingFieldMapArg,
-                    // This is wrong, the arguments should have a span, or the whole thing should have a span
-                    d.name.location,
-                )
-                .into_with_location()
-            })?;
-
-        let field = field_argument.value.item.as_string().ok_or_else(|| {
-            WithLocation::new(
-                ProcessTypeDefinitionError::InvalidField,
-                Location::generated(),
-            )
-        })?;
-
-        Ok(MagicMutationFieldInfo {
-            path: path_val,
-            field_map,
-            field,
-        })
     }
 
     fn parse_field(
@@ -535,7 +456,7 @@ impl de::Error for ProcessTypeDefinitionError {
     }
 }
 
-impl<'a, 'de> Deserializer<'de> for GraphQLDirectiveDeserializer<'a> {
+impl<'de> Deserializer<'de> for GraphQLDirectiveDeserializer<'de> {
     type Error = ProcessTypeDefinitionError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -566,14 +487,13 @@ impl<'a, T> NameValuePairVec<'a, T> {
     }
 }
 
-impl<'a, 'de, T: ToString> MapAccess<'de> for NameValuePairVec<'a, T> {
+impl<'de, T: ToString> MapAccess<'de> for NameValuePairVec<'de, T> {
     type Error = ProcessTypeDefinitionError;
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
     where
         K: de::DeserializeSeed<'de>,
     {
-        print!("Deserializing field at idx {}", self.field_idx);
         if let Some(name_value_pair) = self.arguments.get(self.field_idx) {
             return seed
                 .deserialize(NameSerializer { name_value_pair })
@@ -607,8 +527,8 @@ struct ValueSerializer<'a, TName, TValue: ValueType> {
     name_value_pair: &'a NameValuePair<TName, TValue>,
 }
 
-impl<'a, 'de, TName: ToString, TValue: ValueType> Deserializer<'de>
-    for NameSerializer<'a, TName, TValue>
+impl<'de, TName: ToString, TValue: ValueType> Deserializer<'de>
+    for NameSerializer<'de, TName, TValue>
 {
     type Error = ProcessTypeDefinitionError;
 
@@ -634,22 +554,18 @@ impl<'a, 'de, TName: ToString, TValue: ValueType> Deserializer<'de>
 }
 
 pub struct ConstantValueDeserializer<'de> {
-    value: ConstantValue,
-    marker: PhantomData<&'de ()>,
+    value: &'de ConstantValue,
 }
 
-impl<'de> IntoDeserializer<'de, ProcessTypeDefinitionError> for ConstantValue {
+impl<'de> IntoDeserializer<'de, ProcessTypeDefinitionError> for &'de ConstantValue {
     type Deserializer = ConstantValueDeserializer<'de>;
 
     fn into_deserializer(self) -> Self::Deserializer {
-        ConstantValueDeserializer {
-            value: self,
-            marker: PhantomData,
-        }
+        ConstantValueDeserializer { value: self }
     }
 }
 
-impl<'a, 'de> Deserializer<'de> for ConstantValueDeserializer<'de> {
+impl<'de> Deserializer<'de> for ConstantValueDeserializer<'de> {
     type Error = ProcessTypeDefinitionError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -657,14 +573,14 @@ impl<'a, 'de> Deserializer<'de> for ConstantValueDeserializer<'de> {
         V: de::Visitor<'de>,
     {
         match self.value {
-            ConstantValue::Boolean(bool) => visitor.visit_bool(bool),
+            ConstantValue::Boolean(bool) => visitor.visit_bool(*bool),
             ConstantValue::Enum(enum_literal) => visitor.visit_string(enum_literal.to_string()),
             ConstantValue::Float(float_value) => visitor.visit_f64(float_value.as_float()),
-            ConstantValue::Int(i_64) => visitor.visit_i64(i_64),
+            ConstantValue::Int(i_64) => visitor.visit_i64(*i_64),
             ConstantValue::String(string) => visitor.visit_string(string.to_string()),
             ConstantValue::Null => visitor.visit_none(),
             ConstantValue::List(seq) => {
-                let values: Vec<ConstantValue> = seq.into_iter().map(|entry| entry.item).collect();
+                let values: Vec<&ConstantValue> = seq.iter().map(|entry| &entry.item).collect();
                 let seq_access = SeqDeserializer::new(values.into_iter());
                 visitor.visit_seq(seq_access)
             }
@@ -682,7 +598,7 @@ impl<'a, 'de> Deserializer<'de> for ConstantValueDeserializer<'de> {
     }
 }
 
-impl<'a, 'de, TName> Deserializer<'de> for ValueSerializer<'a, TName, ConstantValue> {
+impl<'de, TName> Deserializer<'de> for ValueSerializer<'de, TName, ConstantValue> {
     type Error = ProcessTypeDefinitionError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -690,8 +606,7 @@ impl<'a, 'de, TName> Deserializer<'de> for ValueSerializer<'a, TName, ConstantVa
         V: de::Visitor<'de>,
     {
         let deserializer = ConstantValueDeserializer {
-            value: self.name_value_pair.value.item.clone(),
-            marker: PhantomData,
+            value: &self.name_value_pair.value.item,
         };
         deserializer.deserialize_any(visitor)
     }
