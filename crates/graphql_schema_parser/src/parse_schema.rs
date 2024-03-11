@@ -1,7 +1,7 @@
 use std::{ops::ControlFlow, str::FromStr};
 
 use common_lang_types::{
-    DescriptionValue, EnumLiteralValue, InterfaceTypeName, ObjectTypeName, Span,
+    DescriptionValue, EnumLiteralValue, GraphQLInterfaceTypeName, GraphQLObjectTypeName, Span,
     StringLiteralValue, TextSource, WithLocation, WithSpan,
 };
 use graphql_syntax::TokenKind;
@@ -438,7 +438,7 @@ fn parse_union_definition(
 fn parse_union_member_types(
     tokens: &mut PeekableLexer,
     text_source: TextSource,
-) -> ParseResult<Vec<WithLocation<ObjectTypeName>>> {
+) -> ParseResult<Vec<WithLocation<GraphQLObjectTypeName>>> {
     // This is a no-op if the token kind doesn't match, so effectively
     // this is an optional pipe
     let _pipe = tokens.parse_token_of_kind(TokenKind::Pipe);
@@ -505,8 +505,11 @@ fn parse_schema_definition(
 }
 
 fn reassign_or_error(
-    root_type: &mut Option<WithLocation<ObjectTypeName>>,
-    operation_type: &(WithSpan<RootOperationKind>, WithLocation<ObjectTypeName>),
+    root_type: &mut Option<WithLocation<GraphQLObjectTypeName>>,
+    operation_type: &(
+        WithSpan<RootOperationKind>,
+        WithLocation<GraphQLObjectTypeName>,
+    ),
 ) -> ParseResult<()> {
     if root_type.is_some() {
         return Err(WithSpan::new(
@@ -521,7 +524,10 @@ fn reassign_or_error(
 fn parse_root_operation_type(
     tokens: &mut PeekableLexer,
     text_source: TextSource,
-) -> ParseResult<(WithSpan<RootOperationKind>, WithLocation<ObjectTypeName>)> {
+) -> ParseResult<(
+    WithSpan<RootOperationKind>,
+    WithLocation<GraphQLObjectTypeName>,
+)> {
     let name = tokens
         .parse_source_of_kind(TokenKind::Identifier)
         .map_err(|with_span| with_span.map(SchemaParseError::from))?;
@@ -576,7 +582,7 @@ fn parse_scalar_type_definition(
 fn parse_implements_interfaces_if_present(
     tokens: &mut PeekableLexer,
     text_source: TextSource,
-) -> ParseResult<Vec<WithLocation<InterfaceTypeName>>> {
+) -> ParseResult<Vec<WithLocation<GraphQLInterfaceTypeName>>> {
     if tokens.parse_matching_identifier("implements").is_ok() {
         let interfaces = parse_interfaces(tokens, text_source)?;
         Ok(interfaces)
@@ -597,7 +603,7 @@ fn parse_implements_interfaces_if_present(
 fn parse_interfaces(
     tokens: &mut PeekableLexer,
     text_source: TextSource,
-) -> ParseResult<Vec<WithLocation<InterfaceTypeName>>> {
+) -> ParseResult<Vec<WithLocation<GraphQLInterfaceTypeName>>> {
     let _optional_ampersand = tokens.parse_token_of_kind(TokenKind::Ampersand);
 
     let first_interface = tokens

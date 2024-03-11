@@ -7,8 +7,8 @@ use crate::{
     UnvalidatedSchemaField, UnvalidatedSchemaResolver, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
 };
 use common_lang_types::{
-    IsographObjectTypeName, Location, ObjectTypeName, ScalarTypeName, SelectableFieldName, Span,
-    StringLiteralValue, UnvalidatedTypeName, WithLocation, WithSpan,
+    GraphQLObjectTypeName, GraphQLScalarTypeName, IsographObjectTypeName, Location,
+    SelectableFieldName, Span, StringLiteralValue, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLFieldDefinition, GraphQLScalarTypeDefinition, GraphQLTypeSystemDefinition,
@@ -549,7 +549,7 @@ impl UnvalidatedSchema {
 
     fn look_up_root_type(
         &self,
-        type_name: WithLocation<ObjectTypeName>,
+        type_name: WithLocation<GraphQLObjectTypeName>,
     ) -> ProcessTypeDefinitionResult<ObjectId> {
         match self.schema_data.defined_types.get(&type_name.item.into()) {
             Some(DefinedTypeId::Object(object_id)) => Ok(*object_id),
@@ -644,7 +644,7 @@ fn get_resolvers_for_schema_object(
 }
 
 fn get_typename_type(
-    string_type_for_typename: ScalarTypeName,
+    string_type_for_typename: GraphQLScalarTypeName,
 ) -> TypeAnnotation<UnvalidatedTypeName> {
     TypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(NamedTypeAnnotation(
         WithSpan::new(

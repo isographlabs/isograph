@@ -1,9 +1,9 @@
 use std::{collections::HashMap, fmt::Debug};
 
 use common_lang_types::{
-    ConstExportName, DescriptionValue, FieldArgumentName, HasName, InputTypeName,
-    InterfaceTypeName, IsographObjectTypeName, JavascriptName, ResolverDefinitionPath,
-    ScalarTypeName, SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
+    ConstExportName, DescriptionValue, FieldArgumentName, GraphQLInterfaceTypeName,
+    GraphQLScalarTypeName, HasName, InputTypeName, IsographObjectTypeName, JavascriptName,
+    ResolverDefinitionPath, SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInputObjectTypeDefinition,
@@ -20,7 +20,7 @@ use lazy_static::lazy_static;
 use crate::{FieldMapItem, ResolverVariant};
 
 lazy_static! {
-    pub static ref ID_GRAPHQL_TYPE: ScalarTypeName = "ID".intern().into();
+    pub static ref ID_GRAPHQL_TYPE: GraphQLScalarTypeName = "ID".intern().into();
     // TODO these don't belong here, and neither does the relative path stuff
     // TODO these shouldn't be SelectableFieldName's
     pub static ref READER: SelectableFieldName = "reader".intern().into();
@@ -277,7 +277,7 @@ pub struct IsographObjectTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<IsographObjectTypeName>,
     // maybe this should be Vec<WithSpan<IsographObjectTypeName>>>
-    pub interfaces: Vec<WithLocation<InterfaceTypeName>>,
+    pub interfaces: Vec<WithLocation<GraphQLInterfaceTypeName>>,
     /// Directives that we don't know about. Maybe this should be validated to be
     /// empty, or not exist.
     pub directives: Vec<GraphQLDirective<ConstantValue>>,
@@ -562,7 +562,7 @@ impl<T> SchemaServerField<T> {
 #[derive(Debug)]
 pub struct SchemaScalar {
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithLocation<ScalarTypeName>,
+    pub name: WithLocation<GraphQLScalarTypeName>,
     pub id: ScalarId,
     pub javascript_name: JavascriptName,
 }
