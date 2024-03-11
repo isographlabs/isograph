@@ -542,11 +542,7 @@ impl<'a, 'de> Deserializer<'de> for GraphQLDirectiveDeserializer<'a> {
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_map(NameValuePairVec {
-            arguments: self.directive.arguments.clone(),
-            field_idx: 0,
-            marker: PhantomData,
-        })
+        visitor.visit_map(NameValuePairVec::new(&self.directive.arguments))
     }
 
     serde::forward_to_deserialize_any! {
@@ -555,16 +551,19 @@ impl<'a, 'de> Deserializer<'de> for GraphQLDirectiveDeserializer<'a> {
         tuple_struct map struct enum identifier ignored_any
     }
 }
-#[derive(Debug)]
-struct GraphQLDirectiveMapAccess<'a> {
-    directive: &'a GraphQLDirective<ConstantValue>,
+
+struct NameValuePairVec<'a, T> {
+    arguments: &'a Vec<NameValuePair<T, ConstantValue>>,
     field_idx: usize,
 }
 
-struct NameValuePairVec<'a, T> {
-    arguments: Vec<NameValuePair<T, ConstantValue>>,
-    field_idx: usize,
-    marker: PhantomData<&'a ()>,
+impl<'a, T> NameValuePairVec<'a, T> {
+    fn new(args: &'a Vec<NameValuePair<T, ConstantValue>>) -> Self {
+        NameValuePairVec {
+            arguments: args,
+            field_idx: 0,
+        }
+    }
 }
 
 impl<'a, 'de, T: ToString> MapAccess<'de> for NameValuePairVec<'a, T> {
@@ -599,35 +598,6 @@ impl<'a, 'de, T: ToString> MapAccess<'de> for NameValuePairVec<'a, T> {
         }
     }
 }
-
-// impl<'a, 'de> MapAccess<'de> for GraphQLDirectiveMapAccess<'a> {
-//     type Error = ProcessTypeDefinitionError;
-
-//     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
-//     where
-//         K: de::DeserializeSeed<'de>,
-//     {
-//         if let Some(name_value_pair) = self.directive.arguments.get(self.field_idx) {
-//             return seed
-//                 .deserialize(NameSerializer { name_value_pair })
-//                 .map(Some);
-//         }
-//         Ok(None)
-//     }
-
-//     fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
-//     where
-//         V: de::DeserializeSeed<'de>,
-//     {
-//         match self.directive.arguments.get(self.field_idx) {
-//             Some(name_value_pair) => seed.deserialize(ValueSerializer { name_value_pair }),
-//             _ => Err(ProcessTypeDefinitionError::FailedToDeserialize(format!(
-//                 "Called deserialization of field value for a field with idx {} that doesn't exist",
-//                 self.field_idx
-//             ))),
-//         }
-//     }
-// }
 
 struct NameSerializer<'a, TName, TValue: ValueType> {
     name_value_pair: &'a NameValuePair<TName, TValue>,
@@ -699,11 +669,7 @@ impl<'a, 'de> Deserializer<'de> for ConstantValueDeserializer<'de> {
                 visitor.visit_seq(seq_access)
             }
             ConstantValue::Object(obj) => {
-                let serializer = NameValuePairVec {
-                    arguments: obj,
-                    field_idx: 0,
-                    marker: PhantomData,
-                };
+                let serializer = NameValuePairVec::new(&obj);
                 visitor.visit_map(serializer)
             }
         }
