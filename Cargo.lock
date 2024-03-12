@@ -185,6 +185,7 @@ name = "common_lang_types"
 version = "0.0.4"
 dependencies = [
  "intern",
+ "serde",
  "string_key_newtype",
 ]
 
@@ -353,7 +354,9 @@ version = "0.0.4"
 dependencies = [
  "common_lang_types",
  "intern",
+ "serde",
  "strum",
+ "thiserror",
 ]
 
 [[package]]

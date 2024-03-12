@@ -30,6 +30,16 @@ macro_rules! string_key_newtype {
                 Self(other)
             }
         }
+
+        impl<'de> serde::Deserialize<'de> for $named {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let s: &'de str = serde::Deserialize::deserialize(deserializer)?;
+                Ok($named::from(s.intern()))
+            }
+        }
     };
 }
 
