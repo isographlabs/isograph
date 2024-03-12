@@ -571,18 +571,8 @@ impl UnvalidatedSchema {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 pub struct FieldMapItem {
     // TODO eventually, we want to support . syntax here, too
-    #[serde(deserialize_with = "deserialize_stringliteral")]
     pub from: StringLiteralValue,
-    #[serde(deserialize_with = "deserialize_stringliteral")]
     pub to: StringLiteralValue,
-}
-
-fn deserialize_stringliteral<'de, D>(deserializer: D) -> Result<StringLiteralValue, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let value = String::deserialize(deserializer)?;
-    Ok(StringLiteralValue::from(value.intern()))
 }
 
 pub struct SplitToArg {
