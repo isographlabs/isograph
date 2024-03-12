@@ -36,7 +36,7 @@ macro_rules! string_key_newtype {
             where
                 D: serde::Deserializer<'de>,
             {
-                let s: &'de str = serde::Deserialize::deserialize(deserializer)?;
+                let s: String = serde::Deserialize::deserialize(deserializer)?;
                 Ok($named::from(s.intern()))
             }
         }

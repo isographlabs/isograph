@@ -380,7 +380,7 @@ mod tests {
         Err("unexpected structure of directive".into())
     }
 
-    fn parse_mutation() -> Result<Vec<MagicMutationFieldInfo>, DeserializationError> {
+    fn parse_mutation() -> Result<Vec<MagicMutationFieldInfo>, Box<dyn Error>> {
         let source = "extend type Mutation
         @exposeField(
           field: \"set_pet_tagline\"

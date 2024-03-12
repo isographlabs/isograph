@@ -23,7 +23,7 @@ use isograph_lang_types::{
     ServerFieldSelection, ServerIdFieldId,
 };
 use lazy_static::lazy_static;
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 use thiserror::Error;
 
 lazy_static! {
