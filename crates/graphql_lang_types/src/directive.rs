@@ -207,6 +207,3 @@ impl<'de, TName> Deserializer<'de> for ValueDeserializer<'de, TName, ConstantVal
         tuple_struct map struct enum ignored_any identifier
     }
 }
-
-#[cfg(test)]
-mod tests {}
