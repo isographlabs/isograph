@@ -164,14 +164,13 @@ impl<'de> Deserializer<'de> for ConstantValueDeserializer<'de> {
     {
         match self.value {
             ConstantValue::Boolean(bool) => visitor.visit_bool(*bool),
-            ConstantValue::Enum(enum_literal) => visitor.visit_string(enum_literal.to_string()),
+            ConstantValue::Enum(enum_literal) => visitor.visit_borrowed_str(enum_literal.lookup()),
             ConstantValue::Float(float_value) => visitor.visit_f64(float_value.as_float()),
             ConstantValue::Int(i_64) => visitor.visit_i64(*i_64),
-            ConstantValue::String(string) => visitor.visit_string(string.to_string()),
+            ConstantValue::String(string) => visitor.visit_borrowed_str(string.lookup()),
             ConstantValue::Null => visitor.visit_none(),
             ConstantValue::List(seq) => {
-                let values: Vec<&ConstantValue> = seq.iter().map(|entry| &entry.item).collect();
-                let seq_access = SeqDeserializer::new(values.into_iter());
+                let seq_access = SeqDeserializer::new(seq.iter().map(|entry| &entry.item));
                 visitor.visit_seq(seq_access)
             }
             ConstantValue::Object(obj) => {
