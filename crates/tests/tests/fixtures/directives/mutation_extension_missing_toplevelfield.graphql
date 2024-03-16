@@ -1,5 +1,2 @@
 extend type Mutation
-    @exposeField(
-        path: "pet"
-        field_map: [{ from: "id", to: "input.id" }]
-    )
+  @exposeField(path: "pet", field_map: [{ from: "id", to: "input.id" }])
