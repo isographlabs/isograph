@@ -1,0 +1,11 @@
+extend type Mutation
+    @exposeField(
+        field: "set_pet_tagline"
+        path: "pet"
+        field_map: [{ from: "id", day: "monday", to: "input.id" }]
+    )
+    @exposeField(
+        field: "set_pet_best_friend"
+        path: "pet"
+        field_map: [{ from: "id", to: "id" }]
+    )

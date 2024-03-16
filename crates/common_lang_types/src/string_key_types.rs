@@ -1,5 +1,4 @@
 use intern::string_key::Intern;
-use serde;
 pub use string_key_newtype::StringKeyNewtype;
 use string_key_newtype::{string_key_conversion, string_key_newtype};
 

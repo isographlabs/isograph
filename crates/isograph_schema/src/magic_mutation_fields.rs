@@ -30,10 +30,25 @@ lazy_static! {
     static ref TO_VALUE_KEY_NAME: ValueKeyName = "to".intern().into();
 }
 #[derive(Deserialize, Eq, PartialEq, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct MagicMutationFieldInfo {
     path: StringLiteralValue,
     field_map: Vec<FieldMapItem>,
     field: StringLiteralValue,
+}
+
+impl MagicMutationFieldInfo {
+    pub fn new(
+        path: StringLiteralValue,
+        field_map: Vec<FieldMapItem>,
+        field: StringLiteralValue,
+    ) -> Self {
+        Self {
+            path,
+            field_map,
+            field,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -273,13 +288,14 @@ impl UnvalidatedSchema {
         d: &GraphQLDirective<ConstantValue>,
     ) -> ProcessTypeDefinitionResult<Option<MagicMutationFieldInfo>> {
         if d.name.item == *EXPOSE_FIELD_DIRECTIVE {
-            let mutation = graphql_lang_types::from_graph_ql_directive(d);
-            Ok(Some(mutation.map_err(|err| match err {
-                DeserializationError::Custom(err) => WithLocation::new(
-                    ProcessTypeDefinitionError::FailedToDeserialize(err),
-                    Location::generated(),
-                ),
-            })?))
+            let mutation =
+                graphql_lang_types::from_graph_ql_directive(d).map_err(|err| match err {
+                    DeserializationError::Custom(err) => WithLocation::new(
+                        ProcessTypeDefinitionError::FailedToDeserialize(err),
+                        Location::generated(),
+                    ),
+                })?;
+            Ok(Some(mutation))
         } else {
             Ok(None)
         }
@@ -352,95 +368,4 @@ fn skip_arguments_contained_in_field_map(
         argument_map.into_arguments(schema, options),
         processed_field_map_items,
     ))
-}
-
-#[cfg(test)]
-mod tests {
-
-    use super::*;
-
-    use common_lang_types::TextSource;
-    use graphql_lang_types::{
-        ConstantValue, GraphQLDirective, GraphQLTypeSystemExtension,
-        GraphQLTypeSystemExtensionOrDefinition,
-    };
-    use graphql_schema_parser::*;
-    use intern::string_key::Intern;
-    use std::error::Error;
-
-    fn unwrap_directive(
-        extension_or_definition: GraphQLTypeSystemExtensionOrDefinition,
-    ) -> Result<Vec<GraphQLDirective<ConstantValue>>, Box<dyn Error>> {
-        if let GraphQLTypeSystemExtensionOrDefinition::Extension(extension) =
-            extension_or_definition
-        {
-            let GraphQLTypeSystemExtension::ObjectTypeExtension(object_type_extension) = extension;
-            return Ok(object_type_extension.directives.clone());
-        }
-        Err("unexpected structure of directive".into())
-    }
-
-    fn parse_mutation() -> Result<Vec<MagicMutationFieldInfo>, Box<dyn Error>> {
-        let source = "extend type Mutation
-        @exposeField(
-          field: \"set_pet_tagline\"
-          path: \"pet\"
-          field_map: [{ from: \"id\", to: \"input.id\" }]
-        )
-        @exposeField(
-          field: \"set_pet_best_friend\"
-          path: \"pet\"
-          field_map: [{ from: \"id\", to: \"id\" }]
-        )";
-        let text_source = TextSource {
-            path: "dummy".intern().into(),
-            span: None,
-        };
-        let document = parse_schema_extensions(source, text_source).map_err(|e| e.item)?;
-        let directives = document
-            .0
-            .into_iter()
-            .map(|dir| unwrap_directive(dir.item))
-            .collect::<Result<Vec<_>, _>>()?;
-        let directives: Vec<GraphQLDirective<ConstantValue>> =
-            directives.into_iter().flatten().collect();
-
-        let magic_mutations: Result<Vec<MagicMutationFieldInfo>, _> = directives
-            .into_iter()
-            .map(|directive| {
-                graphql_lang_types::from_graph_ql_directive::<MagicMutationFieldInfo>(&directive)
-            })
-            .collect();
-        Ok(magic_mutations?)
-    }
-
-    #[test]
-    fn test_set_pet_tagline_prasing() -> Result<(), Box<dyn Error>> {
-        let magic_mutations = parse_mutation()?;
-        let set_tagline_mutation = MagicMutationFieldInfo {
-            path: StringLiteralValue::from("pet".intern()),
-            field_map: vec![FieldMapItem {
-                from: StringLiteralValue::from("id".intern()),
-                to: StringLiteralValue::from("input.id".intern()),
-            }],
-            field: StringLiteralValue::from("set_pet_tagline".intern()),
-        };
-        assert_eq!(magic_mutations[0], set_tagline_mutation);
-        Ok(())
-    }
-
-    #[test]
-    fn test_set_pet_bestfriend_parsing() -> Result<(), Box<dyn Error>> {
-        let magic_mutations = parse_mutation()?;
-        let set_pet_best_friend = MagicMutationFieldInfo {
-            path: StringLiteralValue::from("pet".intern()),
-            field_map: vec![FieldMapItem {
-                from: StringLiteralValue::from("id".intern()),
-                to: StringLiteralValue::from("id".intern()),
-            }],
-            field: StringLiteralValue::from("set_pet_best_friend".intern()),
-        };
-        assert_eq!(magic_mutations[1], set_pet_best_friend);
-        Ok(())
-    }
 }

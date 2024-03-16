@@ -1,0 +1,22 @@
+[package]
+name = "tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+common_lang_types = { path = "../common_lang_types" }
+isograph_lang_types = { path = "../isograph_lang_types" }
+isograph_config = { path = "../isograph_config" }
+isograph_schema = { path = "../isograph_schema" }
+graphql_lang_types = { path = "../graphql_lang_types" }
+intern = { git = "https://github.com/facebook/relay.git", tag = "v16.2.0" }
+thiserror = "1.0.40"
+lazy_static = "1.4"
+colorize = "0.1.0"
+serde = "1.0.197"
+
+[dev-dependencies]
+graphql_schema_parser = { path  = "../graphql_schema_parser"}

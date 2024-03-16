@@ -1176,6 +1176,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "tests"
+version = "0.1.0"
+dependencies = [
+ "colorize",
+ "common_lang_types",
+ "graphql_lang_types",
+ "graphql_schema_parser",
+ "intern",
+ "isograph_config",
+ "isograph_lang_types",
+ "isograph_schema",
+ "lazy_static",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "textwrap"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

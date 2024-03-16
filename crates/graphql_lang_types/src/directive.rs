@@ -2,7 +2,8 @@ use std::fmt;
 
 use super::{write::write_arguments, NameValuePair, ValueType};
 use crate::ConstantValue;
-use common_lang_types::{DirectiveArgumentName, DirectiveName, WithEmbeddedLocation, WithLocation};
+use common_lang_types::{DirectiveArgumentName, DirectiveName, WithEmbeddedLocation};
+use intern::Lookup;
 use serde::de;
 use serde::de::value::SeqDeserializer;
 use serde::de::IntoDeserializer;
@@ -39,7 +40,7 @@ struct GraphQLDirectiveDeserializer<'a> {
 
 #[derive(Debug, Error)]
 pub enum DeserializationError {
-    #[error("Error when deserializing {0} ")]
+    #[error("Error when deserializing.\n\n{0}")]
     Custom(String),
 }
 
@@ -83,7 +84,7 @@ impl<'a, T> NameValuePairVecDeserializer<'a, T> {
     }
 }
 
-impl<'de, T: ToString> MapAccess<'de> for NameValuePairVecDeserializer<'de, T> {
+impl<'de, T: Lookup + Copy> MapAccess<'de> for NameValuePairVecDeserializer<'de, T> {
     type Error = DeserializationError;
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
@@ -92,7 +93,7 @@ impl<'de, T: ToString> MapAccess<'de> for NameValuePairVecDeserializer<'de, T> {
     {
         if let Some(name_value_pair) = self.arguments.get(self.field_idx) {
             return seed
-                .deserialize(NameSerializer { name_value_pair })
+                .deserialize(NameDeserializer { name_value_pair })
                 .map(Some);
         }
         Ok(None)
@@ -105,26 +106,26 @@ impl<'de, T: ToString> MapAccess<'de> for NameValuePairVecDeserializer<'de, T> {
         match self.arguments.get(self.field_idx) {
             Some(name_value_pair) => {
                 self.field_idx += 1;
-                seed.deserialize(ValueSerializer { name_value_pair })
+                seed.deserialize(ValueDeserializer { name_value_pair })
             }
             _ => Err(DeserializationError::Custom(format!(
-                "Called deserialization of field value for a field with idx {} that doesn't exist",
+                "Called deserialization of field value for a field with idx {} that doesn't exist. This is indicative of a bug in Isograph.",
                 self.field_idx
             ))),
         }
     }
 }
 
-struct NameSerializer<'a, TName, TValue: ValueType> {
+struct NameDeserializer<'a, TName, TValue: ValueType> {
     name_value_pair: &'a NameValuePair<TName, TValue>,
 }
 
-struct ValueSerializer<'a, TName, TValue: ValueType> {
+struct ValueDeserializer<'a, TName, TValue: ValueType> {
     name_value_pair: &'a NameValuePair<TName, TValue>,
 }
 
-impl<'de, TName: ToString, TValue: ValueType> Deserializer<'de>
-    for NameSerializer<'de, TName, TValue>
+impl<'de, TName: Lookup + Copy, TValue: ValueType> Deserializer<'de>
+    for NameDeserializer<'de, TName, TValue>
 {
     type Error = DeserializationError;
 
@@ -132,20 +133,13 @@ impl<'de, TName: ToString, TValue: ValueType> Deserializer<'de>
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_string(self.name_value_pair.name.item.to_string())
-    }
-
-    fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: de::Visitor<'de>,
-    {
-        visitor.visit_string(self.name_value_pair.name.item.to_string())
+        visitor.visit_borrowed_str(self.name_value_pair.name.item.lookup())
     }
 
     serde::forward_to_deserialize_any! {
         bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
         bytes byte_buf option unit unit_struct newtype_struct seq tuple
-        tuple_struct map struct enum ignored_any
+        tuple_struct map struct enum ignored_any identifier
     }
 }
 
@@ -194,7 +188,7 @@ impl<'de> Deserializer<'de> for ConstantValueDeserializer<'de> {
     }
 }
 
-impl<'de, TName> Deserializer<'de> for ValueSerializer<'de, TName, ConstantValue> {
+impl<'de, TName> Deserializer<'de> for ValueDeserializer<'de, TName, ConstantValue> {
     type Error = DeserializationError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -213,3 +207,6 @@ impl<'de, TName> Deserializer<'de> for ValueSerializer<'de, TName, ConstantValue
         tuple_struct map struct enum ignored_any identifier
     }
 }
+
+#[cfg(test)]
+mod tests {}

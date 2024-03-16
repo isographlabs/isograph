@@ -569,6 +569,7 @@ impl UnvalidatedSchema {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct FieldMapItem {
     // TODO eventually, we want to support . syntax here, too
     pub from: StringLiteralValue,

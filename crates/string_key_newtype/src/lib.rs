@@ -7,6 +7,7 @@ pub trait StringKeyNewtype:
 macro_rules! string_key_newtype {
     ($named:ident) => {
         // TODO serialize, deserialize
+
         #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
         pub struct $named(intern::string_key::StringKey);
 
