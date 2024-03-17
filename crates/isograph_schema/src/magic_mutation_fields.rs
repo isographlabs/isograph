@@ -292,7 +292,7 @@ impl UnvalidatedSchema {
                 graphql_lang_types::from_graph_ql_directive(d).map_err(|err| match err {
                     DeserializationError::Custom(err) => WithLocation::new(
                         ProcessTypeDefinitionError::FailedToDeserialize(err),
-                        Location::generated(),
+                        d.name.location.into(), // TODO: use location of the entire directive
                     ),
                 })?;
             Ok(Some(mutation))
