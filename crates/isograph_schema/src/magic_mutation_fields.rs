@@ -1,15 +1,17 @@
 use common_lang_types::{
     DirectiveArgumentName, DirectiveName, IsographObjectTypeName, Location, SelectableFieldName,
-    Span, StringLiteralValue, ValueKeyName, WithEmbeddedLocation, WithLocation, WithSpan,
+    Span, StringLiteralValue, ValueKeyName, WithLocation, WithSpan,
 };
-use graphql_lang_types::{ConstantValue, GraphQLDirective, GraphQLInputValueDefinition};
+use graphql_lang_types::{
+    ConstantValue, DeserializationError, GraphQLDirective, GraphQLInputValueDefinition,
+};
 use intern::{string_key::Intern, Lookup};
+use isograph_config::ConfigOptions;
 use isograph_lang_types::{
     ClientFieldId, DefinedTypeId, ObjectId, ScalarFieldSelection, Selection, ServerFieldId,
     ServerFieldSelection,
 };
-
-use isograph_config::ConfigOptions;
+use serde::Deserialize;
 
 use crate::{
     ArgumentMap, DefinedField, FieldMapItem, MutationFieldResolverActionKindInfo,
@@ -27,11 +29,26 @@ lazy_static! {
     static ref FROM_VALUE_KEY_NAME: ValueKeyName = "from".intern().into();
     static ref TO_VALUE_KEY_NAME: ValueKeyName = "to".intern().into();
 }
-
+#[derive(Deserialize, Eq, PartialEq, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct MagicMutationFieldInfo {
     path: StringLiteralValue,
     field_map: Vec<FieldMapItem>,
     field: StringLiteralValue,
+}
+
+impl MagicMutationFieldInfo {
+    pub fn new(
+        path: StringLiteralValue,
+        field_map: Vec<FieldMapItem>,
+        field: StringLiteralValue,
+    ) -> Self {
+        Self {
+            path,
+            field_map,
+            field,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -271,87 +288,17 @@ impl UnvalidatedSchema {
         d: &GraphQLDirective<ConstantValue>,
     ) -> ProcessTypeDefinitionResult<Option<MagicMutationFieldInfo>> {
         if d.name.item == *EXPOSE_FIELD_DIRECTIVE {
-            Ok(Some(self.validate_magic_mutation_directive(d)?))
+            let mutation =
+                graphql_lang_types::from_graph_ql_directive(d).map_err(|err| match err {
+                    DeserializationError::Custom(err) => WithLocation::new(
+                        ProcessTypeDefinitionError::FailedToDeserialize(err),
+                        d.name.location.into(), // TODO: use location of the entire directive
+                    ),
+                })?;
+            Ok(Some(mutation))
         } else {
             Ok(None)
         }
-    }
-
-    fn validate_magic_mutation_directive(
-        &self,
-        d: &GraphQLDirective<ConstantValue>,
-    ) -> ProcessTypeDefinitionResult<MagicMutationFieldInfo> {
-        if d.arguments.len() != 3 {
-            return Err(WithEmbeddedLocation::new(
-                ProcessTypeDefinitionError::InvalidPrimaryDirectiveArgumentCount,
-                // This is wrong, the arguments should have a span, or the whole thing should have a span
-                d.name.location,
-            )
-            .into_with_location());
-        }
-
-        let path = d
-            .arguments
-            .iter()
-            .find(|d| d.name.item == *PATH_DIRECTIVE_ARGUMENT)
-            .ok_or_else(|| {
-                WithEmbeddedLocation::new(
-                    ProcessTypeDefinitionError::MissingPathArg,
-                    // This is wrong, the arguments should have a span, or the whole thing should have a span
-                    d.name.location,
-                )
-                .into_with_location()
-            })?;
-        let path_val = match path.value.item {
-            ConstantValue::String(s) => Ok(s),
-            _ => Err(WithEmbeddedLocation::new(
-                ProcessTypeDefinitionError::PathValueShouldBeString,
-                // This is wrong, the arguments should have a span, or the whole thing should have a span
-                d.name.location,
-            )
-            .into_with_location()),
-        }?;
-
-        let field_map = d
-            .arguments
-            .iter()
-            .find(|d| d.name.item == *FIELD_MAP_DIRECTIVE_ARGUMENT)
-            .ok_or_else(|| {
-                WithEmbeddedLocation::new(
-                    ProcessTypeDefinitionError::MissingFieldMapArg,
-                    // This is wrong, the arguments should have a span, or the whole thing should have a span
-                    d.name.location,
-                )
-                .into_with_location()
-            })?;
-
-        let field_map = parse_field_map_val(&field_map.value)?;
-
-        let field_argument = d
-            .arguments
-            .iter()
-            .find(|d| d.name.item == *FIELD_DIRECTIVE_ARGUMENT)
-            .ok_or_else(|| {
-                WithEmbeddedLocation::new(
-                    ProcessTypeDefinitionError::MissingFieldMapArg,
-                    // This is wrong, the arguments should have a span, or the whole thing should have a span
-                    d.name.location,
-                )
-                .into_with_location()
-            })?;
-
-        let field = field_argument.value.item.as_string().ok_or_else(|| {
-            WithLocation::new(
-                ProcessTypeDefinitionError::InvalidField,
-                Location::generated(),
-            )
-        })?;
-
-        Ok(MagicMutationFieldInfo {
-            path: path_val,
-            field_map,
-            field,
-        })
     }
 
     fn parse_field(
@@ -386,80 +333,6 @@ impl UnvalidatedSchema {
 
         Ok(field_id)
     }
-}
-
-fn parse_field_map_val(
-    value: &WithLocation<ConstantValue>,
-) -> ProcessTypeDefinitionResult<Vec<FieldMapItem>> {
-    let list = match &value.item {
-        ConstantValue::List(l) => Ok(l),
-        _ => Err(WithLocation::new(
-            ProcessTypeDefinitionError::InvalidFieldMap,
-            // This is wrong, the arguments should have a span, or the whole thing should have a span
-            value.location,
-        )),
-    }?;
-
-    list.iter()
-        .map(|argument_value| {
-            let object = match &argument_value.item {
-                ConstantValue::Object(o) => Ok(o),
-                _ => Err(WithLocation::new(
-                    ProcessTypeDefinitionError::InvalidFieldMap,
-                    argument_value.location,
-                )),
-            }?;
-
-            if object.len() != 2 {
-                return Err(WithLocation::new(
-                    ProcessTypeDefinitionError::InvalidFieldMap,
-                    argument_value.location,
-                ));
-            }
-
-            let from = object
-                .iter()
-                .find(|d| d.name.item == *FROM_VALUE_KEY_NAME)
-                .ok_or_else(|| {
-                    WithLocation::new(
-                        ProcessTypeDefinitionError::InvalidFieldMap,
-                        // This is wrong, the arguments should have a span, or the whole thing should have a span
-                        argument_value.location,
-                    )
-                })?;
-
-            let from_arg = match from.value.item {
-                ConstantValue::String(s) => Ok(s),
-                _ => Err(WithLocation::new(
-                    ProcessTypeDefinitionError::InvalidFieldMap,
-                    argument_value.location,
-                )),
-            }?;
-
-            let to = object
-                .iter()
-                .find(|d| d.name.item == *TO_VALUE_KEY_NAME)
-                .ok_or_else(|| {
-                    WithLocation::new(
-                        ProcessTypeDefinitionError::InvalidFieldMap,
-                        // This is wrong, the arguments should have a span, or the whole thing should have a span
-                        argument_value.location,
-                    )
-                })?;
-
-            let to_arg = to.value.item.as_string().ok_or_else(|| {
-                WithLocation::new(
-                    ProcessTypeDefinitionError::InvalidFieldMap,
-                    argument_value.location,
-                )
-            })?;
-
-            Ok(FieldMapItem {
-                from: from_arg,
-                to: to_arg,
-            })
-        })
-        .collect::<Result<Vec<_>, _>>()
 }
 
 fn skip_arguments_contained_in_field_map(

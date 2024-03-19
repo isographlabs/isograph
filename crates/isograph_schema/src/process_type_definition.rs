@@ -23,6 +23,7 @@ use isograph_lang_types::{
     ServerFieldSelection, ServerIdFieldId,
 };
 use lazy_static::lazy_static;
+use serde::Deserialize;
 use thiserror::Error;
 
 lazy_static! {
@@ -567,7 +568,8 @@ impl UnvalidatedSchema {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct FieldMapItem {
     // TODO eventually, we want to support . syntax here, too
     pub from: StringLiteralValue,
@@ -955,4 +957,7 @@ pub enum ProcessTypeDefinitionError {
 
     #[error("Root types must be objects. This type is a scalar.")]
     RootTypeMustBeObject,
+
+    #[error("Failed to deserialize {0}")]
+    FailedToDeserialize(String),
 }
