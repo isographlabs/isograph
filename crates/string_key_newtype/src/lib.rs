@@ -7,7 +7,7 @@ pub trait StringKeyNewtype:
 macro_rules! string_key_newtype {
     ($named:ident) => {
         // TODO serialize, deserialize
-
+   
         #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
         pub struct $named(intern::string_key::StringKey);
 
@@ -38,7 +38,8 @@ macro_rules! string_key_newtype {
                 D: serde::Deserializer<'de>,
             {
                 let s: String = serde::Deserialize::deserialize(deserializer)?;
-                Ok($named::from(s.intern()))
+                let interned = intern::string_key::Intern::intern(s);
+                Ok($named::from(interned))
             }
         }
     };
