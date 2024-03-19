@@ -49,6 +49,12 @@ impl std::fmt::Display for EmbeddedLocation {
     }
 }
 
+impl From<EmbeddedLocation> for Location {
+    fn from(value: EmbeddedLocation) -> Self {
+        Location::Embedded(value)
+    }
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Location {
     Embedded(EmbeddedLocation),
