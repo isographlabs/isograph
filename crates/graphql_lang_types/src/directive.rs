@@ -4,12 +4,10 @@ use super::{write::write_arguments, NameValuePair, ValueType};
 use crate::ConstantValue;
 use common_lang_types::{DirectiveArgumentName, DirectiveName, WithEmbeddedLocation};
 use intern::Lookup;
-use serde::de;
-use serde::de::value::SeqDeserializer;
-use serde::de::IntoDeserializer;
-use serde::de::MapAccess;
-use serde::Deserialize;
-use serde::Deserializer;
+use serde::{
+    de::{self, value::SeqDeserializer, IntoDeserializer, MapAccess},
+    Deserialize, Deserializer,
+};
 use thiserror::Error;
 
 // TODO maybe this should be NameAndArguments and a field should be the same thing...?
