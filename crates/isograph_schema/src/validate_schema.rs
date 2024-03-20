@@ -42,7 +42,7 @@ pub type ValidatedClientField = ClientField<
 >;
 
 /// The validated defined field that shows up in the TScalarField generic.
-pub type ValidatedDefinedField = FieldDefinitionLocation<ServerFieldId, ClientFieldId>;
+pub type ValidatedFieldDefinitionLocation = FieldDefinitionLocation<ServerFieldId, ClientFieldId>;
 
 pub type ValidatedSchemaObject =
     SchemaObject<<ValidatedSchemaState as SchemaValidationState>::EncounteredField>;
@@ -58,10 +58,10 @@ pub struct ValidatedLinkedFieldAssociatedData {
 pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
     type FieldTypeAssociatedData = SelectableFieldId;
-    type ClientFieldSelectionScalarFieldAssociatedData = ValidatedDefinedField;
+    type ClientFieldSelectionScalarFieldAssociatedData = ValidatedFieldDefinitionLocation;
     type ClientFieldSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
     type ClientFieldVariableDefinitionAssociatedData = SelectableFieldId;
-    type EncounteredField = ValidatedDefinedField;
+    type EncounteredField = ValidatedFieldDefinitionLocation;
     type Entrypoint = ClientFieldId;
 }
 

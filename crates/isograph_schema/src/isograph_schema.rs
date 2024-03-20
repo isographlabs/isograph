@@ -39,7 +39,7 @@ pub trait SchemaValidationState: Debug {
 
     /// The associated data type of scalars in resolvers' selection sets and unwraps
     /// - Unvalidated: ()
-    /// - Validated: ValidatedDefinedField
+    /// - Validated: ValidatedFieldDefinitionLocation
     ///   i.e. DefinedField<ServerFieldId, ResolverFieldId>
     type ClientFieldSelectionScalarFieldAssociatedData: Debug;
 
@@ -56,7 +56,7 @@ pub trait SchemaValidationState: Debug {
     /// On objects, what does the HashMap of encountered types contain
     /// - Unvalidated: UnvalidatedObjectFieldInfo
     ///   i.e. DefinedField<TypeAnnotation<UnvalidatedTypeName>, ClientFieldId>
-    /// - Validated: ValidatedDefinedField
+    /// - Validated: ValidatedFieldDefinitionLocation
     ///   i.e. DefinedField<ServerFieldId, ClientFieldId>
     type EncounteredField: Debug;
 

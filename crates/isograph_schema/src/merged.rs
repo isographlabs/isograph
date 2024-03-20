@@ -17,8 +17,8 @@ use isograph_lang_types::{
 use crate::{
     expose_field_directive::RequiresRefinement, ArgumentKeyAndValue, ClientFieldVariant,
     FieldDefinitionLocation, MutationFieldClientFieldVariant, NameAndArguments, PathToRefetchField,
-    ValidatedClientField, ValidatedDefinedField, ValidatedLinkedFieldSelection, ValidatedSchema,
-    ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSelection,
+    ValidatedClientField, ValidatedFieldDefinitionLocation, ValidatedLinkedFieldSelection,
+    ValidatedSchema, ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSelection,
 };
 
 type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSelection>>;
@@ -616,7 +616,7 @@ fn merge_scalar_resolver_field(
 }
 
 fn merge_scalar_server_field(
-    scalar_field: &ScalarFieldSelection<ValidatedDefinedField>,
+    scalar_field: &ScalarFieldSelection<ValidatedFieldDefinitionLocation>,
     merged_selection_set: &mut MergedSelectionMap,
     span: Span,
 ) {
