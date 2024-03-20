@@ -159,17 +159,23 @@ fn nested_client_field_names_to_import_statement(
 
 fn write_client_field_import(
     javascript_import: JavaScriptImports,
-    nested_resolver_name: ObjectTypeAndFieldNames,
+    nested_client_field_name: ObjectTypeAndFieldNames,
     overall: &mut String,
     current_file_type_name: IsographObjectTypeName,
 ) {
     if !javascript_import.default_import && javascript_import.types.is_empty() {
-        panic!("Resolver imports should not be created in an empty state.");
+        panic!(
+            "Client field imports should not be created in an empty state. \
+            This is indicative of a bug in Isograph."
+        );
     }
 
     let mut s = "import ".to_string();
     if javascript_import.default_import {
-        s.push_str(&format!("{}", nested_resolver_name.underscore_separated()));
+        s.push_str(&format!(
+            "{}",
+            nested_client_field_name.underscore_separated()
+        ));
     }
     let mut types = javascript_import.types.iter();
     if let Some(first) = types.next() {
@@ -185,7 +191,7 @@ fn write_client_field_import(
     }
     s.push_str(&format!(
         " from '{}';\n",
-        nested_resolver_name.relative_path(current_file_type_name)
+        nested_client_field_name.relative_path(current_file_type_name)
     ));
     overall.push_str(&s);
 }
