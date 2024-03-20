@@ -21,7 +21,7 @@ use intern::{string_key::Intern, Lookup};
 use isograph_config::ConfigOptions;
 use isograph_lang_types::{
     ClientFieldId, ObjectId, ScalarFieldSelection, SelectableFieldId, Selection, ServerFieldId,
-    ServerFieldSelection, ServerIdFieldId,
+    ServerFieldSelection, ServerStrongIdFieldId,
 };
 use lazy_static::lazy_static;
 use serde::Deserialize;
@@ -601,7 +601,7 @@ impl FieldMapItem {
 /// iso literals.) This is either a refetch field (if the object is refetchable), or
 /// nothing.
 fn get_resolvers_for_schema_object(
-    id_field_id: &Option<ServerIdFieldId>,
+    id_field_id: &Option<ServerStrongIdFieldId>,
     encountered_fields: &mut HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
     schema_resolvers: &mut Vec<UnvalidatedSchemaResolver>,
     parent_object_id: ObjectId,
@@ -664,7 +664,7 @@ struct FieldObjectIdsEtc {
     // TODO this should be HashMap<_, WithLocation<_>> or something
     encountered_fields: HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
     // TODO this should not be a ServerFieldId, but a special type
-    id_field: Option<ServerIdFieldId>,
+    id_field: Option<ServerStrongIdFieldId>,
 }
 
 /// Given a vector of fields from the schema AST all belonging to the same object/interface,
@@ -775,7 +775,7 @@ fn get_field_objects_ids_and_names(
 /// - validate that the id field is properly defined, i.e. has type ID!
 /// - set the id field
 fn set_and_validate_id_field(
-    id_field: &mut Option<ServerIdFieldId>,
+    id_field: &mut Option<ServerStrongIdFieldId>,
     current_field_id: usize,
     field: &WithLocation<GraphQLFieldDefinition>,
     parent_type_name: IsographObjectTypeName,

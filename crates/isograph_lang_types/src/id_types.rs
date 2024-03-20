@@ -3,9 +3,9 @@ use u32_newtypes::{u32_conversion, u32_newtype};
 // Any field defined on the server
 u32_newtype!(ServerFieldId);
 // A field that acts as an id
-u32_newtype!(ServerIdFieldId);
+u32_newtype!(ServerStrongIdFieldId);
 
-u32_conversion!(from: ServerIdFieldId, to: ServerFieldId);
+u32_conversion!(from: ServerStrongIdFieldId, to: ServerFieldId);
 
 u32_newtype!(ClientFieldId);
 

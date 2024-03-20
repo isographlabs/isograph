@@ -13,7 +13,7 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ClientFieldId, LinkedFieldSelection, NonConstantValue, ObjectId, ScalarId, SelectableFieldId,
-    Selection, ServerFieldId, ServerIdFieldId, Unwrap, VariableDefinition,
+    Selection, ServerFieldId, ServerStrongIdFieldId, Unwrap, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -180,7 +180,7 @@ impl<
     /// Get a reference to a given id field by its id.
     pub fn id_field<TIdFieldAssociatedData: TryFrom<TFieldAssociatedData> + Copy>(
         &self,
-        id_field_id: ServerIdFieldId,
+        id_field_id: ServerStrongIdFieldId,
     ) -> SchemaIdField<NamedTypeAnnotation<TIdFieldAssociatedData>> {
         let field_id = id_field_id.into();
 
@@ -347,7 +347,7 @@ pub struct SchemaObject<TEncounteredField> {
     pub directives: Vec<GraphQLDirective<ConstantValue>>,
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
-    pub id_field: Option<ServerIdFieldId>,
+    pub id_field: Option<ServerStrongIdFieldId>,
     pub server_fields: Vec<ServerFieldId>,
     pub resolvers: Vec<ClientFieldId>,
     pub encountered_fields: HashMap<SelectableFieldName, TEncounteredField>,
@@ -397,7 +397,7 @@ impl<TData> SchemaServerField<TData> {
 pub struct SchemaIdField<TData> {
     pub description: Option<DescriptionValue>,
     pub name: WithLocation<SelectableFieldName>,
-    pub id: ServerIdFieldId,
+    pub id: ServerStrongIdFieldId,
     pub associated_data: TData,
     pub parent_type_id: ObjectId,
     // pub directives: Vec<Directive<ConstantValue>>,
