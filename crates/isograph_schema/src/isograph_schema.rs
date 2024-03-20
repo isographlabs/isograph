@@ -41,28 +41,28 @@ pub trait SchemaValidationState: Debug {
     /// - Unvalidated: ()
     /// - Validated: ValidatedDefinedField
     ///   i.e. DefinedField<ServerFieldId, ResolverFieldId>
-    type ResolverSelectionScalarFieldAssociatedData: Debug;
+    type ClientFieldSelectionScalarFieldAssociatedData: Debug;
 
     /// The associated data type of linked fields in resolvers' selection sets and unwraps
     /// - Unvalidated: ()
     /// - Validated: ObjectId
-    type ResolverSelectionLinkedFieldAssociatedData: Debug;
+    type ClientFieldSelectionLinkedFieldAssociatedData: Debug;
 
-    /// The associated data type of resolvers' variable definitions
+    /// The associated data type of client fields' variable definitions
     /// - Unvalidated: UnvalidatedTypeName
-    /// - Validated: DefinedTypeId
-    type ResolverVariableDefinitionAssociatedData: Debug;
+    /// - Validated: FieldDefinition
+    type ClientFieldVariableDefinitionAssociatedData: Debug;
 
     /// On objects, what does the HashMap of encountered types contain
     /// - Unvalidated: UnvalidatedObjectFieldInfo
-    ///   i.e. DefinedField<TypeAnnotation<UnvalidatedTypeName>, ResolverFieldId>
+    ///   i.e. DefinedField<TypeAnnotation<UnvalidatedTypeName>, ClientFieldId>
     /// - Validated: ValidatedDefinedField
-    ///   i.e. DefinedField<ServerFieldId, ResolverFieldId>
+    ///   i.e. DefinedField<ServerFieldId, ClientFieldId>
     type EncounteredField: Debug;
 
     /// What we store in entrypoints
-    /// - Unvalidated: (TextSource, WithSpan<ResolverFetch>)
-    /// - Validated: (ObjectId, ResolverFieldId)
+    /// - Unvalidated: (TextSource, WithSpan<ObjectTypeAndField>)
+    /// - Validated: (ObjectId, ClientFieldId)
     type Entrypoint: Debug;
 }
 
@@ -79,9 +79,9 @@ pub struct Schema<TValidation: SchemaValidationState> {
     pub server_fields: Vec<SchemaServerField<TypeAnnotation<TValidation::FieldTypeAssociatedData>>>,
     pub client_fields: Vec<
         ClientField<
-            TValidation::ResolverSelectionScalarFieldAssociatedData,
-            TValidation::ResolverSelectionLinkedFieldAssociatedData,
-            TValidation::ResolverVariableDefinitionAssociatedData,
+            TValidation::ClientFieldSelectionScalarFieldAssociatedData,
+            TValidation::ClientFieldSelectionLinkedFieldAssociatedData,
+            TValidation::ClientFieldVariableDefinitionAssociatedData,
         >,
     >,
     // TODO consider whether this belongs here. It could just be a free variable.
@@ -157,9 +157,9 @@ impl<TValidation: SchemaValidationState> Schema<TValidation> {
         &self,
         client_field_id: ClientFieldId,
     ) -> &ClientField<
-        TValidation::ResolverSelectionScalarFieldAssociatedData,
-        TValidation::ResolverSelectionLinkedFieldAssociatedData,
-        TValidation::ResolverVariableDefinitionAssociatedData,
+        TValidation::ClientFieldSelectionScalarFieldAssociatedData,
+        TValidation::ClientFieldSelectionLinkedFieldAssociatedData,
+        TValidation::ClientFieldVariableDefinitionAssociatedData,
     > {
         &self.client_fields[client_field_id.as_usize()]
     }

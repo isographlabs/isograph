@@ -22,23 +22,23 @@ use crate::{
 pub type ValidatedSchemaServerField = SchemaServerField<TypeAnnotation<SelectableFieldId>>;
 
 pub type ValidatedSelection = Selection<
-    <ValidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::ResolverSelectionLinkedFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
 >;
 
 pub type ValidatedLinkedFieldSelection = LinkedFieldSelection<
-    <ValidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::ResolverSelectionLinkedFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
 >;
 pub type ValidatedScalarFieldSelection = ScalarFieldSelection<
-    <ValidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
 >;
 
 pub type ValidatedVariableDefinition = VariableDefinition<SelectableFieldId>;
 pub type ValidatedClientField = ClientField<
-    <ValidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::ResolverSelectionLinkedFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::ResolverVariableDefinitionAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientFieldVariableDefinitionAssociatedData,
 >;
 
 /// The validated defined field that shows up in the TScalarField generic.
@@ -58,9 +58,9 @@ pub struct ValidatedLinkedFieldAssociatedData {
 pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
     type FieldTypeAssociatedData = SelectableFieldId;
-    type ResolverSelectionScalarFieldAssociatedData = ValidatedDefinedField;
-    type ResolverSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
-    type ResolverVariableDefinitionAssociatedData = SelectableFieldId;
+    type ClientFieldSelectionScalarFieldAssociatedData = ValidatedDefinedField;
+    type ClientFieldSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
+    type ClientFieldVariableDefinitionAssociatedData = SelectableFieldId;
     type EncounteredField = ValidatedDefinedField;
     type Entrypoint = ClientFieldId;
 }

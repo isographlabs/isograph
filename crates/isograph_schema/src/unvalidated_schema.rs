@@ -25,10 +25,10 @@ pub struct UnvalidatedSchemaState {}
 impl SchemaValidationState for UnvalidatedSchemaState {
     type FieldTypeAssociatedData = UnvalidatedTypeName;
     // N.B. this must be kept in sync with client_field_declaration.rs
-    type ResolverSelectionScalarFieldAssociatedData = ();
+    type ClientFieldSelectionScalarFieldAssociatedData = ();
     // N.B. this must be kept in sync with client_field_declaration.rs
-    type ResolverSelectionLinkedFieldAssociatedData = ();
-    type ResolverVariableDefinitionAssociatedData = UnvalidatedTypeName;
+    type ClientFieldSelectionLinkedFieldAssociatedData = ();
+    type ClientFieldVariableDefinitionAssociatedData = UnvalidatedTypeName;
     type EncounteredField = UnvalidatedObjectFieldInfo;
     type Entrypoint = (TextSource, WithSpan<EntrypointTypeAndField>);
 }
@@ -50,14 +50,14 @@ pub(crate) type UnvalidatedSchemaData =
 pub(crate) type UnvalidatedSchemaField = SchemaServerField<TypeAnnotation<UnvalidatedTypeName>>;
 
 pub(crate) type UnvalidatedClientField = ClientField<
-    <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
-    <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionLinkedFieldAssociatedData,
-    <UnvalidatedSchemaState as SchemaValidationState>::ResolverVariableDefinitionAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldVariableDefinitionAssociatedData,
 >;
 
 pub type UnvalidatedLinkedFieldSelection = LinkedFieldSelection<
-    <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
-    <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionLinkedFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
 >;
 
 pub(crate) type UnvalidatedSchemaServerField = SchemaServerField<TypeAnnotation<SelectableFieldId>>;
