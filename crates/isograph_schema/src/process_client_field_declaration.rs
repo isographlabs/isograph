@@ -7,7 +7,7 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ClientFieldDeclaration, DefinedTypeId, FragmentDirectiveUsage, ObjectId,
+    ClientFieldDeclaration, FragmentDirectiveUsage, ObjectId, SelectableFieldId,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
@@ -35,11 +35,11 @@ impl UnvalidatedSchema {
             ))?;
 
         match parent_type_id {
-            DefinedTypeId::Object(object_id) => {
+            SelectableFieldId::Object(object_id) => {
                 self.add_resolver_field_to_object(*object_id, client_field_declaration)
                     .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?;
             }
-            DefinedTypeId::Scalar(scalar_id) => {
+            SelectableFieldId::Scalar(scalar_id) => {
                 let scalar_name = self.schema_data.scalars[scalar_id.as_usize()].name;
                 return Err(WithLocation::new(
                     ProcessResolverDeclarationError::InvalidParentType {

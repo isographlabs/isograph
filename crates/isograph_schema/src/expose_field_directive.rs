@@ -9,7 +9,7 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_config::ConfigOptions;
 use isograph_lang_types::{
-    ClientFieldId, DefinedTypeId, ObjectId, ScalarFieldSelection, Selection, ServerFieldId,
+    ClientFieldId, ObjectId, ScalarFieldSelection, SelectableFieldId, Selection, ServerFieldId,
     ServerFieldSelection,
 };
 use serde::Deserialize;
@@ -127,7 +127,7 @@ impl UnvalidatedSchema {
             .get(&mutation_field_payload_type_name)
             .map(|x| *x);
 
-        if let Some(DefinedTypeId::Object(mutation_field_object_id)) = payload_id {
+        if let Some(SelectableFieldId::Object(mutation_field_object_id)) = payload_id {
             let (mutation_field_args_without_id, processed_field_map_items) =
                 skip_arguments_contained_in_field_map(
                     self,
@@ -163,7 +163,8 @@ impl UnvalidatedSchema {
 
                         let primary_type = self.schema_data.defined_types.get(inner).clone();
 
-                        if let Some(DefinedTypeId::Object(resolver_parent_object_id)) = primary_type
+                        if let Some(SelectableFieldId::Object(resolver_parent_object_id)) =
+                            primary_type
                         {
                             Ok((*resolver_parent_object_id, *inner))
                         } else {

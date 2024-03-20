@@ -6,7 +6,7 @@ use common_lang_types::{
 use graphql_lang_types::TypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ClientFieldId, DefinedTypeId, EntrypointTypeAndField, LinkedFieldSelection, ScalarId,
+    ClientFieldId, EntrypointTypeAndField, LinkedFieldSelection, ScalarId, SelectableFieldId,
 };
 
 use crate::{
@@ -60,7 +60,7 @@ pub type UnvalidatedLinkedFieldSelection = LinkedFieldSelection<
     <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionLinkedFieldAssociatedData,
 >;
 
-pub(crate) type UnvalidatedSchemaServerField = SchemaServerField<TypeAnnotation<DefinedTypeId>>;
+pub(crate) type UnvalidatedSchemaServerField = SchemaServerField<TypeAnnotation<SelectableFieldId>>;
 
 impl UnvalidatedSchema {
     pub fn new() -> Self {
@@ -125,7 +125,7 @@ impl UnvalidatedSchema {
 
 fn add_schema_defined_scalar_type(
     scalars: &mut Vec<SchemaScalar>,
-    defined_types: &mut HashMap<UnvalidatedTypeName, DefinedTypeId>,
+    defined_types: &mut HashMap<UnvalidatedTypeName, SelectableFieldId>,
     field_name: &'static str,
     javascript_name: JavascriptName,
 ) -> ScalarId {
@@ -143,7 +143,7 @@ fn add_schema_defined_scalar_type(
     });
     defined_types.insert(
         typename.item.into(),
-        DefinedTypeId::Scalar(scalar_id.into()),
+        SelectableFieldId::Scalar(scalar_id.into()),
     );
     scalar_id
 }

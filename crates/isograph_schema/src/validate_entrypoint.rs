@@ -2,7 +2,7 @@ use common_lang_types::{
     IsographObjectTypeName, Location, ScalarFieldName, TextSource, UnvalidatedTypeName,
     WithLocation, WithSpan,
 };
-use isograph_lang_types::{ClientFieldId, DefinedTypeId, EntrypointTypeAndField, ObjectId};
+use isograph_lang_types::{ClientFieldId, EntrypointTypeAndField, ObjectId, SelectableFieldId};
 use thiserror::Error;
 
 use crate::{FieldDefinitionLocation, UnvalidatedSchema};
@@ -41,7 +41,7 @@ impl UnvalidatedSchema {
             ))?;
 
         match parent_type_id {
-            DefinedTypeId::Object(object_id) => {
+            SelectableFieldId::Object(object_id) => {
                 // For now, only the query object is fetchable, and thus
                 // can be used as a parent type in an iso entrypoint declaration.
                 //
@@ -64,7 +64,7 @@ impl UnvalidatedSchema {
                     Ok(*object_id)
                 }
             }
-            DefinedTypeId::Scalar(scalar_id) => {
+            SelectableFieldId::Scalar(scalar_id) => {
                 let scalar_name = self.schema_data.scalars[scalar_id.as_usize()].name;
                 Err(WithLocation::new(
                     ValidateEntrypointDeclarationError::InvalidParentType {

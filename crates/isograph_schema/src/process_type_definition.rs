@@ -20,7 +20,7 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_config::ConfigOptions;
 use isograph_lang_types::{
-    ClientFieldId, DefinedTypeId, ObjectId, ScalarFieldSelection, Selection, ServerFieldId,
+    ClientFieldId, ObjectId, ScalarFieldSelection, SelectableFieldId, Selection, ServerFieldId,
     ServerFieldSelection, ServerIdFieldId,
 };
 use lazy_static::lazy_static;
@@ -223,7 +223,7 @@ impl UnvalidatedSchema {
                                     supertype_name.location,
                                 ))?;
                             match supertype_id {
-                                DefinedTypeId::Scalar(_) => {
+                                SelectableFieldId::Scalar(_) => {
                                     let subtype_name = self.schema_data.object(subtype_id).name;
 
                                     return Err(WithLocation::new(
@@ -234,7 +234,7 @@ impl UnvalidatedSchema {
                                         supertype_name.location,
                                     ));
                                 }
-                                DefinedTypeId::Object(supertype_object_id) => {
+                                SelectableFieldId::Object(supertype_object_id) => {
                                     Ok(*supertype_object_id)
                                 }
                             }
@@ -255,13 +255,13 @@ impl UnvalidatedSchema {
                 .expect("Expected Interface to be found. This indicates a bug in Isograph.");
 
             match supertype_id {
-                DefinedTypeId::Scalar(_) => {
+                SelectableFieldId::Scalar(_) => {
                     panic!(
                         "Expected an object id; this is indicative of a bug in Isograph and \
                         should have already been validated."
                     );
                 }
-                DefinedTypeId::Object(supertype_object_id) => {
+                SelectableFieldId::Object(supertype_object_id) => {
                     // TODO validate that supertype was defined as an interface, perhaps by
                     // including references to the original definition (i.e. as a type parameter)
                     // and having the schema be able to validate this. (i.e. this should be
@@ -336,7 +336,7 @@ impl UnvalidatedSchema {
                 );
 
                 match *id {
-                    DefinedTypeId::Object(object_id) => {
+                    SelectableFieldId::Object(object_id) => {
                         let schema_object = self.schema_data.object_mut(object_id);
 
                         if !object_extension.fields.is_empty() {
@@ -352,7 +352,7 @@ impl UnvalidatedSchema {
 
                         Ok(())
                     }
-                    DefinedTypeId::Scalar(_) => Err(WithLocation::new(
+                    SelectableFieldId::Scalar(_) => Err(WithLocation::new(
                         ProcessTypeDefinitionError::TypeExtensionMismatch {
                             type_name: name.into(),
                             is_type: "a scalar",
@@ -434,7 +434,7 @@ impl UnvalidatedSchema {
                 });
 
                 schema_fields.extend(unvalidated_schema_fields);
-                vacant.insert(DefinedTypeId::Object(next_object_id));
+                vacant.insert(SelectableFieldId::Object(next_object_id));
 
                 // TODO default types are a GraphQL-land concept, but this is Isograph-land
                 if object_type_definition.name.item == *QUERY_TYPE {
@@ -510,7 +510,7 @@ impl UnvalidatedSchema {
                     javascript_name: *STRING_JAVASCRIPT_TYPE,
                 });
 
-                vacant.insert(DefinedTypeId::Scalar(next_scalar_id));
+                vacant.insert(SelectableFieldId::Scalar(next_scalar_id));
             }
         }
         Ok(())
@@ -554,8 +554,8 @@ impl UnvalidatedSchema {
         type_name: WithLocation<GraphQLObjectTypeName>,
     ) -> ProcessTypeDefinitionResult<ObjectId> {
         match self.schema_data.defined_types.get(&type_name.item.into()) {
-            Some(DefinedTypeId::Object(object_id)) => Ok(*object_id),
-            Some(DefinedTypeId::Scalar(_)) => Err(WithLocation::new(
+            Some(SelectableFieldId::Object(object_id)) => Ok(*object_id),
+            Some(SelectableFieldId::Scalar(_)) => Err(WithLocation::new(
                 ProcessTypeDefinitionError::RootTypeMustBeObject,
                 type_name.location,
             )),

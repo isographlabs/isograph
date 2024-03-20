@@ -9,7 +9,7 @@ use graphql_lang_types::{
     TypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
-use isograph_lang_types::{DefinedTypeId, ObjectId, ServerFieldId};
+use isograph_lang_types::{ObjectId, SelectableFieldId, ServerFieldId};
 
 use crate::{
     FieldMapItem, IsographObjectTypeDefinition, ProcessObjectTypeDefinitionOutcome,
@@ -81,7 +81,7 @@ impl ArgumentMap {
                             .get(&unmodified_argument.type_.inner().lookup().intern().into())
                         {
                             Some(defined_type) => match defined_type {
-                                DefinedTypeId::Object(_) => return Err(WithLocation::new(
+                                SelectableFieldId::Object(_) => return Err(WithLocation::new(
                                     ProcessTypeDefinitionError::PrimaryDirectiveCannotRemapObject {
                                         primary_type_name,
                                         field_name: split_to_arg
@@ -91,7 +91,7 @@ impl ArgumentMap {
                                     },
                                     Location::generated(),
                                 )),
-                                DefinedTypeId::Scalar(_) => {}
+                                SelectableFieldId::Scalar(_) => {}
                             },
                             None => panic!(
                                 "Type is not found. This is indicative \
@@ -340,7 +340,7 @@ impl ModifiedArgument {
                 "Expected type to be defined by now. This is indicative of a bug in Isograph.",
             );
             match defined_type_id {
-                DefinedTypeId::Object(object_id) => {
+                SelectableFieldId::Object(object_id) => {
                     let object = schema.schema_data.object(object_id);
 
                     ModifiedObject {
@@ -357,7 +357,7 @@ impl ModifiedArgument {
                             .collect(),
                     }
                 }
-                DefinedTypeId::Scalar(_scalar_id) => {
+                SelectableFieldId::Scalar(_scalar_id) => {
                     // TODO don't be lazy, return an error
                     panic!("Cannot modify a scalar")
                 }
@@ -416,7 +416,7 @@ impl ModifiedArgument {
                                 // N.B. this should be done via a validation pass.
                                 match schema.schema_data.defined_types.get(field_object_type) {
                                     Some(type_) => match type_ {
-                                        DefinedTypeId::Object(_) => {
+                                        SelectableFieldId::Object(_) => {
                                             // Otherwise, formatting breaks :(
                                             use ProcessTypeDefinitionError::PrimaryDirectiveCannotRemapObject;
                                             return Err(WithLocation::new(
@@ -427,7 +427,7 @@ impl ModifiedArgument {
                                                 Location::generated(),
                                             ));
                                         }
-                                        DefinedTypeId::Scalar(_scalar_id) => {
+                                        SelectableFieldId::Scalar(_scalar_id) => {
                                             // Cool! We found a scalar, we can remove it.
                                             argument_object.field_map.remove(&key).expect(
                                                 "Expected to be able to remove item. \

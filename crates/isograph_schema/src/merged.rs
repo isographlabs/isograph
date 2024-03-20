@@ -10,7 +10,7 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ClientFieldId, DefinedTypeId, ObjectId, ScalarFieldSelection, Selection,
+    ClientFieldId, ObjectId, ScalarFieldSelection, SelectableFieldId, Selection,
     SelectionFieldArgument, ServerFieldSelection, VariableDefinition,
 };
 
@@ -165,7 +165,7 @@ pub struct RefetchFieldResolverInfo {
     /// Used to look up what type to narrow on in the generated refetch query,
     /// among other things.
     pub refetch_field_parent_id: ObjectId,
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<DefinedTypeId>>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<SelectableFieldId>>>,
     pub root_parent_object: IsographObjectTypeName,
     pub root_fetchable_field: SelectableFieldName,
     // TODO wrap in a newtype
@@ -178,7 +178,7 @@ pub struct MutationFieldResolverInfo {
     /// Used to look up what type to narrow on in the generated refetch query,
     /// among other things.
     pub refetch_field_parent_id: ObjectId,
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<DefinedTypeId>>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<SelectableFieldId>>>,
     pub root_parent_object: IsographObjectTypeName,
     pub root_fetchable_field: SelectableFieldName,
     // TODO wrap in a newtype

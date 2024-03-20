@@ -12,7 +12,7 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ClientFieldId, DefinedTypeId, LinkedFieldSelection, NonConstantValue, ObjectId, ScalarId,
+    ClientFieldId, LinkedFieldSelection, NonConstantValue, ObjectId, ScalarId, SelectableFieldId,
     Selection, ServerFieldId, ServerIdFieldId, Unwrap, VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -140,7 +140,7 @@ impl<TFieldAssociatedData, TResolverType>
 pub struct SchemaData<TEncounteredField> {
     pub objects: Vec<SchemaObject<TEncounteredField>>,
     pub scalars: Vec<SchemaScalar>,
-    pub defined_types: HashMap<UnvalidatedTypeName, DefinedTypeId>,
+    pub defined_types: HashMap<UnvalidatedTypeName, SelectableFieldId>,
 }
 
 impl<TValidation: SchemaValidationState> Schema<TValidation> {
@@ -215,12 +215,15 @@ impl<TEncounteredField> SchemaData<TEncounteredField> {
         &self.scalars[scalar_id.as_usize()]
     }
 
-    pub fn lookup_unvalidated_type(&self, type_id: DefinedTypeId) -> SchemaType<TEncounteredField> {
+    pub fn lookup_unvalidated_type(
+        &self,
+        type_id: SelectableFieldId,
+    ) -> SchemaType<TEncounteredField> {
         match type_id {
-            DefinedTypeId::Object(id) => {
+            SelectableFieldId::Object(id) => {
                 SchemaType::Object(self.objects.get(id.as_usize()).unwrap())
             }
-            DefinedTypeId::Scalar(id) => {
+            SelectableFieldId::Scalar(id) => {
                 SchemaType::Scalar(self.scalars.get(id.as_usize()).unwrap())
             }
         }
