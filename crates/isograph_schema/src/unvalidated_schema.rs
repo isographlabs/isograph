@@ -24,9 +24,9 @@ pub struct UnvalidatedSchemaState {}
 
 impl SchemaValidationState for UnvalidatedSchemaState {
     type FieldTypeAssociatedData = UnvalidatedTypeName;
-    // N.B. this must be kept in sync with resolver_declaration.rs
+    // N.B. this must be kept in sync with client_field_declaration.rs
     type ResolverSelectionScalarFieldAssociatedData = ();
-    // N.B. this must be kept in sync with resolver_declaration.rs
+    // N.B. this must be kept in sync with client_field_declaration.rs
     type ResolverSelectionLinkedFieldAssociatedData = ();
     type ResolverVariableDefinitionAssociatedData = UnvalidatedTypeName;
     type EncounteredField = UnvalidatedObjectFieldInfo;

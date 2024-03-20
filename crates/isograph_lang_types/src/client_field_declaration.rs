@@ -17,7 +17,7 @@ pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
 >;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct ResolverDeclaration {
+pub struct ClientFieldDeclaration {
     pub const_export_name: ConstExportName,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub resolver_field_name: WithSpan<ScalarFieldName>,

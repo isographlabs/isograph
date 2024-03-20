@@ -9,8 +9,8 @@ use graphql_lang_types::{
 };
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
-    EntrypointTypeAndField, FragmentDirectiveUsage, LinkedFieldSelection, NonConstantValue,
-    ResolverDeclaration, ScalarFieldSelection, Selection, SelectionFieldArgument,
+    ClientFieldDeclaration, EntrypointTypeAndField, FragmentDirectiveUsage, LinkedFieldSelection,
+    NonConstantValue, ScalarFieldSelection, Selection, SelectionFieldArgument,
     ServerFieldSelection, UnvalidatedSelection, Unwrap, VariableDefinition,
 };
 
@@ -20,7 +20,7 @@ use crate::{
 };
 
 pub enum IsoLiteralExtractionResult {
-    ClientFieldDeclaration(WithSpan<ResolverDeclaration>),
+    ClientFieldDeclaration(WithSpan<ClientFieldDeclaration>),
     EntrypointDeclaration(WithSpan<EntrypointTypeAndField>),
 }
 
@@ -40,7 +40,7 @@ pub fn parse_iso_literal(
             parse_iso_fetch(&mut tokens, text_source)?,
         )),
         "field" => Ok(IsoLiteralExtractionResult::ClientFieldDeclaration(
-            parse_iso_client_field(
+            parse_iso_client_field_declaration(
                 &mut tokens,
                 definition_file_path,
                 const_export_name,
@@ -88,15 +88,19 @@ fn parse_iso_fetch(
     Ok(resolver_fetch)
 }
 
-fn parse_iso_client_field(
+fn parse_iso_client_field_declaration(
     tokens: &mut PeekableLexer<'_>,
     definition_file_path: FilePath,
     const_export_name: Option<&str>,
     text_source: TextSource,
-) -> ParseResultWithLocation<WithSpan<ResolverDeclaration>> {
-    let resolver_declaration =
-        parse_resolver_declaration(tokens, definition_file_path, const_export_name, text_source)
-            .map_err(|with_span| with_span.to_with_location(text_source))?;
+) -> ParseResultWithLocation<WithSpan<ClientFieldDeclaration>> {
+    let client_field_declaration = parse_client_field_declaration_inner(
+        tokens,
+        definition_file_path,
+        const_export_name,
+        text_source,
+    )
+    .map_err(|with_span| with_span.to_with_location(text_source))?;
 
     if let Some(span) = tokens.remaining_token_span() {
         return Err(WithLocation::new(
@@ -105,16 +109,16 @@ fn parse_iso_client_field(
         ));
     }
 
-    Ok(resolver_declaration)
+    Ok(client_field_declaration)
 }
 
-fn parse_resolver_declaration<'a>(
+fn parse_client_field_declaration_inner<'a>(
     tokens: &mut PeekableLexer<'a>,
     definition_file_path: FilePath,
     const_export_name: Option<&str>,
     text_source: TextSource,
-) -> ParseResultWithSpan<WithSpan<ResolverDeclaration>> {
-    let resolver_declaration = tokens
+) -> ParseResultWithSpan<WithSpan<ClientFieldDeclaration>> {
+    let client_field_declaration = tokens
         .with_span(|tokens| {
             let _description = parse_optional_description(tokens)?;
             let parent_type = tokens
@@ -150,7 +154,7 @@ fn parse_resolver_declaration<'a>(
             // - it ends up in the reader AST
             // --------------------
 
-            Ok(ResolverDeclaration {
+            Ok(ClientFieldDeclaration {
                 parent_type,
                 resolver_field_name,
                 selection_set_and_unwraps,
@@ -162,7 +166,7 @@ fn parse_resolver_declaration<'a>(
         })
         .transpose();
 
-    resolver_declaration
+    client_field_declaration
 }
 
 // Note: for now, top-level selection sets are required

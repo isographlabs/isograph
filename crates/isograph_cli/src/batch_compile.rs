@@ -14,7 +14,7 @@ use isograph_config::CompilerConfig;
 use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
 };
-use isograph_lang_types::{EntrypointTypeAndField, ResolverDeclaration};
+use isograph_lang_types::{ClientFieldDeclaration, EntrypointTypeAndField};
 use isograph_schema::{
     ProcessResolverDeclarationError, Schema, UnvalidatedSchema, ValidateSchemaError,
 };
@@ -201,12 +201,14 @@ pub(crate) fn handle_compile_command(
 
 fn process_parsed_resolvers_and_entrypoints(
     schema: &mut UnvalidatedSchema,
-    resolvers: Vec<(WithSpan<ResolverDeclaration>, TextSource)>,
+    resolvers: Vec<(WithSpan<ClientFieldDeclaration>, TextSource)>,
     entrypoints: Vec<(WithSpan<EntrypointTypeAndField>, TextSource)>,
 ) -> Result<(), Vec<WithLocation<ProcessResolverDeclarationError>>> {
     let mut errors = vec![];
-    for (resolver_declaration, text_source) in resolvers {
-        if let Err(e) = schema.process_resolver_declaration(resolver_declaration, text_source) {
+    for (client_field_declaration, text_source) in resolvers {
+        if let Err(e) =
+            schema.process_client_field_declaration(client_field_declaration, text_source)
+        {
             errors.push(e);
         }
     }
@@ -226,13 +228,13 @@ fn extract_iso_literals(
     canonicalized_root_path: PathBuf,
 ) -> Result<
     (
-        Vec<(WithSpan<ResolverDeclaration>, TextSource)>,
+        Vec<(WithSpan<ClientFieldDeclaration>, TextSource)>,
         Vec<(WithSpan<EntrypointTypeAndField>, TextSource)>,
     ),
     Vec<WithLocation<IsographLiteralParseError>>,
 > {
     let mut isograph_literal_parse_errors = vec![];
-    let mut resolver_declarations_and_text_sources = vec![];
+    let mut client_field_declarations_and_text_sources = vec![];
     let mut resolver_fetch_and_text_sources = vec![];
 
     for (file_path, file_content) in project_files {
@@ -254,7 +256,7 @@ fn extract_iso_literals(
             ) {
                 Ok((extraction_result, text_source)) => match extraction_result {
                     IsoLiteralExtractionResult::ClientFieldDeclaration(decl) => {
-                        resolver_declarations_and_text_sources.push((decl, text_source))
+                        client_field_declarations_and_text_sources.push((decl, text_source))
                     }
                     IsoLiteralExtractionResult::EntrypointDeclaration(decl) => {
                         resolver_fetch_and_text_sources.push((decl, text_source))
@@ -267,7 +269,7 @@ fn extract_iso_literals(
 
     if isograph_literal_parse_errors.is_empty() {
         Ok((
-            resolver_declarations_and_text_sources,
+            client_field_declarations_and_text_sources,
             resolver_fetch_and_text_sources,
         ))
     } else {

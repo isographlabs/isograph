@@ -6,7 +6,9 @@ use common_lang_types::{
 };
 use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::string_key::Intern;
-use isograph_lang_types::{DefinedTypeId, FragmentDirectiveUsage, ObjectId, ResolverDeclaration};
+use isograph_lang_types::{
+    ClientFieldDeclaration, DefinedTypeId, FragmentDirectiveUsage, ObjectId,
+};
 use lazy_static::lazy_static;
 use thiserror::Error;
 
@@ -16,25 +18,25 @@ use crate::{
 };
 
 impl UnvalidatedSchema {
-    pub fn process_resolver_declaration(
+    pub fn process_client_field_declaration(
         &mut self,
-        resolver_declaration: WithSpan<ResolverDeclaration>,
+        client_field_declaration: WithSpan<ClientFieldDeclaration>,
         text_source: TextSource,
     ) -> Result<(), WithLocation<ProcessResolverDeclarationError>> {
         let parent_type_id = self
             .schema_data
             .defined_types
-            .get(&resolver_declaration.item.parent_type.item.into())
+            .get(&client_field_declaration.item.parent_type.item.into())
             .ok_or(WithLocation::new(
                 ProcessResolverDeclarationError::ParentTypeNotDefined {
-                    parent_type_name: resolver_declaration.item.parent_type.item,
+                    parent_type_name: client_field_declaration.item.parent_type.item,
                 },
-                Location::new(text_source, resolver_declaration.item.parent_type.span),
+                Location::new(text_source, client_field_declaration.item.parent_type.span),
             ))?;
 
         match parent_type_id {
             DefinedTypeId::Object(object_id) => {
-                self.add_resolver_field_to_object(*object_id, resolver_declaration)
+                self.add_resolver_field_to_object(*object_id, client_field_declaration)
                     .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?;
             }
             DefinedTypeId::Scalar(scalar_id) => {
@@ -43,7 +45,7 @@ impl UnvalidatedSchema {
                     ProcessResolverDeclarationError::InvalidParentType {
                         parent_type_name: scalar_name.item.into(),
                     },
-                    Location::new(text_source, resolver_declaration.item.parent_type.span),
+                    Location::new(text_source, client_field_declaration.item.parent_type.span),
                 ));
             }
         }
@@ -54,10 +56,10 @@ impl UnvalidatedSchema {
     fn add_resolver_field_to_object(
         &mut self,
         parent_object_id: ObjectId,
-        resolver_declaration: WithSpan<ResolverDeclaration>,
+        client_field_declaration: WithSpan<ClientFieldDeclaration>,
     ) -> ProcessResolverDeclarationResult<()> {
         let object = &mut self.schema_data.objects[parent_object_id.as_usize()];
-        let resolver_field_name_ws = resolver_declaration.item.resolver_field_name;
+        let resolver_field_name_ws = client_field_declaration.item.resolver_field_name;
         let resolver_field_name = resolver_field_name_ws.item;
         let resolver_field_name_span = resolver_field_name_ws.span;
 
@@ -83,11 +85,15 @@ impl UnvalidatedSchema {
 
         object.resolvers.push(next_resolver_id);
 
-        let name = resolver_declaration.item.resolver_field_name.item.into();
-        let variant = get_resolver_variant(&resolver_declaration.item.directives);
+        let name = client_field_declaration
+            .item
+            .resolver_field_name
+            .item
+            .into();
+        let variant = get_resolver_variant(&client_field_declaration.item.directives);
         let resolver_action_kind = ResolverActionKind::NamedImport((
-            resolver_declaration.item.const_export_name,
-            resolver_declaration.item.definition_path,
+            client_field_declaration.item.const_export_name,
+            client_field_declaration.item.definition_path,
         ));
 
         // TODO variant should carry payloads, instead of this check
@@ -104,9 +110,9 @@ impl UnvalidatedSchema {
             description: None,
             name,
             id: next_resolver_id,
-            selection_set_and_unwraps: resolver_declaration.item.selection_set_and_unwraps,
+            selection_set_and_unwraps: client_field_declaration.item.selection_set_and_unwraps,
             variant,
-            variable_definitions: resolver_declaration.item.variable_definitions,
+            variable_definitions: client_field_declaration.item.variable_definitions,
             type_and_field: ResolverTypeAndField {
                 type_name: object.name,
                 field_name: name,
