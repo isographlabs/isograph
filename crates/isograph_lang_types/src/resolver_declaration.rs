@@ -1,7 +1,7 @@
 use common_lang_types::{
-    ConstExportName, FieldArgumentName, FieldNameOrAlias, HasName, IsographDirectiveName,
-    LinkedFieldAlias, LinkedFieldName, ResolverDefinitionPath, ScalarFieldAlias, ScalarFieldName,
-    SelectableFieldName, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
+    ConstExportName, FieldArgumentName, FieldNameOrAlias, FilePath, HasName, IsographDirectiveName,
+    LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName, SelectableFieldName,
+    UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::TypeAnnotation;
 
@@ -25,7 +25,7 @@ pub struct ResolverDeclaration {
         Option<(Vec<WithSpan<UnvalidatedSelection>>, Vec<WithSpan<Unwrap>>)>,
     pub directives: Vec<WithSpan<FragmentDirectiveUsage>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
-    pub resolver_definition_path: ResolverDefinitionPath,
+    pub definition_path: FilePath,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]

@@ -1,9 +1,9 @@
 use std::{collections::HashMap, fmt::Debug};
 
 use common_lang_types::{
-    ConstExportName, DescriptionValue, FieldArgumentName, GraphQLInterfaceTypeName,
+    ConstExportName, DescriptionValue, FieldArgumentName, FilePath, GraphQLInterfaceTypeName,
     GraphQLScalarTypeName, HasName, InputTypeName, IsographObjectTypeName, JavascriptName,
-    ResolverDefinitionPath, SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
+    SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInputObjectTypeDefinition,
@@ -452,7 +452,7 @@ impl ResolverTypeAndField {
 #[derive(Debug, Clone)]
 pub enum ResolverActionKind {
     /// Associated js function
-    NamedImport((ConstExportName, ResolverDefinitionPath)),
+    NamedImport((ConstExportName, FilePath)),
     /// Refetch fields
     RefetchField,
     /// Mutation field

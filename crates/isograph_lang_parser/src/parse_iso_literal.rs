@@ -1,8 +1,8 @@
 use std::{collections::HashSet, ops::ControlFlow};
 
 use common_lang_types::{
-    Location, ResolverDefinitionPath, ScalarFieldName, SelectableFieldName, Span, StringKeyNewtype,
-    TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
+    FilePath, Location, ScalarFieldName, SelectableFieldName, Span, StringKeyNewtype, TextSource,
+    UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation,
@@ -26,7 +26,7 @@ pub enum IsoLiteralExtractionResult {
 
 pub fn parse_iso_literal(
     iso_literal_text: &str,
-    definition_file_path: ResolverDefinitionPath,
+    definition_file_path: FilePath,
     const_export_name: Option<&str>,
     text_source: TextSource,
 ) -> Result<IsoLiteralExtractionResult, WithLocation<IsographLiteralParseError>> {
@@ -90,7 +90,7 @@ fn parse_iso_fetch(
 
 fn parse_iso_client_field(
     tokens: &mut PeekableLexer<'_>,
-    definition_file_path: ResolverDefinitionPath,
+    definition_file_path: FilePath,
     const_export_name: Option<&str>,
     text_source: TextSource,
 ) -> ParseResultWithLocation<WithSpan<ResolverDeclaration>> {
@@ -110,7 +110,7 @@ fn parse_iso_client_field(
 
 fn parse_resolver_declaration<'a>(
     tokens: &mut PeekableLexer<'a>,
-    definition_file_path: ResolverDefinitionPath,
+    definition_file_path: FilePath,
     const_export_name: Option<&str>,
     text_source: TextSource,
 ) -> ParseResultWithSpan<WithSpan<ResolverDeclaration>> {
@@ -154,7 +154,7 @@ fn parse_resolver_declaration<'a>(
                 parent_type,
                 resolver_field_name,
                 selection_set_and_unwraps,
-                resolver_definition_path: definition_file_path,
+                definition_path: definition_file_path,
                 directives,
                 const_export_name: const_export_name.intern().into(),
                 variable_definitions,

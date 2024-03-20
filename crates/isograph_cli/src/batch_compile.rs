@@ -6,7 +6,7 @@ use std::{
 
 use colored::Colorize;
 use common_lang_types::{
-    Location, ResolverDefinitionPath, SourceFileName, Span, TextSource, WithLocation, WithSpan,
+    FilePath, Location, SourceFileName, Span, TextSource, WithLocation, WithSpan,
 };
 use graphql_schema_parser::{parse_schema, parse_schema_extensions, SchemaParseError};
 use intern::string_key::Intern;
@@ -278,7 +278,7 @@ fn extract_iso_literals(
 fn process_iso_literal_extraction(
     iso_literal_extraction: IsoLiteralExtraction<'_>,
     file_name: SourceFileName,
-    interned_file_path: ResolverDefinitionPath,
+    interned_file_path: FilePath,
 ) -> Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>> {
     let IsoLiteralExtraction {
         iso_literal_text,

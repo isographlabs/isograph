@@ -87,7 +87,7 @@ impl UnvalidatedSchema {
         let variant = get_resolver_variant(&resolver_declaration.item.directives);
         let resolver_action_kind = ResolverActionKind::NamedImport((
             resolver_declaration.item.const_export_name,
-            resolver_declaration.item.resolver_definition_path,
+            resolver_declaration.item.definition_path,
         ));
 
         // TODO variant should carry payloads, instead of this check
