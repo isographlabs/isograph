@@ -24,8 +24,8 @@ use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_resolver,
     ArtifactQueueItem, FieldDefinitionLocation, FieldMapItem, MergedLinkedFieldSelection,
     MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection,
-    MutationFieldResolverInfo, NameAndArguments, PathToRefetchField, RefetchFieldResolverInfo,
-    RequiresRefinement, ResolverActionKind, ResolverTypeAndField, ResolverVariant,
+    MutationFieldResolverInfo, NameAndArguments, ObjectTypeAndFieldNames, PathToRefetchField,
+    RefetchFieldResolverInfo, RequiresRefinement, ResolverActionKind, ResolverVariant,
     RootRefetchedPath, ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver,
     ValidatedSelection, ValidatedVariableDefinition, ENTRYPOINT, READER,
 };
@@ -33,7 +33,7 @@ use thiserror::Error;
 
 use crate::write_artifacts::write_to_disk;
 
-type NestedResolverImports = HashMap<ResolverTypeAndField, ResolverImport>;
+type NestedResolverImports = HashMap<ObjectTypeAndFieldNames, ResolverImport>;
 
 macro_rules! derive_display {
     ($type:ident) => {

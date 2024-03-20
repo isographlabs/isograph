@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use common_lang_types::{IsographObjectTypeName, SelectableFieldName};
-use isograph_schema::{ResolverTypeAndField, ResolverVariant};
+use isograph_schema::{ObjectTypeAndFieldNames, ResolverVariant};
 
 use crate::generate_artifacts::{
     EntrypointArtifactInfo, ReaderArtifactInfo, RefetchArtifactInfo, ResolverImport,
@@ -137,7 +137,7 @@ impl RefetchArtifactInfo {
 }
 
 fn nested_resolver_names_to_import_statement(
-    nested_resolver_imports: HashMap<ResolverTypeAndField, ResolverImport>,
+    nested_resolver_imports: HashMap<ObjectTypeAndFieldNames, ResolverImport>,
     current_file_type_name: IsographObjectTypeName,
 ) -> String {
     let mut overall = String::new();
@@ -159,7 +159,7 @@ fn nested_resolver_names_to_import_statement(
 
 fn write_resolver_import(
     resolver_import: ResolverImport,
-    nested_resolver_name: ResolverTypeAndField,
+    nested_resolver_name: ObjectTypeAndFieldNames,
     overall: &mut String,
     current_file_type_name: IsographObjectTypeName,
 ) {

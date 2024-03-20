@@ -16,8 +16,8 @@ use serde::Deserialize;
 
 use crate::{
     ArgumentMap, FieldDefinitionLocation, FieldMapItem, MutationFieldResolverActionKindInfo,
-    MutationFieldResolverVariant, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
-    ProcessedFieldMapItem, ResolverActionKind, ResolverTypeAndField, ResolverVariant,
+    MutationFieldResolverVariant, ObjectTypeAndFieldNames, ProcessTypeDefinitionError,
+    ProcessTypeDefinitionResult, ProcessedFieldMapItem, ResolverActionKind, ResolverVariant,
     SchemaResolver, UnvalidatedSchema,
 };
 use lazy_static::lazy_static;
@@ -222,7 +222,7 @@ impl UnvalidatedSchema {
                     mutation_primary_field_return_type_object_id: maybe_abstract_parent_object_id,
                 }),
                 variable_definitions: vec![],
-                type_and_field: ResolverTypeAndField {
+                type_and_field: ObjectTypeAndFieldNames {
                     // TODO make this zero cost?
                     type_name: maybe_abstract_parent_type_name.lookup().intern().into(), // e.g. Pet
                     field_name: mutation_field_name, // set_pet_best_friend

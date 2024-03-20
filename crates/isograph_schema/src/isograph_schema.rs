@@ -429,18 +429,18 @@ impl<TData: Copy> TryFrom<SchemaServerField<TData>> for SchemaIdField<TData> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Ord, PartialOrd, Clone, Copy)]
-pub struct ResolverTypeAndField {
+pub struct ObjectTypeAndFieldNames {
     pub type_name: IsographObjectTypeName,
     pub field_name: SelectableFieldName,
 }
 
-impl ResolverTypeAndField {
+impl ObjectTypeAndFieldNames {
     pub fn underscore_separated(&self) -> String {
         format!("{}__{}", self.type_name, self.field_name)
     }
 
     pub fn relative_path(&self, current_file_type_name: IsographObjectTypeName) -> String {
-        let ResolverTypeAndField {
+        let ObjectTypeAndFieldNames {
             type_name,
             field_name,
         } = *self;
@@ -504,7 +504,7 @@ pub struct SchemaResolver<
 
     // TODO this is probably unused
     // Why is this not calculated when needed?
-    pub type_and_field: ResolverTypeAndField,
+    pub type_and_field: ObjectTypeAndFieldNames,
 
     // TODO should this be TypeWithFieldsId???
     pub parent_object_id: ObjectId,

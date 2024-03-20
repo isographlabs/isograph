@@ -1,5 +1,6 @@
 use common_lang_types::{ScalarFieldName, UnvalidatedTypeName, WithSpan};
 
+// TODO should this be ObjectTypeAndFieldNames?
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct EntrypointTypeAndField {
     pub parent_type: WithSpan<UnvalidatedTypeName>,
