@@ -16,7 +16,7 @@ use isograph_lang_parser::{
 };
 use isograph_lang_types::{ClientFieldDeclaration, EntrypointTypeAndField};
 use isograph_schema::{
-    ProcessResolverDeclarationError, Schema, UnvalidatedSchema, ValidateSchemaError,
+    ProcessClientFieldDeclarationError, Schema, UnvalidatedSchema, ValidateSchemaError,
 };
 use pretty_duration::pretty_duration;
 use thiserror::Error;
@@ -203,7 +203,7 @@ fn process_parsed_resolvers_and_entrypoints(
     schema: &mut UnvalidatedSchema,
     resolvers: Vec<(WithSpan<ClientFieldDeclaration>, TextSource)>,
     entrypoint_declarations: Vec<(WithSpan<EntrypointTypeAndField>, TextSource)>,
-) -> Result<(), Vec<WithLocation<ProcessResolverDeclarationError>>> {
+) -> Result<(), Vec<WithLocation<ProcessClientFieldDeclarationError>>> {
     let mut errors = vec![];
     for (client_field_declaration, text_source) in resolvers {
         if let Err(e) =
@@ -377,7 +377,7 @@ pub(crate) enum BatchCompileError {
         messages.into_iter().map(|x| format!("\n\n{x}")).collect::<String>()
     )]
     ErrorWhenProcessingResolverDeclaration {
-        messages: Vec<WithLocation<isograph_schema::ProcessResolverDeclarationError>>,
+        messages: Vec<WithLocation<isograph_schema::ProcessClientFieldDeclarationError>>,
     },
 
     #[error("Error when processing an entrypoint declaration.\nReason: {0}")]
@@ -416,8 +416,8 @@ impl From<Vec<WithLocation<ValidateSchemaError>>> for BatchCompileError {
     }
 }
 
-impl From<Vec<WithLocation<ProcessResolverDeclarationError>>> for BatchCompileError {
-    fn from(messages: Vec<WithLocation<ProcessResolverDeclarationError>>) -> Self {
+impl From<Vec<WithLocation<ProcessClientFieldDeclarationError>>> for BatchCompileError {
+    fn from(messages: Vec<WithLocation<ProcessClientFieldDeclarationError>>) -> Self {
         BatchCompileError::ErrorWhenProcessingResolverDeclaration { messages }
     }
 }

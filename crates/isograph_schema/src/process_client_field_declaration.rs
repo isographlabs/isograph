@@ -22,13 +22,13 @@ impl UnvalidatedSchema {
         &mut self,
         client_field_declaration: WithSpan<ClientFieldDeclaration>,
         text_source: TextSource,
-    ) -> Result<(), WithLocation<ProcessResolverDeclarationError>> {
+    ) -> Result<(), WithLocation<ProcessClientFieldDeclarationError>> {
         let parent_type_id = self
             .schema_data
             .defined_types
             .get(&client_field_declaration.item.parent_type.item.into())
             .ok_or(WithLocation::new(
-                ProcessResolverDeclarationError::ParentTypeNotDefined {
+                ProcessClientFieldDeclarationError::ParentTypeNotDefined {
                     parent_type_name: client_field_declaration.item.parent_type.item,
                 },
                 Location::new(text_source, client_field_declaration.item.parent_type.span),
@@ -42,7 +42,7 @@ impl UnvalidatedSchema {
             SelectableFieldId::Scalar(scalar_id) => {
                 let scalar_name = self.schema_data.scalars[scalar_id.as_usize()].name;
                 return Err(WithLocation::new(
-                    ProcessResolverDeclarationError::InvalidParentType {
+                    ProcessClientFieldDeclarationError::InvalidParentType {
                         parent_type_name: scalar_name.item.into(),
                     },
                     Location::new(text_source, client_field_declaration.item.parent_type.span),
@@ -75,7 +75,7 @@ impl UnvalidatedSchema {
         {
             // Did not insert, so this object already has a field with the same name :(
             return Err(WithSpan::new(
-                ProcessResolverDeclarationError::ParentAlreadyHasField {
+                ProcessClientFieldDeclarationError::ParentAlreadyHasField {
                     parent_type_name: object.name.into(),
                     resolver_field_name: resolver_field_name.into(),
                 },
@@ -100,7 +100,7 @@ impl UnvalidatedSchema {
         if variant == ResolverVariant::Component {
             if !matches!(resolver_action_kind, ResolverActionKind::NamedImport(_)) {
                 return Err(WithSpan::new(
-                    ProcessResolverDeclarationError::ComponentResolverMissingJsFunction,
+                    ProcessClientFieldDeclarationError::ComponentResolverMissingJsFunction,
                     resolver_field_name_span,
                 ));
             }
@@ -125,10 +125,10 @@ impl UnvalidatedSchema {
     }
 }
 
-type ProcessResolverDeclarationResult<T> = Result<T, WithSpan<ProcessResolverDeclarationError>>;
+type ProcessResolverDeclarationResult<T> = Result<T, WithSpan<ProcessClientFieldDeclarationError>>;
 
 #[derive(Error, Debug)]
-pub enum ProcessResolverDeclarationError {
+pub enum ProcessClientFieldDeclarationError {
     #[error("`{parent_type_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {
         parent_type_name: UnvalidatedTypeName,
