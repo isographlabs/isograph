@@ -37,7 +37,7 @@ pub fn parse_iso_literal(
         .map_err(|err| err.to_with_location(text_source))?;
     match discriminator.item {
         "entrypoint" => Ok(IsoLiteralExtractionResult::EntrypointDeclaration(
-            parse_iso_fetch(&mut tokens, text_source)?,
+            parse_iso_entrypoint_declaration(&mut tokens, text_source)?,
         )),
         "field" => Ok(IsoLiteralExtractionResult::ClientFieldDeclaration(
             parse_iso_client_field_declaration(
@@ -54,11 +54,11 @@ pub fn parse_iso_literal(
     }
 }
 
-fn parse_iso_fetch(
+fn parse_iso_entrypoint_declaration(
     tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
 ) -> ParseResultWithLocation<WithSpan<EntrypointTypeAndField>> {
-    let resolver_fetch = tokens
+    let entrypoint_declaration = tokens
         .with_span(|tokens| {
             let parent_type = tokens
                 .parse_string_key_type(IsographLangTokenKind::Identifier)
@@ -72,7 +72,7 @@ fn parse_iso_fetch(
 
             Ok(EntrypointTypeAndField {
                 parent_type,
-                resolver_field_name,
+                client_field_name: resolver_field_name,
             })
         })
         .transpose()
@@ -85,7 +85,7 @@ fn parse_iso_fetch(
         ));
     }
 
-    Ok(resolver_fetch)
+    Ok(entrypoint_declaration)
 }
 
 fn parse_iso_client_field_declaration(

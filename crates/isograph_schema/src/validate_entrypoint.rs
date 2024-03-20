@@ -16,7 +16,7 @@ impl UnvalidatedSchema {
         let parent_object_id = self
             .validate_parent_object_id(entrypoint_type_and_field.item.parent_type, text_source)?;
         let resolver_field_id = self.validate_resolver_field(
-            entrypoint_type_and_field.item.resolver_field_name,
+            entrypoint_type_and_field.item.client_field_name,
             text_source,
             parent_object_id,
         )?;

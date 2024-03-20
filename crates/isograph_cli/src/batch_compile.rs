@@ -202,7 +202,7 @@ pub(crate) fn handle_compile_command(
 fn process_parsed_resolvers_and_entrypoints(
     schema: &mut UnvalidatedSchema,
     resolvers: Vec<(WithSpan<ClientFieldDeclaration>, TextSource)>,
-    entrypoints: Vec<(WithSpan<EntrypointTypeAndField>, TextSource)>,
+    entrypoint_declarations: Vec<(WithSpan<EntrypointTypeAndField>, TextSource)>,
 ) -> Result<(), Vec<WithLocation<ProcessResolverDeclarationError>>> {
     let mut errors = vec![];
     for (client_field_declaration, text_source) in resolvers {
@@ -212,8 +212,10 @@ fn process_parsed_resolvers_and_entrypoints(
             errors.push(e);
         }
     }
-    for (resolver_fetch, text_source) in entrypoints {
-        schema.entrypoints.push((text_source, resolver_fetch))
+    for (entrypoint_declaration, text_source) in entrypoint_declarations {
+        schema
+            .entrypoints
+            .push((text_source, entrypoint_declaration))
     }
 
     if errors.is_empty() {
@@ -235,7 +237,7 @@ fn extract_iso_literals(
 > {
     let mut isograph_literal_parse_errors = vec![];
     let mut client_field_declarations_and_text_sources = vec![];
-    let mut resolver_fetch_and_text_sources = vec![];
+    let mut entrypoint_declarations_and_text_sources = vec![];
 
     for (file_path, file_content) in project_files {
         // TODO don't intern unless there's a match
@@ -259,7 +261,7 @@ fn extract_iso_literals(
                         client_field_declarations_and_text_sources.push((decl, text_source))
                     }
                     IsoLiteralExtractionResult::EntrypointDeclaration(decl) => {
-                        resolver_fetch_and_text_sources.push((decl, text_source))
+                        entrypoint_declarations_and_text_sources.push((decl, text_source))
                     }
                 },
                 Err(e) => isograph_literal_parse_errors.push(e),
@@ -270,7 +272,7 @@ fn extract_iso_literals(
     if isograph_literal_parse_errors.is_empty() {
         Ok((
             client_field_declarations_and_text_sources,
-            resolver_fetch_and_text_sources,
+            entrypoint_declarations_and_text_sources,
         ))
     } else {
         Err(isograph_literal_parse_errors)

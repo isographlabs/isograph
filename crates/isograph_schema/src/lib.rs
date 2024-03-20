@@ -8,7 +8,7 @@ mod process_type_definition;
 pub(crate) mod refetched_paths;
 mod root_types;
 mod unvalidated_schema;
-mod validate_resolver_fetch;
+mod validate_entrypoint;
 mod validate_schema;
 
 use argument_map::*;
@@ -20,5 +20,5 @@ pub use process_client_field_declaration::*;
 pub use process_type_definition::*;
 use root_types::*;
 pub use unvalidated_schema::*;
-pub use validate_resolver_fetch::*;
+pub use validate_entrypoint::*;
 pub use validate_schema::*;
