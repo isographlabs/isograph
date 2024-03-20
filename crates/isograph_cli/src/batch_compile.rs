@@ -30,7 +30,7 @@ use crate::{
 };
 
 pub(crate) struct CompilationStats {
-    pub iso_resolver_count: usize,
+    pub client_field_count: usize,
     pub entrypoint_count: usize,
     pub total_artifacts_written: usize,
 }
@@ -64,7 +64,7 @@ pub(crate) fn compile_and_print(
                     "{}",
                     format!(
                         "Successfully compiled {} client fields and {} entrypoints, and wrote {} artifacts, in {}.\n",
-                        stats.iso_resolver_count,
+                        stats.client_field_count,
                         stats.entrypoint_count,
                         stats.total_artifacts_written,
                         pretty_duration(&elapsed_time, None)
@@ -192,7 +192,7 @@ pub(crate) fn handle_compile_command(
         )?;
 
         Ok(CompilationStats {
-            iso_resolver_count: resolver_count,
+            client_field_count: resolver_count,
             entrypoint_count,
             total_artifacts_written,
         })
