@@ -144,8 +144,8 @@ pub(crate) fn handle_compile_command(
         // - process schema extension
         // - validate
         // - add mutation fields
-        // - process parsed literals
-        // - validate resolvers
+        // - process parsed iso field definitions
+        // - validate client fields
         if let Some(mutation_id) = &original_outcome.root_types.mutation {
             schema
                 .create_mutation_fields_from_expose_as_directives(*mutation_id, config.options)?;
@@ -165,15 +165,15 @@ pub(crate) fn handle_compile_command(
         // TODO return an iterator
         let project_files = read_files_in_folder(&canonicalized_root_path)?;
 
-        let (parsed_resolvers, parsed_entrypoints) =
+        let (client_field_declarations, parsed_entrypoints) =
             extract_iso_literals(project_files, canonicalized_root_path)
                 .map_err(BatchCompileError::from)?;
-        let resolver_count = parsed_resolvers.len();
+        let client_field_count = client_field_declarations.len();
         let entrypoint_count = parsed_entrypoints.len();
 
-        process_parsed_resolvers_and_entrypoints(
+        process_client_fields_and_entrypoints(
             &mut schema,
-            parsed_resolvers,
+            client_field_declarations,
             parsed_entrypoints,
         )?;
 
@@ -192,20 +192,20 @@ pub(crate) fn handle_compile_command(
         )?;
 
         Ok(CompilationStats {
-            client_field_count: resolver_count,
+            client_field_count,
             entrypoint_count,
             total_artifacts_written,
         })
     })
 }
 
-fn process_parsed_resolvers_and_entrypoints(
+fn process_client_fields_and_entrypoints(
     schema: &mut UnvalidatedSchema,
-    resolvers: Vec<(WithSpan<ClientFieldDeclaration>, TextSource)>,
+    client_fields: Vec<(WithSpan<ClientFieldDeclaration>, TextSource)>,
     entrypoint_declarations: Vec<(WithSpan<EntrypointTypeAndField>, TextSource)>,
 ) -> Result<(), Vec<WithLocation<ProcessClientFieldDeclarationError>>> {
     let mut errors = vec![];
-    for (client_field_declaration, text_source) in resolvers {
+    for (client_field_declaration, text_source) in client_fields {
         if let Err(e) =
             schema.process_client_field_declaration(client_field_declaration, text_source)
         {
@@ -376,7 +376,7 @@ pub(crate) enum BatchCompileError {
         },
         messages.into_iter().map(|x| format!("\n\n{x}")).collect::<String>()
     )]
-    ErrorWhenProcessingResolverDeclaration {
+    ErrorWhenProcessingClientFieldDeclaration {
         messages: Vec<WithLocation<isograph_schema::ProcessClientFieldDeclarationError>>,
     },
 
@@ -418,6 +418,6 @@ impl From<Vec<WithLocation<ValidateSchemaError>>> for BatchCompileError {
 
 impl From<Vec<WithLocation<ProcessClientFieldDeclarationError>>> for BatchCompileError {
     fn from(messages: Vec<WithLocation<ProcessClientFieldDeclarationError>>) -> Self {
-        BatchCompileError::ErrorWhenProcessingResolverDeclaration { messages }
+        BatchCompileError::ErrorWhenProcessingClientFieldDeclaration { messages }
     }
 }
