@@ -15,7 +15,7 @@ use isograph_lang_types::{
 use serde::Deserialize;
 
 use crate::{
-    ArgumentMap, DefinedField, FieldMapItem, MutationFieldResolverActionKindInfo,
+    ArgumentMap, FieldDefinitionLocation, FieldMapItem, MutationFieldResolverActionKindInfo,
     MutationFieldResolverVariant, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
     ProcessedFieldMapItem, ResolverActionKind, ResolverTypeAndField, ResolverVariant,
     SchemaResolver, UnvalidatedSchema,
@@ -155,7 +155,7 @@ impl UnvalidatedSchema {
 
             let (maybe_abstract_parent_object_id, maybe_abstract_parent_type_name) =
                 match primary_field {
-                    Some(DefinedField::ServerField(server_field)) => {
+                    Some(FieldDefinitionLocation::Server(server_field)) => {
                         // This is the parent type name (Pet)
                         let inner = server_field.inner();
 
@@ -259,7 +259,7 @@ impl UnvalidatedSchema {
             .encountered_fields
             .insert(
                 mutation_field_name,
-                DefinedField::ResolverField(resolver_id),
+                FieldDefinitionLocation::Client(resolver_id),
             )
             .is_some()
         {

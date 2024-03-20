@@ -27,11 +27,11 @@ impl UnvalidatedSchema {
             for subtype_id in subtype_ids {
                 'field: for (supertype_field_name, defined_field) in &supertype_encountered_fields {
                     match defined_field {
-                        crate::DefinedField::ServerField(_) => {
+                        crate::FieldDefinitionLocation::Server(_) => {
                             // Should we transfer server fields??? That makes no sense for
                             // GraphQL, but ... does it make sense otherwise? Who knows.
                         }
-                        crate::DefinedField::ResolverField(supertype_resolver_field_id) => {
+                        crate::FieldDefinitionLocation::Client(supertype_resolver_field_id) => {
                             // ------ HACK ------
                             // We error if there are fields that are duplicated. This makes sense — defining
                             // Interface.foo and also ConcreteType.foo is a recipe for confusion. So, if you

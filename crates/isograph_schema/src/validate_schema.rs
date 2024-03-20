@@ -11,9 +11,9 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    refetched_paths::refetched_paths_with_path, DefinedField, NameAndArguments, PathToRefetchField,
-    Schema, SchemaData, SchemaIdField, SchemaObject, SchemaResolver, SchemaServerField,
-    SchemaValidationState, UnvalidatedLinkedFieldSelection, UnvalidatedSchema,
+    refetched_paths::refetched_paths_with_path, FieldDefinitionLocation, NameAndArguments,
+    PathToRefetchField, Schema, SchemaData, SchemaIdField, SchemaObject, SchemaResolver,
+    SchemaServerField, SchemaValidationState, UnvalidatedLinkedFieldSelection, UnvalidatedSchema,
     UnvalidatedSchemaData, UnvalidatedSchemaField, UnvalidatedSchemaObject,
     UnvalidatedSchemaResolver, UnvalidatedSchemaServerField, ValidateEntrypointDeclarationError,
 };
@@ -41,7 +41,7 @@ pub type ValidatedSchemaResolver = SchemaResolver<
 >;
 
 /// The validated defined field that shows up in the TScalarField generic.
-pub type ValidatedDefinedField = DefinedField<ServerFieldId, ClientFieldId>;
+pub type ValidatedDefinedField = FieldDefinitionLocation<ServerFieldId, ClientFieldId>;
 
 pub type ValidatedSchemaObject =
     SchemaObject<<ValidatedSchemaState as SchemaValidationState>::EncounteredField>;
@@ -181,7 +181,10 @@ fn transform_object_field_ids(
             for server_field_id in server_fields.iter() {
                 let field = &schema_fields[server_field_id.as_usize()];
                 if field.name.item == encountered_field_name {
-                    return (encountered_field_name, DefinedField::ServerField(field.id));
+                    return (
+                        encountered_field_name,
+                        FieldDefinitionLocation::Server(field.id),
+                    );
                 }
             }
             for resolver in resolvers.iter() {
@@ -189,7 +192,7 @@ fn transform_object_field_ids(
                 if resolver.name == encountered_field_name {
                     return (
                         encountered_field_name,
-                        DefinedField::ResolverField(resolver.id),
+                        FieldDefinitionLocation::Client(resolver.id),
                     );
                 }
             }
@@ -594,7 +597,7 @@ fn validate_field_type_exists_and_is_scalar(
     let scalar_field_name = scalar_field_selection.name.item.into();
     match parent_object.encountered_fields.get(&scalar_field_name) {
         Some(defined_field_type) => match defined_field_type {
-            DefinedField::ServerField(server_field_name) => {
+            FieldDefinitionLocation::Server(server_field_name) => {
                 let field_type_id = *schema_data
                     .defined_types
                     .get(server_field_name.inner())
@@ -605,7 +608,7 @@ fn validate_field_type_exists_and_is_scalar(
                 match field_type_id {
                     DefinedTypeId::Scalar(_scalar_id) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
-                        associated_data: DefinedField::ServerField(
+                        associated_data: FieldDefinitionLocation::Server(
                             find_server_field_id(
                                 server_fields,
                                 scalar_field_selection.name.item,
@@ -631,13 +634,13 @@ fn validate_field_type_exists_and_is_scalar(
                     ),
                 }
             }
-            DefinedField::ResolverField(resolver_field_id) => {
+            FieldDefinitionLocation::Client(resolver_field_id) => {
                 // TODO confirm this works if resolver_name is an alias
                 Ok(ScalarFieldSelection {
                     name: scalar_field_selection.name,
                     reader_alias: scalar_field_selection.reader_alias,
                     unwraps: scalar_field_selection.unwraps,
-                    associated_data: DefinedField::ResolverField(*resolver_field_id),
+                    associated_data: FieldDefinitionLocation::Client(*resolver_field_id),
                     arguments: scalar_field_selection.arguments,
                     normalization_alias: scalar_field_selection.normalization_alias,
                 })
@@ -662,7 +665,7 @@ fn validate_field_type_exists_and_is_linked(
     match (&parent_object.encountered_fields).get(&linked_field_name) {
         Some(defined_field_type) => {
             match defined_field_type {
-                DefinedField::ServerField(server_field_name) => {
+                FieldDefinitionLocation::Server(server_field_name) => {
                     let field_type_id = *schema_data
                         .defined_types
                         .get(server_field_name.inner())
@@ -705,7 +708,7 @@ fn validate_field_type_exists_and_is_linked(
                         }
                     }
                 }
-                DefinedField::ResolverField(_) => Err(WithLocation::new(
+                FieldDefinitionLocation::Client(_) => Err(WithLocation::new(
                     ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsResolver {
                         field_parent_type_name: parent_object.name,
                         field_name: linked_field_name,

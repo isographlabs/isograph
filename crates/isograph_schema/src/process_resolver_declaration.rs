@@ -11,7 +11,8 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    DefinedField, ResolverActionKind, ResolverTypeAndField, SchemaResolver, UnvalidatedSchema,
+    FieldDefinitionLocation, ResolverActionKind, ResolverTypeAndField, SchemaResolver,
+    UnvalidatedSchema,
 };
 
 impl UnvalidatedSchema {
@@ -66,7 +67,7 @@ impl UnvalidatedSchema {
             .encountered_fields
             .insert(
                 resolver_field_name.into(),
-                DefinedField::ResolverField(next_resolver_id),
+                FieldDefinitionLocation::Client(next_resolver_id),
             )
             .is_some()
         {

@@ -1,10 +1,11 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use crate::{
-    DefinedField, EncounteredRootTypes, IsographObjectTypeDefinition, ProcessedRootTypes,
-    ResolverActionKind, ResolverTypeAndField, ResolverVariant, RootTypes, Schema, SchemaObject,
-    SchemaResolver, SchemaScalar, SchemaServerField, UnvalidatedObjectFieldInfo, UnvalidatedSchema,
-    UnvalidatedSchemaField, UnvalidatedSchemaResolver, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
+    EncounteredRootTypes, FieldDefinitionLocation, IsographObjectTypeDefinition,
+    ProcessedRootTypes, ResolverActionKind, ResolverTypeAndField, ResolverVariant, RootTypes,
+    Schema, SchemaObject, SchemaResolver, SchemaScalar, SchemaServerField,
+    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
+    UnvalidatedSchemaResolver, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
 };
 use common_lang_types::{
     GraphQLObjectTypeName, GraphQLScalarTypeName, IsographObjectTypeName, Location,
@@ -637,7 +638,7 @@ fn get_resolvers_for_schema_object(
         });
         encountered_fields.insert(
             "__refetch".intern().into(),
-            DefinedField::ResolverField(next_resolver_id),
+            FieldDefinitionLocation::Client(next_resolver_id),
         );
         vec![next_resolver_id]
     } else {
@@ -688,7 +689,7 @@ fn get_field_objects_ids_and_names(
         // TODO use entry
         match encountered_fields.insert(
             field.item.name.item,
-            DefinedField::ServerField(field.item.type_.clone()),
+            FieldDefinitionLocation::Server(field.item.type_.clone()),
         ) {
             None => {
                 let current_field_id = next_field_id + current_field_index;
@@ -745,7 +746,10 @@ fn get_field_objects_ids_and_names(
     });
 
     if encountered_fields
-        .insert(typename_name.item, DefinedField::ServerField(typename_type))
+        .insert(
+            typename_name.item,
+            FieldDefinitionLocation::Server(typename_type),
+        )
         .is_some()
     {
         return Err(WithLocation::new(

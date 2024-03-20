@@ -15,7 +15,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    expose_field_directive::RequiresRefinement, ArgumentKeyAndValue, DefinedField,
+    expose_field_directive::RequiresRefinement, ArgumentKeyAndValue, FieldDefinitionLocation,
     MutationFieldResolverVariant, NameAndArguments, PathToRefetchField, ResolverVariant,
     ValidatedDefinedField, ValidatedLinkedFieldSelection, ValidatedSchema, ValidatedSchemaIdField,
     ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
@@ -431,10 +431,10 @@ fn merge_selections_into_set(
             Selection::ServerField(validated_server_field) => match validated_server_field {
                 ServerFieldSelection::ScalarField(scalar_field) => {
                     match &scalar_field.associated_data {
-                        DefinedField::ServerField(_) => {
+                        FieldDefinitionLocation::Server(_) => {
                             merge_scalar_server_field(scalar_field, merged_selection_map, span);
                         }
-                        DefinedField::ResolverField(resolver_field_id) => {
+                        FieldDefinitionLocation::Client(resolver_field_id) => {
                             if let Some(ref mut encountered_resolver_ids) =
                                 merge_traversal_state.encountered_resolver_ids
                             {

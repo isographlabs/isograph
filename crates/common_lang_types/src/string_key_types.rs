@@ -5,8 +5,9 @@ string_key_newtype!(DirectiveName);
 string_key_newtype!(DirectiveArgumentName);
 
 // This is an object in the namespace of selectable fields, meaning it can be:
-// - a server-defined field
-// - a client-defined resolver field
+// - a server-defined field or a client-defined field
+// - a scalar field or a linked field
+// (client-defined linked fields do not exist, but will.)
 string_key_newtype!(SelectableFieldName);
 
 string_key_newtype!(InputValueName);

@@ -102,30 +102,36 @@ pub struct Schema<TValidation: SchemaValidationState> {
     // Mutation
 }
 
-/// Distinguishes between server fields and locally-defined resolver fields.
+/// Distinguishes between server-defined fields and locally-defined fields.
 /// TFieldAssociatedData can be a ScalarFieldName in an unvalidated schema, or a
 /// ScalarId, in a validated schema.
 ///
-/// TResolverType can be an UnvalidatedTypeName in an unvalidated schema, or an
+/// TLocalType can be an UnvalidatedTypeName in an unvalidated schema, or an
 /// DefinedTypeId in a validated schema.
+///
+/// Note that locally-defined fields do **not** only include fields defined in
+/// an iso field literal. Refetch fields and generated mutation fields are
+/// also local fields.
 #[derive(Debug, Clone, Copy)]
-pub enum DefinedField<TFieldAssociatedData, TResolverType> {
-    ServerField(TFieldAssociatedData),
-    ResolverField(TResolverType),
+pub enum FieldDefinitionLocation<TServer, TClient> {
+    Server(TServer),
+    Client(TClient),
 }
 
-impl<TFieldAssociatedData, TResolverType> DefinedField<TFieldAssociatedData, TResolverType> {
+impl<TFieldAssociatedData, TResolverType>
+    FieldDefinitionLocation<TFieldAssociatedData, TResolverType>
+{
     pub fn as_server_field(&self) -> Option<&TFieldAssociatedData> {
         match self {
-            DefinedField::ServerField(server_field) => Some(server_field),
-            DefinedField::ResolverField(_) => None,
+            FieldDefinitionLocation::Server(server_field) => Some(server_field),
+            FieldDefinitionLocation::Client(_) => None,
         }
     }
 
-    pub fn as_resolver_field(&self) -> Option<&TResolverType> {
+    pub fn as_client_field(&self) -> Option<&TResolverType> {
         match self {
-            DefinedField::ServerField(_) => None,
-            DefinedField::ResolverField(resolver_field) => Some(resolver_field),
+            FieldDefinitionLocation::Server(_) => None,
+            FieldDefinitionLocation::Client(resolver_field) => Some(resolver_field),
         }
     }
 }

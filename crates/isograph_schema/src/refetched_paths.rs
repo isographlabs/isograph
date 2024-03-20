@@ -4,8 +4,8 @@ use common_lang_types::WithSpan;
 use isograph_lang_types::{Selection, ServerFieldSelection};
 
 use crate::{
-    ArgumentKeyAndValue, DefinedField, NameAndArguments, PathToRefetchField, ResolverVariant,
-    ValidatedSchema, ValidatedSelection,
+    ArgumentKeyAndValue, FieldDefinitionLocation, NameAndArguments, PathToRefetchField,
+    ResolverVariant, ValidatedSchema, ValidatedSelection,
 };
 
 pub fn refetched_paths_with_path(
@@ -19,10 +19,10 @@ pub fn refetched_paths_with_path(
         match &selection.item {
             Selection::ServerField(field) => match field {
                 ServerFieldSelection::ScalarField(scalar) => match scalar.associated_data {
-                    DefinedField::ServerField(_) => {
+                    FieldDefinitionLocation::Server(_) => {
                         // Do nothing, we encountered a server field
                     }
-                    DefinedField::ResolverField(resolver_field_id) => {
+                    FieldDefinitionLocation::Client(resolver_field_id) => {
                         let resolver_field = schema.resolver(resolver_field_id);
                         match resolver_field.variant {
                             ResolverVariant::RefetchField | ResolverVariant::MutationField(_) => {

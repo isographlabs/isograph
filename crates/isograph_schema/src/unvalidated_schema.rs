@@ -10,7 +10,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    DefinedField, Schema, SchemaData, SchemaObject, SchemaResolver, SchemaScalar,
+    FieldDefinitionLocation, Schema, SchemaData, SchemaObject, SchemaResolver, SchemaScalar,
     SchemaServerField, SchemaValidationState,
 };
 use lazy_static::lazy_static;
@@ -42,7 +42,7 @@ pub type UnvalidatedSchemaObject =
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
 /// resolver.)
 pub type UnvalidatedObjectFieldInfo =
-    DefinedField<TypeAnnotation<UnvalidatedTypeName>, ClientFieldId>;
+    FieldDefinitionLocation<TypeAnnotation<UnvalidatedTypeName>, ClientFieldId>;
 
 pub(crate) type UnvalidatedSchemaData =
     SchemaData<<UnvalidatedSchemaState as SchemaValidationState>::EncounteredField>;

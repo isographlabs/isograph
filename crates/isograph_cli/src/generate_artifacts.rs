@@ -22,7 +22,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_resolver,
-    ArtifactQueueItem, DefinedField, FieldMapItem, MergedLinkedFieldSelection,
+    ArtifactQueueItem, FieldDefinitionLocation, FieldMapItem, MergedLinkedFieldSelection,
     MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection,
     MutationFieldResolverInfo, NameAndArguments, PathToRefetchField, RefetchFieldResolverInfo,
     RequiresRefinement, ResolverActionKind, ResolverTypeAndField, ResolverVariant,
@@ -1045,7 +1045,7 @@ fn write_query_types_from_selection(
         Selection::ServerField(field) => match field {
             ServerFieldSelection::ScalarField(scalar_field) => {
                 match scalar_field.associated_data {
-                    DefinedField::ServerField(_server_field) => {
+                    FieldDefinitionLocation::Server(_server_field) => {
                         let parent_field = parent_type
                             .encountered_fields
                             .get(&scalar_field.name.item.into())
@@ -1071,7 +1071,7 @@ fn write_query_types_from_selection(
                             print_type_annotation(&output_type)
                         ));
                     }
-                    DefinedField::ResolverField(resolver_field_id) => {
+                    FieldDefinitionLocation::Client(resolver_field_id) => {
                         let resolver = schema.resolver(resolver_field_id);
 
                         match nested_resolver_imports.entry(resolver.type_and_field) {
@@ -1355,7 +1355,7 @@ fn generate_reader_ast_node(
                 let field_name = scalar_field.name.item;
 
                 match scalar_field.associated_data {
-                    DefinedField::ServerField(_) => {
+                    FieldDefinitionLocation::Server(_) => {
                         let alias = scalar_field
                             .reader_alias
                             .map(|x| format!("\"{}\"", x.item))
@@ -1377,7 +1377,7 @@ fn generate_reader_ast_node(
                             {indent_1}}},\n",
                         )
                     }
-                    DefinedField::ResolverField(resolver_field_id) => {
+                    FieldDefinitionLocation::Client(resolver_field_id) => {
                         // This field is a resolver, so we need to look up the field in the
                         // schema.
                         let alias = scalar_field.name_or_alias().item;
