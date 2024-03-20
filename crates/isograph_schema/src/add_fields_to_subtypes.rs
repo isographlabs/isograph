@@ -31,7 +31,7 @@ impl UnvalidatedSchema {
                             // Should we transfer server fields??? That makes no sense for
                             // GraphQL, but ... does it make sense otherwise? Who knows.
                         }
-                        crate::FieldDefinitionLocation::Client(supertype_resolver_field_id) => {
+                        crate::FieldDefinitionLocation::Client(supertype_client_field_id) => {
                             // ------ HACK ------
                             // We error if there are fields that are duplicated. This makes sense — defining
                             // Interface.foo and also ConcreteType.foo is a recipe for confusion. So, if you
@@ -44,8 +44,8 @@ impl UnvalidatedSchema {
                             //
                             // What we have here is not currently a satisfactory conclusion.
                             // ---- END HACK ----
-                            let resolver = self.resolver(*supertype_resolver_field_id);
-                            if matches!(resolver.variant, ClientFieldVariant::RefetchField) {
+                            let client_field = self.resolver(*supertype_client_field_id);
+                            if matches!(client_field.variant, ClientFieldVariant::RefetchField) {
                                 continue 'field;
                             }
                             let subtype = self.schema_data.object_mut(*subtype_id);
@@ -62,7 +62,7 @@ impl UnvalidatedSchema {
                                     Location::generated(),
                                 ));
                             }
-                            subtype.resolvers.push(*supertype_resolver_field_id);
+                            subtype.resolvers.push(*supertype_client_field_id);
                         }
                     }
                 }

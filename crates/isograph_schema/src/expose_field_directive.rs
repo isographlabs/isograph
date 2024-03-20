@@ -163,10 +163,10 @@ impl UnvalidatedSchema {
 
                         let primary_type = self.schema_data.defined_types.get(inner).clone();
 
-                        if let Some(SelectableFieldId::Object(resolver_parent_object_id)) =
+                        if let Some(SelectableFieldId::Object(client_field_parent_object_id)) =
                             primary_type
                         {
-                            Ok((*resolver_parent_object_id, *inner))
+                            Ok((*client_field_parent_object_id, *inner))
                         } else {
                             Err(WithLocation::new(
                                 ProcessTypeDefinitionError::InvalidMutationField,
@@ -207,12 +207,12 @@ impl UnvalidatedSchema {
                 })
                 .collect::<Vec<_>>();
 
-            let mutation_field_resolver_id = self.client_fields.len().into();
-            let mutation_field_resolver = ClientField {
+            let mutation_field_client_field_id = self.client_fields.len().into();
+            let mutation_client_field = ClientField {
                 description,
                 // set_pet_best_friend
                 name: mutation_field_name,
-                id: mutation_field_resolver_id,
+                id: mutation_field_client_field_id,
                 selection_set_and_unwraps: Some((fields.to_vec(), vec![])),
                 variant: ClientFieldVariant::MutationField(MutationFieldClientFieldVariant {
                     mutation_field_name,
@@ -235,12 +235,12 @@ impl UnvalidatedSchema {
                     },
                 ),
             };
-            self.client_fields.push(mutation_field_resolver);
+            self.client_fields.push(mutation_client_field);
 
-            self.insert_resolver_field_on_object(
+            self.insert_client_field_on_object(
                 mutation_field_name,
                 maybe_abstract_parent_object_id,
-                mutation_field_resolver_id,
+                mutation_field_client_field_id,
                 payload_object_name,
             )?;
         }
@@ -248,19 +248,19 @@ impl UnvalidatedSchema {
     }
 
     // TODO this should be defined elsewhere, probably
-    pub fn insert_resolver_field_on_object(
+    pub fn insert_client_field_on_object(
         &mut self,
         mutation_field_name: SelectableFieldName,
-        resolver_parent_object_id: ObjectId,
-        resolver_id: ClientFieldId,
+        client_field_parent_object_id: ObjectId,
+        client_field_id: ClientFieldId,
         payload_object_name: IsographObjectTypeName,
     ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
-        let resolver_parent = self.schema_data.object_mut(resolver_parent_object_id);
-        if resolver_parent
+        let client_field_parent = self.schema_data.object_mut(client_field_parent_object_id);
+        if client_field_parent
             .encountered_fields
             .insert(
                 mutation_field_name,
-                FieldDefinitionLocation::Client(resolver_id),
+                FieldDefinitionLocation::Client(client_field_id),
             )
             .is_some()
         {
@@ -274,7 +274,7 @@ impl UnvalidatedSchema {
                 Location::generated(),
             ));
         }
-        resolver_parent.resolvers.push(resolver_id);
+        client_field_parent.resolvers.push(client_field_id);
 
         Ok(())
     }
