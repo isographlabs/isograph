@@ -4,8 +4,8 @@ use common_lang_types::{IsographObjectTypeName, SelectableFieldName};
 use isograph_schema::{ObjectTypeAndFieldNames, ResolverVariant};
 
 use crate::generate_artifacts::{
-    ClientFieldOutputType, EntrypointArtifactInfo, ReaderArtifactInfo, RefetchArtifactInfo,
-    ResolverImport,
+    ClientFieldOutputType, EntrypointArtifactInfo, JavaScriptImports, ReaderArtifactInfo,
+    RefetchArtifactInfo,
 };
 
 impl<'schema> EntrypointArtifactInfo<'schema> {
@@ -53,18 +53,18 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
 impl<'schema> ReaderArtifactInfo<'schema> {
     pub(crate) fn file_contents(self) -> String {
         let ReaderArtifactInfo {
-            resolver_import_statement,
+            function_import_statement,
             resolver_parameter_type,
             client_field_output_type,
             reader_ast,
-            nested_resolver_artifact_imports,
+            nested_client_field_artifact_imports,
             parent_type,
             resolver_variant,
             resolver_field_name,
             ..
         } = self;
-        let nested_resolver_import_statement = nested_resolver_names_to_import_statement(
-            nested_resolver_artifact_imports,
+        let nested_client_field_import_statement = nested_client_field_names_to_import_statement(
+            nested_client_field_artifact_imports,
             parent_type.name,
         );
         let output_type_text = get_output_type_text(
@@ -85,8 +85,8 @@ impl<'schema> ReaderArtifactInfo<'schema> {
         let reader_output_type = format!("{parent_name}__{resolver_field_name}__outputType");
         format!(
             "import type {{ReaderArtifact, ReaderAst, ExtractSecondParam}} from '@isograph/react';\n\
-            {resolver_import_statement}\n\
-            {nested_resolver_import_statement}\n\
+            {function_import_statement}\n\
+            {nested_client_field_import_statement}\n\
             {output_type_text}\n\n\
             const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
             export type {reader_param_type} = {resolver_parameter_type};\n\n\
@@ -136,20 +136,20 @@ impl RefetchArtifactInfo {
     }
 }
 
-fn nested_resolver_names_to_import_statement(
-    nested_resolver_imports: HashMap<ObjectTypeAndFieldNames, ResolverImport>,
+fn nested_client_field_names_to_import_statement(
+    nested_client_field_imports: HashMap<ObjectTypeAndFieldNames, JavaScriptImports>,
     current_file_type_name: IsographObjectTypeName,
 ) -> String {
     let mut overall = String::new();
 
     // TODO we should always sort outputs. We should find a nice generic way to ensure that.
-    let mut nested_resolver_imports: Vec<_> = nested_resolver_imports.into_iter().collect();
-    nested_resolver_imports.sort_by(|(a, _), (b, _)| a.cmp(b));
+    let mut nested_client_field_imports: Vec<_> = nested_client_field_imports.into_iter().collect();
+    nested_client_field_imports.sort_by(|(a, _), (b, _)| a.cmp(b));
 
-    for (nested_resolver_name, resolver_import) in nested_resolver_imports {
-        write_resolver_import(
-            resolver_import,
-            nested_resolver_name,
+    for (nested_client_field_name, javascript_import) in nested_client_field_imports {
+        write_client_field_import(
+            javascript_import,
+            nested_client_field_name,
             &mut overall,
             current_file_type_name,
         );
@@ -157,23 +157,23 @@ fn nested_resolver_names_to_import_statement(
     overall
 }
 
-fn write_resolver_import(
-    resolver_import: ResolverImport,
+fn write_client_field_import(
+    javascript_import: JavaScriptImports,
     nested_resolver_name: ObjectTypeAndFieldNames,
     overall: &mut String,
     current_file_type_name: IsographObjectTypeName,
 ) {
-    if !resolver_import.default_import && resolver_import.types.is_empty() {
+    if !javascript_import.default_import && javascript_import.types.is_empty() {
         panic!("Resolver imports should not be created in an empty state.");
     }
 
     let mut s = "import ".to_string();
-    if resolver_import.default_import {
+    if javascript_import.default_import {
         s.push_str(&format!("{}", nested_resolver_name.underscore_separated()));
     }
-    let mut types = resolver_import.types.iter();
+    let mut types = javascript_import.types.iter();
     if let Some(first) = types.next() {
-        if resolver_import.default_import {
+        if javascript_import.default_import {
             s.push_str(",");
         }
         s.push_str(" { ");

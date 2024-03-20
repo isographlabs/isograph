@@ -33,7 +33,7 @@ use thiserror::Error;
 
 use crate::write_artifacts::write_to_disk;
 
-type NestedResolverImports = HashMap<ObjectTypeAndFieldNames, ResolverImport>;
+type NestedResolverImports = HashMap<ObjectTypeAndFieldNames, JavaScriptImports>;
 
 macro_rules! derive_display {
     ($type:ident) => {
@@ -680,7 +680,7 @@ fn generate_reader_artifact<'schema>(
             0,
         );
         let client_field_output_type = generate_output_type(resolver);
-        let resolver_import_statement = generate_resolver_import_statement(
+        let function_import_statement = generate_function_import_statement(
             &resolver.action_kind,
             project_root,
             artifact_directory,
@@ -689,8 +689,8 @@ fn generate_reader_artifact<'schema>(
             parent_type: parent_type.into(),
             resolver_field_name: resolver.name,
             reader_ast,
-            nested_resolver_artifact_imports,
-            resolver_import_statement,
+            nested_client_field_artifact_imports: nested_resolver_artifact_imports,
+            function_import_statement,
             client_field_output_type,
             resolver_parameter_type,
             resolver_variant: resolver.variant.clone(),
@@ -729,8 +729,8 @@ pub(crate) struct QueryText(pub String);
 derive_display!(QueryText);
 
 #[derive(Debug)]
-pub(crate) struct ResolverImportStatement(pub String);
-derive_display!(ResolverImportStatement);
+pub(crate) struct ClientFieldFunctionImportStatement(pub String);
+derive_display!(ClientFieldFunctionImportStatement);
 
 #[derive(Debug)]
 pub(crate) struct ClientFieldOutputType(pub String);
@@ -783,11 +783,11 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
 pub(crate) struct ReaderArtifactInfo<'schema> {
     pub parent_type: &'schema ValidatedSchemaObject,
     pub(crate) resolver_field_name: SelectableFieldName,
-    pub nested_resolver_artifact_imports: NestedResolverImports,
+    pub nested_client_field_artifact_imports: NestedResolverImports,
     pub client_field_output_type: ClientFieldOutputType,
     pub reader_ast: ReaderAst,
     pub resolver_parameter_type: ResolverParameterType,
-    pub resolver_import_statement: ResolverImportStatement,
+    pub function_import_statement: ClientFieldFunctionImportStatement,
     pub resolver_variant: ResolverVariant,
 }
 
@@ -990,7 +990,7 @@ fn generate_resolver_parameter_type(
     selection_set: &[WithSpan<ValidatedSelection>],
     variant: &ResolverVariant,
     parent_type: &ValidatedSchemaObject,
-    nested_resolver_imports: &mut NestedResolverImports,
+    nested_client_field_imports: &mut NestedResolverImports,
     indentation_level: u8,
 ) -> ResolverParameterType {
     // TODO use unwraps
@@ -1006,7 +1006,7 @@ fn generate_resolver_parameter_type(
             // TODO this works, but should be cleaned up
             &ResolverVariant::Eager,
             parent_type,
-            nested_resolver_imports,
+            nested_client_field_imports,
             indentation_level + 1,
         );
     }
@@ -1029,7 +1029,7 @@ fn write_query_types_from_selection(
     selection: &WithSpan<ValidatedSelection>,
     variant: &ResolverVariant,
     parent_type: &ValidatedSchemaObject,
-    nested_resolver_imports: &mut NestedResolverImports,
+    nested_client_field_imports: &mut NestedResolverImports,
     indentation_level: u8,
 ) {
     query_type_declaration.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
@@ -1068,7 +1068,7 @@ fn write_query_types_from_selection(
                     FieldDefinitionLocation::Client(resolver_field_id) => {
                         let resolver = schema.resolver(resolver_field_id);
 
-                        match nested_resolver_imports.entry(resolver.type_and_field) {
+                        match nested_client_field_imports.entry(resolver.type_and_field) {
                             Entry::Occupied(mut occupied) => {
                                 occupied.get_mut().types.push(ResolverImportType {
                                     globally_unique_type_name: ResolverImportName(format!(
@@ -1078,7 +1078,7 @@ fn write_query_types_from_selection(
                                 });
                             }
                             Entry::Vacant(vacant) => {
-                                vacant.insert(ResolverImport {
+                                vacant.insert(JavaScriptImports {
                                     default_import: false,
                                     types: vec![ResolverImportType {
                                         globally_unique_type_name: ResolverImportName(format!(
@@ -1120,7 +1120,7 @@ fn write_query_types_from_selection(
                         &linked_field.selection_set,
                         &variant,
                         object.into(),
-                        nested_resolver_imports,
+                        nested_client_field_imports,
                         indentation_level,
                     );
                     inner
@@ -1174,11 +1174,11 @@ fn print_non_null_type_annotation<T: Display>(non_null: &NonNullTypeAnnotation<T
     }
 }
 
-fn generate_resolver_import_statement(
+fn generate_function_import_statement(
     resolver_action_kind: &ResolverActionKind,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
-) -> ResolverImportStatement {
+) -> ClientFieldFunctionImportStatement {
     match resolver_action_kind {
         ResolverActionKind::NamedImport((name, path)) => {
             let path_to_resolver = project_root
@@ -1199,12 +1199,12 @@ fn generate_resolver_import_statement(
                 // Anyway, TODO do better.
                 pathdiff::diff_paths(path_to_resolver, artifact_directory.join("Type/Field"))
                     .expect("Relative path should work");
-            ResolverImportStatement(format!(
+            ClientFieldFunctionImportStatement(format!(
                 "import {{ {name} as resolver }} from '{}';",
                 relative_path.to_str().expect("This path should be stringifiable. This probably is indicative of a bug in Relay.")
             ))
         }
-        ResolverActionKind::RefetchField => ResolverImportStatement(format!(
+        ResolverActionKind::RefetchField => ClientFieldFunctionImportStatement(format!(
             "import {{ makeNetworkRequest, type IsographEnvironment, type IsographEntrypoint }} from '@isograph/react';\n\
                 const resolver = (\n\
                 {}environment: IsographEnvironment,\n\
@@ -1217,7 +1217,7 @@ fn generate_resolver_import_statement(
         ResolverActionKind::MutationField(ref m) => {
             let spaces = "  ";
             let include_read_out_data = get_read_out_data(&m.field_map);
-            ResolverImportStatement(format!(
+            ClientFieldFunctionImportStatement(format!(
                 "{include_read_out_data}\n\
                 import {{ makeNetworkRequest, type IsographEnvironment, type IsographEntrypoint }} from '@isograph/react';\n\
                 const resolver = (\n\
@@ -1284,7 +1284,7 @@ pub struct ResolverImportType {
     pub(crate) globally_unique_type_name: ResolverImportName,
 }
 #[derive(Debug)]
-pub struct ResolverImport {
+pub struct JavaScriptImports {
     pub(crate) default_import: bool,
     pub(crate) types: Vec<ResolverImportType>,
 }
@@ -1293,7 +1293,7 @@ fn generate_reader_ast<'schema>(
     schema: &'schema ValidatedSchema,
     selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
     indentation_level: u8,
-    nested_resolver_imports: &mut NestedResolverImports,
+    nested_client_field_imports: &mut NestedResolverImports,
     // N.B. this is not root_refetched_paths when we're generating an entrypoint :(
     root_refetched_paths: &[RootRefetchedPath],
 ) -> ReaderAst {
@@ -1301,7 +1301,7 @@ fn generate_reader_ast<'schema>(
         schema,
         selection_set,
         indentation_level,
-        nested_resolver_imports,
+        nested_client_field_imports,
         root_refetched_paths,
         // TODO we are not starting at the root when generating ASTs for reader artifacts
         // (and in theory some entrypoints).
@@ -1313,7 +1313,7 @@ fn generate_reader_ast_with_path<'schema>(
     schema: &'schema ValidatedSchema,
     selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
     indentation_level: u8,
-    nested_resolver_imports: &mut NestedResolverImports,
+    nested_client_field_imports: &mut NestedResolverImports,
     // N.B. this is not root_refetched_paths when we're generating a non-fetchable resolver :(
     root_refetched_paths: &[RootRefetchedPath],
     path: &mut Vec<NameAndArguments>,
@@ -1324,7 +1324,7 @@ fn generate_reader_ast_with_path<'schema>(
             item,
             schema,
             indentation_level + 1,
-            nested_resolver_imports,
+            nested_client_field_imports,
             &root_refetched_paths,
             path,
         );
@@ -1338,7 +1338,7 @@ fn generate_reader_ast_node(
     selection: &WithSpan<ValidatedSelection>,
     schema: &ValidatedSchema,
     indentation_level: u8,
-    nested_resolver_imports: &mut NestedResolverImports,
+    nested_client_field_imports: &mut NestedResolverImports,
     // TODO use this to generate usedRefetchQueries
     root_refetched_paths: &[RootRefetchedPath],
     path: &mut Vec<NameAndArguments>,
@@ -1393,12 +1393,12 @@ fn generate_reader_ast_node(
                             &resolver_refetched_paths,
                         );
 
-                        match nested_resolver_imports.entry(resolver_field.type_and_field) {
+                        match nested_client_field_imports.entry(resolver_field.type_and_field) {
                             Entry::Occupied(mut occupied) => {
                                 occupied.get_mut().default_import = true;
                             }
                             Entry::Vacant(vacant) => {
-                                vacant.insert(ResolverImport {
+                                vacant.insert(JavaScriptImports {
                                     default_import: true,
                                     types: vec![],
                                 });
@@ -1462,7 +1462,7 @@ fn generate_reader_ast_node(
                     schema,
                     &linked_field.selection_set,
                     indentation_level + 1,
-                    nested_resolver_imports,
+                    nested_client_field_imports,
                     root_refetched_paths,
                     path,
                 );
