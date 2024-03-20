@@ -73,15 +73,6 @@
 ## Known bugs
 
 - If a useLazyReference commits then receives new props, it does not make a new network request.
-- if mutation primary field has a non-existent type, we panic, this should be an error
-  - this is because we add the fields before we call Schema::validate_and_construct, where the error would naturally be found.
-  - e.g. change it to
-
-```graphql
-type SetBestFriendResponse {
-  pet: PetFoo!
-}
-```
 
 - error parsing config should not panic, but be a diagnostic
 
@@ -114,6 +105,9 @@ set_foo {
   -* # clear all fields
 }
 ```
+
+- Maybe some way to specify on the directive what fields you want to always select, since it might be annoying to do this on every selection. Though maybe you can go through another client field?
+- Ability to pass as arguments such selections?
 
 - Defer/stream
 - Subscriptions
@@ -183,3 +177,4 @@ set_foo {
 - router example and integration
 - directive on scalar that affects the JS representation of scalars
 - ability to pass a parameter down to the child, e.g. an abstract component can read from its concrete parent an object that implements a given interface. e.g. in order to implement Node, you must implement an id field.
+- exposeField errors are pretty bad right now
