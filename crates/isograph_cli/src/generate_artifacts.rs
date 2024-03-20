@@ -671,7 +671,7 @@ fn generate_reader_artifact<'schema>(
             &root_refetched_paths,
         );
 
-        let resolver_parameter_type = generate_resolver_parameter_type(
+        let client_field_parameter_type = generate_client_field_parameter_type(
             schema,
             &selection_set,
             &client_field.variant,
@@ -692,7 +692,7 @@ fn generate_reader_artifact<'schema>(
             nested_client_field_artifact_imports,
             function_import_statement,
             client_field_output_type,
-            resolver_parameter_type,
+            client_field_parameter_type,
             client_field_variant: client_field.variant.clone(),
         }
     } else {
@@ -721,8 +721,8 @@ impl<'schema> ArtifactInfo<'schema> {
 }
 
 #[derive(Debug)]
-pub(crate) struct ResolverParameterType(pub String);
-derive_display!(ResolverParameterType);
+pub(crate) struct ClientFieldParameterType(pub String);
+derive_display!(ClientFieldParameterType);
 
 #[derive(Debug)]
 pub(crate) struct QueryText(pub String);
@@ -786,7 +786,7 @@ pub(crate) struct ReaderArtifactInfo<'schema> {
     pub nested_client_field_artifact_imports: NestedClientFieldImports,
     pub client_field_output_type: ClientFieldOutputType,
     pub reader_ast: ReaderAst,
-    pub resolver_parameter_type: ResolverParameterType,
+    pub client_field_parameter_type: ClientFieldParameterType,
     pub function_import_statement: ClientFieldFunctionImportStatement,
     pub client_field_variant: ClientFieldVariant,
 }
@@ -985,20 +985,20 @@ fn write_selections_for_query_text(
     }
 }
 
-fn generate_resolver_parameter_type(
+fn generate_client_field_parameter_type(
     schema: &ValidatedSchema,
     selection_set: &[WithSpan<ValidatedSelection>],
     variant: &ClientFieldVariant,
     parent_type: &ValidatedSchemaObject,
     nested_client_field_imports: &mut NestedClientFieldImports,
     indentation_level: u8,
-) -> ResolverParameterType {
+) -> ClientFieldParameterType {
     // TODO use unwraps
-    let mut resolver_parameter_type = "{\n".to_string();
+    let mut client_field_parameter_type = "{\n".to_string();
     for selection in selection_set.iter() {
         write_query_types_from_selection(
             schema,
-            &mut resolver_parameter_type,
+            &mut client_field_parameter_type,
             selection,
             // Variant "unwrapping" only matters for the top-level parameter type,
             // doing it for nested selections is leads to situations where linked fields
@@ -1010,17 +1010,17 @@ fn generate_resolver_parameter_type(
             indentation_level + 1,
         );
     }
-    resolver_parameter_type.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
+    client_field_parameter_type.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
 
     if variant == &ClientFieldVariant::Component {
-        resolver_parameter_type = format!(
+        client_field_parameter_type = format!(
             "{}{}",
             "  ".repeat(indentation_level as usize),
-            resolver_parameter_type,
+            client_field_parameter_type,
         );
     }
 
-    ResolverParameterType(resolver_parameter_type)
+    ClientFieldParameterType(client_field_parameter_type)
 }
 
 fn write_query_types_from_selection(
@@ -1115,7 +1115,7 @@ fn write_query_types_from_selection(
                         panic!("output_type_id should be a object");
                     };
                     let object = schema.schema_data.object(object_id);
-                    let inner = generate_resolver_parameter_type(
+                    let inner = generate_client_field_parameter_type(
                         schema,
                         &linked_field.selection_set,
                         &variant,

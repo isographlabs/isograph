@@ -54,7 +54,7 @@ impl<'schema> ReaderArtifactInfo<'schema> {
     pub(crate) fn file_contents(self) -> String {
         let ReaderArtifactInfo {
             function_import_statement,
-            resolver_parameter_type,
+            client_field_parameter_type,
             client_field_output_type,
             reader_ast,
             nested_client_field_artifact_imports,
@@ -89,7 +89,7 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             {nested_client_field_import_statement}\n\
             {output_type_text}\n\n\
             const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
-            export type {reader_param_type} = {resolver_parameter_type};\n\n\
+            export type {reader_param_type} = {client_field_parameter_type};\n\n\
             const artifact: ReaderArtifact<\n\
             {}{reader_param_type},\n\
             {}{reader_output_type}\n\
