@@ -1,7 +1,7 @@
 use common_lang_types::{Location, WithLocation};
 
 use crate::{
-    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, ResolverVariant, TypeRefinementMap,
+    ClientFieldVariant, ProcessTypeDefinitionError, ProcessTypeDefinitionResult, TypeRefinementMap,
     UnvalidatedSchema,
 };
 
@@ -45,7 +45,7 @@ impl UnvalidatedSchema {
                             // What we have here is not currently a satisfactory conclusion.
                             // ---- END HACK ----
                             let resolver = self.resolver(*supertype_resolver_field_id);
-                            if matches!(resolver.variant, ResolverVariant::RefetchField) {
+                            if matches!(resolver.variant, ClientFieldVariant::RefetchField) {
                                 continue 'field;
                             }
                             let subtype = self.schema_data.object_mut(*subtype_id);

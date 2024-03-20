@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use common_lang_types::{IsographObjectTypeName, SelectableFieldName};
-use isograph_schema::{ObjectTypeAndFieldNames, ResolverVariant};
+use isograph_schema::{ClientFieldVariant, ObjectTypeAndFieldNames};
 
 use crate::generate_artifacts::{
     ClientFieldOutputType, EntrypointArtifactInfo, JavaScriptImports, ReaderArtifactInfo,
@@ -76,7 +76,7 @@ impl<'schema> ReaderArtifactInfo<'schema> {
         // We are not modeling this well, I think.
         let parent_name = parent_type.name;
         let variant = match resolver_variant {
-            ResolverVariant::Component => {
+            ClientFieldVariant::Component => {
                 format!("{{ kind: \"Component\", componentName: \"{parent_name}.{resolver_field_name}\" }}")
             }
             _ => "{ kind: \"Eager\" }".to_string(),

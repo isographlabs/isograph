@@ -1,9 +1,9 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use crate::{
-    EncounteredRootTypes, FieldDefinitionLocation, IsographObjectTypeDefinition,
-    ObjectTypeAndFieldNames, ProcessedRootTypes, ResolverActionKind, ResolverVariant, RootTypes,
-    Schema, SchemaObject, SchemaResolver, SchemaScalar, SchemaServerField,
+    ClientFieldVariant, EncounteredRootTypes, FieldDefinitionLocation,
+    IsographObjectTypeDefinition, ObjectTypeAndFieldNames, ProcessedRootTypes, ResolverActionKind,
+    RootTypes, Schema, SchemaObject, SchemaResolver, SchemaScalar, SchemaServerField,
     UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
     UnvalidatedSchemaResolver, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
 };
@@ -625,7 +625,7 @@ fn get_resolvers_for_schema_object(
             name: "__refetch".intern().into(),
             id: next_resolver_id,
             selection_set_and_unwraps: Some((vec![id_field_selection], vec![])),
-            variant: ResolverVariant::RefetchField,
+            variant: ClientFieldVariant::RefetchField,
             variable_definitions: vec![],
             type_and_field: ObjectTypeAndFieldNames {
                 type_name: type_definition.name.item,

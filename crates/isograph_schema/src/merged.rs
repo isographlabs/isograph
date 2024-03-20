@@ -15,8 +15,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    expose_field_directive::RequiresRefinement, ArgumentKeyAndValue, FieldDefinitionLocation,
-    MutationFieldResolverVariant, NameAndArguments, PathToRefetchField, ResolverVariant,
+    expose_field_directive::RequiresRefinement, ArgumentKeyAndValue, ClientFieldVariant,
+    FieldDefinitionLocation, MutationFieldClientFieldVariant, NameAndArguments, PathToRefetchField,
     ValidatedDefinedField, ValidatedLinkedFieldSelection, ValidatedSchema, ValidatedSchemaIdField,
     ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
 };
@@ -199,7 +199,7 @@ pub struct MutationFieldResolverInfo {
 #[derive(Debug)]
 struct MergeTraversalState<'a> {
     resolver: &'a ValidatedSchemaResolver,
-    paths_to_refetch_fields: Vec<(PathToRefetchField, ObjectId, ResolverVariant)>,
+    paths_to_refetch_fields: Vec<(PathToRefetchField, ObjectId, ClientFieldVariant)>,
     /// As we traverse selection sets, we need to keep track of the path we have
     /// taken so far. This is because when we encounter a refetch query, we need
     /// to take note of the path we took to reach that query, but continue
@@ -283,7 +283,7 @@ pub fn create_merged_selection_set(
                             .collect();
 
                         let field_name = match resolver_variant {
-                            ResolverVariant::RefetchField => {
+                            ClientFieldVariant::RefetchField => {
                                 artifact_queue.push(ArtifactQueueItem::RefetchField(
                                     RefetchFieldResolverInfo {
                                         merged_selection_set: nested_merged_selection_set,
@@ -299,13 +299,15 @@ pub fn create_merged_selection_set(
                                 ));
                                 "__refetch".intern().into()
                             }
-                            ResolverVariant::MutationField(MutationFieldResolverVariant {
-                                mutation_field_name,
-                                mutation_primary_field_name,
-                                mutation_field_arguments,
-                                filtered_mutation_field_arguments: _,
-                                mutation_primary_field_return_type_object_id,
-                            }) => {
+                            ClientFieldVariant::MutationField(
+                                MutationFieldClientFieldVariant {
+                                    mutation_field_name,
+                                    mutation_primary_field_name,
+                                    mutation_field_arguments,
+                                    filtered_mutation_field_arguments: _,
+                                    mutation_primary_field_return_type_object_id,
+                                },
+                            ) => {
                                 let requires_refinement =
                                     if mutation_primary_field_return_type_object_id
                                         == refetch_field_parent_id
@@ -366,8 +368,8 @@ pub fn create_merged_selection_set(
                     let reachable_variables = nested_merged_selection_set.reachable_variables();
 
                     let field_name = match resolver_variant {
-                        ResolverVariant::RefetchField => "__refetch".intern().into(),
-                        ResolverVariant::MutationField(MutationFieldResolverVariant {
+                        ClientFieldVariant::RefetchField => "__refetch".intern().into(),
+                        ClientFieldVariant::MutationField(MutationFieldClientFieldVariant {
                             mutation_field_name,
                             ..
                         }) => mutation_field_name,
@@ -584,13 +586,13 @@ fn merge_scalar_resolver_field(
     }
 
     // HACK... we can model this data better
-    if resolver_field.variant == ResolverVariant::RefetchField {
+    if resolver_field.variant == ClientFieldVariant::RefetchField {
         merge_traversal_state.paths_to_refetch_fields.push((
             merge_traversal_state.current_path.clone(),
             parent_type.id,
-            ResolverVariant::RefetchField,
+            ClientFieldVariant::RefetchField,
         ));
-    } else if let ResolverVariant::MutationField(MutationFieldResolverVariant {
+    } else if let ClientFieldVariant::MutationField(MutationFieldClientFieldVariant {
         mutation_primary_field_name,
         mutation_field_arguments,
         filtered_mutation_field_arguments,
@@ -601,7 +603,7 @@ fn merge_scalar_resolver_field(
         merge_traversal_state.paths_to_refetch_fields.push((
             merge_traversal_state.current_path.clone(),
             parent_type.id,
-            ResolverVariant::MutationField(MutationFieldResolverVariant {
+            ClientFieldVariant::MutationField(MutationFieldClientFieldVariant {
                 mutation_field_name: resolver_field.name,
                 mutation_primary_field_name: *mutation_primary_field_name,
                 mutation_field_arguments: mutation_field_arguments.clone(),

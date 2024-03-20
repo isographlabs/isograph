@@ -17,7 +17,7 @@ use isograph_lang_types::{
 };
 use lazy_static::lazy_static;
 
-use crate::{FieldMapItem, ResolverVariant};
+use crate::{ClientFieldVariant, FieldMapItem};
 
 lazy_static! {
     pub static ref ID_GRAPHQL_TYPE: GraphQLScalarTypeName = "ID".intern().into();
@@ -495,7 +495,7 @@ pub struct SchemaResolver<
     )>,
 
     // TODO we should probably model this differently
-    pub variant: ResolverVariant,
+    pub variant: ClientFieldVariant,
 
     pub action_kind: ResolverActionKind,
 

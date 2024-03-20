@@ -97,7 +97,7 @@ impl UnvalidatedSchema {
         ));
 
         // TODO variant should carry payloads, instead of this check
-        if variant == ResolverVariant::Component {
+        if variant == ClientFieldVariant::Component {
             if !matches!(resolver_action_kind, ResolverActionKind::NamedImport(_)) {
                 return Err(WithSpan::new(
                     ProcessClientFieldDeclarationError::ComponentResolverMissingJsFunction,
@@ -156,7 +156,7 @@ pub enum ProcessClientFieldDeclarationError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct MutationFieldResolverVariant {
+pub struct MutationFieldClientFieldVariant {
     pub mutation_field_name: SelectableFieldName,
     pub mutation_primary_field_name: SelectableFieldName,
     pub mutation_primary_field_return_type_object_id: ObjectId,
@@ -165,20 +165,20 @@ pub struct MutationFieldResolverVariant {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum ResolverVariant {
+pub enum ClientFieldVariant {
     Component,
     Eager,
     RefetchField,
-    MutationField(MutationFieldResolverVariant),
+    MutationField(MutationFieldClientFieldVariant),
 }
 
-impl fmt::Display for ResolverVariant {
+impl fmt::Display for ClientFieldVariant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ResolverVariant::Component => write!(f, "Component"),
-            ResolverVariant::Eager => write!(f, "Eager"),
-            ResolverVariant::RefetchField => write!(f, "RefetchField"),
-            ResolverVariant::MutationField(_) => write!(f, "MutationField"),
+            ClientFieldVariant::Component => write!(f, "Component"),
+            ClientFieldVariant::Eager => write!(f, "Eager"),
+            ClientFieldVariant::RefetchField => write!(f, "RefetchField"),
+            ClientFieldVariant::MutationField(_) => write!(f, "MutationField"),
         }
     }
 }
@@ -187,11 +187,11 @@ lazy_static! {
     static ref COMPONENT: IsographDirectiveName = "component".intern().into();
 }
 
-fn get_resolver_variant(directives: &[WithSpan<FragmentDirectiveUsage>]) -> ResolverVariant {
+fn get_resolver_variant(directives: &[WithSpan<FragmentDirectiveUsage>]) -> ClientFieldVariant {
     for directive in directives.iter() {
         if directive.item.name.item == *COMPONENT {
-            return ResolverVariant::Component;
+            return ClientFieldVariant::Component;
         }
     }
-    return ResolverVariant::Eager;
+    return ClientFieldVariant::Eager;
 }

@@ -22,12 +22,12 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_resolver,
-    ArtifactQueueItem, FieldDefinitionLocation, FieldMapItem, MergedLinkedFieldSelection,
-    MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection,
-    MutationFieldResolverInfo, NameAndArguments, ObjectTypeAndFieldNames, PathToRefetchField,
-    RefetchFieldResolverInfo, RequiresRefinement, ResolverActionKind, ResolverVariant,
-    RootRefetchedPath, ValidatedSchema, ValidatedSchemaObject, ValidatedSchemaResolver,
-    ValidatedSelection, ValidatedVariableDefinition, ENTRYPOINT, READER,
+    ArtifactQueueItem, ClientFieldVariant, FieldDefinitionLocation, FieldMapItem,
+    MergedLinkedFieldSelection, MergedScalarFieldSelection, MergedSelectionSet,
+    MergedServerFieldSelection, MutationFieldResolverInfo, NameAndArguments,
+    ObjectTypeAndFieldNames, PathToRefetchField, RefetchFieldResolverInfo, RequiresRefinement,
+    ResolverActionKind, RootRefetchedPath, ValidatedSchema, ValidatedSchemaObject,
+    ValidatedSchemaResolver, ValidatedSelection, ValidatedVariableDefinition, ENTRYPOINT, READER,
 };
 use thiserror::Error;
 
@@ -104,7 +104,7 @@ fn build_iso_overload_for_client_defined_field(
         "field {}.{}",
         resolver.type_and_field.type_name, resolver.type_and_field.field_name
     );
-    if matches!(resolver.variant, ResolverVariant::Component) {
+    if matches!(resolver.variant, ClientFieldVariant::Component) {
         s.push_str(&format!(
             "
 export function iso<T>(
@@ -788,7 +788,7 @@ pub(crate) struct ReaderArtifactInfo<'schema> {
     pub reader_ast: ReaderAst,
     pub resolver_parameter_type: ResolverParameterType,
     pub function_import_statement: ClientFieldFunctionImportStatement,
-    pub resolver_variant: ResolverVariant,
+    pub resolver_variant: ClientFieldVariant,
 }
 
 impl<'schema> ReaderArtifactInfo<'schema> {
@@ -988,7 +988,7 @@ fn write_selections_for_query_text(
 fn generate_resolver_parameter_type(
     schema: &ValidatedSchema,
     selection_set: &[WithSpan<ValidatedSelection>],
-    variant: &ResolverVariant,
+    variant: &ClientFieldVariant,
     parent_type: &ValidatedSchemaObject,
     nested_client_field_imports: &mut NestedResolverImports,
     indentation_level: u8,
@@ -1004,7 +1004,7 @@ fn generate_resolver_parameter_type(
             // doing it for nested selections is leads to situations where linked fields
             // show up as linkedField: { data: /* actualLinkedFields */ }
             // TODO this works, but should be cleaned up
-            &ResolverVariant::Eager,
+            &ClientFieldVariant::Eager,
             parent_type,
             nested_client_field_imports,
             indentation_level + 1,
@@ -1012,7 +1012,7 @@ fn generate_resolver_parameter_type(
     }
     resolver_parameter_type.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
 
-    if variant == &ResolverVariant::Component {
+    if variant == &ClientFieldVariant::Component {
         resolver_parameter_type = format!(
             "{}{}",
             "  ".repeat(indentation_level as usize),
@@ -1027,7 +1027,7 @@ fn write_query_types_from_selection(
     schema: &ValidatedSchema,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
-    variant: &ResolverVariant,
+    variant: &ClientFieldVariant,
     parent_type: &ValidatedSchemaObject,
     nested_client_field_imports: &mut NestedResolverImports,
     indentation_level: u8,
@@ -1407,7 +1407,7 @@ fn generate_reader_ast_node(
 
                         // This is indicative of poor data modeling.
                         match resolver_field.variant {
-                            ResolverVariant::RefetchField => {
+                            ClientFieldVariant::RefetchField => {
                                 let refetch_query_index =
                                     find_refetch_query_index(root_refetched_paths, path);
                                 format!(
@@ -1419,7 +1419,7 @@ fn generate_reader_ast_node(
                                     {indent_1}}},\n",
                                 )
                             }
-                            ResolverVariant::MutationField(ref s) => {
+                            ClientFieldVariant::MutationField(ref s) => {
                                 let refetch_query_index = find_mutation_query_index(
                                     root_refetched_paths,
                                     path,
@@ -1665,14 +1665,14 @@ fn get_nested_refetch_query_text(
 fn generate_output_type(resolver_definition: &ValidatedSchemaResolver) -> ClientFieldOutputType {
     match &resolver_definition.variant {
         variant => match variant {
-            ResolverVariant::Component => {
+            ClientFieldVariant::Component => {
                 ClientFieldOutputType("(React.FC<ExtractSecondParam<typeof resolver>>)".to_string())
             }
-            ResolverVariant::Eager => {
+            ClientFieldVariant::Eager => {
                 ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
             }
-            ResolverVariant::RefetchField => ClientFieldOutputType("() => void".to_string()),
-            ResolverVariant::MutationField(_) => {
+            ClientFieldVariant::RefetchField => ClientFieldOutputType("() => void".to_string()),
+            ClientFieldVariant::MutationField(_) => {
                 // TODO type these parameters
                 ClientFieldOutputType("(params: any) => void".to_string())
             }

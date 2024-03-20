@@ -15,10 +15,10 @@ use isograph_lang_types::{
 use serde::Deserialize;
 
 use crate::{
-    ArgumentMap, FieldDefinitionLocation, FieldMapItem, MutationFieldResolverActionKindInfo,
-    MutationFieldResolverVariant, ObjectTypeAndFieldNames, ProcessTypeDefinitionError,
-    ProcessTypeDefinitionResult, ProcessedFieldMapItem, ResolverActionKind, ResolverVariant,
-    SchemaResolver, UnvalidatedSchema,
+    ArgumentMap, ClientFieldVariant, FieldDefinitionLocation, FieldMapItem,
+    MutationFieldClientFieldVariant, MutationFieldResolverActionKindInfo, ObjectTypeAndFieldNames,
+    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
+    ResolverActionKind, SchemaResolver, UnvalidatedSchema,
 };
 use lazy_static::lazy_static;
 
@@ -214,7 +214,7 @@ impl UnvalidatedSchema {
                 name: mutation_field_name,
                 id: mutation_field_resolver_id,
                 selection_set_and_unwraps: Some((fields.to_vec(), vec![])),
-                variant: ResolverVariant::MutationField(MutationFieldResolverVariant {
+                variant: ClientFieldVariant::MutationField(MutationFieldClientFieldVariant {
                     mutation_field_name,
                     mutation_primary_field_name: path_selectable_field_name,
                     mutation_field_arguments: mutation_field_arguments.to_vec(),
