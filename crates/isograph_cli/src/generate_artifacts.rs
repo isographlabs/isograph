@@ -679,7 +679,6 @@ fn generate_reader_artifact<'schema>(
             &mut nested_resolver_artifact_imports,
             0,
         );
-        let resolver_return_type = generate_resolver_return_type_declaration(&resolver.action_kind);
         let resolver_read_out_type = generate_read_out_type(resolver);
         let resolver_import_statement = generate_resolver_import_statement(
             &resolver.action_kind,
@@ -694,7 +693,6 @@ fn generate_reader_artifact<'schema>(
             resolver_import_statement,
             resolver_read_out_type,
             resolver_parameter_type,
-            resolver_return_type,
             resolver_variant: resolver.variant.clone(),
         }
     } else {
@@ -733,10 +731,6 @@ derive_display!(QueryText);
 #[derive(Debug)]
 pub(crate) struct ResolverImportStatement(pub String);
 derive_display!(ResolverImportStatement);
-
-#[derive(Debug)]
-pub(crate) struct ResolverReturnType(pub String);
-derive_display!(ResolverReturnType);
 
 #[derive(Debug)]
 pub(crate) struct ResolverReadOutType(pub String);
@@ -793,7 +787,6 @@ pub(crate) struct ReaderArtifactInfo<'schema> {
     pub resolver_read_out_type: ResolverReadOutType,
     pub reader_ast: ReaderAst,
     pub resolver_parameter_type: ResolverParameterType,
-    pub resolver_return_type: Option<ResolverReturnType>,
     pub resolver_import_statement: ResolverImportStatement,
     pub resolver_variant: ResolverVariant,
 }
@@ -1683,19 +1676,6 @@ fn generate_read_out_type(resolver_definition: &ValidatedSchemaResolver) -> Reso
                 ResolverReadOutType("(params: any) => void".to_string())
             }
         },
-    }
-}
-
-fn generate_resolver_return_type_declaration(
-    action_kind: &ResolverActionKind,
-) -> Option<ResolverReturnType> {
-    match action_kind {
-        ResolverActionKind::NamedImport(_) => None,
-        ResolverActionKind::RefetchField => Some(ResolverReturnType(
-            "ReturnType<typeof resolver>".to_string(),
-        )),
-        // TODO what should this be
-        ResolverActionKind::MutationField(_) => Some(ResolverReturnType("any".to_string())),
     }
 }
 

@@ -55,7 +55,6 @@ impl<'schema> ReaderArtifactInfo<'schema> {
         let ReaderArtifactInfo {
             resolver_import_statement,
             resolver_parameter_type,
-            resolver_return_type,
             resolver_read_out_type,
             reader_ast,
             nested_resolver_artifact_imports,
@@ -74,14 +73,6 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             resolver_read_out_type,
         );
 
-        let resolver_return_type = match resolver_return_type {
-            Some(return_type) => format!(
-                "// The type, when returned from the resolver\n\
-                export type ResolverReturnType = {return_type};\n\n"
-            ),
-            None => "".to_string(),
-        };
-
         // We are not modeling this well, I think.
         let parent_name = parent_type.name;
         let variant = match resolver_variant {
@@ -99,7 +90,6 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             {read_out_type_text}\n\n\
             const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
             export type {reader_param_type} = {resolver_parameter_type};\n\n\
-            {resolver_return_type}\
             const artifact: ReaderArtifact<\n\
             {}{reader_param_type},\n\
             {}{reader_output_type}\n\

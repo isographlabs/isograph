@@ -22,9 +22,6 @@ export type Pet____refetch__param = {
   id: string,
 };
 
-// The type, when returned from the resolver
-export type ResolverReturnType = ReturnType<typeof resolver>;
-
 const artifact: ReaderArtifact<
   Pet____refetch__param,
   Pet____refetch__outputType
