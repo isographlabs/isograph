@@ -15,7 +15,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    magic_mutation_fields::RequiresRefinement, ArgumentKeyAndValue, DefinedField,
+    expose_field_directive::RequiresRefinement, ArgumentKeyAndValue, DefinedField,
     MutationFieldResolverVariant, NameAndArguments, PathToRefetchField, ResolverVariant,
     ValidatedDefinedField, ValidatedLinkedFieldSelection, ValidatedSchema, ValidatedSchemaIdField,
     ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,

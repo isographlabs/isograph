@@ -147,7 +147,8 @@ pub(crate) fn handle_compile_command(
         // - process parsed literals
         // - validate resolvers
         if let Some(mutation_id) = &original_outcome.root_types.mutation {
-            schema.create_magic_mutation_fields(*mutation_id, config.options)?;
+            schema
+                .create_mutation_fields_from_expose_as_directives(*mutation_id, config.options)?;
         }
 
         let canonicalized_root_path = {

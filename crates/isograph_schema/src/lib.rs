@@ -1,7 +1,7 @@
 mod add_fields_to_subtypes;
 mod argument_map;
+mod expose_field_directive;
 mod isograph_schema;
-mod magic_mutation_fields;
 mod merged;
 mod process_resolver_declaration;
 mod process_type_definition;
@@ -13,8 +13,8 @@ mod validate_schema;
 
 use argument_map::*;
 
+pub use expose_field_directive::*;
 pub use isograph_schema::*;
-pub use magic_mutation_fields::*;
 pub use merged::*;
 pub use process_resolver_declaration::*;
 pub use process_type_definition::*;

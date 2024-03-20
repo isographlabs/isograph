@@ -3,7 +3,8 @@ use common_lang_types::{
     Span, StringLiteralValue, ValueKeyName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    ConstantValue, DeserializationError, GraphQLDirective, GraphQLInputValueDefinition,
+    from_graph_ql_directive, ConstantValue, DeserializationError, GraphQLDirective,
+    GraphQLInputValueDefinition,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_config::ConfigOptions;
@@ -31,13 +32,13 @@ lazy_static! {
 }
 #[derive(Deserialize, Eq, PartialEq, Debug)]
 #[serde(deny_unknown_fields)]
-pub struct MagicMutationFieldInfo {
+pub struct ExposeFieldDirective {
     path: StringLiteralValue,
     field_map: Vec<FieldMapItem>,
     field: StringLiteralValue,
 }
 
-impl MagicMutationFieldInfo {
+impl ExposeFieldDirective {
     pub fn new(
         path: StringLiteralValue,
         field_map: Vec<FieldMapItem>,
@@ -68,7 +69,7 @@ impl UnvalidatedSchema {
     ///   selected in the merged selection set.
     ///
     /// There is lots of cloning going on here! Not ideal.
-    pub fn create_magic_mutation_fields(
+    pub fn create_mutation_fields_from_expose_as_directives(
         &mut self,
         mutation_id: ObjectId,
         options: ConfigOptions,
@@ -78,19 +79,19 @@ impl UnvalidatedSchema {
         let mutation_object_name = mutation_object.name;
 
         // TODO this is a bit ridiculous
-        let magic_mutation_infos = mutation_object
+        let expose_field_directives = mutation_object
             .directives
             .iter()
-            .map(|d| self.extract_magic_mutation_field_info(d))
+            .map(|d| self.parse_expose_field_directive(d))
             .collect::<Result<Vec<_>, _>>()?;
-        let magic_mutation_infos = magic_mutation_infos
+        let expose_field_directives = expose_field_directives
             .into_iter()
             .flatten()
             .collect::<Vec<_>>();
 
-        for magic_mutation_info in magic_mutation_infos.iter() {
-            self.create_new_magic_mutation_field(
-                magic_mutation_info,
+        for expose_field_directive in expose_field_directives.iter() {
+            self.create_new_mutation_field(
+                expose_field_directive,
                 mutation_object_name,
                 mutation_id,
                 options,
@@ -100,18 +101,18 @@ impl UnvalidatedSchema {
         Ok(())
     }
 
-    fn create_new_magic_mutation_field(
+    fn create_new_mutation_field(
         &mut self,
-        magic_mutation_info: &MagicMutationFieldInfo,
+        expose_field_directive: &ExposeFieldDirective,
         mutation_object_name: IsographObjectTypeName,
         mutation_id: ObjectId,
         options: ConfigOptions,
     ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
-        let MagicMutationFieldInfo {
+        let ExposeFieldDirective {
             path,
             field_map,
             field,
-        } = magic_mutation_info;
+        } = expose_field_directive;
 
         let field_id = self.parse_field(*field, mutation_id)?;
 
@@ -139,12 +140,6 @@ impl UnvalidatedSchema {
                     field_map.clone(),
                     options,
                 )?;
-
-            // TODO this is dangerous! mutation_field.name is also formattable (with carats).
-            // We should find a way to make WithLocation not impl Display, while also making
-            // errors containing WithLocation<...> easy to work with.
-            // TODO "expose as" optional field
-            let magic_mutation_field_name = mutation_field_name;
 
             // payload object is the object type of the mutation field, e.g. SetBestFriendResponse
             let payload_object = self.schema_data.object(mutation_field_object_id);
@@ -211,15 +206,15 @@ impl UnvalidatedSchema {
                 })
                 .collect::<Vec<_>>();
 
-            let magic_mutation_field_resolver_id = self.resolvers.len().into();
-            let magic_mutation_field_resolver = SchemaResolver {
+            let mutation_field_resolver_id = self.resolvers.len().into();
+            let mutation_field_resolver = SchemaResolver {
                 description,
                 // set_pet_best_friend
-                name: magic_mutation_field_name,
-                id: magic_mutation_field_resolver_id,
+                name: mutation_field_name,
+                id: mutation_field_resolver_id,
                 selection_set_and_unwraps: Some((fields.to_vec(), vec![])),
                 variant: ResolverVariant::MutationField(MutationFieldResolverVariant {
-                    mutation_field_name: magic_mutation_field_name,
+                    mutation_field_name,
                     mutation_primary_field_name: path_selectable_field_name,
                     mutation_field_arguments: mutation_field_arguments.to_vec(),
                     filtered_mutation_field_arguments: mutation_field_args_without_id.to_vec(),
@@ -229,7 +224,7 @@ impl UnvalidatedSchema {
                 type_and_field: ResolverTypeAndField {
                     // TODO make this zero cost?
                     type_name: maybe_abstract_parent_type_name.lookup().intern().into(), // e.g. Pet
-                    field_name: magic_mutation_field_name, // set_pet_best_friend
+                    field_name: mutation_field_name, // set_pet_best_friend
                 },
                 parent_object_id: maybe_abstract_parent_object_id,
                 action_kind: ResolverActionKind::MutationField(
@@ -239,12 +234,12 @@ impl UnvalidatedSchema {
                     },
                 ),
             };
-            self.resolvers.push(magic_mutation_field_resolver);
+            self.resolvers.push(mutation_field_resolver);
 
             self.insert_resolver_field_on_object(
-                magic_mutation_field_name,
+                mutation_field_name,
                 maybe_abstract_parent_object_id,
-                magic_mutation_field_resolver_id,
+                mutation_field_resolver_id,
                 payload_object_name,
             )?;
         }
@@ -254,7 +249,7 @@ impl UnvalidatedSchema {
     // TODO this should be defined elsewhere, probably
     pub fn insert_resolver_field_on_object(
         &mut self,
-        magic_mutation_field_name: SelectableFieldName,
+        mutation_field_name: SelectableFieldName,
         resolver_parent_object_id: ObjectId,
         resolver_id: ClientFieldId,
         payload_object_name: IsographObjectTypeName,
@@ -263,7 +258,7 @@ impl UnvalidatedSchema {
         if resolver_parent
             .encountered_fields
             .insert(
-                magic_mutation_field_name,
+                mutation_field_name,
                 DefinedField::ResolverField(resolver_id),
             )
             .is_some()
@@ -271,7 +266,7 @@ impl UnvalidatedSchema {
             return Err(WithLocation::new(
                 // TODO use a more generic error message when making this
                 ProcessTypeDefinitionError::FieldExistsOnSubtype {
-                    field_name: magic_mutation_field_name,
+                    field_name: mutation_field_name,
                     parent_type: payload_object_name,
                 },
                 // TODO this is blatantly incorrect
@@ -283,18 +278,17 @@ impl UnvalidatedSchema {
         Ok(())
     }
 
-    fn extract_magic_mutation_field_info(
+    fn parse_expose_field_directive(
         &self,
         d: &GraphQLDirective<ConstantValue>,
-    ) -> ProcessTypeDefinitionResult<Option<MagicMutationFieldInfo>> {
+    ) -> ProcessTypeDefinitionResult<Option<ExposeFieldDirective>> {
         if d.name.item == *EXPOSE_FIELD_DIRECTIVE {
-            let mutation =
-                graphql_lang_types::from_graph_ql_directive(d).map_err(|err| match err {
-                    DeserializationError::Custom(err) => WithLocation::new(
-                        ProcessTypeDefinitionError::FailedToDeserialize(err),
-                        d.name.location.into(), // TODO: use location of the entire directive
-                    ),
-                })?;
+            let mutation = from_graph_ql_directive(d).map_err(|err| match err {
+                DeserializationError::Custom(err) => WithLocation::new(
+                    ProcessTypeDefinitionError::FailedToDeserialize(err),
+                    d.name.location.into(), // TODO: use location of the entire directive
+                ),
+            })?;
             Ok(Some(mutation))
         } else {
             Ok(None)

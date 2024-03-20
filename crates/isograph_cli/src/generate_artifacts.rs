@@ -406,7 +406,7 @@ fn get_artifact_for_mutation_field<'schema>(
         root_fetchable_field,
         root_parent_object,
         refetch_query_index,
-        mutation_field_name: magic_mutation_field_name,
+        mutation_field_name,
         mutation_primary_field_name,
         mutation_field_arguments,
         requires_refinement,
@@ -441,7 +441,7 @@ fn get_artifact_for_mutation_field<'schema>(
         schema,
         &merged_selection_set,
         variable_definitions,
-        magic_mutation_field_name,
+        mutation_field_name,
         mutation_primary_field_name,
         mutation_field_arguments,
         requires_refinement,
@@ -454,7 +454,7 @@ fn get_artifact_for_mutation_field<'schema>(
     let normalization_ast = NormalizationAst(format!(
         "[{{\n\
         {space_2}kind: \"Linked\",\n\
-        {space_2}fieldName: \"{magic_mutation_field_name}\",\n\
+        {space_2}fieldName: \"{mutation_field_name}\",\n\
         {space_2}arguments: {arguments},\n\
         {space_2}selections: [\n\
         {space_4}{{\n\
@@ -512,7 +512,7 @@ fn generate_mutation_query_text<'schema>(
     schema: &'schema ValidatedSchema,
     merged_selection_set: &MergedSelectionSet,
     mut variable_definitions: Vec<WithSpan<ValidatedVariableDefinition>>,
-    magic_mutation_field_name: SelectableFieldName,
+    mutation_field_name: SelectableFieldName,
     mutation_primary_field_name: SelectableFieldName,
     mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
     requires_refinement: RequiresRefinement,
@@ -552,12 +552,12 @@ fn generate_mutation_query_text<'schema>(
     let mutation_field_arguments = get_serialized_arguments_for_query_text(&mutation_parameters);
 
     let aliased_mutation_field_name =
-        get_aliased_mutation_field_name(magic_mutation_field_name, &mutation_parameters);
+        get_aliased_mutation_field_name(mutation_field_name, &mutation_parameters);
 
     let parent_object_name = parent_object_type.name;
     query_text.push_str(&format!(
-        "mutation {parent_object_name}{magic_mutation_field_name} {variable_text} {{\\\n\
-        {aliased_mutation_field_name}: {magic_mutation_field_name}{mutation_field_arguments} {{\\\n\
+        "mutation {parent_object_name}{mutation_field_name} {variable_text} {{\\\n\
+        {aliased_mutation_field_name}: {mutation_field_name}{mutation_field_arguments} {{\\\n\
         {mutation_primary_field_name} {{ \\\n",
     ));
 

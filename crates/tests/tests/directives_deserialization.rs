@@ -1,7 +1,9 @@
 use common_lang_types::{StringLiteralValue, TextSource};
-use graphql_lang_types::{ConstantValue, DeserializationError, GraphQLDirective};
+use graphql_lang_types::{
+    from_graph_ql_directive, ConstantValue, DeserializationError, GraphQLDirective,
+};
 use intern::string_key::Intern;
-use isograph_schema::{FieldMapItem, MagicMutationFieldInfo};
+use isograph_schema::{ExposeFieldDirective, FieldMapItem};
 use std::error::Error;
 
 use graphql_lang_types::{GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionOrDefinition};
@@ -16,7 +18,7 @@ fn unwrap_directive(
     Err("unexpected structure of directive".into())
 }
 
-fn parse_mutation(source: &str) -> Result<Vec<MagicMutationFieldInfo>, Box<dyn Error>> {
+fn parse_mutation(source: &str) -> Result<Vec<ExposeFieldDirective>, Box<dyn Error>> {
     let text_source = TextSource {
         path: "dummy".intern().into(),
         span: None,
@@ -30,21 +32,19 @@ fn parse_mutation(source: &str) -> Result<Vec<MagicMutationFieldInfo>, Box<dyn E
         .collect::<Result<Vec<_>, _>>()?;
     let directives: Vec<GraphQLDirective<ConstantValue>> =
         directives.into_iter().flatten().collect();
-    let magic_mutations: Result<Vec<MagicMutationFieldInfo>, _> = directives
+    let expose_field_directives: Result<Vec<ExposeFieldDirective>, _> = directives
         .into_iter()
-        .map(|directive| {
-            graphql_lang_types::from_graph_ql_directive::<MagicMutationFieldInfo>(&directive)
-        })
+        .map(|directive| from_graph_ql_directive::<ExposeFieldDirective>(&directive))
         .collect();
-    Ok(magic_mutations?)
+    Ok(expose_field_directives?)
 }
 
 #[test]
 fn test_test_mutation_extension_set_pet_tagline_parsing() -> Result<(), Box<dyn Error>> {
-    let magic_mutations = parse_mutation(include_str!(
+    let expose_field_mutations = parse_mutation(include_str!(
         "fixtures/directives/mutation_extension_valid.graphql"
     ))?;
-    let set_tagline_mutation = MagicMutationFieldInfo::new(
+    let set_tagline_mutation = ExposeFieldDirective::new(
         StringLiteralValue::from("pet".intern()),
         vec![FieldMapItem {
             from: StringLiteralValue::from("id".intern()),
@@ -53,16 +53,16 @@ fn test_test_mutation_extension_set_pet_tagline_parsing() -> Result<(), Box<dyn 
         StringLiteralValue::from("set_pet_tagline".intern()),
     );
 
-    assert_eq!(magic_mutations[0], set_tagline_mutation);
+    assert_eq!(expose_field_mutations[0], set_tagline_mutation);
     Ok(())
 }
 
 #[test]
 fn test_mutation_extension_set_pet_bestfriend_parsing() -> Result<(), Box<dyn Error>> {
-    let magic_mutations = parse_mutation(include_str!(
+    let expose_field_directives = parse_mutation(include_str!(
         "fixtures/directives/mutation_extension_valid.graphql"
     ))?;
-    let set_pet_best_friend = MagicMutationFieldInfo::new(
+    let set_pet_best_friend = ExposeFieldDirective::new(
         StringLiteralValue::from("pet".intern()),
         vec![FieldMapItem {
             from: StringLiteralValue::from("id".intern()),
@@ -70,15 +70,15 @@ fn test_mutation_extension_set_pet_bestfriend_parsing() -> Result<(), Box<dyn Er
         }],
         StringLiteralValue::from("set_pet_best_friend".intern()),
     );
-    assert_eq!(magic_mutations[1], set_pet_best_friend);
+    assert_eq!(expose_field_directives[1], set_pet_best_friend);
     Ok(())
 }
 
 fn match_failure_message(
-    magic_mutations: Result<Vec<MagicMutationFieldInfo>, Box<dyn Error>>,
+    expose_field_directives: Result<Vec<ExposeFieldDirective>, Box<dyn Error>>,
     message: &str,
 ) {
-    match magic_mutations {
+    match expose_field_directives {
         Ok(_) => panic!("Expected an error, but got Ok"),
         Err(e) => {
             if let Some(deserialization_error) = e.downcast_ref::<DeserializationError>() {
@@ -95,11 +95,11 @@ fn match_failure_message(
 }
 #[test]
 fn test_mutation_extension_extra_topfield_parsing_failure() -> Result<(), Box<dyn Error>> {
-    let magic_mutations = parse_mutation(include_str!(
+    let expose_field_directives = parse_mutation(include_str!(
         "fixtures/directives/mutation_extension_extra_toplevelfield.graphql"
     ));
     match_failure_message(
-        magic_mutations,
+        expose_field_directives,
         "unknown field `weight`, expected one of `path`, `field_map`, `field`",
     );
     Ok(())
@@ -107,11 +107,11 @@ fn test_mutation_extension_extra_topfield_parsing_failure() -> Result<(), Box<dy
 
 #[test]
 fn test_mutation_extension_extra_nestedfield_parsing_failure() -> Result<(), Box<dyn Error>> {
-    let magic_mutations = parse_mutation(include_str!(
+    let expose_field_directives = parse_mutation(include_str!(
         "fixtures/directives/mutation_extension_extra_nestedfield.graphql"
     ));
     match_failure_message(
-        magic_mutations,
+        expose_field_directives,
         "unknown field `day`, expected `from` or `to`",
     );
     Ok(())
@@ -119,18 +119,18 @@ fn test_mutation_extension_extra_nestedfield_parsing_failure() -> Result<(), Box
 
 #[test]
 fn test_mutation_extension_missing_topfield_parsing_failure() -> Result<(), Box<dyn Error>> {
-    let magic_mutations = parse_mutation(include_str!(
+    let expose_field_directives = parse_mutation(include_str!(
         "fixtures/directives/mutation_extension_missing_toplevelfield.graphql"
     ));
-    match_failure_message(magic_mutations, "missing field `field`");
+    match_failure_message(expose_field_directives, "missing field `field`");
     Ok(())
 }
 
 #[test]
 fn test_mutation_extension_missing_nestedfield_parsing_failure() -> Result<(), Box<dyn Error>> {
-    let magic_mutations = parse_mutation(include_str!(
+    let expose_field_directives = parse_mutation(include_str!(
         "fixtures/directives/mutation_extension_missing_nestedfield.graphql"
     ));
-    match_failure_message(magic_mutations, "missing field `from`");
+    match_failure_message(expose_field_directives, "missing field `from`");
     Ok(())
 }
