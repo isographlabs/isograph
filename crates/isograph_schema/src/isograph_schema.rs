@@ -76,9 +76,9 @@ pub trait SchemaValidationState: Debug {
 /// the schema does not support removing items.
 #[derive(Debug)]
 pub struct Schema<TValidation: SchemaValidationState> {
-    pub fields: Vec<SchemaServerField<TypeAnnotation<TValidation::FieldTypeAssociatedData>>>,
-    pub resolvers: Vec<
-        SchemaResolver<
+    pub server_fields: Vec<SchemaServerField<TypeAnnotation<TValidation::FieldTypeAssociatedData>>>,
+    pub client_fields: Vec<
+        ClientField<
             TValidation::ResolverSelectionScalarFieldAssociatedData,
             TValidation::ResolverSelectionLinkedFieldAssociatedData,
             TValidation::ResolverVariableDefinitionAssociatedData,
@@ -149,19 +149,19 @@ impl<TValidation: SchemaValidationState> Schema<TValidation> {
         &self,
         field_id: ServerFieldId,
     ) -> &SchemaServerField<TypeAnnotation<TValidation::FieldTypeAssociatedData>> {
-        &self.fields[field_id.as_usize()]
+        &self.server_fields[field_id.as_usize()]
     }
 
     /// Get a reference to a given resolver by its id.
     pub fn resolver(
         &self,
-        resolver_field_id: ClientFieldId,
-    ) -> &SchemaResolver<
+        client_field_id: ClientFieldId,
+    ) -> &ClientField<
         TValidation::ResolverSelectionScalarFieldAssociatedData,
         TValidation::ResolverSelectionLinkedFieldAssociatedData,
         TValidation::ResolverVariableDefinitionAssociatedData,
     > {
-        &self.resolvers[resolver_field_id.as_usize()]
+        &self.client_fields[client_field_id.as_usize()]
     }
 
     /// Get a reference to the root query_object, if it's defined.
@@ -468,7 +468,7 @@ pub struct MutationFieldResolverActionKindInfo {
 }
 
 #[derive(Debug)]
-pub struct SchemaResolver<
+pub struct ClientField<
     TResolverSelectionScalarFieldAssociatedData,
     TResolverSelectionLinkedFieldAssociatedData,
     TResolverVariableDefinitionAssociatedData,

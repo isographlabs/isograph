@@ -10,7 +10,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    FieldDefinitionLocation, Schema, SchemaData, SchemaObject, SchemaResolver, SchemaScalar,
+    ClientField, FieldDefinitionLocation, Schema, SchemaData, SchemaObject, SchemaScalar,
     SchemaServerField, SchemaValidationState,
 };
 use lazy_static::lazy_static;
@@ -49,7 +49,7 @@ pub(crate) type UnvalidatedSchemaData =
 
 pub(crate) type UnvalidatedSchemaField = SchemaServerField<TypeAnnotation<UnvalidatedTypeName>>;
 
-pub(crate) type UnvalidatedSchemaResolver = SchemaResolver<
+pub(crate) type UnvalidatedClientField = ClientField<
     <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionLinkedFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::ResolverVariableDefinitionAssociatedData,
@@ -103,8 +103,8 @@ impl UnvalidatedSchema {
         );
 
         Self {
-            fields,
-            resolvers,
+            server_fields: fields,
+            client_fields: resolvers,
             entrypoints: Default::default(),
             schema_data: SchemaData {
                 objects,

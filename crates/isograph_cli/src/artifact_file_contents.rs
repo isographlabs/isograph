@@ -59,8 +59,8 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             reader_ast,
             nested_client_field_artifact_imports,
             parent_type,
-            resolver_variant,
-            resolver_field_name,
+            client_field_variant: resolver_variant,
+            client_field_name: resolver_field_name,
             ..
         } = self;
         let nested_client_field_import_statement = nested_client_field_names_to_import_statement(

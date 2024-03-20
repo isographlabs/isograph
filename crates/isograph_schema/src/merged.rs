@@ -17,8 +17,8 @@ use isograph_lang_types::{
 use crate::{
     expose_field_directive::RequiresRefinement, ArgumentKeyAndValue, ClientFieldVariant,
     FieldDefinitionLocation, MutationFieldClientFieldVariant, NameAndArguments, PathToRefetchField,
-    ValidatedDefinedField, ValidatedLinkedFieldSelection, ValidatedSchema, ValidatedSchemaIdField,
-    ValidatedSchemaObject, ValidatedSchemaResolver, ValidatedSelection,
+    ValidatedClientField, ValidatedDefinedField, ValidatedLinkedFieldSelection, ValidatedSchema,
+    ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSelection,
 };
 
 type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSelection>>;
@@ -198,7 +198,7 @@ pub struct MutationFieldResolverInfo {
 #[allow(unused)]
 #[derive(Debug)]
 struct MergeTraversalState<'a> {
-    resolver: &'a ValidatedSchemaResolver,
+    resolver: &'a ValidatedClientField,
     paths_to_refetch_fields: Vec<(PathToRefetchField, ObjectId, ClientFieldVariant)>,
     /// As we traverse selection sets, we need to keep track of the path we have
     /// taken so far. This is because when we encounter a refetch query, we need
@@ -215,7 +215,7 @@ struct MergeTraversalState<'a> {
 
 impl<'a> MergeTraversalState<'a> {
     pub fn new(
-        resolver: &'a ValidatedSchemaResolver,
+        resolver: &'a ValidatedClientField,
         encountered_resolver_ids: Option<&'a mut HashSet<ClientFieldId>>,
     ) -> Self {
         Self {
@@ -235,7 +235,7 @@ pub fn create_merged_selection_set(
     artifact_queue: Option<&mut Vec<ArtifactQueueItem>>,
     encountered_resolver_ids: Option<&mut HashSet<ClientFieldId>>,
     // N.B. we call this for non-fetchable resolvers now, but that is a smell
-    root_fetchable_resolver: &ValidatedSchemaResolver,
+    root_fetchable_resolver: &ValidatedClientField,
 ) -> (MergedSelectionSet, Vec<RootRefetchedPath>) {
     let mut merge_traversal_state =
         MergeTraversalState::new(root_fetchable_resolver, encountered_resolver_ids);

@@ -11,11 +11,12 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    refetched_paths::refetched_paths_with_path, FieldDefinitionLocation, NameAndArguments,
-    PathToRefetchField, Schema, SchemaData, SchemaIdField, SchemaObject, SchemaResolver,
-    SchemaServerField, SchemaValidationState, UnvalidatedLinkedFieldSelection, UnvalidatedSchema,
-    UnvalidatedSchemaData, UnvalidatedSchemaField, UnvalidatedSchemaObject,
-    UnvalidatedSchemaResolver, UnvalidatedSchemaServerField, ValidateEntrypointDeclarationError,
+    refetched_paths::refetched_paths_with_path, ClientField, FieldDefinitionLocation,
+    NameAndArguments, PathToRefetchField, Schema, SchemaData, SchemaIdField, SchemaObject,
+    SchemaServerField, SchemaValidationState, UnvalidatedClientField,
+    UnvalidatedLinkedFieldSelection, UnvalidatedSchema, UnvalidatedSchemaData,
+    UnvalidatedSchemaField, UnvalidatedSchemaObject, UnvalidatedSchemaServerField,
+    ValidateEntrypointDeclarationError,
 };
 
 pub type ValidatedSchemaServerField = SchemaServerField<TypeAnnotation<SelectableFieldId>>;
@@ -34,7 +35,7 @@ pub type ValidatedScalarFieldSelection = ScalarFieldSelection<
 >;
 
 pub type ValidatedVariableDefinition = VariableDefinition<SelectableFieldId>;
-pub type ValidatedSchemaResolver = SchemaResolver<
+pub type ValidatedClientField = ClientField<
     <ValidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::ResolverSelectionLinkedFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::ResolverVariableDefinitionAssociatedData,
@@ -90,8 +91,8 @@ impl ValidatedSchema {
         }
 
         let Schema {
-            fields,
-            resolvers,
+            server_fields: fields,
+            client_fields: resolvers,
             entrypoints: _,
             schema_data,
             id_type_id: id_type,
@@ -138,8 +139,8 @@ impl ValidatedSchema {
                 .collect();
 
             Ok(Self {
-                fields: updated_fields,
-                resolvers: updated_resolvers,
+                server_fields: updated_fields,
+                client_fields: updated_resolvers,
                 entrypoints: updated_entrypoints,
                 schema_data: SchemaData {
                     objects,
@@ -161,7 +162,7 @@ impl ValidatedSchema {
 
 fn transform_object_field_ids(
     schema_fields: &[ValidatedSchemaServerField],
-    schema_resolvers: &[ValidatedSchemaResolver],
+    schema_resolvers: &[ValidatedClientField],
     object: UnvalidatedSchemaObject,
 ) -> ValidatedSchemaObject {
     let SchemaObject {
@@ -365,10 +366,10 @@ fn validate_server_field_argument(
 }
 
 fn validate_and_transform_resolvers(
-    resolvers: Vec<UnvalidatedSchemaResolver>,
+    resolvers: Vec<UnvalidatedClientField>,
     schema_data: &UnvalidatedSchemaData,
     server_fields: &[UnvalidatedSchemaServerField],
-) -> Result<Vec<ValidatedSchemaResolver>, Vec<WithLocation<ValidateSchemaError>>> {
+) -> Result<Vec<ValidatedClientField>, Vec<WithLocation<ValidateSchemaError>>> {
     get_all_errors_or_all_ok(
         resolvers
             .into_iter()
@@ -378,9 +379,9 @@ fn validate_and_transform_resolvers(
 
 fn validate_resolver_fragment(
     schema_data: &UnvalidatedSchemaData,
-    unvalidated_resolver: UnvalidatedSchemaResolver,
+    unvalidated_resolver: UnvalidatedClientField,
     server_fields: &[UnvalidatedSchemaServerField],
-) -> ValidateSchemaResult<ValidatedSchemaResolver> {
+) -> ValidateSchemaResult<ValidatedClientField> {
     let variable_definitions =
         validate_variable_definitions(schema_data, unvalidated_resolver.variable_definitions)?;
 
@@ -400,7 +401,7 @@ fn validate_resolver_fragment(
                     unvalidated_resolver.name,
                 )
             })?;
-            Ok(SchemaResolver {
+            Ok(ClientField {
                 description: unvalidated_resolver.description,
                 name: unvalidated_resolver.name,
                 id: unvalidated_resolver.id,
@@ -412,7 +413,7 @@ fn validate_resolver_fragment(
                 action_kind: unvalidated_resolver.action_kind,
             })
         }
-        None => Ok(SchemaResolver {
+        None => Ok(ClientField {
             description: unvalidated_resolver.description,
             name: unvalidated_resolver.name,
             id: unvalidated_resolver.id,
@@ -831,7 +832,7 @@ pub enum ValidateSchemaError {
 }
 
 pub fn refetched_paths_for_resolver(
-    schema_resolver: &ValidatedSchemaResolver,
+    schema_resolver: &ValidatedClientField,
     schema: &ValidatedSchema,
     path: &mut Vec<NameAndArguments>,
 ) -> Vec<PathToRefetchField> {

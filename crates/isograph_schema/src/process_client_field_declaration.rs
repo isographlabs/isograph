@@ -13,7 +13,7 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    FieldDefinitionLocation, ObjectTypeAndFieldNames, ResolverActionKind, SchemaResolver,
+    ClientField, FieldDefinitionLocation, ObjectTypeAndFieldNames, ResolverActionKind,
     UnvalidatedSchema,
 };
 
@@ -63,7 +63,7 @@ impl UnvalidatedSchema {
         let resolver_field_name = resolver_field_name_ws.item;
         let resolver_field_name_span = resolver_field_name_ws.span;
 
-        let next_resolver_id = self.resolvers.len().into();
+        let next_resolver_id = self.client_fields.len().into();
 
         if object
             .encountered_fields
@@ -106,7 +106,7 @@ impl UnvalidatedSchema {
             }
         }
 
-        self.resolvers.push(SchemaResolver {
+        self.client_fields.push(ClientField {
             description: None,
             name,
             id: next_resolver_id,

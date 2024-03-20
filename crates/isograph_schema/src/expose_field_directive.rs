@@ -15,10 +15,10 @@ use isograph_lang_types::{
 use serde::Deserialize;
 
 use crate::{
-    ArgumentMap, ClientFieldVariant, FieldDefinitionLocation, FieldMapItem,
+    ArgumentMap, ClientField, ClientFieldVariant, FieldDefinitionLocation, FieldMapItem,
     MutationFieldClientFieldVariant, MutationFieldResolverActionKindInfo, ObjectTypeAndFieldNames,
     ProcessTypeDefinitionError, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
-    ResolverActionKind, SchemaResolver, UnvalidatedSchema,
+    ResolverActionKind, UnvalidatedSchema,
 };
 use lazy_static::lazy_static;
 
@@ -207,8 +207,8 @@ impl UnvalidatedSchema {
                 })
                 .collect::<Vec<_>>();
 
-            let mutation_field_resolver_id = self.resolvers.len().into();
-            let mutation_field_resolver = SchemaResolver {
+            let mutation_field_resolver_id = self.client_fields.len().into();
+            let mutation_field_resolver = ClientField {
                 description,
                 // set_pet_best_friend
                 name: mutation_field_name,
@@ -235,7 +235,7 @@ impl UnvalidatedSchema {
                     },
                 ),
             };
-            self.resolvers.push(mutation_field_resolver);
+            self.client_fields.push(mutation_field_resolver);
 
             self.insert_resolver_field_on_object(
                 mutation_field_name,

@@ -26,14 +26,14 @@ use isograph_schema::{
     MergedLinkedFieldSelection, MergedScalarFieldSelection, MergedSelectionSet,
     MergedServerFieldSelection, MutationFieldResolverInfo, NameAndArguments,
     ObjectTypeAndFieldNames, PathToRefetchField, RefetchFieldResolverInfo, RequiresRefinement,
-    ResolverActionKind, RootRefetchedPath, ValidatedSchema, ValidatedSchemaObject,
-    ValidatedSchemaResolver, ValidatedSelection, ValidatedVariableDefinition, ENTRYPOINT, READER,
+    ResolverActionKind, RootRefetchedPath, ValidatedClientField, ValidatedSchema,
+    ValidatedSchemaObject, ValidatedSelection, ValidatedVariableDefinition, ENTRYPOINT, READER,
 };
 use thiserror::Error;
 
 use crate::write_artifacts::write_to_disk;
 
-type NestedResolverImports = HashMap<ObjectTypeAndFieldNames, JavaScriptImports>;
+type NestedClientFieldImports = HashMap<ObjectTypeAndFieldNames, JavaScriptImports>;
 
 macro_rules! derive_display {
     ($type:ident) => {
@@ -66,18 +66,19 @@ pub(crate) fn generate_and_write_artifacts(
 }
 
 fn build_iso_overload_for_entrypoint<'schema>(
-    resolver: &ValidatedSchemaResolver,
+    validated_client_field: &ValidatedClientField,
 ) -> (String, String) {
     let mut s: String = "".to_string();
     let import = format!(
         "import entrypoint_{} from '../__isograph/{}/{}/entrypoint'\n",
-        resolver.type_and_field.underscore_separated(),
-        resolver.type_and_field.type_name,
-        resolver.type_and_field.field_name,
+        validated_client_field.type_and_field.underscore_separated(),
+        validated_client_field.type_and_field.type_name,
+        validated_client_field.type_and_field.field_name,
     );
     let formatted_field = format!(
         "entrypoint {}.{}",
-        resolver.type_and_field.type_name, resolver.type_and_field.field_name
+        validated_client_field.type_and_field.type_name,
+        validated_client_field.type_and_field.field_name
     );
     s.push_str(&format!(
         "
@@ -85,33 +86,33 @@ export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
 ): typeof entrypoint_{};\n",
         formatted_field,
-        resolver.type_and_field.underscore_separated(),
+        validated_client_field.type_and_field.underscore_separated(),
     ));
     (import, s)
 }
 
 fn build_iso_overload_for_client_defined_field(
-    resolver: &ValidatedSchemaResolver,
+    client_field: &ValidatedClientField,
 ) -> (String, String) {
     let mut s: String = "".to_string();
     let import = format!(
         "import {{ {}__param }} from './{}/{}/reader'\n",
-        resolver.type_and_field.underscore_separated(),
-        resolver.type_and_field.type_name,
-        resolver.type_and_field.field_name,
+        client_field.type_and_field.underscore_separated(),
+        client_field.type_and_field.type_name,
+        client_field.type_and_field.field_name,
     );
     let formatted_field = format!(
         "field {}.{}",
-        resolver.type_and_field.type_name, resolver.type_and_field.field_name
+        client_field.type_and_field.type_name, client_field.type_and_field.field_name
     );
-    if matches!(resolver.variant, ClientFieldVariant::Component) {
+    if matches!(client_field.variant, ClientFieldVariant::Component) {
         s.push_str(&format!(
             "
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
 ): IdentityWithParamComponent<{}__param>;\n",
             formatted_field,
-            resolver.type_and_field.underscore_separated(),
+            client_field.type_and_field.underscore_separated(),
         ));
     } else {
         s.push_str(&format!(
@@ -120,7 +121,7 @@ export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
 ): IdentityWithParam<{}__param>;\n",
             formatted_field,
-            resolver.type_and_field.underscore_separated(),
+            client_field.type_and_field.underscore_separated(),
         ));
     }
     (import, s)
@@ -186,23 +187,23 @@ export function iso(_isographLiteralText: string):
     }
 }
 
-fn sorted_entrypoints(schema: &ValidatedSchema) -> Vec<&ValidatedSchemaResolver> {
+fn sorted_entrypoints(schema: &ValidatedSchema) -> Vec<&ValidatedClientField> {
     let mut entrypoints = schema
         .entrypoints
         .iter()
-        .map(|resolver_field_id| schema.resolver(*resolver_field_id))
+        .map(|client_field_id| schema.resolver(*client_field_id))
         .collect::<Vec<_>>();
-    entrypoints.sort_by(|resolver_1, resolver_2| {
-        match resolver_1
+    entrypoints.sort_by(|client_field_1, client_field_2| {
+        match client_field_1
             .type_and_field
             .type_name
-            .cmp(&resolver_2.type_and_field.type_name)
+            .cmp(&client_field_2.type_and_field.type_name)
         {
             Ordering::Less => Ordering::Less,
             Ordering::Greater => Ordering::Greater,
             Ordering::Equal => sort_field_name(
-                resolver_1.type_and_field.field_name,
-                resolver_2.type_and_field.field_name,
+                client_field_1.type_and_field.field_name,
+                client_field_2.type_and_field.field_name,
             ),
         }
     });
@@ -232,19 +233,19 @@ fn sort_field_name(field_1: SelectableFieldName, field_2: SelectableFieldName) -
     }
 }
 
-fn sorted_client_defined_fields(schema: &ValidatedSchema) -> Vec<&ValidatedSchemaResolver> {
+fn sorted_client_defined_fields(schema: &ValidatedSchema) -> Vec<&ValidatedClientField> {
     let mut fields = client_defined_fields(schema).collect::<Vec<_>>();
-    fields.sort_by(|resolver_1, resolver_2| {
-        match resolver_1
+    fields.sort_by(|client_field_1, client_field_2| {
+        match client_field_1
             .type_and_field
             .type_name
-            .cmp(&resolver_2.type_and_field.type_name)
+            .cmp(&client_field_2.type_and_field.type_name)
         {
             Ordering::Less => Ordering::Less,
             Ordering::Greater => Ordering::Greater,
             Ordering::Equal => sort_field_name(
-                resolver_1.type_and_field.field_name,
-                resolver_2.type_and_field.field_name,
+                client_field_1.type_and_field.field_name,
+                client_field_2.type_and_field.field_name,
             ),
         }
     });
@@ -253,11 +254,10 @@ fn sorted_client_defined_fields(schema: &ValidatedSchema) -> Vec<&ValidatedSchem
 
 fn client_defined_fields<'a>(
     schema: &'a ValidatedSchema,
-) -> impl Iterator<Item = &'a ValidatedSchemaResolver> + 'a {
-    schema
-        .resolvers
-        .iter()
-        .filter(|resolver| matches!(resolver.action_kind, ResolverActionKind::NamedImport(_)))
+) -> impl Iterator<Item = &'a ValidatedClientField> + 'a {
+    schema.client_fields.iter().filter(|client_field| {
+        matches!(client_field.action_kind, ResolverActionKind::NamedImport(_))
+    })
 }
 
 fn get_artifact_path_and_contents<'schema>(
@@ -279,10 +279,10 @@ fn get_artifact_path_and_contents<'schema>(
 ///   - a refetch field/magic mutation field, add it to the queue
 /// Keep processing artifacts until the queue is empty.
 ///
-/// We *also* need to generate all (type) artifacts for all client-defined resolvers,
+/// We *also* need to generate all (type) artifacts for all client-defined fields,
 /// (i.e. including unreachable ones), because they are referenced in iso.ts.
-/// So we separately add those to the encountered_resolvers_ids set and generate full
-/// artifacts. In the future, we should just generate types for these resolvers, not
+/// So we separately add those to the encountered_client_field_ids set and generate full
+/// artifacts. In the future, we should just generate types for these client fields, not
 /// readers, etc.
 ///
 /// TODO The artifact queue abstraction doesn't make much sense here.
@@ -292,23 +292,23 @@ fn get_artifact_infos<'schema>(
     artifact_directory: &PathBuf,
 ) -> Vec<ArtifactInfo<'schema>> {
     let mut artifact_queue = vec![];
-    let mut encountered_resolvers_ids = HashSet::new();
+    let mut encountered_client_field_ids = HashSet::new();
     let mut artifact_infos = vec![];
 
-    for resolver_field_id in schema.entrypoints.iter() {
+    for client_field_id in schema.entrypoints.iter() {
         artifact_infos.push(ArtifactInfo::Entrypoint(generate_entrypoint_artifact(
             schema,
-            *resolver_field_id,
+            *client_field_id,
             &mut artifact_queue,
-            &mut encountered_resolvers_ids,
+            &mut encountered_client_field_ids,
         )));
 
-        // We also need to generate reader artifacts for the entrypoint resolvers themselves
-        encountered_resolvers_ids.insert(*resolver_field_id);
+        // We also need to generate reader artifacts for the entrypoint client fields themselves
+        encountered_client_field_ids.insert(*client_field_id);
     }
 
     for client_defined_field in client_defined_fields(schema) {
-        if encountered_resolvers_ids.insert(client_defined_field.id) {
+        if encountered_client_field_ids.insert(client_defined_field.id) {
             // What are we doing here?
             // We are generating, and throwing away, an entrypoint artifact. This has the effect of
             // encountering selected __refetch fields. Refetch fields reachable from orphaned
@@ -319,16 +319,16 @@ fn get_artifact_infos<'schema>(
                 schema,
                 client_defined_field.id,
                 &mut vec![],
-                &mut encountered_resolvers_ids,
+                &mut encountered_client_field_ids,
             );
         }
     }
 
-    for encountered_resolver_id in encountered_resolvers_ids {
-        let encountered_resolver = schema.resolver(encountered_resolver_id);
+    for encountered_client_field_id in encountered_client_field_ids {
+        let encountered_client_field = schema.resolver(encountered_client_field_id);
         artifact_infos.push(ArtifactInfo::Reader(generate_reader_artifact(
             schema,
-            encountered_resolver,
+            encountered_client_field,
             project_root,
             artifact_directory,
         )))
@@ -590,17 +590,17 @@ fn get_aliased_mutation_field_name(
 
 fn generate_entrypoint_artifact<'schema>(
     schema: &'schema ValidatedSchema,
-    resolver_field_id: ClientFieldId,
+    client_field_id: ClientFieldId,
     artifact_queue: &mut Vec<ArtifactQueueItem>,
-    encountered_resolvers_ids: &mut HashSet<ClientFieldId>,
+    encountered_cliend_field_ids: &mut HashSet<ClientFieldId>,
 ) -> EntrypointArtifactInfo<'schema> {
-    let top_level_resolver = schema.resolver(resolver_field_id);
-    if let Some((ref selection_set, _)) = top_level_resolver.selection_set_and_unwraps {
-        let query_name = top_level_resolver.name.into();
+    let top_level_client_field = schema.resolver(client_field_id);
+    if let Some((ref selection_set, _)) = top_level_client_field.selection_set_and_unwraps {
+        let query_name = top_level_client_field.name.into();
 
         let (merged_selection_set, root_refetched_paths) = create_merged_selection_set(
             schema,
-            // TODO here we are assuming that the resolver is only on the Query type.
+            // TODO here we are assuming that the client field is only on the Query type.
             // That restriction should be loosened.
             schema
                 .schema_data
@@ -608,8 +608,8 @@ fn generate_entrypoint_artifact<'schema>(
                 .into(),
             selection_set,
             Some(artifact_queue),
-            Some(encountered_resolvers_ids),
-            &top_level_resolver,
+            Some(encountered_cliend_field_ids),
+            &top_level_client_field,
         );
 
         let query_object = schema
@@ -619,7 +619,7 @@ fn generate_entrypoint_artifact<'schema>(
             query_name,
             schema,
             &merged_selection_set,
-            &top_level_resolver.variable_definitions,
+            &top_level_client_field.variable_definitions,
         );
         let refetch_query_artifact_imports =
             generate_refetch_query_artifact_imports(&root_refetched_paths);
@@ -635,23 +635,23 @@ fn generate_entrypoint_artifact<'schema>(
         }
     } else {
         // TODO convert to error
-        todo!("Unsupported: resolvers on query with no selection set")
+        todo!("Unsupported: client fields on query with no selection set")
     }
 }
 
 fn generate_reader_artifact<'schema>(
     schema: &'schema ValidatedSchema,
-    resolver: &ValidatedSchemaResolver,
+    client_field: &ValidatedClientField,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
 ) -> ReaderArtifactInfo<'schema> {
-    if let Some((selection_set, _)) = &resolver.selection_set_and_unwraps {
-        let parent_type = schema.schema_data.object(resolver.parent_object_id);
-        let mut nested_resolver_artifact_imports = HashMap::new();
+    if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
+        let parent_type = schema.schema_data.object(client_field.parent_object_id);
+        let mut nested_client_field_artifact_imports = HashMap::new();
 
         let (_merged_selection_set, root_refetched_paths) = create_merged_selection_set(
             schema,
-            // TODO here we are assuming that the resolver is only on the Query type.
+            // TODO here we are assuming that the client field is only on the Query type.
             // That restriction should be loosened.
             schema
                 .schema_data
@@ -660,43 +660,43 @@ fn generate_reader_artifact<'schema>(
             selection_set,
             None,
             None,
-            resolver,
+            client_field,
         );
 
         let reader_ast = generate_reader_ast(
             schema,
             selection_set,
             0,
-            &mut nested_resolver_artifact_imports,
+            &mut nested_client_field_artifact_imports,
             &root_refetched_paths,
         );
 
         let resolver_parameter_type = generate_resolver_parameter_type(
             schema,
             &selection_set,
-            &resolver.variant,
+            &client_field.variant,
             parent_type.into(),
-            &mut nested_resolver_artifact_imports,
+            &mut nested_client_field_artifact_imports,
             0,
         );
-        let client_field_output_type = generate_output_type(resolver);
+        let client_field_output_type = generate_output_type(client_field);
         let function_import_statement = generate_function_import_statement(
-            &resolver.action_kind,
+            &client_field.action_kind,
             project_root,
             artifact_directory,
         );
         ReaderArtifactInfo {
             parent_type: parent_type.into(),
-            resolver_field_name: resolver.name,
+            client_field_name: client_field.name,
             reader_ast,
-            nested_client_field_artifact_imports: nested_resolver_artifact_imports,
+            nested_client_field_artifact_imports,
             function_import_statement,
             client_field_output_type,
             resolver_parameter_type,
-            resolver_variant: resolver.variant.clone(),
+            client_field_variant: client_field.variant.clone(),
         }
     } else {
-        panic!("Unsupported: resolvers not on query with no selection set")
+        panic!("Unsupported: client fields not on query with no selection set")
     }
 }
 
@@ -782,24 +782,24 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
 #[derive(Debug)]
 pub(crate) struct ReaderArtifactInfo<'schema> {
     pub parent_type: &'schema ValidatedSchemaObject,
-    pub(crate) resolver_field_name: SelectableFieldName,
-    pub nested_client_field_artifact_imports: NestedResolverImports,
+    pub(crate) client_field_name: SelectableFieldName,
+    pub nested_client_field_artifact_imports: NestedClientFieldImports,
     pub client_field_output_type: ClientFieldOutputType,
     pub reader_ast: ReaderAst,
     pub resolver_parameter_type: ResolverParameterType,
     pub function_import_statement: ClientFieldFunctionImportStatement,
-    pub resolver_variant: ClientFieldVariant,
+    pub client_field_variant: ClientFieldVariant,
 }
 
 impl<'schema> ReaderArtifactInfo<'schema> {
     pub fn path_and_content(self) -> PathAndContent {
         let ReaderArtifactInfo {
             parent_type,
-            resolver_field_name,
+            client_field_name,
             ..
         } = &self;
 
-        let relative_directory = generate_path(parent_type.name, *resolver_field_name);
+        let relative_directory = generate_path(parent_type.name, *client_field_name);
 
         PathAndContent {
             file_content: self.file_contents(),
@@ -990,7 +990,7 @@ fn generate_resolver_parameter_type(
     selection_set: &[WithSpan<ValidatedSelection>],
     variant: &ClientFieldVariant,
     parent_type: &ValidatedSchemaObject,
-    nested_client_field_imports: &mut NestedResolverImports,
+    nested_client_field_imports: &mut NestedClientFieldImports,
     indentation_level: u8,
 ) -> ResolverParameterType {
     // TODO use unwraps
@@ -1029,7 +1029,7 @@ fn write_query_types_from_selection(
     selection: &WithSpan<ValidatedSelection>,
     variant: &ClientFieldVariant,
     parent_type: &ValidatedSchemaObject,
-    nested_client_field_imports: &mut NestedResolverImports,
+    nested_client_field_imports: &mut NestedClientFieldImports,
     indentation_level: u8,
 ) {
     query_type_declaration.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
@@ -1065,15 +1065,15 @@ fn write_query_types_from_selection(
                             print_type_annotation(&output_type)
                         ));
                     }
-                    FieldDefinitionLocation::Client(resolver_field_id) => {
-                        let resolver = schema.resolver(resolver_field_id);
+                    FieldDefinitionLocation::Client(client_field_id) => {
+                        let client_field = schema.resolver(client_field_id);
 
-                        match nested_client_field_imports.entry(resolver.type_and_field) {
+                        match nested_client_field_imports.entry(client_field.type_and_field) {
                             Entry::Occupied(mut occupied) => {
                                 occupied.get_mut().types.push(ResolverImportType {
                                     globally_unique_type_name: ResolverImportName(format!(
                                         "{}__outputType",
-                                        resolver.type_and_field.underscore_separated()
+                                        client_field.type_and_field.underscore_separated()
                                     )),
                                 });
                             }
@@ -1083,7 +1083,7 @@ fn write_query_types_from_selection(
                                     types: vec![ResolverImportType {
                                         globally_unique_type_name: ResolverImportName(format!(
                                             "{}__outputType",
-                                            resolver.type_and_field.underscore_separated()
+                                            client_field.type_and_field.underscore_separated()
                                         )),
                                     }],
                                 });
@@ -1093,7 +1093,7 @@ fn write_query_types_from_selection(
                         query_type_declaration.push_str(&format!(
                             "{}: {}__outputType,\n",
                             scalar_field.name_or_alias().item,
-                            resolver.type_and_field.underscore_separated()
+                            client_field.type_and_field.underscore_separated()
                         ));
                     }
                 }
@@ -1181,7 +1181,7 @@ fn generate_function_import_statement(
 ) -> ClientFieldFunctionImportStatement {
     match resolver_action_kind {
         ResolverActionKind::NamedImport((name, path)) => {
-            let path_to_resolver = project_root
+            let path_to_client_field = project_root
                 .join(PathBuf::from_str(path.lookup()).expect(
                     "paths should be legal here. This is indicative of a bug in Isograph.",
                 ));
@@ -1189,15 +1189,15 @@ fn generate_function_import_statement(
                 // artifact directory includes __isograph, so artifact_directory.join("Type/Field")
                 // is a directory "two levels deep" within the artifact_directory.
                 //
-                // So diff_paths(path_to_resolver, artifact_directory.join("Type/Field"))
+                // So diff_paths(path_to_client_field, artifact_directory.join("Type/Field"))
                 // is a lazy way of saying "make a relative path from two levels deep in the artifact
-                // dir to the resolver".
+                // dir to the client field".
                 //
                 // Since we will always go ../../../ the Type/Field part will never show up
                 // in the output.
                 //
                 // Anyway, TODO do better.
-                pathdiff::diff_paths(path_to_resolver, artifact_directory.join("Type/Field"))
+                pathdiff::diff_paths(path_to_client_field, artifact_directory.join("Type/Field"))
                     .expect("Relative path should work");
             ClientFieldFunctionImportStatement(format!(
                 "import {{ {name} as resolver }} from '{}';",
@@ -1293,7 +1293,7 @@ fn generate_reader_ast<'schema>(
     schema: &'schema ValidatedSchema,
     selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
     indentation_level: u8,
-    nested_client_field_imports: &mut NestedResolverImports,
+    nested_client_field_imports: &mut NestedClientFieldImports,
     // N.B. this is not root_refetched_paths when we're generating an entrypoint :(
     root_refetched_paths: &[RootRefetchedPath],
 ) -> ReaderAst {
@@ -1313,8 +1313,8 @@ fn generate_reader_ast_with_path<'schema>(
     schema: &'schema ValidatedSchema,
     selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
     indentation_level: u8,
-    nested_client_field_imports: &mut NestedResolverImports,
-    // N.B. this is not root_refetched_paths when we're generating a non-fetchable resolver :(
+    nested_client_field_imports: &mut NestedClientFieldImports,
+    // N.B. this is not root_refetched_paths when we're generating a non-fetchable client field :(
     root_refetched_paths: &[RootRefetchedPath],
     path: &mut Vec<NameAndArguments>,
 ) -> ReaderAst {
@@ -1338,7 +1338,7 @@ fn generate_reader_ast_node(
     selection: &WithSpan<ValidatedSelection>,
     schema: &ValidatedSchema,
     indentation_level: u8,
-    nested_client_field_imports: &mut NestedResolverImports,
+    nested_client_field_imports: &mut NestedClientFieldImports,
     // TODO use this to generate usedRefetchQueries
     root_refetched_paths: &[RootRefetchedPath],
     path: &mut Vec<NameAndArguments>,
@@ -1371,29 +1371,29 @@ fn generate_reader_ast_node(
                             {indent_1}}},\n",
                         )
                     }
-                    FieldDefinitionLocation::Client(resolver_field_id) => {
-                        // This field is a resolver, so we need to look up the field in the
+                    FieldDefinitionLocation::Client(client_field_id) => {
+                        // This field is a client field, so we need to look up the field in the
                         // schema.
                         let alias = scalar_field.name_or_alias().item;
-                        let resolver_field = schema.resolver(resolver_field_id);
+                        let client_field = schema.resolver(client_field_id);
                         let arguments = get_serialized_field_arguments(
                             &scalar_field.arguments,
                             indentation_level + 1,
                         );
                         let indent_1 = "  ".repeat(indentation_level as usize);
                         let indent_2 = "  ".repeat((indentation_level + 1) as usize);
-                        let resolver_field_string =
-                            resolver_field.type_and_field.underscore_separated();
+                        let client_field_string =
+                            client_field.type_and_field.underscore_separated();
 
-                        let resolver_refetched_paths =
-                            refetched_paths_for_resolver(resolver_field, schema, path);
+                        let client_field_refetched_paths =
+                            refetched_paths_for_resolver(client_field, schema, path);
 
                         let nested_refetch_queries = get_nested_refetch_query_text(
                             &root_refetched_paths,
-                            &resolver_refetched_paths,
+                            &client_field_refetched_paths,
                         );
 
-                        match nested_client_field_imports.entry(resolver_field.type_and_field) {
+                        match nested_client_field_imports.entry(client_field.type_and_field) {
                             Entry::Occupied(mut occupied) => {
                                 occupied.get_mut().default_import = true;
                             }
@@ -1406,7 +1406,7 @@ fn generate_reader_ast_node(
                         }
 
                         // This is indicative of poor data modeling.
-                        match resolver_field.variant {
+                        match client_field.variant {
                             ClientFieldVariant::RefetchField => {
                                 let refetch_query_index =
                                     find_refetch_query_index(root_refetched_paths, path);
@@ -1414,7 +1414,7 @@ fn generate_reader_ast_node(
                                     "{indent_1}{{\n\
                                     {indent_2}kind: \"RefetchField\",\n\
                                     {indent_2}alias: \"{alias}\",\n\
-                                    {indent_2}readerArtifact: {resolver_field_string},\n\
+                                    {indent_2}readerArtifact: {client_field_string},\n\
                                     {indent_2}refetchQuery: {refetch_query_index},\n\
                                     {indent_1}}},\n",
                                 )
@@ -1429,7 +1429,7 @@ fn generate_reader_ast_node(
                                     "{indent_1}{{\n\
                                     {indent_2}kind: \"MutationField\",\n\
                                     {indent_2}alias: \"{alias}\",\n\
-                                    {indent_2}readerArtifact: {resolver_field_string},\n\
+                                    {indent_2}readerArtifact: {client_field_string},\n\
                                     {indent_2}refetchQuery: {refetch_query_index},\n\
                                     {indent_1}}},\n",
                                 )
@@ -1440,7 +1440,7 @@ fn generate_reader_ast_node(
                                     {indent_2}kind: \"Resolver\",\n\
                                     {indent_2}alias: \"{alias}\",\n\
                                     {indent_2}arguments: {arguments},\n\
-                                    {indent_2}readerArtifact: {resolver_field_string},\n\
+                                    {indent_2}readerArtifact: {client_field_string},\n\
                                     {indent_2}usedRefetchQueries: {nested_refetch_queries},\n\
                                     {indent_1}}},\n",
                                 )
@@ -1662,8 +1662,8 @@ fn get_nested_refetch_query_text(
     s
 }
 
-fn generate_output_type(resolver_definition: &ValidatedSchemaResolver) -> ClientFieldOutputType {
-    match &resolver_definition.variant {
+fn generate_output_type(client_field: &ValidatedClientField) -> ClientFieldOutputType {
+    match &client_field.variant {
         variant => match variant {
             ClientFieldVariant::Component => {
                 ClientFieldOutputType("(React.FC<ExtractSecondParam<typeof resolver>>)".to_string())

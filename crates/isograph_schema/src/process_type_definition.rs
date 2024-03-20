@@ -1,11 +1,11 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use crate::{
-    ClientFieldVariant, EncounteredRootTypes, FieldDefinitionLocation,
+    ClientField, ClientFieldVariant, EncounteredRootTypes, FieldDefinitionLocation,
     IsographObjectTypeDefinition, ObjectTypeAndFieldNames, ProcessedRootTypes, ResolverActionKind,
-    RootTypes, Schema, SchemaObject, SchemaResolver, SchemaScalar, SchemaServerField,
-    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
-    UnvalidatedSchemaResolver, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
+    RootTypes, Schema, SchemaObject, SchemaScalar, SchemaServerField, UnvalidatedClientField,
+    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField, ID_GRAPHQL_TYPE,
+    STRING_JAVASCRIPT_TYPE,
 };
 use common_lang_types::{
     GraphQLObjectTypeName, GraphQLScalarTypeName, IsographObjectTypeName, Location,
@@ -375,9 +375,9 @@ impl UnvalidatedSchema {
         options: ConfigOptions,
     ) -> ProcessTypeDefinitionResult<ProcessObjectTypeDefinitionOutcome> {
         let &mut Schema {
-            fields: ref mut schema_fields,
+            server_fields: ref mut schema_fields,
             ref mut schema_data,
-            resolvers: ref mut schema_resolvers,
+            client_fields: ref mut schema_resolvers,
             ..
         } = self;
         let next_object_id = schema_data.objects.len().into();
@@ -603,7 +603,7 @@ impl FieldMapItem {
 fn get_resolvers_for_schema_object(
     id_field_id: &Option<ServerStrongIdFieldId>,
     encountered_fields: &mut HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
-    schema_resolvers: &mut Vec<UnvalidatedSchemaResolver>,
+    schema_resolvers: &mut Vec<UnvalidatedClientField>,
     parent_object_id: ObjectId,
     type_definition: &IsographObjectTypeDefinition,
 ) -> Vec<ClientFieldId> {
@@ -620,7 +620,7 @@ fn get_resolvers_for_schema_object(
             })),
             Span::todo_generated(),
         );
-        schema_resolvers.push(SchemaResolver {
+        schema_resolvers.push(ClientField {
             description: Some("A refetch field for this object.".intern().into()),
             name: "__refetch".intern().into(),
             id: next_resolver_id,
