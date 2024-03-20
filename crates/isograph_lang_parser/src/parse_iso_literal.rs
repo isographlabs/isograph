@@ -66,13 +66,13 @@ fn parse_iso_entrypoint_declaration(
             tokens
                 .parse_token_of_kind(IsographLangTokenKind::Period)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
-            let resolver_field_name = tokens
+            let client_field_name = tokens
                 .parse_string_key_type(IsographLangTokenKind::Identifier)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
             Ok(EntrypointTypeAndField {
                 parent_type,
-                client_field_name: resolver_field_name,
+                client_field_name,
             })
         })
         .transpose()
@@ -129,7 +129,7 @@ fn parse_client_field_declaration_inner<'a>(
                 .parse_token_of_kind(IsographLangTokenKind::Period)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-            let resolver_field_name: WithSpan<ScalarFieldName> = tokens
+            let client_field_name: WithSpan<ScalarFieldName> = tokens
                 .parse_string_key_type(IsographLangTokenKind::Identifier)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
@@ -142,7 +142,7 @@ fn parse_client_field_declaration_inner<'a>(
             let const_export_name = const_export_name.ok_or_else(|| {
                 WithSpan::new(
                     IsographLiteralParseError::ExpectedLiteralToBeExported {
-                        suggested_const_export_name: resolver_field_name.item.into(),
+                        suggested_const_export_name: client_field_name.item.into(),
                     },
                     Span::todo_generated(),
                 )
@@ -156,7 +156,7 @@ fn parse_client_field_declaration_inner<'a>(
 
             Ok(ClientFieldDeclaration {
                 parent_type,
-                resolver_field_name,
+                client_field_name,
                 selection_set_and_unwraps,
                 definition_path: definition_file_path,
                 directives,

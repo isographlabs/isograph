@@ -6,13 +6,13 @@ use common_lang_types::{
 use graphql_lang_types::TypeAnnotation;
 
 pub type UnvalidatedSelection = Selection<
-    // <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
+    // <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
     (),
-    // <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionLinkedFieldAssociatedData,
+    // <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
     (),
 >;
 pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
-    // <UnvalidatedSchemaState as SchemaValidationState>::ResolverSelectionScalarFieldAssociatedData,
+    // <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
     (),
 >;
 
@@ -20,7 +20,7 @@ pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
 pub struct ClientFieldDeclaration {
     pub const_export_name: ConstExportName,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
-    pub resolver_field_name: WithSpan<ScalarFieldName>,
+    pub client_field_name: WithSpan<ScalarFieldName>,
     pub selection_set_and_unwraps:
         Option<(Vec<WithSpan<UnvalidatedSelection>>, Vec<WithSpan<Unwrap>>)>,
     pub directives: Vec<WithSpan<FragmentDirectiveUsage>>,

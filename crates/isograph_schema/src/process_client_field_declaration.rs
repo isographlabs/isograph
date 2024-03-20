@@ -59,7 +59,7 @@ impl UnvalidatedSchema {
         client_field_declaration: WithSpan<ClientFieldDeclaration>,
     ) -> ProcessResolverDeclarationResult<()> {
         let object = &mut self.schema_data.objects[parent_object_id.as_usize()];
-        let resolver_field_name_ws = client_field_declaration.item.resolver_field_name;
+        let resolver_field_name_ws = client_field_declaration.item.client_field_name;
         let resolver_field_name = resolver_field_name_ws.item;
         let resolver_field_name_span = resolver_field_name_ws.span;
 
@@ -85,11 +85,7 @@ impl UnvalidatedSchema {
 
         object.resolvers.push(next_resolver_id);
 
-        let name = client_field_declaration
-            .item
-            .resolver_field_name
-            .item
-            .into();
+        let name = client_field_declaration.item.client_field_name.item.into();
         let variant = get_resolver_variant(&client_field_declaration.item.directives);
         let resolver_action_kind = ResolverActionKind::NamedImport((
             client_field_declaration.item.const_export_name,
