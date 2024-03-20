@@ -679,7 +679,7 @@ fn generate_reader_artifact<'schema>(
             &mut nested_resolver_artifact_imports,
             0,
         );
-        let resolver_read_out_type = generate_read_out_type(resolver);
+        let client_field_output_type = generate_output_type(resolver);
         let resolver_import_statement = generate_resolver_import_statement(
             &resolver.action_kind,
             project_root,
@@ -691,7 +691,7 @@ fn generate_reader_artifact<'schema>(
             reader_ast,
             nested_resolver_artifact_imports,
             resolver_import_statement,
-            resolver_read_out_type,
+            client_field_output_type,
             resolver_parameter_type,
             resolver_variant: resolver.variant.clone(),
         }
@@ -733,8 +733,8 @@ pub(crate) struct ResolverImportStatement(pub String);
 derive_display!(ResolverImportStatement);
 
 #[derive(Debug)]
-pub(crate) struct ResolverReadOutType(pub String);
-derive_display!(ResolverReadOutType);
+pub(crate) struct ClientFieldOutputType(pub String);
+derive_display!(ClientFieldOutputType);
 
 #[derive(Debug)]
 pub(crate) struct ReaderAst(pub String);
@@ -784,7 +784,7 @@ pub(crate) struct ReaderArtifactInfo<'schema> {
     pub parent_type: &'schema ValidatedSchemaObject,
     pub(crate) resolver_field_name: SelectableFieldName,
     pub nested_resolver_artifact_imports: NestedResolverImports,
-    pub resolver_read_out_type: ResolverReadOutType,
+    pub client_field_output_type: ClientFieldOutputType,
     pub reader_ast: ReaderAst,
     pub resolver_parameter_type: ResolverParameterType,
     pub resolver_import_statement: ResolverImportStatement,
@@ -1662,18 +1662,19 @@ fn get_nested_refetch_query_text(
     s
 }
 
-fn generate_read_out_type(resolver_definition: &ValidatedSchemaResolver) -> ResolverReadOutType {
+fn generate_output_type(resolver_definition: &ValidatedSchemaResolver) -> ClientFieldOutputType {
     match &resolver_definition.variant {
         variant => match variant {
             ResolverVariant::Component => {
-                ResolverReadOutType("(React.FC<ExtractSecondParam<typeof resolver>>)".to_string())
+                ClientFieldOutputType("(React.FC<ExtractSecondParam<typeof resolver>>)".to_string())
             }
             ResolverVariant::Eager => {
-                ResolverReadOutType("ReturnType<typeof resolver>".to_string())
+                ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
             }
-            ResolverVariant::RefetchField => ResolverReadOutType("() => void".to_string()),
+            ResolverVariant::RefetchField => ClientFieldOutputType("() => void".to_string()),
             ResolverVariant::MutationField(_) => {
-                ResolverReadOutType("(params: any) => void".to_string())
+                // TODO type these parameters
+                ClientFieldOutputType("(params: any) => void".to_string())
             }
         },
     }

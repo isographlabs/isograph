@@ -30,7 +30,7 @@ string_key_newtype!(InputTypeName);
 // confirmed that the type exists and is the proper type yet (e.g. input, object,
 // output, type with fields, etc.)
 //
-// Resolver parent types and field types are the only places where this should
+// Client field parent types and field types are the only places where this should
 // be used.
 //
 // It can also be used in error messages a sort of top type name type, i.e. any type name
@@ -95,7 +95,7 @@ string_key_newtype!(ConstExportName);
 // Operations
 
 string_key_newtype!(QueryOperationName);
-// Explanation: any resolver field that is on the Query object is eligible
+// Explanation: any client field that is on the Query object is eligible
 // to be a query.
 string_key_conversion!(from: SelectableFieldName, to: QueryOperationName);
 // The reverse is safe as well.

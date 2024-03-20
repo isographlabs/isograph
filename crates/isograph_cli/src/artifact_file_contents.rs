@@ -4,8 +4,8 @@ use common_lang_types::{IsographObjectTypeName, SelectableFieldName};
 use isograph_schema::{ObjectTypeAndFieldNames, ResolverVariant};
 
 use crate::generate_artifacts::{
-    EntrypointArtifactInfo, ReaderArtifactInfo, RefetchArtifactInfo, ResolverImport,
-    ResolverReadOutType,
+    ClientFieldOutputType, EntrypointArtifactInfo, ReaderArtifactInfo, RefetchArtifactInfo,
+    ResolverImport,
 };
 
 impl<'schema> EntrypointArtifactInfo<'schema> {
@@ -55,7 +55,7 @@ impl<'schema> ReaderArtifactInfo<'schema> {
         let ReaderArtifactInfo {
             resolver_import_statement,
             resolver_parameter_type,
-            resolver_read_out_type,
+            client_field_output_type,
             reader_ast,
             nested_resolver_artifact_imports,
             parent_type,
@@ -67,10 +67,10 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             nested_resolver_artifact_imports,
             parent_type.name,
         );
-        let read_out_type_text = get_read_out_type_text(
+        let output_type_text = get_output_type_text(
             parent_type.name,
             resolver_field_name,
-            resolver_read_out_type,
+            client_field_output_type,
         );
 
         // We are not modeling this well, I think.
@@ -87,7 +87,7 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             "import type {{ReaderArtifact, ReaderAst, ExtractSecondParam}} from '@isograph/react';\n\
             {resolver_import_statement}\n\
             {nested_resolver_import_statement}\n\
-            {read_out_type_text}\n\n\
+            {output_type_text}\n\n\
             const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
             export type {reader_param_type} = {resolver_parameter_type};\n\n\
             const artifact: ReaderArtifact<\n\
@@ -190,14 +190,14 @@ fn write_resolver_import(
     overall.push_str(&s);
 }
 
-fn get_read_out_type_text(
+fn get_output_type_text(
     parent_type_name: IsographObjectTypeName,
     field_name: SelectableFieldName,
-    read_out_type: ResolverReadOutType,
+    output_type: ClientFieldOutputType,
 ) -> String {
     format!(
         "// the type, when read out (either via useLazyReference or via graph)\n\
         export type {}__{}__outputType = {};",
-        parent_type_name, field_name, read_out_type
+        parent_type_name, field_name, output_type
     )
 }
