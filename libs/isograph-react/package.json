@@ -1,6 +1,6 @@
 {
   "name": "@isograph/react",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Use Isograph with React",
   "homepage": "https://isograph.dev",
   "main": "dist/index.js",
@@ -16,7 +16,7 @@
     "prepack": "yarn run test && yarn run compile"
   },
   "dependencies": {
-    "@isograph/disposable-types": "0.1.0",
+    "@isograph/disposable-types": "0.1.1",
     "@isograph/react-disposable-state": "*",
     "react": "^18.2.0"
   },
