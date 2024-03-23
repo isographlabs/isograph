@@ -1,4 +1,4 @@
-use common_lang_types::{StringLiteralValue, TextSource};
+use common_lang_types::{SelectableFieldName, StringLiteralValue, TextSource};
 use graphql_lang_types::{
     from_graph_ql_directive, ConstantValue, DeserializationError, GraphQLDirective,
 };
@@ -40,11 +40,32 @@ fn parse_mutation(source: &str) -> Result<Vec<ExposeFieldDirective>, Box<dyn Err
 }
 
 #[test]
+fn test_test_mutation_extension_expose_as() -> Result<(), Box<dyn Error>> {
+    let expose_field_mutations = parse_mutation(include_str!(
+        "fixtures/directives/mutation_extension_valid_as.graphql"
+    ))?;
+    let set_tagline_mutation = ExposeFieldDirective::new(
+        Some(SelectableFieldName::from("set_puppy_tagline".intern())),
+        StringLiteralValue::from("pet".intern()),
+        vec![FieldMapItem {
+            from: StringLiteralValue::from("id".intern()),
+            to: StringLiteralValue::from("input.id".intern()),
+        }],
+        StringLiteralValue::from("set_pet_tagline".intern()),
+    );
+
+    assert_eq!(expose_field_mutations[0], set_tagline_mutation);
+    Ok(())
+}
+
+
+#[test]
 fn test_test_mutation_extension_set_pet_tagline_parsing() -> Result<(), Box<dyn Error>> {
     let expose_field_mutations = parse_mutation(include_str!(
         "fixtures/directives/mutation_extension_valid.graphql"
     ))?;
     let set_tagline_mutation = ExposeFieldDirective::new(
+        None,
         StringLiteralValue::from("pet".intern()),
         vec![FieldMapItem {
             from: StringLiteralValue::from("id".intern()),
@@ -63,6 +84,7 @@ fn test_mutation_extension_set_pet_bestfriend_parsing() -> Result<(), Box<dyn Er
         "fixtures/directives/mutation_extension_valid.graphql"
     ))?;
     let set_pet_best_friend = ExposeFieldDirective::new(
+        None,
         StringLiteralValue::from("pet".intern()),
         vec![FieldMapItem {
             from: StringLiteralValue::from("id".intern()),
@@ -100,7 +122,7 @@ fn test_mutation_extension_extra_topfield_parsing_failure() -> Result<(), Box<dy
     ));
     match_failure_message(
         expose_field_directives,
-        "unknown field `weight`, expected one of `path`, `field_map`, `field`",
+        "unknown field `weight`, expected one of `as`, `path`, `field_map`, `field`",
     );
     Ok(())
 }
