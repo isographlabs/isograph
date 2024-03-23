@@ -178,7 +178,7 @@ impl<'de> Deserializer<'de> for ConstantValueDeserializer<'de> {
         }
     }
 
-    fn deserialize_option<V>(self, visitor:V) -> Result<V::Value, Self::Error>
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
@@ -204,7 +204,6 @@ impl<'de, TName> Deserializer<'de> for ValueDeserializer<'de, TName, ConstantVal
         };
         deserializer.deserialize_any(visitor)
     }
-
 
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where

@@ -58,7 +58,6 @@ fn test_test_mutation_extension_expose_as() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-
 #[test]
 fn test_test_mutation_extension_set_pet_tagline_parsing() -> Result<(), Box<dyn Error>> {
     let expose_field_mutations = parse_mutation(include_str!(
