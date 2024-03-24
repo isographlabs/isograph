@@ -453,7 +453,7 @@ impl ObjectTypeAndFieldNames {
 }
 
 #[derive(Debug, Clone)]
-pub enum ResolverActionKind {
+pub enum ClientFieldActionKind {
     /// Associated js function
     NamedImport((ConstExportName, FilePath)),
     /// Refetch fields
@@ -497,7 +497,7 @@ pub struct ClientField<
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,
 
-    pub action_kind: ResolverActionKind,
+    pub action_kind: ClientFieldActionKind,
 
     pub variable_definitions:
         Vec<WithSpan<VariableDefinition<TResolverVariableDefinitionAssociatedData>>>,

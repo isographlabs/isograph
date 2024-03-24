@@ -22,12 +22,12 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_resolver,
-    ArtifactQueueItem, ClientFieldVariant, FieldDefinitionLocation, FieldMapItem,
-    MergedLinkedFieldSelection, MergedScalarFieldSelection, MergedSelectionSet,
+    ArtifactQueueItem, ClientFieldActionKind, ClientFieldVariant, FieldDefinitionLocation,
+    FieldMapItem, MergedLinkedFieldSelection, MergedScalarFieldSelection, MergedSelectionSet,
     MergedServerFieldSelection, MutationFieldResolverInfo, NameAndArguments,
     ObjectTypeAndFieldNames, PathToRefetchField, RefetchFieldResolverInfo, RequiresRefinement,
-    ResolverActionKind, RootRefetchedPath, ValidatedClientField, ValidatedSchema,
-    ValidatedSchemaObject, ValidatedSelection, ValidatedVariableDefinition, ENTRYPOINT, READER,
+    RootRefetchedPath, ValidatedClientField, ValidatedSchema, ValidatedSchemaObject,
+    ValidatedSelection, ValidatedVariableDefinition, ENTRYPOINT, READER,
 };
 use thiserror::Error;
 
@@ -256,7 +256,10 @@ fn client_defined_fields<'a>(
     schema: &'a ValidatedSchema,
 ) -> impl Iterator<Item = &'a ValidatedClientField> + 'a {
     schema.client_fields.iter().filter(|client_field| {
-        matches!(client_field.action_kind, ResolverActionKind::NamedImport(_))
+        matches!(
+            client_field.action_kind,
+            ClientFieldActionKind::NamedImport(_)
+        )
     })
 }
 
@@ -1175,12 +1178,12 @@ fn print_non_null_type_annotation<T: Display>(non_null: &NonNullTypeAnnotation<T
 }
 
 fn generate_function_import_statement(
-    resolver_action_kind: &ResolverActionKind,
+    action_kind: &ClientFieldActionKind,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
 ) -> ClientFieldFunctionImportStatement {
-    match resolver_action_kind {
-        ResolverActionKind::NamedImport((name, path)) => {
+    match action_kind {
+        ClientFieldActionKind::NamedImport((name, path)) => {
             let path_to_client_field = project_root
                 .join(PathBuf::from_str(path.lookup()).expect(
                     "paths should be legal here. This is indicative of a bug in Isograph.",
@@ -1204,7 +1207,7 @@ fn generate_function_import_statement(
                 relative_path.to_str().expect("This path should be stringifiable. This probably is indicative of a bug in Relay.")
             ))
         }
-        ResolverActionKind::RefetchField => ClientFieldFunctionImportStatement(format!(
+        ClientFieldActionKind::RefetchField => ClientFieldFunctionImportStatement(format!(
             "import {{ makeNetworkRequest, type IsographEnvironment, type IsographEntrypoint }} from '@isograph/react';\n\
                 const resolver = (\n\
                 {}environment: IsographEnvironment,\n\
@@ -1214,7 +1217,7 @@ fn generate_function_import_statement(
                 makeNetworkRequest(environment, artifact, variables);",
             "  ", "  ", "  "
         )),
-        ResolverActionKind::MutationField(ref m) => {
+        ClientFieldActionKind::MutationField(ref m) => {
             let spaces = "  ";
             let include_read_out_data = get_read_out_data(&m.field_map);
             ClientFieldFunctionImportStatement(format!(
