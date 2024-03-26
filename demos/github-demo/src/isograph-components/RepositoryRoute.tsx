@@ -51,10 +51,6 @@ export function RepositoryRoute({
       first: 20,
     },
   );
-  console.log('repository route', {
-    queryReference,
-    name: route.repositoryName,
-  });
   const Component = useResult(queryReference);
   return <Component route={route} setRoute={setRoute} />;
 }
