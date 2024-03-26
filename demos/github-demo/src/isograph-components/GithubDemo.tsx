@@ -61,7 +61,6 @@ function Router({
   route: Route;
   setRoute: (route: Route) => void;
 }) {
-  console.log({ route });
   switch (route.kind) {
     case 'Home':
       return <HomeRoute route={route} setRoute={setRoute} />;
