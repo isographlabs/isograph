@@ -36,6 +36,11 @@ export const RepositoryPage = iso(`
   );
 });
 
+if (typeof window !== 'undefined') {
+  // @ts-expect-error
+  window.__LOG = true;
+}
+
 export function RepositoryRoute({
   route,
   setRoute,
