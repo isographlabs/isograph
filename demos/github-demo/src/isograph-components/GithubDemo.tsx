@@ -65,7 +65,13 @@ function Router({
     case 'Home':
       return <HomeRoute route={route} setRoute={setRoute} />;
     case 'Repository':
-      return <RepositoryRoute route={route} setRoute={setRoute} />;
+      return (
+        <RepositoryRoute
+          route={route}
+          setRoute={setRoute}
+          key={route.repositoryId}
+        />
+      );
     case 'User':
       return <UserRoute route={route} setRoute={setRoute} />;
     case 'PullRequest':
