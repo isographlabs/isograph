@@ -172,7 +172,3 @@ export function assertLink(link: DataTypeValue): Link | null {
   }
   throw new Error('Invalid link');
 }
-
-export type IsographComponentProps<TDataType, TOtherProps = Object> = {
-  data: TDataType;
-} & TOtherProps;
