@@ -95,3 +95,21 @@ export function createIsographStore() {
     [ROOT_ID]: {},
   };
 }
+
+export function defaultMissingFieldHandler(
+  _storeRecord: StoreRecord,
+  _root: DataId,
+  fieldName: string,
+  arguments_: { [index: string]: any } | null,
+  variables: { [index: string]: any } | null,
+): Link | undefined {
+  if (fieldName === 'node' || fieldName === 'user') {
+    const variable = arguments_?.['id'];
+    const value = variables?.[variable];
+
+    // TODO can we handle explicit nulls here too? Probably, after wrapping in objects
+    if (value != null) {
+      return { __link: value };
+    }
+  }
+}
