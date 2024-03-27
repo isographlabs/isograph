@@ -174,7 +174,6 @@ pub struct RefetchFieldResolverInfo {
 
 #[derive(Debug, Clone)]
 pub struct MutationFieldResolverInfo {
-
     pub merged_selection_set: MergedSelectionSet,
     /// Used to look up what type to narrow on in the generated refetch query,
     /// among other things.
