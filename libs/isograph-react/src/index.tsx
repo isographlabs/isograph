@@ -18,6 +18,11 @@ import {
 import { useEffect, useState } from 'react';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import { ReaderArtifact, ReaderAst } from './reader';
+import {
+  IsographEntrypoint,
+  RefetchQueryArtifactWrapper,
+  assertIsEntrypoint,
+} from './entrypoint';
 
 export {
   retainQuery,
@@ -57,52 +62,19 @@ export {
   ReaderResolverVariant,
   ReaderScalarField,
 } from './reader';
-
-// This type should be treated as an opaque type.
-export type IsographEntrypoint<
-  TReadFromStore extends Object,
-  TResolverResult,
-> = {
-  kind: 'Entrypoint';
-  queryText: string;
-  normalizationAst: NormalizationAst;
-  readerArtifact: ReaderArtifact<TReadFromStore, TResolverResult>;
-  nestedRefetchQueries: RefetchQueryArtifactWrapper[];
-};
+export {
+  NormalizationAst,
+  NormalizationAstNode,
+  NormalizationLinkedField,
+  NormalizationScalarField,
+  IsographEntrypoint,
+  assertIsEntrypoint,
+  RefetchQueryArtifact,
+  RefetchQueryArtifactWrapper,
+} from './entrypoint';
 
 export type ExtractSecondParam<T extends (arg1: any, arg2: any) => any> =
   T extends (arg1: any, arg2: infer P) => any ? P : never;
-
-export type NormalizationAstNode =
-  | NormalizationScalarField
-  | NormalizationLinkedField;
-export type NormalizationAst = NormalizationAstNode[];
-
-export type NormalizationScalarField = {
-  kind: 'Scalar';
-  fieldName: string;
-  arguments: Arguments | null;
-};
-
-export type NormalizationLinkedField = {
-  kind: 'Linked';
-  fieldName: string;
-  arguments: Arguments | null;
-  selections: NormalizationAst;
-};
-
-// This is more like an entrypoint, but one specifically for a refetch query/mutation
-export type RefetchQueryArtifact = {
-  kind: 'RefetchQuery';
-  queryText: string;
-  normalizationAst: NormalizationAst;
-};
-
-// TODO rename
-export type RefetchQueryArtifactWrapper = {
-  artifact: RefetchQueryArtifact;
-  allowedVariables: string[];
-};
 
 export type Arguments = Argument[];
 export type Argument = [ArgumentName, ArgumentValue];
@@ -131,17 +103,6 @@ export type FragmentReference<
   // TODO: We should instead have ReaderAst<TResolverProps>
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
-
-function assertIsEntrypoint<TReadFromStore extends Object, TResolverResult>(
-  value:
-    | IsographEntrypoint<TReadFromStore, TResolverResult>
-    | ((_: any) => any)
-    // Temporarily, allow any here. Once we automatically provide
-    // types to entrypoints, we probably don't need this.
-    | any,
-): asserts value is IsographEntrypoint<TReadFromStore, TResolverResult> {
-  if (typeof value === 'function') throw new Error('Not a string');
-}
 
 export type ExtractReadFromStore<Type> =
   Type extends IsographEntrypoint<infer X, any> ? X : never;
