@@ -113,3 +113,16 @@ export function defaultMissingFieldHandler(
     }
   }
 }
+
+export function assertLink(link: DataTypeValue): Link | null {
+  if (Array.isArray(link)) {
+    throw new Error('Unexpected array');
+  }
+  if (link == null) {
+    return null;
+  }
+  if (typeof link === 'object') {
+    return link;
+  }
+  throw new Error('Invalid link');
+}

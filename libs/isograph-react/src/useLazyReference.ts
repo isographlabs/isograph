@@ -1,8 +1,11 @@
-import { ExtractReadFromStore, ExtractResolverResult } from './index';
 import { FragmentReference, Variable } from './FragmentReference';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import { ROOT_ID } from './IsographEnvironment';
-import { assertIsEntrypoint } from './entrypoint';
+import {
+  ExtractReadFromStore,
+  ExtractResolverResult,
+  assertIsEntrypoint,
+} from './entrypoint';
 import { getOrCreateCacheForArtifact } from './cache';
 import { useLazyDisposableState } from '@isograph/isograph-react-disposable-state';
 import { type PromiseWrapper } from './PromiseWrapper';

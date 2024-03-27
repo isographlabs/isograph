@@ -1,6 +1,6 @@
 // TODO this should probably be at least three distinct types, for @component,
 
-import { Arguments } from './index';
+import { Arguments } from './util';
 
 // non-@component and refetch resolvers
 export type ReaderArtifact<TReadFromStore extends Object, TResolverResult> = {

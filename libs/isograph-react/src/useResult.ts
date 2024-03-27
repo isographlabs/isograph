@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { FragmentReference } from './index';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import { subscribe } from './cache';
 import { read } from './read';
+import { FragmentReference } from './FragmentReference';
 
 export function useResult<TReadFromStore extends Object, TResolverResult>(
   fragmentReference: FragmentReference<TReadFromStore, TResolverResult>,

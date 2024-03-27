@@ -1,12 +1,14 @@
 import { getParentRecordKey, onNextChange } from './cache';
 import { getOrCreateCachedComponent } from './componentCache';
 import { RefetchQueryArtifactWrapper } from './entrypoint';
-import { assertLink, FragmentReference, ReaderAst } from './index';
+import { FragmentReference } from './FragmentReference';
 import {
+  assertLink,
   DataId,
   defaultMissingFieldHandler,
   IsographEnvironment,
 } from './IsographEnvironment';
+import { ReaderAst } from './reader';
 
 export function read<TReadFromStore extends Object, TResolverResult>(
   environment: IsographEnvironment,

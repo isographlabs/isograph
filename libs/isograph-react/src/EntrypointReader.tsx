@@ -1,10 +1,7 @@
 import * as React from 'react';
-import {
-  ExtractReadFromStore,
-  IsographEntrypoint,
-  type FragmentReference,
-  useResult,
-} from './index';
+import { ExtractReadFromStore, IsographEntrypoint } from './entrypoint';
+import { FragmentReference } from './FragmentReference';
+import { useResult } from './useResult';
 
 export function EntrypointReader<
   TProps extends Record<any, any>,

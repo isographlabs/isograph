@@ -1,5 +1,5 @@
-import { Arguments } from './index';
 import { ReaderArtifact } from './reader';
+import { Arguments } from './util';
 
 // This type should be treated as an opaque type.
 export type IsographEntrypoint<
@@ -57,3 +57,8 @@ export function assertIsEntrypoint<
 ): asserts value is IsographEntrypoint<TReadFromStore, TResolverResult> {
   if (typeof value === 'function') throw new Error('Not a string');
 }
+
+export type ExtractReadFromStore<Type> =
+  Type extends IsographEntrypoint<infer X, any> ? X : never;
+export type ExtractResolverResult<Type> =
+  Type extends IsographEntrypoint<any, infer X> ? X : never;

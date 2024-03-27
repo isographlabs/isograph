@@ -5,17 +5,6 @@ import {
 } from '@isograph/react-disposable-state';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import {
-  Argument,
-  ArgumentValue,
-  IsographEntrypoint,
-  NormalizationAst,
-  NormalizationLinkedField,
-  NormalizationScalarField,
-  ReaderLinkedField,
-  ReaderScalarField,
-  RefetchQueryArtifactWrapper,
-} from './index';
-import {
   DataId,
   ROOT_ID,
   StoreRecord,
@@ -28,6 +17,15 @@ import {
   retainQuery,
   unretainQuery,
 } from './garbageCollection';
+import {
+  IsographEntrypoint,
+  NormalizationAst,
+  NormalizationLinkedField,
+  NormalizationScalarField,
+  RefetchQueryArtifactWrapper,
+} from './entrypoint';
+import { ReaderLinkedField, ReaderScalarField } from './reader';
+import { Argument, ArgumentValue } from './util';
 
 declare global {
   interface Window {

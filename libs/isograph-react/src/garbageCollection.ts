@@ -4,9 +4,10 @@ import {
   IsographStore,
   ROOT_ID,
   StoreRecord,
+  assertLink,
 } from './IsographEnvironment';
-import { NormalizationAst, assertLink } from './index';
 import { getParentRecordKey } from './cache';
+import { NormalizationAst } from './entrypoint';
 
 export type RetainedQuery = {
   normalizationAst: NormalizationAst;
