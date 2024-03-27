@@ -1,12 +1,11 @@
 import {
   DataId,
-  DataTypeValue,
   IsographEnvironment,
   IsographStore,
   ROOT_ID,
   StoreRecord,
 } from './IsographEnvironment';
-import { NormalizationAst } from './index';
+import { NormalizationAst, assertLink } from './index';
 import { getParentRecordKey } from './cache';
 
 export type RetainedQuery = {
@@ -71,16 +70,6 @@ function recordReachableIds(
   );
 }
 
-function getLinkedId(data: Exclude<DataTypeValue, null | void>): string {
-  // @ts-expect-error
-  if (data.__link != null) {
-    // @ts-expect-error
-    return data.__link;
-  } else {
-    throw new Error('Record in an invalid state');
-  }
-}
-
 function recordReachableIdsFromRecord(
   store: IsographStore,
   currentRecord: StoreRecord,
@@ -96,16 +85,16 @@ function recordReachableIdsFromRecord(
 
         const ids = [];
         if (Array.isArray(linkedFieldOrFields)) {
-          for (const link of linkedFieldOrFields) {
+          for (const maybeLink of linkedFieldOrFields) {
+            const link = assertLink(maybeLink);
             if (link != null) {
-              const id = getLinkedId(link);
-              ids.push(id);
+              ids.push(link.__link);
             }
           }
         } else {
-          if (linkedFieldOrFields != null) {
-            const id = getLinkedId(linkedFieldOrFields);
-            ids.push(id);
+          const link = assertLink(linkedFieldOrFields);
+          if (link != null) {
+            ids.push(link.__link);
           }
         }
 
