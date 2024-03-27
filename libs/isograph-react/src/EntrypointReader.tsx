@@ -7,14 +7,17 @@ import {
 } from './index';
 
 export function EntrypointReader<
-  TEntrypoint extends IsographEntrypoint<any, React.FC<any>>,
+  TProps extends Record<any, any>,
+  TEntrypoint extends IsographEntrypoint<any, React.FC<TProps>>,
 >(props: {
   queryReference: FragmentReference<
     ExtractReadFromStore<TEntrypoint>,
-    React.FC<any>
+    React.FC<TProps>
   >;
-  additionalProps?: any | void;
-}): ReturnType<React.FC<any>> {
+  // TODO make additionalProps optional if TProps extends Record<string, never>
+  // perhaps with a type overload
+  additionalProps: TProps;
+}): React.ReactNode {
   const Component = useResult(props.queryReference);
   return <Component {...props.additionalProps} />;
 }
