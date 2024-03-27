@@ -4,12 +4,12 @@ import { Arguments } from './util';
 // This type should be treated as an opaque type.
 export type IsographEntrypoint<
   TReadFromStore extends Object,
-  TResolverResult,
+  TClientFieldValue,
 > = {
   kind: 'Entrypoint';
   queryText: string;
   normalizationAst: NormalizationAst;
-  readerArtifact: ReaderArtifact<TReadFromStore, TResolverResult>;
+  readerArtifact: ReaderArtifact<TReadFromStore, TClientFieldValue>;
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
@@ -46,15 +46,15 @@ export type RefetchQueryArtifactWrapper = {
 
 export function assertIsEntrypoint<
   TReadFromStore extends Object,
-  TResolverResult,
+  TClientFieldValue,
 >(
   value:
-    | IsographEntrypoint<TReadFromStore, TResolverResult>
+    | IsographEntrypoint<TReadFromStore, TClientFieldValue>
     | ((_: any) => any)
     // Temporarily, allow any here. Once we automatically provide
     // types to entrypoints, we probably don't need this.
     | any,
-): asserts value is IsographEntrypoint<TReadFromStore, TResolverResult> {
+): asserts value is IsographEntrypoint<TReadFromStore, TClientFieldValue> {
   if (typeof value === 'function') throw new Error('Not a string');
 }
 

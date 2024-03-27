@@ -2,10 +2,10 @@ import { Arguments } from './util';
 
 // TODO this should probably be at least three distinct types, for @component,
 // non-@component and refetch resolvers
-export type ReaderArtifact<TReadFromStore extends Object, TResolverResult> = {
+export type ReaderArtifact<TReadFromStore extends Object, TClientFieldValue> = {
   kind: 'ReaderArtifact';
   readerAst: ReaderAst<TReadFromStore>;
-  resolver: (data: TReadFromStore, runtimeProps: any) => TResolverResult;
+  resolver: (data: TReadFromStore, runtimeProps: any) => TClientFieldValue;
   variant: ReaderResolverVariant;
 };
 

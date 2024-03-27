@@ -7,10 +7,10 @@ export type Variable = any;
 
 export type FragmentReference<
   TReadFromStore extends Object,
-  TResolverResult,
+  TClientFieldValue,
 > = {
   kind: 'FragmentReference';
-  readerArtifact: ReaderArtifact<TReadFromStore, TResolverResult>;
+  readerArtifact: ReaderArtifact<TReadFromStore, TClientFieldValue>;
   root: DataId;
   variables: { [index: string]: Variable } | null;
   // TODO: We should instead have ReaderAst<TResolverProps>

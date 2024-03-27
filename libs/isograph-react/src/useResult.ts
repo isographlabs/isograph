@@ -4,9 +4,9 @@ import { subscribe } from './cache';
 import { read } from './read';
 import { FragmentReference } from './FragmentReference';
 
-export function useResult<TReadFromStore extends Object, TResolverResult>(
-  fragmentReference: FragmentReference<TReadFromStore, TResolverResult>,
-): TResolverResult {
+export function useResult<TReadFromStore extends Object, TClientFieldValue>(
+  fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>,
+): TClientFieldValue {
   const environment = useIsographEnvironment();
 
   const [, setState] = useState<object | void>();

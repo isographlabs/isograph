@@ -10,10 +10,10 @@ import {
 } from './IsographEnvironment';
 import { ReaderAst } from './reader';
 
-export function read<TReadFromStore extends Object, TResolverResult>(
+export function read<TReadFromStore extends Object, TClientFieldValue>(
   environment: IsographEnvironment,
-  fragmentReference: FragmentReference<TReadFromStore, TResolverResult>,
-): TResolverResult {
+  fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>,
+): TClientFieldValue {
   const variant = fragmentReference.readerArtifact.variant;
   if (variant.kind === 'Eager') {
     const data = readData(
