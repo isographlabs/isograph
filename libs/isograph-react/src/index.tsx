@@ -1,16 +1,10 @@
-import { getOrCreateCacheForArtifact, subscribe } from './cache';
+import { getOrCreateCacheForArtifact } from './cache';
 import { useLazyDisposableState } from '@isograph/react-disposable-state';
 import { type PromiseWrapper } from './PromiseWrapper';
-import { DataId, DataTypeValue, Link, ROOT_ID } from './IsographEnvironment';
-import { useEffect, useState } from 'react';
+import { DataTypeValue, Link, ROOT_ID } from './IsographEnvironment';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
-import { ReaderArtifact } from './reader';
-import {
-  IsographEntrypoint,
-  RefetchQueryArtifactWrapper,
-  assertIsEntrypoint,
-} from './entrypoint';
-import { read } from './read';
+import { IsographEntrypoint, assertIsEntrypoint } from './entrypoint';
+import { FragmentReference, Variable } from './FragmentReference';
 
 export {
   retainQuery,
@@ -62,6 +56,8 @@ export {
   RefetchQueryArtifactWrapper,
 } from './entrypoint';
 export { read, readButDoNotEvaluate } from './read';
+export { useResult } from './useResult';
+export { type FragmentReference } from './FragmentReference';
 
 export type ExtractSecondParam<T extends (arg1: any, arg2: any) => any> =
   T extends (arg1: any, arg2: infer P) => any ? P : never;
@@ -78,21 +74,6 @@ export type ArgumentValue =
       kind: 'Literal';
       value: any;
     };
-
-// TODO type this better
-type Variable = any;
-
-export type FragmentReference<
-  TReadFromStore extends Object,
-  TResolverResult,
-> = {
-  kind: 'FragmentReference';
-  readerArtifact: ReaderArtifact<TReadFromStore, TResolverResult>;
-  root: DataId;
-  variables: { [index: string]: Variable } | null;
-  // TODO: We should instead have ReaderAst<TResolverProps>
-  nestedRefetchQueries: RefetchQueryArtifactWrapper[];
-};
 
 export type ExtractReadFromStore<Type> =
   Type extends IsographEntrypoint<infer X, any> ? X : never;
@@ -143,21 +124,6 @@ export function useLazyReference<TEntrypoint>(
       nestedRefetchQueries: entrypoint.nestedRefetchQueries,
     },
   };
-}
-
-export function useResult<TReadFromStore extends Object, TResolverResult>(
-  fragmentReference: FragmentReference<TReadFromStore, TResolverResult>,
-): TResolverResult {
-  const environment = useIsographEnvironment();
-
-  const [, setState] = useState<object | void>();
-  useEffect(() => {
-    return subscribe(environment, () => {
-      return setState({});
-    });
-  }, []);
-
-  return read(environment, fragmentReference);
 }
 
 export function assertLink(link: DataTypeValue): Link | null {
