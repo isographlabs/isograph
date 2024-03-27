@@ -125,6 +125,7 @@ impl UnvalidatedSchema {
         let mutation_field = self.field(field_id);
         let mutation_field_payload_type_name = *mutation_field.associated_data.inner();
         let mutation_field_name = expose_as.unwrap_or(mutation_field.name.item);
+        let server_schema_mutation_field_name = mutation_field.name.item;
         let mutation_field_arguments = mutation_field.arguments.clone();
         let description = mutation_field.description.clone();
         let payload_id = self
@@ -222,6 +223,7 @@ impl UnvalidatedSchema {
                 selection_set_and_unwraps: Some((fields.to_vec(), vec![])),
                 variant: ClientFieldVariant::MutationField(MutationFieldClientFieldVariant {
                     mutation_field_name,
+                    server_schema_mutation_field_name,
                     mutation_primary_field_name: path_selectable_field_name,
                     mutation_field_arguments: mutation_field_arguments.to_vec(),
                     filtered_mutation_field_arguments: mutation_field_args_without_id.to_vec(),
