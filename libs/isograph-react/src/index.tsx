@@ -17,6 +17,7 @@ import {
 } from './IsographEnvironment';
 import { useEffect, useState } from 'react';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
+import { ReaderArtifact, ReaderAst } from './reader';
 
 export {
   retainQuery,
@@ -45,6 +46,17 @@ export {
 } from './IsographEnvironmentProvider';
 export { useImperativeReference } from './useImperativeReference';
 export { EntrypointReader } from './EntrypointReader';
+export {
+  type ReaderArtifact,
+  ReaderAst,
+  ReaderAstNode,
+  ReaderLinkedField,
+  ReaderMutationField,
+  ReaderRefetchField,
+  ReaderResolverField,
+  ReaderResolverVariant,
+  ReaderScalarField,
+} from './reader';
 
 // This type should be treated as an opaque type.
 export type IsographEntrypoint<
@@ -58,71 +70,8 @@ export type IsographEntrypoint<
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };
 
-// TODO this should probably be at least three distinct types, for @component,
-// non-@component and refetch resolvers
-export type ReaderArtifact<TReadFromStore extends Object, TResolverResult> = {
-  kind: 'ReaderArtifact';
-  readerAst: ReaderAst<TReadFromStore>;
-  resolver: (data: TReadFromStore, runtimeProps: any) => TResolverResult;
-  variant: ReaderResolverVariant;
-};
-
-export type ReaderAstNode =
-  | ReaderScalarField
-  | ReaderLinkedField
-  | ReaderResolverField
-  | ReaderRefetchField
-  | ReaderMutationField;
-
-// @ts-ignore
-export type ReaderAst<TReadFromStore> = ReaderAstNode[];
-
 export type ExtractSecondParam<T extends (arg1: any, arg2: any) => any> =
   T extends (arg1: any, arg2: infer P) => any ? P : never;
-
-export type ReaderScalarField = {
-  kind: 'Scalar';
-  fieldName: string;
-  alias: string | null;
-  arguments: Arguments | null;
-};
-export type ReaderLinkedField = {
-  kind: 'Linked';
-  fieldName: string;
-  alias: string | null;
-  selections: ReaderAst<unknown>;
-  arguments: Arguments | null;
-};
-
-export type ReaderResolverVariant =
-  | { kind: 'Eager' }
-  // componentName is the component's cacheKey for getRefReaderByName
-  // and is the type + field concatenated
-  | { kind: 'Component'; componentName: string };
-
-export type ReaderResolverField = {
-  kind: 'Resolver';
-  alias: string;
-  readerArtifact: ReaderArtifact<any, any>;
-  arguments: Arguments | null;
-  usedRefetchQueries: number[];
-};
-
-export type ReaderRefetchField = {
-  kind: 'RefetchField';
-  alias: string;
-  // TODO this bad modeling. A refetch field cannot have variant: "Component" (I think)
-  readerArtifact: ReaderArtifact<any, any>;
-  refetchQuery: number;
-};
-
-export type ReaderMutationField = {
-  kind: 'MutationField';
-  alias: string;
-  // TODO this bad modeling. A mutation field cannot have variant: "Component" (I think)
-  readerArtifact: ReaderArtifact<any, any>;
-  refetchQuery: number;
-};
 
 export type NormalizationAstNode =
   | NormalizationScalarField
