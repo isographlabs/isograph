@@ -20,10 +20,7 @@ export const FavoritePhraseLoader = iso(`
         </button>
       ) : (
         <React.Suspense fallback="Loading favorite phrase...">
-          <EntrypointReader
-            queryReference={queryReference}
-            additionalProps={{}}
-          />
+          <EntrypointReader queryReference={queryReference} />
         </React.Suspense>
       )}
     </>
