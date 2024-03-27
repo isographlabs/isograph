@@ -1,10 +1,5 @@
-import { getOrCreateCacheForArtifact } from './cache';
-import { useLazyDisposableState } from '@isograph/react-disposable-state';
-import { type PromiseWrapper } from './PromiseWrapper';
-import { DataTypeValue, Link, ROOT_ID } from './IsographEnvironment';
-import { useIsographEnvironment } from './IsographEnvironmentProvider';
-import { IsographEntrypoint, assertIsEntrypoint } from './entrypoint';
-import { FragmentReference, Variable } from './FragmentReference';
+import { DataTypeValue, Link } from './IsographEnvironment';
+import { IsographEntrypoint } from './entrypoint';
 
 export {
   retainQuery,
@@ -58,6 +53,7 @@ export {
 export { read, readButDoNotEvaluate } from './read';
 export { useResult } from './useResult';
 export { type FragmentReference } from './FragmentReference';
+export { useLazyReference } from './useLazyReference';
 
 export type ExtractSecondParam<T extends (arg1: any, arg2: any) => any> =
   T extends (arg1: any, arg2: infer P) => any ? P : never;
@@ -79,52 +75,6 @@ export type ExtractReadFromStore<Type> =
   Type extends IsographEntrypoint<infer X, any> ? X : never;
 export type ExtractResolverResult<Type> =
   Type extends IsographEntrypoint<any, infer X> ? X : never;
-// Note: we cannot write TEntrypoint extends IsographEntrypoint<any, any, any>, or else
-// if we do not explicitly pass a type, the read out type will be any.
-// We cannot write TEntrypoint extends IsographEntrypoint<never, never, never>, or else
-// any actual Entrypoint we pass will not be valid.
-export function useLazyReference<TEntrypoint>(
-  entrypoint:
-    | TEntrypoint
-    // Temporarily, we need to allow useLazyReference to take the result of calling
-    // iso(`...`). At runtime, we confirm that the passed-in `iso` literal is actually
-    // an entrypoint.
-    | ((_: any) => any),
-  variables: { [key: string]: Variable },
-): {
-  queryReference: FragmentReference<
-    ExtractReadFromStore<TEntrypoint>,
-    ExtractResolverResult<TEntrypoint>
-  >;
-} {
-  const environment = useIsographEnvironment();
-  assertIsEntrypoint<
-    ExtractReadFromStore<TEntrypoint>,
-    ExtractResolverResult<TEntrypoint>
-  >(entrypoint);
-  const cache = getOrCreateCacheForArtifact<ExtractResolverResult<TEntrypoint>>(
-    environment,
-    entrypoint,
-    variables,
-  );
-
-  // TODO add comment explaining why we never use this value
-  // @ts-ignore
-  const data =
-    useLazyDisposableState<PromiseWrapper<ExtractResolverResult<TEntrypoint>>>(
-      cache,
-    ).state;
-
-  return {
-    queryReference: {
-      kind: 'FragmentReference',
-      readerArtifact: entrypoint.readerArtifact,
-      root: ROOT_ID,
-      variables,
-      nestedRefetchQueries: entrypoint.nestedRefetchQueries,
-    },
-  };
-}
 
 export function assertLink(link: DataTypeValue): Link | null {
   if (Array.isArray(link)) {
