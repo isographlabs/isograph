@@ -14,28 +14,35 @@ import {
   Link,
   ROOT_ID,
   StoreRecord,
-  useIsographEnvironment,
 } from './IsographEnvironment';
 import { useEffect, useState } from 'react';
+import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
+export {
+  retainQuery,
+  unretainQuery,
+  type RetainedQuery,
+  garbageCollectEnvironment,
+} from './garbageCollection';
 export { type PromiseWrapper } from './PromiseWrapper';
 export { makeNetworkRequest, subscribe } from './cache';
 export {
-  IsographEnvironmentContext,
   ROOT_ID,
   type DataId,
   type DataTypeValue,
   type IsographEnvironment,
-  IsographEnvironmentProvider,
-  type IsographEnvironmentProviderProps,
   type IsographNetworkFunction,
   type IsographStore,
   type Link,
   type StoreRecord,
-  useIsographEnvironment,
   createIsographEnvironment,
   createIsographStore,
 } from './IsographEnvironment';
+export {
+  IsographEnvironmentProvider,
+  useIsographEnvironment,
+  type IsographEnvironmentProviderProps,
+} from './IsographEnvironmentProvider';
 export { useImperativeReference } from './useImperativeReference';
 export { EntrypointReader } from './EntrypointReader';
 

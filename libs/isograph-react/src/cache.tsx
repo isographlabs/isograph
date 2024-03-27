@@ -21,11 +21,13 @@ import {
   StoreRecord,
   Link,
   type IsographEnvironment,
-  garbageCollectEnvironment,
-  RetainedQuery,
-  unretainQuery,
-  retainQuery,
 } from './IsographEnvironment';
+import {
+  RetainedQuery,
+  garbageCollectEnvironment,
+  retainQuery,
+  unretainQuery,
+} from './garbageCollection';
 
 declare global {
   interface Window {
