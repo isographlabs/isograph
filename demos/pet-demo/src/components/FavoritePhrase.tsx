@@ -1,7 +1,7 @@
-import { iso } from '@iso';
-import * as React from 'react';
-import { UNASSIGNED_STATE } from '@isograph/react-disposable-state';
-import { EntrypointReader, useImperativeReference } from '@isograph/react';
+import { iso } from "@iso";
+import * as React from "react";
+import { UNASSIGNED_STATE } from "@isograph/react-disposable-state";
+import { EntrypointReader, useImperativeReference } from "@isograph/react";
 
 export const FavoritePhraseLoader = iso(`
   field Pet.FavoritePhraseLoader @component {
@@ -20,10 +20,7 @@ export const FavoritePhraseLoader = iso(`
         </button>
       ) : (
         <React.Suspense fallback="Loading favorite phrase...">
-          <EntrypointReader
-            queryReference={queryReference}
-            additionalProps={{}}
-          />
+          <EntrypointReader queryReference={queryReference} />
         </React.Suspense>
       )}
     </>
