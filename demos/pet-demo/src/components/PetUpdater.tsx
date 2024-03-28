@@ -6,7 +6,7 @@ import { PetId } from './router';
 
 export const PetUpdater = iso(`
   field Pet.PetUpdater @component {
-    set_pet_best_friend
+    set_pet_golden_buddy
     potential_new_best_friends {
       id
       name
@@ -32,7 +32,7 @@ export const PetUpdater = iso(`
             if (value === 'NONE') {
               return;
             }
-            data.set_pet_best_friend({
+            data.set_pet_golden_buddy({
               new_best_friend_id: value,
             });
           }

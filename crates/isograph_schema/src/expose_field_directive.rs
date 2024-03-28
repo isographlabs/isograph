@@ -33,6 +33,9 @@ lazy_static! {
 #[derive(Deserialize, Eq, PartialEq, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ExposeFieldDirective {
+    #[serde(default)]
+    #[serde(rename = "as")]
+    expose_as: Option<SelectableFieldName>,
     path: StringLiteralValue,
     field_map: Vec<FieldMapItem>,
     field: StringLiteralValue,
@@ -40,11 +43,13 @@ pub struct ExposeFieldDirective {
 
 impl ExposeFieldDirective {
     pub fn new(
+        expose_as: Option<SelectableFieldName>,
         path: StringLiteralValue,
         field_map: Vec<FieldMapItem>,
         field: StringLiteralValue,
     ) -> Self {
         Self {
+            expose_as,
             path,
             field_map,
             field,
@@ -109,6 +114,7 @@ impl UnvalidatedSchema {
         options: ConfigOptions,
     ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
         let ExposeFieldDirective {
+            expose_as,
             path,
             field_map,
             field,
@@ -118,7 +124,7 @@ impl UnvalidatedSchema {
 
         let mutation_field = self.field(field_id);
         let mutation_field_payload_type_name = *mutation_field.associated_data.inner();
-        let mutation_field_name = mutation_field.name.item;
+        let mutation_field_name = expose_as.unwrap_or(mutation_field.name.item);
         let mutation_field_arguments = mutation_field.arguments.clone();
         let description = mutation_field.description.clone();
         let payload_id = self
