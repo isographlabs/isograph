@@ -13,7 +13,7 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    ClientField, FieldDefinitionLocation, ObjectTypeAndFieldNames, ResolverActionKind,
+    ClientField, ClientFieldActionKind, FieldDefinitionLocation, ObjectTypeAndFieldNames,
     UnvalidatedSchema,
 };
 
@@ -87,14 +87,14 @@ impl UnvalidatedSchema {
 
         let name = client_field_declaration.item.client_field_name.item.into();
         let variant = get_resolver_variant(&client_field_declaration.item.directives);
-        let resolver_action_kind = ResolverActionKind::NamedImport((
+        let action_kind = ClientFieldActionKind::NamedImport((
             client_field_declaration.item.const_export_name,
             client_field_declaration.item.definition_path,
         ));
 
         // TODO variant should carry payloads, instead of this check
         if variant == ClientFieldVariant::Component {
-            if !matches!(resolver_action_kind, ResolverActionKind::NamedImport(_)) {
+            if !matches!(action_kind, ClientFieldActionKind::NamedImport(_)) {
                 return Err(WithSpan::new(
                     ProcessClientFieldDeclarationError::ComponentResolverMissingJsFunction,
                     resolver_field_name_span,
@@ -115,7 +115,7 @@ impl UnvalidatedSchema {
             },
 
             parent_object_id,
-            action_kind: resolver_action_kind,
+            action_kind,
         });
         Ok(())
     }

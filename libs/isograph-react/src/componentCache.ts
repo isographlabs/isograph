@@ -1,10 +1,8 @@
-import {
-  ReaderArtifact,
-  RefetchQueryArtifactWrapper,
-  readButDoNotEvaluate,
-} from './index';
 import { stableCopy } from './cache';
+import { RefetchQueryArtifactWrapper } from './entrypoint';
 import { IsographEnvironment, DataId } from './IsographEnvironment';
+import { readButDoNotEvaluate } from './read';
+import { ReaderArtifact } from './reader';
 
 export function getOrCreateCachedComponent(
   environment: IsographEnvironment,

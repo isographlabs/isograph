@@ -5,23 +5,27 @@ import {
 } from '@isograph/react-disposable-state';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import {
-  Argument,
-  ArgumentValue,
-  IsographEntrypoint,
-  NormalizationAst,
-  NormalizationLinkedField,
-  NormalizationScalarField,
-  ReaderLinkedField,
-  ReaderScalarField,
-  RefetchQueryArtifactWrapper,
-} from './index';
-import {
   DataId,
   ROOT_ID,
   StoreRecord,
   Link,
   type IsographEnvironment,
 } from './IsographEnvironment';
+import {
+  RetainedQuery,
+  garbageCollectEnvironment,
+  retainQuery,
+  unretainQuery,
+} from './garbageCollection';
+import {
+  IsographEntrypoint,
+  NormalizationAst,
+  NormalizationLinkedField,
+  NormalizationScalarField,
+  RefetchQueryArtifactWrapper,
+} from './entrypoint';
+import { ReaderLinkedField, ReaderScalarField } from './reader';
+import { Argument, ArgumentValue } from './util';
 
 declare global {
   interface Window {
@@ -83,6 +87,18 @@ export function getOrCreateCacheForArtifact<T>(
   return getOrCreateCache<PromiseWrapper<T>>(environment, cacheKey, factory);
 }
 
+type NetworkRequestStatus =
+  | {
+      kind: 'UndisposedIncomplete';
+    }
+  | {
+      kind: 'Disposed';
+    }
+  | {
+      kind: 'UndisposedComplete';
+      retainedQuery: RetainedQuery;
+    };
+
 export function makeNetworkRequest<T>(
   environment: IsographEnvironment,
   artifact: IsoResolver,
@@ -91,20 +107,37 @@ export function makeNetworkRequest<T>(
   if (typeof window !== 'undefined' && window.__LOG) {
     console.log('make network request', artifact, variables);
   }
+  let status: NetworkRequestStatus = {
+    kind: 'UndisposedIncomplete',
+  };
+  // This should be an observable, not a promise
   const promise = environment
     .networkFunction(artifact.queryText, variables)
     .then((networkResponse) => {
       if (typeof window !== 'undefined' && window.__LOG) {
         console.log('network response', artifact, artifact);
       }
-      normalizeData(
-        environment,
-        artifact.normalizationAst,
-        networkResponse.data,
-        variables,
-        artifact.nestedRefetchQueries,
-      );
-      return networkResponse.data;
+
+      if (status.kind === 'UndisposedIncomplete') {
+        normalizeData(
+          environment,
+          artifact.normalizationAst,
+          networkResponse.data,
+          variables,
+          artifact.nestedRefetchQueries,
+        );
+        const retainedQuery = {
+          normalizationAst: artifact.normalizationAst,
+          variables,
+        };
+        status = {
+          kind: 'UndisposedComplete',
+          retainedQuery,
+        };
+        retainQuery(environment, retainedQuery);
+      }
+      // TODO return null
+      return networkResponse;
     });
 
   const wrapper = wrapPromise(promise);
@@ -112,7 +145,18 @@ export function makeNetworkRequest<T>(
   const response: ItemCleanupPair<PromiseWrapper<T>> = [
     wrapper,
     () => {
-      // delete from cache
+      if (status.kind === 'UndisposedComplete') {
+        const didUnretainSomeQuery = unretainQuery(
+          environment,
+          status.retainedQuery,
+        );
+        if (didUnretainSomeQuery) {
+          garbageCollectEnvironment(environment);
+        }
+      }
+      status = {
+        kind: 'Disposed',
+      };
     },
   ];
   return response;
@@ -138,7 +182,9 @@ function normalizeData(
   networkResponse: NetworkResponseObject,
   variables: Object,
   nestedRefetchQueries: RefetchQueryArtifactWrapper[],
-) {
+): Set<DataId> {
+  const encounteredIds = new Set<DataId>();
+
   if (typeof window !== 'undefined' && window.__LOG) {
     console.log(
       'about to normalize',
@@ -155,11 +201,13 @@ function normalizeData(
     ROOT_ID,
     variables as any,
     nestedRefetchQueries,
+    encounteredIds,
   );
   if (typeof window !== 'undefined' && window.__LOG) {
     console.log('after normalization', { store: environment.store });
   }
   callSubscriptions(environment);
+  return encounteredIds;
 }
 
 export function subscribe(
@@ -194,7 +242,9 @@ function normalizeDataIntoRecord(
   targetParentRecordId: DataId,
   variables: { [index: string]: string },
   nestedRefetchQueries: RefetchQueryArtifactWrapper[],
+  mutableEncounteredIds: Set<DataId>,
 ) {
+  mutableEncounteredIds.add(targetParentRecordId);
   for (const normalizationNode of normalizationAst) {
     switch (normalizationNode.kind) {
       case 'Scalar': {
@@ -215,6 +265,7 @@ function normalizeDataIntoRecord(
           targetParentRecordId,
           variables,
           nestedRefetchQueries,
+          mutableEncounteredIds,
         );
         break;
       }
@@ -253,6 +304,7 @@ function normalizeLinkedField(
   targetParentRecordId: DataId,
   variables: { [index: string]: string },
   nestedRefetchQueries: RefetchQueryArtifactWrapper[],
+  mutableEncounteredIds: Set<DataId>,
 ) {
   const networkResponseKey = getNetworkResponseKey(astNode);
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
@@ -282,7 +334,9 @@ function normalizeLinkedField(
         variables,
         i,
         nestedRefetchQueries,
+        mutableEncounteredIds,
       );
+
       dataIds.push({ __link: newStoreRecordId });
     }
     targetParentRecord[parentRecordKey] = dataIds;
@@ -295,6 +349,7 @@ function normalizeLinkedField(
       variables,
       null,
       nestedRefetchQueries,
+      mutableEncounteredIds,
     );
     targetParentRecord[parentRecordKey] = {
       __link: newStoreRecordId,
@@ -310,6 +365,7 @@ function normalizeNetworkResponseObject(
   variables: { [index: string]: string },
   index: number | null,
   nestedRefetchQueries: RefetchQueryArtifactWrapper[],
+  mutableEncounteredIds: Set<DataId>,
 ): DataId /* The id of the modified or newly created item */ {
   const newStoreRecordId = getDataIdOfNetworkResponse(
     targetParentRecordId,
@@ -330,6 +386,7 @@ function normalizeNetworkResponseObject(
     newStoreRecordId,
     variables,
     nestedRefetchQueries,
+    mutableEncounteredIds,
   );
 
   return newStoreRecordId;

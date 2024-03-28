@@ -8,4 +8,5 @@
     "libs/isograph-react/src/index.tsx",
     "libs/isograph-react/src/cache.tsx",
   ],
+  "exclude": ["./libs/**/dist/*"],
 }

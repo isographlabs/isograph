@@ -1,20 +1,28 @@
 import * as React from 'react';
-import {
-  ExtractReadFromStore,
-  IsographEntrypoint,
-  type FragmentReference,
-  useResult,
-} from './index';
+import { ExtractReadFromStore, IsographEntrypoint } from './entrypoint';
+import { FragmentReference } from './FragmentReference';
+import { useResult } from './useResult';
 
 export function EntrypointReader<
-  TEntrypoint extends IsographEntrypoint<any, React.FC<any>>,
->(props: {
-  queryReference: FragmentReference<
-    ExtractReadFromStore<TEntrypoint>,
-    React.FC<any>
-  >;
-  additionalProps?: any | void;
-}): ReturnType<React.FC<any>> {
+  TProps extends Record<any, any>,
+  TEntrypoint extends IsographEntrypoint<any, React.FC<TProps>>,
+>(
+  props: TProps extends Record<string, never>
+    ? {
+        queryReference: FragmentReference<
+          ExtractReadFromStore<TEntrypoint>,
+          React.FC<TProps>
+        >;
+        additionalProps?: TProps;
+      }
+    : {
+        queryReference: FragmentReference<
+          ExtractReadFromStore<TEntrypoint>,
+          React.FC<TProps>
+        >;
+        additionalProps: TProps;
+      },
+): React.ReactNode {
   const Component = useResult(props.queryReference);
   return <Component {...props.additionalProps} />;
 }

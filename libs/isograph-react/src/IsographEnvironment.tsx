@@ -1,9 +1,5 @@
-import { ReactNode, createContext, useContext } from 'react';
-import * as React from 'react';
 import { ParentCache } from '@isograph/isograph-react-disposable-state';
-
-export const IsographEnvironmentContext =
-  createContext<IsographEnvironment | null>(null);
+import { RetainedQuery } from './garbageCollection';
 
 type ComponentName = string;
 type StringifiedArgs = string;
@@ -23,6 +19,9 @@ export type IsographEnvironment = {
   componentCache: ComponentCache;
   subscriptions: Subscriptions;
   suspenseCache: SuspenseCache;
+  retainedQueries: Set<RetainedQuery>;
+  gcBuffer: Array<RetainedQuery>;
+  gcBufferSize: number;
 };
 
 export type MissingFieldHandler = (
@@ -41,6 +40,7 @@ export type IsographNetworkFunction = (
 export type Link = {
   __link: DataId;
 };
+
 export type DataTypeValue =
   // N.B. undefined is here to support optional id's, but
   // undefined should not *actually* be present in the store.
@@ -71,33 +71,7 @@ export type IsographStore = {
   __ROOT: StoreRecord;
 };
 
-export type IsographEnvironmentProviderProps = {
-  environment: IsographEnvironment;
-  children: ReactNode;
-};
-
-export function IsographEnvironmentProvider({
-  environment,
-  children,
-}: IsographEnvironmentProviderProps) {
-  return (
-    <IsographEnvironmentContext.Provider value={environment}>
-      {children}
-    </IsographEnvironmentContext.Provider>
-  );
-}
-
-export function useIsographEnvironment(): IsographEnvironment {
-  const context = useContext(IsographEnvironmentContext);
-  if (context == null) {
-    throw new Error(
-      'Unexpected null environment context. Make sure to render ' +
-        'this component within an IsographEnvironmentProvider component',
-    );
-  }
-  return context;
-}
-
+const DEFAULT_GC_BUFFER_SIZE = 10;
 export function createIsographEnvironment(
   store: IsographStore,
   networkFunction: IsographNetworkFunction,
@@ -110,6 +84,9 @@ export function createIsographEnvironment(
     componentCache: {},
     subscriptions: new Set(),
     suspenseCache: {},
+    retainedQueries: new Set(),
+    gcBuffer: [],
+    gcBufferSize: DEFAULT_GC_BUFFER_SIZE,
   };
 }
 
@@ -117,4 +94,35 @@ export function createIsographStore() {
   return {
     [ROOT_ID]: {},
   };
+}
+
+export function defaultMissingFieldHandler(
+  _storeRecord: StoreRecord,
+  _root: DataId,
+  fieldName: string,
+  arguments_: { [index: string]: any } | null,
+  variables: { [index: string]: any } | null,
+): Link | undefined {
+  if (fieldName === 'node' || fieldName === 'user') {
+    const variable = arguments_?.['id'];
+    const value = variables?.[variable];
+
+    // TODO can we handle explicit nulls here too? Probably, after wrapping in objects
+    if (value != null) {
+      return { __link: value };
+    }
+  }
+}
+
+export function assertLink(link: DataTypeValue): Link | null {
+  if (Array.isArray(link)) {
+    throw new Error('Unexpected array');
+  }
+  if (link == null) {
+    return null;
+  }
+  if (typeof link === 'object') {
+    return link;
+  }
+  throw new Error('Invalid link');
 }

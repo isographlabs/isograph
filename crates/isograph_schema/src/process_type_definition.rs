@@ -1,11 +1,11 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use crate::{
-    ClientField, ClientFieldVariant, EncounteredRootTypes, FieldDefinitionLocation,
-    IsographObjectTypeDefinition, ObjectTypeAndFieldNames, ProcessedRootTypes, ResolverActionKind,
-    RootTypes, Schema, SchemaObject, SchemaScalar, SchemaServerField, UnvalidatedClientField,
-    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField, ID_GRAPHQL_TYPE,
-    STRING_JAVASCRIPT_TYPE,
+    ClientField, ClientFieldActionKind, ClientFieldVariant, EncounteredRootTypes,
+    FieldDefinitionLocation, IsographObjectTypeDefinition, ObjectTypeAndFieldNames,
+    ProcessedRootTypes, RootTypes, Schema, SchemaObject, SchemaScalar, SchemaServerField,
+    UnvalidatedClientField, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
+    ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
 };
 use common_lang_types::{
     GraphQLObjectTypeName, GraphQLScalarTypeName, IsographObjectTypeName, Location,
@@ -634,7 +634,7 @@ fn get_resolvers_for_schema_object(
             parent_object_id,
             // N.B. __refetch fields are non-fetchable, but they do execute queries which
             // have normalization ASTs.
-            action_kind: ResolverActionKind::RefetchField,
+            action_kind: ClientFieldActionKind::RefetchField,
         });
         encountered_fields.insert(
             "__refetch".intern().into(),

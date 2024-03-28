@@ -36,6 +36,10 @@ export const RepositoryPage = iso(`
   );
 });
 
+if (typeof window !== 'undefined') {
+  window.__LOG = true;
+}
+
 export function RepositoryRoute({
   route,
   setRoute,
@@ -51,10 +55,6 @@ export function RepositoryRoute({
       first: 20,
     },
   );
-  console.log('repository route', {
-    queryReference,
-    name: route.repositoryName,
-  });
   const Component = useResult(queryReference);
   return <Component route={route} setRoute={setRoute} />;
 }

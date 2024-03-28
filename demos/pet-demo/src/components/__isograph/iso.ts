@@ -17,7 +17,7 @@ import entrypoint_Query__PetFavoritePhrase from '../__isograph/Query/PetFavorite
 type IdentityWithParam<TParam> = <TResolverReturn>(
   x: (param: TParam) => TResolverReturn
 ) => (param: TParam) => TResolverReturn;
-type IdentityWithParamComponent<TParam> = <TResolverReturn, TSecondParam = {}>(
+type IdentityWithParamComponent<TParam> = <TResolverReturn, TSecondParam = Record<string, never>>(
   x: (data: TParam, secondParam: TSecondParam) => TResolverReturn
 ) => (data: TParam, secondParam: TSecondParam) => TResolverReturn;
 

@@ -3,14 +3,14 @@ import {
   useUpdatableDisposableState,
 } from '@isograph/react-disposable-state';
 import {
-  type IsographEntrypoint,
-  type FragmentReference,
   ExtractReadFromStore,
   ExtractResolverResult,
-  ROOT_ID,
-  useIsographEnvironment,
-  makeNetworkRequest,
-} from './index';
+  IsographEntrypoint,
+} from './entrypoint';
+import { FragmentReference } from './FragmentReference';
+import { useIsographEnvironment } from './IsographEnvironmentProvider';
+import { makeNetworkRequest } from './cache';
+import { ROOT_ID } from './IsographEnvironment';
 
 export function useImperativeReference<
   TEntrypoint extends IsographEntrypoint<any, any>,
