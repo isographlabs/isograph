@@ -1,6 +1,6 @@
 import type {IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst} from '@isograph/react';
 const queryText = 'mutation Petset_pet_golden_buddy ($id: ID!, $new_best_friend_id: ID!) {\
-set_pet_golden_buddy____id___v_id____new_best_friend_id___v_new_best_friend_id: set_pet_golden_buddy(id: $id, new_best_friend_id: $new_best_friend_id) {\
+set_pet_golden_buddy____id___v_id____new_best_friend_id___v_new_best_friend_id: set_pet_best_friend(id: $id, new_best_friend_id: $new_best_friend_id) {\
 pet { \
   id,\
   best_friend_relationship {\
