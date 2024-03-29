@@ -7,7 +7,7 @@ import {
   assertIsEntrypoint,
 } from './entrypoint';
 import { getOrCreateCacheForArtifact } from './cache';
-import { useLazyDisposableState } from '@isograph/isograph-react-disposable-state';
+import { useLazyDisposableState } from '@isograph/react-disposable-state';
 import { type PromiseWrapper } from './PromiseWrapper';
 
 // Note: we cannot write TEntrypoint extends IsographEntrypoint<any, any, any>, or else

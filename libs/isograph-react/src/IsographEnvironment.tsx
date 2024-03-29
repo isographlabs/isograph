@@ -1,4 +1,4 @@
-import { ParentCache } from '@isograph/isograph-react-disposable-state';
+import { ParentCache } from '@isograph/react-disposable-state';
 import { RetainedQuery } from './garbageCollection';
 
 type ComponentName = string;
