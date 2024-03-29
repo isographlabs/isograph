@@ -410,6 +410,7 @@ fn get_artifact_for_mutation_field<'schema>(
         root_parent_object,
         refetch_query_index,
         mutation_field_name,
+        server_schema_mutation_field_name,
         mutation_primary_field_name,
         mutation_field_arguments,
         requires_refinement,
@@ -445,6 +446,7 @@ fn get_artifact_for_mutation_field<'schema>(
         &merged_selection_set,
         variable_definitions,
         mutation_field_name,
+        server_schema_mutation_field_name,
         mutation_primary_field_name,
         mutation_field_arguments,
         requires_refinement,
@@ -516,6 +518,7 @@ fn generate_mutation_query_text<'schema>(
     merged_selection_set: &MergedSelectionSet,
     mut variable_definitions: Vec<WithSpan<ValidatedVariableDefinition>>,
     mutation_field_name: SelectableFieldName,
+    server_schema_mutation_field_name: SelectableFieldName,
     mutation_primary_field_name: SelectableFieldName,
     mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
     requires_refinement: RequiresRefinement,
@@ -560,7 +563,7 @@ fn generate_mutation_query_text<'schema>(
     let parent_object_name = parent_object_type.name;
     query_text.push_str(&format!(
         "mutation {parent_object_name}{mutation_field_name} {variable_text} {{\\\n\
-        {aliased_mutation_field_name}: {mutation_field_name}{mutation_field_arguments} {{\\\n\
+        {aliased_mutation_field_name}: {server_schema_mutation_field_name}{mutation_field_arguments} {{\\\n\
         {mutation_primary_field_name} {{ \\\n",
     ));
 

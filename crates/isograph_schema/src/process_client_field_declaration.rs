@@ -154,6 +154,7 @@ pub enum ProcessClientFieldDeclarationError {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MutationFieldClientFieldVariant {
     pub mutation_field_name: SelectableFieldName,
+    pub server_schema_mutation_field_name: SelectableFieldName,
     pub mutation_primary_field_name: SelectableFieldName,
     pub mutation_primary_field_return_type_object_id: ObjectId,
     pub mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,

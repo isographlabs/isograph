@@ -187,6 +187,7 @@ pub struct MutationFieldResolverInfo {
     // the same struct, with everything below wrapped in an option:
     // Mutation name
     pub mutation_field_name: SelectableFieldName,
+    pub server_schema_mutation_field_name: SelectableFieldName,
     pub mutation_primary_field_name: SelectableFieldName,
     pub mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
     pub requires_refinement: RequiresRefinement,
@@ -302,6 +303,7 @@ pub fn create_merged_selection_set(
                             ClientFieldVariant::MutationField(
                                 MutationFieldClientFieldVariant {
                                     mutation_field_name,
+                                    server_schema_mutation_field_name,
                                     mutation_primary_field_name,
                                     mutation_field_arguments,
                                     filtered_mutation_field_arguments: _,
@@ -331,6 +333,7 @@ pub fn create_merged_selection_set(
                                         root_fetchable_field: root_fetchable_resolver.name,
                                         refetch_query_index: index,
                                         mutation_field_name,
+                                        server_schema_mutation_field_name,
                                         mutation_primary_field_name,
                                         mutation_field_arguments: mutation_field_arguments.clone(),
                                         requires_refinement,
@@ -594,6 +597,7 @@ fn merge_scalar_resolver_field(
         ));
     } else if let ClientFieldVariant::MutationField(MutationFieldClientFieldVariant {
         mutation_primary_field_name,
+        server_schema_mutation_field_name,
         mutation_field_arguments,
         filtered_mutation_field_arguments,
         mutation_field_name: _,
@@ -605,6 +609,7 @@ fn merge_scalar_resolver_field(
             parent_type.id,
             ClientFieldVariant::MutationField(MutationFieldClientFieldVariant {
                 mutation_field_name: resolver_field.name,
+                server_schema_mutation_field_name: *server_schema_mutation_field_name,
                 mutation_primary_field_name: *mutation_primary_field_name,
                 mutation_field_arguments: mutation_field_arguments.clone(),
                 filtered_mutation_field_arguments: filtered_mutation_field_arguments.clone(),
