@@ -451,11 +451,9 @@ function getStoreKeyChunkForArgumentValue(
   switch (argumentValue.kind) {
     case 'Literal': {
       return argumentValue.value;
-      break;
     }
     case 'Variable': {
       return variables[argumentValue.name];
-      break;
     }
     default: {
       // TODO configure eslint to allow unused vars starting with _

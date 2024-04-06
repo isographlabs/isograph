@@ -15,6 +15,7 @@
     "noUnusedParameters": true,
     "paths": {
       "@isograph/*": ["./libs/*"]
-    }
+    },
+    "allowUnreachableCode": false
   }
 }
