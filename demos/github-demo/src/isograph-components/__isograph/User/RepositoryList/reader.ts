@@ -13,7 +13,7 @@ const readerAst: ReaderAst<User__RepositoryList__param> = [
     arguments: [
       [
         "last",
-        { kind: "Literal", value: "10" },
+        { kind: "Literal", value: 10 },
       ],
     ],
     selections: [

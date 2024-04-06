@@ -67,7 +67,7 @@ const normalizationAst: NormalizationAst = [
         arguments: [
           [
             "last",
-            { kind: "Literal", value: "10" },
+            { kind: "Literal", value: 10 },
           ],
         ],
         selections: [
