@@ -9,7 +9,7 @@ enum SpanState {
     After,
 }
 
-static LINE_COUNT_BUFFER: usize = 3;
+static LINE_COUNT_BUFFER: usize = 2;
 
 /// For a given string and span, return a string with
 /// the span underlined with carats and LINE_COUNT_BUFFER previous and following
@@ -69,8 +69,7 @@ pub(crate) fn text_with_carats(text: &str, span: Span) -> String {
             // a line may be entirely empty, due to containing only a \n. We probably want to avoid
             // printing an empty line underneath. This is weird and probably buggy!
             if start_of_carats != line_len && end_of_carats != 0 {
-                // -1 is safe, since we have just pushed to output_lines
-                first_line_with_span = std::cmp::min(first_line_with_span, output_lines.len()) - 1;
+                first_line_with_span = std::cmp::min(first_line_with_span, output_lines.len());
                 // add +1 because we want the index of the line containing the carats, not the
                 // source text, and because ranges are exclusive on the end
                 last_line_with_span = output_lines.len() + 1;
@@ -96,7 +95,7 @@ pub(crate) fn text_with_carats(text: &str, span: Span) -> String {
     // - the carat line containing the end of the span and LINE_COUNT_BUFFER later lines
     // - everything in between
 
-    output_lines[(first_line_with_span.saturating_sub(LINE_COUNT_BUFFER))
+    output_lines[(first_line_with_span.saturating_sub(LINE_COUNT_BUFFER + 1))
         ..(std::cmp::min(last_line_with_span + LINE_COUNT_BUFFER, output_lines.len()))]
         .join("\n")
 }
