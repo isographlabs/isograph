@@ -75,6 +75,18 @@
 
 - error parsing config should not panic, but be a diagnostic
 
+- unaliased duplicate fields cause
+
+```
+Starting to compile.
+Error when compiling.
+
+thread 'main' panicked at crates/common_lang_types/src/text_with_carats.rs:73:40:
+attempt to subtract with overflow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+ ELIFECYCLE  Command failed with exit code 101.
+```
+
 ## Extended backlog
 
 - Docs
