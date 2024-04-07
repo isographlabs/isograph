@@ -1616,7 +1616,7 @@ fn get_serialized_field_arguments(
                     "\n\
                     {indent_1}[\n\
                     {indent_2}\"{argument_name}\",\n\
-                    {indent_2}{{ kind: \"Literal\", value: \"{int_value}\" }},\n\
+                    {indent_2}{{ kind: \"Literal\", value: {int_value} }},\n\
                     {indent_1}],\n"
                 )
             }

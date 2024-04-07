@@ -55,7 +55,7 @@ const normalizationAst: NormalizationAst = [{ kind: "Linked", fieldName: "node",
     arguments: [
       [
         "last",
-        { kind: "Literal", value: "10" },
+        { kind: "Literal", value: 10 },
       ],
     ],
     selections: [
