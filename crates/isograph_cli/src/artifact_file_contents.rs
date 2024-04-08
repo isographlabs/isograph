@@ -63,10 +63,13 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             client_field_name: resolver_field_name,
             ..
         } = self;
-        let nested_client_field_import_statement = nested_client_field_names_to_import_statement(
-            nested_client_field_artifact_imports,
-            parent_type.name,
-        );
+
+        let (nested_client_field_import_statement, nested_client_field_import_types_only_statement) =
+            nested_client_field_names_to_import_statement(
+                nested_client_field_artifact_imports,
+                parent_type.name,
+            );
+
         let output_type_text = get_output_type_text(
             parent_type.name,
             resolver_field_name,
@@ -85,7 +88,7 @@ impl<'schema> ReaderArtifactInfo<'schema> {
         let reader_output_type = format!("{parent_name}__{resolver_field_name}__outputType");
         let mut outputs = HashMap::new();
 
-        outputs.insert(String::from("reader"), format!(
+        let render_content = format!(
             "import type {{ReaderArtifact, ReaderAst, ExtractSecondParam}} from '@isograph/react';\n\
             {function_import_statement}\n\
             {nested_client_field_import_statement}\n\
@@ -108,10 +111,24 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             "  ",
             "  ",
             "  ",
-        ));
+        );
 
-        outputs.insert(String::from("param_type"), format!("//param_type"));
-        outputs.insert(String::from("output_type"), format!("//output_type"));
+        let param_type_content = format!(
+            "{nested_client_field_import_types_only_statement}\n\
+            export type {reader_param_type} = {client_field_parameter_type};\n
+            ",
+        );
+
+        let output_type_content = format!(
+            "import type {{ExtractSecondParam}} from '@isograph/react';\n\
+            {function_import_statement}\n\
+            {output_type_text}\n
+            ",
+        );
+
+        outputs.insert(String::from("reader"), render_content);
+        outputs.insert(String::from("param_type"), param_type_content);
+        outputs.insert(String::from("output_type"), output_type_content);
 
         outputs
     }
@@ -146,8 +163,9 @@ impl RefetchArtifactInfo {
 fn nested_client_field_names_to_import_statement(
     nested_client_field_imports: HashMap<ObjectTypeAndFieldNames, JavaScriptImports>,
     current_file_type_name: IsographObjectTypeName,
-) -> String {
+) -> (String, String) {
     let mut overall = String::new();
+    let mut types_only = String::new();
 
     // TODO we should always sort outputs. We should find a nice generic way to ensure that.
     let mut nested_client_field_imports: Vec<_> = nested_client_field_imports.into_iter().collect();
@@ -159,9 +177,10 @@ fn nested_client_field_names_to_import_statement(
             nested_client_field_name,
             &mut overall,
             current_file_type_name,
+            &mut types_only,
         );
     }
-    overall
+    (overall, types_only)
 }
 
 fn write_client_field_import(
@@ -169,6 +188,7 @@ fn write_client_field_import(
     nested_client_field_name: ObjectTypeAndFieldNames,
     overall: &mut String,
     current_file_type_name: IsographObjectTypeName,
+    types_only: &mut String,
 ) {
     if !javascript_import.default_import && javascript_import.types.is_empty() {
         panic!(
@@ -178,6 +198,7 @@ fn write_client_field_import(
     }
 
     let mut s = "import ".to_string();
+    let mut t = "".to_string();
     if javascript_import.default_import {
         s.push_str(&format!(
             "{}",
@@ -189,18 +210,26 @@ fn write_client_field_import(
         if javascript_import.default_import {
             s.push_str(",");
         }
-        s.push_str(" { ");
-        s.push_str(&format!("{}", first.globally_unique_type_name));
+        t.push_str(" { ");
+        t.push_str(&format!("{}", first.globally_unique_type_name));
         for value in types {
-            s.push_str(&format!(", {}", value.globally_unique_type_name));
+            t.push_str(&format!(", {}", value.globally_unique_type_name));
         }
-        s.push_str("}");
+        t.push_str("}");
     }
-    s.push_str(&format!(
+    s.push_str(&t);
+
+    let from = &format!(
         " from '{}';\n",
         nested_client_field_name.relative_path(current_file_type_name)
-    ));
+    );
+
+    s.push_str(from);
+
     overall.push_str(&s);
+
+    let types_import = &format!("import type {} {}", t, from,);
+    types_only.push_str(&types_import);
 }
 
 fn get_output_type_text(
