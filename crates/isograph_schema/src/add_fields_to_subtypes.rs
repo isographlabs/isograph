@@ -62,7 +62,7 @@ impl UnvalidatedSchema {
                                     Location::generated(),
                                 ));
                             }
-                            subtype.resolvers.push(*supertype_client_field_id);
+                            subtype.client_field_ids.push(*supertype_client_field_id);
                         }
                     }
                 }

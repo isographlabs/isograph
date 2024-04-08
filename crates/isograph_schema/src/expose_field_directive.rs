@@ -74,7 +74,7 @@ impl UnvalidatedSchema {
     ///   selected in the merged selection set.
     ///
     /// There is lots of cloning going on here! Not ideal.
-    pub fn create_mutation_fields_from_expose_as_directives(
+    pub fn create_mutation_fields_from_expose_field_directives(
         &mut self,
         mutation_id: ObjectId,
         options: ConfigOptions,
@@ -282,7 +282,7 @@ impl UnvalidatedSchema {
                 Location::generated(),
             ));
         }
-        client_field_parent.resolvers.push(client_field_id);
+        client_field_parent.client_field_ids.push(client_field_id);
 
         Ok(())
     }

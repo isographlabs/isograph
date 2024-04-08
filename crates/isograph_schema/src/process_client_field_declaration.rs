@@ -83,7 +83,7 @@ impl UnvalidatedSchema {
             ));
         }
 
-        object.resolvers.push(next_resolver_id);
+        object.client_field_ids.push(next_resolver_id);
 
         let name = client_field_declaration.item.client_field_name.item.into();
         let variant = get_resolver_variant(&client_field_declaration.item.directives);

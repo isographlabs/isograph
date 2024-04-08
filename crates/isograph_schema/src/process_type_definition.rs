@@ -427,7 +427,7 @@ impl UnvalidatedSchema {
                     name: object_type_definition.name.item,
                     id: next_object_id,
                     server_fields,
-                    resolvers: object_resolvers,
+                    client_field_ids: object_resolvers,
                     encountered_fields,
                     id_field,
                     directives: object_type_definition.directives,

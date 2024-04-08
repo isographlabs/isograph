@@ -21,7 +21,7 @@ use isograph_lang_types::{
     ServerFieldSelection, VariableDefinition,
 };
 use isograph_schema::{
-    create_merged_selection_set, into_name_and_arguments, refetched_paths_for_resolver,
+    create_merged_selection_set, into_name_and_arguments, refetched_paths_for_client_field,
     ArtifactQueueItem, ClientFieldActionKind, ClientFieldVariant, FieldDefinitionLocation,
     FieldMapItem, MergedLinkedFieldSelection, MergedScalarFieldSelection, MergedSelectionSet,
     MergedServerFieldSelection, MutationFieldResolverInfo, NameAndArguments,
@@ -1392,7 +1392,7 @@ fn generate_reader_ast_node(
                             client_field.type_and_field.underscore_separated();
 
                         let client_field_refetched_paths =
-                            refetched_paths_for_resolver(client_field, schema, path);
+                            refetched_paths_for_client_field(client_field, schema, path);
 
                         let nested_refetch_queries = get_nested_refetch_query_text(
                             &root_refetched_paths,

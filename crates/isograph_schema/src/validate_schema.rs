@@ -85,14 +85,14 @@ impl ValidatedSchema {
                         e.location,
                     )
                 }) {
-                Ok(resolver_id) => updated_entrypoints.push(resolver_id),
+                Ok(client_field_id) => updated_entrypoints.push(client_field_id),
                 Err(e) => errors.push(e),
             }
         }
 
         let Schema {
             server_fields: fields,
-            client_fields: resolvers,
+            client_fields,
             entrypoints: _,
             schema_data,
             id_type_id: id_type,
@@ -115,14 +115,17 @@ impl ValidatedSchema {
             }
         };
 
-        let updated_resolvers =
-            match validate_and_transform_resolvers(resolvers, &schema_data, &updated_fields) {
-                Ok(resolvers) => resolvers,
-                Err(new_errors) => {
-                    errors.extend(new_errors);
-                    vec![]
-                }
-            };
+        let updated_client_fields = match validate_and_transform_client_fields(
+            client_fields,
+            &schema_data,
+            &updated_fields,
+        ) {
+            Ok(client_fields) => client_fields,
+            Err(new_errors) => {
+                errors.extend(new_errors);
+                vec![]
+            }
+        };
 
         let SchemaData {
             objects,
@@ -134,13 +137,13 @@ impl ValidatedSchema {
             let objects = objects
                 .into_iter()
                 .map(|object| {
-                    transform_object_field_ids(&updated_fields, &updated_resolvers, object)
+                    transform_object_field_ids(&updated_fields, &updated_client_fields, object)
                 })
                 .collect();
 
             Ok(Self {
                 server_fields: updated_fields,
-                client_fields: updated_resolvers,
+                client_fields: updated_client_fields,
                 entrypoints: updated_entrypoints,
                 schema_data: SchemaData {
                     objects,
@@ -162,8 +165,8 @@ impl ValidatedSchema {
 
 fn transform_object_field_ids(
     schema_fields: &[ValidatedSchemaServerField],
-    schema_resolvers: &[ValidatedClientField],
-    object: UnvalidatedSchemaObject,
+    validated_client_fields: &[ValidatedClientField],
+    unvalidated_object: UnvalidatedSchemaObject,
 ) -> ValidatedSchemaObject {
     let SchemaObject {
         name,
@@ -171,10 +174,10 @@ fn transform_object_field_ids(
         description,
         id,
         encountered_fields: unvalidated_encountered_fields,
-        resolvers,
+        client_field_ids,
         id_field,
         directives,
-    } = object;
+    } = unvalidated_object;
 
     let validated_encountered_fields = unvalidated_encountered_fields
         .into_iter()
@@ -188,12 +191,12 @@ fn transform_object_field_ids(
                     );
                 }
             }
-            for resolver in resolvers.iter() {
-                let resolver = &schema_resolvers[resolver.as_usize()];
-                if resolver.name == encountered_field_name {
+            for client_field_id in client_field_ids.iter() {
+                let client_field = &validated_client_fields[client_field_id.as_usize()];
+                if client_field.name == encountered_field_name {
                     return (
                         encountered_field_name,
-                        FieldDefinitionLocation::Client(resolver.id),
+                        FieldDefinitionLocation::Client(client_field.id),
                     );
                 }
             }
@@ -210,7 +213,7 @@ fn transform_object_field_ids(
         id,
         server_fields,
         encountered_fields: validated_encountered_fields,
-        resolvers,
+        client_field_ids,
         id_field,
         directives,
     }
@@ -365,30 +368,28 @@ fn validate_server_field_argument(
     }
 }
 
-fn validate_and_transform_resolvers(
-    resolvers: Vec<UnvalidatedClientField>,
+fn validate_and_transform_client_fields(
+    client_fields: Vec<UnvalidatedClientField>,
     schema_data: &UnvalidatedSchemaData,
     server_fields: &[UnvalidatedSchemaServerField],
 ) -> Result<Vec<ValidatedClientField>, Vec<WithLocation<ValidateSchemaError>>> {
-    get_all_errors_or_all_ok(
-        resolvers
-            .into_iter()
-            .map(|resolver| validate_resolver_fragment(schema_data, resolver, server_fields)),
-    )
+    get_all_errors_or_all_ok(client_fields.into_iter().map(|client_field| {
+        validate_client_field_selection_set(schema_data, client_field, server_fields)
+    }))
 }
 
-fn validate_resolver_fragment(
+fn validate_client_field_selection_set(
     schema_data: &UnvalidatedSchemaData,
-    unvalidated_resolver: UnvalidatedClientField,
+    unvalidated_client_field: UnvalidatedClientField,
     server_fields: &[UnvalidatedSchemaServerField],
 ) -> ValidateSchemaResult<ValidatedClientField> {
     let variable_definitions =
-        validate_variable_definitions(schema_data, unvalidated_resolver.variable_definitions)?;
+        validate_variable_definitions(schema_data, unvalidated_client_field.variable_definitions)?;
 
-    match unvalidated_resolver.selection_set_and_unwraps {
+    match unvalidated_client_field.selection_set_and_unwraps {
         Some((selection_set, unwraps)) => {
-            let parent_object = schema_data.object(unvalidated_resolver.parent_object_id);
-            let selection_set = validate_resolver_definition_selections_exist_and_types_match(
+            let parent_object = schema_data.object(unvalidated_client_field.parent_object_id);
+            let selection_set = validate_client_field_definition_selections_exist_and_types_match(
                 schema_data,
                 selection_set,
                 parent_object,
@@ -398,31 +399,31 @@ fn validate_resolver_fragment(
                 validate_selections_error_to_validate_schema_error(
                     err,
                     parent_object,
-                    unvalidated_resolver.name,
+                    unvalidated_client_field.name,
                 )
             })?;
             Ok(ClientField {
-                description: unvalidated_resolver.description,
-                name: unvalidated_resolver.name,
-                id: unvalidated_resolver.id,
+                description: unvalidated_client_field.description,
+                name: unvalidated_client_field.name,
+                id: unvalidated_client_field.id,
                 selection_set_and_unwraps: Some((selection_set, unwraps)),
-                variant: unvalidated_resolver.variant,
+                variant: unvalidated_client_field.variant,
                 variable_definitions,
-                type_and_field: unvalidated_resolver.type_and_field,
-                parent_object_id: unvalidated_resolver.parent_object_id,
-                action_kind: unvalidated_resolver.action_kind,
+                type_and_field: unvalidated_client_field.type_and_field,
+                parent_object_id: unvalidated_client_field.parent_object_id,
+                action_kind: unvalidated_client_field.action_kind,
             })
         }
         None => Ok(ClientField {
-            description: unvalidated_resolver.description,
-            name: unvalidated_resolver.name,
-            id: unvalidated_resolver.id,
+            description: unvalidated_client_field.description,
+            name: unvalidated_client_field.name,
+            id: unvalidated_client_field.id,
             selection_set_and_unwraps: None,
-            variant: unvalidated_resolver.variant,
+            variant: unvalidated_client_field.variant,
             variable_definitions,
-            type_and_field: unvalidated_resolver.type_and_field,
-            parent_object_id: unvalidated_resolver.parent_object_id,
-            action_kind: unvalidated_resolver.action_kind,
+            type_and_field: unvalidated_client_field.type_and_field,
+            parent_object_id: unvalidated_client_field.parent_object_id,
+            action_kind: unvalidated_client_field.action_kind,
         }),
     }
 }
@@ -462,13 +463,13 @@ fn validate_variable_definitions(
 fn validate_selections_error_to_validate_schema_error(
     err: WithLocation<ValidateSelectionsError>,
     parent_object: &UnvalidatedSchemaObject,
-    resolver_field_name: SelectableFieldName,
+    client_field_name: SelectableFieldName,
 ) -> WithLocation<ValidateSchemaError> {
     err.map(|item| match item {
         ValidateSelectionsError::FieldDoesNotExist(field_parent_type_name, field_name) => {
             ValidateSchemaError::ClientFieldSelectionFieldDoesNotExist {
                 client_field_parent_type_name: parent_object.name,
-                client_field_name: resolver_field_name,
+                client_field_name,
                 field_parent_type_name,
                 field_name,
             }
@@ -480,7 +481,7 @@ fn validate_selections_error_to_validate_schema_error(
             target_type_name,
         } => ValidateSchemaError::ClientFieldSelectionFieldIsNotScalar {
             client_field_parent_type_name: parent_object.name,
-            client_field_name: resolver_field_name,
+            client_field_name,
             field_parent_type_name: parent_type_name,
             field_name,
             field_type: target_type,
@@ -493,7 +494,7 @@ fn validate_selections_error_to_validate_schema_error(
             target_type_name,
         } => ValidateSchemaError::ClientFieldSelectionFieldIsScalar {
             client_field_parent_type_name: parent_object.name,
-            client_field_name: resolver_field_name,
+            client_field_name,
             field_parent_type_name,
             field_name,
             field_type: target_type,
@@ -535,7 +536,7 @@ enum ValidateSelectionsError {
     },
 }
 
-fn validate_resolver_definition_selections_exist_and_types_match(
+fn validate_client_field_definition_selections_exist_and_types_match(
     schema_data: &UnvalidatedSchemaData,
     selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     parent_object: &UnvalidatedSchemaObject,
@@ -547,7 +548,7 @@ fn validate_resolver_definition_selections_exist_and_types_match(
     Ok(selection_set
         .into_iter()
         .map(|selection| {
-            validate_resolver_definition_selection_exists_and_type_matches(
+            validate_client_field_definition_selection_exists_and_type_matches(
                 selection,
                 parent_object,
                 schema_data,
@@ -557,7 +558,7 @@ fn validate_resolver_definition_selections_exist_and_types_match(
         .collect::<Result<_, _>>()?)
 }
 
-fn validate_resolver_definition_selection_exists_and_type_matches(
+fn validate_client_field_definition_selection_exists_and_type_matches(
     selection: WithSpan<UnvalidatedSelection>,
     parent_object: &UnvalidatedSchemaObject,
     schema_data: &UnvalidatedSchemaData,
@@ -635,13 +636,13 @@ fn validate_field_type_exists_and_is_scalar(
                     ),
                 }
             }
-            FieldDefinitionLocation::Client(resolver_field_id) => {
+            FieldDefinitionLocation::Client(client_field_id) => {
                 // TODO confirm this works if resolver_name is an alias
                 Ok(ScalarFieldSelection {
                     name: scalar_field_selection.name,
                     reader_alias: scalar_field_selection.reader_alias,
                     unwraps: scalar_field_selection.unwraps,
-                    associated_data: FieldDefinitionLocation::Client(*resolver_field_id),
+                    associated_data: FieldDefinitionLocation::Client(*client_field_id),
                     arguments: scalar_field_selection.arguments,
                     normalization_alias: scalar_field_selection.normalization_alias,
                 })
@@ -664,35 +665,34 @@ fn validate_field_type_exists_and_is_linked(
 ) -> ValidateSelectionsResult<ValidatedLinkedFieldSelection> {
     let linked_field_name = linked_field_selection.name.item.into();
     match (&parent_object.encountered_fields).get(&linked_field_name) {
-        Some(defined_field_type) => {
-            match defined_field_type {
-                FieldDefinitionLocation::Server(server_field_name) => {
-                    let field_type_id = *schema_data
-                        .defined_types
-                        .get(server_field_name.inner())
-                        .expect(
-                            "Expected field type to be defined, which I \
+        Some(defined_field_type) => match defined_field_type {
+            FieldDefinitionLocation::Server(server_field_name) => {
+                let field_type_id = *schema_data
+                    .defined_types
+                    .get(server_field_name.inner())
+                    .expect(
+                        "Expected field type to be defined, which I \
                             think was validated earlier, probably indicates a bug in Isograph",
-                        );
-                    match field_type_id {
-                        SelectableFieldId::Scalar(_) => Err(WithLocation::new(
-                            ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsScalar {
-                                field_parent_type_name: parent_object.name,
-                                field_name: linked_field_name,
-                                target_type: "a scalar",
-                                target_type_name: *server_field_name.inner(),
-                            },
-                            linked_field_selection.name.location,
-                        )),
-                        SelectableFieldId::Object(object_id) => {
-                            let object = schema_data.objects.get(object_id.as_usize()).unwrap();
-                            Ok(LinkedFieldSelection {
+                    );
+                match field_type_id {
+                    SelectableFieldId::Scalar(_) => Err(WithLocation::new(
+                        ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsScalar {
+                            field_parent_type_name: parent_object.name,
+                            field_name: linked_field_name,
+                            target_type: "a scalar",
+                            target_type_name: *server_field_name.inner(),
+                        },
+                        linked_field_selection.name.location,
+                    )),
+                    SelectableFieldId::Object(object_id) => {
+                        let object = schema_data.objects.get(object_id.as_usize()).unwrap();
+                        Ok(LinkedFieldSelection {
                                 name: linked_field_selection.name,
                                 reader_alias: linked_field_selection.reader_alias,
                                 normalization_alias: linked_field_selection.normalization_alias,
                                 selection_set: linked_field_selection.selection_set.into_iter().map(
                                     |selection| {
-                                        validate_resolver_definition_selection_exists_and_type_matches(
+                                        validate_client_field_definition_selection_exists_and_type_matches(
                                             selection,
                                             object,
                                             schema_data,
@@ -706,18 +706,17 @@ fn validate_field_type_exists_and_is_linked(
                                 },
                                 arguments: linked_field_selection.arguments,
                             })
-                        }
                     }
                 }
-                FieldDefinitionLocation::Client(_) => Err(WithLocation::new(
-                    ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsResolver {
-                        field_parent_type_name: parent_object.name,
-                        field_name: linked_field_name,
-                    },
-                    linked_field_selection.name.location,
-                )),
             }
-        }
+            FieldDefinitionLocation::Client(_) => Err(WithLocation::new(
+                ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsResolver {
+                    field_parent_type_name: parent_object.name,
+                    field_name: linked_field_name,
+                },
+                linked_field_selection.name.location,
+            )),
+        },
         None => Err(WithLocation::new(
             ValidateSelectionsError::FieldDoesNotExist(parent_object.name, linked_field_name),
             linked_field_selection.name.location,
@@ -831,14 +830,14 @@ pub enum ValidateSchemaError {
     },
 }
 
-pub fn refetched_paths_for_resolver(
-    schema_resolver: &ValidatedClientField,
+pub fn refetched_paths_for_client_field(
+    validated_client_field: &ValidatedClientField,
     schema: &ValidatedSchema,
     path: &mut Vec<NameAndArguments>,
 ) -> Vec<PathToRefetchField> {
-    let path_set = match &schema_resolver.selection_set_and_unwraps {
+    let path_set = match &validated_client_field.selection_set_and_unwraps {
         Some((selection_set, _)) => refetched_paths_with_path(&selection_set, schema, path),
-        None => panic!("unexpected non-existent selection set on resolver"),
+        None => panic!("unexpected non-existent selection set on client field"),
     };
     let mut paths: Vec<_> = path_set.into_iter().collect();
     paths.sort();
