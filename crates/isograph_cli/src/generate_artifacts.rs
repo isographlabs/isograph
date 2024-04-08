@@ -27,7 +27,7 @@ use isograph_schema::{
     MergedServerFieldSelection, MutationFieldResolverInfo, NameAndArguments,
     ObjectTypeAndFieldNames, PathToRefetchField, RefetchFieldResolverInfo, RequiresRefinement,
     RootRefetchedPath, ValidatedClientField, ValidatedSchema, ValidatedSchemaObject,
-    ValidatedSelection, ValidatedVariableDefinition, ENTRYPOINT, READER,
+    ValidatedSelection, ValidatedVariableDefinition, ENTRYPOINT,
 };
 use thiserror::Error;
 
@@ -61,7 +61,6 @@ pub(crate) fn generate_and_write_artifacts(
     let paths_and_contents =
         get_artifact_path_and_contents(schema, project_root, artifact_directory);
     let artifact_count = write_to_disk(paths_and_contents, artifact_directory)?;
-
     Ok(artifact_count)
 }
 
@@ -272,6 +271,7 @@ fn get_artifact_path_and_contents<'schema>(
     artifact_infos
         .into_iter()
         .map(ArtifactInfo::to_path_and_content)
+        .flatten()
         .chain(std::iter::once(build_iso_overload(schema)))
 }
 
@@ -717,11 +717,13 @@ pub(crate) enum ArtifactInfo<'schema> {
 }
 
 impl<'schema> ArtifactInfo<'schema> {
-    pub fn to_path_and_content(self) -> PathAndContent {
+    pub fn to_path_and_content(self) -> Vec<PathAndContent> {
         match self {
-            ArtifactInfo::Entrypoint(entrypoint_artifact) => entrypoint_artifact.path_and_content(),
+            ArtifactInfo::Entrypoint(entrypoint_artifact) => {
+                vec![entrypoint_artifact.path_and_content()]
+            }
             ArtifactInfo::Reader(reader_artifact) => reader_artifact.path_and_content(),
-            ArtifactInfo::RefetchQuery(refetch_query) => refetch_query.path_and_content(),
+            ArtifactInfo::RefetchQuery(refetch_query) => vec![refetch_query.path_and_content()],
         }
     }
 }
@@ -798,7 +800,7 @@ pub(crate) struct ReaderArtifactInfo<'schema> {
 }
 
 impl<'schema> ReaderArtifactInfo<'schema> {
-    pub fn path_and_content(self) -> PathAndContent {
+    pub fn path_and_content(self) -> Vec<PathAndContent> {
         let ReaderArtifactInfo {
             parent_type,
             client_field_name,
@@ -807,11 +809,17 @@ impl<'schema> ReaderArtifactInfo<'schema> {
 
         let relative_directory = generate_path(parent_type.name, *client_field_name);
 
-        PathAndContent {
-            file_content: self.file_contents(),
-            relative_directory,
-            file_name_prefix: *READER,
+        let mut out = vec![];
+
+        for (key, file_content) in self.file_contents() {
+            out.push(PathAndContent {
+                file_content,
+                // Should clone be an issue here?
+                relative_directory: relative_directory.clone(),
+                file_name_prefix: key.intern().into(),
+            })
         }
+        out
     }
 }
 

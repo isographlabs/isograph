@@ -51,7 +51,7 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
 }
 
 impl<'schema> ReaderArtifactInfo<'schema> {
-    pub(crate) fn file_contents(self) -> String {
+    pub(crate) fn file_contents(self) -> HashMap<String, String> {
         let ReaderArtifactInfo {
             function_import_statement,
             client_field_parameter_type,
@@ -83,7 +83,9 @@ impl<'schema> ReaderArtifactInfo<'schema> {
         };
         let reader_param_type = format!("{parent_name}__{resolver_field_name}__param");
         let reader_output_type = format!("{parent_name}__{resolver_field_name}__outputType");
-        format!(
+        let mut outputs = HashMap::new();
+
+        outputs.insert(String::from("reader"), format!(
             "import type {{ReaderArtifact, ReaderAst, ExtractSecondParam}} from '@isograph/react';\n\
             {function_import_statement}\n\
             {nested_client_field_import_statement}\n\
@@ -106,7 +108,12 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             "  ",
             "  ",
             "  ",
-        )
+        ));
+
+        outputs.insert(String::from("param_type"), format!("//param_type"));
+        outputs.insert(String::from("output_type"), format!("//output_type"));
+
+        outputs
     }
 }
 
