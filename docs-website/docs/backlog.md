@@ -10,13 +10,11 @@
 
 - Support for selecting arbitrary mutation fields
 - Support for adding/removing fields from mutation field selections
-- @exposeAs
 - asFoo typecast linked fields
   - Or syntax: bar: `as Foo { ... }`? This can always be added on afterward after some thought.
 
 ## Top implementation detail priorities
 
-- serde deserializer for ConstantValue
 - enable unit tests for react-disposable-state
 
 ## Top cleanup priorities
