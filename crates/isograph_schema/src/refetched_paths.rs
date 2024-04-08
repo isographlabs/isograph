@@ -23,7 +23,7 @@ pub fn refetched_paths_with_path(
                         // Do nothing, we encountered a server field
                     }
                     FieldDefinitionLocation::Client(resolver_field_id) => {
-                        let resolver_field = schema.resolver(resolver_field_id);
+                        let resolver_field = schema.client_field(resolver_field_id);
                         match resolver_field.variant {
                             ClientFieldVariant::RefetchField
                             | ClientFieldVariant::MutationField(_) => {

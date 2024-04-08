@@ -191,7 +191,7 @@ fn sorted_entrypoints(schema: &ValidatedSchema) -> Vec<&ValidatedClientField> {
     let mut entrypoints = schema
         .entrypoints
         .iter()
-        .map(|client_field_id| schema.resolver(*client_field_id))
+        .map(|client_field_id| schema.client_field(*client_field_id))
         .collect::<Vec<_>>();
     entrypoints.sort_by(|client_field_1, client_field_2| {
         match client_field_1
@@ -328,7 +328,7 @@ fn get_artifact_infos<'schema>(
     }
 
     for encountered_client_field_id in encountered_client_field_ids {
-        let encountered_client_field = schema.resolver(encountered_client_field_id);
+        let encountered_client_field = schema.client_field(encountered_client_field_id);
         artifact_infos.push(ArtifactInfo::Reader(generate_reader_artifact(
             schema,
             encountered_client_field,
@@ -600,7 +600,7 @@ fn generate_entrypoint_artifact<'schema>(
     artifact_queue: &mut Vec<ArtifactQueueItem>,
     encountered_cliend_field_ids: &mut HashSet<ClientFieldId>,
 ) -> EntrypointArtifactInfo<'schema> {
-    let top_level_client_field = schema.resolver(client_field_id);
+    let top_level_client_field = schema.client_field(client_field_id);
     if let Some((ref selection_set, _)) = top_level_client_field.selection_set_and_unwraps {
         let query_name = top_level_client_field.name.into();
 
@@ -1072,7 +1072,7 @@ fn write_query_types_from_selection(
                         ));
                     }
                     FieldDefinitionLocation::Client(client_field_id) => {
-                        let client_field = schema.resolver(client_field_id);
+                        let client_field = schema.client_field(client_field_id);
 
                         match nested_client_field_imports.entry(client_field.type_and_field) {
                             Entry::Occupied(mut occupied) => {
@@ -1381,7 +1381,7 @@ fn generate_reader_ast_node(
                         // This field is a client field, so we need to look up the field in the
                         // schema.
                         let alias = scalar_field.name_or_alias().item;
-                        let client_field = schema.resolver(client_field_id);
+                        let client_field = schema.client_field(client_field_id);
                         let arguments = get_serialized_field_arguments(
                             &scalar_field.arguments,
                             indentation_level + 1,

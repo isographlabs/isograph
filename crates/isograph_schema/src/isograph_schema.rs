@@ -153,7 +153,7 @@ impl<TValidation: SchemaValidationState> Schema<TValidation> {
     }
 
     /// Get a reference to a given resolver by its id.
-    pub fn resolver(
+    pub fn client_field(
         &self,
         client_field_id: ClientFieldId,
     ) -> &ClientField<

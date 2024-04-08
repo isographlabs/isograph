@@ -575,7 +575,7 @@ fn merge_scalar_resolver_field(
     merge_traversal_state: &mut MergeTraversalState<'_>,
     resolver_field_id: ClientFieldId,
 ) {
-    let resolver_field = schema.resolver(resolver_field_id);
+    let resolver_field = schema.client_field(resolver_field_id);
     if let Some((ref selection_set, _)) = resolver_field.selection_set_and_unwraps {
         merge_selections_into_set(
             schema,
