@@ -24,6 +24,8 @@ lazy_static! {
     // TODO these don't belong here, and neither does the relative path stuff
     // TODO these shouldn't be SelectableFieldName's
     pub static ref READER: SelectableFieldName = "reader".intern().into();
+    pub static ref READER_PARAM_TYPE: SelectableFieldName = "param_type".intern().into();
+    pub static ref READER_OUTPUT_TYPE: SelectableFieldName = "output_type".intern().into();
     pub static ref ENTRYPOINT: SelectableFieldName = "entrypoint".intern().into();
 }
 
