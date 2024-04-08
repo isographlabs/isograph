@@ -1,12 +1,12 @@
-# Magic mutation fields
+# `@exposeField` directives
 
-## Schema extensions
+:::note
+Schema extensions
 
 You can include a `schema_extensions` field in your `isograph.config.json` file. It's value should be an array of schema extension files.
 
 If the source of truth for your schema is not the repository where you use Isograph (e.g. it is imported from elsewhere, or it is generated, etc.), you may find it easier to work with a schema extension. That is what we will do in this guide.
-
-## Magic mutation fields
+:::
 
 A mutation often has a primary object that is modified. For example, a `setUserProperties` mutation might modify a user, and return the updated user.
 
@@ -16,7 +16,7 @@ In Isograph, you can select that `setUserProperties` mutation directly off of a 
 - since we know which user you're mutating, you don't have to pass the user's ID as a mutation parameter
 - since the compiler knows what fields you fetched on that user, you can refetch those exact same fields in the mutation response!
 
-## How do we create a magic mutation field?
+## How do we create such fields?
 
 Let's assume that we have a schema containing the following:
 
@@ -51,6 +51,7 @@ extend type Mutation
     field: "set_pet_tagline"
     path: "pet"
     field_map: [{ from: "id", to: "input.id" }]
+    as: "set_tagline"
   )
 ```
 
@@ -60,6 +61,7 @@ Let's go through each of these parameters in turn.
 - `path` this is the path in the mutation field's response object to the parent object, **on which we want to expose the field**. So, `SetPetTaglineResponse.pet` gets us a `Pet` object, so each `Pet` will have the magic mutation field added.
 - `field_map`: this is an array of `from` and `to` values, that maps fields **from** the `Pet` **to** the mutation field params. So, we are mapping `Pet.id` to the `id` field of the `input` param of the `set_pet_tagline` field.
   - since this field is provided, this means that the user must provide something that looks like `{ input: { tagline } }`, and Isograph fills in the rest.
+- `as`: the newly created field will have the name `set_tagline`. By default, the name of the new field will keep the name of the mutation field (i.e. `set_pet_tagline`).
 
 ## How do we use this field?
 
@@ -70,7 +72,7 @@ You might select it like
 ```tsx
 export const PetTaglineInput = iso`
   Pet.PetTaglineInput @component {
-    set_pet_tagline,
+    set_tagline,
     tagline,
   }
 `(PetTaglineInputComponent);
@@ -87,7 +89,7 @@ You might use it as follows:
 function PetTaglineInputComponent(data) {
   const [tagline, setTagline] = useState<string>(data.tagline);
 
-  const updateTagline = () => data.set_pet_tagline({ input: { tagline } });
+  const updateTagline = () => data.set_tagline({ input: { tagline } });
 
   return (
     <>
