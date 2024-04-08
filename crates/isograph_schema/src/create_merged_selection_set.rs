@@ -199,7 +199,7 @@ pub struct MutationFieldResolverInfo {
 #[allow(unused)]
 #[derive(Debug)]
 struct MergeTraversalState<'a> {
-    resolver: &'a ValidatedClientField,
+    entrypoint: &'a ValidatedClientField,
     paths_to_refetch_fields: Vec<(PathToRefetchField, ObjectId, ClientFieldVariant)>,
     /// As we traverse selection sets, we need to keep track of the path we have
     /// taken so far. This is because when we encounter a refetch query, we need
@@ -211,19 +211,19 @@ struct MergeTraversalState<'a> {
     /// needed for each refetch query. At this point, we have enough information
     /// to generate the refetch query.
     current_path: PathToRefetchField,
-    encountered_resolver_ids: Option<&'a mut HashSet<ClientFieldId>>,
+    encountered_client_field_ids: Option<&'a mut HashSet<ClientFieldId>>,
 }
 
 impl<'a> MergeTraversalState<'a> {
     pub fn new(
-        resolver: &'a ValidatedClientField,
-        encountered_resolver_ids: Option<&'a mut HashSet<ClientFieldId>>,
+        entrypoint: &'a ValidatedClientField,
+        encountered_client_field_ids: Option<&'a mut HashSet<ClientFieldId>>,
     ) -> Self {
         Self {
-            resolver,
+            entrypoint,
             paths_to_refetch_fields: Default::default(),
             current_path: Default::default(),
-            encountered_resolver_ids,
+            encountered_client_field_ids,
         }
     }
 }
@@ -234,12 +234,12 @@ pub fn create_merged_selection_set(
     validated_selections: &[WithSpan<ValidatedSelection>],
     // TODO consider ways to get rid of these parameters.
     artifact_queue: Option<&mut Vec<ArtifactQueueItem>>,
-    encountered_resolver_ids: Option<&mut HashSet<ClientFieldId>>,
+    encountered_client_field_ids: Option<&mut HashSet<ClientFieldId>>,
     // N.B. we call this for non-fetchable resolvers now, but that is a smell
-    root_fetchable_resolver: &ValidatedClientField,
+    entrypoint: &ValidatedClientField,
 ) -> (MergedSelectionSet, Vec<RootRefetchedPath>) {
     let mut merge_traversal_state =
-        MergeTraversalState::new(root_fetchable_resolver, encountered_resolver_ids);
+        MergeTraversalState::new(entrypoint, encountered_client_field_ids);
     let merged_selection_set = create_merged_selection_set_with_merge_traversal_state(
         schema,
         parent_type,
@@ -256,7 +256,7 @@ pub fn create_merged_selection_set(
                 .map(
                     |(
                         index,
-                        (path_to_refetch_field, refetch_field_parent_id, resolver_variant),
+                        (path_to_refetch_field, refetch_field_parent_id, client_field_variant),
                     )| {
                         let nested_merged_selection_set =
                             find_by_path(&merged_selection_set, &path_to_refetch_field);
@@ -267,7 +267,7 @@ pub fn create_merged_selection_set(
                         let definitions_of_used_variables = reachable_variables
                             .iter()
                             .map(|variable_name| {
-                                root_fetchable_resolver
+                                entrypoint
                                     .variable_definitions
                                     .iter()
                                     .find(|definition| definition.item.name.item == *variable_name)
@@ -277,13 +277,13 @@ pub fn create_merged_selection_set(
                                 This might not be validated yet. For now, each resolver \
                                 containing a __refetch field must re-defined all used variables. \
                                 Resolver {} is missing variable definition {}",
-                                        root_fetchable_resolver.name, variable_name
+                                        entrypoint.name, variable_name
                                     ))
                                     .clone()
                             })
                             .collect();
 
-                        let field_name = match resolver_variant {
+                        let field_name = match client_field_variant {
                             ClientFieldVariant::RefetchField => {
                                 artifact_queue.push(ArtifactQueueItem::RefetchField(
                                     RefetchFieldResolverInfo {
@@ -292,9 +292,9 @@ pub fn create_merged_selection_set(
                                         variable_definitions: definitions_of_used_variables,
                                         root_parent_object: schema
                                             .schema_data
-                                            .object(root_fetchable_resolver.parent_object_id)
+                                            .object(entrypoint.parent_object_id)
                                             .name,
-                                        root_fetchable_field: root_fetchable_resolver.name,
+                                        root_fetchable_field: entrypoint.name,
                                         refetch_query_index: index,
                                     },
                                 ));
@@ -328,9 +328,9 @@ pub fn create_merged_selection_set(
                                         variable_definitions: definitions_of_used_variables,
                                         root_parent_object: schema
                                             .schema_data
-                                            .object(root_fetchable_resolver.parent_object_id)
+                                            .object(entrypoint.parent_object_id)
                                             .name,
-                                        root_fetchable_field: root_fetchable_resolver.name,
+                                        root_fetchable_field: entrypoint.name,
                                         refetch_query_index: index,
                                         mutation_field_name,
                                         server_schema_mutation_field_name,
@@ -363,14 +363,14 @@ pub fn create_merged_selection_set(
             let val: Vec<_> = merge_traversal_state
                 .paths_to_refetch_fields
                 .into_iter()
-                .map(|(path_to_refetch_field, _, resolver_variant)| {
+                .map(|(path_to_refetch_field, _, client_field_variant)| {
                     let nested_merged_selection_set =
                         find_by_path(&merged_selection_set, &path_to_refetch_field);
 
                     // TODO we can pre-calculate this instead of re-iterating here
                     let reachable_variables = nested_merged_selection_set.reachable_variables();
 
-                    let field_name = match resolver_variant {
+                    let field_name = match client_field_variant {
                         ClientFieldVariant::RefetchField => "__refetch".intern().into(),
                         ClientFieldVariant::MutationField(MutationFieldClientFieldVariant {
                             mutation_field_name,
@@ -441,7 +441,7 @@ fn merge_selections_into_set(
                         }
                         FieldDefinitionLocation::Client(resolver_field_id) => {
                             if let Some(ref mut encountered_resolver_ids) =
-                                merge_traversal_state.encountered_resolver_ids
+                                merge_traversal_state.encountered_client_field_ids
                             {
                                 encountered_resolver_ids.insert(*resolver_field_id);
                             }
