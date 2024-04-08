@@ -121,7 +121,7 @@ fn test_mutation_extension_extra_topfield_parsing_failure() -> Result<(), Box<dy
     ));
     match_failure_message(
         expose_field_directives,
-        "unknown field `weight`, expected one of `as`, `path`, `field_map`, `field`",
+        "unknown field `weight`, expected one of `as`, `path`, `fieldMap`, `field`",
     );
     Ok(())
 }

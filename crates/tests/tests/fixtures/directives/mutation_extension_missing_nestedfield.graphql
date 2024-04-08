@@ -1,6 +1,6 @@
 extend type Mutation
   @exposeField(
     path: "pet"
-    field_map: [{ to: "input.id" }]
+    fieldMap: [{ to: "input.id" }]
     field: "set_pet_tagline"
   )

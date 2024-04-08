@@ -88,7 +88,7 @@ When the Isograph compiler encounters an Isograph literal of the form ``iso(`ent
 
 Magic mutation fields are fields that are added to certain types. When read out, these fields are functions that trigger mutations. For example, you might configure a `User.set_name` field to call the `Mutation.set_name` mutation.
 
-These are now configurable in schema extensions via the `@exposeField` directive. See the [documentation](/docs/magic-mutation-fields/).
+These are now configurable in schema extensions via the `@exposeField` directive. See the [documentation](/docs/expose-field-directives/).
 
 Commits: [1](https://github.com/isographlabs/isograph/commit/700bc00d875cf99ab0cc1330dc29dcbdc2ee6909) and [2](https://github.com/isographlabs/isograph/commit/453b8fbee869aa72373d30af872d37a599b9a03d).
 

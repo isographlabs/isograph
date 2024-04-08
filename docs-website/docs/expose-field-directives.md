@@ -50,7 +50,7 @@ extend type Mutation
   @exposeField(
     field: "set_pet_tagline"
     path: "pet"
-    field_map: [{ from: "id", to: "input.id" }]
+    fieldMap: [{ from: "id", to: "input.id" }]
     as: "set_tagline"
   )
 ```
@@ -59,7 +59,7 @@ Let's go through each of these parameters in turn.
 
 - `field` this is the field on the `Mutation` object that we want to expose.
 - `path` this is the path in the mutation field's response object to the parent object, **on which we want to expose the field**. So, `SetPetTaglineResponse.pet` gets us a `Pet` object, so each `Pet` will have the magic mutation field added.
-- `field_map`: this is an array of `from` and `to` values, that maps fields **from** the `Pet` **to** the mutation field params. So, we are mapping `Pet.id` to the `id` field of the `input` param of the `set_pet_tagline` field.
+- `fieldMap`: this is an array of `from` and `to` values, that maps fields **from** the `Pet` **to** the mutation field params. So, we are mapping `Pet.id` to the `id` field of the `input` param of the `set_pet_tagline` field.
   - since this field is provided, this means that the user must provide something that looks like `{ input: { tagline } }`, and Isograph fills in the rest.
 - `as`: the newly created field will have the name `set_tagline`. By default, the name of the new field will keep the name of the mutation field (i.e. `set_pet_tagline`).
 

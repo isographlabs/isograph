@@ -31,7 +31,7 @@ lazy_static! {
     static ref TO_VALUE_KEY_NAME: ValueKeyName = "to".intern().into();
 }
 #[derive(Deserialize, Eq, PartialEq, Debug)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ExposeFieldDirective {
     #[serde(default)]
     #[serde(rename = "as")]

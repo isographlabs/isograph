@@ -3,10 +3,10 @@ extend type Mutation
     field: "set_pet_tagline"
     path: "pet"
     weight: 7
-    field_map: [{ from: "id", to: "input.id" }]
+    fieldMap: [{ from: "id", to: "input.id" }]
   )
   @exposeField(
     field: "set_pet_best_friend"
     path: "pet"
-    field_map: [{ from: "id", to: "id" }]
+    fieldMap: [{ from: "id", to: "id" }]
   )

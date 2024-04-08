@@ -57,11 +57,7 @@ const checkins = [
 ];
 
 export const schema = createSchema({
-  // LOL
-  typeDefs:
-    'input FieldMap { from: String!, to: String! } \n' +
-    'directive @primary(path: String!, field_map: [FieldMap!]!) repeatable on OBJECT \n ' +
-    schemaContents,
+  typeDefs: schemaContents,
   resolvers: {
     Query: {
       pet: (obj, args) => getPet(args.id),
