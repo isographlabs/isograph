@@ -1,8 +1,7 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { Starrable__IsStarred__param } from './param_type.ts';
+import { Starrable__IsStarred__outputType } from './output_type.ts';
 import { IsStarred as resolver } from '../../../RepositoryDetail.tsx';
-
-// the type, when read out (either via useLazyReference or via graph)
-export type Starrable__IsStarred__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
 
 const readerAst: ReaderAst<Starrable__IsStarred__param> = [
   {
@@ -18,11 +17,6 @@ const readerAst: ReaderAst<Starrable__IsStarred__param> = [
     arguments: null,
   },
 ];
-
-export type Starrable__IsStarred__param = {
-  stargazerCount: number,
-  viewerHasStarred: boolean,
-};
 
 const artifact: ReaderArtifact<
   Starrable__IsStarred__param,

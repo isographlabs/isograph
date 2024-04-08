@@ -1,10 +1,9 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { Query__UserPage__param } from './param_type.ts';
+import { Query__UserPage__outputType } from './output_type.ts';
 import { UserPage as resolver } from '../../../UserRoute.tsx';
-import Query__Header, { Query__Header__outputType} from '../Header/reader';
-import Query__UserDetail, { Query__UserDetail__outputType} from '../UserDetail/reader';
-
-// the type, when read out (either via useLazyReference or via graph)
-export type Query__UserPage__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
+import Query__Header from '../Header/reader';
+import Query__UserDetail from '../UserDetail/reader';
 
 const readerAst: ReaderAst<Query__UserPage__param> = [
   {
@@ -22,11 +21,6 @@ const readerAst: ReaderAst<Query__UserPage__param> = [
     usedRefetchQueries: [],
   },
 ];
-
-export type Query__UserPage__param = {
-  Header: Query__Header__outputType,
-  UserDetail: Query__UserDetail__outputType,
-};
 
 const artifact: ReaderArtifact<
   Query__UserPage__param,

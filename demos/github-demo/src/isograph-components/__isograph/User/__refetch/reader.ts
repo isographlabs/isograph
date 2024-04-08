@@ -1,13 +1,12 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { User____refetch__param } from './param_type.ts';
+import { User____refetch__outputType } from './output_type.ts';
 import { makeNetworkRequest, type IsographEnvironment, type IsographEntrypoint } from '@isograph/react';
 const resolver = (
   environment: IsographEnvironment,
   artifact: IsographEntrypoint<any, any>,
   variables: any
 ) => () => makeNetworkRequest(environment, artifact, variables);
-
-// the type, when read out (either via useLazyReference or via graph)
-export type User____refetch__outputType = () => void;
 
 const readerAst: ReaderAst<User____refetch__param> = [
   {
@@ -17,10 +16,6 @@ const readerAst: ReaderAst<User____refetch__param> = [
     arguments: null,
   },
 ];
-
-export type User____refetch__param = {
-  id: string,
-};
 
 const artifact: ReaderArtifact<
   User____refetch__param,

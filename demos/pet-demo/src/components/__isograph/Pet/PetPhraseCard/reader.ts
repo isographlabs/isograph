@@ -1,8 +1,7 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { Pet__PetPhraseCard__param } from './param_type.ts';
+import { Pet__PetPhraseCard__outputType } from './output_type.ts';
 import { PetPhraseCard as resolver } from '../../../PetPhraseCard.tsx';
-
-// the type, when read out (either via useLazyReference or via graph)
-export type Pet__PetPhraseCard__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
 
 const readerAst: ReaderAst<Pet__PetPhraseCard__param> = [
   {
@@ -18,11 +17,6 @@ const readerAst: ReaderAst<Pet__PetPhraseCard__param> = [
     arguments: null,
   },
 ];
-
-export type Pet__PetPhraseCard__param = {
-  id: string,
-  favorite_phrase: (string | null),
-};
 
 const artifact: ReaderArtifact<
   Pet__PetPhraseCard__param,

@@ -1,10 +1,9 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { Pet__PetUpdater__param } from './param_type.ts';
+import { Pet__PetUpdater__outputType } from './output_type.ts';
 import { PetUpdater as resolver } from '../../../PetUpdater.tsx';
-import Pet__set_best_friend, { Pet__set_best_friend__outputType} from '../set_best_friend/reader';
-import Pet__set_pet_tagline, { Pet__set_pet_tagline__outputType} from '../set_pet_tagline/reader';
-
-// the type, when read out (either via useLazyReference or via graph)
-export type Pet__PetUpdater__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
+import Pet__set_best_friend from '../set_best_friend/reader';
+import Pet__set_pet_tagline from '../set_pet_tagline/reader';
 
 const readerAst: ReaderAst<Pet__PetUpdater__param> = [
   {
@@ -46,16 +45,6 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
     arguments: null,
   },
 ];
-
-export type Pet__PetUpdater__param = {
-  set_best_friend: Pet__set_best_friend__outputType,
-  potential_new_best_friends: ({
-    id: string,
-    name: string,
-  })[],
-  set_pet_tagline: Pet__set_pet_tagline__outputType,
-  tagline: string,
-};
 
 const artifact: ReaderArtifact<
   Pet__PetUpdater__param,

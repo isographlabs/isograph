@@ -1,4 +1,6 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { Pet__set_pet_tagline__param } from './param_type.ts';
+import { Pet__set_pet_tagline__outputType } from './output_type.ts';
 const includeReadOutData = (variables: any, readOutData: any) => {
   variables.input = variables.input ?? {};
   variables.input.id = readOutData.id;
@@ -17,9 +19,6 @@ const resolver = (
 };
 
 
-// the type, when read out (either via useLazyReference or via graph)
-export type Pet__set_pet_tagline__outputType = (params: any) => void;
-
 const readerAst: ReaderAst<Pet__set_pet_tagline__param> = [
   {
     kind: "Scalar",
@@ -28,10 +27,6 @@ const readerAst: ReaderAst<Pet__set_pet_tagline__param> = [
     arguments: null,
   },
 ];
-
-export type Pet__set_pet_tagline__param = {
-  id: string,
-};
 
 const artifact: ReaderArtifact<
   Pet__set_pet_tagline__param,

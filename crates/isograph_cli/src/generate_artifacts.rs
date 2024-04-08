@@ -69,7 +69,7 @@ fn build_iso_overload_for_entrypoint<'schema>(
 ) -> (String, String) {
     let mut s: String = "".to_string();
     let import = format!(
-        "import entrypoint_{} from '../__isograph/{}/{}/entrypoint'\n",
+        "import entrypoint_{} from '../__isograph/{}/{}/entrypoint';\n",
         validated_client_field.type_and_field.underscore_separated(),
         validated_client_field.type_and_field.type_name,
         validated_client_field.type_and_field.field_name,
@@ -95,7 +95,7 @@ fn build_iso_overload_for_client_defined_field(
 ) -> (String, String) {
     let mut s: String = "".to_string();
     let import = format!(
-        "import {{ {}__param }} from './{}/{}/reader'\n",
+        "import {{ {}__param }} from './{}/{}/param_type';\n",
         client_field.type_and_field.underscore_separated(),
         client_field.type_and_field.type_name,
         client_field.type_and_field.field_name,
@@ -809,17 +809,7 @@ impl<'schema> ReaderArtifactInfo<'schema> {
 
         let relative_directory = generate_path(parent_type.name, *client_field_name);
 
-        let mut out = vec![];
-
-        for (key, file_content) in self.file_contents() {
-            out.push(PathAndContent {
-                file_content,
-                // Should clone be an issue here?
-                relative_directory: relative_directory.clone(),
-                file_name_prefix: key.intern().into(),
-            })
-        }
-        out
+        self.file_contents(&relative_directory)
     }
 }
 

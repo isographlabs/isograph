@@ -441,15 +441,19 @@ impl ObjectTypeAndFieldNames {
         format!("{}__{}", self.type_name, self.field_name)
     }
 
-    pub fn relative_path(&self, current_file_type_name: IsographObjectTypeName) -> String {
+    pub fn relative_path(
+        &self,
+        current_file_type_name: IsographObjectTypeName,
+        file_type: SelectableFieldName,
+    ) -> String {
         let ObjectTypeAndFieldNames {
             type_name,
             field_name,
         } = *self;
         if type_name != current_file_type_name {
-            format!("../../{type_name}/{field_name}/{}", *READER)
+            format!("../../{type_name}/{field_name}/{}", file_type)
         } else {
-            format!("../{field_name}/{}", *READER)
+            format!("../{field_name}/{}", file_type)
         }
     }
 }

@@ -1,8 +1,7 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { PullRequest__createdAtFormatted__param } from './param_type.ts';
+import { PullRequest__createdAtFormatted__outputType } from './output_type.ts';
 import { createdAtFormatted as resolver } from '../../../PullRequestTable.tsx';
-
-// the type, when read out (either via useLazyReference or via graph)
-export type PullRequest__createdAtFormatted__outputType = ReturnType<typeof resolver>;
 
 const readerAst: ReaderAst<PullRequest__createdAtFormatted__param> = [
   {
@@ -12,10 +11,6 @@ const readerAst: ReaderAst<PullRequest__createdAtFormatted__param> = [
     arguments: null,
   },
 ];
-
-export type PullRequest__createdAtFormatted__param = {
-  createdAt: string,
-};
 
 const artifact: ReaderArtifact<
   PullRequest__createdAtFormatted__param,

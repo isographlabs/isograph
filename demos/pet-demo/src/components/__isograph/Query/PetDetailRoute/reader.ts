@@ -1,12 +1,11 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { Query__PetDetailRoute__param } from './param_type.ts';
+import { Query__PetDetailRoute__outputType } from './output_type.ts';
 import { PetDetailRoute as resolver } from '../../../PetDetailRoute.tsx';
-import Pet__PetBestFriendCard, { Pet__PetBestFriendCard__outputType} from '../../Pet/PetBestFriendCard/reader';
-import Pet__PetCheckinsCard, { Pet__PetCheckinsCard__outputType} from '../../Pet/PetCheckinsCard/reader';
-import Pet__PetPhraseCard, { Pet__PetPhraseCard__outputType} from '../../Pet/PetPhraseCard/reader';
-import Pet__PetTaglineCard, { Pet__PetTaglineCard__outputType} from '../../Pet/PetTaglineCard/reader';
-
-// the type, when read out (either via useLazyReference or via graph)
-export type Query__PetDetailRoute__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
+import Pet__PetBestFriendCard from '../../Pet/PetBestFriendCard/reader';
+import Pet__PetCheckinsCard from '../../Pet/PetCheckinsCard/reader';
+import Pet__PetPhraseCard from '../../Pet/PetPhraseCard/reader';
+import Pet__PetTaglineCard from '../../Pet/PetTaglineCard/reader';
 
 const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
   {
@@ -57,16 +56,6 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
     ],
   },
 ];
-
-export type Query__PetDetailRoute__param = {
-  pet: ({
-    name: string,
-    PetCheckinsCard: Pet__PetCheckinsCard__outputType,
-    PetBestFriendCard: Pet__PetBestFriendCard__outputType,
-    PetPhraseCard: Pet__PetPhraseCard__outputType,
-    PetTaglineCard: Pet__PetTaglineCard__outputType,
-  } | null),
-};
 
 const artifact: ReaderArtifact<
   Query__PetDetailRoute__param,

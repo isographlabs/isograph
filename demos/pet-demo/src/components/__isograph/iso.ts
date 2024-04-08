@@ -1,18 +1,18 @@
 import type {IsographEntrypoint} from '@isograph/react';
-import { Pet__FavoritePhraseLoader__param } from './Pet/FavoritePhraseLoader/reader'
-import { Pet__PetBestFriendCard__param } from './Pet/PetBestFriendCard/reader'
-import { Pet__PetCheckinsCard__param } from './Pet/PetCheckinsCard/reader'
-import { Pet__PetPhraseCard__param } from './Pet/PetPhraseCard/reader'
-import { Pet__PetStatsCard__param } from './Pet/PetStatsCard/reader'
-import { Pet__PetSummaryCard__param } from './Pet/PetSummaryCard/reader'
-import { Pet__PetTaglineCard__param } from './Pet/PetTaglineCard/reader'
-import { Pet__PetUpdater__param } from './Pet/PetUpdater/reader'
-import { Query__HomeRoute__param } from './Query/HomeRoute/reader'
-import { Query__PetDetailRoute__param } from './Query/PetDetailRoute/reader'
-import { Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/reader'
-import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint'
-import entrypoint_Query__PetDetailRoute from '../__isograph/Query/PetDetailRoute/entrypoint'
-import entrypoint_Query__PetFavoritePhrase from '../__isograph/Query/PetFavoritePhrase/entrypoint'
+import { Pet__FavoritePhraseLoader__param } from './Pet/FavoritePhraseLoader/param_type';
+import { Pet__PetBestFriendCard__param } from './Pet/PetBestFriendCard/param_type';
+import { Pet__PetCheckinsCard__param } from './Pet/PetCheckinsCard/param_type';
+import { Pet__PetPhraseCard__param } from './Pet/PetPhraseCard/param_type';
+import { Pet__PetStatsCard__param } from './Pet/PetStatsCard/param_type';
+import { Pet__PetSummaryCard__param } from './Pet/PetSummaryCard/param_type';
+import { Pet__PetTaglineCard__param } from './Pet/PetTaglineCard/param_type';
+import { Pet__PetUpdater__param } from './Pet/PetUpdater/param_type';
+import { Query__HomeRoute__param } from './Query/HomeRoute/param_type';
+import { Query__PetDetailRoute__param } from './Query/PetDetailRoute/param_type';
+import { Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/param_type';
+import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint';
+import entrypoint_Query__PetDetailRoute from '../__isograph/Query/PetDetailRoute/entrypoint';
+import entrypoint_Query__PetFavoritePhrase from '../__isograph/Query/PetFavoritePhrase/entrypoint';
 
 type IdentityWithParam<TParam> = <TResolverReturn>(
   x: (param: TParam) => TResolverReturn

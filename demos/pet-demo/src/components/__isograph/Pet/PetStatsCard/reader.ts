@@ -1,9 +1,8 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { Pet__PetStatsCard__param } from './param_type.ts';
+import { Pet__PetStatsCard__outputType } from './output_type.ts';
 import { PetStatsCard as resolver } from '../../../PetStatsCard.tsx';
-import Pet____refetch, { Pet____refetch__outputType} from '../__refetch/reader';
-
-// the type, when read out (either via useLazyReference or via graph)
-export type Pet__PetStatsCard__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
+import Pet____refetch from '../__refetch/reader';
 
 const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
   {
@@ -75,21 +74,6 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
     ],
   },
 ];
-
-export type Pet__PetStatsCard__param = {
-  id: string,
-  nickname: (string | null),
-  __refetch: Pet____refetch__outputType,
-  age: number,
-  stats: {
-    weight: number,
-    intelligence: number,
-    cuteness: number,
-    hunger: number,
-    sociability: number,
-    energy: number,
-  },
-};
 
 const artifact: ReaderArtifact<
   Pet__PetStatsCard__param,

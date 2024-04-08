@@ -1,27 +1,27 @@
 import type {IsographEntrypoint} from '@isograph/react';
-import { Actor__UserLink__param } from './Actor/UserLink/reader'
-import { IssueComment__formattedCommentCreationDate__param } from './IssueComment/formattedCommentCreationDate/reader'
-import { PullRequest__CommentList__param } from './PullRequest/CommentList/reader'
-import { PullRequest__PullRequestLink__param } from './PullRequest/PullRequestLink/reader'
-import { PullRequest__createdAtFormatted__param } from './PullRequest/createdAtFormatted/reader'
-import { PullRequestConnection__PullRequestTable__param } from './PullRequestConnection/PullRequestTable/reader'
-import { Query__Header__param } from './Query/Header/reader'
-import { Query__HomePageList__param } from './Query/HomePageList/reader'
-import { Query__HomePage__param } from './Query/HomePage/reader'
-import { Query__PullRequestDetail__param } from './Query/PullRequestDetail/reader'
-import { Query__PullRequest__param } from './Query/PullRequest/reader'
-import { Query__RepositoryDetail__param } from './Query/RepositoryDetail/reader'
-import { Query__RepositoryPage__param } from './Query/RepositoryPage/reader'
-import { Query__UserDetail__param } from './Query/UserDetail/reader'
-import { Query__UserPage__param } from './Query/UserPage/reader'
-import { Repository__RepositoryLink__param } from './Repository/RepositoryLink/reader'
-import { Starrable__IsStarred__param } from './Starrable/IsStarred/reader'
-import { User__Avatar__param } from './User/Avatar/reader'
-import { User__RepositoryList__param } from './User/RepositoryList/reader'
-import entrypoint_Query__HomePage from '../__isograph/Query/HomePage/entrypoint'
-import entrypoint_Query__PullRequest from '../__isograph/Query/PullRequest/entrypoint'
-import entrypoint_Query__RepositoryPage from '../__isograph/Query/RepositoryPage/entrypoint'
-import entrypoint_Query__UserPage from '../__isograph/Query/UserPage/entrypoint'
+import { Actor__UserLink__param } from './Actor/UserLink/param_type';
+import { IssueComment__formattedCommentCreationDate__param } from './IssueComment/formattedCommentCreationDate/param_type';
+import { PullRequest__CommentList__param } from './PullRequest/CommentList/param_type';
+import { PullRequest__PullRequestLink__param } from './PullRequest/PullRequestLink/param_type';
+import { PullRequest__createdAtFormatted__param } from './PullRequest/createdAtFormatted/param_type';
+import { PullRequestConnection__PullRequestTable__param } from './PullRequestConnection/PullRequestTable/param_type';
+import { Query__Header__param } from './Query/Header/param_type';
+import { Query__HomePageList__param } from './Query/HomePageList/param_type';
+import { Query__HomePage__param } from './Query/HomePage/param_type';
+import { Query__PullRequestDetail__param } from './Query/PullRequestDetail/param_type';
+import { Query__PullRequest__param } from './Query/PullRequest/param_type';
+import { Query__RepositoryDetail__param } from './Query/RepositoryDetail/param_type';
+import { Query__RepositoryPage__param } from './Query/RepositoryPage/param_type';
+import { Query__UserDetail__param } from './Query/UserDetail/param_type';
+import { Query__UserPage__param } from './Query/UserPage/param_type';
+import { Repository__RepositoryLink__param } from './Repository/RepositoryLink/param_type';
+import { Starrable__IsStarred__param } from './Starrable/IsStarred/param_type';
+import { User__Avatar__param } from './User/Avatar/param_type';
+import { User__RepositoryList__param } from './User/RepositoryList/param_type';
+import entrypoint_Query__HomePage from '../__isograph/Query/HomePage/entrypoint';
+import entrypoint_Query__PullRequest from '../__isograph/Query/PullRequest/entrypoint';
+import entrypoint_Query__RepositoryPage from '../__isograph/Query/RepositoryPage/entrypoint';
+import entrypoint_Query__UserPage from '../__isograph/Query/UserPage/entrypoint';
 
 type IdentityWithParam<TParam> = <TResolverReturn>(
   x: (param: TParam) => TResolverReturn
