@@ -40,7 +40,7 @@ impl Span {
     }
 
     pub fn is_empty(&self) -> bool {
-        return self.start == 0 && self.end == 0;
+        self.start == self.end
     }
 
     pub fn with_offset(self, offset: u32) -> Self {
