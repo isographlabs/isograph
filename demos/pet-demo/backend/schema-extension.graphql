@@ -5,7 +5,7 @@ extend type Mutation
     field_map: [{ from: "id", to: "input.id" }]
   )
   @exposeField(
-    as: "set_pet_golden_buddy"
+    as: "set_best_friend"
     field: "set_pet_best_friend"
     path: "pet"
     field_map: [{ from: "id", to: "id" }]

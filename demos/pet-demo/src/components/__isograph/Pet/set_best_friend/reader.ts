@@ -17,9 +17,9 @@ const resolver = (
 
 
 // the type, when read out (either via useLazyReference or via graph)
-export type Pet__set_pet_golden_buddy__outputType = (params: any) => void;
+export type Pet__set_best_friend__outputType = (params: any) => void;
 
-const readerAst: ReaderAst<Pet__set_pet_golden_buddy__param> = [
+const readerAst: ReaderAst<Pet__set_best_friend__param> = [
   {
     kind: "Scalar",
     fieldName: "id",
@@ -28,13 +28,13 @@ const readerAst: ReaderAst<Pet__set_pet_golden_buddy__param> = [
   },
 ];
 
-export type Pet__set_pet_golden_buddy__param = {
+export type Pet__set_best_friend__param = {
   id: string,
 };
 
 const artifact: ReaderArtifact<
-  Pet__set_pet_golden_buddy__param,
-  Pet__set_pet_golden_buddy__outputType
+  Pet__set_best_friend__param,
+  Pet__set_best_friend__outputType
 > = {
   kind: "ReaderArtifact",
   resolver: resolver as any,
