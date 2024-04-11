@@ -575,8 +575,8 @@ fn merge_scalar_resolver_field(
     merge_traversal_state: &mut MergeTraversalState<'_>,
     resolver_field_id: ClientFieldId,
 ) {
-    let resolver_field = schema.client_field(resolver_field_id);
-    if let Some((ref selection_set, _)) = resolver_field.selection_set_and_unwraps {
+    let client_field = schema.client_field(resolver_field_id);
+    if let Some((ref selection_set, _)) = client_field.selection_set_and_unwraps {
         merge_selections_into_set(
             schema,
             merged_selection_map,
@@ -589,7 +589,7 @@ fn merge_scalar_resolver_field(
     }
 
     // HACK... we can model this data better
-    if resolver_field.variant == ClientFieldVariant::RefetchField {
+    if client_field.variant == ClientFieldVariant::RefetchField {
         merge_traversal_state.paths_to_refetch_fields.push((
             merge_traversal_state.current_path.clone(),
             parent_type.id,
@@ -602,13 +602,13 @@ fn merge_scalar_resolver_field(
         filtered_mutation_field_arguments,
         mutation_field_name: _,
         mutation_primary_field_return_type_object_id,
-    }) = &resolver_field.variant
+    }) = &client_field.variant
     {
         merge_traversal_state.paths_to_refetch_fields.push((
             merge_traversal_state.current_path.clone(),
             parent_type.id,
             ClientFieldVariant::MutationField(MutationFieldClientFieldVariant {
-                mutation_field_name: resolver_field.name,
+                mutation_field_name: client_field.name,
                 server_schema_mutation_field_name: *server_schema_mutation_field_name,
                 mutation_primary_field_name: *mutation_primary_field_name,
                 mutation_field_arguments: mutation_field_arguments.clone(),
