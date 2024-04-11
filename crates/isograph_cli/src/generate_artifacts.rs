@@ -1076,22 +1076,18 @@ fn write_query_types_from_selection(
 
                         match nested_client_field_imports.entry(client_field.type_and_field) {
                             Entry::Occupied(mut occupied) => {
-                                occupied.get_mut().types.push(ResolverImportType {
-                                    globally_unique_type_name: ResolverImportName(format!(
-                                        "{}__outputType",
-                                        client_field.type_and_field.underscore_separated()
-                                    )),
-                                });
+                                occupied.get_mut().types.push(TypeImportName(format!(
+                                    "{}__outputType",
+                                    client_field.type_and_field.underscore_separated()
+                                )));
                             }
                             Entry::Vacant(vacant) => {
                                 vacant.insert(JavaScriptImports {
                                     default_import: false,
-                                    types: vec![ResolverImportType {
-                                        globally_unique_type_name: ResolverImportName(format!(
-                                            "{}__outputType",
-                                            client_field.type_and_field.underscore_separated()
-                                        )),
-                                    }],
+                                    types: vec![TypeImportName(format!(
+                                        "{}__outputType",
+                                        client_field.type_and_field.underscore_separated()
+                                    ))],
                                 });
                             }
                         }
@@ -1282,17 +1278,13 @@ fn get_read_out_data(field_map: &[FieldMapItem]) -> String {
 }
 
 #[derive(Debug)]
-pub(crate) struct ResolverImportName(pub String);
-derive_display!(ResolverImportName);
+pub(crate) struct TypeImportName(pub String);
+derive_display!(TypeImportName);
 
-#[derive(Debug)]
-pub struct ResolverImportType {
-    pub(crate) globally_unique_type_name: ResolverImportName,
-}
 #[derive(Debug)]
 pub struct JavaScriptImports {
     pub(crate) default_import: bool,
-    pub(crate) types: Vec<ResolverImportType>,
+    pub(crate) types: Vec<TypeImportName>,
 }
 
 fn generate_reader_ast<'schema>(

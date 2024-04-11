@@ -183,9 +183,9 @@ fn write_client_field_import(
             s.push_str(",");
         }
         s.push_str(" { ");
-        s.push_str(&format!("{}", first.globally_unique_type_name));
+        s.push_str(&format!("{}", first));
         for value in types {
-            s.push_str(&format!(", {}", value.globally_unique_type_name));
+            s.push_str(&format!(", {}", value));
         }
         s.push_str("}");
     }
