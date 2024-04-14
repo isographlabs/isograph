@@ -1,5 +1,9 @@
 # Backlog
 
+:::note
+See the [open issues](https://github.com/isographlabs/isograph/issues).
+:::
+
 ## Top mid-term runtime priorities
 
 - preloaded queries w/dispose
