@@ -400,13 +400,6 @@ function normalizeLinkedField(
       mutableEncounteredIds,
     );
 
-    console.log({
-      existingValue,
-      newStoreRecordId,
-      parentRecordKey,
-      targetParentRecord: JSON.stringify(targetParentRecord),
-    });
-
     targetParentRecord[parentRecordKey] = {
       __link: newStoreRecordId,
     };
