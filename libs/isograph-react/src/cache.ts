@@ -76,15 +76,22 @@ export function stableCopy<T>(value: T): T {
 
 type IsoResolver = IsographEntrypoint<any, any>;
 
-export function getOrCreateCacheForArtifact<T>(
+export function getOrCreateCacheForArtifact<
+  TReadFromStore extends Object,
+  TClientFieldValue,
+>(
   environment: IsographEnvironment,
-  artifact: IsographEntrypoint<any, T>,
+  artifact: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
   variables: object,
-): ParentCache<PromiseWrapper<T>> {
+): ParentCache<PromiseWrapper<TClientFieldValue>> {
   const cacheKey = artifact.queryText + JSON.stringify(stableCopy(variables));
-  const factory: Factory<PromiseWrapper<T>> = () =>
-    makeNetworkRequest<T>(environment, artifact, variables);
-  return getOrCreateCache<PromiseWrapper<T>>(environment, cacheKey, factory);
+  const factory: Factory<PromiseWrapper<TClientFieldValue>> = () =>
+    makeNetworkRequest<TClientFieldValue>(environment, artifact, variables);
+  return getOrCreateCache<PromiseWrapper<TClientFieldValue>>(
+    environment,
+    cacheKey,
+    factory,
+  );
 }
 
 type NetworkRequestStatus =

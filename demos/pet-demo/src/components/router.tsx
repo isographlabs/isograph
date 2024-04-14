@@ -75,6 +75,7 @@ function PetDetailRouteLoader({
   navigateTo: (path: Route) => void;
   route: PetDetailRoute;
 }) {
+  const foo = useLazyReference('asdf', {});
   const { queryReference } = useLazyReference(
     iso(`entrypoint Query.PetDetailRoute`),
     { id: route.id },
