@@ -9,6 +9,7 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 - preloaded queries w/dispose
 - garbage collection & retention
 - subscriptions & granular rerendering
+  - change how top-level fields are normalized (i.e. into their own object, without going through ROOT)
 - connections and pagination
 
 ## Top mid-term compiler/syntax priorities
@@ -18,6 +19,7 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 - asFoo typecast linked fields
   - Or syntax: bar: `as Foo { ... }`? This can always be added on afterward after some thought.
 - connections and pagination
+- client links/pointers
 
 ## Top implementation detail priorities
 
