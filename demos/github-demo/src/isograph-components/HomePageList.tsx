@@ -25,7 +25,9 @@ export const HomePageList = iso(`
       <RepoGitHubLink filePath="demos/github-demo/src/isograph-components/HomePage.tsx">
         Home Page List Component
       </RepoGitHubLink>
-      <h1>rbalicki2's repository stats</h1>
+      <h1>
+        {data.viewer.name}&apos;s ({data.viewer.login}) repository stats
+      </h1>
       <Button onClick={() => data.viewer.__refetch()} variant="contained">
         Refetch viewer
       </Button>

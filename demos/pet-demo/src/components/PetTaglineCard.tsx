@@ -12,7 +12,7 @@ field Pet.PetTaglineCard @component {
     <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
       <CardContent>
         <h2>Tagline</h2>
-        <p>"{data.tagline}"</p>
+        <p>&quot;{data.tagline}&quot;</p>
       </CardContent>
     </Card>
   );

@@ -12,7 +12,7 @@ field Pet.PetPhraseCard @component {
     <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
       <CardContent>
         <h2>Likes to say</h2>
-        <p>"{data.favorite_phrase}"</p>
+        <p>&quot;{data.favorite_phrase}&quot;</p>
       </CardContent>
     </Card>
   );

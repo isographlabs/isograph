@@ -56,10 +56,9 @@ export const RepositoryList = iso(`
           return (
             <TableRow key={node.id}>
               <TableCell>
-                <node.RepositoryLink
-                  setRoute={setRoute}
-                  children={node.nameWithOwner}
-                />
+                <node.RepositoryLink setRoute={setRoute}>
+                  {node.nameWithOwner}
+                </node.RepositoryLink>
               </TableCell>
               <TableCell>{node.stargazerCount}</TableCell>
               <TableCell>{node.forkCount}</TableCell>

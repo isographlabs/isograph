@@ -16,7 +16,7 @@ export const HomeRoute = iso(`
 ) {
   return (
     <Container maxWidth="md">
-      <h1>Robert's Pet List 3000</h1>
+      <h1>Robert&apos;s Pet List 3000</h1>
       <Stack direction="column" spacing={4}>
         {data.pets.map((pet) => (
           <pet.PetSummaryCard

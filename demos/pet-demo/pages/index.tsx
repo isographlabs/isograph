@@ -6,7 +6,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>Robert's Pet List 3000</title>
+        <title>Robert&apos;s Pet List 3000</title>
         <meta name="description" content="Demo for GraphQL Conf 2023" />
       </Head>
       <ThemeProvider theme={theme}>

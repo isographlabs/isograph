@@ -47,10 +47,9 @@ export const RepositoryDetail = iso(`
       {parent != null ? (
         <h3>
           <small>Forked from</small>{' '}
-          <parent.RepositoryLink
-            setRoute={setRoute}
-            children={parent.nameWithOwner}
-          />
+          <parent.RepositoryLink setRoute={setRoute}>
+            {parent.nameWithOwner}
+          </parent.RepositoryLink>
         </h3>
       ) : null}
       <repository.IsStarred />

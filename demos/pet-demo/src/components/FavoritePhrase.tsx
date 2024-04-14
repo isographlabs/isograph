@@ -39,7 +39,7 @@ export const PetFavoritePhrase = iso(`
   if (pet == null) return;
   return (
     <p>
-      {pet.name} likes to say: "{pet.favorite_phrase}"
+      {pet.name} likes to say: &quot;{pet.favorite_phrase}&quot;
     </p>
   );
 });
