@@ -91,7 +91,7 @@ jobs:
         run: './scripts/check-git-status.sh'
 
   typecheck-demos:
-    name: Typecheck Demos
+    name: Typecheck and Lint Demos
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -115,6 +115,8 @@ jobs:
         run: pnpm -r compile
       - name: Typecheck
         run: cd ./demos/${{ matrix.target.folder }} && yarn tsc
+      - name: Lint
+        run: cd ./demos/${{ matrix.target.folder }} && yarn lint
 
   build-js-packages:
     name: Build js packages
