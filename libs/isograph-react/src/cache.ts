@@ -10,6 +10,9 @@ import {
   StoreRecord,
   Link,
   type IsographEnvironment,
+  DataTypeValue,
+  assertLink,
+  getLink,
 } from './IsographEnvironment';
 import {
   RetainedQuery,
@@ -211,7 +214,10 @@ function normalizeData(
     encounteredIds,
   );
   if (typeof window !== 'undefined' && window.__LOG) {
-    console.log('after normalization', { store: environment.store });
+    console.log('after normalization', {
+      store: environment.store,
+      encounteredIds,
+    });
   }
   callSubscriptions(environment, encounteredIds);
   return encounteredIds;
@@ -274,20 +280,22 @@ function normalizeDataIntoRecord(
   nestedRefetchQueries: RefetchQueryArtifactWrapper[],
   mutableEncounteredIds: Set<DataId>,
 ) {
-  mutableEncounteredIds.add(targetParentRecordId);
+  let recordHasBeenUpdated = false;
   for (const normalizationNode of normalizationAst) {
     switch (normalizationNode.kind) {
       case 'Scalar': {
-        normalizeScalarField(
+        const scalarFieldResultedInChange = normalizeScalarField(
           normalizationNode,
           networkResponseParentRecord,
           targetParentRecord,
           variables,
         );
+        recordHasBeenUpdated =
+          recordHasBeenUpdated || scalarFieldResultedInChange;
         break;
       }
       case 'Linked': {
-        normalizeLinkedField(
+        const linkedFieldResultedInChange = normalizeLinkedField(
           environment,
           normalizationNode,
           networkResponseParentRecord,
@@ -297,18 +305,24 @@ function normalizeDataIntoRecord(
           nestedRefetchQueries,
           mutableEncounteredIds,
         );
+        recordHasBeenUpdated =
+          recordHasBeenUpdated || linkedFieldResultedInChange;
         break;
       }
     }
   }
+  if (recordHasBeenUpdated) {
+    mutableEncounteredIds.add(targetParentRecordId);
+  }
 }
 
+type RecordHasBeenUpdated = boolean;
 function normalizeScalarField(
   astNode: NormalizationScalarField,
   networkResponseParentRecord: NetworkResponseObject,
   targetStoreRecord: StoreRecord,
   variables: { [index: string]: string },
-) {
+): RecordHasBeenUpdated {
   const networkResponseKey = getNetworkResponseKey(astNode);
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
   const parentRecordKey = getParentRecordKey(astNode, variables);
@@ -317,7 +331,9 @@ function normalizeScalarField(
     networkResponseData == null ||
     isScalarOrEmptyArray(networkResponseData)
   ) {
+    const existingValue = targetStoreRecord[parentRecordKey];
     targetStoreRecord[parentRecordKey] = networkResponseData;
+    return existingValue !== networkResponseData;
   } else {
     throw new Error('Unexpected object array when normalizing scalar');
   }
@@ -335,14 +351,15 @@ function normalizeLinkedField(
   variables: { [index: string]: string },
   nestedRefetchQueries: RefetchQueryArtifactWrapper[],
   mutableEncounteredIds: Set<DataId>,
-) {
+): RecordHasBeenUpdated {
   const networkResponseKey = getNetworkResponseKey(astNode);
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
   const parentRecordKey = getParentRecordKey(astNode, variables);
+  const existingValue = targetParentRecord[parentRecordKey];
 
   if (networkResponseData == null) {
     targetParentRecord[parentRecordKey] = null;
-    return;
+    return existingValue !== null;
   }
 
   if (isScalarButNotEmptyArray(networkResponseData)) {
@@ -370,6 +387,7 @@ function normalizeLinkedField(
       dataIds.push({ __link: newStoreRecordId });
     }
     targetParentRecord[parentRecordKey] = dataIds;
+    return !dataIdsAreTheSame(existingValue, dataIds);
   } else {
     const newStoreRecordId = normalizeNetworkResponseObject(
       environment,
@@ -381,9 +399,41 @@ function normalizeLinkedField(
       nestedRefetchQueries,
       mutableEncounteredIds,
     );
+
+    console.log({
+      existingValue,
+      newStoreRecordId,
+      parentRecordKey,
+      targetParentRecord: JSON.stringify(targetParentRecord),
+    });
+
     targetParentRecord[parentRecordKey] = {
       __link: newStoreRecordId,
     };
+    const link = getLink(existingValue);
+    return link?.__link !== newStoreRecordId;
+  }
+}
+
+function dataIdsAreTheSame(
+  existingValue: DataTypeValue,
+  newDataIds: Link[],
+): boolean {
+  if (Array.isArray(existingValue)) {
+    if (newDataIds.length !== existingValue.length) {
+      return false;
+    }
+    for (let i = 0; i < newDataIds.length; i++) {
+      const maybeLink = getLink(existingValue[i]);
+      if (maybeLink !== null) {
+        if (newDataIds[i].__link !== maybeLink.__link) {
+          return false;
+        }
+      }
+    }
+    return true;
+  } else {
+    return false;
   }
 }
 

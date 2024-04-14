@@ -130,3 +130,15 @@ export function assertLink(link: DataTypeValue): Link | null | undefined {
   }
   throw new Error('Invalid link');
 }
+
+export function getLink(maybeLink: DataTypeValue): Link | null {
+  if (
+    maybeLink != null &&
+    typeof maybeLink === 'object' &&
+    // @ts-expect-error this is safe
+    maybeLink.__link != null
+  ) {
+    return maybeLink as any;
+  }
+  return null;
+}
