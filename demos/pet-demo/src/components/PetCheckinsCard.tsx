@@ -1,11 +1,12 @@
 import React from 'react';
 import { iso } from '@iso';
-import { Card, CardContent } from '@mui/material';
+import { Button, Card, CardContent } from '@mui/material';
 
 export const PetCheckinsCard = iso(`
   field Pet.PetCheckinsCard @component {
     id
     checkins {
+      CheckinDisplay
       id
       location
       time
@@ -19,7 +20,7 @@ export const PetCheckinsCard = iso(`
         <ul>
           {data.checkins.map((checkin) => (
             <li key={checkin.id}>
-              <b>{checkin.location}</b> at {checkin.time}
+              <checkin.CheckinDisplay />
             </li>
           ))}
         </ul>
@@ -27,3 +28,18 @@ export const PetCheckinsCard = iso(`
     </Card>
   );
 });
+
+export const CheckinDisplay = iso(`
+  field Checkin.CheckinDisplay @component {
+    location,
+    time
+    make_super
+  }
+`)((checkin) => (
+  <b>
+    {checkin.location} at {checkin.time}&nbsp;
+    <Button onClick={() => checkin.make_super({})} variant="text">
+      🎉
+    </Button>
+  </b>
+));

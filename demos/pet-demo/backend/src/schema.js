@@ -113,6 +113,15 @@ export const schema = createSchema({
           id: params.input.id,
         };
       },
+      make_checkin_super: (_obj, params) => {
+        const checkin = checkins[params.checkin_id];
+        if (checkin != null) {
+          checkin.location = 'Super ' + checkin.location;
+          return { id: params.checkin_id };
+        } else {
+          return { id: null };
+        }
+      },
     },
     SetBestFriendResponse: {
       pet: (object) => {
@@ -122,6 +131,11 @@ export const schema = createSchema({
     SetPetTaglineResponse: {
       pet: (object) => {
         return getPet(object.id);
+      },
+    },
+    MakeCheckinSuperResponse: {
+      checkin: (object) => {
+        return checkins[object.id];
       },
     },
   },

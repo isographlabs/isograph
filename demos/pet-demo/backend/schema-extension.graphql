@@ -10,3 +10,9 @@ extend type Mutation
     path: "pet"
     fieldMap: [{ from: "id", to: "id" }]
   )
+  @exposeField(
+    field: "make_checkin_super"
+    as: "make_super"
+    path: "checkin"
+    fieldMap: [{ from: "id", to: "checkin_id" }]
+  )

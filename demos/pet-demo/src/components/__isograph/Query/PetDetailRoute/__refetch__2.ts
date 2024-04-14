@@ -1,48 +1,45 @@
-import type {IsographEntrypoint, NormalizationAst, RefetchQueryArtifactWrapper} from '@isograph/react';
-import type {Query__PetDetailRoute__param, Query__PetDetailRoute__outputType} from './reader';
-import readerResolver from './reader';
-import refetchQuery0 from './__refetch__0';
-import refetchQuery1 from './__refetch__1';
-import refetchQuery2 from './__refetch__2';
-const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [{ artifact: refetchQuery0, allowedVariables: [] }, { artifact: refetchQuery1, allowedVariables: [] }, { artifact: refetchQuery2, allowedVariables: [] }, ];
-
-const queryText = 'query PetDetailRoute ($id: ID!) {\
-  pet____id___v_id: pet(id: $id) {\
-    id,\
-    best_friend_relationship {\
-      best_friend {\
-        id,\
-        name,\
-        picture,\
-      },\
-      picture_together,\
-    },\
-    checkins {\
-      id,\
-      location,\
-      time,\
-    },\
-    favorite_phrase,\
-    name,\
-    potential_new_best_friends {\
+import type {IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst} from '@isograph/react';
+const queryText = 'mutation Petset_pet_tagline ($input: SetPetTaglineParams!) {\
+set_pet_tagline____input___v_input: set_pet_tagline(input: $input) {\
+pet { \
+  id,\
+  best_friend_relationship {\
+    best_friend {\
       id,\
       name,\
+      picture,\
     },\
-    tagline,\
+    picture_together,\
   },\
-}';
+  checkins {\
+    id,\
+    location,\
+    time,\
+  },\
+  favorite_phrase,\
+  name,\
+  potential_new_best_friends {\
+    id,\
+    name,\
+  },\
+  tagline,\
+}}}';
 
-const normalizationAst: NormalizationAst = [
-  {
-    kind: "Linked",
-    fieldName: "pet",
-    arguments: [
-      [
-        "id",
-        { kind: "Variable", name: "id" },
-      ],
+const normalizationAst: NormalizationAst = [{
+  kind: "Linked",
+  fieldName: "set_pet_tagline",
+  arguments: [
+    [
+      "input",
+      { kind: "Variable", name: "input" },
     ],
-    selections: [
+  ],
+  selections: [
+    {
+      kind: "Linked",
+      fieldName: "pet",
+      arguments: null,
+      selections: [
       {
         kind: "Scalar",
         fieldName: "id",
@@ -137,17 +134,13 @@ const normalizationAst: NormalizationAst = [
         arguments: null,
       },
     ],
-  },
-];
-const artifact: IsographEntrypoint<
-  Query__PetDetailRoute__param,
-  Query__PetDetailRoute__outputType
-> = {
-  kind: "Entrypoint",
+    },
+  ],
+}];
+const artifact: any = {
+  kind: "RefetchQuery",
   queryText,
   normalizationAst,
-  nestedRefetchQueries,
-  readerArtifact: readerResolver,
 };
 
 export default artifact;

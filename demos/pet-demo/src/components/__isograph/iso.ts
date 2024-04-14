@@ -1,4 +1,5 @@
 import type {IsographEntrypoint} from '@isograph/react';
+import { Checkin__CheckinDisplay__param } from './Checkin/CheckinDisplay/reader'
 import { Pet__FavoritePhraseLoader__param } from './Pet/FavoritePhraseLoader/reader'
 import { Pet__PetBestFriendCard__param } from './Pet/PetBestFriendCard/reader'
 import { Pet__PetCheckinsCard__param } from './Pet/PetCheckinsCard/reader'
@@ -30,6 +31,10 @@ type MatchesWhitespaceAndString<
   TString extends string,
   T
 > = Whitespace<T> extends `${TString}${string}` ? T : never;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Checkin.CheckinDisplay', T>
+): IdentityWithParamComponent<Checkin__CheckinDisplay__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.FavoritePhraseLoader', T>
