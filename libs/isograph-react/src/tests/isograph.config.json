@@ -1,0 +1,7 @@
+{
+  "project_root": ".",
+  "schema": "./schema.graphql",
+  "options": {
+    "on_invalid_id_type": "error"
+  }
+}

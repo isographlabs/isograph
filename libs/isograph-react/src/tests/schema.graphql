@@ -1,0 +1,16 @@
+type Query {
+  me: Economist!
+  you: Economist!
+  node(id: ID!): Node
+}
+
+type Economist implements Node {
+  id: ID!
+  name: String!
+  predecessor: Economist
+  successor: Economist
+}
+
+interface Node {
+  id: ID!
+}

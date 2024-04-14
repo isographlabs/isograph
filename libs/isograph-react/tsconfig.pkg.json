@@ -7,5 +7,6 @@
     "jsx": "react",
     "lib": ["es2017", "DOM"]
   },
-  "include": ["./**/*.ts", "./**/*.tsx"]
+  "include": ["./**/*.ts", "./**/*.tsx"],
+  "exclude": ["./src/tests/**/*"]
 }

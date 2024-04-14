@@ -10,7 +10,7 @@
   "scripts": {
     "compile": "rm -rf dist/* && tsc -p tsconfig.pkg.json",
     "compile-watch": "tsc -p tsconfig.pkg.json --watch",
-    "test": "echo no tests yet",
+    "test": "vitest run",
     "test-watch": "vitest watch",
     "coverage": "vitest run --coverage",
     "prepack": "yarn run test && yarn run compile"
