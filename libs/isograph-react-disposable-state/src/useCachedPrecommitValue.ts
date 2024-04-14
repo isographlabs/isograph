@@ -14,7 +14,7 @@ import { ItemCleanupPair } from '@isograph/disposable-types/dist';
  *   disposed by the time of the commit. If so, this hook checks the parent cache
  *   for another T or creates one, and passes this T to onCommit.
  * - If the T returned during the last render is not the same as the one that
- *   is passed to onCommit, during the commit phase, will schedule another render.
+ *   is passed to onCommit, during the commit phase, it will schedule another render.
  *
  * Invariant: the returned T has not been disposed during the tick of the render.
  * The T passed to the onCommit callback has not been disposed when the onCommit
