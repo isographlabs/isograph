@@ -133,10 +133,15 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Run unit tests
-        run: pnpm -r test
       - name: Build
         run: pnpm -r compile
+      - name: Run unit tests
+        # Note: unit tests have to run after building, because the unit tests
+        # rely on Isograph, which relies on @isograph/react being a valid input
+        #
+        # This can be overcome, if necessary, e.g. if "@isograph/react" was a
+        # parameter passed to the CLI.
+        run: pnpm -r test
 
   build-website:
     name: Build website
