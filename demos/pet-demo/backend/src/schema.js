@@ -13,43 +13,43 @@ const picturesTogether = [
 
 const checkins = [
   {
-    id: '0',
+    id: 'Checkin__0',
     location: 'Couch',
     pet_id: '0',
     time: '4:10pm',
   },
   {
-    id: '1',
+    id: 'Checkin__1',
     location: 'Food bowl',
     pet_id: '0',
     time: '10:30am',
   },
   {
-    id: '2',
+    id: 'Checkin__2',
     location: 'Doggie bed',
     pet_id: '0',
     time: '8:00am',
   },
   {
-    id: '3',
+    id: 'Checkin__3',
     location: 'Taco Bell',
     pet_id: '1',
     time: 'Many years ago',
   },
   {
-    id: '4',
+    id: 'Checkin__4',
     location: 'Crevice between couches',
     pet_id: '2',
     time: 'Every day',
   },
   {
-    id: '5',
+    id: 'Checkin__5',
     location: 'Hallway',
     pet_id: '3',
     time: '3:00pm',
   },
   {
-    id: '6',
+    id: 'Checkin__6',
     location: 'Dog park',
     pet_id: '3',
     time: '1:00pm',
@@ -114,7 +114,7 @@ export const schema = createSchema({
         };
       },
       make_checkin_super: (_obj, params) => {
-        const checkin = checkins[params.checkin_id];
+        const checkin = getCheckin(params.checkin_id);
         if (checkin != null) {
           checkin.location = 'Super ' + checkin.location;
           return { id: params.checkin_id };
@@ -134,9 +134,7 @@ export const schema = createSchema({
       },
     },
     MakeCheckinSuperResponse: {
-      checkin: (object) => {
-        return checkins[object.id];
-      },
+      checkin: (object) => getCheckin(object.id),
     },
   },
 });
@@ -204,4 +202,8 @@ const pets = [
 
 function getPet(id) {
   return pets[Number(id)];
+}
+
+function getCheckin(id) {
+  return checkins.find((checkin) => checkin.id === id);
 }
