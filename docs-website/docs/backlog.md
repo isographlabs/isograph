@@ -9,6 +9,7 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 - preloaded queries w/dispose
 - garbage collection & retention
 - subscriptions & granular rerendering
+- connections and pagination
 
 ## Top mid-term compiler/syntax priorities
 
@@ -16,6 +17,7 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 - Support for adding/removing fields from mutation field selections
 - asFoo typecast linked fields
   - Or syntax: bar: `as Foo { ... }`? This can always be added on afterward after some thought.
+- connections and pagination
 
 ## Top implementation detail priorities
 
