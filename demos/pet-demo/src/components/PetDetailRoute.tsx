@@ -23,7 +23,7 @@ export const PetDetailRoute = iso(`
   }
   return (
     <Container maxWidth="md">
-      <h1>Pet Detail for {data.pet?.name}</h1>
+      <h1>Pet Detail for {pet.name}</h1>
       <h3
         onClick={() => navigateTo({ kind: 'Home' })}
         style={{ cursor: 'pointer' }}
