@@ -10,35 +10,48 @@ import {
 } from './IsographEnvironment';
 import { ReaderAst } from './reader';
 
+export type WithEncounteredRecords<T> = {
+  encounteredRecords: Set<DataId>;
+  item: T;
+};
+
 export function read<TReadFromStore extends Object, TClientFieldValue>(
   environment: IsographEnvironment,
   fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>,
-): TClientFieldValue {
+): WithEncounteredRecords<TClientFieldValue> {
   const variant = fragmentReference.readerArtifact.variant;
   if (variant.kind === 'Eager') {
+    const mutableEncounteredRecords = new Set<DataId>();
     const data = readData(
       environment,
       fragmentReference.readerArtifact.readerAst,
       fragmentReference.root,
       fragmentReference.variables ?? {},
       fragmentReference.nestedRefetchQueries,
+      mutableEncounteredRecords,
     );
     if (data.kind === 'MissingData') {
       throw onNextChange(environment);
     } else {
-      // @ts-expect-error This not properly typed yet
-      return fragmentReference.readerArtifact.resolver(data.data);
+      return {
+        encounteredRecords: mutableEncounteredRecords,
+        // @ts-expect-error This not properly typed yet
+        item: fragmentReference.readerArtifact.resolver(data.data),
+      };
     }
   } else if (variant.kind === 'Component') {
-    // @ts-ignore
-    return getOrCreateCachedComponent(
-      environment,
-      fragmentReference.root,
-      variant.componentName,
-      fragmentReference.readerArtifact,
-      fragmentReference.variables ?? {},
-      fragmentReference.nestedRefetchQueries,
-    );
+    return {
+      // @ts-ignore
+      item: getOrCreateCachedComponent(
+        environment,
+        fragmentReference.root,
+        variant.componentName,
+        fragmentReference.readerArtifact,
+        fragmentReference.variables ?? {},
+        fragmentReference.nestedRefetchQueries,
+      ),
+      encounteredRecords: new Set(),
+    };
   }
   // Why can't Typescript realize that this is unreachable??
   throw new Error('This is unreachable');
@@ -47,13 +60,15 @@ export function read<TReadFromStore extends Object, TClientFieldValue>(
 export function readButDoNotEvaluate<TReadFromStore extends Object>(
   environment: IsographEnvironment,
   reference: FragmentReference<TReadFromStore, unknown>,
-): TReadFromStore {
+): WithEncounteredRecords<TReadFromStore> {
+  const mutableEncounteredRecords = new Set<DataId>();
   const response = readData(
     environment,
     reference.readerArtifact.readerAst,
     reference.root,
     reference.variables ?? {},
     reference.nestedRefetchQueries,
+    mutableEncounteredRecords,
   );
   if (typeof window !== 'undefined' && window.__LOG) {
     console.log('done reading', { response });
@@ -61,7 +76,10 @@ export function readButDoNotEvaluate<TReadFromStore extends Object>(
   if (response.kind === 'MissingData') {
     throw onNextChange(environment);
   } else {
-    return response.data;
+    return {
+      encounteredRecords: mutableEncounteredRecords,
+      item: response.data,
+    };
   }
 }
 
@@ -69,6 +87,7 @@ type ReadDataResult<TReadFromStore> =
   | {
       kind: 'Success';
       data: TReadFromStore;
+      encounteredRecords: Set<DataId>;
     }
   | {
       kind: 'MissingData';
@@ -82,14 +101,23 @@ function readData<TReadFromStore>(
   root: DataId,
   variables: { [index: string]: string },
   nestedRefetchQueries: RefetchQueryArtifactWrapper[],
+  mutableEncounteredRecords: Set<DataId>,
 ): ReadDataResult<TReadFromStore> {
+  mutableEncounteredRecords.add(root);
   let storeRecord = environment.store[root];
   if (storeRecord === undefined) {
-    return { kind: 'MissingData', reason: 'No record for root ' + root };
+    return {
+      kind: 'MissingData',
+      reason: 'No record for root ' + root,
+    };
   }
 
   if (storeRecord === null) {
-    return { kind: 'Success', data: null as any };
+    return {
+      kind: 'Success',
+      data: null as any,
+      encounteredRecords: mutableEncounteredRecords,
+    };
   }
 
   let target: { [index: string]: any } = {};
@@ -138,6 +166,7 @@ function readData<TReadFromStore>(
               link.__link,
               variables,
               nestedRefetchQueries,
+              mutableEncounteredRecords,
             );
             if (result.kind === 'MissingData') {
               return {
@@ -194,6 +223,7 @@ function readData<TReadFromStore>(
           targetId,
           variables,
           nestedRefetchQueries,
+          mutableEncounteredRecords,
         );
         if (data.kind === 'MissingData') {
           return {
@@ -213,6 +243,7 @@ function readData<TReadFromStore>(
           variables,
           // Refetch fields just read the id, and don't need refetch query artifacts
           [],
+          mutableEncounteredRecords,
         );
         if (typeof window !== 'undefined' && window.__LOG) {
           console.log('refetch field data', data, field);
@@ -253,8 +284,9 @@ function readData<TReadFromStore>(
           field.readerArtifact.readerAst,
           root,
           variables,
-          // Refetch fields just read the id, and don't need refetch query artifacts
+          // Mutation don't need refetch query artifacts
           [],
+          mutableEncounteredRecords,
         );
         if (typeof window !== 'undefined' && window.__LOG) {
           console.log('refetch field data', data, field);
@@ -298,6 +330,7 @@ function readData<TReadFromStore>(
             root,
             variables,
             resolverRefetchQueries,
+            mutableEncounteredRecords,
           );
           if (data.kind === 'MissingData') {
             return {
@@ -323,7 +356,11 @@ function readData<TReadFromStore>(
       }
     }
   }
-  return { kind: 'Success', data: target as any };
+  return {
+    kind: 'Success',
+    data: target as any,
+    encounteredRecords: mutableEncounteredRecords,
+  };
 }
 
 function filterVariables(

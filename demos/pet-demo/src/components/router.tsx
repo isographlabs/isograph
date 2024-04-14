@@ -83,3 +83,8 @@ function PetDetailRouteLoader({
   const Component = useResult(queryReference);
   return <Component navigateTo={navigateTo} />;
 }
+
+if (typeof window !== 'undefined') {
+  // @ts-expect-error
+  window.__LOG = true;
+}

@@ -213,29 +213,52 @@ function normalizeData(
   if (typeof window !== 'undefined' && window.__LOG) {
     console.log('after normalization', { store: environment.store });
   }
-  callSubscriptions(environment);
+  callSubscriptions(environment, encounteredIds);
   return encounteredIds;
 }
 
 export function subscribe(
   environment: IsographEnvironment,
+  encounteredRecords: Set<DataId> | null,
   callback: () => void,
 ): () => void {
-  environment.subscriptions.add(callback);
-  return () => environment.subscriptions.delete(callback);
+  const callbackAndRecords = {
+    callback,
+    records: encounteredRecords,
+  };
+  environment.subscriptions.add(callbackAndRecords);
+  return () => environment.subscriptions.delete(callbackAndRecords);
 }
 
 export function onNextChange(environment: IsographEnvironment): Promise<void> {
   return new Promise((resolve) => {
-    const unsubscribe = subscribe(environment, () => {
+    const unsubscribe = subscribe(environment, null, () => {
       unsubscribe();
       resolve();
     });
   });
 }
 
-function callSubscriptions(environment: IsographEnvironment) {
-  environment.subscriptions.forEach((callback) => callback());
+function callSubscriptions(
+  environment: IsographEnvironment,
+  recordsEncounteredWhenNormalizing: Set<DataId>,
+) {
+  environment.subscriptions.forEach(({ callback, records }) => {
+    if (records === null) {
+      callback();
+    } else if (hasOverlappingIds(recordsEncounteredWhenNormalizing, records)) {
+      callback();
+    }
+  });
+}
+
+function hasOverlappingIds(set1: Set<DataId>, set2: Set<DataId>): boolean {
+  for (const id of set1) {
+    if (set2.has(id)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**

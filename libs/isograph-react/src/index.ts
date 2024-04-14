@@ -58,3 +58,4 @@ export {
   ArgumentValue,
   Arguments,
 } from './util';
+export { useRerenderWhenEncounteredRecordChanges } from './useRerenderWhenEncounteredRecordChanges';

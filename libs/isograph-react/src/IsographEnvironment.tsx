@@ -9,7 +9,11 @@ type ComponentCache = {
   };
 };
 
-export type Subscriptions = Set<() => void>;
+type CallbackAndRecords = {
+  callback: () => void;
+  records: Set<DataId> | null;
+};
+type Subscriptions = Set<CallbackAndRecords>;
 type SuspenseCache = { [index: string]: ParentCache<any> };
 
 export type IsographEnvironment = {

@@ -1,20 +1,19 @@
-import { useEffect, useState } from 'react';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
-import { subscribe } from './cache';
 import { read } from './read';
 import { FragmentReference } from './FragmentReference';
+import { useRerenderWhenEncounteredRecordChanges } from './useRerenderWhenEncounteredRecordChanges';
 
 export function useResult<TReadFromStore extends Object, TClientFieldValue>(
   fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>,
 ): TClientFieldValue {
   const environment = useIsographEnvironment();
 
-  const [, setState] = useState<object | void>();
-  useEffect(() => {
-    return subscribe(environment, () => {
-      return setState({});
-    });
-  }, []);
+  const { item: data, encounteredRecords } = read(
+    environment,
+    fragmentReference,
+  );
 
-  return read(environment, fragmentReference);
+  useRerenderWhenEncounteredRecordChanges(environment, encounteredRecords);
+
+  return data;
 }
