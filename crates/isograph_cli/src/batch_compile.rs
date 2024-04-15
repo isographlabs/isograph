@@ -8,6 +8,7 @@ use colored::Colorize;
 use common_lang_types::{
     FilePath, Location, SourceFileName, Span, TextSource, WithLocation, WithSpan,
 };
+use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
 use graphql_schema_parser::{parse_schema, parse_schema_extensions, SchemaParseError};
 use intern::string_key::Intern;
 use isograph_config::CompilerConfig;
@@ -89,38 +90,9 @@ pub(crate) fn handle_compile_command(
     config: &CompilerConfig,
 ) -> WithDuration<Result<CompilationStats, BatchCompileError>> {
     WithDuration::new(|| {
-        let content = read_schema_file(&config.schema)?;
-        let schema_text_source = TextSource {
-            path: config
-                .schema
-                .to_str()
-                .expect("Expected schema to be valid string")
-                .intern()
-                .into(),
-            span: None,
-        };
-        let type_system_document = parse_schema(&content, schema_text_source)
-            .map_err(|with_span| with_span.to_with_location(schema_text_source))?;
+        let type_system_document = read_and_parse_graphql_schema(config)?;
 
-        let type_extension_documents = config
-            .schema_extensions
-            .iter()
-            .map(|schema_extension_path| {
-                let extension_text_source = TextSource {
-                    path: schema_extension_path
-                        .to_str()
-                        .expect("Expected schema extension to be valid string")
-                        .intern()
-                        .into(),
-                    span: None,
-                };
-                let extension_content = read_schema_file(schema_extension_path)?;
-                let type_extension_document =
-                    parse_schema_extensions(&extension_content, extension_text_source)
-                        .map_err(|with_span| with_span.to_with_location(extension_text_source))?;
-                Ok(type_extension_document)
-            })
-            .collect::<Result<Vec<_>, BatchCompileError>>()?;
+        let type_extension_documents = read_and_parse_graphql_schema_extension(config)?;
 
         let mut schema = UnvalidatedSchema::new();
 
@@ -153,16 +125,7 @@ pub(crate) fn handle_compile_command(
             )?;
         }
 
-        let canonicalized_root_path = {
-            let current_dir = std::env::current_dir().expect("current_dir should exist");
-            let joined = current_dir.join(&config.project_root);
-            joined
-                .canonicalize()
-                .map_err(|message| BatchCompileError::UnableToLoadSchema {
-                    path: joined.clone(),
-                    message,
-                })?
-        };
+        let canonicalized_root_path = get_canonicalized_root_path(config)?;
 
         // TODO return an iterator
         let project_files = read_files_in_folder(&canonicalized_root_path)?;
@@ -199,6 +162,59 @@ pub(crate) fn handle_compile_command(
             total_artifacts_written,
         })
     })
+}
+
+fn get_canonicalized_root_path(config: &CompilerConfig) -> Result<PathBuf, BatchCompileError> {
+    let current_dir = std::env::current_dir().expect("current_dir should exist");
+    let joined = current_dir.join(&config.project_root);
+    joined
+        .canonicalize()
+        .map_err(|message| BatchCompileError::UnableToLoadSchema {
+            path: joined.clone(),
+            message,
+        })
+}
+
+fn read_and_parse_graphql_schema_extension(
+    config: &CompilerConfig,
+) -> Result<Vec<GraphQLTypeSystemExtensionDocument>, BatchCompileError> {
+    config
+        .schema_extensions
+        .iter()
+        .map(|schema_extension_path| {
+            let extension_text_source = TextSource {
+                path: schema_extension_path
+                    .to_str()
+                    .expect("Expected schema extension to be valid string")
+                    .intern()
+                    .into(),
+                span: None,
+            };
+            let extension_content = read_schema_file(schema_extension_path)?;
+            let type_extension_document =
+                parse_schema_extensions(&extension_content, extension_text_source)
+                    .map_err(|with_span| with_span.to_with_location(extension_text_source))?;
+            Ok(type_extension_document)
+        })
+        .collect::<Result<Vec<_>, BatchCompileError>>()
+}
+
+fn read_and_parse_graphql_schema(
+    config: &CompilerConfig,
+) -> Result<GraphQLTypeSystemDocument, BatchCompileError> {
+    let content = read_schema_file(&config.schema)?;
+    let schema_text_source = TextSource {
+        path: config
+            .schema
+            .to_str()
+            .expect("Expected schema to be valid string")
+            .intern()
+            .into(),
+        span: None,
+    };
+    let type_system_document = parse_schema(&content, schema_text_source)
+        .map_err(|with_span| with_span.to_with_location(schema_text_source))?;
+    Ok(type_system_document)
 }
 
 fn process_client_fields_and_entrypoints(
