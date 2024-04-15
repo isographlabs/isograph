@@ -183,3 +183,5 @@ set_foo {
 - directive on scalar that affects the JS representation of scalars
 - ability to pass a parameter down to the child, e.g. an abstract component can read from its concrete parent an object that implements a given interface. e.g. in order to implement Node, you must implement an id field.
 - exposeField errors are pretty bad right now
+
+- date transformations and other types
