@@ -196,10 +196,8 @@ pub struct MutationFieldArtifactInfo {
 /// This struct contains everything that is available when we start
 /// generating a merged selection set for a given fetchable resolver root.
 /// A mutable reference to this struct is passed down to all children.
-#[allow(unused)]
 #[derive(Debug)]
 struct MergeTraversalState<'a> {
-    entrypoint: &'a ValidatedClientField,
     paths_to_refetch_fields: Vec<(PathToRefetchField, ObjectId, ClientFieldVariant)>,
     /// As we traverse selection sets, we need to keep track of the path we have
     /// taken so far. This is because when we encounter a refetch query, we need
@@ -215,12 +213,8 @@ struct MergeTraversalState<'a> {
 }
 
 impl<'a> MergeTraversalState<'a> {
-    pub fn new(
-        entrypoint: &'a ValidatedClientField,
-        encountered_client_field_ids: Option<&'a mut HashSet<ClientFieldId>>,
-    ) -> Self {
+    pub fn new(encountered_client_field_ids: Option<&'a mut HashSet<ClientFieldId>>) -> Self {
         Self {
-            entrypoint,
             paths_to_refetch_fields: Default::default(),
             current_path: Default::default(),
             encountered_client_field_ids,
@@ -238,8 +232,7 @@ pub fn create_merged_selection_set(
     // N.B. we call this for non-fetchable resolvers now, but that is a smell
     entrypoint: &ValidatedClientField,
 ) -> (MergedSelectionSet, Vec<RootRefetchedPath>) {
-    let mut merge_traversal_state =
-        MergeTraversalState::new(entrypoint, encountered_client_field_ids);
+    let mut merge_traversal_state = MergeTraversalState::new(encountered_client_field_ids);
     let merged_selection_set = create_merged_selection_set_with_merge_traversal_state(
         schema,
         parent_type,
