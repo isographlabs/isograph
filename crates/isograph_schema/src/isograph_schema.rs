@@ -120,8 +120,8 @@ pub enum FieldDefinitionLocation<TServer, TClient> {
     Client(TClient),
 }
 
-impl<TFieldAssociatedData, TResolverType>
-    FieldDefinitionLocation<TFieldAssociatedData, TResolverType>
+impl<TFieldAssociatedData, TClientFieldType>
+    FieldDefinitionLocation<TFieldAssociatedData, TClientFieldType>
 {
     pub fn as_server_field(&self) -> Option<&TFieldAssociatedData> {
         match self {
@@ -130,7 +130,7 @@ impl<TFieldAssociatedData, TResolverType>
         }
     }
 
-    pub fn as_client_field(&self) -> Option<&TResolverType> {
+    pub fn as_client_field(&self) -> Option<&TClientFieldType> {
         match self {
             FieldDefinitionLocation::Server(_) => None,
             FieldDefinitionLocation::Client(resolver_field) => Some(resolver_field),
@@ -475,9 +475,9 @@ pub struct MutationFieldResolverActionKindInfo {
 
 #[derive(Debug)]
 pub struct ClientField<
-    TResolverSelectionScalarFieldAssociatedData,
-    TResolverSelectionLinkedFieldAssociatedData,
-    TResolverVariableDefinitionAssociatedData,
+    TClientFieldSelectionScalarFieldAssociatedData,
+    TClientFieldSelectionLinkedFieldAssociatedData,
+    TClientFieldVariableDefinitionAssociatedData,
 > {
     pub description: Option<DescriptionValue>,
     // TODO make this a ResolverName that can be converted into a SelectableFieldName
@@ -492,8 +492,8 @@ pub struct ClientField<
         Vec<
             WithSpan<
                 Selection<
-                    TResolverSelectionScalarFieldAssociatedData,
-                    TResolverSelectionLinkedFieldAssociatedData,
+                    TClientFieldSelectionScalarFieldAssociatedData,
+                    TClientFieldSelectionLinkedFieldAssociatedData,
                 >,
             >,
         >,
@@ -506,7 +506,7 @@ pub struct ClientField<
     pub action_kind: ClientFieldActionKind,
 
     pub variable_definitions:
-        Vec<WithSpan<VariableDefinition<TResolverVariableDefinitionAssociatedData>>>,
+        Vec<WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
 
     // TODO this is probably unused
     // Why is this not calculated when needed?

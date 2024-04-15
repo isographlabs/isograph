@@ -15,12 +15,12 @@ import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoin
 import entrypoint_Query__PetDetailRoute from '../__isograph/Query/PetDetailRoute/entrypoint';
 import entrypoint_Query__PetFavoritePhrase from '../__isograph/Query/PetFavoritePhrase/entrypoint';
 
-type IdentityWithParam<TParam> = <TResolverReturn>(
-  x: (param: TParam) => TResolverReturn
-) => (param: TParam) => TResolverReturn;
-type IdentityWithParamComponent<TParam> = <TResolverReturn, TSecondParam = Record<string, never>>(
-  x: (data: TParam, secondParam: TSecondParam) => TResolverReturn
-) => (data: TParam, secondParam: TSecondParam) => TResolverReturn;
+type IdentityWithParam<TParam> = <TClientFieldReturn>(
+  x: (param: TParam) => TClientFieldReturn
+) => (param: TParam) => TClientFieldReturn;
+type IdentityWithParamComponent<TParam> = <TClientFieldReturn, TSecondParam = Record<string, never>>(
+  x: (data: TParam, secondParam: TSecondParam) => TClientFieldReturn
+) => (data: TParam, secondParam: TSecondParam) => TClientFieldReturn;
 
 type WhitespaceCharacter = ' ' | '\t' | '\n';
 type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
@@ -97,9 +97,9 @@ export function iso(_isographLiteralText: string):
   | IdentityWithParamComponent<any>
   | IsographEntrypoint<any, any>
 {
-  return function identity<TResolverReturn>(
-    clientFieldOrEntrypoint: (param: any) => TResolverReturn,
-  ): (param: any) => TResolverReturn {
+  return function identity<TClientFieldReturn>(
+    clientFieldOrEntrypoint: (param: any) => TClientFieldReturn,
+  ): (param: any) => TClientFieldReturn {
     return clientFieldOrEntrypoint;
   };
 }

@@ -13,6 +13,6 @@ export type FragmentReference<
   readerArtifact: ReaderArtifact<TReadFromStore, TClientFieldValue>;
   root: DataId;
   variables: { [index: string]: Variable } | null;
-  // TODO: We should instead have ReaderAst<TResolverProps>
+  // TODO: We should instead have ReaderAst<TClientFieldProps>
   nestedRefetchQueries: RefetchQueryArtifactWrapper[];
 };

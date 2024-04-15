@@ -130,12 +130,12 @@ fn build_iso_overload<'schema>(schema: &'schema ValidatedSchema) -> PathAndConte
     let mut imports = "import type {IsographEntrypoint} from '@isograph/react';\n".to_string();
     let mut content = String::from(
         "
-type IdentityWithParam<TParam> = <TResolverReturn>(
-  x: (param: TParam) => TResolverReturn
-) => (param: TParam) => TResolverReturn;
-type IdentityWithParamComponent<TParam> = <TResolverReturn, TSecondParam = Record<string, never>>(
-  x: (data: TParam, secondParam: TSecondParam) => TResolverReturn
-) => (data: TParam, secondParam: TSecondParam) => TResolverReturn;
+type IdentityWithParam<TParam> = <TClientFieldReturn>(
+  x: (param: TParam) => TClientFieldReturn
+) => (param: TParam) => TClientFieldReturn;
+type IdentityWithParamComponent<TParam> = <TClientFieldReturn, TSecondParam = Record<string, never>>(
+  x: (data: TParam, secondParam: TSecondParam) => TClientFieldReturn
+) => (data: TParam, secondParam: TSecondParam) => TClientFieldReturn;
 
 type WhitespaceCharacter = ' ' | '\\t' | '\\n';
 type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
@@ -171,9 +171,9 @@ export function iso(_isographLiteralText: string):
   | IdentityWithParamComponent<any>
   | IsographEntrypoint<any, any>
 {
-  return function identity<TResolverReturn>(
-    clientFieldOrEntrypoint: (param: any) => TResolverReturn,
-  ): (param: any) => TResolverReturn {
+  return function identity<TClientFieldReturn>(
+    clientFieldOrEntrypoint: (param: any) => TClientFieldReturn,
+  ): (param: any) => TClientFieldReturn {
     return clientFieldOrEntrypoint;
   };
 }",
