@@ -17,7 +17,7 @@ use isograph_lang_types::{
 };
 use lazy_static::lazy_static;
 
-use crate::{ClientFieldVariant, FieldMapItem};
+use crate::ClientFieldVariant;
 
 lazy_static! {
     pub static ref ID_GRAPHQL_TYPE: GraphQLScalarTypeName = "ID".intern().into();
@@ -456,11 +456,6 @@ impl ObjectTypeAndFieldNames {
             format!("../{field_name}/{}", file_type)
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct MutationFieldResolverActionKindInfo {
-    pub field_map: Vec<FieldMapItem>,
 }
 
 #[derive(Debug)]
