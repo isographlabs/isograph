@@ -1,8 +1,9 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use common_lang_types::{IsographObjectTypeName, SelectableFieldName};
-use intern::string_key::Intern;
-use isograph_schema::{ClientFieldVariant, ObjectTypeAndFieldNames, READER, READER_OUTPUT_TYPE};
+use isograph_schema::{
+    ClientFieldVariant, ObjectTypeAndFieldNames, READER, READER_OUTPUT_TYPE, READER_PARAM_TYPE,
+};
 
 use crate::generate_artifacts::{
     ClientFieldOutputType, EntrypointArtifactInfo, JavaScriptImports, PathAndContent,
@@ -117,17 +118,17 @@ impl<'schema> ReaderArtifactInfo<'schema> {
         vec![
             PathAndContent {
                 relative_directory: relative_directory.clone(),
-                file_name_prefix: "reader".intern().into(),
+                file_name_prefix: *READER,
                 file_content: reader_content,
             },
             PathAndContent {
                 relative_directory: relative_directory.clone(),
-                file_name_prefix: "param_type".intern().into(),
+                file_name_prefix: *READER_PARAM_TYPE,
                 file_content: param_type_content,
             },
             PathAndContent {
                 relative_directory: relative_directory.clone(),
-                file_name_prefix: "output_type".intern().into(),
+                file_name_prefix: *READER_OUTPUT_TYPE,
                 file_content: output_type_content,
             },
         ]
