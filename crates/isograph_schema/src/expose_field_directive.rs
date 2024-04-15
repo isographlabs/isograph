@@ -15,10 +15,9 @@ use isograph_lang_types::{
 use serde::Deserialize;
 
 use crate::{
-    ArgumentMap, ClientField, ClientFieldActionKind, ClientFieldVariant, FieldDefinitionLocation,
-    FieldMapItem, MutationFieldClientFieldVariant, MutationFieldResolverActionKindInfo,
-    ObjectTypeAndFieldNames, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
-    ProcessedFieldMapItem, UnvalidatedSchema,
+    ArgumentMap, ClientField, ClientFieldVariant, FieldDefinitionLocation, FieldMapItem,
+    MutationFieldClientFieldVariant, ObjectTypeAndFieldNames, ProcessTypeDefinitionError,
+    ProcessTypeDefinitionResult, ProcessedFieldMapItem, UnvalidatedSchema,
 };
 use lazy_static::lazy_static;
 
@@ -228,6 +227,7 @@ impl UnvalidatedSchema {
                     mutation_field_arguments: mutation_field_arguments.to_vec(),
                     filtered_mutation_field_arguments: mutation_field_args_without_id.to_vec(),
                     mutation_primary_field_return_type_object_id: maybe_abstract_parent_object_id,
+                    field_map: field_map.to_vec(),
                 }),
                 variable_definitions: vec![],
                 type_and_field: ObjectTypeAndFieldNames {
@@ -236,12 +236,6 @@ impl UnvalidatedSchema {
                     field_name: mutation_field_name, // set_pet_best_friend
                 },
                 parent_object_id: maybe_abstract_parent_object_id,
-                action_kind: ClientFieldActionKind::MutationField(
-                    MutationFieldResolverActionKindInfo {
-                        // TODO don't clone
-                        field_map: field_map.to_vec(),
-                    },
-                ),
             };
             self.client_fields.push(mutation_client_field);
 

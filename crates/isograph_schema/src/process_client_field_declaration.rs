@@ -1,20 +1,17 @@
 use std::fmt;
 
 use common_lang_types::{
-    IsographDirectiveName, IsographObjectTypeName, Location, SelectableFieldName, TextSource,
-    UnvalidatedTypeName, WithLocation, WithSpan,
+    ConstExportName, FilePath, IsographDirectiveName, IsographObjectTypeName, Location,
+    SelectableFieldName, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::string_key::Intern;
-use isograph_lang_types::{
-    ClientFieldDeclaration, FragmentDirectiveUsage, ObjectId, SelectableFieldId,
-};
+use isograph_lang_types::{ClientFieldDeclaration, ObjectId, SelectableFieldId};
 use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    ClientField, ClientFieldActionKind, FieldDefinitionLocation, ObjectTypeAndFieldNames,
-    UnvalidatedSchema,
+    ClientField, FieldDefinitionLocation, FieldMapItem, ObjectTypeAndFieldNames, UnvalidatedSchema,
 };
 
 impl UnvalidatedSchema {
@@ -86,21 +83,7 @@ impl UnvalidatedSchema {
         object.client_field_ids.push(next_resolver_id);
 
         let name = client_field_declaration.item.client_field_name.item.into();
-        let variant = get_resolver_variant(&client_field_declaration.item.directives);
-        let action_kind = ClientFieldActionKind::NamedImport((
-            client_field_declaration.item.const_export_name,
-            client_field_declaration.item.definition_path,
-        ));
-
-        // TODO variant should carry payloads, instead of this check
-        if variant == ClientFieldVariant::Component {
-            if !matches!(action_kind, ClientFieldActionKind::NamedImport(_)) {
-                return Err(WithSpan::new(
-                    ProcessClientFieldDeclarationError::ComponentResolverMissingJsFunction,
-                    resolver_field_name_span,
-                ));
-            }
-        }
+        let variant = get_resolver_variant(&client_field_declaration.item);
 
         self.client_fields.push(ClientField {
             description: None,
@@ -115,7 +98,6 @@ impl UnvalidatedSchema {
             },
 
             parent_object_id,
-            action_kind,
         });
         Ok(())
     }
@@ -159,12 +141,13 @@ pub struct MutationFieldClientFieldVariant {
     pub mutation_primary_field_return_type_object_id: ObjectId,
     pub mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
     pub filtered_mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+    pub field_map: Vec<FieldMapItem>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ClientFieldVariant {
-    Component,
-    Eager,
+    Component((ConstExportName, FilePath)),
+    Eager((ConstExportName, FilePath)),
     RefetchField,
     MutationField(MutationFieldClientFieldVariant),
 }
@@ -172,8 +155,8 @@ pub enum ClientFieldVariant {
 impl fmt::Display for ClientFieldVariant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ClientFieldVariant::Component => write!(f, "Component"),
-            ClientFieldVariant::Eager => write!(f, "Eager"),
+            ClientFieldVariant::Component(_) => write!(f, "Component"),
+            ClientFieldVariant::Eager(_) => write!(f, "Eager"),
             ClientFieldVariant::RefetchField => write!(f, "RefetchField"),
             ClientFieldVariant::MutationField(_) => write!(f, "MutationField"),
         }
@@ -184,11 +167,17 @@ lazy_static! {
     static ref COMPONENT: IsographDirectiveName = "component".intern().into();
 }
 
-fn get_resolver_variant(directives: &[WithSpan<FragmentDirectiveUsage>]) -> ClientFieldVariant {
-    for directive in directives.iter() {
+fn get_resolver_variant(client_field_declaration: &ClientFieldDeclaration) -> ClientFieldVariant {
+    for directive in client_field_declaration.directives.iter() {
         if directive.item.name.item == *COMPONENT {
-            return ClientFieldVariant::Component;
+            return ClientFieldVariant::Component((
+                client_field_declaration.const_export_name,
+                client_field_declaration.definition_path,
+            ));
         }
     }
-    return ClientFieldVariant::Eager;
+    return ClientFieldVariant::Eager((
+        client_field_declaration.const_export_name,
+        client_field_declaration.definition_path,
+    ));
 }

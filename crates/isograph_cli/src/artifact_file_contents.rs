@@ -75,7 +75,7 @@ impl<'schema> ReaderArtifactInfo<'schema> {
         // We are not modeling this well, I think.
         let parent_name = parent_type.name;
         let variant = match resolver_variant {
-            ClientFieldVariant::Component => {
+            ClientFieldVariant::Component(_) => {
                 format!("{{ kind: \"Component\", componentName: \"{parent_name}.{resolver_field_name}\" }}")
             }
             _ => "{ kind: \"Eager\" }".to_string(),

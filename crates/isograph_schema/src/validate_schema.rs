@@ -411,7 +411,6 @@ fn validate_client_field_selection_set(
                 variable_definitions,
                 type_and_field: unvalidated_client_field.type_and_field,
                 parent_object_id: unvalidated_client_field.parent_object_id,
-                action_kind: unvalidated_client_field.action_kind,
             })
         }
         None => Ok(ClientField {
@@ -423,7 +422,6 @@ fn validate_client_field_selection_set(
             variable_definitions,
             type_and_field: unvalidated_client_field.type_and_field,
             parent_object_id: unvalidated_client_field.parent_object_id,
-            action_kind: unvalidated_client_field.action_kind,
         }),
     }
 }

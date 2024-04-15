@@ -308,6 +308,7 @@ pub fn create_merged_selection_set(
                                     mutation_field_arguments,
                                     filtered_mutation_field_arguments: _,
                                     mutation_primary_field_return_type_object_id,
+                                    field_map: _,
                                 },
                             ) => {
                                 let requires_refinement =
@@ -602,6 +603,7 @@ fn merge_scalar_resolver_field(
         filtered_mutation_field_arguments,
         mutation_field_name: _,
         mutation_primary_field_return_type_object_id,
+        field_map,
     }) = &client_field.variant
     {
         merge_traversal_state.paths_to_refetch_fields.push((
@@ -615,6 +617,7 @@ fn merge_scalar_resolver_field(
                 filtered_mutation_field_arguments: filtered_mutation_field_arguments.clone(),
                 mutation_primary_field_return_type_object_id:
                     *mutation_primary_field_return_type_object_id,
+                field_map: field_map.clone(),
             }),
         ));
     }

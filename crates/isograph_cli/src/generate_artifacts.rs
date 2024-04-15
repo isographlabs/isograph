@@ -22,8 +22,8 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_client_field,
-    ArtifactQueueItem, ClientFieldActionKind, ClientFieldVariant, FieldDefinitionLocation,
-    FieldMapItem, MergedLinkedFieldSelection, MergedScalarFieldSelection, MergedSelectionSet,
+    ArtifactQueueItem, ClientFieldVariant, FieldDefinitionLocation, FieldMapItem,
+    MergedLinkedFieldSelection, MergedScalarFieldSelection, MergedSelectionSet,
     MergedServerFieldSelection, MutationFieldResolverInfo, NameAndArguments,
     ObjectTypeAndFieldNames, PathToRefetchField, RefetchFieldResolverInfo, RequiresRefinement,
     RootRefetchedPath, ValidatedClientField, ValidatedSchema, ValidatedSchemaObject,
@@ -104,7 +104,7 @@ fn build_iso_overload_for_client_defined_field(
         "field {}.{}",
         client_field.type_and_field.type_name, client_field.type_and_field.field_name
     );
-    if matches!(client_field.variant, ClientFieldVariant::Component) {
+    if matches!(client_field.variant, ClientFieldVariant::Component(_)) {
         s.push_str(&format!(
             "
 export function iso<T>(
@@ -256,8 +256,8 @@ fn client_defined_fields<'a>(
 ) -> impl Iterator<Item = &'a ValidatedClientField> + 'a {
     schema.client_fields.iter().filter(|client_field| {
         matches!(
-            client_field.action_kind,
-            ClientFieldActionKind::NamedImport(_)
+            client_field.variant,
+            ClientFieldVariant::Component(_) | ClientFieldVariant::Eager(_)
         )
     })
 }
@@ -687,7 +687,7 @@ fn generate_reader_artifact<'schema>(
         );
         let client_field_output_type = generate_output_type(client_field);
         let function_import_statement = generate_function_import_statement(
-            &client_field.action_kind,
+            &client_field.variant,
             project_root,
             artifact_directory,
         );
@@ -1004,25 +1004,13 @@ fn generate_client_field_parameter_type(
             schema,
             &mut client_field_parameter_type,
             selection,
-            // Variant "unwrapping" only matters for the top-level parameter type,
-            // doing it for nested selections is leads to situations where linked fields
-            // show up as linkedField: { data: /* actualLinkedFields */ }
-            // TODO this works, but should be cleaned up
-            &ClientFieldVariant::Eager,
+            variant,
             parent_type,
             nested_client_field_imports,
             indentation_level + 1,
         );
     }
     client_field_parameter_type.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
-
-    if variant == &ClientFieldVariant::Component {
-        client_field_parameter_type = format!(
-            "{}{}",
-            "  ".repeat(indentation_level as usize),
-            client_field_parameter_type,
-        );
-    }
 
     ClientFieldParameterType(client_field_parameter_type)
 }
@@ -1175,12 +1163,12 @@ fn print_non_null_type_annotation<T: Display>(non_null: &NonNullTypeAnnotation<T
 }
 
 fn generate_function_import_statement(
-    action_kind: &ClientFieldActionKind,
+    action_kind: &ClientFieldVariant,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
 ) -> ClientFieldFunctionImportStatement {
     match action_kind {
-        ClientFieldActionKind::NamedImport((name, path)) => {
+        ClientFieldVariant::Component((name, path)) | ClientFieldVariant::Eager((name, path))=> {
             let path_to_client_field = project_root
                 .join(PathBuf::from_str(path.lookup()).expect(
                     "paths should be legal here. This is indicative of a bug in Isograph.",
@@ -1204,7 +1192,7 @@ fn generate_function_import_statement(
                 relative_path.to_str().expect("This path should be stringifiable. This probably is indicative of a bug in Relay.")
             ))
         }
-        ClientFieldActionKind::RefetchField => ClientFieldFunctionImportStatement(format!(
+        ClientFieldVariant::RefetchField => ClientFieldFunctionImportStatement(format!(
             "import {{ makeNetworkRequest, type IsographEnvironment, type IsographEntrypoint }} from '@isograph/react';\n\
                 const resolver = (\n\
                 {}environment: IsographEnvironment,\n\
@@ -1214,7 +1202,7 @@ fn generate_function_import_statement(
                 makeNetworkRequest(environment, artifact, variables);",
             "  ", "  ", "  "
         )),
-        ClientFieldActionKind::MutationField(ref m) => {
+        ClientFieldVariant::MutationField(ref m) => {
             let spaces = "  ";
             let include_read_out_data = get_read_out_data(&m.field_map);
             ClientFieldFunctionImportStatement(format!(
@@ -1661,10 +1649,10 @@ fn get_nested_refetch_query_text(
 fn generate_output_type(client_field: &ValidatedClientField) -> ClientFieldOutputType {
     match &client_field.variant {
         variant => match variant {
-            ClientFieldVariant::Component => {
+            ClientFieldVariant::Component(_) => {
                 ClientFieldOutputType("(React.FC<ExtractSecondParam<typeof resolver>>)".to_string())
             }
-            ClientFieldVariant::Eager => {
+            ClientFieldVariant::Eager(_) => {
                 ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
             }
             ClientFieldVariant::RefetchField => ClientFieldOutputType("() => void".to_string()),

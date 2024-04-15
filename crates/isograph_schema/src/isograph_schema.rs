@@ -1,9 +1,9 @@
 use std::{collections::HashMap, fmt::Debug};
 
 use common_lang_types::{
-    ConstExportName, DescriptionValue, FieldArgumentName, FilePath, GraphQLInterfaceTypeName,
-    GraphQLScalarTypeName, HasName, InputTypeName, IsographObjectTypeName, JavascriptName,
-    SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
+    DescriptionValue, FieldArgumentName, GraphQLInterfaceTypeName, GraphQLScalarTypeName, HasName,
+    InputTypeName, IsographObjectTypeName, JavascriptName, SelectableFieldName,
+    UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInputObjectTypeDefinition,
@@ -459,16 +459,6 @@ impl ObjectTypeAndFieldNames {
 }
 
 #[derive(Debug, Clone)]
-pub enum ClientFieldActionKind {
-    /// Associated js function
-    NamedImport((ConstExportName, FilePath)),
-    /// Refetch fields
-    RefetchField,
-    /// Mutation field
-    MutationField(MutationFieldResolverActionKindInfo),
-}
-
-#[derive(Debug, Clone)]
 pub struct MutationFieldResolverActionKindInfo {
     pub field_map: Vec<FieldMapItem>,
 }
@@ -502,8 +492,6 @@ pub struct ClientField<
 
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,
-
-    pub action_kind: ClientFieldActionKind,
 
     pub variable_definitions:
         Vec<WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
