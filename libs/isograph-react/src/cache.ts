@@ -11,7 +11,6 @@ import {
   Link,
   type IsographEnvironment,
   DataTypeValue,
-  assertLink,
   getLink,
 } from './IsographEnvironment';
 import {
