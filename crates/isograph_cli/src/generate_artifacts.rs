@@ -24,8 +24,8 @@ use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_client_field,
     ArtifactQueueItem, ClientFieldVariant, FieldDefinitionLocation, FieldMapItem,
     MergedLinkedFieldSelection, MergedScalarFieldSelection, MergedSelectionSet,
-    MergedServerFieldSelection, MutationFieldResolverInfo, NameAndArguments,
-    ObjectTypeAndFieldNames, PathToRefetchField, RefetchFieldResolverInfo, RequiresRefinement,
+    MergedServerFieldSelection, MutationFieldArtifactInfo, NameAndArguments,
+    ObjectTypeAndFieldNames, PathToRefetchField, RefetchFieldArtifactInfo, RequiresRefinement,
     RootRefetchedPath, ValidatedClientField, ValidatedSchema, ValidatedSchemaObject,
     ValidatedSelection, ValidatedVariableDefinition, ENTRYPOINT,
 };
@@ -355,9 +355,9 @@ fn get_artifact_infos<'schema>(
 // and it could use some de-duplication
 fn get_artifact_for_refetch_field(
     schema: &ValidatedSchema,
-    refetch_info: RefetchFieldResolverInfo,
+    refetch_info: RefetchFieldArtifactInfo,
 ) -> RefetchArtifactInfo {
-    let RefetchFieldResolverInfo {
+    let RefetchFieldArtifactInfo {
         merged_selection_set,
         refetch_field_parent_id: parent_id,
         variable_definitions,
@@ -400,9 +400,9 @@ fn get_artifact_for_refetch_field(
 
 fn get_artifact_for_mutation_field<'schema>(
     schema: &'schema ValidatedSchema,
-    mutation_info: MutationFieldResolverInfo,
+    mutation_info: MutationFieldArtifactInfo,
 ) -> RefetchArtifactInfo {
-    let MutationFieldResolverInfo {
+    let MutationFieldArtifactInfo {
         merged_selection_set,
         refetch_field_parent_id: parent_id,
         variable_definitions,

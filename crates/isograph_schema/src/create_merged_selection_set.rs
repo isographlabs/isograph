@@ -155,12 +155,12 @@ enum NormalizationKey {
 
 #[derive(Debug)]
 pub enum ArtifactQueueItem {
-    RefetchField(RefetchFieldResolverInfo),
-    MutationField(MutationFieldResolverInfo),
+    RefetchField(RefetchFieldArtifactInfo),
+    MutationField(MutationFieldArtifactInfo),
 }
 
 #[derive(Debug, Clone)]
-pub struct RefetchFieldResolverInfo {
+pub struct RefetchFieldArtifactInfo {
     pub merged_selection_set: MergedSelectionSet,
     /// Used to look up what type to narrow on in the generated refetch query,
     /// among other things.
@@ -173,7 +173,7 @@ pub struct RefetchFieldResolverInfo {
 }
 
 #[derive(Debug, Clone)]
-pub struct MutationFieldResolverInfo {
+pub struct MutationFieldArtifactInfo {
     pub merged_selection_set: MergedSelectionSet,
     /// Used to look up what type to narrow on in the generated refetch query,
     /// among other things.
@@ -286,7 +286,7 @@ pub fn create_merged_selection_set(
                         let field_name = match client_field_variant {
                             ClientFieldVariant::RefetchField => {
                                 artifact_queue.push(ArtifactQueueItem::RefetchField(
-                                    RefetchFieldResolverInfo {
+                                    RefetchFieldArtifactInfo {
                                         merged_selection_set: nested_merged_selection_set,
                                         refetch_field_parent_id,
                                         variable_definitions: definitions_of_used_variables,
@@ -323,7 +323,7 @@ pub fn create_merged_selection_set(
                                     };
 
                                 artifact_queue.push(ArtifactQueueItem::MutationField(
-                                    MutationFieldResolverInfo {
+                                    MutationFieldArtifactInfo {
                                         merged_selection_set: nested_merged_selection_set,
                                         refetch_field_parent_id,
                                         variable_definitions: definitions_of_used_variables,
