@@ -1,11 +1,10 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { Query__RepositoryDetail__param } from './param_type.ts';
+import { Query__RepositoryDetail__outputType } from './output_type.ts';
 import { RepositoryDetail as resolver } from '../../../RepositoryDetail.tsx';
-import PullRequestConnection__PullRequestTable, { PullRequestConnection__PullRequestTable__outputType} from '../../PullRequestConnection/PullRequestTable/reader';
-import Repository__RepositoryLink, { Repository__RepositoryLink__outputType} from '../../Repository/RepositoryLink/reader';
-import Starrable__IsStarred, { Starrable__IsStarred__outputType} from '../../Starrable/IsStarred/reader';
-
-// the type, when read out (either via useLazyReference or via graph)
-export type Query__RepositoryDetail__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
+import PullRequestConnection__PullRequestTable from '../../PullRequestConnection/PullRequestTable/reader';
+import Repository__RepositoryLink from '../../Repository/RepositoryLink/reader';
+import Starrable__IsStarred from '../../Starrable/IsStarred/reader';
 
 const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
   {
@@ -81,20 +80,6 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
     ],
   },
 ];
-
-export type Query__RepositoryDetail__param = {
-  repository: ({
-    IsStarred: Starrable__IsStarred__outputType,
-    nameWithOwner: string,
-    parent: ({
-      RepositoryLink: Repository__RepositoryLink__outputType,
-      nameWithOwner: string,
-    } | null),
-    pullRequests: {
-      PullRequestTable: PullRequestConnection__PullRequestTable__outputType,
-    },
-  } | null),
-};
 
 const artifact: ReaderArtifact<
   Query__RepositoryDetail__param,

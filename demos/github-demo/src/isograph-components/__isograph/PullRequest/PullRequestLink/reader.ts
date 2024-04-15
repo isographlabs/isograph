@@ -1,8 +1,7 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { PullRequest__PullRequestLink__param } from './param_type.ts';
+import { PullRequest__PullRequestLink__outputType } from './output_type.ts';
 import { PullRequestLink as resolver } from '../../../PullRequestLink.tsx';
-
-// the type, when read out (either via useLazyReference or via graph)
-export type PullRequest__PullRequestLink__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
 
 const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
   {
@@ -40,16 +39,6 @@ const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
     ],
   },
 ];
-
-export type PullRequest__PullRequestLink__param = {
-  number: number,
-  repository: {
-    name: string,
-    owner: {
-      login: string,
-    },
-  },
-};
 
 const artifact: ReaderArtifact<
   PullRequest__PullRequestLink__param,

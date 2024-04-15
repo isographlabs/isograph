@@ -1,5 +1,6 @@
 import type {IsographEntrypoint, NormalizationAst, RefetchQueryArtifactWrapper} from '@isograph/react';
-import type {Query__PullRequest__param, Query__PullRequest__outputType} from './reader';
+import {Query__PullRequest__param} from './param_type';
+import {Query__PullRequest__outputType} from './output_type';
 import readerResolver from './reader';
 const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [];
 

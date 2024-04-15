@@ -1,8 +1,7 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { Actor__UserLink__param } from './param_type.ts';
+import { Actor__UserLink__outputType } from './output_type.ts';
 import { UserLink as resolver } from '../../../UserLink.tsx';
-
-// the type, when read out (either via useLazyReference or via graph)
-export type Actor__UserLink__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
 
 const readerAst: ReaderAst<Actor__UserLink__param> = [
   {
@@ -12,10 +11,6 @@ const readerAst: ReaderAst<Actor__UserLink__param> = [
     arguments: null,
   },
 ];
-
-export type Actor__UserLink__param = {
-  login: string,
-};
 
 const artifact: ReaderArtifact<
   Actor__UserLink__param,

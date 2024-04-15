@@ -1,8 +1,7 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { Query__meNameSuccessor__param } from './param_type.ts';
+import { Query__meNameSuccessor__outputType } from './output_type.ts';
 import { meNameField as resolver } from '../../../meNameSuccessor.ts';
-
-// the type, when read out (either via useLazyReference or via graph)
-export type Query__meNameSuccessor__outputType = ReturnType<typeof resolver>;
 
 const readerAst: ReaderAst<Query__meNameSuccessor__param> = [
   {
@@ -42,17 +41,6 @@ const readerAst: ReaderAst<Query__meNameSuccessor__param> = [
     ],
   },
 ];
-
-export type Query__meNameSuccessor__param = {
-  me: {
-    name: string,
-    successor: ({
-      successor: ({
-        name: string,
-      } | null),
-    } | null),
-  },
-};
 
 const artifact: ReaderArtifact<
   Query__meNameSuccessor__param,

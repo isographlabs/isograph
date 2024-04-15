@@ -1,8 +1,7 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { Query__meName__param } from './param_type.ts';
+import { Query__meName__outputType } from './output_type.ts';
 import { meNameField as resolver } from '../../../garbageCollection.test.ts';
-
-// the type, when read out (either via useLazyReference or via graph)
-export type Query__meName__outputType = ReturnType<typeof resolver>;
 
 const readerAst: ReaderAst<Query__meName__param> = [
   {
@@ -20,12 +19,6 @@ const readerAst: ReaderAst<Query__meName__param> = [
     ],
   },
 ];
-
-export type Query__meName__param = {
-  me: {
-    name: string,
-  },
-};
 
 const artifact: ReaderArtifact<
   Query__meName__param,

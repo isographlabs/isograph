@@ -1,9 +1,8 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { Checkin__CheckinDisplay__param } from './param_type.ts';
+import { Checkin__CheckinDisplay__outputType } from './output_type.ts';
 import { CheckinDisplay as resolver } from '../../../PetCheckinsCard.tsx';
-import Checkin__make_super, { Checkin__make_super__outputType} from '../make_super/reader';
-
-// the type, when read out (either via useLazyReference or via graph)
-export type Checkin__CheckinDisplay__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
+import Checkin__make_super from '../make_super/reader';
 
 const readerAst: ReaderAst<Checkin__CheckinDisplay__param> = [
   {
@@ -25,12 +24,6 @@ const readerAst: ReaderAst<Checkin__CheckinDisplay__param> = [
     refetchQuery: 0,
   },
 ];
-
-export type Checkin__CheckinDisplay__param = {
-  location: string,
-  time: string,
-  make_super: Checkin__make_super__outputType,
-};
 
 const artifact: ReaderArtifact<
   Checkin__CheckinDisplay__param,

@@ -1,9 +1,8 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { User__RepositoryList__param } from './param_type.ts';
+import { User__RepositoryList__outputType } from './output_type.ts';
 import { RepositoryList as resolver } from '../../../UserRepositoryList.tsx';
-import Repository__RepositoryLink, { Repository__RepositoryLink__outputType} from '../../Repository/RepositoryLink/reader';
-
-// the type, when read out (either via useLazyReference or via graph)
-export type User__RepositoryList__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
+import Repository__RepositoryLink from '../../Repository/RepositoryLink/reader';
 
 const readerAst: ReaderAst<User__RepositoryList__param> = [
   {
@@ -117,28 +116,6 @@ const readerAst: ReaderAst<User__RepositoryList__param> = [
     ],
   },
 ];
-
-export type User__RepositoryList__param = {
-  repositories: {
-    edges: (({
-      node: ({
-        id: string,
-        RepositoryLink: Repository__RepositoryLink__outputType,
-        name: string,
-        nameWithOwner: string,
-        description: (string | null),
-        forkCount: number,
-        pullRequests: {
-          totalCount: number,
-        },
-        stargazerCount: number,
-        watchers: {
-          totalCount: number,
-        },
-      } | null),
-    } | null))[],
-  },
-};
 
 const artifact: ReaderArtifact<
   User__RepositoryList__param,

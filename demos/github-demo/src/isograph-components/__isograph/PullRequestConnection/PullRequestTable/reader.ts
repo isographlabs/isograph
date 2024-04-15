@@ -1,11 +1,10 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { PullRequestConnection__PullRequestTable__param } from './param_type.ts';
+import { PullRequestConnection__PullRequestTable__outputType } from './output_type.ts';
 import { PullRequestTable as resolver } from '../../../PullRequestTable.tsx';
-import Actor__UserLink, { Actor__UserLink__outputType} from '../../Actor/UserLink/reader';
-import PullRequest__PullRequestLink, { PullRequest__PullRequestLink__outputType} from '../../PullRequest/PullRequestLink/reader';
-import PullRequest__createdAtFormatted, { PullRequest__createdAtFormatted__outputType} from '../../PullRequest/createdAtFormatted/reader';
-
-// the type, when read out (either via useLazyReference or via graph)
-export type PullRequestConnection__PullRequestTable__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
+import Actor__UserLink from '../../Actor/UserLink/reader';
+import PullRequest__PullRequestLink from '../../PullRequest/PullRequestLink/reader';
+import PullRequest__createdAtFormatted from '../../PullRequest/createdAtFormatted/reader';
 
 const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
   {
@@ -90,24 +89,6 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
     ],
   },
 ];
-
-export type PullRequestConnection__PullRequestTable__param = {
-  edges: (({
-    node: ({
-      id: string,
-      PullRequestLink: PullRequest__PullRequestLink__outputType,
-      number: number,
-      title: string,
-      author: ({
-        UserLink: Actor__UserLink__outputType,
-        login: string,
-      } | null),
-      closed: boolean,
-      totalCommentsCount: (number | null),
-      createdAtFormatted: PullRequest__createdAtFormatted__outputType,
-    } | null),
-  } | null))[],
-};
 
 const artifact: ReaderArtifact<
   PullRequestConnection__PullRequestTable__param,

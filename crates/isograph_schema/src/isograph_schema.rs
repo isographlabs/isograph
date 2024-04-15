@@ -24,6 +24,8 @@ lazy_static! {
     // TODO these don't belong here, and neither does the relative path stuff
     // TODO these shouldn't be SelectableFieldName's
     pub static ref READER: SelectableFieldName = "reader".intern().into();
+    pub static ref READER_PARAM_TYPE: SelectableFieldName = "param_type".intern().into();
+    pub static ref READER_OUTPUT_TYPE: SelectableFieldName = "output_type".intern().into();
     pub static ref ENTRYPOINT: SelectableFieldName = "entrypoint".intern().into();
 }
 
@@ -439,15 +441,19 @@ impl ObjectTypeAndFieldNames {
         format!("{}__{}", self.type_name, self.field_name)
     }
 
-    pub fn relative_path(&self, current_file_type_name: IsographObjectTypeName) -> String {
+    pub fn relative_path(
+        &self,
+        current_file_type_name: IsographObjectTypeName,
+        file_type: SelectableFieldName,
+    ) -> String {
         let ObjectTypeAndFieldNames {
             type_name,
             field_name,
         } = *self;
         if type_name != current_file_type_name {
-            format!("../../{type_name}/{field_name}/{}", *READER)
+            format!("../../{type_name}/{field_name}/{}", file_type)
         } else {
-            format!("../{field_name}/{}", *READER)
+            format!("../{field_name}/{}", file_type)
         }
     }
 }

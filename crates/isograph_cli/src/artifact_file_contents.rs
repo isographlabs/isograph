@@ -1,11 +1,12 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use common_lang_types::{IsographObjectTypeName, SelectableFieldName};
-use isograph_schema::{ClientFieldVariant, ObjectTypeAndFieldNames};
+use intern::string_key::Intern;
+use isograph_schema::{ClientFieldVariant, ObjectTypeAndFieldNames, READER, READER_OUTPUT_TYPE};
 
 use crate::generate_artifacts::{
-    ClientFieldOutputType, EntrypointArtifactInfo, JavaScriptImports, ReaderArtifactInfo,
-    RefetchArtifactInfo,
+    ClientFieldOutputType, EntrypointArtifactInfo, JavaScriptImports, PathAndContent,
+    ReaderArtifactInfo, RefetchArtifactInfo,
 };
 
 impl<'schema> EntrypointArtifactInfo<'schema> {
@@ -23,7 +24,8 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
         format!(
             "import type {{IsographEntrypoint, \
             NormalizationAst, RefetchQueryArtifactWrapper}} from '@isograph/react';\n\
-            import type {{{entrypoint_params_typename}, {entrypoint_output_type_name}}} from './reader';\n\
+            import {{{entrypoint_params_typename}}} from './param_type';\n\
+            import {{{entrypoint_output_type_name}}} from './output_type';\n\
             import readerResolver from './reader';\n\
             {refetch_query_artifact_import}\n\n\
             const queryText = '{query_text}';\n\n\
@@ -39,19 +41,13 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             {}readerArtifact: readerResolver,\n\
             }};\n\n\
             export default artifact;\n",
-            "  ",
-            "  ",
-            "  ",
-            "  ",
-            "  ",
-            "  ",
-            "  ",
+            "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     }
 }
 
 impl<'schema> ReaderArtifactInfo<'schema> {
-    pub(crate) fn file_contents(self) -> String {
+    pub(crate) fn file_contents(self, relative_directory: &PathBuf) -> Vec<PathAndContent> {
         let ReaderArtifactInfo {
             function_import_statement,
             client_field_parameter_type,
@@ -63,10 +59,13 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             client_field_name: resolver_field_name,
             ..
         } = self;
-        let nested_client_field_import_statement = nested_client_field_names_to_import_statement(
-            nested_client_field_artifact_imports,
-            parent_type.name,
-        );
+
+        let (resolver_import_statement, resolver_type_import_statement) =
+            nested_client_field_names_to_import_statement(
+                nested_client_field_artifact_imports,
+                parent_type.name,
+            );
+
         let output_type_text = get_output_type_text(
             parent_type.name,
             resolver_field_name,
@@ -83,13 +82,14 @@ impl<'schema> ReaderArtifactInfo<'schema> {
         };
         let reader_param_type = format!("{parent_name}__{resolver_field_name}__param");
         let reader_output_type = format!("{parent_name}__{resolver_field_name}__outputType");
-        format!(
-            "import type {{ReaderArtifact, ReaderAst, ExtractSecondParam}} from '@isograph/react';\n\
+
+        let reader_content = format!(
+            "import type {{ReaderArtifact, ReaderAst}} from '@isograph/react';\n\
+            import {{ {reader_param_type} }} from './param_type.ts';\n\
+            import {{ {reader_output_type} }} from './output_type.ts';\n\
             {function_import_statement}\n\
-            {nested_client_field_import_statement}\n\
-            {output_type_text}\n\n\
+            {resolver_import_statement}\n\
             const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
-            export type {reader_param_type} = {client_field_parameter_type};\n\n\
             const artifact: ReaderArtifact<\n\
             {}{reader_param_type},\n\
             {}{reader_output_type}\n\
@@ -100,13 +100,37 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             {}variant: {variant},\n\
             }};\n\n\
             export default artifact;\n",
-            "  ",
-            "  ",
-            "  ",
-            "  ",
-            "  ",
-            "  ",
-        )
+            "  ", "  ", "  ", "  ", "  ", "  ",
+        );
+
+        let param_type_content = format!(
+            "{resolver_type_import_statement}\n\
+            export type {reader_param_type} = {client_field_parameter_type};\n",
+        );
+
+        let output_type_content = format!(
+            "import type {{ExtractSecondParam}} from '@isograph/react';\n\
+            {function_import_statement}\n\
+            {output_type_text}\n",
+        );
+
+        vec![
+            PathAndContent {
+                relative_directory: relative_directory.clone(),
+                file_name_prefix: "reader".intern().into(),
+                file_content: reader_content,
+            },
+            PathAndContent {
+                relative_directory: relative_directory.clone(),
+                file_name_prefix: "param_type".intern().into(),
+                file_content: param_type_content,
+            },
+            PathAndContent {
+                relative_directory: relative_directory.clone(),
+                file_name_prefix: "output_type".intern().into(),
+                file_content: output_type_content,
+            },
+        ]
     }
 }
 
@@ -139,8 +163,9 @@ impl RefetchArtifactInfo {
 fn nested_client_field_names_to_import_statement(
     nested_client_field_imports: HashMap<ObjectTypeAndFieldNames, JavaScriptImports>,
     current_file_type_name: IsographObjectTypeName,
-) -> String {
-    let mut overall = String::new();
+) -> (String, String) {
+    let mut resolver_import_statement = String::new();
+    let mut resolver_type_import_statement = String::new();
 
     // TODO we should always sort outputs. We should find a nice generic way to ensure that.
     let mut nested_client_field_imports: Vec<_> = nested_client_field_imports.into_iter().collect();
@@ -150,17 +175,19 @@ fn nested_client_field_names_to_import_statement(
         write_client_field_import(
             javascript_import,
             nested_client_field_name,
-            &mut overall,
+            &mut resolver_import_statement,
+            &mut resolver_type_import_statement,
             current_file_type_name,
         );
     }
-    overall
+    (resolver_import_statement, resolver_type_import_statement)
 }
 
 fn write_client_field_import(
     javascript_import: JavaScriptImports,
     nested_client_field_name: ObjectTypeAndFieldNames,
-    overall: &mut String,
+    resolver_import_statement: &mut String,
+    resolver_type_import_statement: &mut String,
     current_file_type_name: IsographObjectTypeName,
 ) {
     if !javascript_import.default_import && javascript_import.types.is_empty() {
@@ -170,32 +197,32 @@ fn write_client_field_import(
         );
     }
 
-    let mut s = "import ".to_string();
+    let mut s_resolver_import = "".to_string();
+    let mut s_resolver_type_import = "".to_string();
+
     if javascript_import.default_import {
-        s.push_str(&format!(
-            "{}",
-            nested_client_field_name.underscore_separated()
+        s_resolver_import.push_str(&format!(
+            "import {} from '{}';\n",
+            nested_client_field_name.underscore_separated(),
+            nested_client_field_name.relative_path(current_file_type_name, *READER)
         ));
     }
+
     let mut types = javascript_import.types.iter();
     if let Some(first) = types.next() {
-        if javascript_import.default_import {
-            s.push_str(",");
-        }
-        s.push_str(" { ");
-        s.push_str(&format!("{}", first));
+        s_resolver_type_import.push_str(&format!("import {{{}", first));
         for value in types {
-            s.push_str(&format!(", {}", value));
+            s_resolver_type_import.push_str(&format!(", {}", value));
         }
-        s.push_str("}");
+        s_resolver_type_import.push_str(&format!(
+            "}} from '{}';\n",
+            nested_client_field_name.relative_path(current_file_type_name, *READER_OUTPUT_TYPE)
+        ));
     }
-    s.push_str(&format!(
-        " from '{}';\n",
-        nested_client_field_name.relative_path(current_file_type_name)
-    ));
-    overall.push_str(&s);
-}
 
+    resolver_import_statement.push_str(&s_resolver_import);
+    resolver_type_import_statement.push_str(&s_resolver_type_import);
+}
 fn get_output_type_text(
     parent_type_name: IsographObjectTypeName,
     field_name: SelectableFieldName,

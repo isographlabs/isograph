@@ -1,9 +1,8 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { Query__Header__param } from './param_type.ts';
+import { Query__Header__outputType } from './output_type.ts';
 import { Header as resolver } from '../../../header.tsx';
-import User__Avatar, { User__Avatar__outputType} from '../../User/Avatar/reader';
-
-// the type, when read out (either via useLazyReference or via graph)
-export type Query__Header__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
+import User__Avatar from '../../User/Avatar/reader';
 
 const readerAst: ReaderAst<Query__Header__param> = [
   {
@@ -28,13 +27,6 @@ const readerAst: ReaderAst<Query__Header__param> = [
     ],
   },
 ];
-
-export type Query__Header__param = {
-  viewer: {
-    name: (string | null),
-    Avatar: User__Avatar__outputType,
-  },
-};
 
 const artifact: ReaderArtifact<
   Query__Header__param,

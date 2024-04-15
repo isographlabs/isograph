@@ -1,4 +1,6 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { Checkin__make_super__param } from './param_type.ts';
+import { Checkin__make_super__outputType } from './output_type.ts';
 const includeReadOutData = (variables: any, readOutData: any) => {
   variables.checkin_id = readOutData.id;
   return variables;
@@ -16,9 +18,6 @@ const resolver = (
 };
 
 
-// the type, when read out (either via useLazyReference or via graph)
-export type Checkin__make_super__outputType = (params: any) => void;
-
 const readerAst: ReaderAst<Checkin__make_super__param> = [
   {
     kind: "Scalar",
@@ -27,10 +26,6 @@ const readerAst: ReaderAst<Checkin__make_super__param> = [
     arguments: null,
   },
 ];
-
-export type Checkin__make_super__param = {
-  id: string,
-};
 
 const artifact: ReaderArtifact<
   Checkin__make_super__param,

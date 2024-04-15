@@ -1,8 +1,7 @@
-import type {ReaderArtifact, ReaderAst, ExtractSecondParam} from '@isograph/react';
+import type {ReaderArtifact, ReaderAst} from '@isograph/react';
+import { Query__nodeField__param } from './param_type.ts';
+import { Query__nodeField__outputType } from './output_type.ts';
 import { nodeField as resolver } from '../../../nodeQuery.ts';
-
-// the type, when read out (either via useLazyReference or via graph)
-export type Query__nodeField__outputType = ReturnType<typeof resolver>;
 
 const readerAst: ReaderAst<Query__nodeField__param> = [
   {
@@ -25,12 +24,6 @@ const readerAst: ReaderAst<Query__nodeField__param> = [
     ],
   },
 ];
-
-export type Query__nodeField__param = {
-  node: ({
-    id: string,
-  } | null),
-};
 
 const artifact: ReaderArtifact<
   Query__nodeField__param,
