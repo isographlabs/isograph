@@ -8,8 +8,8 @@ use std::{
 };
 
 use common_lang_types::{
-    HasName, IsographObjectTypeName, Location, QueryOperationName, SelectableFieldName, Span,
-    UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
+    ArtifactFileType, HasName, IsographObjectTypeName, Location, QueryOperationName,
+    SelectableFieldName, Span, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLInputValueDefinition, GraphQLTypeAnnotation, ListTypeAnnotation, NamedTypeAnnotation,
@@ -27,11 +27,11 @@ use isograph_schema::{
     MergedServerFieldSelection, MutationFieldArtifactInfo, NameAndArguments,
     ObjectTypeAndFieldNames, PathToRefetchField, RefetchFieldArtifactInfo, RequiresRefinement,
     RootRefetchedPath, ValidatedClientField, ValidatedSchema, ValidatedSchemaObject,
-    ValidatedSelection, ValidatedVariableDefinition, ENTRYPOINT,
+    ValidatedSelection, ValidatedVariableDefinition,
 };
 use thiserror::Error;
 
-use crate::write_artifacts::write_to_disk;
+use crate::{artifact_file_contents::ENTRYPOINT, write_artifacts::write_to_disk};
 
 type NestedClientFieldImports = HashMap<ObjectTypeAndFieldNames, JavaScriptImports>;
 
@@ -48,7 +48,7 @@ macro_rules! derive_display {
 pub(crate) struct PathAndContent {
     pub(crate) relative_directory: PathBuf,
     // It doesn't make sense that this is a SelectableFieldName
-    pub(crate) file_name_prefix: SelectableFieldName,
+    pub(crate) file_name_prefix: ArtifactFileType,
     pub(crate) file_content: String,
 }
 

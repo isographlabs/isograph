@@ -1,9 +1,9 @@
 use std::{collections::HashMap, fmt::Debug};
 
 use common_lang_types::{
-    DescriptionValue, FieldArgumentName, GraphQLInterfaceTypeName, GraphQLScalarTypeName, HasName,
-    InputTypeName, IsographObjectTypeName, JavascriptName, SelectableFieldName,
-    UnvalidatedTypeName, WithLocation, WithSpan,
+    ArtifactFileType, DescriptionValue, FieldArgumentName, GraphQLInterfaceTypeName,
+    GraphQLScalarTypeName, HasName, InputTypeName, IsographObjectTypeName, JavascriptName,
+    SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     ConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInputObjectTypeDefinition,
@@ -22,12 +22,6 @@ use crate::ClientFieldVariant;
 
 lazy_static! {
     pub static ref ID_GRAPHQL_TYPE: GraphQLScalarTypeName = "ID".intern().into();
-    // TODO these don't belong here, and neither does the relative path stuff
-    // TODO these shouldn't be SelectableFieldName's
-    pub static ref READER: SelectableFieldName = "reader".intern().into();
-    pub static ref READER_PARAM_TYPE: SelectableFieldName = "param_type".intern().into();
-    pub static ref READER_OUTPUT_TYPE: SelectableFieldName = "output_type".intern().into();
-    pub static ref ENTRYPOINT: SelectableFieldName = "entrypoint".intern().into();
 }
 
 /// A trait that encapsulates all the types over which a schema, fields, etc.
@@ -451,7 +445,7 @@ impl ObjectTypeAndFieldNames {
     pub fn relative_path(
         &self,
         current_file_type_name: IsographObjectTypeName,
-        file_type: SelectableFieldName,
+        file_type: ArtifactFileType,
     ) -> String {
         let ObjectTypeAndFieldNames {
             type_name,

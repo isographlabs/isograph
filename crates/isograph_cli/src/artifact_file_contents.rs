@@ -1,14 +1,22 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use common_lang_types::{IsographObjectTypeName, SelectableFieldName};
-use isograph_schema::{
-    ClientFieldVariant, ObjectTypeAndFieldNames, READER, READER_OUTPUT_TYPE, READER_PARAM_TYPE,
-};
+use common_lang_types::{ArtifactFileType, IsographObjectTypeName, SelectableFieldName};
+use intern::string_key::Intern;
+use isograph_schema::{ClientFieldVariant, ObjectTypeAndFieldNames};
+use lazy_static::lazy_static;
 
 use crate::generate_artifacts::{
     ClientFieldOutputType, EntrypointArtifactInfo, JavaScriptImports, PathAndContent,
     ReaderArtifactInfo, RefetchArtifactInfo,
 };
+
+lazy_static! {
+    // TODO these shouldn't be SelectableFieldName's
+    pub static ref READER: ArtifactFileType = "reader".intern().into();
+    pub static ref READER_PARAM_TYPE: ArtifactFileType= "param_type".intern().into();
+    pub static ref READER_OUTPUT_TYPE: ArtifactFileType = "output_type".intern().into();
+    pub static ref ENTRYPOINT: ArtifactFileType = "entrypoint".intern().into();
+}
 
 impl<'schema> EntrypointArtifactInfo<'schema> {
     pub(crate) fn file_contents(self) -> String {

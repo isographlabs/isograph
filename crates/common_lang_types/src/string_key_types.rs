@@ -111,3 +111,5 @@ string_key_newtype!(IsographDirectiveName);
 string_key_newtype!(FieldArgumentName);
 
 string_key_newtype!(SourceFileName);
+
+string_key_newtype!(ArtifactFileType);
