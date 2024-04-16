@@ -1041,7 +1041,7 @@ fn write_query_types_from_selection(
                             .expect("parent_field should exist 1")
                             .as_server_field()
                             .expect("parent_field should exist and be server field");
-                        let field = schema.field(*parent_field);
+                        let field = schema.server_field(*parent_field);
                         let name_or_alias = scalar_field.name_or_alias().item;
 
                         // TODO there should be a clever way to print without cloning
@@ -1097,7 +1097,7 @@ fn write_query_types_from_selection(
                     .expect("parent_field should exist 2")
                     .as_server_field()
                     .expect("Parent field should exist and be server field");
-                let field = schema.field(*parent_field);
+                let field = schema.server_field(*parent_field);
                 let name_or_alias = linked_field.name_or_alias().item;
                 let type_annotation = field.associated_data.clone().map(|output_type_id| {
                     // TODO Or interface or union type

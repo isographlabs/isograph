@@ -121,7 +121,7 @@ impl UnvalidatedSchema {
 
         let field_id = self.parse_field(*field, mutation_id)?;
 
-        let mutation_field = self.field(field_id);
+        let mutation_field = self.server_field(field_id);
         let mutation_field_payload_type_name = *mutation_field.associated_data.inner();
         let mutation_field_name = expose_as.unwrap_or(mutation_field.name.item);
         let server_schema_mutation_field_name = mutation_field.name.item;
@@ -316,7 +316,7 @@ impl UnvalidatedSchema {
             .server_fields
             .iter()
             .find_map(|field_id| {
-                let server_field = self.field(*field_id);
+                let server_field = self.server_field(*field_id);
                 if server_field.name.item == field_arg {
                     Some(*field_id)
                 } else {

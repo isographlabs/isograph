@@ -149,16 +149,16 @@ pub struct ServerFieldData<TEncounteredField> {
 }
 
 impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationState> {
-    /// Get a reference to a given field by its id.
-    pub fn field(
+    /// Get a reference to a given server field by its id.
+    pub fn server_field(
         &self,
-        field_id: ServerFieldId,
+        server_field_id: ServerFieldId,
     ) -> &SchemaServerField<GraphQLTypeAnnotation<TSchemaValidationState::FieldTypeAssociatedData>>
     {
-        &self.server_fields[field_id.as_usize()]
+        &self.server_fields[server_field_id.as_usize()]
     }
 
-    /// Get a reference to a given resolver by its id.
+    /// Get a reference to a given client field by its id.
     pub fn client_field(
         &self,
         client_field_id: ClientFieldId,
@@ -191,7 +191,7 @@ impl<
         let field_id = id_field_id.into();
 
         let field = self
-            .field(field_id)
+            .server_field(field_id)
             .and_then(|e| match e.inner_non_null_named_type() {
                 Some(inner) => Ok(NamedTypeAnnotation(inner.0.clone().map(|x| {
                     let y: Result<TIdFieldAssociatedData, _> = x.try_into();

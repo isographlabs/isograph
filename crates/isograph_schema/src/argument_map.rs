@@ -214,7 +214,7 @@ impl ModifiedObject {
             .server_fields
             .iter()
             .flat_map(|field_id| {
-                let field = schema.field(*field_id);
+                let field = schema.server_field(*field_id);
 
                 // HACK alert
                 if field.name.item == "__typename".intern().into() {
@@ -354,7 +354,7 @@ impl ModifiedArgument {
                             .iter()
                             .map(|server_field_id| {
                                 (
-                                    schema.field(*server_field_id).name.item,
+                                    schema.server_field(*server_field_id).name.item,
                                     PotentiallyModifiedField::Unmodified(*server_field_id),
                                 )
                             })
@@ -414,7 +414,7 @@ impl ModifiedArgument {
 
                         match field {
                             PotentiallyModifiedField::Unmodified(field_id) => {
-                                let field_object = schema.field(*field_id);
+                                let field_object = schema.server_field(*field_id);
                                 let field_object_type = field_object.associated_data.inner();
 
                                 // N.B. this should be done via a validation pass.
