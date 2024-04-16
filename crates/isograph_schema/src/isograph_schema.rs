@@ -78,19 +78,20 @@ pub trait SchemaValidationState: Debug {
 /// form of newtype wrappers around u32 indexes (e.g. FieldId, etc.) As a result,
 /// the schema does not support removing items.
 #[derive(Debug)]
-pub struct Schema<TValidation: SchemaValidationState> {
-    pub server_fields:
-        Vec<SchemaServerField<GraphQLTypeAnnotation<TValidation::FieldTypeAssociatedData>>>,
+pub struct Schema<TSchemaValidationState: SchemaValidationState> {
+    pub server_fields: Vec<
+        SchemaServerField<GraphQLTypeAnnotation<TSchemaValidationState::FieldTypeAssociatedData>>,
+    >,
     pub client_fields: Vec<
         ClientField<
-            TValidation::ClientFieldSelectionScalarFieldAssociatedData,
-            TValidation::ClientFieldSelectionLinkedFieldAssociatedData,
-            TValidation::ClientFieldVariableDefinitionAssociatedData,
+            TSchemaValidationState::ClientFieldSelectionScalarFieldAssociatedData,
+            TSchemaValidationState::ClientFieldSelectionLinkedFieldAssociatedData,
+            TSchemaValidationState::ClientFieldVariableDefinitionAssociatedData,
         >,
     >,
     // TODO consider whether this belongs here. It could just be a free variable.
-    pub entrypoints: Vec<TValidation::Entrypoint>,
-    pub server_field_data: ServerFieldData<TValidation::EncounteredField>,
+    pub entrypoints: Vec<TSchemaValidationState::Entrypoint>,
+    pub server_field_data: ServerFieldData<TSchemaValidationState::EncounteredField>,
 
     // Well known types
     pub id_type_id: ServerScalarId,
@@ -147,12 +148,13 @@ pub struct ServerFieldData<TEncounteredField> {
     pub defined_types: HashMap<UnvalidatedTypeName, SelectableServerFieldId>,
 }
 
-impl<TValidation: SchemaValidationState> Schema<TValidation> {
+impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationState> {
     /// Get a reference to a given field by its id.
     pub fn field(
         &self,
         field_id: ServerFieldId,
-    ) -> &SchemaServerField<GraphQLTypeAnnotation<TValidation::FieldTypeAssociatedData>> {
+    ) -> &SchemaServerField<GraphQLTypeAnnotation<TSchemaValidationState::FieldTypeAssociatedData>>
+    {
         &self.server_fields[field_id.as_usize()]
     }
 
@@ -161,15 +163,15 @@ impl<TValidation: SchemaValidationState> Schema<TValidation> {
         &self,
         client_field_id: ClientFieldId,
     ) -> &ClientField<
-        TValidation::ClientFieldSelectionScalarFieldAssociatedData,
-        TValidation::ClientFieldSelectionLinkedFieldAssociatedData,
-        TValidation::ClientFieldVariableDefinitionAssociatedData,
+        TSchemaValidationState::ClientFieldSelectionScalarFieldAssociatedData,
+        TSchemaValidationState::ClientFieldSelectionLinkedFieldAssociatedData,
+        TSchemaValidationState::ClientFieldVariableDefinitionAssociatedData,
     > {
         &self.client_fields[client_field_id.as_usize()]
     }
 
     /// Get a reference to the root query_object, if it's defined.
-    pub fn query_object(&self) -> Option<&SchemaObject<TValidation::EncounteredField>> {
+    pub fn query_object(&self) -> Option<&SchemaObject<TSchemaValidationState::EncounteredField>> {
         self.query_type_id
             .as_ref()
             .map(|id| self.server_field_data.object(*id))
@@ -178,8 +180,8 @@ impl<TValidation: SchemaValidationState> Schema<TValidation> {
 
 impl<
         TFieldAssociatedData: Clone,
-        TValidation: SchemaValidationState<FieldTypeAssociatedData = TFieldAssociatedData>,
-    > Schema<TValidation>
+        TSchemaValidationState: SchemaValidationState<FieldTypeAssociatedData = TFieldAssociatedData>,
+    > Schema<TSchemaValidationState>
 {
     /// Get a reference to a given id field by its id.
     pub fn id_field<TIdFieldAssociatedData: TryFrom<TFieldAssociatedData> + Copy>(
@@ -265,8 +267,8 @@ impl<'a, T> HasName for SchemaType<'a, T> {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum SchemaOutputType<'a, TValidation: SchemaValidationState> {
-    Object(&'a SchemaObject<TValidation>),
+pub enum SchemaOutputType<'a, TSchemaValidationState: SchemaValidationState> {
+    Object(&'a SchemaObject<TSchemaValidationState>),
     Scalar(&'a SchemaScalar),
     // excludes input object
 }
