@@ -122,6 +122,7 @@ const artifact: ReaderArtifact<
   User__RepositoryList__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "RepositoryList",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "User.RepositoryList" },

@@ -17,6 +17,7 @@ const artifact: ReaderArtifact<
   PullRequest__createdAtFormatted__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "createdAtFormatted",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Eager" },

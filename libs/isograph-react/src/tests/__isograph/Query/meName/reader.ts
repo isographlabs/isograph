@@ -25,6 +25,7 @@ const artifact: ReaderArtifact<
   Query__meName__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "meName",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Eager" },

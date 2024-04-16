@@ -17,6 +17,7 @@ const artifact: ReaderArtifact<
   Actor__UserLink__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "UserLink",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "Actor.UserLink" },

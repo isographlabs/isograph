@@ -33,6 +33,7 @@ const artifact: ReaderArtifact<
   Query__Header__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "Header",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "Query.Header" },

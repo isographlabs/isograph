@@ -23,6 +23,7 @@ const artifact: ReaderArtifact<
   Pet__PetPhraseCard__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "PetPhraseCard",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "Pet.PetPhraseCard" },

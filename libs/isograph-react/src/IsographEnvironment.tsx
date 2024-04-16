@@ -1,11 +1,11 @@
 import { ParentCache } from '@isograph/react-disposable-state';
 import { RetainedQuery } from './garbageCollection';
 
-type ComponentName = string;
+export type ComponentOrFieldName = string;
 type StringifiedArgs = string;
 type ComponentCache = {
   [key: DataId]: {
-    [key: ComponentName]: { [key: StringifiedArgs]: React.FC<any> };
+    [key: ComponentOrFieldName]: { [key: StringifiedArgs]: React.FC<any> };
   };
 };
 

@@ -33,6 +33,7 @@ const artifact: ReaderArtifact<
   Pet__set_pet_tagline__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "set_pet_tagline",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Eager" },

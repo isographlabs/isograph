@@ -68,7 +68,7 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             nested_client_field_artifact_imports,
             parent_type,
             client_field_variant: resolver_variant,
-            client_field_name: resolver_field_name,
+            client_field_name,
             ..
         } = self;
 
@@ -80,7 +80,7 @@ impl<'schema> ReaderArtifactInfo<'schema> {
 
         let output_type_text = get_output_type_text(
             parent_type.name,
-            resolver_field_name,
+            client_field_name,
             client_field_output_type,
         );
 
@@ -88,12 +88,12 @@ impl<'schema> ReaderArtifactInfo<'schema> {
         let parent_name = parent_type.name;
         let variant = match resolver_variant {
             ClientFieldVariant::Component(_) => {
-                format!("{{ kind: \"Component\", componentName: \"{parent_name}.{resolver_field_name}\" }}")
+                format!("{{ kind: \"Component\", componentName: \"{parent_name}.{client_field_name}\" }}")
             }
             _ => "{ kind: \"Eager\" }".to_string(),
         };
-        let reader_param_type = format!("{parent_name}__{resolver_field_name}__param");
-        let reader_output_type = format!("{parent_name}__{resolver_field_name}__outputType");
+        let reader_param_type = format!("{parent_name}__{client_field_name}__param");
+        let reader_output_type = format!("{parent_name}__{client_field_name}__outputType");
 
         let reader_content = format!(
             "import type {{ReaderArtifact, ReaderAst}} from '@isograph/react';\n\
@@ -107,12 +107,13 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             {}{reader_output_type}\n\
             > = {{\n\
             {}kind: \"ReaderArtifact\",\n\
+            {}fieldName: \"{client_field_name}\",\n\
             {}resolver: resolver as any,\n\
             {}readerAst,\n\
             {}variant: {variant},\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ",
+            "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         );
 
         let param_type_content = format!(

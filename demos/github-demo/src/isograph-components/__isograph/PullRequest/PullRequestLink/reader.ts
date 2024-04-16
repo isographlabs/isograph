@@ -45,6 +45,7 @@ const artifact: ReaderArtifact<
   PullRequest__PullRequestLink__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "PullRequestLink",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "PullRequest.PullRequestLink" },

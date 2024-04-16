@@ -46,6 +46,7 @@ const artifact: ReaderArtifact<
   Query__HomePageList__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "HomePageList",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "Query.HomePageList" },

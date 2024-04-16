@@ -27,6 +27,7 @@ const artifact: ReaderArtifact<
   Query__UserPage__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "UserPage",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "Query.UserPage" },

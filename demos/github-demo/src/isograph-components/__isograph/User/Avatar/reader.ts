@@ -23,6 +23,7 @@ const artifact: ReaderArtifact<
   User__Avatar__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "Avatar",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "User.Avatar" },

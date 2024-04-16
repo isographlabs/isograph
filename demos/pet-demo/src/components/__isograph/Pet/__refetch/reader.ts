@@ -22,6 +22,7 @@ const artifact: ReaderArtifact<
   Pet____refetch__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "__refetch",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Eager" },

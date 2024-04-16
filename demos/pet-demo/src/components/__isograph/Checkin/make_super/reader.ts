@@ -32,6 +32,7 @@ const artifact: ReaderArtifact<
   Checkin__make_super__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "make_super",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Eager" },

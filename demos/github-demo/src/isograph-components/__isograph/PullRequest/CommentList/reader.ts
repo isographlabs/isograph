@@ -74,6 +74,7 @@ const artifact: ReaderArtifact<
   PullRequest__CommentList__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "CommentList",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "PullRequest.CommentList" },

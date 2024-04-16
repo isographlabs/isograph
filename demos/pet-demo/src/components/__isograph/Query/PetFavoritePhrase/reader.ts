@@ -36,6 +36,7 @@ const artifact: ReaderArtifact<
   Query__PetFavoritePhrase__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "PetFavoritePhrase",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "Query.PetFavoritePhrase" },

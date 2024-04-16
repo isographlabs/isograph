@@ -62,6 +62,7 @@ const artifact: ReaderArtifact<
   Query__PetDetailRoute__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "PetDetailRoute",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "Query.PetDetailRoute" },

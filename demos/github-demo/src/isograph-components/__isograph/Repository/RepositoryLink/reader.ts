@@ -37,6 +37,7 @@ const artifact: ReaderArtifact<
   Repository__RepositoryLink__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "RepositoryLink",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "Repository.RepositoryLink" },

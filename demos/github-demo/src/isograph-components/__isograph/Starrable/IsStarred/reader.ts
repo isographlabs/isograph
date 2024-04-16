@@ -23,6 +23,7 @@ const artifact: ReaderArtifact<
   Starrable__IsStarred__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "IsStarred",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "Starrable.IsStarred" },

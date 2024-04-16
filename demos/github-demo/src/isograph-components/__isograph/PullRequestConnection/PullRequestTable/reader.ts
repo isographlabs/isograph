@@ -95,6 +95,7 @@ const artifact: ReaderArtifact<
   PullRequestConnection__PullRequestTable__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "PullRequestTable",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "PullRequestConnection.PullRequestTable" },

@@ -1,9 +1,13 @@
+import { ComponentOrFieldName } from './IsographEnvironment';
 import { Arguments } from './util';
 
 // TODO this should probably be at least three distinct types, for @component,
 // non-@component and refetch resolvers
 export type ReaderArtifact<TReadFromStore extends Object, TClientFieldValue> = {
   kind: 'ReaderArtifact';
+  // The DataID of the parent + the fieldName + the variables are enough
+  // to uniquely identify a call to read(...) at a given time.
+  fieldName: ComponentOrFieldName;
   readerAst: ReaderAst<TReadFromStore>;
   resolver: (data: TReadFromStore, runtimeProps: any) => TClientFieldValue;
   variant: ReaderResolverVariant;

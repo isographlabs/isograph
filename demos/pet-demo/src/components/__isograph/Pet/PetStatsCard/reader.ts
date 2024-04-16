@@ -80,6 +80,7 @@ const artifact: ReaderArtifact<
   Pet__PetStatsCard__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "PetStatsCard",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "Pet.PetStatsCard" },

@@ -17,6 +17,7 @@ const artifact: ReaderArtifact<
   Pet__FavoritePhraseLoader__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "FavoritePhraseLoader",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "Pet.FavoritePhraseLoader" },

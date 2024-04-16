@@ -47,6 +47,7 @@ const artifact: ReaderArtifact<
   Query__meNameSuccessor__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "meNameSuccessor",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Eager" },

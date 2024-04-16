@@ -38,6 +38,7 @@ const artifact: ReaderArtifact<
   Query__UserDetail__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "UserDetail",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "Query.UserDetail" },

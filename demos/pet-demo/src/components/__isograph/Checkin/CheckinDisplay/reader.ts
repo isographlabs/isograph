@@ -30,6 +30,7 @@ const artifact: ReaderArtifact<
   Checkin__CheckinDisplay__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "CheckinDisplay",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "Checkin.CheckinDisplay" },

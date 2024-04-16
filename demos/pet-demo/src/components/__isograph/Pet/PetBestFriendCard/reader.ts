@@ -65,6 +65,7 @@ const artifact: ReaderArtifact<
   Pet__PetBestFriendCard__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "PetBestFriendCard",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "Pet.PetBestFriendCard" },

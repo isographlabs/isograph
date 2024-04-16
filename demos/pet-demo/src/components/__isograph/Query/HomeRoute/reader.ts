@@ -33,6 +33,7 @@ const artifact: ReaderArtifact<
   Query__HomeRoute__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "HomeRoute",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "Query.HomeRoute" },

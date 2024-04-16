@@ -30,6 +30,7 @@ const artifact: ReaderArtifact<
   Query__nodeField__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "nodeField",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Eager" },

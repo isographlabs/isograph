@@ -62,6 +62,7 @@ const artifact: ReaderArtifact<
   Query__PullRequestDetail__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "PullRequestDetail",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "Query.PullRequestDetail" },

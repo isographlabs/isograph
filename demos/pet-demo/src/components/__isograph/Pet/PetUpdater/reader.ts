@@ -51,6 +51,7 @@ const artifact: ReaderArtifact<
   Pet__PetUpdater__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "PetUpdater",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Component", componentName: "Pet.PetUpdater" },

@@ -32,6 +32,7 @@ const artifact: ReaderArtifact<
   Pet__set_best_friend__outputType
 > = {
   kind: "ReaderArtifact",
+  fieldName: "set_best_friend",
   resolver: resolver as any,
   readerAst,
   variant: { kind: "Eager" },
