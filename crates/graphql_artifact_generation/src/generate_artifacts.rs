@@ -112,9 +112,9 @@ fn build_iso_overload<'schema>(schema: &'schema ValidatedSchema) -> PathAndConte
 type IdentityWithParam<TParam> = <TClientFieldReturn>(
   x: (param: TParam) => TClientFieldReturn
 ) => (param: TParam) => TClientFieldReturn;
-type IdentityWithParamComponent<TParam> = <TClientFieldReturn, TSecondParam = Record<string, never>>(
-  x: (data: TParam, secondParam: TSecondParam) => TClientFieldReturn
-) => (data: TParam, secondParam: TSecondParam) => TClientFieldReturn;
+type IdentityWithParamComponent<TParam> = <TClientFieldReturn, TAdditionalProps = Record<string, never>>(
+  x: (data: TParam, secondParam: TAdditionalProps) => TClientFieldReturn
+) => (data: TParam, secondParam: TAdditionalProps) => TClientFieldReturn;
 
 type WhitespaceCharacter = ' ' | '\\t' | '\\n';
 type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
