@@ -109,7 +109,7 @@ impl UnvalidatedSchema {
         &mut self,
         expose_field_directive: &ExposeFieldDirective,
         mutation_object_name: IsographObjectTypeName,
-        mutation_id: ServerObjectId,
+        mutation_object_id: ServerObjectId,
         options: ConfigOptions,
     ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
         let ExposeFieldDirective {
@@ -119,9 +119,9 @@ impl UnvalidatedSchema {
             field,
         } = expose_field_directive;
 
-        let field_id = self.parse_field(*field, mutation_id)?;
+        let mutation_subfield_id = self.parse_mutation_subfield_id(*field, mutation_object_id)?;
 
-        let mutation_field = self.server_field(field_id);
+        let mutation_field = self.server_field(mutation_subfield_id);
         let mutation_field_payload_type_name = *mutation_field.associated_data.inner();
         let mutation_field_name = expose_as.unwrap_or(mutation_field.name.item);
         let server_schema_mutation_field_name = mutation_field.name.item;
@@ -301,12 +301,14 @@ impl UnvalidatedSchema {
         }
     }
 
-    fn parse_field(
+    /// Here, we are turning "pet" (the field_arg) to the ServerFieldId
+    /// of that specific field
+    fn parse_mutation_subfield_id(
         &self,
         field_arg: StringLiteralValue,
-        mutation_id: ServerObjectId,
+        mutation_object_id: ServerObjectId,
     ) -> ProcessTypeDefinitionResult<ServerFieldId> {
-        let mutation = self.server_field_data.object(mutation_id);
+        let mutation = self.server_field_data.object(mutation_object_id);
 
         // TODO make this a no-op
         let field_arg = field_arg.lookup().intern().into();
@@ -315,14 +317,7 @@ impl UnvalidatedSchema {
         let field_id = mutation
             .server_fields
             .iter()
-            .find_map(|field_id| {
-                let server_field = self.server_field(*field_id);
-                if server_field.name.item == field_arg {
-                    Some(*field_id)
-                } else {
-                    None
-                }
-            })
+            .find(|field_id| self.server_field(**field_id).name.item == field_arg)
             .ok_or_else(|| {
                 WithLocation::new(
                     ProcessTypeDefinitionError::InvalidField,
@@ -331,7 +326,7 @@ impl UnvalidatedSchema {
                 )
             })?;
 
-        Ok(field_id)
+        Ok(*field_id)
     }
 }
 
