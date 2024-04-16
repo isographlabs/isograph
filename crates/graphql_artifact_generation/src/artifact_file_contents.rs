@@ -18,6 +18,7 @@ lazy_static! {
     pub static ref READER_PARAM_TYPE: ArtifactFileType= "param_type".intern().into();
     pub static ref READER_OUTPUT_TYPE: ArtifactFileType = "output_type".intern().into();
     pub static ref ENTRYPOINT: ArtifactFileType = "entrypoint".intern().into();
+    pub static ref ISO_TS: ArtifactFileType = "iso".intern().into();
 }
 
 impl<'schema> EntrypointArtifactInfo<'schema> {

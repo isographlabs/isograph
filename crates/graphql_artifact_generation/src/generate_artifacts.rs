@@ -29,7 +29,7 @@ use isograph_schema::{
     ValidatedSelection, ValidatedVariableDefinition,
 };
 
-use crate::artifact_file_contents::ENTRYPOINT;
+use crate::artifact_file_contents::{ENTRYPOINT, ISO_TS};
 
 type NestedClientFieldImports = HashMap<ObjectTypeAndFieldNames, JavaScriptImports>;
 
@@ -161,7 +161,7 @@ export function iso(_isographLiteralText: string):
     PathAndContent {
         file_content: imports,
         relative_directory: PathBuf::new(),
-        file_name_prefix: "iso".intern().into(),
+        file_name_prefix: *ISO_TS,
     }
 }
 
