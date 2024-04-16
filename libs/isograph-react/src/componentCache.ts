@@ -12,13 +12,19 @@ export function getOrCreateCachedComponent(
   readerArtifact: ReaderArtifact<any, any>,
   variables: { [key: string]: string },
   resolverRefetchQueries: RefetchQueryArtifactWrapper[],
-) {
+): React.FC<any> {
+  // cachedComponentsById is a three layer cache: id, then component name, then
+  // stringified args. These three, together, uniquely identify a read at a given
+  // time.
   const cachedComponentsById = environment.componentCache;
-  const stringifiedArgs = JSON.stringify(stableCopy(variables));
+
   cachedComponentsById[rootId] = cachedComponentsById[rootId] ?? {};
   const componentsByName = cachedComponentsById[rootId];
+
   componentsByName[componentName] = componentsByName[componentName] ?? {};
   const byArgs = componentsByName[componentName];
+
+  const stringifiedArgs = JSON.stringify(stableCopy(variables));
   byArgs[stringifiedArgs] =
     byArgs[stringifiedArgs] ??
     (() => {
