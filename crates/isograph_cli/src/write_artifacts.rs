@@ -1,10 +1,11 @@
 use std::{
     fs::{self, File},
-    io::Write,
+    io::{self, Write},
     path::PathBuf,
 };
 
-use crate::generate_artifacts::{GenerateArtifactsError, PathAndContent};
+use graphql_artifact_generation::PathAndContent;
+use thiserror::Error;
 
 pub(crate) fn write_to_disk<'schema>(
     paths_and_contents: impl Iterator<Item = PathAndContent>,
@@ -54,4 +55,16 @@ pub(crate) fn write_to_disk<'schema>(
             })?;
     }
     Ok(count)
+}
+
+#[derive(Debug, Error)]
+pub enum GenerateArtifactsError {
+    #[error("Unable to write to artifact file at path {path:?}.\nReason: {message:?}")]
+    UnableToWriteToArtifactFile { path: PathBuf, message: io::Error },
+
+    #[error("Unable to create directory at path {path:?}.\nReason: {message:?}")]
+    UnableToCreateDirectory { path: PathBuf, message: io::Error },
+
+    #[error("Unable to delete directory at path {path:?}.\nReason: {message:?}")]
+    UnableToDeleteDirectory { path: PathBuf, message: io::Error },
 }

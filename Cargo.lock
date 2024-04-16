@@ -349,6 +349,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "graphql_artifact_generation"
+version = "0.0.4"
+dependencies = [
+ "common_lang_types",
+ "graphql_lang_types",
+ "intern",
+ "isograph_lang_types",
+ "isograph_schema",
+ "lazy_static",
+ "pathdiff",
+]
+
+[[package]]
 name = "graphql_lang_types"
 version = "0.0.4"
 dependencies = [
@@ -488,6 +501,7 @@ version = "0.0.4"
 dependencies = [
  "colored",
  "common_lang_types",
+ "graphql_artifact_generation",
  "graphql_lang_types",
  "graphql_schema_parser",
  "intern",
@@ -498,7 +512,6 @@ dependencies = [
  "lazy_static",
  "notify",
  "notify-debouncer-full",
- "pathdiff",
  "pretty-duration",
  "regex",
  "structopt",

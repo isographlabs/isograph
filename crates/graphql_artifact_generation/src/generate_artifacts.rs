@@ -2,7 +2,6 @@ use std::{
     cmp::Ordering,
     collections::{hash_map::Entry, HashMap, HashSet},
     fmt::{self, Debug, Display},
-    io,
     path::PathBuf,
     str::FromStr,
 };
@@ -29,9 +28,8 @@ use isograph_schema::{
     RootRefetchedPath, ValidatedClientField, ValidatedSchema, ValidatedSchemaObject,
     ValidatedSelection, ValidatedVariableDefinition,
 };
-use thiserror::Error;
 
-use crate::{artifact_file_contents::ENTRYPOINT, write_artifacts::write_to_disk};
+use crate::artifact_file_contents::ENTRYPOINT;
 
 type NestedClientFieldImports = HashMap<ObjectTypeAndFieldNames, JavaScriptImports>;
 
@@ -45,23 +43,10 @@ macro_rules! derive_display {
     };
 }
 
-pub(crate) struct PathAndContent {
-    pub(crate) relative_directory: PathBuf,
-    // It doesn't make sense that this is a SelectableFieldName
-    pub(crate) file_name_prefix: ArtifactFileType,
-    pub(crate) file_content: String,
-}
-
-// TODO move to another module
-pub(crate) fn generate_and_write_artifacts(
-    schema: &ValidatedSchema,
-    project_root: &PathBuf,
-    artifact_directory: &PathBuf,
-) -> Result<usize, GenerateArtifactsError> {
-    let paths_and_contents =
-        get_artifact_path_and_contents(schema, project_root, artifact_directory);
-    let artifact_count = write_to_disk(paths_and_contents, artifact_directory)?;
-    Ok(artifact_count)
+pub struct PathAndContent {
+    pub relative_directory: PathBuf,
+    pub file_name_prefix: ArtifactFileType,
+    pub file_content: String,
 }
 
 fn build_iso_overload_for_entrypoint<'schema>(
@@ -262,7 +247,7 @@ fn client_defined_fields<'a>(
     })
 }
 
-fn get_artifact_path_and_contents<'schema>(
+pub fn get_artifact_path_and_contents<'schema>(
     schema: &'schema ValidatedSchema,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
@@ -938,18 +923,6 @@ fn write_variables_to_string<'a>(
         variable_text.push(')');
         variable_text
     }
-}
-
-#[derive(Debug, Error)]
-pub enum GenerateArtifactsError {
-    #[error("Unable to write to artifact file at path {path:?}.\nReason: {message:?}")]
-    UnableToWriteToArtifactFile { path: PathBuf, message: io::Error },
-
-    #[error("Unable to create directory at path {path:?}.\nReason: {message:?}")]
-    UnableToCreateDirectory { path: PathBuf, message: io::Error },
-
-    #[error("Unable to delete directory at path {path:?}.\nReason: {message:?}")]
-    UnableToDeleteDirectory { path: PathBuf, message: io::Error },
 }
 
 fn write_selections_for_query_text(

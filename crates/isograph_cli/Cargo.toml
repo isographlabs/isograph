@@ -15,11 +15,12 @@ isograph_schema = { path = "../isograph_schema" }
 isograph_lang_parser = { path = "../isograph_lang_parser" }
 isograph_lang_types = { path = "../isograph_lang_types" }
 common_lang_types = { path = "../common_lang_types" }
+graphql_artifact_generation = { path = "../graphql_artifact_generation" }
 lazy_static = "1.4"
 regex = "1.6.0"
 colored = "2.0.4"
-pathdiff = "0.2.1"
 notify = "6.1.1"
 tokio = { version="1.35.0", features=["full"] }
 notify-debouncer-full = "0.3.1"
 pretty-duration = "0.1.1"
+

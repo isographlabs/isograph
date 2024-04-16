@@ -8,6 +8,7 @@ use colored::Colorize;
 use common_lang_types::{
     FilePath, Location, SourceFileName, Span, TextSource, WithLocation, WithSpan,
 };
+use graphql_artifact_generation::get_artifact_path_and_contents;
 use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
 use graphql_schema_parser::{parse_schema, parse_schema_extensions, SchemaParseError};
 use intern::string_key::Intern;
@@ -18,16 +19,17 @@ use isograph_lang_parser::{
 use isograph_lang_types::{ClientFieldDeclaration, EntrypointTypeAndField};
 use isograph_schema::{
     ProcessClientFieldDeclarationError, Schema, UnvalidatedSchema, ValidateSchemaError,
+    ValidatedSchema,
 };
 use pretty_duration::pretty_duration;
 use thiserror::Error;
 
 use crate::{
-    generate_artifacts::{generate_and_write_artifacts, GenerateArtifactsError},
     isograph_literals::{
         extract_iso_literal_from_file_content, read_files_in_folder, IsoLiteralExtraction,
     },
     schema::read_schema_file,
+    write_artifacts::{write_to_disk, GenerateArtifactsError},
 };
 
 pub(crate) struct CompilationStats {
@@ -162,6 +164,17 @@ pub(crate) fn handle_compile_command(
             total_artifacts_written,
         })
     })
+}
+
+pub fn generate_and_write_artifacts(
+    schema: &ValidatedSchema,
+    project_root: &PathBuf,
+    artifact_directory: &PathBuf,
+) -> Result<usize, GenerateArtifactsError> {
+    let paths_and_contents =
+        get_artifact_path_and_contents(schema, project_root, artifact_directory);
+    let artifact_count = write_to_disk(paths_and_contents, artifact_directory)?;
+    Ok(artifact_count)
 }
 
 fn get_canonicalized_root_path(config: &CompilerConfig) -> Result<PathBuf, BatchCompileError> {
