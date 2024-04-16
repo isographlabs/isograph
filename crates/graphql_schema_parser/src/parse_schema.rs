@@ -15,11 +15,10 @@ use graphql_lang_types::{
     GraphQLEnumDefinition, GraphQLEnumValueDefinition, GraphQLFieldDefinition,
     GraphQLInputObjectTypeDefinition, GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition,
     GraphQLObjectTypeDefinition, GraphQLObjectTypeExtension, GraphQLScalarTypeDefinition,
-    GraphQLSchemaDefinition, GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument,
-    GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
+    GraphQLSchemaDefinition, GraphQLTypeAnnotation, GraphQLTypeSystemDefinition,
+    GraphQLTypeSystemDocument, GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
     GraphQLTypeSystemExtensionOrDefinition, GraphQLUnionTypeDefinition, ListTypeAnnotation,
-    NameValuePair, NamedTypeAnnotation, NonNullTypeAnnotation, RootOperationKind, TypeAnnotation,
-    ValueType,
+    NameValuePair, NamedTypeAnnotation, NonNullTypeAnnotation, RootOperationKind, ValueType,
 };
 
 use crate::ParseResult;
@@ -900,7 +899,7 @@ fn parse_field<'a>(
 
 fn parse_type_annotation<T: From<StringKey>>(
     tokens: &mut PeekableLexer,
-) -> ParseResult<TypeAnnotation<T>> {
+) -> ParseResult<GraphQLTypeAnnotation<T>> {
     from_control_flow(|| {
         to_control_flow::<_, WithSpan<SchemaParseError>>(|| {
             let type_ = tokens
@@ -909,11 +908,11 @@ fn parse_type_annotation<T: From<StringKey>>(
 
             let is_non_null = tokens.parse_token_of_kind(TokenKind::Exclamation).is_ok();
             if is_non_null {
-                Ok(TypeAnnotation::NonNull(Box::new(
+                Ok(GraphQLTypeAnnotation::NonNull(Box::new(
                     NonNullTypeAnnotation::Named(NamedTypeAnnotation(type_)),
                 )))
             } else {
-                Ok(TypeAnnotation::Named(NamedTypeAnnotation(type_)))
+                Ok(GraphQLTypeAnnotation::Named(NamedTypeAnnotation(type_)))
             }
         })?;
 
@@ -930,11 +929,11 @@ fn parse_type_annotation<T: From<StringKey>>(
             let is_non_null = tokens.parse_token_of_kind(TokenKind::Exclamation).is_ok();
 
             if is_non_null {
-                Ok(TypeAnnotation::NonNull(Box::new(
+                Ok(GraphQLTypeAnnotation::NonNull(Box::new(
                     NonNullTypeAnnotation::List(ListTypeAnnotation(inner_type_annotation)),
                 )))
             } else {
-                Ok(TypeAnnotation::List(Box::new(ListTypeAnnotation(
+                Ok(GraphQLTypeAnnotation::List(Box::new(ListTypeAnnotation(
                     inner_type_annotation,
                 ))))
             }

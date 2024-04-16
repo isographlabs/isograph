@@ -12,10 +12,10 @@ use common_lang_types::{
     SelectableFieldName, Span, StringLiteralValue, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    GraphQLFieldDefinition, GraphQLScalarTypeDefinition, GraphQLTypeSystemDefinition,
-    GraphQLTypeSystemDocument, GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
-    GraphQLTypeSystemExtensionOrDefinition, NamedTypeAnnotation, NonNullTypeAnnotation,
-    RootOperationKind, TypeAnnotation,
+    GraphQLFieldDefinition, GraphQLScalarTypeDefinition, GraphQLTypeAnnotation,
+    GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument, GraphQLTypeSystemExtension,
+    GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition,
+    NamedTypeAnnotation, NonNullTypeAnnotation, RootOperationKind,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_config::ConfigOptions;
@@ -645,8 +645,8 @@ fn get_resolvers_for_schema_object(
 
 fn get_typename_type(
     string_type_for_typename: GraphQLScalarTypeName,
-) -> TypeAnnotation<UnvalidatedTypeName> {
-    TypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(NamedTypeAnnotation(
+) -> GraphQLTypeAnnotation<UnvalidatedTypeName> {
+    GraphQLTypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(NamedTypeAnnotation(
         WithSpan::new(
             string_type_for_typename.into(),
             // TODO we probably need a generated or built-in span type
@@ -671,7 +671,7 @@ fn get_field_objects_ids_and_names(
     next_field_id: usize,
     parent_type_id: ObjectId,
     parent_type_name: IsographObjectTypeName,
-    typename_type: TypeAnnotation<UnvalidatedTypeName>,
+    typename_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     // TODO this is hacky
     may_have_field_id: bool,
     options: ConfigOptions,

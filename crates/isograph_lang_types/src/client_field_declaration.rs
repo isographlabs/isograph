@@ -3,7 +3,7 @@ use common_lang_types::{
     LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName, SelectableFieldName,
     UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
-use graphql_lang_types::TypeAnnotation;
+use graphql_lang_types::GraphQLTypeAnnotation;
 
 pub type UnvalidatedSelection = Selection<
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
@@ -248,7 +248,7 @@ impl NonConstantValue {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct VariableDefinition<TValue> {
     pub name: WithLocation<VariableName>,
-    pub type_: TypeAnnotation<TValue>,
+    pub type_: GraphQLTypeAnnotation<TValue>,
     // pub default_value: Option<WithLocation<ConstantValue>>,
 }
 

@@ -6,7 +6,7 @@ use common_lang_types::{
 };
 use graphql_lang_types::{
     ConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInputValueDefinition,
-    TypeAnnotation,
+    GraphQLTypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{ObjectId, SelectableFieldId, ServerFieldId};
@@ -315,7 +315,7 @@ pub(crate) struct ModifiedField {
 struct ModifiedArgument {
     description: Option<WithSpan<DescriptionValue>>,
     name: WithLocation<InputValueName>,
-    object: TypeAnnotation<ModifiedObject>,
+    object: GraphQLTypeAnnotation<ModifiedObject>,
     default_value: Option<WithLocation<ConstantValue>>,
     directives: Vec<GraphQLDirective<ConstantValue>>,
 }

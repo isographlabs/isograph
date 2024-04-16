@@ -8,7 +8,7 @@ use common_lang_types::{
 use graphql_lang_types::{
     ConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInputObjectTypeDefinition,
     GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition,
-    NamedTypeAnnotation, TypeAnnotation,
+    GraphQLTypeAnnotation, NamedTypeAnnotation,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -78,7 +78,8 @@ pub trait SchemaValidationState: Debug {
 /// the schema does not support removing items.
 #[derive(Debug)]
 pub struct Schema<TValidation: SchemaValidationState> {
-    pub server_fields: Vec<SchemaServerField<TypeAnnotation<TValidation::FieldTypeAssociatedData>>>,
+    pub server_fields:
+        Vec<SchemaServerField<GraphQLTypeAnnotation<TValidation::FieldTypeAssociatedData>>>,
     pub client_fields: Vec<
         ClientField<
             TValidation::ClientFieldSelectionScalarFieldAssociatedData,
@@ -150,7 +151,7 @@ impl<TValidation: SchemaValidationState> Schema<TValidation> {
     pub fn field(
         &self,
         field_id: ServerFieldId,
-    ) -> &SchemaServerField<TypeAnnotation<TValidation::FieldTypeAssociatedData>> {
+    ) -> &SchemaServerField<GraphQLTypeAnnotation<TValidation::FieldTypeAssociatedData>> {
         &self.server_fields[field_id.as_usize()]
     }
 

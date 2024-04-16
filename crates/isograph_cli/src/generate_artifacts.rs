@@ -12,8 +12,8 @@ use common_lang_types::{
     UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    GraphQLInputValueDefinition, ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
-    TypeAnnotation,
+    GraphQLInputValueDefinition, GraphQLTypeAnnotation, ListTypeAnnotation, NamedTypeAnnotation,
+    NonNullTypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -492,7 +492,7 @@ fn generate_refetchable_query_text<'schema>(
     variable_definitions.push(WithSpan {
         item: VariableDefinition {
             name: WithLocation::new("id".intern().into(), Location::generated()),
-            type_: TypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
+            type_: GraphQLTypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
                 NamedTypeAnnotation(WithSpan {
                     item: SelectableFieldId::Scalar(schema.id_type_id),
                     span: Span::todo_generated(),
@@ -917,7 +917,7 @@ fn write_variables_to_string<'a>(
             first = false;
         }
         // TODO can we consume the variables here?
-        let x: TypeAnnotation<UnvalidatedTypeName> =
+        let x: GraphQLTypeAnnotation<UnvalidatedTypeName> =
             variable.item.type_.clone().map(|input_type_id| {
                 let schema_input_type = schema.schema_data.lookup_unvalidated_type(input_type_id);
                 schema_input_type.name().into()
@@ -1123,23 +1123,26 @@ fn write_query_types_from_selection(
     }
 }
 
-fn print_type_annotation<T: Display>(type_annotation: &TypeAnnotation<T>) -> String {
+fn print_type_annotation<T: Display>(type_annotation: &GraphQLTypeAnnotation<T>) -> String {
     let mut s = String::new();
     print_type_annotation_impl(type_annotation, &mut s);
     s
 }
 
-fn print_type_annotation_impl<T: Display>(type_annotation: &TypeAnnotation<T>, s: &mut String) {
+fn print_type_annotation_impl<T: Display>(
+    type_annotation: &GraphQLTypeAnnotation<T>,
+    s: &mut String,
+) {
     match &type_annotation {
-        TypeAnnotation::Named(named) => {
+        GraphQLTypeAnnotation::Named(named) => {
             s.push_str("(");
             s.push_str(&named.item.to_string());
             s.push_str(" | null)");
         }
-        TypeAnnotation::List(list) => {
+        GraphQLTypeAnnotation::List(list) => {
             print_list_type_annotation(list, s);
         }
-        TypeAnnotation::NonNull(non_null) => {
+        GraphQLTypeAnnotation::NonNull(non_null) => {
             print_non_null_type_annotation(non_null, s);
         }
     }

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use common_lang_types::{
     JavascriptName, Location, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
 };
-use graphql_lang_types::TypeAnnotation;
+use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ClientFieldId, EntrypointTypeAndField, LinkedFieldSelection, ScalarId, SelectableFieldId,
@@ -42,12 +42,13 @@ pub type UnvalidatedSchemaObject =
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
 /// resolver.)
 pub type UnvalidatedObjectFieldInfo =
-    FieldDefinitionLocation<TypeAnnotation<UnvalidatedTypeName>, ClientFieldId>;
+    FieldDefinitionLocation<GraphQLTypeAnnotation<UnvalidatedTypeName>, ClientFieldId>;
 
 pub(crate) type UnvalidatedSchemaData =
     SchemaData<<UnvalidatedSchemaState as SchemaValidationState>::EncounteredField>;
 
-pub(crate) type UnvalidatedSchemaField = SchemaServerField<TypeAnnotation<UnvalidatedTypeName>>;
+pub(crate) type UnvalidatedSchemaField =
+    SchemaServerField<GraphQLTypeAnnotation<UnvalidatedTypeName>>;
 
 pub(crate) type UnvalidatedClientField = ClientField<
     <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
@@ -60,7 +61,8 @@ pub type UnvalidatedLinkedFieldSelection = LinkedFieldSelection<
     <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
 >;
 
-pub(crate) type UnvalidatedSchemaServerField = SchemaServerField<TypeAnnotation<SelectableFieldId>>;
+pub(crate) type UnvalidatedSchemaServerField =
+    SchemaServerField<GraphQLTypeAnnotation<SelectableFieldId>>;
 
 impl UnvalidatedSchema {
     pub fn new() -> Self {

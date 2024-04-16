@@ -1,6 +1,6 @@
 use std::{fmt, ops::Deref};
 
-use crate::{GraphQLDirective, TypeAnnotation};
+use crate::{GraphQLDirective, GraphQLTypeAnnotation};
 
 use super::{write_arguments, write_directives, ConstantValue};
 use common_lang_types::{
@@ -237,7 +237,7 @@ impl From<GraphQLInputValueDefinition> for GraphQLFieldDefinition {
 pub struct GraphQLFieldDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<SelectableFieldName>,
-    pub type_: TypeAnnotation<UnvalidatedTypeName>,
+    pub type_: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     pub arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
     pub directives: Vec<GraphQLDirective<ConstantValue>>,
 }
@@ -257,7 +257,7 @@ impl fmt::Display for GraphQLFieldDefinition {
 pub struct GraphQLInputValueDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<InputValueName>,
-    pub type_: TypeAnnotation<InputTypeName>,
+    pub type_: GraphQLTypeAnnotation<InputTypeName>,
     // This unused, except for printing. Isograph does not care about this,
     // except inasmuch as it means that the type is nullable.
     pub default_value: Option<WithLocation<ConstantValue>>,

@@ -5,7 +5,7 @@ use common_lang_types::{
     UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation, TypeAnnotation,
+    GraphQLTypeAnnotation, ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
 };
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
@@ -491,7 +491,7 @@ fn parse_variable_definition(
 
 fn parse_type_annotation(
     tokens: &mut PeekableLexer,
-) -> ParseResultWithSpan<TypeAnnotation<UnvalidatedTypeName>> {
+) -> ParseResultWithSpan<GraphQLTypeAnnotation<UnvalidatedTypeName>> {
     from_control_flow(|| {
         to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
             let type_ = tokens
@@ -502,11 +502,11 @@ fn parse_type_annotation(
                 .parse_token_of_kind(IsographLangTokenKind::Exclamation)
                 .is_ok();
             if is_non_null {
-                Ok(TypeAnnotation::NonNull(Box::new(
+                Ok(GraphQLTypeAnnotation::NonNull(Box::new(
                     NonNullTypeAnnotation::Named(NamedTypeAnnotation(type_)),
                 )))
             } else {
-                Ok(TypeAnnotation::Named(NamedTypeAnnotation(type_)))
+                Ok(GraphQLTypeAnnotation::Named(NamedTypeAnnotation(type_)))
             }
         })?;
 
@@ -525,11 +525,11 @@ fn parse_type_annotation(
                 .is_ok();
 
             if is_non_null {
-                Ok(TypeAnnotation::NonNull(Box::new(
+                Ok(GraphQLTypeAnnotation::NonNull(Box::new(
                     NonNullTypeAnnotation::List(ListTypeAnnotation(inner_type_annotation)),
                 )))
             } else {
-                Ok(TypeAnnotation::List(Box::new(ListTypeAnnotation(
+                Ok(GraphQLTypeAnnotation::List(Box::new(ListTypeAnnotation(
                     inner_type_annotation,
                 ))))
             }

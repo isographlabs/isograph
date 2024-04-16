@@ -2,7 +2,7 @@ use common_lang_types::{
     InputTypeName, InputValueName, IsographObjectTypeName, ScalarFieldName, SelectableFieldName,
     UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
-use graphql_lang_types::{GraphQLInputValueDefinition, NamedTypeAnnotation, TypeAnnotation};
+use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation, NamedTypeAnnotation};
 use isograph_lang_types::{
     ClientFieldId, LinkedFieldSelection, ObjectId, ScalarFieldSelection, ScalarId,
     SelectableFieldId, Selection, ServerFieldId, UnvalidatedScalarFieldSelection,
@@ -19,7 +19,7 @@ use crate::{
     ValidateEntrypointDeclarationError,
 };
 
-pub type ValidatedSchemaServerField = SchemaServerField<TypeAnnotation<SelectableFieldId>>;
+pub type ValidatedSchemaServerField = SchemaServerField<GraphQLTypeAnnotation<SelectableFieldId>>;
 
 pub type ValidatedSelection = Selection<
     <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
@@ -323,9 +323,9 @@ fn validate_and_transform_field(
 
 fn validate_server_field_type_exists(
     schema_data: &UnvalidatedSchemaData,
-    server_field_type: &TypeAnnotation<UnvalidatedTypeName>,
+    server_field_type: &GraphQLTypeAnnotation<UnvalidatedTypeName>,
     field: &SchemaServerField<()>,
-) -> ValidateSchemaResult<TypeAnnotation<SelectableFieldId>> {
+) -> ValidateSchemaResult<GraphQLTypeAnnotation<SelectableFieldId>> {
     // look up the item in defined_types. If it's not there, error.
     match schema_data.defined_types.get(server_field_type.inner()) {
         // Why do we need to clone here? Can we avoid this?
