@@ -27,6 +27,22 @@ type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
   ? Whitespace<In>
   : In;
 
+// This is a recursive TypeScript type that matches strings that
+// start with whitespace, followed by TString. So e.g. if we have
+// ```
+// export function iso<T>(
+//   param: T & MatchesWhitespaceAndString<'field Query.foo', T>
+// ): Bar;
+// ```
+// then, when you call
+// ```
+// const x = iso(`
+//   field Query.foo ...
+// `);
+// ```
+// then the type of `x` will be `Bar`, both in VSCode and when running
+// tsc. This is how we achieve type safety — you can only use fields
+// that you have explicitly selected.
 type MatchesWhitespaceAndString<
   TString extends string,
   T

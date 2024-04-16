@@ -22,6 +22,7 @@ pub(crate) fn read_files_in_folder(
     read_dir_recursive(&canonicalized_root_path)?
         .into_iter()
         .filter(has_valid_extension)
+        .filter(not_in_artifact_directory)
         .map(|path| read_file(path, canonicalized_root_path))
         .collect()
 }
@@ -32,6 +33,14 @@ fn has_valid_extension(path: &PathBuf) -> bool {
         Some("ts") | Some("tsx") | Some("js") | Some("jsx") => true,
         _ => false,
     }
+}
+
+// TODO do this better
+fn not_in_artifact_directory(path: &PathBuf) -> bool {
+    !path
+        .to_str()
+        .expect("Expected path to be stringable")
+        .contains("__isograph")
 }
 
 fn read_file(
