@@ -15,9 +15,21 @@ import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoin
 import entrypoint_Query__PetDetailRoute from '../__isograph/Query/PetDetailRoute/entrypoint';
 import entrypoint_Query__PetFavoritePhrase from '../__isograph/Query/PetFavoritePhrase/entrypoint';
 
+// This is the type given to regular client fields.
+// This means that the type of the exported iso literal is exactly
+// the type of the passed-in function, which takes one parameter
+// of type TParam.
 type IdentityWithParam<TParam> = <TClientFieldReturn>(
   x: (param: TParam) => TClientFieldReturn
 ) => (param: TParam) => TClientFieldReturn;
+
+// This is the type given it to client fields with @component.
+// This means that the type of the exported iso literal is exactly
+// the type of the passed-in function, which takes two parameters.
+// The first has type TParam, and the second has type TAdditionalProps.
+//
+// TAdditionalProps becomes the types of the props you must pass
+// whenever the @component field is rendered.
 type IdentityWithParamComponent<TParam> = <TClientFieldReturn, TAdditionalProps = Record<string, never>>(
   x: (data: TParam, secondParam: TAdditionalProps) => TClientFieldReturn
 ) => (data: TParam, secondParam: TAdditionalProps) => TClientFieldReturn;
