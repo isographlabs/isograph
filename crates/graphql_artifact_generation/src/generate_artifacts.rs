@@ -241,7 +241,7 @@ fn client_defined_fields<'a>(
     })
 }
 
-pub fn get_artifact_path_and_contents<'schema>(
+pub fn get_artifact_path_and_content<'schema>(
     schema: &'schema ValidatedSchema,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
