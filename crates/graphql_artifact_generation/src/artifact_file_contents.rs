@@ -1,13 +1,15 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use common_lang_types::{ArtifactFileType, IsographObjectTypeName, SelectableFieldName};
+use common_lang_types::{
+    ArtifactFileType, IsographObjectTypeName, PathAndContent, SelectableFieldName,
+};
 use intern::string_key::Intern;
 use isograph_schema::{ClientFieldVariant, ObjectTypeAndFieldNames};
 use lazy_static::lazy_static;
 
 use crate::generate_artifacts::{
-    ClientFieldOutputType, EntrypointArtifactInfo, JavaScriptImports, PathAndContent,
-    ReaderArtifactInfo, RefetchArtifactInfo,
+    ClientFieldOutputType, EntrypointArtifactInfo, JavaScriptImports, ReaderArtifactInfo,
+    RefetchArtifactInfo,
 };
 
 lazy_static! {

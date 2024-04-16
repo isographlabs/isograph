@@ -4,7 +4,7 @@ use std::{
     path::PathBuf,
 };
 
-use graphql_artifact_generation::PathAndContent;
+use common_lang_types::PathAndContent;
 use thiserror::Error;
 
 pub(crate) fn write_to_disk<'schema>(

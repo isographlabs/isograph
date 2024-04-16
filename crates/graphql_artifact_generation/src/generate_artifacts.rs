@@ -7,7 +7,7 @@ use std::{
 };
 
 use common_lang_types::{
-    ArtifactFileType, HasName, IsographObjectTypeName, Location, QueryOperationName,
+    HasName, IsographObjectTypeName, Location, PathAndContent, QueryOperationName,
     SelectableFieldName, Span, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
@@ -41,12 +41,6 @@ macro_rules! derive_display {
             }
         }
     };
-}
-
-pub struct PathAndContent {
-    pub relative_directory: PathBuf,
-    pub file_name_prefix: ArtifactFileType,
-    pub file_content: String,
 }
 
 fn build_iso_overload_for_entrypoint<'schema>(
