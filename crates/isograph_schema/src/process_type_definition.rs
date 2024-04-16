@@ -431,7 +431,7 @@ impl UnvalidatedSchema {
                     description: object_type_definition.description.map(|d| d.item),
                     name: object_type_definition.name.item,
                     id: next_object_id,
-                    server_fields,
+                    server_field_ids: server_fields,
                     client_field_ids: object_resolvers,
                     encountered_fields,
                     id_field,

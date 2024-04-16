@@ -315,7 +315,7 @@ impl UnvalidatedSchema {
 
         // TODO avoid a linear scan?
         let field_id = mutation
-            .server_fields
+            .server_field_ids
             .iter()
             .find(|field_id| self.server_field(**field_id).name.item == field_arg)
             .ok_or_else(|| {

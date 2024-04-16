@@ -357,7 +357,7 @@ pub struct SchemaObject<TEncounteredField> {
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
-    pub server_fields: Vec<ServerFieldId>,
+    pub server_field_ids: Vec<ServerFieldId>,
     pub client_field_ids: Vec<ClientFieldId>,
     pub encountered_fields: HashMap<SelectableFieldName, TEncounteredField>,
 }

@@ -211,7 +211,7 @@ impl ModifiedObject {
         let original_object = schema.server_field_data.object(self.object_id);
 
         let fields = original_object
-            .server_fields
+            .server_field_ids
             .iter()
             .flat_map(|field_id| {
                 let field = schema.server_field(*field_id);
@@ -350,7 +350,7 @@ impl ModifiedArgument {
                     ModifiedObject {
                         object_id,
                         field_map: object
-                            .server_fields
+                            .server_field_ids
                             .iter()
                             .map(|server_field_id| {
                                 (

@@ -171,7 +171,7 @@ fn transform_object_field_ids(
 ) -> ValidatedSchemaObject {
     let SchemaObject {
         name,
-        server_fields,
+        server_field_ids: server_fields,
         description,
         id,
         encountered_fields: unvalidated_encountered_fields,
@@ -212,7 +212,7 @@ fn transform_object_field_ids(
         description,
         name,
         id,
-        server_fields,
+        server_field_ids: server_fields,
         encountered_fields: validated_encountered_fields,
         client_field_ids,
         id_field,
@@ -613,7 +613,7 @@ fn validate_field_type_exists_and_is_scalar(
                             find_server_field_id(
                                 server_fields,
                                 scalar_field_selection.name.item,
-                                &parent_object.server_fields,
+                                &parent_object.server_field_ids,
                             )
                             .expect("Expected to find scalar field, this probably indicates a bug in Isograph"),
                         ),
