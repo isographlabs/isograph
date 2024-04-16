@@ -11,5 +11,8 @@ export function useRerenderWhenEncounteredRecordChanges(
     return subscribe(environment, encounteredRecords, () => {
       return setState({});
     });
+    // TODO this is probably buggy — we should re-evaluate the effect when
+    // encounteredRecords changes. However, it is not a stable object, so...
+    // how?
   }, []);
 }
