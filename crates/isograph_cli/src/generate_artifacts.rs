@@ -1163,11 +1163,11 @@ fn print_non_null_type_annotation<T: Display>(non_null: &NonNullTypeAnnotation<T
 }
 
 fn generate_function_import_statement(
-    action_kind: &ClientFieldVariant,
+    variant: &ClientFieldVariant,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
 ) -> ClientFieldFunctionImportStatement {
-    match action_kind {
+    match variant {
         ClientFieldVariant::Component((name, path)) | ClientFieldVariant::Eager((name, path))=> {
             let path_to_client_field = project_root
                 .join(PathBuf::from_str(path.lookup()).expect(
