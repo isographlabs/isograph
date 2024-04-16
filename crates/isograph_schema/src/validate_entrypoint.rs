@@ -2,7 +2,9 @@ use common_lang_types::{
     IsographObjectTypeName, Location, ScalarFieldName, TextSource, UnvalidatedTypeName,
     WithLocation, WithSpan,
 };
-use isograph_lang_types::{ClientFieldId, EntrypointTypeAndField, ObjectId, SelectableFieldId};
+use isograph_lang_types::{
+    ClientFieldId, EntrypointTypeAndField, SelectableServerFieldId, ServerObjectId,
+};
 use thiserror::Error;
 
 use crate::{FieldDefinitionLocation, UnvalidatedSchema};
@@ -28,9 +30,9 @@ impl UnvalidatedSchema {
         &self,
         parent_type: WithSpan<UnvalidatedTypeName>,
         text_source: TextSource,
-    ) -> Result<ObjectId, WithLocation<ValidateEntrypointDeclarationError>> {
+    ) -> Result<ServerObjectId, WithLocation<ValidateEntrypointDeclarationError>> {
         let parent_type_id = self
-            .schema_data
+            .server_field_data
             .defined_types
             .get(&parent_type.item.into())
             .ok_or(WithLocation::new(
@@ -41,7 +43,7 @@ impl UnvalidatedSchema {
             ))?;
 
         match parent_type_id {
-            SelectableFieldId::Object(object_id) => {
+            SelectableServerFieldId::Object(object_id) => {
                 // For now, only the query object is fetchable, and thus
                 // can be used as a parent type in an iso entrypoint declaration.
                 //
@@ -64,8 +66,8 @@ impl UnvalidatedSchema {
                     Ok(*object_id)
                 }
             }
-            SelectableFieldId::Scalar(scalar_id) => {
-                let scalar_name = self.schema_data.scalars[scalar_id.as_usize()].name;
+            SelectableServerFieldId::Scalar(scalar_id) => {
+                let scalar_name = self.server_field_data.server_scalars[scalar_id.as_usize()].name;
                 Err(WithLocation::new(
                     ValidateEntrypointDeclarationError::InvalidParentType {
                         parent_type: "scalar",
@@ -81,9 +83,9 @@ impl UnvalidatedSchema {
         &self,
         field_name: WithSpan<ScalarFieldName>,
         text_source: TextSource,
-        parent_object_id: ObjectId,
+        parent_object_id: ServerObjectId,
     ) -> Result<ClientFieldId, WithLocation<ValidateEntrypointDeclarationError>> {
-        let parent_object = self.schema_data.object(parent_object_id);
+        let parent_object = self.server_field_data.object(parent_object_id);
 
         match parent_object
             .encountered_fields

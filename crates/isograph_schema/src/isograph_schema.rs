@@ -12,8 +12,9 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ClientFieldId, LinkedFieldSelection, NonConstantValue, ObjectId, ScalarId, SelectableFieldId,
-    Selection, ServerFieldId, ServerStrongIdFieldId, Unwrap, VariableDefinition,
+    ClientFieldId, LinkedFieldSelection, NonConstantValue, SelectableServerFieldId, Selection,
+    ServerFieldId, ServerObjectId, ServerScalarId, ServerStrongIdFieldId, Unwrap,
+    VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -89,18 +90,18 @@ pub struct Schema<TValidation: SchemaValidationState> {
     >,
     // TODO consider whether this belongs here. It could just be a free variable.
     pub entrypoints: Vec<TValidation::Entrypoint>,
-    pub schema_data: SchemaData<TValidation::EncounteredField>,
+    pub server_field_data: ServerFieldData<TValidation::EncounteredField>,
 
     // Well known types
-    pub id_type_id: ScalarId,
-    pub string_type_id: ScalarId,
-    pub float_type_id: ScalarId,
-    pub boolean_type_id: ScalarId,
-    pub int_type_id: ScalarId,
+    pub id_type_id: ServerScalarId,
+    pub string_type_id: ServerScalarId,
+    pub float_type_id: ServerScalarId,
+    pub boolean_type_id: ServerScalarId,
+    pub int_type_id: ServerScalarId,
 
     // typename
     // TODO name this root query type?
-    pub query_type_id: Option<ObjectId>,
+    pub query_type_id: Option<ServerObjectId>,
     // Subscription
     // Mutation
 }
@@ -140,10 +141,10 @@ impl<TFieldAssociatedData, TClientFieldType>
 }
 
 #[derive(Debug)]
-pub struct SchemaData<TEncounteredField> {
-    pub objects: Vec<SchemaObject<TEncounteredField>>,
-    pub scalars: Vec<SchemaScalar>,
-    pub defined_types: HashMap<UnvalidatedTypeName, SelectableFieldId>,
+pub struct ServerFieldData<TEncounteredField> {
+    pub server_objects: Vec<SchemaObject<TEncounteredField>>,
+    pub server_scalars: Vec<SchemaScalar>,
+    pub defined_types: HashMap<UnvalidatedTypeName, SelectableServerFieldId>,
 }
 
 impl<TValidation: SchemaValidationState> Schema<TValidation> {
@@ -171,7 +172,7 @@ impl<TValidation: SchemaValidationState> Schema<TValidation> {
     pub fn query_object(&self) -> Option<&SchemaObject<TValidation::EncounteredField>> {
         self.query_type_id
             .as_ref()
-            .map(|id| self.schema_data.object(*id))
+            .map(|id| self.server_field_data.object(*id))
     }
 }
 
@@ -212,34 +213,37 @@ impl<
     }
 }
 
-impl<TEncounteredField> SchemaData<TEncounteredField> {
+impl<TEncounteredField> ServerFieldData<TEncounteredField> {
     /// Get a reference to a given scalar type by its id.
-    pub fn scalar(&self, scalar_id: ScalarId) -> &SchemaScalar {
-        &self.scalars[scalar_id.as_usize()]
+    pub fn scalar(&self, scalar_id: ServerScalarId) -> &SchemaScalar {
+        &self.server_scalars[scalar_id.as_usize()]
     }
 
     pub fn lookup_unvalidated_type(
         &self,
-        type_id: SelectableFieldId,
+        type_id: SelectableServerFieldId,
     ) -> SchemaType<TEncounteredField> {
         match type_id {
-            SelectableFieldId::Object(id) => {
-                SchemaType::Object(self.objects.get(id.as_usize()).unwrap())
+            SelectableServerFieldId::Object(id) => {
+                SchemaType::Object(self.server_objects.get(id.as_usize()).unwrap())
             }
-            SelectableFieldId::Scalar(id) => {
-                SchemaType::Scalar(self.scalars.get(id.as_usize()).unwrap())
+            SelectableServerFieldId::Scalar(id) => {
+                SchemaType::Scalar(self.server_scalars.get(id.as_usize()).unwrap())
             }
         }
     }
 
     /// Get a reference to a given object type by its id.
-    pub fn object(&self, object_id: ObjectId) -> &SchemaObject<TEncounteredField> {
-        &self.objects[object_id.as_usize()]
+    pub fn object(&self, object_id: ServerObjectId) -> &SchemaObject<TEncounteredField> {
+        &self.server_objects[object_id.as_usize()]
     }
 
     /// Get a mutable reference to a given object type by its id.
-    pub fn object_mut(&mut self, object_id: ObjectId) -> &mut SchemaObject<TEncounteredField> {
-        &mut self.objects[object_id.as_usize()]
+    pub fn object_mut(
+        &mut self,
+        object_id: ServerObjectId,
+    ) -> &mut SchemaObject<TEncounteredField> {
+        &mut self.server_objects[object_id.as_usize()]
     }
 }
 
@@ -345,7 +349,7 @@ impl From<GraphQLInputObjectTypeDefinition> for IsographObjectTypeDefinition {
 pub struct SchemaObject<TEncounteredField> {
     pub description: Option<DescriptionValue>,
     pub name: IsographObjectTypeName,
-    pub id: ObjectId,
+    pub id: ServerObjectId,
     // We probably don't want this
     pub directives: Vec<GraphQLDirective<ConstantValue>>,
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
@@ -360,7 +364,7 @@ pub struct SchemaObject<TEncounteredField> {
 /// union can be narrowed to. valid_refinements should be empty for concrete types.
 #[derive(Debug)]
 pub struct ValidRefinement {
-    pub target: ObjectId,
+    pub target: ServerObjectId,
     // pub is_guaranteed_to_work: bool,
 }
 
@@ -373,7 +377,7 @@ pub struct SchemaServerField<TData> {
     pub name: WithLocation<SelectableFieldName>,
     pub id: ServerFieldId,
     pub associated_data: TData,
-    pub parent_type_id: ObjectId,
+    pub parent_type_id: ServerObjectId,
     // pub directives: Vec<Directive<ConstantValue>>,
     pub arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
 }
@@ -402,7 +406,7 @@ pub struct SchemaIdField<TData> {
     pub name: WithLocation<SelectableFieldName>,
     pub id: ServerStrongIdFieldId,
     pub associated_data: TData,
-    pub parent_type_id: ObjectId,
+    pub parent_type_id: ServerObjectId,
     // pub directives: Vec<Directive<ConstantValue>>,
 }
 
@@ -497,7 +501,7 @@ pub struct ClientField<
     pub type_and_field: ObjectTypeAndFieldNames,
 
     // TODO should this be TypeWithFieldsId???
-    pub parent_object_id: ObjectId,
+    pub parent_object_id: ServerObjectId,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -562,6 +566,6 @@ impl<T> SchemaServerField<T> {
 pub struct SchemaScalar {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<GraphQLScalarTypeName>,
-    pub id: ScalarId,
+    pub id: ServerScalarId,
     pub javascript_name: JavascriptName,
 }

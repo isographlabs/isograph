@@ -6,12 +6,13 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ClientFieldId, EntrypointTypeAndField, LinkedFieldSelection, ScalarId, SelectableFieldId,
+    ClientFieldId, EntrypointTypeAndField, LinkedFieldSelection, SelectableServerFieldId,
+    ServerScalarId,
 };
 
 use crate::{
-    ClientField, FieldDefinitionLocation, Schema, SchemaData, SchemaObject, SchemaScalar,
-    SchemaServerField, SchemaValidationState,
+    ClientField, FieldDefinitionLocation, Schema, SchemaObject, SchemaScalar, SchemaServerField,
+    SchemaValidationState, ServerFieldData,
 };
 use lazy_static::lazy_static;
 
@@ -45,7 +46,7 @@ pub type UnvalidatedObjectFieldInfo =
     FieldDefinitionLocation<GraphQLTypeAnnotation<UnvalidatedTypeName>, ClientFieldId>;
 
 pub(crate) type UnvalidatedSchemaData =
-    SchemaData<<UnvalidatedSchemaState as SchemaValidationState>::EncounteredField>;
+    ServerFieldData<<UnvalidatedSchemaState as SchemaValidationState>::EncounteredField>;
 
 pub(crate) type UnvalidatedSchemaField =
     SchemaServerField<GraphQLTypeAnnotation<UnvalidatedTypeName>>;
@@ -62,7 +63,7 @@ pub type UnvalidatedLinkedFieldSelection = LinkedFieldSelection<
 >;
 
 pub(crate) type UnvalidatedSchemaServerField =
-    SchemaServerField<GraphQLTypeAnnotation<SelectableFieldId>>;
+    SchemaServerField<GraphQLTypeAnnotation<SelectableServerFieldId>>;
 
 impl UnvalidatedSchema {
     pub fn new() -> Self {
@@ -108,9 +109,9 @@ impl UnvalidatedSchema {
             server_fields: fields,
             client_fields: resolvers,
             entrypoints: Default::default(),
-            schema_data: SchemaData {
-                objects,
-                scalars,
+            server_field_data: ServerFieldData {
+                server_objects: objects,
+                server_scalars: scalars,
                 defined_types,
             },
 
@@ -127,10 +128,10 @@ impl UnvalidatedSchema {
 
 fn add_schema_defined_scalar_type(
     scalars: &mut Vec<SchemaScalar>,
-    defined_types: &mut HashMap<UnvalidatedTypeName, SelectableFieldId>,
+    defined_types: &mut HashMap<UnvalidatedTypeName, SelectableServerFieldId>,
     field_name: &'static str,
     javascript_name: JavascriptName,
-) -> ScalarId {
+) -> ServerScalarId {
     let scalar_id = scalars.len().into();
 
     // TODO this is problematic, we have no span (or really, no location) associated with this
@@ -145,7 +146,7 @@ fn add_schema_defined_scalar_type(
     });
     defined_types.insert(
         typename.item.into(),
-        SelectableFieldId::Scalar(scalar_id.into()),
+        SelectableServerFieldId::Scalar(scalar_id.into()),
     );
     scalar_id
 }

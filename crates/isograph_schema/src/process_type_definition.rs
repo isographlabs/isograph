@@ -20,8 +20,8 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_config::ConfigOptions;
 use isograph_lang_types::{
-    ClientFieldId, ObjectId, ScalarFieldSelection, SelectableFieldId, Selection, ServerFieldId,
-    ServerFieldSelection, ServerStrongIdFieldId,
+    ClientFieldId, ScalarFieldSelection, SelectableServerFieldId, Selection, ServerFieldId,
+    ServerFieldSelection, ServerObjectId, ServerStrongIdFieldId,
 };
 use lazy_static::lazy_static;
 use serde::Deserialize;
@@ -33,11 +33,11 @@ lazy_static! {
 }
 
 // When parsing, we have the subtype's ObjectId, but only the Supertype's name
-type UnvalidatedSupertypeToSubtypeMap = HashMap<IsographObjectTypeName, Vec<ObjectId>>;
+type UnvalidatedSupertypeToSubtypeMap = HashMap<IsographObjectTypeName, Vec<ServerObjectId>>;
 type UnvalidatedSubtypeToSupertypeMap =
-    HashMap<ObjectId, Vec<WithLocation<IsographObjectTypeName>>>;
+    HashMap<ServerObjectId, Vec<WithLocation<IsographObjectTypeName>>>;
 // When constructing the final map, we have both!
-pub type TypeRefinementMap = HashMap<ObjectId, Vec<ObjectId>>;
+pub type TypeRefinementMap = HashMap<ServerObjectId, Vec<ServerObjectId>>;
 
 #[allow(unused)]
 #[derive(Debug)]
@@ -52,7 +52,7 @@ pub struct ProcessGraphQLDocumentOutcome {
 }
 
 pub struct ProcessObjectTypeDefinitionOutcome {
-    pub object_id: ObjectId,
+    pub object_id: ServerObjectId,
     pub encountered_root_kind: Option<RootOperationKind>,
 }
 
@@ -204,7 +204,7 @@ impl UnvalidatedSchema {
                     panic!(
                         "Expected type_refinement_map to be empty at {} \
                         ({}). This is indicative of a bug in Isograph.",
-                        self.schema_data.object(subtype_id).name,
+                        self.server_field_data.object(subtype_id).name,
                         subtype_id
                     );
                 }
@@ -213,7 +213,7 @@ impl UnvalidatedSchema {
                         .into_iter()
                         .map(|supertype_name| {
                             let supertype_id = self
-                                .schema_data
+                                .server_field_data
                                 .defined_types
                                 .get(&supertype_name.item.into())
                                 .ok_or(WithLocation::new(
@@ -223,8 +223,9 @@ impl UnvalidatedSchema {
                                     supertype_name.location,
                                 ))?;
                             match supertype_id {
-                                SelectableFieldId::Scalar(_) => {
-                                    let subtype_name = self.schema_data.object(subtype_id).name;
+                                SelectableServerFieldId::Scalar(_) => {
+                                    let subtype_name =
+                                        self.server_field_data.object(subtype_id).name;
 
                                     return Err(WithLocation::new(
                                         ProcessTypeDefinitionError::ObjectIsScalar {
@@ -234,7 +235,7 @@ impl UnvalidatedSchema {
                                         supertype_name.location,
                                     ));
                                 }
-                                SelectableFieldId::Object(supertype_object_id) => {
+                                SelectableServerFieldId::Object(supertype_object_id) => {
                                     Ok(*supertype_object_id)
                                 }
                             }
@@ -249,19 +250,19 @@ impl UnvalidatedSchema {
         let mut supertype_to_subtype_map = HashMap::new();
         for (supertype_name, subtypes) in unvalidated_supertype_to_subtype_map {
             let supertype_id = self
-                .schema_data
+                .server_field_data
                 .defined_types
                 .get(&supertype_name.into())
                 .expect("Expected Interface to be found. This indicates a bug in Isograph.");
 
             match supertype_id {
-                SelectableFieldId::Scalar(_) => {
+                SelectableServerFieldId::Scalar(_) => {
                     panic!(
                         "Expected an object id; this is indicative of a bug in Isograph and \
                         should have already been validated."
                     );
                 }
-                SelectableFieldId::Object(supertype_object_id) => {
+                SelectableServerFieldId::Object(supertype_object_id) => {
                     // TODO validate that supertype was defined as an interface, perhaps by
                     // including references to the original definition (i.e. as a type parameter)
                     // and having the schema be able to validate this. (i.e. this should be
@@ -331,13 +332,17 @@ impl UnvalidatedSchema {
             GraphQLTypeSystemExtension::ObjectTypeExtension(object_extension) => {
                 let name = object_extension.name.item;
 
-                let id = self.schema_data.defined_types.get(&name.into()).expect(
+                let id = self
+                    .server_field_data
+                    .defined_types
+                    .get(&name.into())
+                    .expect(
                     "TODO why does this id not exist. This probably indicates a bug in Isograph.",
                 );
 
                 match *id {
-                    SelectableFieldId::Object(object_id) => {
-                        let schema_object = self.schema_data.object_mut(object_id);
+                    SelectableServerFieldId::Object(object_id) => {
+                        let schema_object = self.server_field_data.object_mut(object_id);
 
                         if !object_extension.fields.is_empty() {
                             panic!("Adding fields in schema extensions is not allowed, yet.");
@@ -352,7 +357,7 @@ impl UnvalidatedSchema {
 
                         Ok(())
                     }
-                    SelectableFieldId::Scalar(_) => Err(WithLocation::new(
+                    SelectableServerFieldId::Scalar(_) => Err(WithLocation::new(
                         ProcessTypeDefinitionError::TypeExtensionMismatch {
                             type_name: name.into(),
                             is_type: "a scalar",
@@ -376,14 +381,14 @@ impl UnvalidatedSchema {
     ) -> ProcessTypeDefinitionResult<ProcessObjectTypeDefinitionOutcome> {
         let &mut Schema {
             server_fields: ref mut schema_fields,
-            ref mut schema_data,
+            server_field_data: ref mut schema_data,
             client_fields: ref mut schema_resolvers,
             ..
         } = self;
-        let next_object_id = schema_data.objects.len().into();
+        let next_object_id = schema_data.server_objects.len().into();
         let string_type_for_typename = schema_data.scalar(self.string_type_id).name;
         let ref mut type_names = schema_data.defined_types;
-        let ref mut objects = schema_data.objects;
+        let ref mut objects = schema_data.server_objects;
         let encountered_root_kind = match type_names.entry(object_type_definition.name.item.into())
         {
             Entry::Occupied(_) => {
@@ -434,7 +439,7 @@ impl UnvalidatedSchema {
                 });
 
                 schema_fields.extend(unvalidated_schema_fields);
-                vacant.insert(SelectableFieldId::Object(next_object_id));
+                vacant.insert(SelectableServerFieldId::Object(next_object_id));
 
                 // TODO default types are a GraphQL-land concept, but this is Isograph-land
                 if object_type_definition.name.item == *QUERY_TYPE {
@@ -486,12 +491,12 @@ impl UnvalidatedSchema {
         scalar_type_definition: GraphQLScalarTypeDefinition,
     ) -> ProcessTypeDefinitionResult<()> {
         let &mut Schema {
-            ref mut schema_data,
+            server_field_data: ref mut schema_data,
             ..
         } = self;
-        let next_scalar_id = schema_data.scalars.len().into();
+        let next_scalar_id = schema_data.server_scalars.len().into();
         let ref mut type_names = schema_data.defined_types;
-        let ref mut scalars = schema_data.scalars;
+        let ref mut scalars = schema_data.server_scalars;
         match type_names.entry(scalar_type_definition.name.item.into()) {
             Entry::Occupied(_) => {
                 return Err(WithLocation::new(
@@ -510,7 +515,7 @@ impl UnvalidatedSchema {
                     javascript_name: *STRING_JAVASCRIPT_TYPE,
                 });
 
-                vacant.insert(SelectableFieldId::Scalar(next_scalar_id));
+                vacant.insert(SelectableServerFieldId::Scalar(next_scalar_id));
             }
         }
         Ok(())
@@ -552,10 +557,14 @@ impl UnvalidatedSchema {
     fn look_up_root_type(
         &self,
         type_name: WithLocation<GraphQLObjectTypeName>,
-    ) -> ProcessTypeDefinitionResult<ObjectId> {
-        match self.schema_data.defined_types.get(&type_name.item.into()) {
-            Some(SelectableFieldId::Object(object_id)) => Ok(*object_id),
-            Some(SelectableFieldId::Scalar(_)) => Err(WithLocation::new(
+    ) -> ProcessTypeDefinitionResult<ServerObjectId> {
+        match self
+            .server_field_data
+            .defined_types
+            .get(&type_name.item.into())
+        {
+            Some(SelectableServerFieldId::Object(object_id)) => Ok(*object_id),
+            Some(SelectableServerFieldId::Scalar(_)) => Err(WithLocation::new(
                 ProcessTypeDefinitionError::RootTypeMustBeObject,
                 type_name.location,
             )),
@@ -604,7 +613,7 @@ fn get_resolvers_for_schema_object(
     id_field_id: &Option<ServerStrongIdFieldId>,
     encountered_fields: &mut HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
     schema_resolvers: &mut Vec<UnvalidatedClientField>,
-    parent_object_id: ObjectId,
+    parent_object_id: ServerObjectId,
     type_definition: &IsographObjectTypeDefinition,
 ) -> Vec<ClientFieldId> {
     if let Some(_id_field_id) = id_field_id {
@@ -669,7 +678,7 @@ struct FieldObjectIdsEtc {
 fn get_field_objects_ids_and_names(
     new_fields: Vec<WithLocation<GraphQLFieldDefinition>>,
     next_field_id: usize,
-    parent_type_id: ObjectId,
+    parent_type_id: ServerObjectId,
     parent_type_name: IsographObjectTypeName,
     typename_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     // TODO this is hacky

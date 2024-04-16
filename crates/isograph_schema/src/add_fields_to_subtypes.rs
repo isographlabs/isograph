@@ -17,7 +17,7 @@ impl UnvalidatedSchema {
         supertype_to_subtype_map: &TypeRefinementMap,
     ) -> ProcessTypeDefinitionResult<()> {
         for (supertype_id, subtype_ids) in supertype_to_subtype_map {
-            let supertype = self.schema_data.object(*supertype_id);
+            let supertype = self.server_field_data.object(*supertype_id);
 
             // TODO is there a way to do this without cloning? I would think so, in theory,
             // if you could prove (or check at runtime?) that the supertype and subtype are not
@@ -48,7 +48,7 @@ impl UnvalidatedSchema {
                             if matches!(client_field.variant, ClientFieldVariant::RefetchField) {
                                 continue 'field;
                             }
-                            let subtype = self.schema_data.object_mut(*subtype_id);
+                            let subtype = self.server_field_data.object_mut(*subtype_id);
 
                             if let Some(_) = subtype
                                 .encountered_fields

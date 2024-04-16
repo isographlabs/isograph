@@ -4,22 +4,23 @@ use common_lang_types::{
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation, NamedTypeAnnotation};
 use isograph_lang_types::{
-    ClientFieldId, LinkedFieldSelection, ObjectId, ScalarFieldSelection, ScalarId,
-    SelectableFieldId, Selection, ServerFieldId, UnvalidatedScalarFieldSelection,
+    ClientFieldId, LinkedFieldSelection, ScalarFieldSelection, SelectableServerFieldId, Selection,
+    ServerFieldId, ServerObjectId, ServerScalarId, UnvalidatedScalarFieldSelection,
     UnvalidatedSelection, VariableDefinition,
 };
 use thiserror::Error;
 
 use crate::{
     refetched_paths::refetched_paths_with_path, ClientField, FieldDefinitionLocation,
-    NameAndArguments, PathToRefetchField, Schema, SchemaData, SchemaIdField, SchemaObject,
-    SchemaServerField, SchemaValidationState, UnvalidatedClientField,
+    NameAndArguments, PathToRefetchField, Schema, SchemaIdField, SchemaObject, SchemaServerField,
+    SchemaValidationState, ServerFieldData, UnvalidatedClientField,
     UnvalidatedLinkedFieldSelection, UnvalidatedSchema, UnvalidatedSchemaData,
     UnvalidatedSchemaField, UnvalidatedSchemaObject, UnvalidatedSchemaServerField,
     ValidateEntrypointDeclarationError,
 };
 
-pub type ValidatedSchemaServerField = SchemaServerField<GraphQLTypeAnnotation<SelectableFieldId>>;
+pub type ValidatedSchemaServerField =
+    SchemaServerField<GraphQLTypeAnnotation<SelectableServerFieldId>>;
 
 pub type ValidatedSelection = Selection<
     <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
@@ -34,7 +35,7 @@ pub type ValidatedScalarFieldSelection = ScalarFieldSelection<
     <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
 >;
 
-pub type ValidatedVariableDefinition = VariableDefinition<SelectableFieldId>;
+pub type ValidatedVariableDefinition = VariableDefinition<SelectableServerFieldId>;
 pub type ValidatedClientField = ClientField<
     <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
@@ -47,20 +48,20 @@ pub type ValidatedFieldDefinitionLocation = FieldDefinitionLocation<ServerFieldI
 pub type ValidatedSchemaObject =
     SchemaObject<<ValidatedSchemaState as SchemaValidationState>::EncounteredField>;
 
-pub type ValidatedSchemaIdField = SchemaIdField<NamedTypeAnnotation<ScalarId>>;
+pub type ValidatedSchemaIdField = SchemaIdField<NamedTypeAnnotation<ServerScalarId>>;
 
 #[derive(Debug)]
 pub struct ValidatedLinkedFieldAssociatedData {
-    pub parent_object_id: ObjectId,
+    pub parent_object_id: ServerObjectId,
 }
 
 #[derive(Debug)]
 pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
-    type FieldTypeAssociatedData = SelectableFieldId;
+    type FieldTypeAssociatedData = SelectableServerFieldId;
     type ClientFieldSelectionScalarFieldAssociatedData = ValidatedFieldDefinitionLocation;
     type ClientFieldSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
-    type ClientFieldVariableDefinitionAssociatedData = SelectableFieldId;
+    type ClientFieldVariableDefinitionAssociatedData = SelectableServerFieldId;
     type EncounteredField = ValidatedFieldDefinitionLocation;
     type Entrypoint = ClientFieldId;
 }
@@ -94,7 +95,7 @@ impl ValidatedSchema {
             server_fields: fields,
             client_fields,
             entrypoints: _,
-            schema_data,
+            server_field_data: schema_data,
             id_type_id: id_type,
             string_type_id: string_type,
             query_type_id,
@@ -127,9 +128,9 @@ impl ValidatedSchema {
             }
         };
 
-        let SchemaData {
-            objects,
-            scalars,
+        let ServerFieldData {
+            server_objects: objects,
+            server_scalars: scalars,
             defined_types,
         } = schema_data;
 
@@ -145,9 +146,9 @@ impl ValidatedSchema {
                 server_fields: updated_fields,
                 client_fields: updated_client_fields,
                 entrypoints: updated_entrypoints,
-                schema_data: SchemaData {
-                    objects,
-                    scalars,
+                server_field_data: ServerFieldData {
+                    server_objects: objects,
+                    server_scalars: scalars,
                     defined_types,
                 },
                 id_type_id: id_type,
@@ -325,7 +326,7 @@ fn validate_server_field_type_exists(
     schema_data: &UnvalidatedSchemaData,
     server_field_type: &GraphQLTypeAnnotation<UnvalidatedTypeName>,
     field: &SchemaServerField<()>,
-) -> ValidateSchemaResult<GraphQLTypeAnnotation<SelectableFieldId>> {
+) -> ValidateSchemaResult<GraphQLTypeAnnotation<SelectableServerFieldId>> {
     // look up the item in defined_types. If it's not there, error.
     match schema_data.defined_types.get(server_field_type.inner()) {
         // Why do we need to clone here? Can we avoid this?
@@ -344,7 +345,7 @@ fn validate_server_field_type_exists(
 fn validate_server_field_argument(
     argument: WithLocation<GraphQLInputValueDefinition>,
     schema_data: &UnvalidatedSchemaData,
-    parent_type_id: ObjectId,
+    parent_type_id: ServerObjectId,
     name: WithLocation<SelectableFieldName>,
 ) -> ValidateSchemaResult<WithLocation<GraphQLInputValueDefinition>> {
     // Isograph doesn't care about the default value, and that remains
@@ -606,7 +607,7 @@ fn validate_field_type_exists_and_is_scalar(
                         was validated earlier, probably indicates a bug in Isograph",
                     );
                 match field_type_id {
-                    SelectableFieldId::Scalar(_scalar_id) => Ok(ScalarFieldSelection {
+                    SelectableServerFieldId::Scalar(_scalar_id) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
                         associated_data: FieldDefinitionLocation::Server(
                             find_server_field_id(
@@ -621,7 +622,7 @@ fn validate_field_type_exists_and_is_scalar(
                         unwraps: scalar_field_selection.unwraps,
                         arguments: scalar_field_selection.arguments,
                     }),
-                    SelectableFieldId::Object(_) => Err(
+                    SelectableServerFieldId::Object(_) => Err(
                         WithLocation::new(
                             ValidateSelectionsError::FieldSelectedAsScalarButTypeIsNotScalar {
                                 field_parent_type_name: parent_object.name,
@@ -673,7 +674,7 @@ fn validate_field_type_exists_and_is_linked(
                             think was validated earlier, probably indicates a bug in Isograph",
                     );
                 match field_type_id {
-                    SelectableFieldId::Scalar(_) => Err(WithLocation::new(
+                    SelectableServerFieldId::Scalar(_) => Err(WithLocation::new(
                         ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsScalar {
                             field_parent_type_name: parent_object.name,
                             field_name: linked_field_name,
@@ -682,8 +683,11 @@ fn validate_field_type_exists_and_is_linked(
                         },
                         linked_field_selection.name.location,
                     )),
-                    SelectableFieldId::Object(object_id) => {
-                        let object = schema_data.objects.get(object_id.as_usize()).unwrap();
+                    SelectableServerFieldId::Object(object_id) => {
+                        let object = schema_data
+                            .server_objects
+                            .get(object_id.as_usize())
+                            .unwrap();
                         Ok(LinkedFieldSelection {
                                 name: linked_field_selection.name,
                                 reader_alias: linked_field_selection.reader_alias,

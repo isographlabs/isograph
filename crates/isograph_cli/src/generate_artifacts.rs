@@ -17,7 +17,7 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ClientFieldId, NonConstantValue, SelectableFieldId, Selection, SelectionFieldArgument,
+    ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection, SelectionFieldArgument,
     ServerFieldSelection, VariableDefinition,
 };
 use isograph_schema::{
@@ -367,7 +367,7 @@ fn get_artifact_for_refetch_field(
         ..
     } = refetch_info;
 
-    let parent_object = schema.schema_data.object(parent_id);
+    let parent_object = schema.server_field_data.object(parent_id);
 
     // --------- HACK ---------
     // Merged selection sets do not support type refinements, so for now,
@@ -438,7 +438,7 @@ fn get_artifact_for_mutation_field<'schema>(
         1,
     );
 
-    let parent_object = schema.schema_data.object(parent_id);
+    let parent_object = schema.server_field_data.object(parent_id);
 
     let query_text = generate_mutation_query_text(
         parent_object,
@@ -494,7 +494,7 @@ fn generate_refetchable_query_text<'schema>(
             name: WithLocation::new("id".intern().into(), Location::generated()),
             type_: GraphQLTypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
                 NamedTypeAnnotation(WithSpan {
-                    item: SelectableFieldId::Scalar(schema.id_type_id),
+                    item: SelectableServerFieldId::Scalar(schema.id_type_id),
                     span: Span::todo_generated(),
                 }),
             ))),
@@ -534,7 +534,7 @@ fn generate_mutation_query_text<'schema>(
                     name: variable_name,
                     type_: argument.item.type_.clone().map(|type_name| {
                         *schema
-                            .schema_data
+                            .server_field_data
                             .defined_types
                             .get(&type_name.into())
                             .expect("Expected type to be found, this indicates a bug in Isograph")
@@ -609,7 +609,7 @@ fn generate_entrypoint_artifact<'schema>(
             // TODO here we are assuming that the client field is only on the Query type.
             // That restriction should be loosened.
             schema
-                .schema_data
+                .server_field_data
                 .object(schema.query_type_id.expect("expect query type to exist"))
                 .into(),
             selection_set,
@@ -652,7 +652,9 @@ fn generate_reader_artifact<'schema>(
     artifact_directory: &PathBuf,
 ) -> ReaderArtifactInfo<'schema> {
     if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
-        let parent_type = schema.schema_data.object(client_field.parent_object_id);
+        let parent_type = schema
+            .server_field_data
+            .object(client_field.parent_object_id);
         let mut nested_client_field_artifact_imports = HashMap::new();
 
         let (_merged_selection_set, root_refetched_paths) = create_merged_selection_set(
@@ -660,7 +662,7 @@ fn generate_reader_artifact<'schema>(
             // TODO here we are assuming that the client field is only on the Query type.
             // That restriction should be loosened.
             schema
-                .schema_data
+                .server_field_data
                 .object(schema.query_type_id.expect("expect query type to exist"))
                 .into(),
             selection_set,
@@ -919,7 +921,9 @@ fn write_variables_to_string<'a>(
         // TODO can we consume the variables here?
         let x: GraphQLTypeAnnotation<UnvalidatedTypeName> =
             variable.item.type_.clone().map(|input_type_id| {
-                let schema_input_type = schema.schema_data.lookup_unvalidated_type(input_type_id);
+                let schema_input_type = schema
+                    .server_field_data
+                    .lookup_unvalidated_type(input_type_id);
                 schema_input_type.name().into()
             });
         // TODO this is dangerous, since variable.item.name is a WithLocation, which impl's Display.
@@ -1044,12 +1048,12 @@ fn write_query_types_from_selection(
                         let output_type = field.associated_data.clone().map(|output_type_id| {
                             // TODO not just scalars, enums as well. Both should have a javascript name
                             let scalar_id =
-                                if let SelectableFieldId::Scalar(scalar) = output_type_id {
+                                if let SelectableServerFieldId::Scalar(scalar) = output_type_id {
                                     scalar
                                 } else {
                                     panic!("output_type_id should be a scalar");
                                 };
-                            schema.schema_data.scalar(scalar_id).javascript_name
+                            schema.server_field_data.scalar(scalar_id).javascript_name
                         });
                         query_type_declaration.push_str(&format!(
                             "{}: {},\n",
@@ -1097,12 +1101,13 @@ fn write_query_types_from_selection(
                 let name_or_alias = linked_field.name_or_alias().item;
                 let type_annotation = field.associated_data.clone().map(|output_type_id| {
                     // TODO Or interface or union type
-                    let object_id = if let SelectableFieldId::Object(object) = output_type_id {
+                    let object_id = if let SelectableServerFieldId::Object(object) = output_type_id
+                    {
                         object
                     } else {
                         panic!("output_type_id should be a object");
                     };
-                    let object = schema.schema_data.object(object_id);
+                    let object = schema.server_field_data.object(object_id);
                     let inner = generate_client_field_parameter_type(
                         schema,
                         &linked_field.selection_set,

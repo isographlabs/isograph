@@ -6,7 +6,7 @@ use common_lang_types::{
 };
 use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::string_key::Intern;
-use isograph_lang_types::{ClientFieldDeclaration, ObjectId, SelectableFieldId};
+use isograph_lang_types::{ClientFieldDeclaration, SelectableServerFieldId, ServerObjectId};
 use lazy_static::lazy_static;
 use thiserror::Error;
 
@@ -21,7 +21,7 @@ impl UnvalidatedSchema {
         text_source: TextSource,
     ) -> Result<(), WithLocation<ProcessClientFieldDeclarationError>> {
         let parent_type_id = self
-            .schema_data
+            .server_field_data
             .defined_types
             .get(&client_field_declaration.item.parent_type.item.into())
             .ok_or(WithLocation::new(
@@ -32,12 +32,12 @@ impl UnvalidatedSchema {
             ))?;
 
         match parent_type_id {
-            SelectableFieldId::Object(object_id) => {
+            SelectableServerFieldId::Object(object_id) => {
                 self.add_resolver_field_to_object(*object_id, client_field_declaration)
                     .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?;
             }
-            SelectableFieldId::Scalar(scalar_id) => {
-                let scalar_name = self.schema_data.scalars[scalar_id.as_usize()].name;
+            SelectableServerFieldId::Scalar(scalar_id) => {
+                let scalar_name = self.server_field_data.server_scalars[scalar_id.as_usize()].name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
                         parent_type_name: scalar_name.item.into(),
@@ -52,10 +52,10 @@ impl UnvalidatedSchema {
 
     fn add_resolver_field_to_object(
         &mut self,
-        parent_object_id: ObjectId,
+        parent_object_id: ServerObjectId,
         client_field_declaration: WithSpan<ClientFieldDeclaration>,
     ) -> ProcessResolverDeclarationResult<()> {
-        let object = &mut self.schema_data.objects[parent_object_id.as_usize()];
+        let object = &mut self.server_field_data.server_objects[parent_object_id.as_usize()];
         let resolver_field_name_ws = client_field_declaration.item.client_field_name;
         let resolver_field_name = resolver_field_name_ws.item;
         let resolver_field_name_span = resolver_field_name_ws.span;
@@ -138,7 +138,7 @@ pub struct MutationFieldClientFieldVariant {
     pub mutation_field_name: SelectableFieldName,
     pub server_schema_mutation_field_name: SelectableFieldName,
     pub mutation_primary_field_name: SelectableFieldName,
-    pub mutation_primary_field_return_type_object_id: ObjectId,
+    pub mutation_primary_field_return_type_object_id: ServerObjectId,
     pub mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
     pub filtered_mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
     pub field_map: Vec<FieldMapItem>,

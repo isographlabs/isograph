@@ -10,8 +10,8 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ClientFieldId, ObjectId, ScalarFieldSelection, SelectableFieldId, Selection,
-    SelectionFieldArgument, ServerFieldSelection, VariableDefinition,
+    ClientFieldId, ScalarFieldSelection, SelectableServerFieldId, Selection,
+    SelectionFieldArgument, ServerFieldSelection, ServerObjectId, VariableDefinition,
 };
 
 use crate::{
@@ -164,8 +164,8 @@ pub struct RefetchFieldArtifactInfo {
     pub merged_selection_set: MergedSelectionSet,
     /// Used to look up what type to narrow on in the generated refetch query,
     /// among other things.
-    pub refetch_field_parent_id: ObjectId,
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<SelectableFieldId>>>,
+    pub refetch_field_parent_id: ServerObjectId,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<SelectableServerFieldId>>>,
     pub root_parent_object: IsographObjectTypeName,
     pub root_fetchable_field: SelectableFieldName,
     // TODO wrap in a newtype
@@ -177,8 +177,8 @@ pub struct MutationFieldArtifactInfo {
     pub merged_selection_set: MergedSelectionSet,
     /// Used to look up what type to narrow on in the generated refetch query,
     /// among other things.
-    pub refetch_field_parent_id: ObjectId,
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<SelectableFieldId>>>,
+    pub refetch_field_parent_id: ServerObjectId,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<SelectableServerFieldId>>>,
     pub root_parent_object: IsographObjectTypeName,
     pub root_fetchable_field: SelectableFieldName,
     // TODO wrap in a newtype
@@ -198,7 +198,7 @@ pub struct MutationFieldArtifactInfo {
 /// A mutable reference to this struct is passed down to all children.
 #[derive(Debug)]
 struct MergeTraversalState<'a> {
-    paths_to_refetch_fields: Vec<(PathToRefetchField, ObjectId, ClientFieldVariant)>,
+    paths_to_refetch_fields: Vec<(PathToRefetchField, ServerObjectId, ClientFieldVariant)>,
     /// As we traverse selection sets, we need to keep track of the path we have
     /// taken so far. This is because when we encounter a refetch query, we need
     /// to take note of the path we took to reach that query, but continue
@@ -284,7 +284,7 @@ pub fn create_merged_selection_set(
                                         refetch_field_parent_id,
                                         variable_definitions: definitions_of_used_variables,
                                         root_parent_object: schema
-                                            .schema_data
+                                            .server_field_data
                                             .object(entrypoint.parent_object_id)
                                             .name,
                                         root_fetchable_field: entrypoint.name,
@@ -311,7 +311,10 @@ pub fn create_merged_selection_set(
                                         RequiresRefinement::No
                                     } else {
                                         RequiresRefinement::Yes(
-                                            schema.schema_data.object(refetch_field_parent_id).name,
+                                            schema
+                                                .server_field_data
+                                                .object(refetch_field_parent_id)
+                                                .name,
                                         )
                                     };
 
@@ -321,7 +324,7 @@ pub fn create_merged_selection_set(
                                         refetch_field_parent_id,
                                         variable_definitions: definitions_of_used_variables,
                                         root_parent_object: schema
-                                            .schema_data
+                                            .server_field_data
                                             .object(entrypoint.parent_object_id)
                                             .name,
                                         root_fetchable_field: entrypoint.name,
@@ -521,7 +524,7 @@ fn merge_linked_field_into_vacant_entry(
             name: new_linked_field.name,
             selection_set: {
                 let type_id = new_linked_field.associated_data.parent_object_id;
-                let linked_field_parent_type = schema.schema_data.object(type_id);
+                let linked_field_parent_type = schema.server_field_data.object(type_id);
                 let merged_set = create_merged_selection_set_with_merge_traversal_state(
                     schema,
                     linked_field_parent_type,
@@ -550,7 +553,7 @@ fn merge_linked_field_into_occupied_entry(
         }
         MergedServerFieldSelection::LinkedField(existing_linked_field) => {
             let type_id = new_linked_field.associated_data.parent_object_id;
-            let linked_field_parent_type = schema.schema_data.object(type_id);
+            let linked_field_parent_type = schema.server_field_data.object(type_id);
             HACK__merge_linked_fields(
                 schema,
                 &mut existing_linked_field.selection_set,

@@ -1,6 +1,6 @@
 use common_lang_types::{GraphQLObjectTypeName, WithLocation};
 use graphql_lang_types::RootOperationKind;
-use isograph_lang_types::ObjectId;
+use isograph_lang_types::ServerObjectId;
 
 pub struct RootTypes<T> {
     pub query: Option<T>,
@@ -42,5 +42,5 @@ impl<T> RootTypes<T> {
     }
 }
 
-pub type EncounteredRootTypes = RootTypes<ObjectId>;
+pub type EncounteredRootTypes = RootTypes<ServerObjectId>;
 pub type ProcessedRootTypes = RootTypes<WithLocation<GraphQLObjectTypeName>>;

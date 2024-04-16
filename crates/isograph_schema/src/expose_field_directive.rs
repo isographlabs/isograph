@@ -9,8 +9,8 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_config::ConfigOptions;
 use isograph_lang_types::{
-    ClientFieldId, ObjectId, ScalarFieldSelection, SelectableFieldId, Selection, ServerFieldId,
-    ServerFieldSelection,
+    ClientFieldId, ScalarFieldSelection, SelectableServerFieldId, Selection, ServerFieldId,
+    ServerFieldSelection, ServerObjectId,
 };
 use serde::Deserialize;
 
@@ -75,11 +75,11 @@ impl UnvalidatedSchema {
     /// There is lots of cloning going on here! Not ideal.
     pub fn create_mutation_fields_from_expose_field_directives(
         &mut self,
-        mutation_id: ObjectId,
+        mutation_id: ServerObjectId,
         options: ConfigOptions,
     ) -> ProcessTypeDefinitionResult<()> {
         // TODO don't clone if possible
-        let mutation_object = self.schema_data.object(mutation_id);
+        let mutation_object = self.server_field_data.object(mutation_id);
         let mutation_object_name = mutation_object.name;
 
         // TODO this is a bit ridiculous
@@ -109,7 +109,7 @@ impl UnvalidatedSchema {
         &mut self,
         expose_field_directive: &ExposeFieldDirective,
         mutation_object_name: IsographObjectTypeName,
-        mutation_id: ObjectId,
+        mutation_id: ServerObjectId,
         options: ConfigOptions,
     ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
         let ExposeFieldDirective {
@@ -128,12 +128,12 @@ impl UnvalidatedSchema {
         let mutation_field_arguments = mutation_field.arguments.clone();
         let description = mutation_field.description.clone();
         let payload_id = self
-            .schema_data
+            .server_field_data
             .defined_types
             .get(&mutation_field_payload_type_name)
             .map(|x| *x);
 
-        if let Some(SelectableFieldId::Object(mutation_field_object_id)) = payload_id {
+        if let Some(SelectableServerFieldId::Object(mutation_field_object_id)) = payload_id {
             let (mutation_field_args_without_id, processed_field_map_items) =
                 skip_arguments_contained_in_field_map(
                     self,
@@ -148,7 +148,7 @@ impl UnvalidatedSchema {
                 )?;
 
             // payload object is the object type of the mutation field, e.g. SetBestFriendResponse
-            let payload_object = self.schema_data.object(mutation_field_object_id);
+            let payload_object = self.server_field_data.object(mutation_field_object_id);
             let payload_object_name = payload_object.name;
 
             // TODO make this zero cost
@@ -167,10 +167,11 @@ impl UnvalidatedSchema {
 
                         // TODO validate that the payload object has no plural fields in between
 
-                        let primary_type = self.schema_data.defined_types.get(inner).clone();
+                        let primary_type = self.server_field_data.defined_types.get(inner).clone();
 
-                        if let Some(SelectableFieldId::Object(client_field_parent_object_id)) =
-                            primary_type
+                        if let Some(SelectableServerFieldId::Object(
+                            client_field_parent_object_id,
+                        )) = primary_type
                         {
                             Ok((*client_field_parent_object_id, *inner))
                         } else {
@@ -253,11 +254,13 @@ impl UnvalidatedSchema {
     pub fn insert_client_field_on_object(
         &mut self,
         mutation_field_name: SelectableFieldName,
-        client_field_parent_object_id: ObjectId,
+        client_field_parent_object_id: ServerObjectId,
         client_field_id: ClientFieldId,
         payload_object_name: IsographObjectTypeName,
     ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
-        let client_field_parent = self.schema_data.object_mut(client_field_parent_object_id);
+        let client_field_parent = self
+            .server_field_data
+            .object_mut(client_field_parent_object_id);
         if client_field_parent
             .encountered_fields
             .insert(
@@ -301,9 +304,9 @@ impl UnvalidatedSchema {
     fn parse_field(
         &self,
         field_arg: StringLiteralValue,
-        mutation_id: ObjectId,
+        mutation_id: ServerObjectId,
     ) -> ProcessTypeDefinitionResult<ServerFieldId> {
-        let mutation = self.schema_data.object(mutation_id);
+        let mutation = self.server_field_data.object(mutation_id);
 
         // TODO make this a no-op
         let field_arg = field_arg.lookup().intern().into();
