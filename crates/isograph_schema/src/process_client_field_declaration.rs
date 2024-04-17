@@ -33,7 +33,7 @@ impl UnvalidatedSchema {
 
         match parent_type_id {
             SelectableServerFieldId::Object(object_id) => {
-                self.add_resolver_field_to_object(*object_id, client_field_declaration)
+                self.add_client_field_to_object(*object_id, client_field_declaration)
                     .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?;
             }
             SelectableServerFieldId::Scalar(scalar_id) => {
@@ -50,23 +50,23 @@ impl UnvalidatedSchema {
         Ok(())
     }
 
-    fn add_resolver_field_to_object(
+    fn add_client_field_to_object(
         &mut self,
         parent_object_id: ServerObjectId,
         client_field_declaration: WithSpan<ClientFieldDeclaration>,
-    ) -> ProcessResolverDeclarationResult<()> {
+    ) -> ProcessClientFieldDeclarationResult<()> {
         let object = &mut self.server_field_data.server_objects[parent_object_id.as_usize()];
-        let resolver_field_name_ws = client_field_declaration.item.client_field_name;
-        let resolver_field_name = resolver_field_name_ws.item;
-        let resolver_field_name_span = resolver_field_name_ws.span;
+        let client_field_field_name_ws = client_field_declaration.item.client_field_name;
+        let client_field_name = client_field_field_name_ws.item;
+        let client_field_name_span = client_field_field_name_ws.span;
 
-        let next_resolver_id = self.client_fields.len().into();
+        let next_client_field_id = self.client_fields.len().into();
 
         if object
             .encountered_fields
             .insert(
-                resolver_field_name.into(),
-                FieldDefinitionLocation::Client(next_resolver_id),
+                client_field_name.into(),
+                FieldDefinitionLocation::Client(next_client_field_id),
             )
             .is_some()
         {
@@ -74,21 +74,21 @@ impl UnvalidatedSchema {
             return Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ParentAlreadyHasField {
                     parent_type_name: object.name.into(),
-                    resolver_field_name: resolver_field_name.into(),
+                    client_field_name: client_field_name.into(),
                 },
-                resolver_field_name_span,
+                client_field_name_span,
             ));
         }
 
-        object.client_field_ids.push(next_resolver_id);
+        object.client_field_ids.push(next_client_field_id);
 
         let name = client_field_declaration.item.client_field_name.item.into();
-        let variant = get_resolver_variant(&client_field_declaration.item);
+        let variant = get_client_variant(&client_field_declaration.item);
 
         self.client_fields.push(ClientField {
             description: None,
             name,
-            id: next_resolver_id,
+            id: next_client_field_id,
             selection_set_and_unwraps: client_field_declaration.item.selection_set_and_unwraps,
             variant,
             variable_definitions: client_field_declaration.item.variable_definitions,
@@ -103,7 +103,8 @@ impl UnvalidatedSchema {
     }
 }
 
-type ProcessResolverDeclarationResult<T> = Result<T, WithSpan<ProcessClientFieldDeclarationError>>;
+type ProcessClientFieldDeclarationResult<T> =
+    Result<T, WithSpan<ProcessClientFieldDeclarationError>>;
 
 #[derive(Error, Debug)]
 pub enum ProcessClientFieldDeclarationError {
@@ -119,18 +120,12 @@ pub enum ProcessClientFieldDeclarationError {
     },
 
     #[error(
-        "The Isograph object type \"{parent_type_name}\" already has a field named \"{resolver_field_name}\"."
+        "The Isograph object type \"{parent_type_name}\" already has a field named \"{client_field_name}\"."
     )]
     ParentAlreadyHasField {
         parent_type_name: IsographObjectTypeName,
-        resolver_field_name: SelectableFieldName,
+        client_field_name: SelectableFieldName,
     },
-
-    #[error(
-        "Resolvers with @component must have associated javascript (i.e. iso(`...`) must be called as a function, as in iso(`...`)(MyComponent))"
-    )]
-    // TODO add parent type and resolver field name
-    ComponentResolverMissingJsFunction,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -167,7 +162,7 @@ lazy_static! {
     static ref COMPONENT: IsographDirectiveName = "component".intern().into();
 }
 
-fn get_resolver_variant(client_field_declaration: &ClientFieldDeclaration) -> ClientFieldVariant {
+fn get_client_variant(client_field_declaration: &ClientFieldDeclaration) -> ClientFieldVariant {
     for directive in client_field_declaration.directives.iter() {
         if directive.item.name.item == *COMPONENT {
             return ClientFieldVariant::Component((
