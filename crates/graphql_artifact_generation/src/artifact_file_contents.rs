@@ -67,12 +67,12 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             reader_ast,
             nested_client_field_artifact_imports,
             parent_type,
-            client_field_variant: resolver_variant,
+            client_field_variant,
             client_field_name,
             ..
         } = self;
 
-        let (resolver_import_statement, resolver_type_import_statement) =
+        let (client_field_import_statement, client_field_type_import_statement) =
             nested_client_field_names_to_import_statement(
                 nested_client_field_artifact_imports,
                 parent_type.name,
@@ -86,7 +86,7 @@ impl<'schema> ReaderArtifactInfo<'schema> {
 
         // We are not modeling this well, I think.
         let parent_name = parent_type.name;
-        let variant = match resolver_variant {
+        let variant = match client_field_variant {
             ClientFieldVariant::Component(_) => {
                 format!("{{ kind: \"Component\", componentName: \"{parent_name}.{client_field_name}\" }}")
             }
@@ -100,7 +100,7 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             import {{ {reader_param_type} }} from './param_type.ts';\n\
             import {{ {reader_output_type} }} from './output_type.ts';\n\
             {function_import_statement}\n\
-            {resolver_import_statement}\n\
+            {client_field_import_statement}\n\
             const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
             const artifact: ReaderArtifact<\n\
             {}{reader_param_type},\n\
@@ -117,7 +117,7 @@ impl<'schema> ReaderArtifactInfo<'schema> {
         );
 
         let param_type_content = format!(
-            "{resolver_type_import_statement}\n\
+            "{client_field_type_import_statement}\n\
             export type {reader_param_type} = {client_field_parameter_type};\n",
         );
 
@@ -177,8 +177,8 @@ fn nested_client_field_names_to_import_statement(
     nested_client_field_imports: HashMap<ObjectTypeAndFieldNames, JavaScriptImports>,
     current_file_type_name: IsographObjectTypeName,
 ) -> (String, String) {
-    let mut resolver_import_statement = String::new();
-    let mut resolver_type_import_statement = String::new();
+    let mut client_field_import_statement = String::new();
+    let mut client_field_type_import_statement = String::new();
 
     // TODO we should always sort outputs. We should find a nice generic way to ensure that.
     let mut nested_client_field_imports: Vec<_> = nested_client_field_imports.into_iter().collect();
@@ -188,19 +188,22 @@ fn nested_client_field_names_to_import_statement(
         write_client_field_import(
             javascript_import,
             nested_client_field_name,
-            &mut resolver_import_statement,
-            &mut resolver_type_import_statement,
+            &mut client_field_import_statement,
+            &mut client_field_type_import_statement,
             current_file_type_name,
         );
     }
-    (resolver_import_statement, resolver_type_import_statement)
+    (
+        client_field_import_statement,
+        client_field_type_import_statement,
+    )
 }
 
 fn write_client_field_import(
     javascript_import: JavaScriptImports,
     nested_client_field_name: ObjectTypeAndFieldNames,
-    resolver_import_statement: &mut String,
-    resolver_type_import_statement: &mut String,
+    client_field_import_statement: &mut String,
+    client_field_type_import_statement: &mut String,
     current_file_type_name: IsographObjectTypeName,
 ) {
     if !javascript_import.default_import && javascript_import.types.is_empty() {
@@ -210,11 +213,11 @@ fn write_client_field_import(
         );
     }
 
-    let mut s_resolver_import = "".to_string();
-    let mut s_resolver_type_import = "".to_string();
+    let mut s_client_field_import = "".to_string();
+    let mut s_client_field_type_import = "".to_string();
 
     if javascript_import.default_import {
-        s_resolver_import.push_str(&format!(
+        s_client_field_import.push_str(&format!(
             "import {} from '{}';\n",
             nested_client_field_name.underscore_separated(),
             nested_client_field_name.relative_path(current_file_type_name, *READER)
@@ -223,18 +226,18 @@ fn write_client_field_import(
 
     let mut types = javascript_import.types.iter();
     if let Some(first) = types.next() {
-        s_resolver_type_import.push_str(&format!("import {{{}", first));
+        s_client_field_type_import.push_str(&format!("import {{{}", first));
         for value in types {
-            s_resolver_type_import.push_str(&format!(", {}", value));
+            s_client_field_type_import.push_str(&format!(", {}", value));
         }
-        s_resolver_type_import.push_str(&format!(
+        s_client_field_type_import.push_str(&format!(
             "}} from '{}';\n",
             nested_client_field_name.relative_path(current_file_type_name, *READER_OUTPUT_TYPE)
         ));
     }
 
-    resolver_import_statement.push_str(&s_resolver_import);
-    resolver_type_import_statement.push_str(&s_resolver_type_import);
+    client_field_import_statement.push_str(&s_client_field_import);
+    client_field_type_import_statement.push_str(&s_client_field_type_import);
 }
 fn get_output_type_text(
     parent_type_name: IsographObjectTypeName,
