@@ -203,9 +203,6 @@ function readData<TReadFromStore>(
           [],
           mutableEncounteredRecords,
         );
-        if (typeof window !== 'undefined' && window.__LOG) {
-          console.log('refetch field data', data, field);
-        }
         if (data.kind === 'MissingData') {
           return {
             kind: 'MissingData',
@@ -246,9 +243,6 @@ function readData<TReadFromStore>(
           [],
           mutableEncounteredRecords,
         );
-        if (typeof window !== 'undefined' && window.__LOG) {
-          console.log('refetch field data', data, field);
-        }
         if (data.kind === 'MissingData') {
           return {
             kind: 'MissingData',
