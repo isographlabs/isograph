@@ -1,57 +1,63 @@
+import { useState } from 'react';
 import { stableCopy } from './cache';
-import { RefetchQueryArtifactWrapper } from './entrypoint';
-import { IsographEnvironment, DataId } from './IsographEnvironment';
+import { IsographEnvironment } from './IsographEnvironment';
 import { readButDoNotEvaluate } from './read';
-import { ReaderArtifact } from './reader';
-import { useRerenderWhenEncounteredRecordChanges } from './useRerenderWhenEncounteredRecordChanges';
+import { useRerenderOnChange } from './useRerenderOnChange';
+import { FragmentReference } from './FragmentReference';
 
 export function getOrCreateCachedComponent(
   environment: IsographEnvironment,
-  rootId: DataId,
   componentName: string,
-  readerArtifact: ReaderArtifact<any, any>,
-  variables: { [key: string]: string },
-  resolverRefetchQueries: RefetchQueryArtifactWrapper[],
+  fragmentReference: FragmentReference<any, any>,
 ): React.FC<any> {
   // cachedComponentsById is a three layer cache: id, then component name, then
   // stringified args. These three, together, uniquely identify a read at a given
   // time.
   const cachedComponentsById = environment.componentCache;
 
-  cachedComponentsById[rootId] = cachedComponentsById[rootId] ?? {};
-  const componentsByName = cachedComponentsById[rootId];
+  cachedComponentsById[fragmentReference.root] =
+    cachedComponentsById[fragmentReference.root] ?? {};
+  const componentsByName = cachedComponentsById[fragmentReference.root];
 
   componentsByName[componentName] = componentsByName[componentName] ?? {};
   const byArgs = componentsByName[componentName];
 
-  const stringifiedArgs = JSON.stringify(stableCopy(variables));
+  const stringifiedArgs = JSON.stringify(
+    stableCopy(fragmentReference.variables),
+  );
   byArgs[stringifiedArgs] =
     byArgs[stringifiedArgs] ??
     (() => {
       function Component(additionalRuntimeProps: { [key: string]: any }) {
-        const { item: data, encounteredRecords } = readButDoNotEvaluate(
-          environment,
-          {
-            kind: 'FragmentReference',
-            readerArtifact: readerArtifact,
-            root: rootId,
-            variables,
-            nestedRefetchQueries: resolverRefetchQueries,
-          },
+        // During pre-commit renders, we call readButDoNotEvaluate.
+        // There may be multiple pre-commit renders, so we should find
+        // a way to read the cached data from the store instead
+        const [readOutDataAndRecords, setReadOutDataAndRecords] = useState(() =>
+          readButDoNotEvaluate(environment, fragmentReference),
         );
 
-        useRerenderWhenEncounteredRecordChanges(
+        useRerenderOnChange(
           environment,
-          encounteredRecords,
+          readOutDataAndRecords,
+          fragmentReference,
+          setReadOutDataAndRecords,
         );
 
         if (typeof window !== 'undefined' && window.__LOG) {
-          console.log('Component re-rendered: ' + componentName + ' ' + rootId);
+          console.log(
+            'Component re-rendered: ' +
+              componentName +
+              ' ' +
+              fragmentReference.root,
+          );
         }
 
-        return readerArtifact.resolver(data, additionalRuntimeProps);
+        return fragmentReference.readerArtifact.resolver(
+          readOutDataAndRecords.item,
+          additionalRuntimeProps,
+        );
       }
-      Component.displayName = `${componentName} (id: ${rootId}) @component`;
+      Component.displayName = `${componentName} (id: ${fragmentReference.root}) @component`;
       return Component;
     })();
   return byArgs[stringifiedArgs];

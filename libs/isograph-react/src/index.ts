@@ -47,7 +47,7 @@ export {
   RefetchQueryArtifact,
   RefetchQueryArtifactWrapper,
 } from './entrypoint';
-export { read, readButDoNotEvaluate } from './read';
+export { readButDoNotEvaluate } from './read';
 export { useResult } from './useResult';
 export { type FragmentReference } from './FragmentReference';
 export { useLazyReference } from './useLazyReference';
@@ -58,4 +58,4 @@ export {
   ArgumentValue,
   Arguments,
 } from './util';
-export { useRerenderWhenEncounteredRecordChanges } from './useRerenderWhenEncounteredRecordChanges';
+export { useRerenderOnChange } from './useRerenderOnChange';

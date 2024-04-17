@@ -1,19 +1,32 @@
 import { ParentCache } from '@isograph/react-disposable-state';
 import { RetainedQuery } from './garbageCollection';
+import { WithEncounteredRecords } from './read';
+import { FragmentReference } from './FragmentReference';
 
 export type ComponentOrFieldName = string;
-type StringifiedArgs = string;
+export type StringifiedArgs = string;
 type ComponentCache = {
   [key: DataId]: {
     [key: ComponentOrFieldName]: { [key: StringifiedArgs]: React.FC<any> };
   };
 };
 
-type CallbackAndRecords = {
-  callback: () => void;
-  records: Set<DataId> | null;
+type FragmentSubscription<TReadFromStore extends Object> = {
+  readonly kind: 'FragmentSubscription';
+  readonly callback: (
+    newEncounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
+  ) => void;
+  /** The value read out from the previous call to readButDoNotEvaluate */
+  readonly encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>;
+  readonly fragmentReference: FragmentReference<TReadFromStore, any>;
 };
-type Subscriptions = Set<CallbackAndRecords>;
+type AnyRecordSubscription = {
+  readonly kind: 'AnyRecords';
+  readonly callback: () => void;
+};
+
+type Subscription = FragmentSubscription<any> | AnyRecordSubscription;
+type Subscriptions = Set<Subscription>;
 type SuspenseCache = { [index: string]: ParentCache<any> };
 
 export type IsographEnvironment = {

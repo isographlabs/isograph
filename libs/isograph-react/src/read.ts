@@ -15,48 +15,6 @@ export type WithEncounteredRecords<T> = {
   item: T;
 };
 
-export function read<TReadFromStore extends Object, TClientFieldValue>(
-  environment: IsographEnvironment,
-  fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>,
-): WithEncounteredRecords<TClientFieldValue> {
-  const variant = fragmentReference.readerArtifact.variant;
-  if (variant.kind === 'Eager') {
-    const mutableEncounteredRecords = new Set<DataId>();
-    const data = readData(
-      environment,
-      fragmentReference.readerArtifact.readerAst,
-      fragmentReference.root,
-      fragmentReference.variables ?? {},
-      fragmentReference.nestedRefetchQueries,
-      mutableEncounteredRecords,
-    );
-    if (data.kind === 'MissingData') {
-      throw onNextChange(environment);
-    } else {
-      return {
-        encounteredRecords: mutableEncounteredRecords,
-        // @ts-expect-error This not properly typed yet
-        item: fragmentReference.readerArtifact.resolver(data.data),
-      };
-    }
-  } else if (variant.kind === 'Component') {
-    return {
-      // @ts-ignore
-      item: getOrCreateCachedComponent(
-        environment,
-        fragmentReference.root,
-        variant.componentName,
-        fragmentReference.readerArtifact,
-        fragmentReference.variables ?? {},
-        fragmentReference.nestedRefetchQueries,
-      ),
-      encounteredRecords: new Set(),
-    };
-  }
-  // Why can't Typescript realize that this is unreachable??
-  throw new Error('This is unreachable');
-}
-
 export function readButDoNotEvaluate<TReadFromStore extends Object>(
   environment: IsographEnvironment,
   reference: FragmentReference<TReadFromStore, unknown>,
@@ -345,11 +303,14 @@ function readData<TReadFromStore>(
         } else if (variant.kind === 'Component') {
           target[field.alias] = getOrCreateCachedComponent(
             environment,
-            root,
             variant.componentName,
-            field.readerArtifact,
-            variables,
-            resolverRefetchQueries,
+            {
+              kind: 'FragmentReference',
+              readerArtifact: field.readerArtifact,
+              root,
+              variables,
+              nestedRefetchQueries: resolverRefetchQueries,
+            } as const,
           );
         }
         break;

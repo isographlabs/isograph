@@ -28,6 +28,8 @@ import {
 } from './entrypoint';
 import { ReaderLinkedField, ReaderScalarField } from './reader';
 import { Argument, ArgumentValue } from './util';
+import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
+import { FragmentReference } from './FragmentReference';
 
 declare global {
   interface Window {
@@ -222,22 +224,39 @@ function normalizeData(
   return encounteredIds;
 }
 
-export function subscribe(
+export function subscribeToAnyChange(
   environment: IsographEnvironment,
-  encounteredRecords: Set<DataId> | null,
   callback: () => void,
 ): () => void {
-  const callbackAndRecords = {
+  const subscription = {
+    kind: 'AnyRecords',
     callback,
-    records: encounteredRecords,
-  };
-  environment.subscriptions.add(callbackAndRecords);
-  return () => environment.subscriptions.delete(callbackAndRecords);
+  } as const;
+  environment.subscriptions.add(subscription);
+  return () => environment.subscriptions.delete(subscription);
+}
+
+export function subscribe<TReadFromStore>(
+  environment: IsographEnvironment,
+  encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
+  fragmentReference: FragmentReference<any, any>,
+  callback: (
+    newEncounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
+  ) => void,
+): () => void {
+  const fragmentSubscription = {
+    kind: 'FragmentSubscription',
+    callback,
+    encounteredDataAndRecords,
+    fragmentReference,
+  } as const;
+  environment.subscriptions.add(fragmentSubscription);
+  return () => environment.subscriptions.delete(fragmentSubscription);
 }
 
 export function onNextChange(environment: IsographEnvironment): Promise<void> {
   return new Promise((resolve) => {
-    const unsubscribe = subscribe(environment, null, () => {
+    const unsubscribe = subscribeToAnyChange(environment, () => {
       unsubscribe();
       resolve();
     });
@@ -248,11 +267,32 @@ function callSubscriptions(
   environment: IsographEnvironment,
   recordsEncounteredWhenNormalizing: Set<DataId>,
 ) {
-  environment.subscriptions.forEach(({ callback, records }) => {
-    if (records === null) {
-      callback();
-    } else if (hasOverlappingIds(recordsEncounteredWhenNormalizing, records)) {
-      callback();
+  environment.subscriptions.forEach((subscription) => {
+    switch (subscription.kind) {
+      case 'FragmentSubscription': {
+        if (
+          hasOverlappingIds(
+            recordsEncounteredWhenNormalizing,
+            subscription.encounteredDataAndRecords.encounteredRecords,
+          )
+        ) {
+          const newEncounteredDataAndRecords = readButDoNotEvaluate(
+            environment,
+            subscription.fragmentReference,
+          );
+          // TODO deep compare values
+          subscription.callback(newEncounteredDataAndRecords);
+        }
+        return;
+      }
+      case 'AnyRecords': {
+        return subscription.callback();
+      }
+      default: {
+        // @ts-expect-error(6133)
+        const _: never = subscription;
+        throw new Error('Unexpected case');
+      }
     }
   });
 }
