@@ -25,7 +25,7 @@ type AnyRecordSubscription = {
   readonly callback: () => void;
 };
 
-type Subscription = FragmentSubscription<any> | AnyRecordSubscription;
+type Subscription = FragmentSubscription<Object> | AnyRecordSubscription;
 type Subscriptions = Set<Subscription>;
 type SuspenseCache = { [index: string]: ParentCache<any> };
 

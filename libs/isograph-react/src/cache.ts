@@ -30,6 +30,7 @@ import { ReaderLinkedField, ReaderScalarField } from './reader';
 import { Argument, ArgumentValue } from './util';
 import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
 import { FragmentReference } from './FragmentReference';
+import { areEqualObjectsWithDeepComparison } from './areEqualWithDeepComparison';
 
 declare global {
   interface Window {
@@ -236,10 +237,10 @@ export function subscribeToAnyChange(
   return () => environment.subscriptions.delete(subscription);
 }
 
-export function subscribe<TReadFromStore>(
+export function subscribe<TReadFromStore extends Object>(
   environment: IsographEnvironment,
   encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
-  fragmentReference: FragmentReference<any, any>,
+  fragmentReference: FragmentReference<TReadFromStore, any>,
   callback: (
     newEncounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
   ) => void,
@@ -250,7 +251,9 @@ export function subscribe<TReadFromStore>(
     encounteredDataAndRecords,
     fragmentReference,
   } as const;
+  // @ts-expect-error
   environment.subscriptions.add(fragmentSubscription);
+  // @ts-expect-error
   return () => environment.subscriptions.delete(fragmentSubscription);
 }
 
@@ -270,6 +273,9 @@ function callSubscriptions(
   environment.subscriptions.forEach((subscription) => {
     switch (subscription.kind) {
       case 'FragmentSubscription': {
+        // TODO if there are multiple components subscribed to the same
+        // fragment, we will call readButNotEvaluate multiple times. We
+        // should fix that.
         if (
           hasOverlappingIds(
             recordsEncounteredWhenNormalizing,
@@ -280,8 +286,30 @@ function callSubscriptions(
             environment,
             subscription.fragmentReference,
           );
-          // TODO deep compare values
-          subscription.callback(newEncounteredDataAndRecords);
+
+          if (
+            !areEqualObjectsWithDeepComparison(
+              subscription.encounteredDataAndRecords.item,
+              newEncounteredDataAndRecords.item,
+            )
+          ) {
+            if (typeof window !== 'undefined' && window.__LOG) {
+              console.log('Deep equality - No', {
+                fragmentReference: subscription.fragmentReference,
+                old: subscription.encounteredDataAndRecords.item,
+                new: newEncounteredDataAndRecords.item,
+              });
+            }
+            // TODO deep compare values
+            subscription.callback(newEncounteredDataAndRecords);
+          } else {
+            if (typeof window !== 'undefined' && window.__LOG) {
+              console.log('Deep equality - Yes', {
+                fragmentReference: subscription.fragmentReference,
+                old: subscription.encounteredDataAndRecords.item,
+              });
+            }
+          }
         }
         return;
       }
