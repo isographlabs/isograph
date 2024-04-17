@@ -41,7 +41,7 @@ pub type UnvalidatedSchemaObject =
 
 /// On unvalidated schema objects, the encountered types are either a type annotation
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
-/// resolver.)
+/// client field.)
 pub type UnvalidatedObjectFieldInfo =
     FieldDefinitionLocation<GraphQLTypeAnnotation<UnvalidatedTypeName>, ClientFieldId>;
 
@@ -69,7 +69,7 @@ impl UnvalidatedSchema {
     pub fn new() -> Self {
         // TODO add __typename
         let fields = vec![];
-        let resolvers = vec![];
+        let client_fields = vec![];
         let objects = vec![];
         let mut scalars = vec![];
         let mut defined_types = HashMap::default();
@@ -107,7 +107,7 @@ impl UnvalidatedSchema {
 
         Self {
             server_fields: fields,
-            client_fields: resolvers,
+            client_fields,
             entrypoints: Default::default(),
             server_field_data: ServerFieldData {
                 server_objects: objects,

@@ -382,7 +382,7 @@ impl UnvalidatedSchema {
         let &mut Schema {
             server_fields: ref mut schema_fields,
             server_field_data: ref mut schema_data,
-            client_fields: ref mut schema_resolvers,
+            ref mut client_fields,
             ..
         } = self;
         let next_object_id = schema_data.server_objects.len().into();
@@ -419,10 +419,10 @@ impl UnvalidatedSchema {
                     options,
                 )?;
 
-                let object_resolvers = get_resolvers_for_schema_object(
+                let client_field_ids = get_client_fields_for_schema_object(
                     &id_field,
                     &mut encountered_fields,
-                    schema_resolvers,
+                    client_fields,
                     next_object_id,
                     &object_type_definition,
                 );
@@ -432,7 +432,7 @@ impl UnvalidatedSchema {
                     name: object_type_definition.name.item,
                     id: next_object_id,
                     server_field_ids: server_fields,
-                    client_field_ids: object_resolvers,
+                    client_field_ids,
                     encountered_fields,
                     id_field,
                     directives: object_type_definition.directives,
@@ -606,18 +606,18 @@ impl FieldMapItem {
     }
 }
 
-/// Returns the resolvers for a schema object that we know up-front (before processing
+/// Returns the client fields for a schema object that we know up-front (before processing
 /// iso literals.) This is either a refetch field (if the object is refetchable), or
 /// nothing.
-fn get_resolvers_for_schema_object(
+fn get_client_fields_for_schema_object(
     id_field_id: &Option<ServerStrongIdFieldId>,
     encountered_fields: &mut HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
-    schema_resolvers: &mut Vec<UnvalidatedClientField>,
+    unvalidated_client_field: &mut Vec<UnvalidatedClientField>,
     parent_object_id: ServerObjectId,
     type_definition: &IsographObjectTypeDefinition,
 ) -> Vec<ClientFieldId> {
     if let Some(_id_field_id) = id_field_id {
-        let next_resolver_id = schema_resolvers.len().into();
+        let next_client_field_id = unvalidated_client_field.len().into();
         let id_field_selection = WithSpan::new(
             Selection::ServerField(ServerFieldSelection::ScalarField(ScalarFieldSelection {
                 name: WithLocation::new("id".intern().into(), Location::generated()),
@@ -629,10 +629,10 @@ fn get_resolvers_for_schema_object(
             })),
             Span::todo_generated(),
         );
-        schema_resolvers.push(ClientField {
+        unvalidated_client_field.push(ClientField {
             description: Some("A refetch field for this object.".intern().into()),
             name: "__refetch".intern().into(),
-            id: next_resolver_id,
+            id: next_client_field_id,
             selection_set_and_unwraps: Some((vec![id_field_selection], vec![])),
             variant: ClientFieldVariant::RefetchField,
             variable_definitions: vec![],
@@ -644,9 +644,9 @@ fn get_resolvers_for_schema_object(
         });
         encountered_fields.insert(
             "__refetch".intern().into(),
-            FieldDefinitionLocation::Client(next_resolver_id),
+            FieldDefinitionLocation::Client(next_client_field_id),
         );
-        vec![next_resolver_id]
+        vec![next_client_field_id]
     } else {
         vec![]
     }

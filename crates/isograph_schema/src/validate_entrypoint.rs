@@ -17,13 +17,13 @@ impl UnvalidatedSchema {
     ) -> Result<ClientFieldId, WithLocation<ValidateEntrypointDeclarationError>> {
         let parent_object_id = self
             .validate_parent_object_id(entrypoint_type_and_field.item.parent_type, text_source)?;
-        let resolver_field_id = self.validate_resolver_field(
+        let client_field_id = self.validate_client_field(
             entrypoint_type_and_field.item.client_field_name,
             text_source,
             parent_object_id,
         )?;
 
-        Ok(resolver_field_id)
+        Ok(client_field_id)
     }
 
     fn validate_parent_object_id(
@@ -79,7 +79,7 @@ impl UnvalidatedSchema {
         }
     }
 
-    fn validate_resolver_field(
+    fn validate_client_field(
         &self,
         field_name: WithSpan<ScalarFieldName>,
         text_source: TextSource,
@@ -93,18 +93,18 @@ impl UnvalidatedSchema {
         {
             Some(defined_field) => match defined_field {
                 FieldDefinitionLocation::Server(_) => Err(WithLocation::new(
-                    ValidateEntrypointDeclarationError::FieldMustBeResolverField {
+                    ValidateEntrypointDeclarationError::FieldMustBeClientField {
                         parent_type_name: parent_object.name,
-                        resolver_field_name: field_name.item,
+                        client_field_name: field_name.item,
                     },
                     Location::new(text_source, field_name.span),
                 )),
-                FieldDefinitionLocation::Client(resolver_field_id) => Ok(*resolver_field_id),
+                FieldDefinitionLocation::Client(client_field_id) => Ok(*client_field_id),
             },
             None => Err(WithLocation::new(
-                ValidateEntrypointDeclarationError::ResolverFieldMustExist {
+                ValidateEntrypointDeclarationError::ClientFieldMustExist {
                     parent_type_name: parent_object.name,
-                    resolver_field_name: field_name.item,
+                    client_field_name: field_name.item,
                 },
                 Location::new(text_source, field_name.span),
             )),
@@ -135,16 +135,16 @@ pub enum ValidateEntrypointDeclarationError {
         parent_type_name: UnvalidatedTypeName,
     },
 
-    #[error("The resolver `{parent_type_name}.{resolver_field_name}` is not defined.")]
-    ResolverFieldMustExist {
+    #[error("The client field `{parent_type_name}.{client_field_name}` is not defined.")]
+    ClientFieldMustExist {
         parent_type_name: IsographObjectTypeName,
-        resolver_field_name: ScalarFieldName,
+        client_field_name: ScalarFieldName,
     },
 
     // N.B. We could conceivably support fetching server fields, though!
-    #[error("The field `{parent_type_name}.{resolver_field_name}` is a server field. It must be a client defined field.")]
-    FieldMustBeResolverField {
+    #[error("The field `{parent_type_name}.{client_field_name}` is a server field. It must be a client defined field.")]
+    FieldMustBeClientField {
         parent_type_name: IsographObjectTypeName,
-        resolver_field_name: ScalarFieldName,
+        client_field_name: ScalarFieldName,
     },
 }

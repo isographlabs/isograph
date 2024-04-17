@@ -499,10 +499,10 @@ fn validate_selections_error_to_validate_schema_error(
             field_type: target_type,
             target_type_name,
         },
-        ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsResolver {
+        ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsClientField {
             field_parent_type_name,
             field_name,
-        } => ValidateSchemaError::ClientFieldSelectionFieldIsResolver {
+        } => ValidateSchemaError::ClientFieldSelectionClientFieldSelectedAsLinked {
             client_field_parent_type_name: parent_object.name,
             client_field_name: field_name,
             field_parent_type_name,
@@ -529,7 +529,7 @@ enum ValidateSelectionsError {
         target_type: &'static str,
         target_type_name: UnvalidatedTypeName,
     },
-    FieldSelectedAsLinkedButTypeIsResolver {
+    FieldSelectedAsLinkedButTypeIsClientField {
         field_parent_type_name: IsographObjectTypeName,
         field_name: SelectableFieldName,
     },
@@ -712,7 +712,7 @@ fn validate_field_type_exists_and_is_linked(
                 }
             }
             FieldDefinitionLocation::Client(_) => Err(WithLocation::new(
-                ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsResolver {
+                ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsClientField {
                     field_parent_type_name: parent_object.name,
                     field_name: linked_field_name,
                 },
@@ -809,7 +809,7 @@ pub enum ValidateSchemaError {
         field `{field_parent_type_name}.{field_name}` is selected as a linked field, \
         but that field is a client field, which can only be selected as a scalar."
     )]
-    ClientFieldSelectionFieldIsResolver {
+    ClientFieldSelectionClientFieldSelectedAsLinked {
         client_field_parent_type_name: IsographObjectTypeName,
         client_field_name: SelectableFieldName,
         field_parent_type_name: IsographObjectTypeName,

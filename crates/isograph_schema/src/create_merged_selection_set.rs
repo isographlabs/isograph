@@ -267,9 +267,9 @@ pub fn create_merged_selection_set(
                                     // TODO make this an error, don't panic
                                     .expect(&format!(
                                         "Did not find matching variable definition. \
-                                This might not be validated yet. For now, each resolver \
+                                This might not be validated yet. For now, each client field \
                                 containing a __refetch field must re-defined all used variables. \
-                                Resolver {} is missing variable definition {}",
+                                Client field {} is missing variable definition {}",
                                         entrypoint.name, variable_name
                                     ))
                                     .clone()
@@ -338,7 +338,7 @@ pub fn create_merged_selection_set(
                                 ));
                                 mutation_field_name
                             }
-                            _ => panic!("invalid resolver variant"),
+                            _ => panic!("invalid client field variant"),
                         };
 
                         let mut reachable_variables_vec: Vec<_> =
@@ -373,7 +373,7 @@ pub fn create_merged_selection_set(
                             mutation_field_name,
                             ..
                         }) => mutation_field_name,
-                        _ => panic!("invalid resolver variant"),
+                        _ => panic!("invalid client field variant"),
                     };
 
                     let mut reachable_variables_vec: Vec<_> =
@@ -436,18 +436,18 @@ fn merge_selections_into_set(
                         FieldDefinitionLocation::Server(_) => {
                             merge_scalar_server_field(scalar_field, merged_selection_map, span);
                         }
-                        FieldDefinitionLocation::Client(resolver_field_id) => {
-                            if let Some(ref mut encountered_resolver_ids) =
+                        FieldDefinitionLocation::Client(client_field_id) => {
+                            if let Some(ref mut encountered_client_field_ids) =
                                 merge_traversal_state.encountered_client_field_ids
                             {
-                                encountered_resolver_ids.insert(*resolver_field_id);
+                                encountered_client_field_ids.insert(*client_field_id);
                             }
-                            merge_scalar_resolver_field(
+                            merge_scalar_client_field(
                                 parent_type,
                                 schema,
                                 merged_selection_map,
                                 merge_traversal_state,
-                                *resolver_field_id,
+                                *client_field_id,
                             )
                         }
                     };
@@ -565,14 +565,14 @@ fn merge_linked_field_into_occupied_entry(
     }
 }
 
-fn merge_scalar_resolver_field(
+fn merge_scalar_client_field(
     parent_type: &ValidatedSchemaObject,
     schema: &ValidatedSchema,
     merged_selection_map: &mut MergedSelectionMap,
     merge_traversal_state: &mut MergeTraversalState<'_>,
-    resolver_field_id: ClientFieldId,
+    client_field_id: ClientFieldId,
 ) {
-    let client_field = schema.client_field(resolver_field_id);
+    let client_field = schema.client_field(client_field_id);
     if let Some((ref selection_set, _)) = client_field.selection_set_and_unwraps {
         merge_selections_into_set(
             schema,
@@ -582,7 +582,7 @@ fn merge_scalar_resolver_field(
             merge_traversal_state,
         );
     } else {
-        panic!("unsupported resolver without selection set");
+        panic!("unsupported client field without selection set");
     }
 
     // HACK... we can model this data better

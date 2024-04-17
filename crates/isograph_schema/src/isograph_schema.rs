@@ -34,13 +34,13 @@ pub trait SchemaValidationState: Debug {
     /// - Validated: DefinedTypeId
     type FieldTypeAssociatedData: Debug;
 
-    /// The associated data type of scalars in resolvers' selection sets and unwraps
+    /// The associated data type of scalars in client fields' selection sets and unwraps
     /// - Unvalidated: ()
     /// - Validated: ValidatedFieldDefinitionLocation
-    ///   i.e. DefinedField<ServerFieldId, ResolverFieldId>
+    ///   i.e. DefinedField<ServerFieldId, ClientFieldId>
     type ClientFieldSelectionScalarFieldAssociatedData: Debug;
 
-    /// The associated data type of linked fields in resolvers' selection sets and unwraps
+    /// The associated data type of linked fields in client fields' selection sets and unwraps
     /// - Unvalidated: ()
     /// - Validated: ObjectId
     type ClientFieldSelectionLinkedFieldAssociatedData: Debug;
@@ -130,7 +130,7 @@ impl<TFieldAssociatedData, TClientFieldType>
     pub fn as_client_field(&self) -> Option<&TClientFieldType> {
         match self {
             FieldDefinitionLocation::Server(_) => None,
-            FieldDefinitionLocation::Client(resolver_field) => Some(resolver_field),
+            FieldDefinitionLocation::Client(client_field) => Some(client_field),
         }
     }
 }
@@ -368,7 +368,7 @@ pub struct ValidRefinement {
 pub struct SchemaServerField<TData> {
     pub description: Option<DescriptionValue>,
     /// The name of the server field and the location where it was defined
-    /// (i.e. for resolvers, an iso literal, and for server fields, the schema
+    /// (i.e. for client fields, an iso literal, and for server fields, the schema
     /// file, and for other fields, Location::Generated).
     pub name: WithLocation<SelectableFieldName>,
     pub id: ServerFieldId,
@@ -466,10 +466,10 @@ pub struct ClientField<
     TClientFieldVariableDefinitionAssociatedData,
 > {
     pub description: Option<DescriptionValue>,
-    // TODO make this a ResolverName that can be converted into a SelectableFieldName
+    // TODO make this a ClientFieldName that can be converted into a SelectableFieldName
     pub name: SelectableFieldName,
     pub id: ClientFieldId,
-    // TODO it makes no sense for a resolver to not select fields!
+    // TODO it makes no sense for a client field to not select fields!
     // Why not just make it a global function at that point? Who knows.
     // Unless you'll eventually select fields?
     // Perhaps refetch fields for viewer (or other fields that have a known path

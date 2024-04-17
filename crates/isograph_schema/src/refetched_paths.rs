@@ -22,9 +22,9 @@ pub fn refetched_paths_with_path(
                     FieldDefinitionLocation::Server(_) => {
                         // Do nothing, we encountered a server field
                     }
-                    FieldDefinitionLocation::Client(resolver_field_id) => {
-                        let resolver_field = schema.client_field(resolver_field_id);
-                        match resolver_field.variant {
+                    FieldDefinitionLocation::Client(client_field_id) => {
+                        let client_field = schema.client_field(client_field_id);
+                        match client_field.variant {
                             ClientFieldVariant::RefetchField
                             | ClientFieldVariant::MutationField(_) => {
                                 paths.insert(PathToRefetchField {
@@ -34,14 +34,14 @@ pub fn refetched_paths_with_path(
                             _ => {
                                 // For non-refetch fields, we need to recurse into the selection set
                                 // (if there is one)
-                                match &resolver_field.selection_set_and_unwraps {
+                                match &client_field.selection_set_and_unwraps {
                                     Some((selection_set, _unwraps)) => {
                                         let new_paths =
                                             refetched_paths_with_path(selection_set, schema, path);
 
                                         paths.extend(new_paths.into_iter());
                                     }
-                                    None => panic!("Resolver field has no selection set"),
+                                    None => panic!("Client field has no selection set"),
                                 };
                             }
                         }
