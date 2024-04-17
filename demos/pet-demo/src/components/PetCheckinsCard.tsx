@@ -8,8 +8,6 @@ export const PetCheckinsCard = iso(`
     checkins {
       CheckinDisplay
       id
-      location
-      time
     }
   }
 `)(function PetCheckinsCardComponent(data) {

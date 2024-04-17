@@ -30,18 +30,6 @@ const readerAst: ReaderAst<Pet__PetCheckinsCard__param> = [
         alias: null,
         arguments: null,
       },
-      {
-        kind: "Scalar",
-        fieldName: "location",
-        alias: null,
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "time",
-        alias: null,
-        arguments: null,
-      },
     ],
   },
 ];
