@@ -30,15 +30,15 @@ type Subscriptions = Set<Subscription>;
 type SuspenseCache = { [index: string]: ParentCache<any> };
 
 export type IsographEnvironment = {
-  store: IsographStore;
-  networkFunction: IsographNetworkFunction;
-  missingFieldHandler: MissingFieldHandler | null;
-  componentCache: ComponentCache;
-  subscriptions: Subscriptions;
-  suspenseCache: SuspenseCache;
-  retainedQueries: Set<RetainedQuery>;
-  gcBuffer: Array<RetainedQuery>;
-  gcBufferSize: number;
+  readonly store: IsographStore;
+  readonly networkFunction: IsographNetworkFunction;
+  readonly missingFieldHandler: MissingFieldHandler | null;
+  readonly componentCache: ComponentCache;
+  readonly subscriptions: Subscriptions;
+  readonly suspenseCache: SuspenseCache;
+  readonly retainedQueries: Set<RetainedQuery>;
+  readonly gcBuffer: Array<RetainedQuery>;
+  readonly gcBufferSize: number;
 };
 
 export type MissingFieldHandler = (
@@ -55,7 +55,7 @@ export type IsographNetworkFunction = (
 ) => Promise<any>;
 
 export type Link = {
-  __link: DataId;
+  readonly __link: DataId;
 };
 
 export type DataTypeValue =
@@ -76,7 +76,7 @@ export type StoreRecord = {
   [index: DataId | string]: DataTypeValue;
   // TODO __typename?: T, which is restricted to being a concrete string
   // TODO this shouldn't always be named id
-  id?: DataId;
+  readonly id?: DataId;
 };
 
 export type DataId = string;
@@ -85,7 +85,7 @@ export const ROOT_ID: DataId & '__ROOT' = '__ROOT';
 
 export type IsographStore = {
   [index: DataId]: StoreRecord | null;
-  __ROOT: StoreRecord;
+  readonly __ROOT: StoreRecord;
 };
 
 const DEFAULT_GC_BUFFER_SIZE = 10;

@@ -6,7 +6,7 @@ type NotSet = typeof NOT_SET;
  * Before the promise is resolved, value becomes non-null.
  */
 export type PromiseWrapper<T> = {
-  promise: Promise<T>;
+  readonly promise: Promise<T>;
   value: Exclude<T, NotSet> | NotSet;
 };
 

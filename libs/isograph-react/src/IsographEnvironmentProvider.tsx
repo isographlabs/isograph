@@ -6,8 +6,8 @@ export const IsographEnvironmentContext =
   createContext<IsographEnvironment | null>(null);
 
 export type IsographEnvironmentProviderProps = {
-  environment: IsographEnvironment;
-  children: ReactNode;
+  readonly environment: IsographEnvironment;
+  readonly children: ReactNode;
 };
 
 export function IsographEnvironmentProvider({

@@ -10,8 +10,8 @@ import { getParentRecordKey } from './cache';
 import { NormalizationAst } from './entrypoint';
 
 export type RetainedQuery = {
-  normalizationAst: NormalizationAst;
-  variables: {};
+  readonly normalizationAst: NormalizationAst;
+  readonly variables: {};
 };
 
 type DidUnretainSomeQuery = boolean;

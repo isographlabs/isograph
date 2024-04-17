@@ -4,12 +4,15 @@ import { Arguments } from './util';
 // TODO this should probably be at least three distinct types, for @component,
 // non-@component and refetch resolvers
 export type ReaderArtifact<TReadFromStore extends Object, TClientFieldValue> = {
-  kind: 'ReaderArtifact';
-  fieldName: ComponentOrFieldName;
-  readerAst: ReaderAst<TReadFromStore>;
+  readonly kind: 'ReaderArtifact';
+  readonly fieldName: ComponentOrFieldName;
+  readonly readerAst: ReaderAst<TReadFromStore>;
   // TODO move resolver into the variant
-  resolver: (data: TReadFromStore, runtimeProps: any) => TClientFieldValue;
-  variant: ReaderResolverVariant;
+  readonly resolver: (
+    data: TReadFromStore,
+    runtimeProps: any,
+  ) => TClientFieldValue;
+  readonly variant: ReaderResolverVariant;
 };
 
 export type ReaderAstNode =
@@ -20,47 +23,47 @@ export type ReaderAstNode =
   | ReaderMutationField;
 
 // @ts-ignore
-export type ReaderAst<TReadFromStore> = ReaderAstNode[];
+export type ReaderAst<TReadFromStore> = ReadonlyArray<ReaderAstNode>;
 
 export type ReaderScalarField = {
-  kind: 'Scalar';
-  fieldName: string;
-  alias: string | null;
-  arguments: Arguments | null;
+  readonly kind: 'Scalar';
+  readonly fieldName: string;
+  readonly alias: string | null;
+  readonly arguments: Arguments | null;
 };
 export type ReaderLinkedField = {
-  kind: 'Linked';
-  fieldName: string;
-  alias: string | null;
-  selections: ReaderAst<unknown>;
-  arguments: Arguments | null;
+  readonly kind: 'Linked';
+  readonly fieldName: string;
+  readonly alias: string | null;
+  readonly selections: ReaderAst<unknown>;
+  readonly arguments: Arguments | null;
 };
 
 export type ReaderResolverVariant =
-  | { kind: 'Eager' }
+  | { readonly kind: 'Eager' }
   // componentName is type + field concatenated
-  | { kind: 'Component'; componentName: string };
+  | { readonly kind: 'Component'; readonly componentName: string };
 
 export type ReaderResolverField = {
-  kind: 'Resolver';
-  alias: string;
-  readerArtifact: ReaderArtifact<any, any>;
-  arguments: Arguments | null;
-  usedRefetchQueries: number[];
+  readonly kind: 'Resolver';
+  readonly alias: string;
+  readonly readerArtifact: ReaderArtifact<any, any>;
+  readonly arguments: Arguments | null;
+  readonly usedRefetchQueries: number[];
 };
 
 export type ReaderRefetchField = {
-  kind: 'RefetchField';
-  alias: string;
+  readonly kind: 'RefetchField';
+  readonly alias: string;
   // TODO this bad modeling. A refetch field cannot have variant: "Component" (I think)
-  readerArtifact: ReaderArtifact<any, any>;
-  refetchQuery: number;
+  readonly readerArtifact: ReaderArtifact<any, any>;
+  readonly refetchQuery: number;
 };
 
 export type ReaderMutationField = {
-  kind: 'MutationField';
-  alias: string;
+  readonly kind: 'MutationField';
+  readonly alias: string;
   // TODO this bad modeling. A mutation field cannot have variant: "Component" (I think)
-  readerArtifact: ReaderArtifact<any, any>;
-  refetchQuery: number;
+  readonly readerArtifact: ReaderArtifact<any, any>;
+  readonly refetchQuery: number;
 };

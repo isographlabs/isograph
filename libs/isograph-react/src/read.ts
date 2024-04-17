@@ -11,8 +11,8 @@ import {
 import { ReaderAst } from './reader';
 
 export type WithEncounteredRecords<T> = {
-  encounteredRecords: Set<DataId>;
-  item: T;
+  readonly encounteredRecords: Set<DataId>;
+  readonly item: T;
 };
 
 export function readButDoNotEvaluate<TReadFromStore extends Object>(
@@ -43,14 +43,14 @@ export function readButDoNotEvaluate<TReadFromStore extends Object>(
 
 type ReadDataResult<TReadFromStore> =
   | {
-      kind: 'Success';
-      data: TReadFromStore;
-      encounteredRecords: Set<DataId>;
+      readonly kind: 'Success';
+      readonly data: TReadFromStore;
+      readonly encounteredRecords: Set<DataId>;
     }
   | {
-      kind: 'MissingData';
-      reason: string;
-      nestedReason?: ReadDataResult<unknown>;
+      readonly kind: 'MissingData';
+      readonly reason: string;
+      readonly nestedReason?: ReadDataResult<unknown>;
     };
 
 function readData<TReadFromStore>(

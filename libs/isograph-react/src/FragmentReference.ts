@@ -11,10 +11,10 @@ export type FragmentReference<
   TReadFromStore extends Object,
   TClientFieldValue,
 > = {
-  kind: 'FragmentReference';
-  readerArtifact: ReaderArtifact<TReadFromStore, TClientFieldValue>;
-  root: DataId;
-  variables: Variables | null;
+  readonly kind: 'FragmentReference';
+  readonly readerArtifact: ReaderArtifact<TReadFromStore, TClientFieldValue>;
+  readonly root: DataId;
+  readonly variables: Variables | null;
   // TODO: We should instead have ReaderAst<TClientFieldProps>
-  nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[];
+  readonly nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[];
 };

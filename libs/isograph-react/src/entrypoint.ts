@@ -6,42 +6,42 @@ export type IsographEntrypoint<
   TReadFromStore extends Object,
   TClientFieldValue,
 > = {
-  kind: 'Entrypoint';
-  queryText: string;
-  normalizationAst: NormalizationAst;
-  readerArtifact: ReaderArtifact<TReadFromStore, TClientFieldValue>;
-  nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[];
+  readonly kind: 'Entrypoint';
+  readonly queryText: string;
+  readonly normalizationAst: NormalizationAst;
+  readonly readerArtifact: ReaderArtifact<TReadFromStore, TClientFieldValue>;
+  readonly nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[];
 };
 
 export type NormalizationAstNode =
   | NormalizationScalarField
   | NormalizationLinkedField;
-export type NormalizationAst = NormalizationAstNode[];
+export type NormalizationAst = ReadonlyArray<NormalizationAstNode>;
 
 export type NormalizationScalarField = {
-  kind: 'Scalar';
-  fieldName: string;
-  arguments: Arguments | null;
+  readonly kind: 'Scalar';
+  readonly fieldName: string;
+  readonly arguments: Arguments | null;
 };
 
 export type NormalizationLinkedField = {
-  kind: 'Linked';
-  fieldName: string;
-  arguments: Arguments | null;
-  selections: NormalizationAst;
+  readonly kind: 'Linked';
+  readonly fieldName: string;
+  readonly arguments: Arguments | null;
+  readonly selections: NormalizationAst;
 };
 
 // This is more like an entrypoint, but one specifically for a refetch query/mutation
 export type RefetchQueryNormalizationArtifact = {
-  kind: 'RefetchQuery';
-  queryText: string;
-  normalizationAst: NormalizationAst;
+  readonly kind: 'RefetchQuery';
+  readonly queryText: string;
+  readonly normalizationAst: NormalizationAst;
 };
 
 // TODO rename
 export type RefetchQueryNormalizationArtifactWrapper = {
-  artifact: RefetchQueryNormalizationArtifact;
-  allowedVariables: string[];
+  readonly artifact: RefetchQueryNormalizationArtifact;
+  readonly allowedVariables: string[];
 };
 
 export function assertIsEntrypoint<

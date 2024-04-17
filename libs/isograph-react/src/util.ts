@@ -6,10 +6,10 @@ export type Argument = [ArgumentName, ArgumentValue];
 export type ArgumentName = string;
 export type ArgumentValue =
   | {
-      kind: 'Variable';
-      name: string;
+      readonly kind: 'Variable';
+      readonly name: string;
     }
   | {
-      kind: 'Literal';
-      value: any;
+      readonly kind: 'Literal';
+      readonly value: any;
     };

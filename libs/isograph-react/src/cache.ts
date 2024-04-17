@@ -101,14 +101,14 @@ export function getOrCreateCacheForArtifact<
 
 type NetworkRequestStatus =
   | {
-      kind: 'UndisposedIncomplete';
+      readonly kind: 'UndisposedIncomplete';
     }
   | {
-      kind: 'Disposed';
+      readonly kind: 'Disposed';
     }
   | {
-      kind: 'UndisposedComplete';
-      retainedQuery: RetainedQuery;
+      readonly kind: 'UndisposedComplete';
+      readonly retainedQuery: RetainedQuery;
     };
 
 export function makeNetworkRequest<T>(
