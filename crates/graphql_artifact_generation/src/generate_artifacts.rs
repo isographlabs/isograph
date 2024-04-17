@@ -689,7 +689,6 @@ fn generate_reader_artifact<'schema>(
         let client_field_parameter_type = generate_client_field_parameter_type(
             schema,
             &selection_set,
-            &client_field.variant,
             parent_type.into(),
             &mut nested_client_field_artifact_imports,
             0,
@@ -991,7 +990,6 @@ fn write_selections_for_query_text(
 fn generate_client_field_parameter_type(
     schema: &ValidatedSchema,
     selection_set: &[WithSpan<ValidatedSelection>],
-    variant: &ClientFieldVariant,
     parent_type: &ValidatedSchemaObject,
     nested_client_field_imports: &mut NestedClientFieldImports,
     indentation_level: u8,
@@ -1003,7 +1001,6 @@ fn generate_client_field_parameter_type(
             schema,
             &mut client_field_parameter_type,
             selection,
-            variant,
             parent_type,
             nested_client_field_imports,
             indentation_level + 1,
@@ -1018,7 +1015,6 @@ fn write_query_types_from_selection(
     schema: &ValidatedSchema,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
-    variant: &ClientFieldVariant,
     parent_type: &ValidatedSchemaObject,
     nested_client_field_imports: &mut NestedClientFieldImports,
     indentation_level: u8,
@@ -1106,7 +1102,6 @@ fn write_query_types_from_selection(
                     let inner = generate_client_field_parameter_type(
                         schema,
                         &linked_field.selection_set,
-                        &variant,
                         object.into(),
                         nested_client_field_imports,
                         indentation_level,
