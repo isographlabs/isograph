@@ -38,8 +38,7 @@ export type ReaderLinkedField = {
 
 export type ReaderResolverVariant =
   | { kind: 'Eager' }
-  // componentName is the component's cacheKey for getRefReaderByName
-  // and is the type + field concatenated
+  // componentName is type + field concatenated
   | { kind: 'Component'; componentName: string };
 
 export type ReaderResolverField = {
