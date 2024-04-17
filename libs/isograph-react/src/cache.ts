@@ -24,7 +24,7 @@ import {
   NormalizationAst,
   NormalizationLinkedField,
   NormalizationScalarField,
-  RefetchQueryArtifactWrapper,
+  RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
 import { ReaderLinkedField, ReaderScalarField } from './reader';
 import { Argument, ArgumentValue } from './util';
@@ -193,7 +193,7 @@ function normalizeData(
   normalizationAst: NormalizationAst,
   networkResponse: NetworkResponseObject,
   variables: Object,
-  nestedRefetchQueries: RefetchQueryArtifactWrapper[],
+  nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
 ): Set<DataId> {
   const encounteredIds = new Set<DataId>();
 
@@ -344,7 +344,7 @@ function normalizeDataIntoRecord(
   targetParentRecord: StoreRecord,
   targetParentRecordId: DataId,
   variables: { [index: string]: string },
-  nestedRefetchQueries: RefetchQueryArtifactWrapper[],
+  nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: Set<DataId>,
 ) {
   let recordHasBeenUpdated = false;
@@ -416,7 +416,7 @@ function normalizeLinkedField(
   targetParentRecord: StoreRecord,
   targetParentRecordId: DataId,
   variables: { [index: string]: string },
-  nestedRefetchQueries: RefetchQueryArtifactWrapper[],
+  nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: Set<DataId>,
 ): RecordHasBeenUpdated {
   const networkResponseKey = getNetworkResponseKey(astNode);
@@ -504,7 +504,7 @@ function normalizeNetworkResponseObject(
   targetParentRecordId: string,
   variables: { [index: string]: string },
   index: number | null,
-  nestedRefetchQueries: RefetchQueryArtifactWrapper[],
+  nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: Set<DataId>,
 ): DataId /* The id of the modified or newly created item */ {
   const newStoreRecordId = getDataIdOfNetworkResponse(

@@ -10,7 +10,7 @@ export type IsographEntrypoint<
   queryText: string;
   normalizationAst: NormalizationAst;
   readerArtifact: ReaderArtifact<TReadFromStore, TClientFieldValue>;
-  nestedRefetchQueries: RefetchQueryArtifactWrapper[];
+  nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[];
 };
 
 export type NormalizationAstNode =
@@ -32,15 +32,15 @@ export type NormalizationLinkedField = {
 };
 
 // This is more like an entrypoint, but one specifically for a refetch query/mutation
-export type RefetchQueryArtifact = {
+export type RefetchQueryNormalizationArtifact = {
   kind: 'RefetchQuery';
   queryText: string;
   normalizationAst: NormalizationAst;
 };
 
 // TODO rename
-export type RefetchQueryArtifactWrapper = {
-  artifact: RefetchQueryArtifact;
+export type RefetchQueryNormalizationArtifactWrapper = {
+  artifact: RefetchQueryNormalizationArtifact;
   allowedVariables: string[];
 };
 

@@ -1,5 +1,5 @@
 import { DataId } from './IsographEnvironment';
-import { RefetchQueryArtifactWrapper } from './entrypoint';
+import { RefetchQueryNormalizationArtifactWrapper } from './entrypoint';
 import { ReaderArtifact } from './reader';
 
 // TODO type this better
@@ -16,5 +16,5 @@ export type FragmentReference<
   root: DataId;
   variables: Variables | null;
   // TODO: We should instead have ReaderAst<TClientFieldProps>
-  nestedRefetchQueries: RefetchQueryArtifactWrapper[];
+  nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[];
 };

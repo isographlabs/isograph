@@ -44,8 +44,8 @@ export {
   NormalizationScalarField,
   IsographEntrypoint,
   assertIsEntrypoint,
-  RefetchQueryArtifact,
-  RefetchQueryArtifactWrapper,
+  RefetchQueryNormalizationArtifact,
+  RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
 export { readButDoNotEvaluate } from './read';
 export { useResult } from './useResult';

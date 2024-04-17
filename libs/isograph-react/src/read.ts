@@ -1,6 +1,6 @@
 import { getParentRecordKey, onNextChange } from './cache';
 import { getOrCreateCachedComponent } from './componentCache';
-import { RefetchQueryArtifactWrapper } from './entrypoint';
+import { RefetchQueryNormalizationArtifactWrapper } from './entrypoint';
 import { FragmentReference } from './FragmentReference';
 import {
   assertLink,
@@ -58,7 +58,7 @@ function readData<TReadFromStore>(
   ast: ReaderAst<TReadFromStore>,
   root: DataId,
   variables: { [index: string]: string },
-  nestedRefetchQueries: RefetchQueryArtifactWrapper[],
+  nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredRecords: Set<DataId>,
 ): ReadDataResult<TReadFromStore> {
   mutableEncounteredRecords.add(root);
