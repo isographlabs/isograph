@@ -186,3 +186,71 @@ set_foo {
   - use generics to enforce this e.g. require a function of `(data: Data<TIDType>) => TIDType`. So you can't return shit from anywhere else.
   - opt into non-waterfall behavior for these
   - just for fun, in unit tests, we can make the id type an object instead of a string.
+
+# Types of fields:
+
+- Examples: Mutation fields, lazy, refetch with or w/o variables, regular, pagination
+
+Can vary by:
+
+- Time:
+  - Along with parent
+  - Deferred
+  - Upon normalization
+    - this includes: deferred fields when the server doesn't support defer, and waterfalls stemming from a client link
+  - Imperatively (this should include on render)
+    - Can this include loading arbitrary data structures, e.g. an enum of routes w/params
+- Whether we have a selection set generated for you or not
+  - The type of the data from a generated selection set should not be exposed to the user.
+    - Maybe this implies that they are syntactically part of parent, but exposed as field?
+  - Only custom selection sets (or the custom aspects of selection sets) should be exposed
+- Whether they syntactically are part of the parent (refetch, mutation fields) or not (fields)
+  - i.e. Whether they affect an object or a scalar field? Maybe scalar fields are turned into objects as a result
+- Whether they can be disposed (should mutations be auto-disposed? I think not.)
+- And some sort of transform that affects the type of the UI exposed to users:
+  - mutation: expose a set
+  - refetch: expose a set, but read from the latest
+  - load once: expose { kind: 'NotLoaded', load } | { kind: 'Loaded', data }
+    - is there any benefit to making these load once, instead of useQueryLoader style?
+  - useQueryLoader: dispose anything from previous renders
+  - pagination: concatenate the items in the set
+
+```
+// UnwrappedPromise can be suspended on
+type UnwrappedPromise<T> = { kind: 'Success', data: T } | { kind: 'InProgress', promise: Promise }
+type Result<T, E> = { kind: 'Ok', value: T } | { kind: 'Error', error: E }
+type Disposable<T> = { dispose: () => void, item: T }
+
+// How the mutation field would show up
+[mutationName]: {
+  startMutation: (config: MutationConfig<TVariables>) => MutationId,
+  // All non-disposed items go here? Or do we want tombstones, like... could
+  // you conceivably care to know that a disposed item existed?
+  // We're also implicitly depending on Maps having insertion-order iteration
+  results: Map<MutationId, Disposable<UnwrappedPromise<Result<void>>>>,
+
+  // and some derived getters? e.g.
+  isMutationInFlight: boolean,
+  // a promise that you can suspend on, which unsuspends only when no
+  // mutation is in flight
+  inFlightPromise: UnwrappedPromise<Result<void>> | null,
+  // a promise you can suspend on, which unsuspends only when the most
+  // recent mutation is not in flight
+  mostRecentPromise: UnwrappedPromise<Result<void>> | null,
+}
+
+type MutationConfig<TVariables> = {
+  variables: TVariables,
+  onComplete: (data: UnwrappedPromise<Result<void>>) => void,
+  // onIncremental? updater? optimistic? fetch policies?
+}
+```
+
+- appear as new field, modifies parent, implicit selection set, imperatively executed
+- can the suspense on mutations be syntactically unwrapped?
+
+### Questions etc
+
+- Where can we store this? Clearly, since we can load during normalization time, it can't be in component state.
+  - So, does that mean that we suffer from the situation where multiple identical components share the same loaded queries, pagination state, etc.?
+  - Or, are fields that are loaded during normalization different than those loaded post-render?
