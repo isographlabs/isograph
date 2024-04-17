@@ -1,9 +1,7 @@
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
-import { readButDoNotEvaluate } from './read';
 import { FragmentReference } from './FragmentReference';
-import { useState } from 'react';
-import { useRerenderOnChange } from './useRerenderOnChange';
 import { getOrCreateCachedComponent } from './componentCache';
+import { useReadAndSubscribe } from './useReadAndSubscribe';
 
 export function useResult<TReadFromStore extends Object, TClientFieldValue>(
   fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>,
@@ -20,17 +18,9 @@ export function useResult<TReadFromStore extends Object, TClientFieldValue>(
       );
     }
     case 'Eager': {
-      const [readOutDataAndRecords, setReadOutDataAndRecords] = useState(() =>
-        readButDoNotEvaluate(environment, fragmentReference),
-      );
-      useRerenderOnChange(
-        environment,
-        readOutDataAndRecords,
-        fragmentReference,
-        setReadOutDataAndRecords,
-      );
-      // @ts-expect-error
-      return readOutDataAndRecords.item;
+      const data = useReadAndSubscribe(environment, fragmentReference);
+      // @ts-expect-error resolver is incorrectly typed in ReaderArtifact
+      return fragmentReference.readerArtifact.resolver(data);
     }
   }
 }

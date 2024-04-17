@@ -1,9 +1,7 @@
-import { useState } from 'react';
 import { stableCopy } from './cache';
 import { IsographEnvironment } from './IsographEnvironment';
-import { readButDoNotEvaluate } from './read';
-import { useRerenderOnChange } from './useRerenderOnChange';
 import { FragmentReference } from './FragmentReference';
+import { useReadAndSubscribe } from './useReadAndSubscribe';
 
 export function getOrCreateCachedComponent(
   environment: IsographEnvironment,
@@ -29,19 +27,7 @@ export function getOrCreateCachedComponent(
     byArgs[stringifiedArgs] ??
     (() => {
       function Component(additionalRuntimeProps: { [key: string]: any }) {
-        // During pre-commit renders, we call readButDoNotEvaluate.
-        // There may be multiple pre-commit renders, so we should find
-        // a way to read the cached data from the store instead
-        const [readOutDataAndRecords, setReadOutDataAndRecords] = useState(() =>
-          readButDoNotEvaluate(environment, fragmentReference),
-        );
-
-        useRerenderOnChange(
-          environment,
-          readOutDataAndRecords,
-          fragmentReference,
-          setReadOutDataAndRecords,
-        );
+        const data = useReadAndSubscribe(environment, fragmentReference);
 
         if (typeof window !== 'undefined' && window.__LOG) {
           console.log(
@@ -53,7 +39,7 @@ export function getOrCreateCachedComponent(
         }
 
         return fragmentReference.readerArtifact.resolver(
-          readOutDataAndRecords.item,
+          data,
           additionalRuntimeProps,
         );
       }

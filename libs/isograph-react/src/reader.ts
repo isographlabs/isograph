@@ -5,10 +5,9 @@ import { Arguments } from './util';
 // non-@component and refetch resolvers
 export type ReaderArtifact<TReadFromStore extends Object, TClientFieldValue> = {
   kind: 'ReaderArtifact';
-  // The DataID of the parent + the fieldName + the variables are enough
-  // to uniquely identify a call to read(...) at a given time.
   fieldName: ComponentOrFieldName;
   readerAst: ReaderAst<TReadFromStore>;
+  // TODO move resolver into the variant
   resolver: (data: TReadFromStore, runtimeProps: any) => TClientFieldValue;
   variant: ReaderResolverVariant;
 };
