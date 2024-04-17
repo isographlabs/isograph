@@ -19,7 +19,10 @@ export const PetBestFriendCard = iso(`
   const bestFriendRelationship = data.best_friend_relationship;
   if (!bestFriendRelationship) {
     return (
-      <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
+      <Card
+        variant="outlined"
+        sx={{ width: 450, boxShadow: 3, backgroundColor: '#BBB' }}
+      >
         <CardContent>
           <data.PetUpdater />
         </CardContent>
@@ -28,7 +31,10 @@ export const PetBestFriendCard = iso(`
   }
 
   return (
-    <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
+    <Card
+      variant="outlined"
+      sx={{ width: 450, boxShadow: 3, backgroundColor: '#BBB' }}
+    >
       <CardContent>
         <Stack direction="column" spacing={4}>
           <Stack direction="row" spacing={4}>

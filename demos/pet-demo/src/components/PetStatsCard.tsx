@@ -21,7 +21,12 @@ export const PetStatsCard = iso(`
   return (
     <Card
       variant="outlined"
-      sx={{ width: 450, boxShadow: 3, cursor: 'pointer' }}
+      sx={{
+        width: 450,
+        boxShadow: 3,
+        cursor: 'pointer',
+        backgroundColor: '#BBB',
+      }}
     >
       <CardContent>
         <h2>Stats</h2>

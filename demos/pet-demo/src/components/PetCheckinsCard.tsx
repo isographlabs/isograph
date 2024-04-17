@@ -14,7 +14,10 @@ export const PetCheckinsCard = iso(`
   }
 `)(function PetCheckinsCardComponent(data) {
   return (
-    <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
+    <Card
+      variant="outlined"
+      sx={{ width: 450, boxShadow: 3, backgroundColor: '#BBB' }}
+    >
       <CardContent>
         <h2>Check-ins</h2>
         <ul>

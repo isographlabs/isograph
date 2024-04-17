@@ -16,7 +16,10 @@ export const PetSummaryCard = iso(`
   runtimeProps: { navigateTo: (newRoute: Route) => void },
 ) {
   return (
-    <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
+    <Card
+      variant="outlined"
+      sx={{ width: 450, boxShadow: 3, backgroundColor: '#BBB' }}
+    >
       <CardContent>
         <Stack direction="row" spacing={4}>
           <Avatar

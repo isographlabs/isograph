@@ -9,7 +9,10 @@ field Pet.PetTaglineCard @component {
 }
 `)(function PetTaglineCardComponent(data) {
   return (
-    <Card variant="outlined" sx={{ width: 450, boxShadow: 3 }}>
+    <Card
+      variant="outlined"
+      sx={{ width: 450, boxShadow: 3, backgroundColor: '#BBB' }}
+    >
       <CardContent>
         <h2>Tagline</h2>
         <p>&quot;{data.tagline}&quot;</p>
