@@ -1,9 +1,9 @@
-import type {IsographEntrypoint, NormalizationAst, RefetchQueryArtifactWrapper} from '@isograph/react';
+import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Query__HomePage__param} from './param_type';
 import {Query__HomePage__outputType} from './output_type';
 import readerResolver from './reader';
 import refetchQuery0 from './__refetch__0';
-const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [{ artifact: refetchQuery0, allowedVariables: ["first", ] }, ];
+const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [{ artifact: refetchQuery0, allowedVariables: ["first", ] }, ];
 
 const queryText = 'query HomePage ($first: Int!) {\
   viewer {\

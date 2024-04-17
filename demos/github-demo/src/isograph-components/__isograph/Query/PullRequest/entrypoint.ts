@@ -1,8 +1,8 @@
-import type {IsographEntrypoint, NormalizationAst, RefetchQueryArtifactWrapper} from '@isograph/react';
+import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Query__PullRequest__param} from './param_type';
 import {Query__PullRequest__outputType} from './output_type';
 import readerResolver from './reader';
-const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [];
+const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
 const queryText = 'query PullRequest ($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!) {\
   repository____owner___v_repositoryOwner____name___v_repositoryName: repository(owner: $repositoryOwner, name: $repositoryName) {\

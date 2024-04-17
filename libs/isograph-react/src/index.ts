@@ -27,7 +27,10 @@ export {
 export { useImperativeReference } from './useImperativeReference';
 export { EntrypointReader } from './EntrypointReader';
 export {
-  type ReaderArtifact,
+  EagerReaderArtifact,
+  ComponentReaderArtifact,
+  MutationReaderArtifact,
+  RefetchReaderArtifact,
   ReaderAst,
   ReaderAstNode,
   ReaderLinkedField,

@@ -1,8 +1,8 @@
-import type {IsographEntrypoint, NormalizationAst, RefetchQueryArtifactWrapper} from '@isograph/react';
+import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Query__UserPage__param} from './param_type';
 import {Query__UserPage__outputType} from './output_type';
 import readerResolver from './reader';
-const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [];
+const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
 const queryText = 'query UserPage ($first: Int!, $userLogin: String!) {\
   user____login___v_userLogin: user(login: $userLogin) {\

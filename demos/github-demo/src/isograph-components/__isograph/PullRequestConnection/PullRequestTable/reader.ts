@@ -1,6 +1,5 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { PullRequestConnection__PullRequestTable__param } from './param_type.ts';
-import { PullRequestConnection__PullRequestTable__outputType } from './output_type.ts';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import { PullRequestConnection__PullRequestTable__param } from './param_type';
 import { PullRequestTable as resolver } from '../../../PullRequestTable.tsx';
 import Actor__UserLink from '../../Actor/UserLink/reader';
 import PullRequest__PullRequestLink from '../../PullRequest/PullRequestLink/reader';
@@ -90,15 +89,14 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
   },
 ];
 
-const artifact: ReaderArtifact<
+const artifact: ComponentReaderArtifact<
   PullRequestConnection__PullRequestTable__param,
-  PullRequestConnection__PullRequestTable__outputType
+  ExtractSecondParam<typeof resolver>
 > = {
-  kind: "ReaderArtifact",
-  fieldName: "PullRequestTable",
-  resolver: resolver as any,
+  kind: "ComponentReaderArtifact",
+  componentName: "PullRequestConnection.PullRequestTable",
+  resolver,
   readerAst,
-  variant: { kind: "Component", componentName: "PullRequestConnection.PullRequestTable" },
 };
 
 export default artifact;

@@ -1,9 +1,8 @@
-import type {ExtractSecondParam} from '@isograph/react';
-import { makeNetworkRequest, type IsographEnvironment, type IsographEntrypoint } from '@isograph/react';
+import { RefetchQueryNormalizationArtifact } from '@isograph/react';
+import { makeNetworkRequest, type IsographEnvironment } from '@isograph/react';
 const resolver = (
   environment: IsographEnvironment,
-  artifact: IsographEntrypoint<any, any>,
+  artifact: RefetchQueryNormalizationArtifact,
   variables: any
 ) => () => makeNetworkRequest(environment, artifact, variables);
-// the type, when read out (either via useLazyReference or via graph)
 export type Pet____refetch__outputType = () => void;

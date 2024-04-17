@@ -222,11 +222,9 @@ function readData<TReadFromStore>(
             environment,
             // resolvers for refetch fields take 3 args, and this is not reflected in types
             refetchQueryArtifact,
-            // @ts-expect-error
             {
+              // @ts-expect-error
               ...data.data,
-              // TODO continue from here
-              // variables need to be filtered for what we need just for the refetch query
               ...filterVariables(variables, allowedVariables),
             },
           );
@@ -261,7 +259,6 @@ function readData<TReadFromStore>(
           target[field.alias] = field.readerArtifact.resolver(
             environment,
             refetchQueryArtifact,
-            // @ts-expect-error
             data.data,
             filterVariables(variables, allowedVariables),
           );
@@ -274,8 +271,8 @@ function readData<TReadFromStore>(
           (index) => nestedRefetchQueries[index],
         );
 
-        const variant = field.readerArtifact.variant;
-        if (variant.kind === 'Eager') {
+        const kind = field.readerArtifact.kind;
+        if (kind === 'EagerReaderArtifact') {
           const data = readData(
             environment,
             field.readerArtifact.readerAst,
@@ -291,13 +288,12 @@ function readData<TReadFromStore>(
               nestedReason: data,
             };
           } else {
-            // @ts-expect-error
             target[field.alias] = field.readerArtifact.resolver(data.data);
           }
-        } else if (variant.kind === 'Component') {
+        } else if (kind === 'ComponentReaderArtifact') {
           target[field.alias] = getOrCreateCachedComponent(
             environment,
-            variant.componentName,
+            field.readerArtifact.componentName,
             {
               kind: 'FragmentReference',
               readerArtifact: field.readerArtifact,

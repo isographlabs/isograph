@@ -1,6 +1,5 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Query__HomePage__param } from './param_type.ts';
-import { Query__HomePage__outputType } from './output_type.ts';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import { Query__HomePage__param } from './param_type';
 import { HomePage as resolver } from '../../../HomeRoute.tsx';
 import Query__Header from '../Header/reader';
 import Query__HomePageList from '../HomePageList/reader';
@@ -22,15 +21,14 @@ const readerAst: ReaderAst<Query__HomePage__param> = [
   },
 ];
 
-const artifact: ReaderArtifact<
+const artifact: ComponentReaderArtifact<
   Query__HomePage__param,
-  Query__HomePage__outputType
+  ExtractSecondParam<typeof resolver>
 > = {
-  kind: "ReaderArtifact",
-  fieldName: "HomePage",
-  resolver: resolver as any,
+  kind: "ComponentReaderArtifact",
+  componentName: "Query.HomePage",
+  resolver,
   readerAst,
-  variant: { kind: "Component", componentName: "Query.HomePage" },
 };
 
 export default artifact;

@@ -1,6 +1,5 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Starrable__IsStarred__param } from './param_type.ts';
-import { Starrable__IsStarred__outputType } from './output_type.ts';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import { Starrable__IsStarred__param } from './param_type';
 import { IsStarred as resolver } from '../../../RepositoryDetail.tsx';
 
 const readerAst: ReaderAst<Starrable__IsStarred__param> = [
@@ -18,15 +17,14 @@ const readerAst: ReaderAst<Starrable__IsStarred__param> = [
   },
 ];
 
-const artifact: ReaderArtifact<
+const artifact: ComponentReaderArtifact<
   Starrable__IsStarred__param,
-  Starrable__IsStarred__outputType
+  ExtractSecondParam<typeof resolver>
 > = {
-  kind: "ReaderArtifact",
-  fieldName: "IsStarred",
-  resolver: resolver as any,
+  kind: "ComponentReaderArtifact",
+  componentName: "Starrable.IsStarred",
+  resolver,
   readerAst,
-  variant: { kind: "Component", componentName: "Starrable.IsStarred" },
 };
 
 export default artifact;

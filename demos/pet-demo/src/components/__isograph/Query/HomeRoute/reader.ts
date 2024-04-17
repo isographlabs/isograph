@@ -1,6 +1,5 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Query__HomeRoute__param } from './param_type.ts';
-import { Query__HomeRoute__outputType } from './output_type.ts';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import { Query__HomeRoute__param } from './param_type';
 import { HomeRoute as resolver } from '../../../HomeRoute.tsx';
 import Pet__PetSummaryCard from '../../Pet/PetSummaryCard/reader';
 
@@ -28,15 +27,14 @@ const readerAst: ReaderAst<Query__HomeRoute__param> = [
   },
 ];
 
-const artifact: ReaderArtifact<
+const artifact: ComponentReaderArtifact<
   Query__HomeRoute__param,
-  Query__HomeRoute__outputType
+  ExtractSecondParam<typeof resolver>
 > = {
-  kind: "ReaderArtifact",
-  fieldName: "HomeRoute",
-  resolver: resolver as any,
+  kind: "ComponentReaderArtifact",
+  componentName: "Query.HomeRoute",
+  resolver,
   readerAst,
-  variant: { kind: "Component", componentName: "Query.HomeRoute" },
 };
 
 export default artifact;

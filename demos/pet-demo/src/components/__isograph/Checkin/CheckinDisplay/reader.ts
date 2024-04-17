@@ -1,6 +1,5 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Checkin__CheckinDisplay__param } from './param_type.ts';
-import { Checkin__CheckinDisplay__outputType } from './output_type.ts';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import { Checkin__CheckinDisplay__param } from './param_type';
 import { CheckinDisplay as resolver } from '../../../PetCheckinsCard.tsx';
 import Checkin__make_super from '../make_super/reader';
 
@@ -25,15 +24,14 @@ const readerAst: ReaderAst<Checkin__CheckinDisplay__param> = [
   },
 ];
 
-const artifact: ReaderArtifact<
+const artifact: ComponentReaderArtifact<
   Checkin__CheckinDisplay__param,
-  Checkin__CheckinDisplay__outputType
+  ExtractSecondParam<typeof resolver>
 > = {
-  kind: "ReaderArtifact",
-  fieldName: "CheckinDisplay",
-  resolver: resolver as any,
+  kind: "ComponentReaderArtifact",
+  componentName: "Checkin.CheckinDisplay",
+  resolver,
   readerAst,
-  variant: { kind: "Component", componentName: "Checkin.CheckinDisplay" },
 };
 
 export default artifact;

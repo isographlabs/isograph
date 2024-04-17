@@ -1,6 +1,5 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Pet__PetBestFriendCard__param } from './param_type.ts';
-import { Pet__PetBestFriendCard__outputType } from './output_type.ts';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import { Pet__PetBestFriendCard__param } from './param_type';
 import { PetBestFriendCard as resolver } from '../../../PetBestFriendCard.tsx';
 import Pet__PetUpdater from '../PetUpdater/reader';
 
@@ -60,15 +59,14 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
   },
 ];
 
-const artifact: ReaderArtifact<
+const artifact: ComponentReaderArtifact<
   Pet__PetBestFriendCard__param,
-  Pet__PetBestFriendCard__outputType
+  ExtractSecondParam<typeof resolver>
 > = {
-  kind: "ReaderArtifact",
-  fieldName: "PetBestFriendCard",
-  resolver: resolver as any,
+  kind: "ComponentReaderArtifact",
+  componentName: "Pet.PetBestFriendCard",
+  resolver,
   readerAst,
-  variant: { kind: "Component", componentName: "Pet.PetBestFriendCard" },
 };
 
 export default artifact;

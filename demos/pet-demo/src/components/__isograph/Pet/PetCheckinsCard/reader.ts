@@ -1,6 +1,5 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Pet__PetCheckinsCard__param } from './param_type.ts';
-import { Pet__PetCheckinsCard__outputType } from './output_type.ts';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import { Pet__PetCheckinsCard__param } from './param_type';
 import { PetCheckinsCard as resolver } from '../../../PetCheckinsCard.tsx';
 import Checkin__CheckinDisplay from '../../Checkin/CheckinDisplay/reader';
 
@@ -34,15 +33,14 @@ const readerAst: ReaderAst<Pet__PetCheckinsCard__param> = [
   },
 ];
 
-const artifact: ReaderArtifact<
+const artifact: ComponentReaderArtifact<
   Pet__PetCheckinsCard__param,
-  Pet__PetCheckinsCard__outputType
+  ExtractSecondParam<typeof resolver>
 > = {
-  kind: "ReaderArtifact",
-  fieldName: "PetCheckinsCard",
-  resolver: resolver as any,
+  kind: "ComponentReaderArtifact",
+  componentName: "Pet.PetCheckinsCard",
+  resolver,
   readerAst,
-  variant: { kind: "Component", componentName: "Pet.PetCheckinsCard" },
 };
 
 export default artifact;

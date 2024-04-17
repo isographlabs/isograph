@@ -1,4 +1,4 @@
-import { ReaderArtifact } from './reader';
+import { TopLevelReaderArtifact } from './reader';
 import { Arguments } from './util';
 
 // This type should be treated as an opaque type.
@@ -9,7 +9,12 @@ export type IsographEntrypoint<
   readonly kind: 'Entrypoint';
   readonly queryText: string;
   readonly normalizationAst: NormalizationAst;
-  readonly readerArtifact: ReaderArtifact<TReadFromStore, TClientFieldValue>;
+  readonly readerArtifact: TopLevelReaderArtifact<
+    TReadFromStore,
+    TClientFieldValue,
+    // TODO don't type this as any
+    any
+  >;
   readonly nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[];
 };
 

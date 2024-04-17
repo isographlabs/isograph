@@ -1,11 +1,11 @@
-import type {IsographEntrypoint, NormalizationAst, RefetchQueryArtifactWrapper} from '@isograph/react';
+import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Query__PetDetailRoute__param} from './param_type';
 import {Query__PetDetailRoute__outputType} from './output_type';
 import readerResolver from './reader';
 import refetchQuery0 from './__refetch__0';
 import refetchQuery1 from './__refetch__1';
 import refetchQuery2 from './__refetch__2';
-const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [{ artifact: refetchQuery0, allowedVariables: [] }, { artifact: refetchQuery1, allowedVariables: [] }, { artifact: refetchQuery2, allowedVariables: [] }, ];
+const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [{ artifact: refetchQuery0, allowedVariables: [] }, { artifact: refetchQuery1, allowedVariables: [] }, { artifact: refetchQuery2, allowedVariables: [] }, ];
 
 const queryText = 'query PetDetailRoute ($id: ID!) {\
   pet____id___v_id: pet(id: $id) {\

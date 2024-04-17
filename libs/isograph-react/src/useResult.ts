@@ -8,18 +8,17 @@ export function useResult<TReadFromStore extends Object, TClientFieldValue>(
 ): TClientFieldValue {
   const environment = useIsographEnvironment();
 
-  switch (fragmentReference.readerArtifact.variant.kind) {
-    case 'Component': {
+  switch (fragmentReference.readerArtifact.kind) {
+    case 'ComponentReaderArtifact': {
       // @ts-expect-error
       return getOrCreateCachedComponent(
         environment,
-        fragmentReference.readerArtifact.variant.componentName,
+        fragmentReference.readerArtifact.componentName,
         fragmentReference,
       );
     }
-    case 'Eager': {
+    case 'EagerReaderArtifact': {
       const data = useReadAndSubscribe(environment, fragmentReference);
-      // @ts-expect-error resolver is incorrectly typed in ReaderArtifact
       return fragmentReference.readerArtifact.resolver(data);
     }
   }

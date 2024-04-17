@@ -7,8 +7,9 @@ use std::{
 };
 
 use common_lang_types::{
-    HasName, IsographObjectTypeName, Location, PathAndContent, QueryOperationName,
-    SelectableFieldName, Span, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
+    ConstExportName, FilePath, HasName, IsographObjectTypeName, Location, PathAndContent,
+    QueryOperationName, SelectableFieldName, Span, UnvalidatedTypeName, VariableName, WithLocation,
+    WithSpan,
 };
 use graphql_lang_types::{
     GraphQLInputValueDefinition, GraphQLTypeAnnotation, ListTypeAnnotation, NamedTypeAnnotation,
@@ -23,10 +24,10 @@ use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_client_field,
     ArtifactQueueItem, ClientFieldVariant, FieldDefinitionLocation, FieldMapItem,
     MergedLinkedFieldSelection, MergedScalarFieldSelection, MergedSelectionSet,
-    MergedServerFieldSelection, MutationFieldArtifactInfo, NameAndArguments,
-    ObjectTypeAndFieldNames, PathToRefetchField, RefetchFieldArtifactInfo, RequiresRefinement,
-    RootRefetchedPath, ValidatedClientField, ValidatedSchema, ValidatedSchemaObject,
-    ValidatedSelection, ValidatedVariableDefinition,
+    MergedServerFieldSelection, MutationFieldArtifactInfo, MutationFieldClientFieldVariant,
+    NameAndArguments, ObjectTypeAndFieldNames, PathToRefetchField, RefetchFieldArtifactInfo,
+    RequiresRefinement, RootRefetchedPath, ValidatedClientField, ValidatedSchema,
+    ValidatedSchemaObject, ValidatedSelection, ValidatedVariableDefinition,
 };
 
 use crate::artifact_file_contents::{ENTRYPOINT, ISO_TS};
@@ -336,12 +337,37 @@ fn get_artifact_infos<'schema>(
 
     for encountered_client_field_id in encountered_client_field_ids {
         let encountered_client_field = schema.client_field(encountered_client_field_id);
-        artifact_infos.push(ArtifactInfo::Reader(generate_reader_artifact(
-            schema,
-            encountered_client_field,
-            project_root,
-            artifact_directory,
-        )))
+        let artifact_info = match &encountered_client_field.variant {
+            ClientFieldVariant::Eager(component_name_and_path) => {
+                ArtifactInfo::EagerReader(generate_eager_reader_artifact(
+                    schema,
+                    encountered_client_field,
+                    project_root,
+                    artifact_directory,
+                    *component_name_and_path,
+                ))
+            }
+            ClientFieldVariant::Component(component_name_and_path) => {
+                ArtifactInfo::ComponentReader(generate_component_reader_artifact(
+                    schema,
+                    encountered_client_field,
+                    project_root,
+                    artifact_directory,
+                    *component_name_and_path,
+                ))
+            }
+            ClientFieldVariant::RefetchField => ArtifactInfo::RefetchReader(
+                generate_refetch_reader_artifact(schema, encountered_client_field),
+            ),
+            ClientFieldVariant::MutationField(mutation_variant) => {
+                ArtifactInfo::MutationReader(generate_mutation_reader_artifact(
+                    schema,
+                    encountered_client_field,
+                    mutation_variant,
+                ))
+            }
+        };
+        artifact_infos.push(artifact_info);
     }
 
     for queue_item in artifact_queue {
@@ -363,7 +389,7 @@ fn get_artifact_infos<'schema>(
 fn get_artifact_for_refetch_field(
     schema: &ValidatedSchema,
     refetch_info: RefetchFieldArtifactInfo,
-) -> RefetchArtifactInfo {
+) -> RefetchEntrypointArtifactInfo {
     let RefetchFieldArtifactInfo {
         merged_selection_set,
         refetch_field_parent_id: parent_id,
@@ -396,7 +422,7 @@ fn get_artifact_for_refetch_field(
     ));
     // ------- END HACK -------
 
-    RefetchArtifactInfo {
+    RefetchEntrypointArtifactInfo {
         normalization_ast,
         query_text,
         root_fetchable_field,
@@ -408,7 +434,7 @@ fn get_artifact_for_refetch_field(
 fn get_artifact_for_mutation_field<'schema>(
     schema: &'schema ValidatedSchema,
     mutation_info: MutationFieldArtifactInfo,
-) -> RefetchArtifactInfo {
+) -> RefetchEntrypointArtifactInfo {
     let MutationFieldArtifactInfo {
         merged_selection_set,
         refetch_field_parent_id: parent_id,
@@ -479,7 +505,7 @@ fn get_artifact_for_mutation_field<'schema>(
         }}]",
     ));
 
-    RefetchArtifactInfo {
+    RefetchEntrypointArtifactInfo {
         normalization_ast,
         query_text,
         root_fetchable_field,
@@ -652,12 +678,13 @@ fn generate_entrypoint_artifact<'schema>(
     }
 }
 
-fn generate_reader_artifact<'schema>(
+fn generate_eager_reader_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     client_field: &ValidatedClientField,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
-) -> ReaderArtifactInfo<'schema> {
+    component_name_and_path: (ConstExportName, FilePath),
+) -> EagerReaderArtifactInfo<'schema> {
     if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
         let parent_type = schema
             .server_field_data
@@ -694,12 +721,12 @@ fn generate_reader_artifact<'schema>(
             0,
         );
         let client_field_output_type = generate_output_type(client_field);
-        let function_import_statement = generate_function_import_statement(
-            &client_field.variant,
+        let function_import_statement = generate_function_import_statement_for_eager_or_component(
             project_root,
             artifact_directory,
+            component_name_and_path,
         );
-        ReaderArtifactInfo {
+        EagerReaderArtifactInfo {
             parent_type: parent_type.into(),
             client_field_name: client_field.name,
             reader_ast,
@@ -707,7 +734,180 @@ fn generate_reader_artifact<'schema>(
             function_import_statement,
             client_field_output_type,
             client_field_parameter_type,
-            client_field_variant: client_field.variant.clone(),
+        }
+    } else {
+        panic!("Unsupported: client fields not on query with no selection set")
+    }
+}
+
+fn generate_component_reader_artifact<'schema>(
+    schema: &'schema ValidatedSchema,
+    client_field: &ValidatedClientField,
+    project_root: &PathBuf,
+    artifact_directory: &PathBuf,
+    component_name_and_path: (ConstExportName, FilePath),
+) -> ComponentReaderArtifactInfo<'schema> {
+    if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
+        let parent_type = schema
+            .server_field_data
+            .object(client_field.parent_object_id);
+        let mut nested_client_field_artifact_imports = HashMap::new();
+
+        let (_merged_selection_set, root_refetched_paths) = create_merged_selection_set(
+            schema,
+            // TODO here we are assuming that the client field is only on the Query type.
+            // That restriction should be loosened.
+            schema
+                .server_field_data
+                .object(schema.query_type_id.expect("expect query type to exist"))
+                .into(),
+            selection_set,
+            None,
+            None,
+            client_field,
+        );
+
+        let reader_ast = generate_reader_ast(
+            schema,
+            selection_set,
+            0,
+            &mut nested_client_field_artifact_imports,
+            &root_refetched_paths,
+        );
+
+        let client_field_parameter_type = generate_client_field_parameter_type(
+            schema,
+            &selection_set,
+            parent_type.into(),
+            &mut nested_client_field_artifact_imports,
+            0,
+        );
+        let client_field_output_type = generate_output_type(client_field);
+        let function_import_statement = generate_function_import_statement_for_eager_or_component(
+            project_root,
+            artifact_directory,
+            component_name_and_path,
+        );
+        ComponentReaderArtifactInfo {
+            parent_type: parent_type.into(),
+            client_field_name: client_field.name,
+            reader_ast,
+            nested_client_field_artifact_imports,
+            function_import_statement,
+            client_field_output_type,
+            client_field_parameter_type,
+        }
+    } else {
+        panic!("Unsupported: client fields not on query with no selection set")
+    }
+}
+
+fn generate_refetch_reader_artifact<'schema>(
+    schema: &'schema ValidatedSchema,
+    client_field: &ValidatedClientField,
+) -> RefetchReaderArtifactInfo<'schema> {
+    if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
+        let parent_type = schema
+            .server_field_data
+            .object(client_field.parent_object_id);
+        let mut nested_client_field_artifact_imports = HashMap::new();
+
+        let (_merged_selection_set, root_refetched_paths) = create_merged_selection_set(
+            schema,
+            // TODO here we are assuming that the client field is only on the Query type.
+            // That restriction should be loosened.
+            schema
+                .server_field_data
+                .object(schema.query_type_id.expect("expect query type to exist"))
+                .into(),
+            selection_set,
+            None,
+            None,
+            client_field,
+        );
+
+        let reader_ast = generate_reader_ast(
+            schema,
+            selection_set,
+            0,
+            &mut nested_client_field_artifact_imports,
+            &root_refetched_paths,
+        );
+
+        let client_field_parameter_type = generate_client_field_parameter_type(
+            schema,
+            &selection_set,
+            parent_type.into(),
+            &mut nested_client_field_artifact_imports,
+            0,
+        );
+        let client_field_output_type = generate_output_type(client_field);
+        let function_import_statement = generate_function_import_statement_for_refetch_reader();
+        RefetchReaderArtifactInfo {
+            parent_type: parent_type.into(),
+            client_field_name: client_field.name,
+            reader_ast,
+            nested_client_field_artifact_imports,
+            function_import_statement,
+            client_field_output_type,
+            client_field_parameter_type,
+        }
+    } else {
+        panic!("Unsupported: client fields not on query with no selection set")
+    }
+}
+
+fn generate_mutation_reader_artifact<'schema>(
+    schema: &'schema ValidatedSchema,
+    client_field: &ValidatedClientField,
+    mutation_variant: &MutationFieldClientFieldVariant,
+) -> MutationReaderArtifactInfo<'schema> {
+    if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
+        let parent_type = schema
+            .server_field_data
+            .object(client_field.parent_object_id);
+        let mut nested_client_field_artifact_imports = HashMap::new();
+
+        let (_merged_selection_set, root_refetched_paths) = create_merged_selection_set(
+            schema,
+            // TODO here we are assuming that the client field is only on the Query type.
+            // That restriction should be loosened.
+            schema
+                .server_field_data
+                .object(schema.query_type_id.expect("expect query type to exist"))
+                .into(),
+            selection_set,
+            None,
+            None,
+            client_field,
+        );
+
+        let reader_ast = generate_reader_ast(
+            schema,
+            selection_set,
+            0,
+            &mut nested_client_field_artifact_imports,
+            &root_refetched_paths,
+        );
+
+        let client_field_parameter_type = generate_client_field_parameter_type(
+            schema,
+            &selection_set,
+            parent_type.into(),
+            &mut nested_client_field_artifact_imports,
+            0,
+        );
+        let client_field_output_type = generate_output_type(client_field);
+        let function_import_statement =
+            generate_function_import_statement_for_mutation_reader(mutation_variant);
+        MutationReaderArtifactInfo {
+            parent_type: parent_type.into(),
+            client_field_name: client_field.name,
+            reader_ast,
+            nested_client_field_artifact_imports,
+            function_import_statement,
+            client_field_output_type,
+            client_field_parameter_type,
         }
     } else {
         panic!("Unsupported: client fields not on query with no selection set")
@@ -720,8 +920,16 @@ fn generate_reader_artifact<'schema>(
 #[derive(Debug)]
 pub(crate) enum ArtifactInfo<'schema> {
     Entrypoint(EntrypointArtifactInfo<'schema>),
-    Reader(ReaderArtifactInfo<'schema>),
-    RefetchQuery(RefetchArtifactInfo),
+
+    // These four artifact types all generate reader.ts files, but they
+    // are different. Namely, they have different types of resolvers and
+    // different types of exported artifacts.
+    EagerReader(EagerReaderArtifactInfo<'schema>),
+    ComponentReader(ComponentReaderArtifactInfo<'schema>),
+    RefetchReader(RefetchReaderArtifactInfo<'schema>),
+    MutationReader(MutationReaderArtifactInfo<'schema>),
+
+    RefetchQuery(RefetchEntrypointArtifactInfo),
 }
 
 impl<'schema> ArtifactInfo<'schema> {
@@ -730,8 +938,19 @@ impl<'schema> ArtifactInfo<'schema> {
             ArtifactInfo::Entrypoint(entrypoint_artifact) => {
                 vec![entrypoint_artifact.path_and_content()]
             }
-            ArtifactInfo::Reader(reader_artifact) => reader_artifact.path_and_content(),
             ArtifactInfo::RefetchQuery(refetch_query) => vec![refetch_query.path_and_content()],
+            ArtifactInfo::EagerReader(eager_reader_artifact) => {
+                eager_reader_artifact.path_and_content()
+            }
+            ArtifactInfo::ComponentReader(component_reader_artifact) => {
+                component_reader_artifact.path_and_content()
+            }
+            ArtifactInfo::RefetchReader(refetch_reader_artifact) => {
+                refetch_reader_artifact.path_and_content()
+            }
+            ArtifactInfo::MutationReader(mutation_reader_artifact) => {
+                mutation_reader_artifact.path_and_content()
+            }
         }
     }
 }
@@ -796,7 +1015,7 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
 }
 
 #[derive(Debug)]
-pub(crate) struct ReaderArtifactInfo<'schema> {
+pub(crate) struct EagerReaderArtifactInfo<'schema> {
     pub parent_type: &'schema ValidatedSchemaObject,
     pub(crate) client_field_name: SelectableFieldName,
     pub nested_client_field_artifact_imports: NestedClientFieldImports,
@@ -804,12 +1023,11 @@ pub(crate) struct ReaderArtifactInfo<'schema> {
     pub reader_ast: ReaderAst,
     pub client_field_parameter_type: ClientFieldParameterType,
     pub function_import_statement: ClientFieldFunctionImportStatement,
-    pub client_field_variant: ClientFieldVariant,
 }
 
-impl<'schema> ReaderArtifactInfo<'schema> {
+impl<'schema> EagerReaderArtifactInfo<'schema> {
     pub fn path_and_content(self) -> Vec<PathAndContent> {
-        let ReaderArtifactInfo {
+        let EagerReaderArtifactInfo {
             parent_type,
             client_field_name,
             ..
@@ -822,7 +1040,82 @@ impl<'schema> ReaderArtifactInfo<'schema> {
 }
 
 #[derive(Debug)]
-pub(crate) struct RefetchArtifactInfo {
+pub(crate) struct ComponentReaderArtifactInfo<'schema> {
+    pub parent_type: &'schema ValidatedSchemaObject,
+    pub(crate) client_field_name: SelectableFieldName,
+    pub nested_client_field_artifact_imports: NestedClientFieldImports,
+    pub client_field_output_type: ClientFieldOutputType,
+    pub reader_ast: ReaderAst,
+    pub client_field_parameter_type: ClientFieldParameterType,
+    pub function_import_statement: ClientFieldFunctionImportStatement,
+}
+
+impl<'schema> ComponentReaderArtifactInfo<'schema> {
+    pub fn path_and_content(self) -> Vec<PathAndContent> {
+        let ComponentReaderArtifactInfo {
+            parent_type,
+            client_field_name,
+            ..
+        } = &self;
+
+        let relative_directory = generate_path(parent_type.name, *client_field_name);
+
+        self.file_contents(&relative_directory)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct RefetchReaderArtifactInfo<'schema> {
+    pub parent_type: &'schema ValidatedSchemaObject,
+    pub(crate) client_field_name: SelectableFieldName,
+    pub nested_client_field_artifact_imports: NestedClientFieldImports,
+    pub client_field_output_type: ClientFieldOutputType,
+    pub reader_ast: ReaderAst,
+    pub client_field_parameter_type: ClientFieldParameterType,
+    pub function_import_statement: ClientFieldFunctionImportStatement,
+}
+
+impl<'schema> RefetchReaderArtifactInfo<'schema> {
+    pub fn path_and_content(self) -> Vec<PathAndContent> {
+        let RefetchReaderArtifactInfo {
+            parent_type,
+            client_field_name,
+            ..
+        } = &self;
+
+        let relative_directory = generate_path(parent_type.name, *client_field_name);
+
+        self.file_contents(&relative_directory)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct MutationReaderArtifactInfo<'schema> {
+    pub parent_type: &'schema ValidatedSchemaObject,
+    pub(crate) client_field_name: SelectableFieldName,
+    pub nested_client_field_artifact_imports: NestedClientFieldImports,
+    pub client_field_output_type: ClientFieldOutputType,
+    pub reader_ast: ReaderAst,
+    pub client_field_parameter_type: ClientFieldParameterType,
+    pub function_import_statement: ClientFieldFunctionImportStatement,
+}
+
+impl<'schema> MutationReaderArtifactInfo<'schema> {
+    pub fn path_and_content(self) -> Vec<PathAndContent> {
+        let MutationReaderArtifactInfo {
+            parent_type,
+            client_field_name,
+            ..
+        } = &self;
+
+        let relative_directory = generate_path(parent_type.name, *client_field_name);
+
+        self.file_contents(&relative_directory)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct RefetchEntrypointArtifactInfo {
     pub normalization_ast: NormalizationAst,
     pub query_text: QueryText,
     pub root_fetchable_field: SelectableFieldName,
@@ -831,9 +1124,9 @@ pub(crate) struct RefetchArtifactInfo {
     pub refetch_query_index: usize,
 }
 
-impl RefetchArtifactInfo {
+impl RefetchEntrypointArtifactInfo {
     pub fn path_and_content(self) -> PathAndContent {
-        let RefetchArtifactInfo {
+        let RefetchEntrypointArtifactInfo {
             root_fetchable_field,
             root_fetchable_field_parent_object,
             refetch_query_index,
@@ -891,7 +1184,7 @@ fn generate_refetch_query_artifact_imports(
         ));
     }
     output.push_str(&format!(
-        "const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [{}];",
+        "const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [{}];",
         array_syntax
     ));
     RefetchQueryArtifactImport(output)
@@ -1160,67 +1453,72 @@ fn print_non_null_type_annotation<T: Display>(non_null: &NonNullTypeAnnotation<T
     }
 }
 
-fn generate_function_import_statement(
-    variant: &ClientFieldVariant,
+fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctionImportStatement {
+    let content = format!(
+        "import {{ makeNetworkRequest, type IsographEnvironment }} \
+        from '@isograph/react';\n\
+        const resolver = (\n\
+        {}environment: IsographEnvironment,\n\
+        {}artifact: RefetchQueryNormalizationArtifact,\n\
+        {}variables: any\n\
+        ) => () => \
+        makeNetworkRequest(environment, artifact, variables);",
+        "  ", "  ", "  "
+    );
+    ClientFieldFunctionImportStatement(content)
+}
+
+fn generate_function_import_statement_for_mutation_reader(
+    m: &MutationFieldClientFieldVariant,
+) -> ClientFieldFunctionImportStatement {
+    let include_read_out_data = get_read_out_data(&m.field_map);
+    ClientFieldFunctionImportStatement(format!(
+        "{include_read_out_data}\n\
+        import {{ makeNetworkRequest, type IsographEnvironment }} from '@isograph/react';\n\
+        const resolver = (\n\
+        {}environment: IsographEnvironment,\n\
+        {}artifact: RefetchQueryNormalizationArtifact,\n\
+        {}readOutData: any,\n\
+        {}filteredVariables: any\n\
+        ) => (mutationParams: any) => {{\n\
+        {}const variables = includeReadOutData({{...filteredVariables, \
+        ...mutationParams}}, readOutData);\n\
+        {}makeNetworkRequest(environment, artifact, variables);\n\
+        }};\n\
+        ",
+        "  ", "  ", "  ", "  ", "  ", "  "
+    ))
+}
+
+fn generate_function_import_statement_for_eager_or_component(
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
+    (file_name, path): (ConstExportName, FilePath),
 ) -> ClientFieldFunctionImportStatement {
-    match variant {
-        ClientFieldVariant::Component((name, path)) | ClientFieldVariant::Eager((name, path))=> {
-            let path_to_client_field = project_root
-                .join(PathBuf::from_str(path.lookup()).expect(
-                    "paths should be legal here. This is indicative of a bug in Isograph.",
-                ));
-            let relative_path =
-                // artifact directory includes __isograph, so artifact_directory.join("Type/Field")
-                // is a directory "two levels deep" within the artifact_directory.
-                //
-                // So diff_paths(path_to_client_field, artifact_directory.join("Type/Field"))
-                // is a lazy way of saying "make a relative path from two levels deep in the artifact
-                // dir to the client field".
-                //
-                // Since we will always go ../../../ the Type/Field part will never show up
-                // in the output.
-                //
-                // Anyway, TODO do better.
-                pathdiff::diff_paths(path_to_client_field, artifact_directory.join("Type/Field"))
-                    .expect("Relative path should work");
-            ClientFieldFunctionImportStatement(format!(
-                "import {{ {name} as resolver }} from '{}';",
-                relative_path.to_str().expect("This path should be stringifiable. This probably is indicative of a bug in Relay.")
-            ))
-        }
-        ClientFieldVariant::RefetchField => ClientFieldFunctionImportStatement(format!(
-            "import {{ makeNetworkRequest, type IsographEnvironment, type IsographEntrypoint }} from '@isograph/react';\n\
-                const resolver = (\n\
-                {}environment: IsographEnvironment,\n\
-                {}artifact: IsographEntrypoint<any, any>,\n\
-                {}variables: any\n\
-                ) => () => \
-                makeNetworkRequest(environment, artifact, variables);",
-            "  ", "  ", "  "
-        )),
-        ClientFieldVariant::MutationField(ref m) => {
-            let spaces = "  ";
-            let include_read_out_data = get_read_out_data(&m.field_map);
-            ClientFieldFunctionImportStatement(format!(
-                "{include_read_out_data}\n\
-                import {{ makeNetworkRequest, type IsographEnvironment, type IsographEntrypoint }} from '@isograph/react';\n\
-                const resolver = (\n\
-                {}environment: IsographEnvironment,\n\
-                {}artifact: IsographEntrypoint<any, any>,\n\
-                {}readOutData: any,\n\
-                {}filteredVariables: any\n\
-                ) => (mutationParams: any) => {{\n\
-                {spaces}const variables = includeReadOutData({{...filteredVariables, \
-                ...mutationParams}}, readOutData);\n\
-                {spaces}makeNetworkRequest(environment, artifact, variables);\n\
-            }};\n\
-            ",
-                "  ", "  ", "  ", "  "
-            ))
-        }
-    }
+    let path_to_client_field = project_root.join(
+        PathBuf::from_str(path.lookup())
+            .expect("paths should be legal here. This is indicative of a bug in Isograph."),
+    );
+    let relative_path =
+        // artifact directory includes __isograph, so artifact_directory.join("Type/Field")
+        // is a directory "two levels deep" within the artifact_directory.
+        //
+        // So diff_paths(path_to_client_field, artifact_directory.join("Type/Field"))
+        // is a lazy way of saying "make a relative path from two levels deep in the artifact
+        // dir to the client field".
+        //
+        // Since we will always go ../../../ the Type/Field part will never show up
+        // in the output.
+        //
+        // Anyway, TODO do better.
+        pathdiff::diff_paths(path_to_client_field, artifact_directory.join("Type/Field"))
+            .expect("Relative path should work");
+    ClientFieldFunctionImportStatement(format!(
+        "import {{ {file_name} as resolver }} from '{}';",
+        relative_path.to_str().expect(
+            "This path should be stringifiable. This probably is indicative of a bug in Relay."
+        )
+    ))
 }
 
 fn get_read_out_data(field_map: &[FieldMapItem]) -> String {

@@ -1,8 +1,8 @@
-import type {IsographEntrypoint, NormalizationAst, RefetchQueryArtifactWrapper} from '@isograph/react';
+import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Query__nodeField__param} from './param_type';
 import {Query__nodeField__outputType} from './output_type';
 import readerResolver from './reader';
-const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [];
+const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
 const queryText = 'query nodeField ($id: ID!) {\
   node____id___v_id: node(id: $id) {\

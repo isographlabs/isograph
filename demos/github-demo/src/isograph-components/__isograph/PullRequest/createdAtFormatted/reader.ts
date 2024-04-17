@@ -1,6 +1,6 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { PullRequest__createdAtFormatted__param } from './param_type.ts';
-import { PullRequest__createdAtFormatted__outputType } from './output_type.ts';
+import type {EagerReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import { PullRequest__createdAtFormatted__param } from './param_type';
+import { PullRequest__createdAtFormatted__outputType } from './output_type';
 import { createdAtFormatted as resolver } from '../../../PullRequestTable.tsx';
 
 const readerAst: ReaderAst<PullRequest__createdAtFormatted__param> = [
@@ -12,15 +12,13 @@ const readerAst: ReaderAst<PullRequest__createdAtFormatted__param> = [
   },
 ];
 
-const artifact: ReaderArtifact<
+const artifact: EagerReaderArtifact<
   PullRequest__createdAtFormatted__param,
   PullRequest__createdAtFormatted__outputType
 > = {
-  kind: "ReaderArtifact",
-  fieldName: "createdAtFormatted",
-  resolver: resolver as any,
+  kind: "EagerReaderArtifact",
+  resolver,
   readerAst,
-  variant: { kind: "Eager" },
 };
 
 export default artifact;

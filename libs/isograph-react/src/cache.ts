@@ -24,6 +24,7 @@ import {
   NormalizationAst,
   NormalizationLinkedField,
   NormalizationScalarField,
+  RefetchQueryNormalizationArtifact,
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
 import { ReaderLinkedField, ReaderScalarField } from './reader';
@@ -79,8 +80,6 @@ export function stableCopy<T>(value: T): T {
   return stable as any;
 }
 
-type IsoResolver = IsographEntrypoint<any, any>;
-
 export function getOrCreateCacheForArtifact<
   TReadFromStore extends Object,
   TClientFieldValue,
@@ -113,7 +112,7 @@ type NetworkRequestStatus =
 
 export function makeNetworkRequest<T>(
   environment: IsographEnvironment,
-  artifact: IsoResolver,
+  artifact: RefetchQueryNormalizationArtifact | IsographEntrypoint<any, any>,
   variables: object,
 ): ItemCleanupPair<PromiseWrapper<T>> {
   if (typeof window !== 'undefined' && window.__LOG) {
@@ -136,7 +135,7 @@ export function makeNetworkRequest<T>(
           artifact.normalizationAst,
           networkResponse.data,
           variables,
-          artifact.nestedRefetchQueries,
+          artifact.kind === 'Entrypoint' ? artifact.nestedRefetchQueries : [],
         );
         const retainedQuery = {
           normalizationAst: artifact.normalizationAst,

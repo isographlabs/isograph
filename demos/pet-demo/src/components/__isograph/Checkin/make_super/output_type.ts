@@ -1,13 +1,13 @@
-import type {ExtractSecondParam} from '@isograph/react';
+import { RefetchQueryNormalizationArtifact } from '@isograph/react';
 const includeReadOutData = (variables: any, readOutData: any) => {
   variables.checkin_id = readOutData.id;
   return variables;
 };
 
-import { makeNetworkRequest, type IsographEnvironment, type IsographEntrypoint } from '@isograph/react';
+import { makeNetworkRequest, type IsographEnvironment } from '@isograph/react';
 const resolver = (
   environment: IsographEnvironment,
-  artifact: IsographEntrypoint<any, any>,
+  artifact: RefetchQueryNormalizationArtifact,
   readOutData: any,
   filteredVariables: any
 ) => (mutationParams: any) => {
@@ -15,5 +15,4 @@ const resolver = (
   makeNetworkRequest(environment, artifact, variables);
 };
 
-// the type, when read out (either via useLazyReference or via graph)
 export type Checkin__make_super__outputType = (params: any) => void;

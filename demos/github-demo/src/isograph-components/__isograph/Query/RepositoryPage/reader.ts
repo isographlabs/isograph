@@ -1,6 +1,5 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Query__RepositoryPage__param } from './param_type.ts';
-import { Query__RepositoryPage__outputType } from './output_type.ts';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import { Query__RepositoryPage__param } from './param_type';
 import { RepositoryPage as resolver } from '../../../RepositoryRoute.tsx';
 import Query__Header from '../Header/reader';
 import Query__RepositoryDetail from '../RepositoryDetail/reader';
@@ -22,15 +21,14 @@ const readerAst: ReaderAst<Query__RepositoryPage__param> = [
   },
 ];
 
-const artifact: ReaderArtifact<
+const artifact: ComponentReaderArtifact<
   Query__RepositoryPage__param,
-  Query__RepositoryPage__outputType
+  ExtractSecondParam<typeof resolver>
 > = {
-  kind: "ReaderArtifact",
-  fieldName: "RepositoryPage",
-  resolver: resolver as any,
+  kind: "ComponentReaderArtifact",
+  componentName: "Query.RepositoryPage",
+  resolver,
   readerAst,
-  variant: { kind: "Component", componentName: "Query.RepositoryPage" },
 };
 
 export default artifact;

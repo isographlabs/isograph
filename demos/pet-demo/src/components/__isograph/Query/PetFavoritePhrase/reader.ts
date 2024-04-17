@@ -1,6 +1,5 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Query__PetFavoritePhrase__param } from './param_type.ts';
-import { Query__PetFavoritePhrase__outputType } from './output_type.ts';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import { Query__PetFavoritePhrase__param } from './param_type';
 import { PetFavoritePhrase as resolver } from '../../../FavoritePhrase.tsx';
 
 const readerAst: ReaderAst<Query__PetFavoritePhrase__param> = [
@@ -31,15 +30,14 @@ const readerAst: ReaderAst<Query__PetFavoritePhrase__param> = [
   },
 ];
 
-const artifact: ReaderArtifact<
+const artifact: ComponentReaderArtifact<
   Query__PetFavoritePhrase__param,
-  Query__PetFavoritePhrase__outputType
+  ExtractSecondParam<typeof resolver>
 > = {
-  kind: "ReaderArtifact",
-  fieldName: "PetFavoritePhrase",
-  resolver: resolver as any,
+  kind: "ComponentReaderArtifact",
+  componentName: "Query.PetFavoritePhrase",
+  resolver,
   readerAst,
-  variant: { kind: "Component", componentName: "Query.PetFavoritePhrase" },
 };
 
 export default artifact;

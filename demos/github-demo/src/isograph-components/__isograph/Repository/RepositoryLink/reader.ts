@@ -1,6 +1,5 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Repository__RepositoryLink__param } from './param_type.ts';
-import { Repository__RepositoryLink__outputType } from './output_type.ts';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import { Repository__RepositoryLink__param } from './param_type';
 import { RepositoryLink as resolver } from '../../../RepositoryLink.tsx';
 
 const readerAst: ReaderAst<Repository__RepositoryLink__param> = [
@@ -32,15 +31,14 @@ const readerAst: ReaderAst<Repository__RepositoryLink__param> = [
   },
 ];
 
-const artifact: ReaderArtifact<
+const artifact: ComponentReaderArtifact<
   Repository__RepositoryLink__param,
-  Repository__RepositoryLink__outputType
+  ExtractSecondParam<typeof resolver>
 > = {
-  kind: "ReaderArtifact",
-  fieldName: "RepositoryLink",
-  resolver: resolver as any,
+  kind: "ComponentReaderArtifact",
+  componentName: "Repository.RepositoryLink",
+  resolver,
   readerAst,
-  variant: { kind: "Component", componentName: "Repository.RepositoryLink" },
 };
 
 export default artifact;

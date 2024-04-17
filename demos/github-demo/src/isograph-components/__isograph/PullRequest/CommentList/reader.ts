@@ -1,6 +1,5 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { PullRequest__CommentList__param } from './param_type.ts';
-import { PullRequest__CommentList__outputType } from './output_type.ts';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import { PullRequest__CommentList__param } from './param_type';
 import { CommentList as resolver } from '../../../CommentList.tsx';
 import IssueComment__formattedCommentCreationDate from '../../IssueComment/formattedCommentCreationDate/reader';
 
@@ -69,15 +68,14 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
   },
 ];
 
-const artifact: ReaderArtifact<
+const artifact: ComponentReaderArtifact<
   PullRequest__CommentList__param,
-  PullRequest__CommentList__outputType
+  ExtractSecondParam<typeof resolver>
 > = {
-  kind: "ReaderArtifact",
-  fieldName: "CommentList",
-  resolver: resolver as any,
+  kind: "ComponentReaderArtifact",
+  componentName: "PullRequest.CommentList",
+  resolver,
   readerAst,
-  variant: { kind: "Component", componentName: "PullRequest.CommentList" },
 };
 
 export default artifact;

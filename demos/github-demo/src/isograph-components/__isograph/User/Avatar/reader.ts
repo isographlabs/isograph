@@ -1,6 +1,5 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { User__Avatar__param } from './param_type.ts';
-import { User__Avatar__outputType } from './output_type.ts';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import { User__Avatar__param } from './param_type';
 import { Avatar as resolver } from '../../../avatar.tsx';
 
 const readerAst: ReaderAst<User__Avatar__param> = [
@@ -18,15 +17,14 @@ const readerAst: ReaderAst<User__Avatar__param> = [
   },
 ];
 
-const artifact: ReaderArtifact<
+const artifact: ComponentReaderArtifact<
   User__Avatar__param,
-  User__Avatar__outputType
+  ExtractSecondParam<typeof resolver>
 > = {
-  kind: "ReaderArtifact",
-  fieldName: "Avatar",
-  resolver: resolver as any,
+  kind: "ComponentReaderArtifact",
+  componentName: "User.Avatar",
+  resolver,
   readerAst,
-  variant: { kind: "Component", componentName: "User.Avatar" },
 };
 
 export default artifact;

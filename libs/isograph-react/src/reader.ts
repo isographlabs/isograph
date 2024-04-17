@@ -1,18 +1,63 @@
-import { ComponentOrFieldName } from './IsographEnvironment';
+import {
+  ComponentOrFieldName,
+  IsographEnvironment,
+} from './IsographEnvironment';
+import { RefetchQueryNormalizationArtifact } from './entrypoint';
 import { Arguments } from './util';
 
-// TODO this should probably be at least three distinct types, for @component,
-// non-@component and refetch resolvers
-export type ReaderArtifact<TReadFromStore extends Object, TClientFieldValue> = {
-  readonly kind: 'ReaderArtifact';
-  readonly fieldName: ComponentOrFieldName;
+export type TopLevelReaderArtifact<
+  TReadFromStore extends Object,
+  TClientFieldValue,
+  TAdditionalProps extends Record<string, never>,
+> =
+  | EagerReaderArtifact<TReadFromStore, TClientFieldValue>
+  | ComponentReaderArtifact<TReadFromStore, TAdditionalProps>;
+
+export type EagerReaderArtifact<
+  TReadFromStore extends Object,
+  TClientFieldValue,
+> = {
+  readonly kind: 'EagerReaderArtifact';
   readonly readerAst: ReaderAst<TReadFromStore>;
-  // TODO move resolver into the variant
+  readonly resolver: (data: TReadFromStore) => TClientFieldValue;
+};
+
+export type ComponentReaderArtifact<
+  TReadFromStore extends Object,
+  TAdditionalProps extends Record<string, unknown> = Record<string, never>,
+> = {
+  readonly kind: 'ComponentReaderArtifact';
+  readonly componentName: ComponentOrFieldName;
+  readonly readerAst: ReaderAst<TReadFromStore>;
   readonly resolver: (
     data: TReadFromStore,
-    runtimeProps: any,
-  ) => TClientFieldValue;
-  readonly variant: ReaderResolverVariant;
+    runtimeProps: TAdditionalProps,
+  ) => React.ReactNode;
+};
+
+export type RefetchReaderArtifact = {
+  readonly kind: 'RefetchReaderArtifact';
+  readonly readerAst: ReaderAst<unknown>;
+  readonly resolver: (
+    environment: IsographEnvironment,
+    artifact: RefetchQueryNormalizationArtifact,
+    // TODO type this better
+    variables: any,
+  ) => () => void;
+};
+
+export type MutationReaderArtifact<TReadFromStore extends Object> = {
+  readonly kind: 'MutationReaderArtifact';
+  readonly readerAst: ReaderAst<unknown>;
+  readonly resolver: (
+    environment: IsographEnvironment,
+    // TODO type this better
+    entrypoint: RefetchQueryNormalizationArtifact,
+    readOutData: TReadFromStore,
+    // TODO type this better
+    filteredVariables: any,
+    // TODO type this better
+  ) => (mutationParams: any) => void;
 };
 
 export type ReaderAstNode =
@@ -47,7 +92,8 @@ export type ReaderResolverVariant =
 export type ReaderResolverField = {
   readonly kind: 'Resolver';
   readonly alias: string;
-  readonly readerArtifact: ReaderArtifact<any, any>;
+  // TODO don't type this as any
+  readonly readerArtifact: TopLevelReaderArtifact<any, any, any>;
   readonly arguments: Arguments | null;
   readonly usedRefetchQueries: number[];
 };
@@ -55,15 +101,14 @@ export type ReaderResolverField = {
 export type ReaderRefetchField = {
   readonly kind: 'RefetchField';
   readonly alias: string;
-  // TODO this bad modeling. A refetch field cannot have variant: "Component" (I think)
-  readonly readerArtifact: ReaderArtifact<any, any>;
+  readonly readerArtifact: RefetchReaderArtifact;
   readonly refetchQuery: number;
 };
 
 export type ReaderMutationField = {
   readonly kind: 'MutationField';
   readonly alias: string;
-  // TODO this bad modeling. A mutation field cannot have variant: "Component" (I think)
-  readonly readerArtifact: ReaderArtifact<any, any>;
+  // TODO don't pass any here
+  readonly readerArtifact: MutationReaderArtifact<any>;
   readonly refetchQuery: number;
 };

@@ -1,6 +1,6 @@
 import { DataId } from './IsographEnvironment';
 import { RefetchQueryNormalizationArtifactWrapper } from './entrypoint';
-import { ReaderArtifact } from './reader';
+import { TopLevelReaderArtifact } from './reader';
 
 // TODO type this better
 export type Variable = any;
@@ -12,7 +12,11 @@ export type FragmentReference<
   TClientFieldValue,
 > = {
   readonly kind: 'FragmentReference';
-  readonly readerArtifact: ReaderArtifact<TReadFromStore, TClientFieldValue>;
+  readonly readerArtifact: TopLevelReaderArtifact<
+    TReadFromStore,
+    TClientFieldValue,
+    any
+  >;
   readonly root: DataId;
   readonly variables: Variables | null;
   // TODO: We should instead have ReaderAst<TClientFieldProps>

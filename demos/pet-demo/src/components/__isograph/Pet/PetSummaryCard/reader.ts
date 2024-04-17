@@ -1,6 +1,5 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Pet__PetSummaryCard__param } from './param_type.ts';
-import { Pet__PetSummaryCard__outputType } from './output_type.ts';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import { Pet__PetSummaryCard__param } from './param_type';
 import { PetSummaryCard as resolver } from '../../../PetSummaryCard.tsx';
 import Pet__FavoritePhraseLoader from '../FavoritePhraseLoader/reader';
 
@@ -38,15 +37,14 @@ const readerAst: ReaderAst<Pet__PetSummaryCard__param> = [
   },
 ];
 
-const artifact: ReaderArtifact<
+const artifact: ComponentReaderArtifact<
   Pet__PetSummaryCard__param,
-  Pet__PetSummaryCard__outputType
+  ExtractSecondParam<typeof resolver>
 > = {
-  kind: "ReaderArtifact",
-  fieldName: "PetSummaryCard",
-  resolver: resolver as any,
+  kind: "ComponentReaderArtifact",
+  componentName: "Pet.PetSummaryCard",
+  resolver,
   readerAst,
-  variant: { kind: "Component", componentName: "Pet.PetSummaryCard" },
 };
 
 export default artifact;

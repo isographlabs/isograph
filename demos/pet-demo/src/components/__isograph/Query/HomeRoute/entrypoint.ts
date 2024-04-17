@@ -1,8 +1,8 @@
-import type {IsographEntrypoint, NormalizationAst, RefetchQueryArtifactWrapper} from '@isograph/react';
+import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Query__HomeRoute__param} from './param_type';
 import {Query__HomeRoute__outputType} from './output_type';
 import readerResolver from './reader';
-const nestedRefetchQueries: RefetchQueryArtifactWrapper[] = [];
+const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
 const queryText = 'query HomeRoute  {\
   pets {\

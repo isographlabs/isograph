@@ -4,12 +4,13 @@ use common_lang_types::{
     ArtifactFileType, IsographObjectTypeName, PathAndContent, SelectableFieldName,
 };
 use intern::string_key::Intern;
-use isograph_schema::{ClientFieldVariant, ObjectTypeAndFieldNames};
+use isograph_schema::ObjectTypeAndFieldNames;
 use lazy_static::lazy_static;
 
 use crate::generate_artifacts::{
-    ClientFieldOutputType, EntrypointArtifactInfo, JavaScriptImports, ReaderArtifactInfo,
-    RefetchArtifactInfo,
+    ClientFieldFunctionImportStatement, ClientFieldOutputType, ComponentReaderArtifactInfo,
+    EagerReaderArtifactInfo, EntrypointArtifactInfo, JavaScriptImports, MutationReaderArtifactInfo,
+    RefetchEntrypointArtifactInfo, RefetchReaderArtifactInfo,
 };
 
 lazy_static! {
@@ -35,7 +36,7 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             format!("{}__{}__outputType", parent_type.name, query_name);
         format!(
             "import type {{IsographEntrypoint, \
-            NormalizationAst, RefetchQueryArtifactWrapper}} from '@isograph/react';\n\
+            NormalizationAst, RefetchQueryNormalizationArtifactWrapper}} from '@isograph/react';\n\
             import {{{entrypoint_params_typename}}} from './param_type';\n\
             import {{{entrypoint_output_type_name}}} from './output_type';\n\
             import readerResolver from './reader';\n\
@@ -58,16 +59,15 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
     }
 }
 
-impl<'schema> ReaderArtifactInfo<'schema> {
+impl<'schema> EagerReaderArtifactInfo<'schema> {
     pub(crate) fn file_contents(self, relative_directory: &PathBuf) -> Vec<PathAndContent> {
-        let ReaderArtifactInfo {
+        let EagerReaderArtifactInfo {
             function_import_statement,
             client_field_parameter_type,
             client_field_output_type,
             reader_ast,
             nested_client_field_artifact_imports,
             parent_type,
-            client_field_variant,
             client_field_name,
             ..
         } = self;
@@ -79,41 +79,107 @@ impl<'schema> ReaderArtifactInfo<'schema> {
             );
 
         let output_type_text = get_output_type_text(
+            &function_import_statement,
             parent_type.name,
             client_field_name,
             client_field_output_type,
         );
 
-        // We are not modeling this well, I think.
         let parent_name = parent_type.name;
-        let variant = match client_field_variant {
-            ClientFieldVariant::Component(_) => {
-                format!("{{ kind: \"Component\", componentName: \"{parent_name}.{client_field_name}\" }}")
-            }
-            _ => "{ kind: \"Eager\" }".to_string(),
-        };
         let reader_param_type = format!("{parent_name}__{client_field_name}__param");
         let reader_output_type = format!("{parent_name}__{client_field_name}__outputType");
 
         let reader_content = format!(
-            "import type {{ReaderArtifact, ReaderAst}} from '@isograph/react';\n\
-            import {{ {reader_param_type} }} from './param_type.ts';\n\
-            import {{ {reader_output_type} }} from './output_type.ts';\n\
+            "import type {{EagerReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact}} from '@isograph/react';\n\
+            import {{ {reader_param_type} }} from './param_type';\n\
+            import {{ {reader_output_type} }} from './output_type';\n\
             {function_import_statement}\n\
             {client_field_import_statement}\n\
             const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
-            const artifact: ReaderArtifact<\n\
+            const artifact: EagerReaderArtifact<\n\
             {}{reader_param_type},\n\
             {}{reader_output_type}\n\
             > = {{\n\
-            {}kind: \"ReaderArtifact\",\n\
-            {}fieldName: \"{client_field_name}\",\n\
-            {}resolver: resolver as any,\n\
+            {}kind: \"EagerReaderArtifact\",\n\
+            {}resolver,\n\
             {}readerAst,\n\
-            {}variant: {variant},\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ", "  ",
+            "  ", "  ", "  ", "  ", "  ",
+        );
+
+        let param_type_content = format!(
+            "{client_field_type_import_statement}\n\
+            export type {reader_param_type} = {client_field_parameter_type};\n",
+        );
+
+        vec![
+            PathAndContent {
+                relative_directory: relative_directory.clone(),
+                file_name_prefix: *READER,
+                file_content: reader_content,
+            },
+            PathAndContent {
+                relative_directory: relative_directory.clone(),
+                file_name_prefix: *READER_PARAM_TYPE,
+                file_content: param_type_content,
+            },
+            PathAndContent {
+                relative_directory: relative_directory.clone(),
+                file_name_prefix: *READER_OUTPUT_TYPE,
+                file_content: output_type_text,
+            },
+        ]
+    }
+}
+
+impl<'schema> ComponentReaderArtifactInfo<'schema> {
+    pub(crate) fn file_contents(self, relative_directory: &PathBuf) -> Vec<PathAndContent> {
+        let ComponentReaderArtifactInfo {
+            function_import_statement,
+            client_field_parameter_type,
+            client_field_output_type,
+            reader_ast,
+            nested_client_field_artifact_imports,
+            parent_type,
+            client_field_name,
+            ..
+        } = self;
+
+        let (client_field_import_statement, client_field_type_import_statement) =
+            nested_client_field_names_to_import_statement(
+                nested_client_field_artifact_imports,
+                parent_type.name,
+            );
+
+        let output_type_text = get_output_type_text(
+            &function_import_statement,
+            parent_type.name,
+            client_field_name,
+            client_field_output_type,
+        );
+
+        let parent_name = parent_type.name;
+        let reader_param_type = format!("{parent_name}__{client_field_name}__param");
+        let component_name = format!("{}.{}", parent_name, client_field_name);
+
+        let reader_content = format!(
+            "import type {{ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact}} from '@isograph/react';\n\
+            import {{ {reader_param_type} }} from './param_type';\n\
+            {function_import_statement}\n\
+            {client_field_import_statement}\n\
+            const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
+            const artifact: ComponentReaderArtifact<\n\
+            {}{reader_param_type},\n\
+            {}ExtractSecondParam<typeof resolver>\n\
+            > = {{\n\
+            {}kind: \"ComponentReaderArtifact\",\n\
+            {}componentName: \"{component_name}\",\n\
+            {}resolver,\n\
+            {}readerAst,\n\
+            }};\n\n\
+            export default artifact;\n",
+            "  ", "  ", "  ", "  ", "  ", "  ",
         );
 
         let param_type_content = format!(
@@ -122,8 +188,7 @@ impl<'schema> ReaderArtifactInfo<'schema> {
         );
 
         let output_type_content = format!(
-            "import type {{ExtractSecondParam}} from '@isograph/react';\n\
-            {function_import_statement}\n\
+            "import type {{ExtractSecondParam, RefetchQueryNormalizationArtifact}} from '@isograph/react';\n\
             {output_type_text}\n",
         );
 
@@ -147,16 +212,164 @@ impl<'schema> ReaderArtifactInfo<'schema> {
     }
 }
 
-impl RefetchArtifactInfo {
+impl<'schema> RefetchReaderArtifactInfo<'schema> {
+    pub(crate) fn file_contents(self, relative_directory: &PathBuf) -> Vec<PathAndContent> {
+        let RefetchReaderArtifactInfo {
+            function_import_statement,
+            client_field_parameter_type,
+            client_field_output_type,
+            reader_ast,
+            nested_client_field_artifact_imports,
+            parent_type,
+            client_field_name,
+            ..
+        } = self;
+
+        let (client_field_import_statement, client_field_type_import_statement) =
+            nested_client_field_names_to_import_statement(
+                nested_client_field_artifact_imports,
+                parent_type.name,
+            );
+
+        let output_type_text = get_output_type_text(
+            &function_import_statement,
+            parent_type.name,
+            client_field_name,
+            client_field_output_type,
+        );
+        let output_type_text = format!(
+            "import {{ RefetchQueryNormalizationArtifact }} from '@isograph/react';\n\
+            {output_type_text}"
+        );
+
+        let parent_name = parent_type.name;
+        let reader_param_type = format!("{parent_name}__{client_field_name}__param");
+
+        let reader_content = format!(
+            "import type {{RefetchReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact}} from '@isograph/react';\n\
+            import {{ {reader_param_type} }} from './param_type';\n\
+            {function_import_statement}\n\
+            {client_field_import_statement}\n\
+            const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
+            const artifact: RefetchReaderArtifact = {{\n\
+            {}kind: \"RefetchReaderArtifact\",\n\
+            {}resolver,\n\
+            {}readerAst,\n\
+            }};\n\n\
+            export default artifact;\n",
+            "  ", "  ", "  ", 
+        );
+
+        let param_type_content = format!(
+            "{client_field_type_import_statement}\n\
+            export type {reader_param_type} = {client_field_parameter_type};\n",
+        );
+
+        vec![
+            PathAndContent {
+                relative_directory: relative_directory.clone(),
+                file_name_prefix: *READER,
+                file_content: reader_content,
+            },
+            PathAndContent {
+                relative_directory: relative_directory.clone(),
+                file_name_prefix: *READER_PARAM_TYPE,
+                file_content: param_type_content,
+            },
+            PathAndContent {
+                relative_directory: relative_directory.clone(),
+                file_name_prefix: *READER_OUTPUT_TYPE,
+                file_content: output_type_text,
+            },
+        ]
+    }
+}
+
+impl<'schema> MutationReaderArtifactInfo<'schema> {
+    pub(crate) fn file_contents(self, relative_directory: &PathBuf) -> Vec<PathAndContent> {
+        let MutationReaderArtifactInfo {
+            function_import_statement,
+            client_field_parameter_type,
+            client_field_output_type,
+            reader_ast,
+            nested_client_field_artifact_imports,
+            parent_type,
+            client_field_name,
+            ..
+        } = self;
+
+        let (client_field_import_statement, client_field_type_import_statement) =
+            nested_client_field_names_to_import_statement(
+                nested_client_field_artifact_imports,
+                parent_type.name,
+            );
+
+        let output_type_text = get_output_type_text(
+            &function_import_statement,
+            parent_type.name,
+            client_field_name,
+            client_field_output_type,
+        );
+        let output_type_text = format!(
+            "import {{ RefetchQueryNormalizationArtifact }} from '@isograph/react';\n\
+            {output_type_text}"
+        );
+
+        let parent_name = parent_type.name;
+        let reader_param_type = format!("{parent_name}__{client_field_name}__param");
+
+        let reader_content = format!(
+            "import type {{MutationReaderArtifact, RefetchQueryNormalizationArtifact, ReaderAst}} from '@isograph/react';\n\
+            import {{ {reader_param_type} }} from './param_type';\n\
+            {function_import_statement}\n\
+            {client_field_import_statement}\n\
+            const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
+            const artifact: MutationReaderArtifact<\n\
+            {}{reader_param_type}\n\
+            > = {{\n\
+            {}kind: \"MutationReaderArtifact\",\n\
+            {}resolver,\n\
+            {}readerAst,\n\
+            }};\n\n\
+            export default artifact;\n",
+            "  ", "  ", "  ", "  ",
+        );
+
+        let param_type_content = format!(
+            "{client_field_type_import_statement}\n\
+            export type {reader_param_type} = {client_field_parameter_type};\n",
+        );
+
+        vec![
+            PathAndContent {
+                relative_directory: relative_directory.clone(),
+                file_name_prefix: *READER,
+                file_content: reader_content,
+            },
+            PathAndContent {
+                relative_directory: relative_directory.clone(),
+                file_name_prefix: *READER_PARAM_TYPE,
+                file_content: param_type_content,
+            },
+            PathAndContent {
+                relative_directory: relative_directory.clone(),
+                file_name_prefix: *READER_OUTPUT_TYPE,
+                file_content: output_type_text,
+            },
+        ]
+    }
+}
+
+impl RefetchEntrypointArtifactInfo {
     pub(crate) fn file_contents(self) -> String {
-        let RefetchArtifactInfo {
+        let RefetchEntrypointArtifactInfo {
             normalization_ast,
             query_text,
             ..
         } = self;
 
         format!(
-            "import type {{IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst}} from '@isograph/react';\n\
+            "import type {{IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact}} from '@isograph/react';\n\
             const queryText = '{query_text}';\n\n\
             const normalizationAst: NormalizationAst = {normalization_ast};\n\
             const artifact: any = {{\n\
@@ -240,12 +453,14 @@ fn write_client_field_import(
     client_field_type_import_statement.push_str(&s_client_field_type_import);
 }
 fn get_output_type_text(
+    function_import_statement: &ClientFieldFunctionImportStatement,
     parent_type_name: IsographObjectTypeName,
     field_name: SelectableFieldName,
     output_type: ClientFieldOutputType,
 ) -> String {
+    let function_import_statement = &function_import_statement.0;
     format!(
-        "// the type, when read out (either via useLazyReference or via graph)\n\
+        "{function_import_statement}\n\
         export type {}__{}__outputType = {};",
         parent_type_name, field_name, output_type
     )

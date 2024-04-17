@@ -1,6 +1,5 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Actor__UserLink__param } from './param_type.ts';
-import { Actor__UserLink__outputType } from './output_type.ts';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import { Actor__UserLink__param } from './param_type';
 import { UserLink as resolver } from '../../../UserLink.tsx';
 
 const readerAst: ReaderAst<Actor__UserLink__param> = [
@@ -12,15 +11,14 @@ const readerAst: ReaderAst<Actor__UserLink__param> = [
   },
 ];
 
-const artifact: ReaderArtifact<
+const artifact: ComponentReaderArtifact<
   Actor__UserLink__param,
-  Actor__UserLink__outputType
+  ExtractSecondParam<typeof resolver>
 > = {
-  kind: "ReaderArtifact",
-  fieldName: "UserLink",
-  resolver: resolver as any,
+  kind: "ComponentReaderArtifact",
+  componentName: "Actor.UserLink",
+  resolver,
   readerAst,
-  variant: { kind: "Component", componentName: "Actor.UserLink" },
 };
 
 export default artifact;

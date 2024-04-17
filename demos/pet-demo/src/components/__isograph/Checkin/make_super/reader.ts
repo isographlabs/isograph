@@ -1,15 +1,14 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Checkin__make_super__param } from './param_type.ts';
-import { Checkin__make_super__outputType } from './output_type.ts';
+import type {MutationReaderArtifact, RefetchQueryNormalizationArtifact, ReaderAst} from '@isograph/react';
+import { Checkin__make_super__param } from './param_type';
 const includeReadOutData = (variables: any, readOutData: any) => {
   variables.checkin_id = readOutData.id;
   return variables;
 };
 
-import { makeNetworkRequest, type IsographEnvironment, type IsographEntrypoint } from '@isograph/react';
+import { makeNetworkRequest, type IsographEnvironment } from '@isograph/react';
 const resolver = (
   environment: IsographEnvironment,
-  artifact: IsographEntrypoint<any, any>,
+  artifact: RefetchQueryNormalizationArtifact,
   readOutData: any,
   filteredVariables: any
 ) => (mutationParams: any) => {
@@ -27,15 +26,12 @@ const readerAst: ReaderAst<Checkin__make_super__param> = [
   },
 ];
 
-const artifact: ReaderArtifact<
-  Checkin__make_super__param,
-  Checkin__make_super__outputType
+const artifact: MutationReaderArtifact<
+  Checkin__make_super__param
 > = {
-  kind: "ReaderArtifact",
-  fieldName: "make_super",
-  resolver: resolver as any,
+  kind: "MutationReaderArtifact",
+  resolver,
   readerAst,
-  variant: { kind: "Eager" },
 };
 
 export default artifact;

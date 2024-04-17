@@ -1,6 +1,5 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Query__Header__param } from './param_type.ts';
-import { Query__Header__outputType } from './output_type.ts';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import { Query__Header__param } from './param_type';
 import { Header as resolver } from '../../../header.tsx';
 import User__Avatar from '../../User/Avatar/reader';
 
@@ -28,15 +27,14 @@ const readerAst: ReaderAst<Query__Header__param> = [
   },
 ];
 
-const artifact: ReaderArtifact<
+const artifact: ComponentReaderArtifact<
   Query__Header__param,
-  Query__Header__outputType
+  ExtractSecondParam<typeof resolver>
 > = {
-  kind: "ReaderArtifact",
-  fieldName: "Header",
-  resolver: resolver as any,
+  kind: "ComponentReaderArtifact",
+  componentName: "Query.Header",
+  resolver,
   readerAst,
-  variant: { kind: "Component", componentName: "Query.Header" },
 };
 
 export default artifact;

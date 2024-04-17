@@ -1,4 +1,4 @@
-import type {IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst} from '@isograph/react';
+import type {IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 const queryText = 'query User_refetch ($first: Int!, $id: ID!) { node____id___id: node(id: $id) { ... on User { \
   login,\
   avatarUrl,\

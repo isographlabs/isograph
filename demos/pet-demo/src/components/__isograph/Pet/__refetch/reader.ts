@@ -1,10 +1,9 @@
-import type {ReaderArtifact, ReaderAst} from '@isograph/react';
-import { Pet____refetch__param } from './param_type.ts';
-import { Pet____refetch__outputType } from './output_type.ts';
-import { makeNetworkRequest, type IsographEnvironment, type IsographEntrypoint } from '@isograph/react';
+import type {RefetchReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import { Pet____refetch__param } from './param_type';
+import { makeNetworkRequest, type IsographEnvironment } from '@isograph/react';
 const resolver = (
   environment: IsographEnvironment,
-  artifact: IsographEntrypoint<any, any>,
+  artifact: RefetchQueryNormalizationArtifact,
   variables: any
 ) => () => makeNetworkRequest(environment, artifact, variables);
 
@@ -17,15 +16,10 @@ const readerAst: ReaderAst<Pet____refetch__param> = [
   },
 ];
 
-const artifact: ReaderArtifact<
-  Pet____refetch__param,
-  Pet____refetch__outputType
-> = {
-  kind: "ReaderArtifact",
-  fieldName: "__refetch",
-  resolver: resolver as any,
+const artifact: RefetchReaderArtifact = {
+  kind: "RefetchReaderArtifact",
+  resolver,
   readerAst,
-  variant: { kind: "Eager" },
 };
 
 export default artifact;
