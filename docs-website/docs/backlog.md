@@ -182,3 +182,7 @@ set_foo {
 - ability to pass a parameter down to the child, e.g. an abstract component can read from its concrete parent an object that implements a given interface. e.g. in order to implement Node, you must implement an id field.
 - exposeField errors are pretty bad right now
 - date transformations and other types
+- client links that return an ID from the original data
+  - use generics to enforce this e.g. require a function of `(data: Data<TIDType>) => TIDType`. So you can't return shit from anywhere else.
+  - opt into non-waterfall behavior for these
+  - just for fun, in unit tests, we can make the id type an object instead of a string.
