@@ -1,7 +1,7 @@
 use common_lang_types::{
-    ConstExportName, FieldArgumentName, FieldNameOrAlias, FilePath, HasName, IsographDirectiveName,
-    LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName, SelectableFieldName,
-    UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
+    ConstExportName, DescriptionValue, FieldArgumentName, FieldNameOrAlias, FilePath, HasName,
+    IsographDirectiveName, LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName,
+    SelectableFieldName, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 
@@ -21,6 +21,7 @@ pub struct ClientFieldDeclaration {
     pub const_export_name: ConstExportName,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub client_field_name: WithSpan<ScalarFieldName>,
+    pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set_and_unwraps:
         Option<(Vec<WithSpan<UnvalidatedSelection>>, Vec<WithSpan<Unwrap>>)>,
     pub directives: Vec<WithSpan<FragmentDirectiveUsage>>,

@@ -120,7 +120,6 @@ fn parse_client_field_declaration_inner<'a>(
 ) -> ParseResultWithSpan<WithSpan<ClientFieldDeclaration>> {
     let client_field_declaration = tokens
         .with_span(|tokens| {
-            let _description = parse_optional_description(tokens)?;
             let parent_type = tokens
                 .parse_string_key_type(IsographLangTokenKind::Identifier)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
@@ -136,6 +135,8 @@ fn parse_client_field_declaration_inner<'a>(
             let variable_definitions = parse_variable_definitions(tokens, text_source)?;
 
             let directives = parse_directives(tokens)?;
+
+            let description = parse_optional_description(tokens);
 
             let selection_set_and_unwraps = parse_selection_set_and_unwraps(tokens, text_source)?;
 
@@ -157,6 +158,7 @@ fn parse_client_field_declaration_inner<'a>(
             Ok(ClientFieldDeclaration {
                 parent_type,
                 client_field_name,
+                description,
                 selection_set_and_unwraps,
                 definition_path: definition_file_path,
                 directives,

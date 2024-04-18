@@ -86,7 +86,7 @@ impl UnvalidatedSchema {
         let variant = get_client_variant(&client_field_declaration.item);
 
         self.client_fields.push(ClientField {
-            description: None,
+            description: client_field_declaration.item.description.map(|x| x.item),
             name,
             id: next_client_field_id,
             selection_set_and_unwraps: client_field_declaration.item.selection_set_and_unwraps,

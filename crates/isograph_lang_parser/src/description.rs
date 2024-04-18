@@ -4,24 +4,12 @@ use intern::string_key::Intern;
 
 use common_lang_types::{DescriptionValue, WithSpan};
 
-use crate::{IsographLangTokenKind, IsographLiteralParseError, ParseResultWithSpan, PeekableLexer};
+use crate::{IsographLangTokenKind, PeekableLexer};
 
 pub(crate) fn parse_optional_description(
     tokens: &mut PeekableLexer,
-) -> ParseResultWithSpan<Option<WithSpan<DescriptionValue>>> {
-    // descriptions break the babel plugin and the generated
-    // type refinements.
-    // TODO handle descriptions and re-enable them
-    let disallowed_description =
-        parse_single_line_description(tokens).or_else(|| parse_multiline_description(tokens));
-
-    match disallowed_description {
-        Some(description) => Err(WithSpan::new(
-            IsographLiteralParseError::DescriptionsAreDisallowed,
-            description.span,
-        )),
-        None => Ok(None),
-    }
+) -> Option<WithSpan<DescriptionValue>> {
+    parse_single_line_description(tokens).or_else(|| parse_multiline_description(tokens))
 }
 
 fn parse_multiline_description(tokens: &mut PeekableLexer) -> Option<WithSpan<DescriptionValue>> {

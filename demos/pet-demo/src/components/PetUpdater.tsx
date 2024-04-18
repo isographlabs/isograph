@@ -5,7 +5,13 @@ import { MenuItem, Select, Button, Input, Box } from '@mui/material';
 import { PetId } from './router';
 
 export const PetUpdater = iso(`
-  field Pet.PetUpdater @component {
+  field Pet.PetUpdater @component 
+  """
+  # Pet.PetUpdater
+  A component to test behavior with respect to mutations.
+  You can update the best friend and the tagline.
+  """
+  {
     set_best_friend
     potential_new_best_friends {
       id
