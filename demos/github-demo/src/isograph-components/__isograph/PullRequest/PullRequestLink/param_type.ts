@@ -1,10 +1,25 @@
 
 export type PullRequest__PullRequestLink__param = {
-  number: number,
+    /**
+Identifies the pull request number.
+  */
+number: number,
+  /**
+The repository associated with this node.
+  */
   repository: {
-    name: string,
+        /**
+The name of the repository.
+    */
+name: string,
+    /**
+The User owner of the repository.
+    */
     owner: {
-      login: string,
+            /**
+The username used to login.
+      */
+login: string,
     },
   },
 };

@@ -1,4 +1,7 @@
 
 export type User____refetch__param = {
-  id: string,
+    /**
+The Node ID of the User object
+  */
+id: string,
 };

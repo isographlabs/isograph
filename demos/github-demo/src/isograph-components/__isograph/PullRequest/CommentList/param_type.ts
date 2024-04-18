@@ -1,14 +1,35 @@
 import {IssueComment__formattedCommentCreationDate__outputType} from '../../IssueComment/formattedCommentCreationDate/output_type';
 
 export type PullRequest__CommentList__param = {
+  /**
+A list of comments associated with the pull request.
+  */
   comments: {
+    /**
+A list of edges.
+    */
     edges: (({
+      /**
+The item at the end of the edge.
+      */
       node: ({
-        id: string,
-        bodyText: string,
+                /**
+The Node ID of the IssueComment object
+        */
+id: string,
+                /**
+The body rendered to text.
+        */
+bodyText: string,
         formattedCommentCreationDate: IssueComment__formattedCommentCreationDate__outputType,
+        /**
+The actor who authored the comment.
+        */
         author: ({
-          login: string,
+                    /**
+The username of the actor.
+          */
+login: string,
         } | null),
       } | null),
     } | null))[],

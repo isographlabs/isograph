@@ -1,4 +1,7 @@
 
 export type Actor__UserLink__param = {
-  login: string,
+    /**
+The username of the actor.
+  */
+login: string,
 };

@@ -1,5 +1,11 @@
 
 export type Starrable__IsStarred__param = {
-  stargazerCount: number,
-  viewerHasStarred: boolean,
+    /**
+Returns a count of how many stargazers there are on this object
+  */
+stargazerCount: number,
+    /**
+Returns a boolean indicating whether the viewing user has starred this starrable.
+  */
+viewerHasStarred: boolean,
 };

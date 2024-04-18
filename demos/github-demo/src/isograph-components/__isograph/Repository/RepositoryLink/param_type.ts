@@ -1,8 +1,20 @@
 
 export type Repository__RepositoryLink__param = {
-  id: string,
-  name: string,
+    /**
+The Node ID of the Repository object
+  */
+id: string,
+    /**
+The name of the repository.
+  */
+name: string,
+  /**
+The User owner of the repository.
+  */
   owner: {
-    login: string,
+        /**
+The username used to login.
+    */
+login: string,
   },
 };

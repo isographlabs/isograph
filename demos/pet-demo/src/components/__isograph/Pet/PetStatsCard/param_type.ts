@@ -3,6 +3,9 @@ import {Pet____refetch__outputType} from '../__refetch/output_type';
 export type Pet__PetStatsCard__param = {
   id: string,
   nickname: (string | null),
+  /**
+A refetch field for this object.
+  */
   __refetch: Pet____refetch__outputType,
   age: number,
   stats: {

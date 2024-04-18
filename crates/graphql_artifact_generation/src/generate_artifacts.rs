@@ -7,9 +7,9 @@ use std::{
 };
 
 use common_lang_types::{
-    ConstExportName, FilePath, HasName, IsographObjectTypeName, Location, PathAndContent,
-    QueryOperationName, SelectableFieldName, Span, UnvalidatedTypeName, VariableName, WithLocation,
-    WithSpan,
+    ConstExportName, DescriptionValue, FilePath, HasName, IsographObjectTypeName, Location,
+    PathAndContent, QueryOperationName, SelectableFieldName, Span, UnvalidatedTypeName,
+    VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLInputValueDefinition, GraphQLTypeAnnotation, ListTypeAnnotation, NamedTypeAnnotation,
@@ -1312,13 +1312,13 @@ fn write_query_types_from_selection(
     nested_client_field_imports: &mut NestedClientFieldImports,
     indentation_level: u8,
 ) {
-    query_type_declaration.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
-
     match &selection.item {
         Selection::ServerField(field) => match field {
             ServerFieldSelection::ScalarField(scalar_field) => {
                 match scalar_field.associated_data {
                     FieldDefinitionLocation::Server(_server_field) => {
+                        query_type_declaration
+                            .push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
                         let parent_field = parent_type
                             .encountered_fields
                             .get(&scalar_field.name.item.into())
@@ -1326,6 +1326,13 @@ fn write_query_types_from_selection(
                             .as_server_field()
                             .expect("parent_field should exist and be server field");
                         let field = schema.server_field(*parent_field);
+
+                        write_optional_description(
+                            field.description,
+                            query_type_declaration,
+                            indentation_level,
+                        );
+
                         let name_or_alias = scalar_field.name_or_alias().item;
 
                         // TODO there should be a clever way to print without cloning
@@ -1347,6 +1354,13 @@ fn write_query_types_from_selection(
                     }
                     FieldDefinitionLocation::Client(client_field_id) => {
                         let client_field = schema.client_field(client_field_id);
+                        write_optional_description(
+                            client_field.description,
+                            query_type_declaration,
+                            indentation_level,
+                        );
+                        query_type_declaration
+                            .push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
 
                         match nested_client_field_imports.entry(client_field.type_and_field) {
                             Entry::Occupied(mut occupied) => {
@@ -1382,6 +1396,13 @@ fn write_query_types_from_selection(
                     .as_server_field()
                     .expect("Parent field should exist and be server field");
                 let field = schema.server_field(*parent_field);
+                write_optional_description(
+                    field.description,
+                    query_type_declaration,
+                    indentation_level,
+                );
+                query_type_declaration
+                    .push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
                 let name_or_alias = linked_field.name_or_alias().item;
                 let type_annotation = field.associated_data.clone().map(|output_type_id| {
                     // TODO Or interface or union type
@@ -1408,6 +1429,21 @@ fn write_query_types_from_selection(
                 ));
             }
         },
+    }
+}
+
+fn write_optional_description(
+    description: Option<DescriptionValue>,
+    query_type_declaration: &mut String,
+    indentation_level: u8,
+) {
+    if let Some(description) = description {
+        query_type_declaration.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+        query_type_declaration.push_str("/**\n");
+        query_type_declaration.push_str(description.lookup());
+        query_type_declaration.push_str("\n");
+        query_type_declaration.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+        query_type_declaration.push_str("*/\n");
     }
 }
 
