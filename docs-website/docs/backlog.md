@@ -210,7 +210,7 @@ Can vary by:
 - And some sort of transform that affects the type of the UI exposed to users:
   - mutation: expose a set
   - refetch: expose a set, but read from the latest
-  - load once: expose { kind: 'NotLoaded', load } | { kind: 'Loaded', data }
+  - load once: expose `{ kind: 'NotLoaded', load } | { kind: 'Loaded', data }`
     - is there any benefit to making these load once, instead of useQueryLoader style?
   - useQueryLoader: dispose anything from previous renders
   - pagination: concatenate the items in the set
