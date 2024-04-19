@@ -28,5 +28,6 @@
     "type": "git",
     "url": "git+https://github.com/isographlabs/isograph.git",
     "directory": "libs/isograph-reference-counted-pointer"
-  }
+  },
+  "sideEffects": false
 }

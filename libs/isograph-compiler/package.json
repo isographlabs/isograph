@@ -14,5 +14,6 @@
     "type": "git",
     "url": "git+https://github.com/isographlabs/isograph.git",
     "directory": "libs/isograph-compiler"
-  }
+  },
+  "sideEffects": false
 }

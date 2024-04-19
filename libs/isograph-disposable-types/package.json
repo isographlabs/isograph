@@ -23,5 +23,6 @@
     "type": "git",
     "url": "git+https://github.com/isographlabs/isograph.git",
     "directory": "libs/isograph-disposable-types"
-  }
+  },
+  "sideEffects": false
 }

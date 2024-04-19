@@ -24,5 +24,6 @@
     "@babel/core": "^7.20.0",
     "prettier": "2.8.8",
     "prettier-plugin-hermes-parser": "0.16.0"
-  }
+  },
+  "sideEffects": false
 }
