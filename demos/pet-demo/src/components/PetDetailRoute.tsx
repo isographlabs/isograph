@@ -1,11 +1,12 @@
 import React from 'react';
 import { iso } from '@iso';
-import { Container, Stack } from '@mui/material';
+import { Button, Container, Stack } from '@mui/material';
 import { Route } from './router';
 
 export const PetDetailRoute = iso(`
   field Query.PetDetailRoute($id: ID!) @component {
     pet(id: $id) {
+      __refetch
       name
       PetCheckinsCard
       PetBestFriendCard
@@ -23,7 +24,16 @@ export const PetDetailRoute = iso(`
   }
   return (
     <Container maxWidth="md">
-      <h1>Pet Detail for {pet.name}</h1>
+      <h1>
+        Pet Detail for {pet.name}
+        <Button
+          onClick={() => pet.__refetch()}
+          variant="contained"
+          style={{ marginLeft: 20 }}
+        >
+          Refetch pet
+        </Button>
+      </h1>
       <h3
         onClick={() => navigateTo({ kind: 'Home' })}
         style={{ cursor: 'pointer' }}

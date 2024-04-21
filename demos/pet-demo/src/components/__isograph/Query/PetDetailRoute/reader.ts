@@ -5,6 +5,7 @@ import Pet__PetBestFriendCard from '../../Pet/PetBestFriendCard/reader';
 import Pet__PetCheckinsCard from '../../Pet/PetCheckinsCard/reader';
 import Pet__PetPhraseCard from '../../Pet/PetPhraseCard/reader';
 import Pet__PetTaglineCard from '../../Pet/PetTaglineCard/reader';
+import Pet____refetch from '../../Pet/__refetch/reader';
 
 const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
   {
@@ -19,6 +20,12 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
     ],
     selections: [
       {
+        kind: "RefetchField",
+        alias: "__refetch",
+        readerArtifact: Pet____refetch,
+        refetchQuery: 0,
+      },
+      {
         kind: "Scalar",
         fieldName: "name",
         alias: null,
@@ -29,14 +36,14 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
         alias: "PetCheckinsCard",
         arguments: null,
         readerArtifact: Pet__PetCheckinsCard,
-        usedRefetchQueries: [0, ],
+        usedRefetchQueries: [1, ],
       },
       {
         kind: "Resolver",
         alias: "PetBestFriendCard",
         arguments: null,
         readerArtifact: Pet__PetBestFriendCard,
-        usedRefetchQueries: [1, 2, ],
+        usedRefetchQueries: [0, 2, 3, ],
       },
       {
         kind: "Resolver",
