@@ -60,8 +60,11 @@ export const schema = createSchema({
   typeDefs: schemaContents,
   resolvers: {
     Query: {
-      pet: (obj, args) => getPet(args.id),
+      pet: (_obj, args) => getPet(args.id),
       pets: () => pets,
+      node: (_obj, args) => {
+        return getPet(args.id);
+      },
     },
     Pet: {
       stats: (pet) => {
@@ -141,6 +144,7 @@ export const schema = createSchema({
 
 const pets = [
   {
+    __typename: 'Pet',
     id: '0',
     name: 'Makayla Balicka',
     nickname: 'Princess',
@@ -154,6 +158,7 @@ const pets = [
     favorite_phrase: "Don't bother me!",
   },
   {
+    __typename: 'Pet',
     id: '1',
     name: 'Mimi Balicka',
     nickname: 'Mimcia',
@@ -163,6 +168,7 @@ const pets = [
     favorite_phrase: null,
   },
   {
+    __typename: 'Pet',
     id: '2',
     name: 'Henry Balicki',
     nickname: 'Booboo',
@@ -172,6 +178,7 @@ const pets = [
     favorite_phrase: 'It would be too much effort to utter a phrase.',
   },
   {
+    __typename: 'Pet',
     id: '3',
     name: 'Tiberius Balicki',
     nickname: null,
@@ -181,6 +188,7 @@ const pets = [
     favorite_phrase: "I'll get that lazer pointer, you just watch!",
   },
   {
+    __typename: 'Pet',
     id: '4',
     name: 'Kiki Balicka',
     nickname: null,
@@ -190,6 +198,7 @@ const pets = [
     favorite_phrase: null,
   },
   {
+    __typename: 'Pet',
     id: '5',
     name: 'Rezor Balicki',
     nickname: null,

@@ -1,12 +1,17 @@
 type Query {
   pets: [Pet!]!
   pet(id: ID!): Pet
+  node(id: ID!): Node
 }
 
 type Mutation {
   set_pet_best_friend(id: ID!, new_best_friend_id: ID!): SetBestFriendResponse!
   set_pet_tagline(input: SetPetTaglineParams!): SetPetTaglineResponse!
   make_checkin_super(checkin_id: ID!): MakeCheckinSuperResponse!
+}
+
+interface Node {
+  id: ID!
 }
 
 # TODO make this a union: Success | InvalidId instead of using an optional field
@@ -27,7 +32,7 @@ type SetPetTaglineResponse {
   pet: Pet!
 }
 
-type Pet {
+type Pet implements Node {
   id: ID!
   name: String!
   best_friend_relationship: BestFriendRelationship
