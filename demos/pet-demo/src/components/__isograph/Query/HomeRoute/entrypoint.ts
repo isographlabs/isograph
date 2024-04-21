@@ -4,7 +4,11 @@ import {Query__HomeRoute__outputType} from './output_type';
 import readerResolver from './reader';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
-const queryText = 'query HomeRoute  {\
+const queryText = 'query HomeRoute ($id: ID!) {\
+  pet____id___v_id: pet(id: $id) {\
+    id,\
+    name,\
+  },\
   pets {\
     id,\
     name,\
@@ -14,6 +18,28 @@ const queryText = 'query HomeRoute  {\
 }';
 
 const normalizationAst: NormalizationAst = [
+  {
+    kind: "Linked",
+    fieldName: "pet",
+    arguments: [
+      [
+        "id",
+        { kind: "Variable", name: "id" },
+      ],
+    ],
+    selections: [
+      {
+        kind: "Scalar",
+        fieldName: "id",
+        arguments: null,
+      },
+      {
+        kind: "Scalar",
+        fieldName: "name",
+        arguments: null,
+      },
+    ],
+  },
   {
     kind: "Linked",
     fieldName: "pets",

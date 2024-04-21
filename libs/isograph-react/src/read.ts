@@ -1,4 +1,8 @@
-import { getParentRecordKey, onNextChange } from './cache';
+import {
+  callAllSubscriptions,
+  getParentRecordKey,
+  onNextChange,
+} from './cache';
 import { getOrCreateCachedComponent } from './componentCache';
 import { RefetchQueryNormalizationArtifactWrapper } from './entrypoint';
 import { FragmentReference } from './FragmentReference';
@@ -271,37 +275,80 @@ function readData<TReadFromStore>(
           (index) => nestedRefetchQueries[index],
         );
 
-        const kind = field.readerArtifact.kind;
-        if (kind === 'EagerReaderArtifact') {
-          const data = readData(
-            environment,
-            field.readerArtifact.readerAst,
-            root,
-            variables,
-            resolverRefetchQueries,
-            mutableEncounteredRecords,
-          );
-          if (data.kind === 'MissingData') {
-            return {
-              kind: 'MissingData',
-              reason: 'Missing data for ' + field.alias + ' on root ' + root,
-              nestedReason: data,
-            };
-          } else {
-            target[field.alias] = field.readerArtifact.resolver(data.data);
-          }
-        } else if (kind === 'ComponentReaderArtifact') {
-          target[field.alias] = getOrCreateCachedComponent(
-            environment,
-            field.readerArtifact.componentName,
-            {
-              kind: 'FragmentReference',
-              readerArtifact: field.readerArtifact,
+        switch (field.readerArtifact.kind) {
+          case 'EagerReaderArtifact': {
+            const data = readData(
+              environment,
+              field.readerArtifact.readerAst,
               root,
               variables,
-              nestedRefetchQueries: resolverRefetchQueries,
-            } as const,
-          );
+              resolverRefetchQueries,
+              mutableEncounteredRecords,
+            );
+            if (data.kind === 'MissingData') {
+              return {
+                kind: 'MissingData',
+                reason: 'Missing data for ' + field.alias + ' on root ' + root,
+                nestedReason: data,
+              };
+            } else {
+              target[field.alias] = field.readerArtifact.resolver(data.data);
+            }
+            break;
+          }
+          case 'ComponentReaderArtifact': {
+            target[field.alias] = getOrCreateCachedComponent(
+              environment,
+              field.readerArtifact.componentName,
+              {
+                kind: 'FragmentReference',
+                readerArtifact: field.readerArtifact,
+                root,
+                variables,
+                nestedRefetchQueries: resolverRefetchQueries,
+              } as const,
+            );
+            break;
+          }
+          default: {
+            if (field.readerArtifact instanceof Function) {
+              if (field.actualReaderArtifact != null) {
+                console.log('actualReaderArtifact', field);
+                const data = readData(
+                  environment,
+                  field.actualReaderArtifact.readerAst,
+                  root,
+                  variables,
+                  resolverRefetchQueries,
+                  mutableEncounteredRecords,
+                );
+                if (data.kind === 'MissingData') {
+                  return {
+                    kind: 'MissingData',
+                    reason:
+                      'Missing data for ' + field.alias + ' on root ' + root,
+                    nestedReason: data,
+                  };
+                } else {
+                  target[field.alias] = field.actualReaderArtifact.resolver(
+                    data.data,
+                  );
+                }
+              } else {
+                field.readerArtifact().then((readerArtifact) => {
+                  console.log('received artifact', readerArtifact);
+                  field.actualReaderArtifact = readerArtifact.default;
+                  callAllSubscriptions(environment);
+                });
+                return {
+                  kind: 'MissingData',
+                  reason: 'async module load',
+                };
+              }
+            } else {
+              throw new Error('Unexpected kind: ' + field.readerArtifact);
+            }
+          }
         }
         break;
       }

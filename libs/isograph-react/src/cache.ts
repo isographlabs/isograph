@@ -265,6 +265,31 @@ export function onNextChange(environment: IsographEnvironment): Promise<void> {
   });
 }
 
+/** This is a test function. You do not want to use it. */
+export function callAllSubscriptions(environment: IsographEnvironment) {
+  environment.subscriptions.forEach((subscription) => {
+    switch (subscription.kind) {
+      case 'FragmentSubscription': {
+        const newEncounteredDataAndRecords = readButDoNotEvaluate(
+          environment,
+          subscription.fragmentReference,
+        );
+
+        subscription.callback(newEncounteredDataAndRecords);
+        return;
+      }
+      case 'AnyRecords': {
+        return subscription.callback();
+      }
+      default: {
+        // @ts-expect-error(6133)
+        const _: never = subscription;
+        throw new Error('Unexpected case');
+      }
+    }
+  });
+}
+
 function callSubscriptions(
   environment: IsographEnvironment,
   recordsEncounteredWhenNormalizing: Set<DataId>,

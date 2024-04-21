@@ -2,6 +2,7 @@ import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQuer
 import { Query__HomeRoute__param } from './param_type';
 import { HomeRoute as resolver } from '../../../HomeRoute.tsx';
 import Pet__PetSummaryCard from '../../Pet/PetSummaryCard/reader';
+// import Pet__petSuperName from '../../Pet/petSuperName/reader';
 
 const readerAst: ReaderAst<Query__HomeRoute__param> = [
   {
@@ -21,6 +22,27 @@ const readerAst: ReaderAst<Query__HomeRoute__param> = [
         alias: "PetSummaryCard",
         arguments: null,
         readerArtifact: Pet__PetSummaryCard,
+        usedRefetchQueries: [],
+      },
+    ],
+  },
+  {
+    kind: "Linked",
+    fieldName: "pet",
+    alias: null,
+    arguments: [
+      [
+        "id",
+        { kind: "Variable", name: "id" },
+      ],
+    ],
+    selections: [
+      {
+        kind: "Resolver",
+        alias: "petSuperName",
+        arguments: null,
+        // readerArtifact: Pet__petSuperName,
+        readerArtifact: () =>import('../../Pet/petSuperName/reader'),
         usedRefetchQueries: [],
       },
     ],

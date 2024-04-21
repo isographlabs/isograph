@@ -61,7 +61,7 @@ function HomeRouteLoader({
 }) {
   const { queryReference } = useLazyReference(
     iso(`entrypoint Query.HomeRoute`),
-    {},
+    { id: 1123 },
   );
 
   const Component = useResult(queryReference);
