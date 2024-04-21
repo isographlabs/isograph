@@ -6,6 +6,7 @@ export const PetPhraseCard = iso(`
 field Pet.PetPhraseCard @component {
   id
   favorite_phrase
+  set_pet_tagline
 }
 `)(function PetPhraseCardComponent(data) {
   return (

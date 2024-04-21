@@ -36,14 +36,14 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
         alias: "PetBestFriendCard",
         arguments: null,
         readerArtifact: Pet__PetBestFriendCard,
-        usedRefetchQueries: [1, 2, ],
+        usedRefetchQueries: [1, 2, 3, ],
       },
       {
         kind: "Resolver",
         alias: "PetPhraseCard",
         arguments: null,
         readerArtifact: Pet__PetPhraseCard,
-        usedRefetchQueries: [],
+        usedRefetchQueries: [1, 2, 3, ],
       },
       {
         kind: "Resolver",
