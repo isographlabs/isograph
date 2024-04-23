@@ -128,7 +128,7 @@ pub enum ProcessClientFieldDeclarationError {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MutationFieldClientFieldVariant {
     pub mutation_field_name: SelectableFieldName,
     pub server_schema_mutation_field_name: SelectableFieldName,
@@ -139,7 +139,7 @@ pub struct MutationFieldClientFieldVariant {
     pub field_map: Vec<FieldMapItem>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ClientFieldVariant {
     Component((ConstExportName, FilePath)),
     Eager((ConstExportName, FilePath)),

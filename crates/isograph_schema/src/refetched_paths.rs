@@ -29,6 +29,7 @@ pub fn refetched_paths_with_path(
                             | ClientFieldVariant::MutationField(_) => {
                                 paths.insert(PathToRefetchField {
                                     linked_fields: path.clone(),
+                                    field_name: client_field.name,
                                 });
                             }
                             _ => {

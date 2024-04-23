@@ -28,6 +28,7 @@ pub struct RootRefetchedPath {
     pub path: PathToRefetchField,
     pub variables: Vec<VariableName>,
     // TODO This should not be an option
+    // TODO is this always the same as .path.field_name?
     pub field_name: SelectableFieldName,
 }
 
@@ -198,7 +199,7 @@ pub struct MutationFieldArtifactInfo {
 /// A mutable reference to this struct is passed down to all children.
 #[derive(Debug)]
 struct MergeTraversalState<'a> {
-    paths_to_refetch_fields: Vec<(PathToRefetchField, ServerObjectId, ClientFieldVariant)>,
+    paths_to_refetch_fields: HashSet<(PathToRefetchField, ServerObjectId, ClientFieldVariant)>,
     /// As we traverse selection sets, we need to keep track of the path we have
     /// taken so far. This is because when we encounter a refetch query, we need
     /// to take note of the path we took to reach that query, but continue
@@ -208,7 +209,7 @@ struct MergeTraversalState<'a> {
     /// we re-traverse the paths to get the complete merged selection sets
     /// needed for each refetch query. At this point, we have enough information
     /// to generate the refetch query.
-    current_path: PathToRefetchField,
+    current_path: Vec<NameAndArguments>,
     encountered_client_field_ids: Option<&'a mut HashSet<ClientFieldId>>,
 }
 
@@ -216,9 +217,17 @@ impl<'a> MergeTraversalState<'a> {
     pub fn new(encountered_client_field_ids: Option<&'a mut HashSet<ClientFieldId>>) -> Self {
         Self {
             paths_to_refetch_fields: Default::default(),
-            current_path: Default::default(),
+            current_path: vec![],
             encountered_client_field_ids,
         }
+    }
+
+    pub fn sorted_paths_to_refetch_fields(
+        self,
+    ) -> Vec<(PathToRefetchField, ServerObjectId, ClientFieldVariant)> {
+        let mut paths = self.paths_to_refetch_fields.into_iter().collect::<Vec<_>>();
+        paths.sort();
+        paths
     }
 }
 
@@ -242,8 +251,8 @@ pub fn create_merged_selection_set(
 
     match artifact_queue {
         Some(artifact_queue) => {
-            let val: Vec<_> = merge_traversal_state
-                .paths_to_refetch_fields
+            let root_refetched_paths: Vec<_> = merge_traversal_state
+                .sorted_paths_to_refetch_fields()
                 .into_iter()
                 .enumerate()
                 .map(
@@ -354,11 +363,11 @@ pub fn create_merged_selection_set(
                 )
                 .collect();
 
-            (merged_selection_set, val)
+            (merged_selection_set, root_refetched_paths)
         }
         None => {
-            let val: Vec<_> = merge_traversal_state
-                .paths_to_refetch_fields
+            let root_refetched_paths: Vec<_> = merge_traversal_state
+                .sorted_paths_to_refetch_fields()
                 .into_iter()
                 .map(|(path_to_refetch_field, _, client_field_variant)| {
                     let nested_merged_selection_set =
@@ -388,7 +397,7 @@ pub fn create_merged_selection_set(
                 })
                 .collect();
 
-            (merged_selection_set, val)
+            (merged_selection_set, root_refetched_paths)
         }
     }
 }
@@ -457,20 +466,17 @@ fn merge_selections_into_set(
                         new_linked_field.name.item.into(),
                         &new_linked_field.arguments,
                     ));
-                    merge_traversal_state
-                        .current_path
-                        .linked_fields
-                        .push(NameAndArguments {
-                            name: new_linked_field.name.item.into(),
-                            arguments: new_linked_field
-                                .arguments
-                                .iter()
-                                .map(|argument| ArgumentKeyAndValue {
-                                    key: argument.item.name.item,
-                                    value: argument.item.value.item.clone(),
-                                })
-                                .collect(),
-                        });
+                    merge_traversal_state.current_path.push(NameAndArguments {
+                        name: new_linked_field.name.item.into(),
+                        arguments: new_linked_field
+                            .arguments
+                            .iter()
+                            .map(|argument| ArgumentKeyAndValue {
+                                key: argument.item.name.item,
+                                value: argument.item.value.item.clone(),
+                            })
+                            .collect(),
+                    });
 
                     match merged_selection_map.entry(normalization_key) {
                         Entry::Vacant(vacant_entry) => merge_linked_field_into_vacant_entry(
@@ -488,7 +494,7 @@ fn merge_selections_into_set(
                         ),
                     };
 
-                    merge_traversal_state.current_path.linked_fields.pop();
+                    merge_traversal_state.current_path.pop();
                 }
             },
         }
@@ -587,8 +593,11 @@ fn merge_scalar_client_field(
 
     // HACK... we can model this data better
     if client_field.variant == ClientFieldVariant::RefetchField {
-        merge_traversal_state.paths_to_refetch_fields.push((
-            merge_traversal_state.current_path.clone(),
+        merge_traversal_state.paths_to_refetch_fields.insert((
+            PathToRefetchField {
+                linked_fields: merge_traversal_state.current_path.clone(),
+                field_name: client_field.name,
+            },
             parent_type.id,
             ClientFieldVariant::RefetchField,
         ));
@@ -602,8 +611,11 @@ fn merge_scalar_client_field(
         field_map,
     }) = &client_field.variant
     {
-        merge_traversal_state.paths_to_refetch_fields.push((
-            merge_traversal_state.current_path.clone(),
+        merge_traversal_state.paths_to_refetch_fields.insert((
+            PathToRefetchField {
+                linked_fields: merge_traversal_state.current_path.clone(),
+                field_name: client_field.name,
+            },
             parent_type.id,
             ClientFieldVariant::MutationField(MutationFieldClientFieldVariant {
                 mutation_field_name: client_field.name,

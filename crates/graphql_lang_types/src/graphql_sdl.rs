@@ -253,7 +253,7 @@ impl fmt::Display for GraphQLFieldDefinition {
 }
 
 /// This is an argument definition, but we're using the GraphQL spec lingo here.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLInputValueDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<InputValueName>,

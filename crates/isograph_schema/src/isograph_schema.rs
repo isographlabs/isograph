@@ -500,9 +500,10 @@ pub struct ClientField<
     pub parent_object_id: ServerObjectId,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PathToRefetchField {
     pub linked_fields: Vec<NameAndArguments>,
+    pub field_name: SelectableFieldName,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
