@@ -8,10 +8,10 @@ import { Arguments } from './util';
 export type TopLevelReaderArtifact<
   TReadFromStore extends Object,
   TClientFieldValue,
-  TAdditionalProps extends Record<string, never>,
+  TComponentProps extends Record<string, never>,
 > =
   | EagerReaderArtifact<TReadFromStore, TClientFieldValue>
-  | ComponentReaderArtifact<TReadFromStore, TAdditionalProps>;
+  | ComponentReaderArtifact<TReadFromStore, TComponentProps>;
 
 export type EagerReaderArtifact<
   TReadFromStore extends Object,
@@ -24,14 +24,14 @@ export type EagerReaderArtifact<
 
 export type ComponentReaderArtifact<
   TReadFromStore extends Object,
-  TAdditionalProps extends Record<string, unknown> = Record<string, never>,
+  TComponentProps extends Record<string, unknown> = Record<string, never>,
 > = {
   readonly kind: 'ComponentReaderArtifact';
   readonly componentName: ComponentOrFieldName;
   readonly readerAst: ReaderAst<TReadFromStore>;
   readonly resolver: (
     data: TReadFromStore,
-    runtimeProps: TAdditionalProps,
+    runtimeProps: TComponentProps,
   ) => React.ReactNode;
 };
 

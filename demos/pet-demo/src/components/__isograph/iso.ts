@@ -20,19 +20,19 @@ import entrypoint_Query__PetFavoritePhrase from '../__isograph/Query/PetFavorite
 // the type of the passed-in function, which takes one parameter
 // of type TParam.
 type IdentityWithParam<TParam> = <TClientFieldReturn>(
-  x: (param: TParam) => TClientFieldReturn
+  clientField: (param: TParam) => TClientFieldReturn
 ) => (param: TParam) => TClientFieldReturn;
 
 // This is the type given it to client fields with @component.
 // This means that the type of the exported iso literal is exactly
 // the type of the passed-in function, which takes two parameters.
-// The first has type TParam, and the second has type TAdditionalProps.
+// The first has type TParam, and the second has type TComponentProps.
 //
-// TAdditionalProps becomes the types of the props you must pass
+// TComponentProps becomes the types of the props you must pass
 // whenever the @component field is rendered.
-type IdentityWithParamComponent<TParam> = <TClientFieldReturn, TAdditionalProps = Record<string, never>>(
-  x: (data: TParam, secondParam: TAdditionalProps) => TClientFieldReturn
-) => (data: TParam, secondParam: TAdditionalProps) => TClientFieldReturn;
+type IdentityWithParamComponent<TParam> = <TClientFieldReturn, TComponentProps = Record<string, never>>(
+  clientComponentField: (data: TParam, componentProps: TComponentProps) => TClientFieldReturn
+) => (data: TParam, componentProps: TComponentProps) => TClientFieldReturn;
 
 type WhitespaceCharacter = ' ' | '\t' | '\n';
 type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
@@ -43,7 +43,7 @@ type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
 // start with whitespace, followed by TString. So e.g. if we have
 // ```
 // export function iso<T>(
-//   param: T & MatchesWhitespaceAndString<'field Query.foo', T>
+//   isographLiteralText: T & MatchesWhitespaceAndString<'field Query.foo', T>
 // ): Bar;
 // ```
 // then, when you call
