@@ -16,3 +16,6 @@ extend type Mutation
     path: "checkin"
     fieldMap: [{ from: "id", to: "checkin_id" }]
   )
+
+extend type Query
+  @exposeField(field: "pet", path: "stats", as: "refetch_pet_stats")

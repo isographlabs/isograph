@@ -11,6 +11,7 @@ export const PetDetailRoute = iso(`
       PetBestFriendCard
       PetPhraseCard
       PetTaglineCard
+      PetStatsCard
     }
   }
 `)(function PetDetailRouteComponent(
@@ -32,7 +33,10 @@ export const PetDetailRoute = iso(`
       </h3>
       <React.Suspense fallback={<h2>Loading pet details...</h2>}>
         <Stack direction="row" spacing={4}>
-          <pet.PetCheckinsCard />
+          <Stack direction="column" spacing={4}>
+            <pet.PetCheckinsCard />
+            <pet.PetStatsCard />
+          </Stack>
           <Stack direction="column" spacing={4}>
             <pet.PetBestFriendCard />
 

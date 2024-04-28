@@ -3,6 +3,7 @@ const queryText = 'mutation Petset_best_friend ($id: ID!, $new_best_friend_id: I
 set_best_friend____id___v_id____new_best_friend_id___v_new_best_friend_id: set_pet_best_friend(id: $id, new_best_friend_id: $new_best_friend_id) {\
 pet { \
   id,\
+  age,\
   best_friend_relationship {\
     best_friend {\
       id,\
@@ -18,9 +19,18 @@ pet { \
   },\
   favorite_phrase,\
   name,\
+  nickname,\
   potential_new_best_friends {\
     id,\
     name,\
+  },\
+  stats {\
+    cuteness,\
+    energy,\
+    hunger,\
+    intelligence,\
+    sociability,\
+    weight,\
   },\
   tagline,\
 }}}';
@@ -48,6 +58,11 @@ const normalizationAst: NormalizationAst = [{
       {
         kind: "Scalar",
         fieldName: "id",
+        arguments: null,
+      },
+      {
+        kind: "Scalar",
+        fieldName: "age",
         arguments: null,
       },
       {
@@ -117,6 +132,11 @@ const normalizationAst: NormalizationAst = [{
         arguments: null,
       },
       {
+        kind: "Scalar",
+        fieldName: "nickname",
+        arguments: null,
+      },
+      {
         kind: "Linked",
         fieldName: "potential_new_best_friends",
         arguments: null,
@@ -129,6 +149,43 @@ const normalizationAst: NormalizationAst = [{
           {
             kind: "Scalar",
             fieldName: "name",
+            arguments: null,
+          },
+        ],
+      },
+      {
+        kind: "Linked",
+        fieldName: "stats",
+        arguments: null,
+        selections: [
+          {
+            kind: "Scalar",
+            fieldName: "cuteness",
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            fieldName: "energy",
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            fieldName: "hunger",
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            fieldName: "intelligence",
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            fieldName: "sociability",
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            fieldName: "weight",
             arguments: null,
           },
         ],

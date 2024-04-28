@@ -40,7 +40,7 @@ type Pet implements Node {
   picture: Url!
   nickname: String
   age: Int!
-  stats: PetStats!
+  stats: PetStats
   tagline: String!
   potential_new_best_friends: [Pet!]!
 
@@ -56,12 +56,12 @@ type BestFriendRelationship {
 }
 
 type PetStats {
-  weight: Int!
-  intelligence: Int!
-  cuteness: Int!
-  hunger: Int!
-  sociability: Int!
-  energy: Int!
+  weight: Int
+  intelligence: Int
+  cuteness: Int
+  hunger: Int
+  sociability: Int
+  energy: Int
 }
 
 type Checkin {

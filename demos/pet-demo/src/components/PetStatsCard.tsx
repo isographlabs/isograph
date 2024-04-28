@@ -1,12 +1,11 @@
 import React from 'react';
 import { iso } from '@iso';
-import { Card, CardContent } from '@mui/material';
+import { Button, Card, CardContent } from '@mui/material';
 
 export const PetStatsCard = iso(`
   field Pet.PetStatsCard @component {
     id
     nickname
-    __refetch
     age
     stats {
       weight
@@ -15,9 +14,10 @@ export const PetStatsCard = iso(`
       hunger
       sociability
       energy
+      refetch_pet_stats(id: $id)
     }
   }
-`)(function PetStatsCardComponent(data) {
+`)(function PetStatsCardComponent(pet) {
   return (
     <Card
       variant="outlined"
@@ -30,14 +30,22 @@ export const PetStatsCard = iso(`
     >
       <CardContent>
         <h2>Stats</h2>
-        <ul>
-          <li>Weight: {data.stats.weight}</li>
-          <li>Intelligence: {data.stats.intelligence}</li>
-          <li>Cuteness: {data.stats.cuteness}</li>
-          <li>Hunger: {data.stats.hunger}</li>
-          <li>Sociability: {data.stats.sociability}</li>
-          <li>Energy: {data.stats.energy}</li>
-        </ul>
+        {pet.stats ? (
+          <ul>
+            <li>Weight: {pet.stats.weight}</li>
+            <li>Intelligence: {pet.stats.intelligence}</li>
+            <li>Cuteness: {pet.stats.cuteness}</li>
+            <li>Hunger: {pet.stats.hunger}</li>
+            <li>Sociability: {pet.stats.sociability}</li>
+            <li>Energy: {pet.stats.energy}</li>
+          </ul>
+        ) : null}
+        <Button
+          variant="contained"
+          onClick={() => pet.stats?.refetch_pet_stats({ id: pet.id })}
+        >
+          Refetch pet??
+        </Button>
       </CardContent>
     </Card>
   );

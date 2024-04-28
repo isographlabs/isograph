@@ -1,7 +1,7 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Pet__PetStatsCard__param } from './param_type';
 import { PetStatsCard as resolver } from '../../../PetStatsCard.tsx';
-import Pet____refetch from '../__refetch/reader';
+import PetStats__refetch_pet_stats from '../../PetStats/refetch_pet_stats/reader';
 
 const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
   {
@@ -15,12 +15,6 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
     fieldName: "nickname",
     alias: null,
     arguments: null,
-  },
-  {
-    kind: "RefetchField",
-    alias: "__refetch",
-    readerArtifact: Pet____refetch,
-    refetchQuery: 0,
   },
   {
     kind: "Scalar",
@@ -69,6 +63,12 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
         fieldName: "energy",
         alias: null,
         arguments: null,
+      },
+      {
+        kind: "MutationField",
+        alias: "refetch_pet_stats",
+        readerArtifact: PetStats__refetch_pet_stats,
+        refetchQuery: 0,
       },
     ],
   },

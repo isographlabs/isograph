@@ -156,6 +156,14 @@ const pets = [
     age: 16,
     tagline: 'The OG',
     favorite_phrase: "Don't bother me!",
+    stats: {
+      weight: 18,
+      intelligence: 100,
+      cuteness: 50,
+      hunger: 67,
+      sociability: 4,
+      energy: 10,
+    },
   },
   {
     __typename: 'Pet',

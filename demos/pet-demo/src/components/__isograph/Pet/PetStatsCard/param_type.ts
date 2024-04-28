@@ -1,19 +1,16 @@
-import {Pet____refetch__outputType} from '../__refetch/output_type';
+import {PetStats__refetch_pet_stats__outputType} from '../../PetStats/refetch_pet_stats/output_type';
 
 export type Pet__PetStatsCard__param = {
   id: string,
   nickname: (string | null),
-  /**
-A refetch field for this object.
-  */
-  __refetch: Pet____refetch__outputType,
   age: number,
-  stats: {
-    weight: number,
-    intelligence: number,
-    cuteness: number,
-    hunger: number,
-    sociability: number,
-    energy: number,
-  },
+  stats: ({
+    weight: (number | null),
+    intelligence: (number | null),
+    cuteness: (number | null),
+    hunger: (number | null),
+    sociability: (number | null),
+    energy: (number | null),
+    refetch_pet_stats: PetStats__refetch_pet_stats__outputType,
+  } | null),
 };

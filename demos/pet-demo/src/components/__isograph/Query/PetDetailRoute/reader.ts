@@ -4,6 +4,7 @@ import { PetDetailRoute as resolver } from '../../../PetDetailRoute.tsx';
 import Pet__PetBestFriendCard from '../../Pet/PetBestFriendCard/reader';
 import Pet__PetCheckinsCard from '../../Pet/PetCheckinsCard/reader';
 import Pet__PetPhraseCard from '../../Pet/PetPhraseCard/reader';
+import Pet__PetStatsCard from '../../Pet/PetStatsCard/reader';
 import Pet__PetTaglineCard from '../../Pet/PetTaglineCard/reader';
 
 const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
@@ -51,6 +52,13 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
         arguments: null,
         readerArtifact: Pet__PetTaglineCard,
         usedRefetchQueries: [],
+      },
+      {
+        kind: "Resolver",
+        alias: "PetStatsCard",
+        arguments: null,
+        readerArtifact: Pet__PetStatsCard,
+        usedRefetchQueries: [3, ],
       },
     ],
   },
