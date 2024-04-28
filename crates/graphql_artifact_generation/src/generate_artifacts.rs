@@ -26,8 +26,8 @@ use isograph_schema::{
     MergedLinkedFieldSelection, MergedScalarFieldSelection, MergedSelectionSet,
     MergedServerFieldSelection, MutationFieldArtifactInfo, MutationFieldClientFieldVariant,
     NameAndArguments, ObjectTypeAndFieldNames, PathToRefetchField, RefetchFieldArtifactInfo,
-    RequiresRefinement, RootRefetchedPath, ValidatedClientField, ValidatedSchema,
-    ValidatedSchemaObject, ValidatedSelection, ValidatedVariableDefinition,
+    RequiresRefinement, RootOperationName, RootRefetchedPath, ValidatedClientField,
+    ValidatedSchema, ValidatedSchemaObject, ValidatedSelection, ValidatedVariableDefinition,
 };
 
 use crate::artifact_file_contents::{ENTRYPOINT, ISO_TS};
@@ -648,6 +648,22 @@ fn generate_entrypoint_artifact<'schema>(
             &fetchable_client_field,
         );
 
+        // TODO when we do not call generate_entrypoint_artifact extraneously,
+        // we can panic instead of using a default entrypoint type
+        // TODO model this better so that the RootOperationName is somehow a
+        // parameter
+        let root_operation_name = schema
+            .root_types
+            .get(&fetchable_client_field.parent_object_id)
+            .unwrap_or_else(|| {
+                schema
+                    .root_types
+                    .iter()
+                    .next()
+                    .expect("Expected at least one fetchable type to exist")
+                    .1
+            });
+
         let parent_object = schema
             .server_field_data
             .object(fetchable_client_field.parent_object_id);
@@ -656,6 +672,7 @@ fn generate_entrypoint_artifact<'schema>(
             schema,
             &merged_selection_set,
             &fetchable_client_field.variable_definitions,
+            root_operation_name,
         );
         let refetch_query_artifact_imports =
             generate_refetch_query_artifact_imports(&root_refetched_paths);
@@ -1143,12 +1160,16 @@ fn generate_query_text(
     schema: &ValidatedSchema,
     merged_selection_set: &MergedSelectionSet,
     query_variables: &[WithSpan<ValidatedVariableDefinition>],
+    root_operation_name: &RootOperationName,
 ) -> QueryText {
     let mut query_text = String::new();
 
     let variable_text = write_variables_to_string(schema, query_variables.iter());
 
-    query_text.push_str(&format!("query {} {} {{\\\n", query_name, variable_text));
+    query_text.push_str(&format!(
+        "{} {} {} {{\\\n",
+        root_operation_name.0, query_name, variable_text
+    ));
     write_selections_for_query_text(&mut query_text, schema, &merged_selection_set, 1);
     query_text.push_str("}");
     QueryText(query_text)
