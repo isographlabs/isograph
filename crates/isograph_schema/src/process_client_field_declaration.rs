@@ -137,6 +137,7 @@ pub struct ExposedFieldVariant {
     pub mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
     pub filtered_mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
     pub field_map: Vec<FieldMapItem>,
+    pub expose_field_fetchable_field_parent_id: ServerObjectId,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

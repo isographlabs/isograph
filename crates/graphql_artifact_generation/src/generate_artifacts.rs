@@ -18,7 +18,7 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection, SelectionFieldArgument,
-    ServerFieldSelection, VariableDefinition,
+    ServerFieldSelection, ServerObjectId, VariableDefinition,
 };
 use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_client_field,
@@ -447,7 +447,7 @@ fn get_artifact_for_mutation_field<'schema>(
         mutation_primary_field_name,
         mutation_field_arguments,
         requires_refinement,
-        ..
+        exposed_field_parent_object_id,
     } = mutation_info;
 
     let arguments = get_serialized_field_arguments(
@@ -483,6 +483,7 @@ fn get_artifact_for_mutation_field<'schema>(
         mutation_primary_field_name,
         mutation_field_arguments,
         requires_refinement,
+        exposed_field_parent_object_id,
     );
 
     let selections = generate_normalization_ast(schema, &merged_selection_set, 2);
@@ -555,6 +556,7 @@ fn generate_mutation_query_text<'schema>(
     mutation_primary_field_name: SelectableFieldName,
     mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
     requires_refinement: RequiresRefinement,
+    exposed_field_parent_object_id: ServerObjectId,
 ) -> QueryText {
     let mut query_text = String::new();
 
@@ -595,8 +597,14 @@ fn generate_mutation_query_text<'schema>(
 
     let parent_object_name = parent_object_type.name;
 
+    let exposed_field_operation_name = &schema
+        .fetchable_types
+        .get(&exposed_field_parent_object_id)
+        .expect("Expected root type to be fetchable here. This is indicative of a bug in Isograph.")
+        .0;
+
     query_text.push_str(&format!(
-        "mutation {parent_object_name}{mutation_field_name} {variable_text} {{\\\n\
+        "{exposed_field_operation_name} {parent_object_name}{mutation_field_name} {variable_text} {{\\\n\
         {aliased_mutation_field_name}: {server_schema_mutation_field_name}{mutation_field_arguments} {{\\\n\
         {mutation_primary_field_name} {{ \\\n",
     ));

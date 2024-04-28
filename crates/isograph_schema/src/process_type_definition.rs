@@ -642,6 +642,8 @@ fn get_client_fields_for_schema_object(
                 type_name: type_definition.name.item,
                 field_name: "__refetch".intern().into(),
             },
+            // This is extremely likely to be wrong. What id is this? It's probably
+            // not Query or Mutation
             parent_object_id,
         });
         encountered_fields.insert(

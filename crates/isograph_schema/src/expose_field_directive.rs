@@ -231,6 +231,7 @@ impl UnvalidatedSchema {
                     filtered_mutation_field_arguments: mutation_field_args_without_id.to_vec(),
                     mutation_primary_field_return_type_object_id: maybe_abstract_parent_object_id,
                     field_map: field_map.to_vec(),
+                    expose_field_fetchable_field_parent_id: parent_object_id,
                 }),
                 variable_definitions: vec![],
                 type_and_field: ObjectTypeAndFieldNames {

@@ -192,6 +192,8 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
     pub mutation_primary_field_name: SelectableFieldName,
     pub mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
     pub requires_refinement: RequiresRefinement,
+
+    pub exposed_field_parent_object_id: ServerObjectId,
 }
 
 /// This struct contains everything that is available when we start
@@ -311,6 +313,7 @@ pub fn create_merged_selection_set(
                                 filtered_mutation_field_arguments: _,
                                 mutation_primary_field_return_type_object_id,
                                 field_map: _,
+                                expose_field_fetchable_field_parent_id,
                             }) => {
                                 // It's a bit weird that all exposed fields become imperatively
                                 // loaded fields. It probably makes sense to think about how we
@@ -332,6 +335,8 @@ pub fn create_merged_selection_set(
 
                                 artifact_queue.push(ArtifactQueueItem::ImperativelyLoadedField(
                                     ImperativelyLoadedFieldArtifactInfo {
+                                        exposed_field_parent_object_id:
+                                            expose_field_fetchable_field_parent_id,
                                         merged_selection_set: nested_merged_selection_set,
                                         refetch_field_parent_id,
                                         variable_definitions: definitions_of_used_variables,
@@ -595,7 +600,7 @@ fn merge_scalar_client_field(
     }
 
     // HACK... we can model this data better
-    if client_field.variant == ClientFieldVariant::RefetchField {
+    if let ClientFieldVariant::RefetchField = client_field.variant {
         merge_traversal_state.paths_to_refetch_fields.insert((
             PathToRefetchField {
                 linked_fields: merge_traversal_state.current_path.clone(),
@@ -612,6 +617,7 @@ fn merge_scalar_client_field(
         mutation_field_name: _,
         mutation_primary_field_return_type_object_id,
         field_map,
+        expose_field_fetchable_field_parent_id: expose_field_parent_id,
     }) = &client_field.variant
     {
         merge_traversal_state.paths_to_refetch_fields.insert((
@@ -629,6 +635,7 @@ fn merge_scalar_client_field(
                 mutation_primary_field_return_type_object_id:
                     *mutation_primary_field_return_type_object_id,
                 field_map: field_map.clone(),
+                expose_field_fetchable_field_parent_id: *expose_field_parent_id,
             }),
         ));
     }
