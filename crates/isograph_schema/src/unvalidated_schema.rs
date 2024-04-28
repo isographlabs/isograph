@@ -121,7 +121,7 @@ impl UnvalidatedSchema {
             float_type_id,
             boolean_type_id,
 
-            query_type_id: None,
+            root_types: HashMap::new(),
         }
     }
 }

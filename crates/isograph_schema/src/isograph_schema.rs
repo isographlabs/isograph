@@ -63,6 +63,9 @@ pub trait SchemaValidationState: Debug {
     type Entrypoint: Debug;
 }
 
+#[derive(Debug)]
+pub struct RootOperationName(pub String);
+
 /// The in-memory representation of a schema.
 ///
 /// The type param with which the Schema type is instantiated vary based on
@@ -94,11 +97,7 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
     pub boolean_type_id: ServerScalarId,
     pub int_type_id: ServerScalarId,
 
-    // typename
-    // TODO name this root query type?
-    pub query_type_id: Option<ServerObjectId>,
-    // Subscription
-    // Mutation
+    pub root_types: HashMap<ServerObjectId, RootOperationName>,
 }
 
 /// Distinguishes between server-defined fields and locally-defined fields.
@@ -162,13 +161,6 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
         TSchemaValidationState::ClientFieldVariableDefinitionAssociatedData,
     > {
         &self.client_fields[client_field_id.as_usize()]
-    }
-
-    /// Get a reference to the root query_object, if it's defined.
-    pub fn query_object(&self) -> Option<&SchemaObject<TSchemaValidationState::EncounteredField>> {
-        self.query_type_id
-            .as_ref()
-            .map(|id| self.server_field_data.object(*id))
     }
 }
 

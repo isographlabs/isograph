@@ -2,8 +2,8 @@ use std::collections::{hash_map::Entry, HashMap};
 
 use crate::{
     ClientField, ClientFieldVariant, EncounteredRootTypes, FieldDefinitionLocation,
-    IsographObjectTypeDefinition, ObjectTypeAndFieldNames, ProcessedRootTypes, RootTypes, Schema,
-    SchemaObject, SchemaScalar, SchemaServerField, UnvalidatedClientField,
+    IsographObjectTypeDefinition, ObjectTypeAndFieldNames, ProcessedRootTypes, RootOperationName,
+    RootTypes, Schema, SchemaObject, SchemaScalar, SchemaServerField, UnvalidatedClientField,
     UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField, ID_GRAPHQL_TYPE,
     STRING_JAVASCRIPT_TYPE,
 };
@@ -176,12 +176,14 @@ impl UnvalidatedSchema {
         let root_types = self.process_root_types(processed_root_types, encountered_root_types)?;
 
         if let Some(query_type_id) = root_types.query {
-            debug_assert!(
-                self.query_type_id.is_none(),
-                "Expected query not to be already defined."
-            );
-            self.query_type_id = Some(query_type_id);
+            self.root_types
+                .insert(query_type_id, RootOperationName("query".to_string()));
         }
+        if let Some(mutation_type_id) = root_types.mutation {
+            self.root_types
+                .insert(mutation_type_id, RootOperationName("mutation".to_string()));
+        }
+        // TODO add support for subscriptions
 
         Ok(ProcessGraphQLDocumentOutcome {
             root_types,

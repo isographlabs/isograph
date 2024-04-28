@@ -44,21 +44,18 @@ impl UnvalidatedSchema {
 
         match parent_type_id {
             SelectableServerFieldId::Object(object_id) => {
-                // For now, only the query object is fetchable, and thus
-                // can be used as a parent type in an iso entrypoint declaration.
-                //
-                // This requirement should be loosened — anything that we
-                // know how to fetch (e.g. viewer, an item implementing Node, etc.)
-                // should be fetchable.
-                let query_id = self.query_type_id.ok_or(WithLocation::new(
-                    ValidateEntrypointDeclarationError::RootQueryTypeMustExist,
-                    Location::generated(),
-                ))?;
-
-                if query_id != *object_id {
+                if !self.root_types.contains_key(object_id) {
                     Err(WithLocation::new(
                         ValidateEntrypointDeclarationError::NonFetchableParentType {
                             parent_type_name: parent_type.item,
+                            fetchable_types: self
+                                .root_types
+                                .iter()
+                                .map(|(object_id, _)| {
+                                    self.server_field_data.object(*object_id).name.to_string()
+                                })
+                                .collect::<Vec<_>>()
+                                .join(", "),
                         },
                         Location::new(text_source, parent_type.span),
                     ))
@@ -125,14 +122,12 @@ pub enum ValidateEntrypointDeclarationError {
         parent_type_name: UnvalidatedTypeName,
     },
 
-    #[error("A root query type must exist.")]
-    RootQueryTypeMustExist,
-
     #[error(
-        "The type `{parent_type_name}` is not fetchable. (Currently, only Query is fetchable.)"
+        "The type `{parent_type_name}` is not fetchable. The following types are fetchable: {fetchable_types}.",
     )]
     NonFetchableParentType {
         parent_type_name: UnvalidatedTypeName,
+        fetchable_types: String,
     },
 
     #[error("The client field `{parent_type_name}.{client_field_name}` is not defined.")]

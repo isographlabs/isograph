@@ -98,10 +98,10 @@ impl ValidatedSchema {
             server_field_data: schema_data,
             id_type_id: id_type,
             string_type_id: string_type,
-            query_type_id,
             float_type_id,
             boolean_type_id,
             int_type_id,
+            root_types,
         } = unvalidated_schema;
 
         let updated_fields = match validate_and_transform_fields(fields, &schema_data) {
@@ -153,10 +153,10 @@ impl ValidatedSchema {
                 },
                 id_type_id: id_type,
                 string_type_id: string_type,
-                query_type_id,
                 float_type_id,
                 boolean_type_id,
                 int_type_id,
+                root_types,
             })
         } else {
             Err(errors)

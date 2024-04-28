@@ -633,32 +633,29 @@ fn generate_entrypoint_artifact<'schema>(
     artifact_queue: &mut Vec<ArtifactQueueItem>,
     encountered_cliend_field_ids: &mut HashSet<ClientFieldId>,
 ) -> EntrypointArtifactInfo<'schema> {
-    let top_level_client_field = schema.client_field(client_field_id);
-    if let Some((ref selection_set, _)) = top_level_client_field.selection_set_and_unwraps {
-        let query_name = top_level_client_field.name.into();
+    let fetchable_client_field = schema.client_field(client_field_id);
+    if let Some((ref selection_set, _)) = fetchable_client_field.selection_set_and_unwraps {
+        let query_name = fetchable_client_field.name.into();
 
         let (merged_selection_set, root_refetched_paths) = create_merged_selection_set(
             schema,
-            // TODO here we are assuming that the client field is only on the Query type.
-            // That restriction should be loosened.
             schema
-                .query_object()
-                .expect("expect query type to exist")
-                .into(),
+                .server_field_data
+                .object(fetchable_client_field.parent_object_id),
             selection_set,
             Some(artifact_queue),
             Some(encountered_cliend_field_ids),
-            &top_level_client_field,
+            &fetchable_client_field,
         );
 
-        let query_object = schema
-            .query_object()
-            .expect("Expected query object to exist");
+        let parent_object = schema
+            .server_field_data
+            .object(fetchable_client_field.parent_object_id);
         let query_text = generate_query_text(
             query_name,
             schema,
             &merged_selection_set,
-            &top_level_client_field.variable_definitions,
+            &fetchable_client_field.variable_definitions,
         );
         let refetch_query_artifact_imports =
             generate_refetch_query_artifact_imports(&root_refetched_paths);
@@ -668,7 +665,7 @@ fn generate_entrypoint_artifact<'schema>(
         EntrypointArtifactInfo {
             query_text,
             query_name,
-            parent_type: query_object.into(),
+            parent_type: parent_object.into(),
             normalization_ast,
             refetch_query_artifact_import: refetch_query_artifact_imports,
         }
@@ -696,8 +693,8 @@ fn generate_eager_reader_artifact<'schema>(
             // TODO here we are assuming that the client field is only on the Query type.
             // That restriction should be loosened.
             schema
-                .query_object()
-                .expect("expect query type to exist")
+                .server_field_data
+                .object(client_field.parent_object_id)
                 .into(),
             selection_set,
             None,
@@ -755,11 +752,9 @@ fn generate_component_reader_artifact<'schema>(
 
         let (_merged_selection_set, root_refetched_paths) = create_merged_selection_set(
             schema,
-            // TODO here we are assuming that the client field is only on the Query type.
-            // That restriction should be loosened.
             schema
-                .query_object()
-                .expect("expect query type to exist")
+                .server_field_data
+                .object(client_field.parent_object_id)
                 .into(),
             selection_set,
             None,
@@ -814,11 +809,9 @@ fn generate_refetch_reader_artifact<'schema>(
 
         let (_merged_selection_set, root_refetched_paths) = create_merged_selection_set(
             schema,
-            // TODO here we are assuming that the client field is only on the Query type.
-            // That restriction should be loosened.
             schema
-                .query_object()
-                .expect("expect query type to exist")
+                .server_field_data
+                .object(client_field.parent_object_id)
                 .into(),
             selection_set,
             None,
@@ -870,11 +863,9 @@ fn generate_mutation_reader_artifact<'schema>(
 
         let (_merged_selection_set, root_refetched_paths) = create_merged_selection_set(
             schema,
-            // TODO here we are assuming that the client field is only on the Query type.
-            // That restriction should be loosened.
             schema
-                .query_object()
-                .expect("expect query type to exist")
+                .server_field_data
+                .object(client_field.parent_object_id)
                 .into(),
             selection_set,
             None,
