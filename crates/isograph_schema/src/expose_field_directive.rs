@@ -36,6 +36,7 @@ pub struct ExposeFieldDirective {
     #[serde(rename = "as")]
     expose_as: Option<SelectableFieldName>,
     path: StringLiteralValue,
+    #[serde(default)]
     field_map: Vec<FieldMapItem>,
     field: StringLiteralValue,
 }
@@ -73,17 +74,17 @@ impl UnvalidatedSchema {
     ///   selected in the merged selection set.
     ///
     /// There is lots of cloning going on here! Not ideal.
-    pub fn create_mutation_fields_from_expose_field_directives(
+    pub fn add_exposed_fields_to_parent_object_types(
         &mut self,
-        mutation_id: ServerObjectId,
+        parent_object_id: ServerObjectId,
         options: ConfigOptions,
     ) -> ProcessTypeDefinitionResult<()> {
         // TODO don't clone if possible
-        let mutation_object = self.server_field_data.object(mutation_id);
-        let mutation_object_name = mutation_object.name;
+        let parent_object = self.server_field_data.object(parent_object_id);
+        let parent_object_name = parent_object.name;
 
         // TODO this is a bit ridiculous
-        let expose_field_directives = mutation_object
+        let expose_field_directives = parent_object
             .directives
             .iter()
             .map(|d| self.parse_expose_field_directive(d))
@@ -94,10 +95,10 @@ impl UnvalidatedSchema {
             .collect::<Vec<_>>();
 
         for expose_field_directive in expose_field_directives.iter() {
-            self.create_new_mutation_field(
+            self.create_new_exposed_field(
                 expose_field_directive,
-                mutation_object_name,
-                mutation_id,
+                parent_object_name,
+                parent_object_id,
                 options,
             )?;
         }
@@ -105,11 +106,11 @@ impl UnvalidatedSchema {
         Ok(())
     }
 
-    fn create_new_mutation_field(
+    fn create_new_exposed_field(
         &mut self,
         expose_field_directive: &ExposeFieldDirective,
-        mutation_object_name: IsographObjectTypeName,
-        mutation_object_id: ServerObjectId,
+        parent_object_name: IsographObjectTypeName,
+        parent_object_id: ServerObjectId,
         options: ConfigOptions,
     ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
         let ExposeFieldDirective {
@@ -119,8 +120,9 @@ impl UnvalidatedSchema {
             field,
         } = expose_field_directive;
 
-        let mutation_subfield_id = self.parse_mutation_subfield_id(*field, mutation_object_id)?;
+        let mutation_subfield_id = self.parse_mutation_subfield_id(*field, parent_object_id)?;
 
+        // TODO do not use mutation naming here
         let mutation_field = self.server_field(mutation_subfield_id);
         let mutation_field_payload_type_name = *mutation_field.associated_data.inner();
         let mutation_field_name = expose_as.unwrap_or(mutation_field.name.item);
@@ -140,7 +142,7 @@ impl UnvalidatedSchema {
                     mutation_field_arguments.clone(),
                     // TODO make this a no-op
                     mutation_field_payload_type_name.lookup().intern().into(),
-                    mutation_object_name,
+                    parent_object_name,
                     mutation_field_name,
                     // TODO don't clone
                     field_map.clone(),
@@ -289,13 +291,13 @@ impl UnvalidatedSchema {
         d: &GraphQLDirective<ConstantValue>,
     ) -> ProcessTypeDefinitionResult<Option<ExposeFieldDirective>> {
         if d.name.item == *EXPOSE_FIELD_DIRECTIVE {
-            let mutation = from_graph_ql_directive(d).map_err(|err| match err {
+            let expose_field_directive = from_graph_ql_directive(d).map_err(|err| match err {
                 DeserializationError::Custom(err) => WithLocation::new(
                     ProcessTypeDefinitionError::FailedToDeserialize(err),
                     d.name.location.into(), // TODO: use location of the entire directive
                 ),
             })?;
-            Ok(Some(mutation))
+            Ok(Some(expose_field_directive))
         } else {
             Ok(None)
         }

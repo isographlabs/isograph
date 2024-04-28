@@ -63,7 +63,7 @@ pub trait SchemaValidationState: Debug {
     type Entrypoint: Debug;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RootOperationName(pub String);
 
 /// The in-memory representation of a schema.

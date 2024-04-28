@@ -594,6 +594,7 @@ fn generate_mutation_query_text<'schema>(
         get_aliased_mutation_field_name(mutation_field_name, &mutation_parameters);
 
     let parent_object_name = parent_object_type.name;
+
     query_text.push_str(&format!(
         "mutation {parent_object_name}{mutation_field_name} {variable_text} {{\\\n\
         {aliased_mutation_field_name}: {server_schema_mutation_field_name}{mutation_field_arguments} {{\\\n\
