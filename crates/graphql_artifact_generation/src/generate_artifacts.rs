@@ -642,8 +642,8 @@ fn generate_entrypoint_artifact<'schema>(
             // TODO here we are assuming that the client field is only on the Query type.
             // That restriction should be loosened.
             schema
-                .server_field_data
-                .object(schema.query_type_id.expect("expect query type to exist"))
+                .query_object()
+                .expect("expect query type to exist")
                 .into(),
             selection_set,
             Some(artifact_queue),
@@ -696,8 +696,8 @@ fn generate_eager_reader_artifact<'schema>(
             // TODO here we are assuming that the client field is only on the Query type.
             // That restriction should be loosened.
             schema
-                .server_field_data
-                .object(schema.query_type_id.expect("expect query type to exist"))
+                .query_object()
+                .expect("expect query type to exist")
                 .into(),
             selection_set,
             None,
@@ -758,8 +758,8 @@ fn generate_component_reader_artifact<'schema>(
             // TODO here we are assuming that the client field is only on the Query type.
             // That restriction should be loosened.
             schema
-                .server_field_data
-                .object(schema.query_type_id.expect("expect query type to exist"))
+                .query_object()
+                .expect("expect query type to exist")
                 .into(),
             selection_set,
             None,
@@ -817,8 +817,8 @@ fn generate_refetch_reader_artifact<'schema>(
             // TODO here we are assuming that the client field is only on the Query type.
             // That restriction should be loosened.
             schema
-                .server_field_data
-                .object(schema.query_type_id.expect("expect query type to exist"))
+                .query_object()
+                .expect("expect query type to exist")
                 .into(),
             selection_set,
             None,
@@ -873,8 +873,8 @@ fn generate_mutation_reader_artifact<'schema>(
             // TODO here we are assuming that the client field is only on the Query type.
             // That restriction should be loosened.
             schema
-                .server_field_data
-                .object(schema.query_type_id.expect("expect query type to exist"))
+                .query_object()
+                .expect("expect query type to exist")
                 .into(),
             selection_set,
             None,
