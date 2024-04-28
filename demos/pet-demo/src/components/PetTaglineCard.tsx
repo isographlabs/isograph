@@ -1,13 +1,18 @@
 import React from 'react';
 import { iso } from '@iso';
-import { Card, CardContent } from '@mui/material';
+import { Button, Card, CardContent } from '@mui/material';
+import { useImperativeReference } from '@isograph/react';
+import { UNASSIGNED_STATE } from '@isograph/react-disposable-state';
 
 export const PetTaglineCard = iso(`
 field Pet.PetTaglineCard @component {
   id
   tagline
 }
-`)(function PetTaglineCardComponent(data) {
+`)(function PetTaglineCardComponent(pet) {
+  const { queryReference: mutationRef, loadQueryReference: loadMutation } =
+    useImperativeReference(iso(`entrypoint Mutation.SetTagline`));
+
   return (
     <Card
       variant="outlined"
@@ -15,8 +20,34 @@ field Pet.PetTaglineCard @component {
     >
       <CardContent>
         <h2>Tagline</h2>
-        <p>&quot;{data.tagline}&quot;</p>
+        <p>&quot;{pet.tagline}&quot;</p>
+        {mutationRef == UNASSIGNED_STATE ? (
+          <Button
+            onClick={() => {
+              loadMutation({
+                // @ts-expect-error TODO improve types
+                input: {
+                  id: pet.id,
+                  tagline: 'SUPER DOG',
+                },
+              });
+            }}
+            variant="contained"
+          >
+            Set tagline to SUPER DOG
+          </Button>
+        ) : null}
       </CardContent>
     </Card>
   );
 });
+
+export const setTagline = iso(`
+  field Mutation.SetTagline($input: SetPetTaglineParams!) {
+    set_pet_tagline(input: $input) {
+      pet {
+        tagline
+      }
+    }
+  }
+`)(() => {});

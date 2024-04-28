@@ -1,5 +1,6 @@
 import type {IsographEntrypoint} from '@isograph/react';
 import { Checkin__CheckinDisplay__param } from './Checkin/CheckinDisplay/param_type';
+import { Mutation__SetTagline__param } from './Mutation/SetTagline/param_type';
 import { Pet__FavoritePhraseLoader__param } from './Pet/FavoritePhraseLoader/param_type';
 import { Pet__PetBestFriendCard__param } from './Pet/PetBestFriendCard/param_type';
 import { Pet__PetCheckinsCard__param } from './Pet/PetCheckinsCard/param_type';
@@ -11,6 +12,7 @@ import { Pet__PetUpdater__param } from './Pet/PetUpdater/param_type';
 import { Query__HomeRoute__param } from './Query/HomeRoute/param_type';
 import { Query__PetDetailRoute__param } from './Query/PetDetailRoute/param_type';
 import { Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/param_type';
+import entrypoint_Mutation__SetTagline from '../__isograph/Mutation/SetTagline/entrypoint';
 import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint';
 import entrypoint_Query__PetDetailRoute from '../__isograph/Query/PetDetailRoute/entrypoint';
 import entrypoint_Query__PetFavoritePhrase from '../__isograph/Query/PetFavoritePhrase/entrypoint';
@@ -65,6 +67,10 @@ export function iso<T>(
 ): IdentityWithParamComponent<Checkin__CheckinDisplay__param>;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Mutation.SetTagline', T>
+): IdentityWithParam<Mutation__SetTagline__param>;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.FavoritePhraseLoader', T>
 ): IdentityWithParamComponent<Pet__FavoritePhraseLoader__param>;
 
@@ -107,6 +113,10 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.PetFavoritePhrase', T>
 ): IdentityWithParamComponent<Query__PetFavoritePhrase__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Mutation.SetTagline', T>
+): typeof entrypoint_Mutation__SetTagline;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.HomeRoute', T>

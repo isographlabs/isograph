@@ -7,7 +7,7 @@ export const FavoritePhraseLoader = iso(`
   field Pet.FavoritePhraseLoader @component {
     id
   }
-`)((data) => {
+`)((pet) => {
   const { queryReference, loadQueryReference } = useImperativeReference(
     iso(`entrypoint Query.PetFavoritePhrase`),
   );
@@ -15,7 +15,7 @@ export const FavoritePhraseLoader = iso(`
   return (
     <>
       {queryReference == UNASSIGNED_STATE ? (
-        <button onClick={() => loadQueryReference({ id: data.id })}>
+        <button onClick={() => loadQueryReference({ id: pet.id })}>
           Reveal favorite phrase
         </button>
       ) : (
