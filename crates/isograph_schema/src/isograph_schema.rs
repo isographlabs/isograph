@@ -97,7 +97,7 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
     pub boolean_type_id: ServerScalarId,
     pub int_type_id: ServerScalarId,
 
-    pub root_types: HashMap<ServerObjectId, RootOperationName>,
+    pub fetchable_types: HashMap<ServerObjectId, RootOperationName>,
 }
 
 /// Distinguishes between server-defined fields and locally-defined fields.

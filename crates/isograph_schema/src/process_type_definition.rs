@@ -176,11 +176,11 @@ impl UnvalidatedSchema {
         let root_types = self.process_root_types(processed_root_types, encountered_root_types)?;
 
         if let Some(query_type_id) = root_types.query {
-            self.root_types
+            self.fetchable_types
                 .insert(query_type_id, RootOperationName("query".to_string()));
         }
         if let Some(mutation_type_id) = root_types.mutation {
-            self.root_types
+            self.fetchable_types
                 .insert(mutation_type_id, RootOperationName("mutation".to_string()));
         }
         // TODO add support for subscriptions

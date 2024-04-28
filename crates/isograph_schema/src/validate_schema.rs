@@ -101,7 +101,7 @@ impl ValidatedSchema {
             float_type_id,
             boolean_type_id,
             int_type_id,
-            root_types,
+            fetchable_types: root_types,
         } = unvalidated_schema;
 
         let updated_fields = match validate_and_transform_fields(fields, &schema_data) {
@@ -156,7 +156,7 @@ impl ValidatedSchema {
                 float_type_id,
                 boolean_type_id,
                 int_type_id,
-                root_types,
+                fetchable_types: root_types,
             })
         } else {
             Err(errors)

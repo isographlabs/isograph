@@ -653,11 +653,11 @@ fn generate_entrypoint_artifact<'schema>(
         // TODO model this better so that the RootOperationName is somehow a
         // parameter
         let root_operation_name = schema
-            .root_types
+            .fetchable_types
             .get(&fetchable_client_field.parent_object_id)
             .unwrap_or_else(|| {
                 schema
-                    .root_types
+                    .fetchable_types
                     .iter()
                     .next()
                     .expect("Expected at least one fetchable type to exist")

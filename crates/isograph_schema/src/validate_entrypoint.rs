@@ -44,12 +44,12 @@ impl UnvalidatedSchema {
 
         match parent_type_id {
             SelectableServerFieldId::Object(object_id) => {
-                if !self.root_types.contains_key(object_id) {
+                if !self.fetchable_types.contains_key(object_id) {
                     Err(WithLocation::new(
                         ValidateEntrypointDeclarationError::NonFetchableParentType {
                             parent_type_name: parent_type.item,
                             fetchable_types: self
-                                .root_types
+                                .fetchable_types
                                 .iter()
                                 .map(|(object_id, _)| {
                                     self.server_field_data.object(*object_id).name.to_string()
