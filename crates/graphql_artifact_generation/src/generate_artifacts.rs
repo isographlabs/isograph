@@ -22,12 +22,12 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_client_field,
-    ArtifactQueueItem, ClientFieldVariant, FieldDefinitionLocation, FieldMapItem,
-    MergedLinkedFieldSelection, MergedScalarFieldSelection, MergedSelectionSet,
-    MergedServerFieldSelection, MutationFieldArtifactInfo, MutationFieldClientFieldVariant,
-    NameAndArguments, ObjectTypeAndFieldNames, PathToRefetchField, RefetchFieldArtifactInfo,
-    RequiresRefinement, RootOperationName, RootRefetchedPath, ValidatedClientField,
-    ValidatedSchema, ValidatedSchemaObject, ValidatedSelection, ValidatedVariableDefinition,
+    ArtifactQueueItem, ClientFieldVariant, ExposedFieldVariant, FieldDefinitionLocation,
+    FieldMapItem, ImperativelyLoadedFieldArtifactInfo, MergedLinkedFieldSelection,
+    MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection, NameAndArguments,
+    ObjectTypeAndFieldNames, PathToRefetchField, RefetchFieldArtifactInfo, RequiresRefinement,
+    RootOperationName, RootRefetchedPath, ValidatedClientField, ValidatedSchema,
+    ValidatedSchemaObject, ValidatedSelection, ValidatedVariableDefinition,
 };
 
 use crate::artifact_file_contents::{ENTRYPOINT, ISO_TS};
@@ -359,7 +359,7 @@ fn get_artifact_infos<'schema>(
             ClientFieldVariant::RefetchField => ArtifactInfo::RefetchReader(
                 generate_refetch_reader_artifact(schema, encountered_client_field),
             ),
-            ClientFieldVariant::MutationField(mutation_variant) => {
+            ClientFieldVariant::ExposedField(mutation_variant) => {
                 ArtifactInfo::MutationReader(generate_mutation_reader_artifact(
                     schema,
                     encountered_client_field,
@@ -375,7 +375,7 @@ fn get_artifact_infos<'schema>(
             ArtifactQueueItem::RefetchField(refetch_info) => {
                 get_artifact_for_refetch_field(schema, refetch_info)
             }
-            ArtifactQueueItem::MutationField(mutation_info) => {
+            ArtifactQueueItem::ImperativelyLoadedField(mutation_info) => {
                 get_artifact_for_mutation_field(schema, mutation_info)
             }
         }))
@@ -433,9 +433,9 @@ fn get_artifact_for_refetch_field(
 
 fn get_artifact_for_mutation_field<'schema>(
     schema: &'schema ValidatedSchema,
-    mutation_info: MutationFieldArtifactInfo,
+    mutation_info: ImperativelyLoadedFieldArtifactInfo,
 ) -> RefetchEntrypointArtifactInfo {
-    let MutationFieldArtifactInfo {
+    let ImperativelyLoadedFieldArtifactInfo {
         merged_selection_set,
         refetch_field_parent_id: parent_id,
         variable_definitions,
@@ -871,7 +871,7 @@ fn generate_refetch_reader_artifact<'schema>(
 fn generate_mutation_reader_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     client_field: &ValidatedClientField,
-    mutation_variant: &MutationFieldClientFieldVariant,
+    mutation_variant: &ExposedFieldVariant,
 ) -> MutationReaderArtifactInfo<'schema> {
     if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
         let parent_type = schema
@@ -1518,7 +1518,7 @@ fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctio
 }
 
 fn generate_function_import_statement_for_mutation_reader(
-    m: &MutationFieldClientFieldVariant,
+    m: &ExposedFieldVariant,
 ) -> ClientFieldFunctionImportStatement {
     let include_read_out_data = get_read_out_data(&m.field_map);
     ClientFieldFunctionImportStatement(format!(
@@ -1748,7 +1748,7 @@ fn generate_reader_ast_node(
                                     {indent_1}}},\n",
                                 )
                             }
-                            ClientFieldVariant::MutationField(ref s) => {
+                            ClientFieldVariant::ExposedField(ref s) => {
                                 let refetch_query_index = find_mutation_query_index(
                                     root_refetched_paths,
                                     path,
@@ -2001,7 +2001,7 @@ fn generate_output_type(client_field: &ValidatedClientField) -> ClientFieldOutpu
                 ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
             }
             ClientFieldVariant::RefetchField => ClientFieldOutputType("() => void".to_string()),
-            ClientFieldVariant::MutationField(_) => {
+            ClientFieldVariant::ExposedField(_) => {
                 // TODO type these parameters
                 ClientFieldOutputType("(params: any) => void".to_string())
             }

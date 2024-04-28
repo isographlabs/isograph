@@ -16,7 +16,7 @@ use isograph_lang_types::{
 
 use crate::{
     expose_field_directive::RequiresRefinement, ArgumentKeyAndValue, ClientFieldVariant,
-    FieldDefinitionLocation, MutationFieldClientFieldVariant, NameAndArguments, PathToRefetchField,
+    ExposedFieldVariant, FieldDefinitionLocation, NameAndArguments, PathToRefetchField,
     ValidatedClientField, ValidatedFieldDefinitionLocation, ValidatedLinkedFieldSelection,
     ValidatedSchema, ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSelection,
 };
@@ -157,7 +157,7 @@ enum NormalizationKey {
 #[derive(Debug)]
 pub enum ArtifactQueueItem {
     RefetchField(RefetchFieldArtifactInfo),
-    MutationField(MutationFieldArtifactInfo),
+    ImperativelyLoadedField(ImperativelyLoadedFieldArtifactInfo),
 }
 
 #[derive(Debug, Clone)]
@@ -174,7 +174,7 @@ pub struct RefetchFieldArtifactInfo {
 }
 
 #[derive(Debug, Clone)]
-pub struct MutationFieldArtifactInfo {
+pub struct ImperativelyLoadedFieldArtifactInfo {
     pub merged_selection_set: MergedSelectionSet,
     /// Used to look up what type to narrow on in the generated refetch query,
     /// among other things.
@@ -302,17 +302,20 @@ pub fn create_merged_selection_set(
                                 ));
                                 "__refetch".intern().into()
                             }
-                            ClientFieldVariant::MutationField(
-                                MutationFieldClientFieldVariant {
-                                    mutation_field_name,
+                            ClientFieldVariant::ExposedField(ExposedFieldVariant {
+                                mutation_field_name,
+                                fetchable_type_original_field_name:
                                     server_schema_mutation_field_name,
-                                    mutation_primary_field_name,
-                                    mutation_field_arguments,
-                                    filtered_mutation_field_arguments: _,
-                                    mutation_primary_field_return_type_object_id,
-                                    field_map: _,
-                                },
-                            ) => {
+                                aliased_exposed_field_name: mutation_primary_field_name,
+                                mutation_field_arguments,
+                                filtered_mutation_field_arguments: _,
+                                mutation_primary_field_return_type_object_id,
+                                field_map: _,
+                            }) => {
+                                // It's a bit weird that all exposed fields become imperatively
+                                // loaded fields. It probably makes sense to think about how we
+                                // can name the things in this block better.
+
                                 let requires_refinement =
                                     if mutation_primary_field_return_type_object_id
                                         == refetch_field_parent_id
@@ -327,8 +330,8 @@ pub fn create_merged_selection_set(
                                         )
                                     };
 
-                                artifact_queue.push(ArtifactQueueItem::MutationField(
-                                    MutationFieldArtifactInfo {
+                                artifact_queue.push(ArtifactQueueItem::ImperativelyLoadedField(
+                                    ImperativelyLoadedFieldArtifactInfo {
                                         merged_selection_set: nested_merged_selection_set,
                                         refetch_field_parent_id,
                                         variable_definitions: definitions_of_used_variables,
@@ -378,7 +381,7 @@ pub fn create_merged_selection_set(
 
                     let field_name = match client_field_variant {
                         ClientFieldVariant::RefetchField => "__refetch".intern().into(),
-                        ClientFieldVariant::MutationField(MutationFieldClientFieldVariant {
+                        ClientFieldVariant::ExposedField(ExposedFieldVariant {
                             mutation_field_name,
                             ..
                         }) => mutation_field_name,
@@ -601,9 +604,9 @@ fn merge_scalar_client_field(
             parent_type.id,
             ClientFieldVariant::RefetchField,
         ));
-    } else if let ClientFieldVariant::MutationField(MutationFieldClientFieldVariant {
-        mutation_primary_field_name,
-        server_schema_mutation_field_name,
+    } else if let ClientFieldVariant::ExposedField(ExposedFieldVariant {
+        aliased_exposed_field_name: mutation_primary_field_name,
+        fetchable_type_original_field_name: server_schema_mutation_field_name,
         mutation_field_arguments,
         filtered_mutation_field_arguments,
         mutation_field_name: _,
@@ -617,10 +620,10 @@ fn merge_scalar_client_field(
                 field_name: client_field.name,
             },
             parent_type.id,
-            ClientFieldVariant::MutationField(MutationFieldClientFieldVariant {
+            ClientFieldVariant::ExposedField(ExposedFieldVariant {
                 mutation_field_name: client_field.name,
-                server_schema_mutation_field_name: *server_schema_mutation_field_name,
-                mutation_primary_field_name: *mutation_primary_field_name,
+                fetchable_type_original_field_name: *server_schema_mutation_field_name,
+                aliased_exposed_field_name: *mutation_primary_field_name,
                 mutation_field_arguments: mutation_field_arguments.clone(),
                 filtered_mutation_field_arguments: filtered_mutation_field_arguments.clone(),
                 mutation_primary_field_return_type_object_id:

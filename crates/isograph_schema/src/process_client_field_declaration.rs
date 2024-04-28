@@ -129,10 +129,10 @@ pub enum ProcessClientFieldDeclarationError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct MutationFieldClientFieldVariant {
+pub struct ExposedFieldVariant {
     pub mutation_field_name: SelectableFieldName,
-    pub server_schema_mutation_field_name: SelectableFieldName,
-    pub mutation_primary_field_name: SelectableFieldName,
+    pub fetchable_type_original_field_name: SelectableFieldName,
+    pub aliased_exposed_field_name: SelectableFieldName,
     pub mutation_primary_field_return_type_object_id: ServerObjectId,
     pub mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
     pub filtered_mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
@@ -144,7 +144,7 @@ pub enum ClientFieldVariant {
     Component((ConstExportName, FilePath)),
     Eager((ConstExportName, FilePath)),
     RefetchField,
-    MutationField(MutationFieldClientFieldVariant),
+    ExposedField(ExposedFieldVariant),
 }
 
 impl fmt::Display for ClientFieldVariant {
@@ -153,7 +153,7 @@ impl fmt::Display for ClientFieldVariant {
             ClientFieldVariant::Component(_) => write!(f, "Component"),
             ClientFieldVariant::Eager(_) => write!(f, "Eager"),
             ClientFieldVariant::RefetchField => write!(f, "RefetchField"),
-            ClientFieldVariant::MutationField(_) => write!(f, "MutationField"),
+            ClientFieldVariant::ExposedField(_) => write!(f, "MutationField"),
         }
     }
 }
