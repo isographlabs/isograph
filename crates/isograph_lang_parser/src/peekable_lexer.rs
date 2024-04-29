@@ -109,8 +109,8 @@ impl<'source> PeekableLexer<'source> {
         &self.source[start..end]
     }
 
-    /// Advances the parser iff the IsographLangTokenKind, so this is safe
-    /// to call to see if the next token matches.
+    /// If the next token doesn't match expected_kind, we don't advance
+    /// the parser, so this is safe to use without peeking.
     pub fn parse_token_of_kind(
         &mut self,
         expected_kind: IsographLangTokenKind,
