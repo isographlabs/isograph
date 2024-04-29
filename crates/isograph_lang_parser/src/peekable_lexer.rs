@@ -1,5 +1,5 @@
 use crate::IsographLangTokenKind;
-use common_lang_types::{Span, WithSpan};
+use common_lang_types::{EmbeddedLocation, Location, Span, TextSource, WithLocation, WithSpan};
 use intern::string_key::{Intern, StringKey};
 use logos::Logos;
 use thiserror::Error;
@@ -11,10 +11,11 @@ pub(crate) struct PeekableLexer<'source> {
     /// the byte offset of the *end* of the previous token
     end_index_of_last_parsed_token: u32,
     offset: u32,
+    text_source: TextSource,
 }
 
 impl<'source> PeekableLexer<'source> {
-    pub fn new(source: &'source str) -> Self {
+    pub fn new(source: &'source str, text_source: TextSource) -> Self {
         // To enable fast lookahead the parser needs to store at least the 'kind' (IsographLangTokenKind)
         // of the next token: the simplest option is to store the full current token, but
         // the Parser requires an initial value. Rather than incur runtime/code overhead
@@ -30,6 +31,7 @@ impl<'source> PeekableLexer<'source> {
             source,
             end_index_of_last_parsed_token: 0,
             offset: 0,
+            text_source,
         };
 
         // Advance to the first real token before doing any work
@@ -47,10 +49,24 @@ impl<'source> PeekableLexer<'source> {
                 .unwrap_or(IsographLangTokenKind::EndOfFile);
             match kind {
                 IsographLangTokenKind::Error => {
+                    // HACK we print out the location here, but we should return
+                    // the error. In particular, we can show multiple such errors
+                    // if they occur in different iso literals.
+                    let span = self.lexer_span();
                     // TODO propagate? continue?
-                    panic!("Encountered an error. \
-                    This can occur if you commented out an iso literal, or if an iso literal contains \
-                    an invalid token.")
+                    panic!(
+                        "Encountered an error. \
+                        This can occur if you commented out an iso literal, \
+                        or if an iso literal contains \
+                        an invalid token. \n{}",
+                        WithLocation::new(
+                            "",
+                            Location::Embedded(EmbeddedLocation {
+                                text_source: self.text_source,
+                                span
+                            })
+                        )
+                    )
                 }
                 _ => {
                     self.end_index_of_last_parsed_token = self.current.span.end;

@@ -5,7 +5,7 @@ import { MenuItem, Select, Button, Input, Box } from '@mui/material';
 import { PetId } from './router';
 
 export const PetUpdater = iso(`
-  field Pet.PetUpdater @component 
+  field Pet.PetUpdater @component
   """
   # Pet.PetUpdater
   A component to test behavior with respect to mutations.

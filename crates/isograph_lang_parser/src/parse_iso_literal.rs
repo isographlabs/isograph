@@ -30,7 +30,7 @@ pub fn parse_iso_literal(
     const_export_name: Option<&str>,
     text_source: TextSource,
 ) -> Result<IsoLiteralExtractionResult, WithLocation<IsographLiteralParseError>> {
-    let mut tokens = PeekableLexer::new(iso_literal_text);
+    let mut tokens = PeekableLexer::new(iso_literal_text, text_source);
     let discriminator = tokens
         .parse_source_of_kind(IsographLangTokenKind::Identifier)
         .map_err(|with_span| with_span.map(IsographLiteralParseError::from))
@@ -589,12 +589,21 @@ fn HACK_combine_name_and_variables_into_normalization_alias<T: StringKeyNewtype>
 
 #[cfg(test)]
 mod test {
+    use common_lang_types::TextSource;
+    use intern::string_key::Intern;
+
     use crate::{IsographLangTokenKind, PeekableLexer};
 
     #[test]
     fn parse_literal_tests() {
         let source = "\"Description\" Query.foo { bar, baz, }";
-        let mut lexer = PeekableLexer::new(source);
+        let mut lexer = PeekableLexer::new(
+            source,
+            TextSource {
+                path: "path".intern().into(),
+                span: None,
+            },
+        );
 
         loop {
             let token = lexer.parse_token();
