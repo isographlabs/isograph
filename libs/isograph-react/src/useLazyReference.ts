@@ -1,4 +1,4 @@
-import { FragmentReference, Variable } from './FragmentReference';
+import { FragmentReference, Variables } from './FragmentReference';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import { ROOT_ID } from './IsographEnvironment';
 import { IsographEntrypoint } from './entrypoint';
@@ -10,7 +10,7 @@ export function useLazyReference<
   TClientFieldValue,
 >(
   entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
-  variables: { [key: string]: Variable },
+  variables: Variables,
 ): {
   queryReference: FragmentReference<TReadFromStore, TClientFieldValue>;
 } {

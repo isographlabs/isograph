@@ -3,7 +3,7 @@ import {
   useUpdatableDisposableState,
 } from '@isograph/react-disposable-state';
 import { IsographEntrypoint } from './entrypoint';
-import { FragmentReference } from './FragmentReference';
+import { FragmentReference, Variables } from './FragmentReference';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import { makeNetworkRequest } from './cache';
 import { ROOT_ID } from './IsographEnvironment';
@@ -17,7 +17,7 @@ export function useImperativeReference<
   queryReference:
     | FragmentReference<TReadFromStore, TClientFieldValue>
     | UnassignedState;
-  loadQueryReference: (variables: { [index: string]: string }) => void;
+  loadQueryReference: (variables: Variables) => void;
 } {
   const { state, setState } =
     useUpdatableDisposableState<
@@ -26,7 +26,7 @@ export function useImperativeReference<
   const environment = useIsographEnvironment();
   return {
     queryReference: state,
-    loadQueryReference: (variables: { [index: string]: string }) => {
+    loadQueryReference: (variables: Variables) => {
       const [_networkRequest, disposeNetworkRequest] = makeNetworkRequest(
         environment,
         entrypoint,

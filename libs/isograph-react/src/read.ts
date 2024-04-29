@@ -1,7 +1,7 @@
 import { getParentRecordKey, onNextChange } from './cache';
 import { getOrCreateCachedComponent } from './componentCache';
 import { RefetchQueryNormalizationArtifactWrapper } from './entrypoint';
-import { FragmentReference } from './FragmentReference';
+import { FragmentReference, Variables } from './FragmentReference';
 import {
   assertLink,
   DataId,
@@ -57,7 +57,7 @@ function readData<TReadFromStore>(
   environment: IsographEnvironment,
   ast: ReaderAst<TReadFromStore>,
   root: DataId,
-  variables: { [index: string]: string },
+  variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredRecords: Set<DataId>,
 ): ReadDataResult<TReadFromStore> {
@@ -315,11 +315,12 @@ function readData<TReadFromStore>(
 }
 
 function filterVariables(
-  variables: { [index: string]: string },
+  variables: Variables,
   allowedVariables: string[],
-): { [index: string]: string } {
-  const result: { [index: string]: string } = {};
+): Variables {
+  const result: Variables = {};
   for (const key of allowedVariables) {
+    // @ts-expect-error
     result[key] = variables[key];
   }
   return result;

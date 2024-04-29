@@ -3,9 +3,9 @@ import { RefetchQueryNormalizationArtifactWrapper } from './entrypoint';
 import { TopLevelReaderArtifact } from './reader';
 
 // TODO type this better
-export type Variable = any;
+export type VariableValue = string | number | boolean | null | object;
 
-export type Variables = { readonly [index: string]: Variable };
+export type Variables = { readonly [index: string]: VariableValue };
 
 export type FragmentReference<
   TReadFromStore extends Object,

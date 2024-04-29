@@ -30,7 +30,7 @@ import {
 import { ReaderLinkedField, ReaderScalarField } from './reader';
 import { Argument, ArgumentValue } from './util';
 import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
-import { FragmentReference } from './FragmentReference';
+import { FragmentReference, Variables } from './FragmentReference';
 import { areEqualObjectsWithDeepComparison } from './areEqualWithDeepComparison';
 
 declare global {
@@ -86,7 +86,7 @@ export function getOrCreateCacheForArtifact<
 >(
   environment: IsographEnvironment,
   artifact: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
-  variables: object,
+  variables: Variables,
 ): ParentCache<PromiseWrapper<TClientFieldValue>> {
   const cacheKey = artifact.queryText + JSON.stringify(stableCopy(variables));
   const factory: Factory<PromiseWrapper<TClientFieldValue>> = () =>
@@ -113,7 +113,7 @@ type NetworkRequestStatus =
 export function makeNetworkRequest<T>(
   environment: IsographEnvironment,
   artifact: RefetchQueryNormalizationArtifact | IsographEntrypoint<any, any>,
-  variables: object,
+  variables: Variables,
 ): ItemCleanupPair<PromiseWrapper<T>> {
   if (typeof window !== 'undefined' && window.__LOG) {
     console.log('make network request', artifact, variables);
@@ -191,7 +191,7 @@ function normalizeData(
   environment: IsographEnvironment,
   normalizationAst: NormalizationAst,
   networkResponse: NetworkResponseObject,
-  variables: Object,
+  variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
 ): Set<DataId> {
   const encounteredIds = new Set<DataId>();
@@ -342,7 +342,7 @@ function normalizeDataIntoRecord(
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
   targetParentRecordId: DataId,
-  variables: { [index: string]: string },
+  variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: Set<DataId>,
 ) {
@@ -387,7 +387,7 @@ function normalizeScalarField(
   astNode: NormalizationScalarField,
   networkResponseParentRecord: NetworkResponseObject,
   targetStoreRecord: StoreRecord,
-  variables: { [index: string]: string },
+  variables: Variables,
 ): RecordHasBeenUpdated {
   const networkResponseKey = getNetworkResponseKey(astNode);
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
@@ -414,7 +414,7 @@ function normalizeLinkedField(
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
   targetParentRecordId: DataId,
-  variables: { [index: string]: string },
+  variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: Set<DataId>,
 ): RecordHasBeenUpdated {
@@ -501,7 +501,7 @@ function normalizeNetworkResponseObject(
   astNode: NormalizationLinkedField,
   networkResponseData: NetworkResponseObject,
   targetParentRecordId: string,
-  variables: { [index: string]: string },
+  variables: Variables,
   index: number | null,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: Set<DataId>,
@@ -570,7 +570,7 @@ export function getParentRecordKey(
     | NormalizationScalarField
     | ReaderLinkedField
     | ReaderScalarField,
-  variables: { [index: string]: string },
+  variables: Variables,
 ): string {
   let parentRecordKey = astNode.fieldName;
   const fieldParameters = astNode.arguments;
@@ -585,7 +585,7 @@ export function getParentRecordKey(
 
 function getStoreKeyChunkForArgumentValue(
   argumentValue: ArgumentValue,
-  variables: { [index: string]: string },
+  variables: Variables,
 ) {
   switch (argumentValue.kind) {
     case 'Literal': {
@@ -603,10 +603,7 @@ function getStoreKeyChunkForArgumentValue(
   }
 }
 
-function getStoreKeyChunkForArgument(
-  argument: Argument,
-  variables: { [index: string]: string },
-) {
+function getStoreKeyChunkForArgument(argument: Argument, variables: Variables) {
   const chunk = getStoreKeyChunkForArgumentValue(argument[1], variables);
   return `${FIRST_SPLIT_KEY}${argument[0]}${SECOND_SPLIT_KEY}${chunk}`;
 }
@@ -650,7 +647,7 @@ function getDataIdOfNetworkResponse(
   parentRecordId: DataId,
   dataToNormalize: NetworkResponseObject,
   astNode: NormalizationLinkedField | NormalizationScalarField,
-  variables: { [index: string]: string },
+  variables: Variables,
   index: number | null,
 ): DataId {
   // Check whether the dataToNormalize has an id field. If so, that is the key.

@@ -25,7 +25,6 @@ field Pet.PetTaglineCard @component {
           <Button
             onClick={() => {
               loadMutation({
-                // @ts-expect-error TODO improve types
                 input: {
                   id: pet.id,
                   tagline: 'SUPER DOG',

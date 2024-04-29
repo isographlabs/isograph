@@ -1,3 +1,4 @@
+import { Variables } from './FragmentReference';
 import {
   DataId,
   IsographEnvironment,
@@ -76,7 +77,7 @@ function recordReachableIdsFromRecord(
   currentRecord: StoreRecord,
   mutableRetainedIds: Set<DataId>,
   selections: NormalizationAst,
-  variables: { [index: string]: string } | null,
+  variables: Variables | null,
 ) {
   for (const selection of selections) {
     switch (selection.kind) {

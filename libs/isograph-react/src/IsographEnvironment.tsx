@@ -1,7 +1,7 @@
 import { ParentCache } from '@isograph/react-disposable-state';
 import { RetainedQuery } from './garbageCollection';
 import { WithEncounteredRecords } from './read';
-import { FragmentReference } from './FragmentReference';
+import { FragmentReference, Variables } from './FragmentReference';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -46,12 +46,12 @@ export type MissingFieldHandler = (
   root: DataId,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
-  variables: { [index: string]: any } | null,
+  variables: Variables | null,
 ) => Link | undefined;
 
 export type IsographNetworkFunction = (
   queryText: string,
-  variables: object,
+  variables: Variables,
 ) => Promise<any>;
 
 export type Link = {
@@ -118,7 +118,7 @@ export function defaultMissingFieldHandler(
   _root: DataId,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
-  variables: { [index: string]: any } | null,
+  variables: Variables | null,
 ): Link | undefined {
   if (fieldName === 'node' || fieldName === 'user') {
     const variable = arguments_?.['id'];
@@ -126,6 +126,7 @@ export function defaultMissingFieldHandler(
 
     // TODO can we handle explicit nulls here too? Probably, after wrapping in objects
     if (value != null) {
+      // @ts-expect-error
       return { __link: value };
     }
   }
