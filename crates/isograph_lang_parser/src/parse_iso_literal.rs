@@ -252,20 +252,19 @@ fn parse_delimited_list<'a, TResult>(
     Ok(items)
 }
 
-fn parse_comma_or_line_break<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResultWithSpan<()> {
+fn parse_comma_line_break_or_curly<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResultWithSpan<()> {
     let comma = tokens.parse_token_of_kind(IsographLangTokenKind::Comma);
-    if comma.is_err() {
-        let white_space_text = tokens.source(tokens.white_space_span());
-        if white_space_text.contains('\n') {
-            Ok(())
-        } else {
-            Err(WithSpan::new(
-                IsographLiteralParseError::ExpectedCommaOrLineBreak,
-                tokens.peek().span,
-            ))
-        }
-    } else {
+    if comma.is_ok() {
         Ok(())
+    } else if tokens.source(tokens.white_space_span()).contains('\n') {
+        Ok(())
+    } else if matches!(tokens.peek().item, IsographLangTokenKind::CloseBrace) {
+        Ok(())
+    } else {
+        Err(WithSpan::new(
+            IsographLiteralParseError::ExpectedCommaOrLineBreak,
+            tokens.peek().span,
+        ))
     }
 }
 
@@ -288,7 +287,7 @@ fn parse_selection<'a>(
             let unwraps = parse_unwraps(tokens);
 
             // commas are required
-            parse_comma_or_line_break(tokens)?;
+            parse_comma_line_break_or_curly(tokens)?;
 
             let selection = match selection_set {
                 Some(selection_set) => Selection::ServerField(ServerFieldSelection::LinkedField(
