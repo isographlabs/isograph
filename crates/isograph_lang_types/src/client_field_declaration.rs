@@ -144,6 +144,7 @@ pub struct ScalarFieldSelection<TScalarField> {
     pub associated_data: TScalarField,
     pub unwraps: Vec<WithSpan<Unwrap>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
+    pub directives: Vec<WithSpan<FragmentDirectiveUsage>>,
 }
 
 impl<TScalarField> ScalarFieldSelection<TScalarField> {
@@ -155,6 +156,7 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
             unwraps: self.unwraps,
             arguments: self.arguments,
             normalization_alias: self.normalization_alias,
+            directives: self.directives,
         }
     }
 
@@ -169,6 +171,7 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
             unwraps: self.unwraps,
             arguments: self.arguments,
             normalization_alias: self.normalization_alias,
+            directives: self.directives,
         })
     }
 
@@ -188,6 +191,7 @@ pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
     pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
     pub unwraps: Vec<WithSpan<Unwrap>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
+    pub directives: Vec<WithSpan<FragmentDirectiveUsage>>,
 }
 
 impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField> {

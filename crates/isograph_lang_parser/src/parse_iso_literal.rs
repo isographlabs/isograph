@@ -286,6 +286,8 @@ fn parse_selection<'a>(
 
             let unwraps = parse_unwraps(tokens);
 
+            let directives = parse_directives(tokens)?;
+
             // commas are required
             parse_comma_line_break_or_curly(tokens)?;
 
@@ -304,6 +306,7 @@ fn parse_selection<'a>(
                                 &arguments,
                             ),
                         arguments,
+                        directives,
                     },
                 )),
                 None => Selection::ServerField(ServerFieldSelection::ScalarField(
@@ -319,6 +322,7 @@ fn parse_selection<'a>(
                                 &arguments,
                             ),
                         arguments,
+                        directives,
                     },
                 )),
             };

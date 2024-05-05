@@ -628,6 +628,7 @@ fn get_client_fields_for_schema_object(
                 associated_data: (),
                 unwraps: vec![],
                 arguments: vec![],
+                directives: vec![],
             })),
             Span::todo_generated(),
         );

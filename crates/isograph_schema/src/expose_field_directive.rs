@@ -205,6 +205,7 @@ impl UnvalidatedSchema {
                         unwraps: vec![],
                         // TODO what about arguments? How would we handle them?
                         arguments: vec![],
+                        directives: vec![],
                     };
 
                     WithSpan::new(

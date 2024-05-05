@@ -621,6 +621,7 @@ fn validate_field_type_exists_and_is_scalar(
                         normalization_alias: scalar_field_selection.normalization_alias,
                         unwraps: scalar_field_selection.unwraps,
                         arguments: scalar_field_selection.arguments,
+                        directives: scalar_field_selection.directives
                     }),
                     SelectableServerFieldId::Object(_) => Err(
                         WithLocation::new(
@@ -644,6 +645,7 @@ fn validate_field_type_exists_and_is_scalar(
                     associated_data: FieldDefinitionLocation::Client(*client_field_id),
                     arguments: scalar_field_selection.arguments,
                     normalization_alias: scalar_field_selection.normalization_alias,
+                    directives: scalar_field_selection.directives,
                 })
             }
         },
@@ -707,6 +709,7 @@ fn validate_field_type_exists_and_is_linked(
                                     parent_object_id: object_id,
                                 },
                                 arguments: linked_field_selection.arguments,
+                                directives: linked_field_selection.directives
                             })
                     }
                 }
