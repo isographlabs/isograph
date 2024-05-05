@@ -9,7 +9,7 @@ use graphql_lang_types::{
 };
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
-    ClientFieldDeclaration, EntrypointTypeAndField, FragmentDirectiveUsage, LinkedFieldSelection,
+    ClientFieldDeclaration, EntrypointTypeAndField, IsographFieldDirective, LinkedFieldSelection,
     NonConstantValue, ScalarFieldSelection, Selection, SelectionFieldArgument,
     ServerFieldSelection, UnvalidatedSelection, Unwrap, VariableDefinition,
 };
@@ -363,7 +363,7 @@ fn parse_unwraps(tokens: &mut PeekableLexer) -> Vec<WithSpan<Unwrap>> {
 fn parse_directives(
     tokens: &mut PeekableLexer,
     text_source: TextSource,
-) -> ParseResultWithSpan<Vec<WithSpan<FragmentDirectiveUsage>>> {
+) -> ParseResultWithSpan<Vec<WithSpan<IsographFieldDirective>>> {
     let mut directives = vec![];
     while let Ok(token) = tokens.parse_token_of_kind(IsographLangTokenKind::At) {
         let name = tokens
@@ -374,7 +374,7 @@ fn parse_directives(
         let arguments = parse_optional_arguments(tokens, text_source)?;
 
         directives.push(WithSpan::new(
-            FragmentDirectiveUsage { name, arguments },
+            IsographFieldDirective { name, arguments },
             directive_span,
         ));
     }

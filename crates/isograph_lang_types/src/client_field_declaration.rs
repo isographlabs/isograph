@@ -1,9 +1,11 @@
 use common_lang_types::{
     ConstExportName, DescriptionValue, FieldArgumentName, FieldNameOrAlias, FilePath, HasName,
-    IsographDirectiveName, LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName,
-    SelectableFieldName, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
+    LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName, SelectableFieldName,
+    UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
+
+use crate::IsographFieldDirective;
 
 pub type UnvalidatedSelection = Selection<
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
@@ -24,16 +26,9 @@ pub struct ClientFieldDeclaration {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set_and_unwraps:
         Option<(Vec<WithSpan<UnvalidatedSelection>>, Vec<WithSpan<Unwrap>>)>,
-    pub directives: Vec<WithSpan<FragmentDirectiveUsage>>,
+    pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: FilePath,
-}
-
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-/// Ugly name, but at least it makes clear this isn't a schema directive.
-pub struct FragmentDirectiveUsage {
-    pub name: WithSpan<IsographDirectiveName>,
-    pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -144,7 +139,7 @@ pub struct ScalarFieldSelection<TScalarField> {
     pub associated_data: TScalarField,
     pub unwraps: Vec<WithSpan<Unwrap>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
-    pub directives: Vec<WithSpan<FragmentDirectiveUsage>>,
+    pub directives: Vec<WithSpan<IsographFieldDirective>>,
 }
 
 impl<TScalarField> ScalarFieldSelection<TScalarField> {
@@ -191,7 +186,7 @@ pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
     pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
     pub unwraps: Vec<WithSpan<Unwrap>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
-    pub directives: Vec<WithSpan<FragmentDirectiveUsage>>,
+    pub directives: Vec<WithSpan<IsographFieldDirective>>,
 }
 
 impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField> {
