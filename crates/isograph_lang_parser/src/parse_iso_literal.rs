@@ -134,7 +134,7 @@ fn parse_client_field_declaration_inner<'a>(
 
             let variable_definitions = parse_variable_definitions(tokens, text_source)?;
 
-            let directives = parse_directives(tokens)?;
+            let directives = parse_directives(tokens, text_source)?;
 
             let description = parse_optional_description(tokens);
 
@@ -286,7 +286,7 @@ fn parse_selection<'a>(
 
             let unwraps = parse_unwraps(tokens);
 
-            let directives = parse_directives(tokens)?;
+            let directives = parse_directives(tokens, text_source)?;
 
             // commas are required
             parse_comma_line_break_or_curly(tokens)?;
@@ -362,6 +362,7 @@ fn parse_unwraps(tokens: &mut PeekableLexer) -> Vec<WithSpan<Unwrap>> {
 
 fn parse_directives(
     tokens: &mut PeekableLexer,
+    text_source: TextSource,
 ) -> ParseResultWithSpan<Vec<WithSpan<FragmentDirectiveUsage>>> {
     let mut directives = vec![];
     while let Ok(token) = tokens.parse_token_of_kind(IsographLangTokenKind::At) {
@@ -369,8 +370,11 @@ fn parse_directives(
             .parse_string_key_type(IsographLangTokenKind::Identifier)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
         let directive_span = Span::join(token.span, name.span);
+
+        let arguments = parse_optional_arguments(tokens, text_source)?;
+
         directives.push(WithSpan::new(
-            FragmentDirectiveUsage { name },
+            FragmentDirectiveUsage { name, arguments },
             directive_span,
         ));
     }

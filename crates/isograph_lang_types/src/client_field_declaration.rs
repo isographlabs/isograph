@@ -33,7 +33,7 @@ pub struct ClientFieldDeclaration {
 /// Ugly name, but at least it makes clear this isn't a schema directive.
 pub struct FragmentDirectiveUsage {
     pub name: WithSpan<IsographDirectiveName>,
-    // TODO arguments and such
+    pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
