@@ -6,7 +6,10 @@ use common_lang_types::{
 };
 use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::string_key::Intern;
-use isograph_lang_types::{ClientFieldDeclaration, SelectableServerFieldId, ServerObjectId};
+use isograph_lang_types::{
+    ClientFieldDeclaration, ClientFieldDeclarationWithUnvalidatedDirectives,
+    SelectableServerFieldId, ServerObjectId,
+};
 use lazy_static::lazy_static;
 use thiserror::Error;
 
@@ -17,7 +20,7 @@ use crate::{
 impl UnvalidatedSchema {
     pub fn process_client_field_declaration(
         &mut self,
-        client_field_declaration: WithSpan<ClientFieldDeclaration>,
+        client_field_declaration: WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>,
         text_source: TextSource,
     ) -> Result<(), WithLocation<ProcessClientFieldDeclarationError>> {
         let parent_type_id = self
@@ -53,7 +56,7 @@ impl UnvalidatedSchema {
     fn add_client_field_to_object(
         &mut self,
         parent_object_id: ServerObjectId,
-        client_field_declaration: WithSpan<ClientFieldDeclaration>,
+        client_field_declaration: WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>,
     ) -> ProcessClientFieldDeclarationResult<()> {
         let object = &mut self.server_field_data.server_objects[parent_object_id.as_usize()];
         let client_field_field_name_ws = client_field_declaration.item.client_field_name;
@@ -163,7 +166,9 @@ lazy_static! {
     static ref COMPONENT: IsographDirectiveName = "component".intern().into();
 }
 
-fn get_client_variant(client_field_declaration: &ClientFieldDeclaration) -> ClientFieldVariant {
+fn get_client_variant<TScalarField, TLinkedField>(
+    client_field_declaration: &ClientFieldDeclaration<TScalarField, TLinkedField>,
+) -> ClientFieldVariant {
     for directive in client_field_declaration.directives.iter() {
         if directive.item.name.item == *COMPONENT {
             return ClientFieldVariant::Component((

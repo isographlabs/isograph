@@ -19,17 +19,21 @@ pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
 >;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct ClientFieldDeclaration {
+pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
     pub const_export_name: ConstExportName,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub client_field_name: WithSpan<ScalarFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub selection_set_and_unwraps:
-        Option<(Vec<WithSpan<UnvalidatedSelection>>, Vec<WithSpan<Unwrap>>)>,
+    pub selection_set_and_unwraps: Option<(
+        Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
+        Vec<WithSpan<Unwrap>>,
+    )>,
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: FilePath,
 }
+
+pub type ClientFieldDeclarationWithUnvalidatedDirectives = ClientFieldDeclaration<(), ()>;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum Selection<TScalarField, TLinkedField> {

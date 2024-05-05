@@ -16,7 +16,9 @@ use isograph_config::CompilerConfig;
 use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
 };
-use isograph_lang_types::{ClientFieldDeclaration, EntrypointTypeAndField};
+use isograph_lang_types::{
+    ClientFieldDeclarationWithUnvalidatedDirectives, EntrypointTypeAndField,
+};
 use isograph_schema::{
     ProcessClientFieldDeclarationError, Schema, UnvalidatedSchema, ValidateSchemaError,
 };
@@ -225,7 +227,10 @@ fn read_and_parse_graphql_schema(
 
 fn process_client_fields_and_entrypoints(
     schema: &mut UnvalidatedSchema,
-    client_fields: Vec<(WithSpan<ClientFieldDeclaration>, TextSource)>,
+    client_fields: Vec<(
+        WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>,
+        TextSource,
+    )>,
     entrypoint_declarations: Vec<(WithSpan<EntrypointTypeAndField>, TextSource)>,
 ) -> Result<(), Vec<WithLocation<ProcessClientFieldDeclarationError>>> {
     let mut errors = vec![];
@@ -254,7 +259,10 @@ fn extract_iso_literals(
     canonicalized_root_path: PathBuf,
 ) -> Result<
     (
-        Vec<(WithSpan<ClientFieldDeclaration>, TextSource)>,
+        Vec<(
+            WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>,
+            TextSource,
+        )>,
         Vec<(WithSpan<EntrypointTypeAndField>, TextSource)>,
     ),
     Vec<WithLocation<IsographLiteralParseError>>,

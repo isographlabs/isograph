@@ -9,9 +9,10 @@ use graphql_lang_types::{
 };
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
-    ClientFieldDeclaration, EntrypointTypeAndField, IsographFieldDirective, LinkedFieldSelection,
-    NonConstantValue, ScalarFieldSelection, Selection, SelectionFieldArgument,
-    ServerFieldSelection, UnvalidatedSelection, Unwrap, VariableDefinition,
+    ClientFieldDeclaration, ClientFieldDeclarationWithUnvalidatedDirectives,
+    EntrypointTypeAndField, IsographFieldDirective, LinkedFieldSelection, NonConstantValue,
+    ScalarFieldSelection, Selection, SelectionFieldArgument, ServerFieldSelection,
+    UnvalidatedSelection, Unwrap, VariableDefinition,
 };
 
 use crate::{
@@ -20,7 +21,7 @@ use crate::{
 };
 
 pub enum IsoLiteralExtractionResult {
-    ClientFieldDeclaration(WithSpan<ClientFieldDeclaration>),
+    ClientFieldDeclaration(WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>),
     EntrypointDeclaration(WithSpan<EntrypointTypeAndField>),
 }
 
@@ -93,7 +94,7 @@ fn parse_iso_client_field_declaration(
     definition_file_path: FilePath,
     const_export_name: Option<&str>,
     text_source: TextSource,
-) -> ParseResultWithLocation<WithSpan<ClientFieldDeclaration>> {
+) -> ParseResultWithLocation<WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>> {
     let client_field_declaration = parse_client_field_declaration_inner(
         tokens,
         definition_file_path,
@@ -117,7 +118,7 @@ fn parse_client_field_declaration_inner<'a>(
     definition_file_path: FilePath,
     const_export_name: Option<&str>,
     text_source: TextSource,
-) -> ParseResultWithSpan<WithSpan<ClientFieldDeclaration>> {
+) -> ParseResultWithSpan<WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>> {
     let client_field_declaration = tokens
         .with_span(|tokens| {
             let parent_type = tokens
