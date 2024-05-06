@@ -6,8 +6,8 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ClientFieldId, EntrypointTypeAndField, LinkedFieldSelection, SelectableServerFieldId,
-    ServerScalarId,
+    ClientFieldId, EntrypointTypeAndField, IsographSelectionVariant, LinkedFieldSelection,
+    SelectableServerFieldId, ServerScalarId,
 };
 
 use crate::{
@@ -25,10 +25,8 @@ pub struct UnvalidatedSchemaState {}
 
 impl SchemaValidationState for UnvalidatedSchemaState {
     type FieldTypeAssociatedData = UnvalidatedTypeName;
-    // N.B. this must be kept in sync with client_field_declaration.rs
-    type ClientFieldSelectionScalarFieldAssociatedData = ();
-    // N.B. this must be kept in sync with client_field_declaration.rs
-    type ClientFieldSelectionLinkedFieldAssociatedData = ();
+    type ClientFieldSelectionScalarFieldAssociatedData = IsographSelectionVariant;
+    type ClientFieldSelectionLinkedFieldAssociatedData = IsographSelectionVariant;
     type ClientFieldVariableDefinitionAssociatedData = UnvalidatedTypeName;
     type EncounteredField = UnvalidatedObjectFieldInfo;
     type Entrypoint = (TextSource, WithSpan<EntrypointTypeAndField>);

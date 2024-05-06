@@ -20,8 +20,8 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_config::ConfigOptions;
 use isograph_lang_types::{
-    ClientFieldId, ScalarFieldSelection, SelectableServerFieldId, Selection, ServerFieldId,
-    ServerFieldSelection, ServerObjectId, ServerStrongIdFieldId,
+    ClientFieldId, IsographSelectionVariant, ScalarFieldSelection, SelectableServerFieldId,
+    Selection, ServerFieldId, ServerFieldSelection, ServerObjectId, ServerStrongIdFieldId,
 };
 use lazy_static::lazy_static;
 use serde::Deserialize;
@@ -625,7 +625,7 @@ fn get_client_fields_for_schema_object(
                 name: WithLocation::new("id".intern().into(), Location::generated()),
                 reader_alias: None,
                 normalization_alias: None,
-                associated_data: (),
+                associated_data: IsographSelectionVariant::Regular,
                 unwraps: vec![],
                 arguments: vec![],
                 directives: vec![],

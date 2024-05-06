@@ -9,8 +9,8 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_config::ConfigOptions;
 use isograph_lang_types::{
-    ClientFieldId, ScalarFieldSelection, SelectableServerFieldId, Selection, ServerFieldId,
-    ServerFieldSelection, ServerObjectId,
+    ClientFieldId, IsographSelectionVariant, ScalarFieldSelection, SelectableServerFieldId,
+    Selection, ServerFieldId, ServerFieldSelection, ServerObjectId,
 };
 use serde::Deserialize;
 
@@ -201,7 +201,7 @@ impl UnvalidatedSchema {
                         ),
                         reader_alias: None,
                         normalization_alias: None,
-                        associated_data: (),
+                        associated_data: IsographSelectionVariant::Regular,
                         unwraps: vec![],
                         // TODO what about arguments? How would we handle them?
                         arguments: vec![],

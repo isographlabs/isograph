@@ -4,18 +4,21 @@ use common_lang_types::{
     UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
+use serde::Deserialize;
 
 use crate::IsographFieldDirective;
 
+pub type UnvalidatedSelectionWithUnvalidatedDirectives = Selection<(), ()>;
+
 pub type UnvalidatedSelection = Selection<
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
-    (),
+    IsographSelectionVariant,
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
-    (),
+    IsographSelectionVariant,
 >;
 pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
-    (),
+    IsographSelectionVariant,
 >;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -34,6 +37,20 @@ pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
 }
 
 pub type ClientFieldDeclarationWithUnvalidatedDirectives = ClientFieldDeclaration<(), ()>;
+pub type ClientFieldDeclarationWithValidatedDirectives =
+    ClientFieldDeclaration<IsographSelectionVariant, IsographSelectionVariant>;
+
+#[derive(Debug, Clone)]
+pub enum IsographSelectionVariant {
+    Regular,
+    Loadable(LoadableVariant),
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct LoadableVariant {
+    #[allow(dead_code)]
+    fat_selection_set: bool,
+}
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum Selection<TScalarField, TLinkedField> {
@@ -97,10 +114,11 @@ impl<TScalarField, TLinkedField> ServerFieldSelection<TScalarField, TLinkedField
 
     pub fn and_then<TNewScalarField, TNewLinkedField, E>(
         self,
-        map_scalar_field: &mut impl FnMut(
+        and_then_scalar_field: &mut impl FnMut(
             ScalarFieldSelection<TScalarField>,
-        ) -> Result<ScalarFieldSelection<TNewScalarField>, E>,
-        map_linked_field: &mut impl FnMut(
+        )
+            -> Result<ScalarFieldSelection<TNewScalarField>, E>,
+        and_then_linked_field: &mut impl FnMut(
             LinkedFieldSelection<TScalarField, TLinkedField>,
         ) -> Result<
             LinkedFieldSelection<TNewScalarField, TNewLinkedField>,
@@ -109,10 +127,10 @@ impl<TScalarField, TLinkedField> ServerFieldSelection<TScalarField, TLinkedField
     ) -> Result<ServerFieldSelection<TNewScalarField, TNewLinkedField>, E> {
         match self {
             ServerFieldSelection::ScalarField(s) => {
-                Ok(ServerFieldSelection::ScalarField(map_scalar_field(s)?))
+                Ok(ServerFieldSelection::ScalarField(and_then_scalar_field(s)?))
             }
             ServerFieldSelection::LinkedField(l) => {
-                Ok(ServerFieldSelection::LinkedField(map_linked_field(l)?))
+                Ok(ServerFieldSelection::LinkedField(and_then_linked_field(l)?))
             }
         }
     }
@@ -147,7 +165,7 @@ pub struct ScalarFieldSelection<TScalarField> {
 }
 
 impl<TScalarField> ScalarFieldSelection<TScalarField> {
-    pub fn map<U>(self, map: &mut impl FnMut(TScalarField) -> U) -> ScalarFieldSelection<U> {
+    pub fn map<U>(self, mut map: impl FnMut(TScalarField) -> U) -> ScalarFieldSelection<U> {
         ScalarFieldSelection {
             name: self.name,
             reader_alias: self.reader_alias,
@@ -161,7 +179,7 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
 
     pub fn and_then<U, E>(
         self,
-        map: &mut impl FnMut(TScalarField) -> Result<U, E>,
+        mut map: impl FnMut(TScalarField) -> Result<U, E>,
     ) -> Result<ScalarFieldSelection<U>, E> {
         Ok(ScalarFieldSelection {
             name: self.name,

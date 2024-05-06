@@ -1,4 +1,5 @@
 mod batch_compile;
+mod field_directives;
 mod isograph_literals;
 mod opt;
 mod schema;

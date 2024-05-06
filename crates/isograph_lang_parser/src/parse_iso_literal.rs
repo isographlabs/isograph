@@ -12,7 +12,7 @@ use isograph_lang_types::{
     ClientFieldDeclaration, ClientFieldDeclarationWithUnvalidatedDirectives,
     EntrypointTypeAndField, IsographFieldDirective, LinkedFieldSelection, NonConstantValue,
     ScalarFieldSelection, Selection, SelectionFieldArgument, ServerFieldSelection,
-    UnvalidatedSelection, Unwrap, VariableDefinition,
+    UnvalidatedSelectionWithUnvalidatedDirectives, Unwrap, VariableDefinition,
 };
 
 use crate::{
@@ -176,7 +176,12 @@ fn parse_client_field_declaration_inner<'a>(
 fn parse_selection_set_and_unwraps<'a>(
     tokens: &mut PeekableLexer<'a>,
     text_source: TextSource,
-) -> ParseResultWithSpan<Option<(Vec<WithSpan<UnvalidatedSelection>>, Vec<WithSpan<Unwrap>>)>> {
+) -> ParseResultWithSpan<
+    Option<(
+        Vec<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>>,
+        Vec<WithSpan<Unwrap>>,
+    )>,
+> {
     let selection_set = parse_optional_selection_set(tokens, text_source)?;
     match selection_set {
         Some(selection_set) => {
@@ -193,7 +198,7 @@ fn parse_selection_set_and_unwraps<'a>(
 fn parse_optional_selection_set<'a>(
     tokens: &mut PeekableLexer<'a>,
     text_source: TextSource,
-) -> ParseResultWithSpan<Option<Vec<WithSpan<UnvalidatedSelection>>>> {
+) -> ParseResultWithSpan<Option<Vec<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>>>> {
     let open_brace = tokens.parse_token_of_kind(IsographLangTokenKind::OpenBrace);
     if open_brace.is_err() {
         return Ok(None);
@@ -272,7 +277,7 @@ fn parse_comma_line_break_or_curly<'a>(tokens: &mut PeekableLexer<'a>) -> ParseR
 fn parse_selection<'a>(
     tokens: &mut PeekableLexer<'a>,
     text_source: TextSource,
-) -> ParseResultWithSpan<WithSpan<UnvalidatedSelection>> {
+) -> ParseResultWithSpan<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>> {
     tokens
         .with_span(|tokens| {
             let (field_name, alias) = parse_optional_alias_and_field_name(tokens)?;

@@ -17,7 +17,8 @@ use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
 };
 use isograph_lang_types::{
-    ClientFieldDeclarationWithUnvalidatedDirectives, EntrypointTypeAndField,
+    ClientFieldDeclarationWithUnvalidatedDirectives, ClientFieldDeclarationWithValidatedDirectives,
+    EntrypointTypeAndField,
 };
 use isograph_schema::{
     ProcessClientFieldDeclarationError, Schema, UnvalidatedSchema, ValidateSchemaError,
@@ -26,6 +27,7 @@ use pretty_duration::pretty_duration;
 use thiserror::Error;
 
 use crate::{
+    field_directives::validate_isograph_field_directives,
     isograph_literals::{
         extract_iso_literal_from_file_content, read_files_in_folder, IsoLiteralExtraction,
     },
@@ -142,6 +144,9 @@ pub(crate) fn handle_compile_command(
         let client_field_count = client_field_declarations.len();
         let entrypoint_count = parsed_entrypoints.len();
 
+        let client_field_declarations =
+            validate_isograph_field_directives(client_field_declarations)?;
+
         process_client_fields_and_entrypoints(
             &mut schema,
             client_field_declarations,
@@ -228,7 +233,7 @@ fn read_and_parse_graphql_schema(
 fn process_client_fields_and_entrypoints(
     schema: &mut UnvalidatedSchema,
     client_fields: Vec<(
-        WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>,
+        WithSpan<ClientFieldDeclarationWithValidatedDirectives>,
         TextSource,
     )>,
     entrypoint_declarations: Vec<(WithSpan<EntrypointTypeAndField>, TextSource)>,
