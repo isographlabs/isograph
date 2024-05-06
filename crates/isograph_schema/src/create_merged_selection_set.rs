@@ -16,7 +16,7 @@ use isograph_lang_types::{
 
 use crate::{
     expose_field_directive::RequiresRefinement, ArgumentKeyAndValue, ClientFieldVariant,
-    ExposedFieldVariant, FieldDefinitionLocation, NameAndArguments, PathToRefetchField,
+    FieldDefinitionLocation, ImperativelyLoadedFieldVariant, NameAndArguments, PathToRefetchField,
     ValidatedClientField, ValidatedFieldDefinitionLocation, ValidatedLinkedFieldSelection,
     ValidatedSchema, ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSelection,
 };
@@ -303,17 +303,19 @@ pub fn create_merged_selection_set(
                                 ));
                                 "__refetch".intern().into()
                             }
-                            ClientFieldVariant::ExposedField(ExposedFieldVariant {
-                                mutation_field_name,
-                                fetchable_type_original_field_name:
-                                    server_schema_mutation_field_name,
-                                aliased_exposed_field_name: mutation_primary_field_name,
-                                mutation_field_arguments,
-                                filtered_mutation_field_arguments: _,
-                                mutation_primary_field_return_type_object_id,
-                                field_map: _,
-                                expose_field_fetchable_field_parent_id,
-                            }) => {
+                            ClientFieldVariant::ImperativelyLoadedField(
+                                ImperativelyLoadedFieldVariant {
+                                    mutation_field_name,
+                                    fetchable_type_original_field_name:
+                                        server_schema_mutation_field_name,
+                                    aliased_exposed_field_name: mutation_primary_field_name,
+                                    mutation_field_arguments,
+                                    filtered_mutation_field_arguments: _,
+                                    mutation_primary_field_return_type_object_id,
+                                    field_map: _,
+                                    expose_field_fetchable_field_parent_id,
+                                },
+                            ) => {
                                 // It's a bit weird that all exposed fields become imperatively
                                 // loaded fields. It probably makes sense to think about how we
                                 // can name the things in this block better.
@@ -385,10 +387,12 @@ pub fn create_merged_selection_set(
 
                     let field_name = match client_field_variant {
                         ClientFieldVariant::RefetchField => "__refetch".intern().into(),
-                        ClientFieldVariant::ExposedField(ExposedFieldVariant {
-                            mutation_field_name,
-                            ..
-                        }) => mutation_field_name,
+                        ClientFieldVariant::ImperativelyLoadedField(
+                            ImperativelyLoadedFieldVariant {
+                                mutation_field_name,
+                                ..
+                            },
+                        ) => mutation_field_name,
                         _ => panic!("invalid client field variant"),
                     };
 
@@ -608,7 +612,7 @@ fn merge_scalar_client_field(
             parent_type.id,
             ClientFieldVariant::RefetchField,
         ));
-    } else if let ClientFieldVariant::ExposedField(ExposedFieldVariant {
+    } else if let ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
         aliased_exposed_field_name: mutation_primary_field_name,
         fetchable_type_original_field_name: server_schema_mutation_field_name,
         mutation_field_arguments,
@@ -625,7 +629,7 @@ fn merge_scalar_client_field(
                 field_name: client_field.name,
             },
             parent_type.id,
-            ClientFieldVariant::ExposedField(ExposedFieldVariant {
+            ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
                 mutation_field_name: client_field.name,
                 fetchable_type_original_field_name: *server_schema_mutation_field_name,
                 aliased_exposed_field_name: *mutation_primary_field_name,

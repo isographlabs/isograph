@@ -1,5 +1,3 @@
-use std::fmt;
-
 use common_lang_types::{
     ConstExportName, FilePath, IsographDirectiveName, IsographObjectTypeName, Location,
     SelectableFieldName, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
@@ -138,7 +136,7 @@ pub enum ProcessClientFieldDeclarationError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ExposedFieldVariant {
+pub struct ImperativelyLoadedFieldVariant {
     pub mutation_field_name: SelectableFieldName,
     pub fetchable_type_original_field_name: SelectableFieldName,
     pub aliased_exposed_field_name: SelectableFieldName,
@@ -154,18 +152,7 @@ pub enum ClientFieldVariant {
     Component((ConstExportName, FilePath)),
     Eager((ConstExportName, FilePath)),
     RefetchField,
-    ExposedField(ExposedFieldVariant),
-}
-
-impl fmt::Display for ClientFieldVariant {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ClientFieldVariant::Component(_) => write!(f, "Component"),
-            ClientFieldVariant::Eager(_) => write!(f, "Eager"),
-            ClientFieldVariant::RefetchField => write!(f, "RefetchField"),
-            ClientFieldVariant::ExposedField(_) => write!(f, "MutationField"),
-        }
-    }
+    ImperativelyLoadedField(ImperativelyLoadedFieldVariant),
 }
 
 lazy_static! {

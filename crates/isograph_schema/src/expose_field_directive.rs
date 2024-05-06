@@ -15,9 +15,9 @@ use isograph_lang_types::{
 use serde::Deserialize;
 
 use crate::{
-    ArgumentMap, ClientField, ClientFieldVariant, ExposedFieldVariant, FieldDefinitionLocation,
-    FieldMapItem, ObjectTypeAndFieldNames, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
-    ProcessedFieldMapItem, UnvalidatedSchema,
+    ArgumentMap, ClientField, ClientFieldVariant, FieldDefinitionLocation, FieldMapItem,
+    ImperativelyLoadedFieldVariant, ObjectTypeAndFieldNames, ProcessTypeDefinitionError,
+    ProcessTypeDefinitionResult, ProcessedFieldMapItem, UnvalidatedSchema,
 };
 use lazy_static::lazy_static;
 
@@ -224,16 +224,19 @@ impl UnvalidatedSchema {
                 name: mutation_field_name,
                 id: mutation_field_client_field_id,
                 selection_set_and_unwraps: Some((fields.to_vec(), vec![])),
-                variant: ClientFieldVariant::ExposedField(ExposedFieldVariant {
-                    mutation_field_name,
-                    fetchable_type_original_field_name,
-                    aliased_exposed_field_name: path_selectable_field_name,
-                    mutation_field_arguments: mutation_field_arguments.to_vec(),
-                    filtered_mutation_field_arguments: mutation_field_args_without_id.to_vec(),
-                    mutation_primary_field_return_type_object_id: maybe_abstract_parent_object_id,
-                    field_map: field_map.to_vec(),
-                    expose_field_fetchable_field_parent_id: parent_object_id,
-                }),
+                variant: ClientFieldVariant::ImperativelyLoadedField(
+                    ImperativelyLoadedFieldVariant {
+                        mutation_field_name,
+                        fetchable_type_original_field_name,
+                        aliased_exposed_field_name: path_selectable_field_name,
+                        mutation_field_arguments: mutation_field_arguments.to_vec(),
+                        filtered_mutation_field_arguments: mutation_field_args_without_id.to_vec(),
+                        mutation_primary_field_return_type_object_id:
+                            maybe_abstract_parent_object_id,
+                        field_map: field_map.to_vec(),
+                        expose_field_fetchable_field_parent_id: parent_object_id,
+                    },
+                ),
                 variable_definitions: vec![],
                 type_and_field: ObjectTypeAndFieldNames {
                     // TODO make this zero cost?
