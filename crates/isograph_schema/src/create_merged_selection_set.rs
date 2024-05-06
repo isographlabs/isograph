@@ -10,14 +10,14 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ClientFieldId, ScalarFieldSelection, SelectableServerFieldId, Selection,
-    SelectionFieldArgument, ServerFieldSelection, ServerObjectId, VariableDefinition,
+    ClientFieldId, SelectableServerFieldId, Selection, SelectionFieldArgument,
+    ServerFieldSelection, ServerObjectId, VariableDefinition,
 };
 
 use crate::{
     expose_field_directive::RequiresRefinement, ArgumentKeyAndValue, ClientFieldVariant,
     FieldDefinitionLocation, ImperativelyLoadedFieldVariant, NameAndArguments, PathToRefetchField,
-    ValidatedClientField, ValidatedFieldDefinitionLocation, ValidatedLinkedFieldSelection,
+    ValidatedClientField, ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection,
     ValidatedSchema, ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSelection,
 };
 
@@ -452,7 +452,7 @@ fn merge_selections_into_set(
         match &validated_selection.item {
             Selection::ServerField(validated_server_field) => match validated_server_field {
                 ServerFieldSelection::ScalarField(scalar_field) => {
-                    match &scalar_field.associated_data {
+                    match &scalar_field.associated_data.location {
                         FieldDefinitionLocation::Server(_) => {
                             merge_scalar_server_field(scalar_field, merged_selection_map, span);
                         }
@@ -645,7 +645,7 @@ fn merge_scalar_client_field(
 }
 
 fn merge_scalar_server_field(
-    scalar_field: &ScalarFieldSelection<ValidatedFieldDefinitionLocation>,
+    scalar_field: &ValidatedScalarFieldSelection,
     merged_selection_set: &mut MergedSelectionMap,
     span: Span,
 ) {

@@ -56,10 +56,15 @@ pub struct ValidatedLinkedFieldAssociatedData {
 }
 
 #[derive(Debug)]
+pub struct ValidatedScalarFieldAssociatedData {
+    pub location: ValidatedFieldDefinitionLocation,
+}
+
+#[derive(Debug)]
 pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
     type FieldTypeAssociatedData = SelectableServerFieldId;
-    type ClientFieldSelectionScalarFieldAssociatedData = ValidatedFieldDefinitionLocation;
+    type ClientFieldSelectionScalarFieldAssociatedData = ValidatedScalarFieldAssociatedData;
     type ClientFieldSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
     type ClientFieldVariableDefinitionAssociatedData = SelectableServerFieldId;
     type EncounteredField = ValidatedFieldDefinitionLocation;
@@ -609,14 +614,14 @@ fn validate_field_type_exists_and_is_scalar(
                 match field_type_id {
                     SelectableServerFieldId::Scalar(_scalar_id) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
-                        associated_data: FieldDefinitionLocation::Server(
+                        associated_data: ValidatedScalarFieldAssociatedData { location: FieldDefinitionLocation::Server(
                             find_server_field_id(
                                 server_fields,
                                 scalar_field_selection.name.item,
                                 &parent_object.server_field_ids,
                             )
                             .expect("Expected to find scalar field, this probably indicates a bug in Isograph"),
-                        ),
+                        )},
                         reader_alias: scalar_field_selection.reader_alias,
                         normalization_alias: scalar_field_selection.normalization_alias,
                         unwraps: scalar_field_selection.unwraps,
@@ -642,7 +647,9 @@ fn validate_field_type_exists_and_is_scalar(
                     name: scalar_field_selection.name,
                     reader_alias: scalar_field_selection.reader_alias,
                     unwraps: scalar_field_selection.unwraps,
-                    associated_data: FieldDefinitionLocation::Client(*client_field_id),
+                    associated_data: ValidatedScalarFieldAssociatedData {
+                        location: FieldDefinitionLocation::Client(*client_field_id),
+                    },
                     arguments: scalar_field_selection.arguments,
                     normalization_alias: scalar_field_selection.normalization_alias,
                     directives: scalar_field_selection.directives,

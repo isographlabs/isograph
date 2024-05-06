@@ -18,36 +18,41 @@ pub fn refetched_paths_with_path(
     for selection in selection_set {
         match &selection.item {
             Selection::ServerField(field) => match field {
-                ServerFieldSelection::ScalarField(scalar) => match scalar.associated_data {
-                    FieldDefinitionLocation::Server(_) => {
-                        // Do nothing, we encountered a server field
-                    }
-                    FieldDefinitionLocation::Client(client_field_id) => {
-                        let client_field = schema.client_field(client_field_id);
-                        match client_field.variant {
-                            ClientFieldVariant::RefetchField
-                            | ClientFieldVariant::ImperativelyLoadedField(_) => {
-                                paths.insert(PathToRefetchField {
-                                    linked_fields: path.clone(),
-                                    field_name: client_field.name,
-                                });
-                            }
-                            _ => {
-                                // For non-refetch fields, we need to recurse into the selection set
-                                // (if there is one)
-                                match &client_field.selection_set_and_unwraps {
-                                    Some((selection_set, _unwraps)) => {
-                                        let new_paths =
-                                            refetched_paths_with_path(selection_set, schema, path);
+                ServerFieldSelection::ScalarField(scalar) => {
+                    match scalar.associated_data.location {
+                        FieldDefinitionLocation::Server(_) => {
+                            // Do nothing, we encountered a server field
+                        }
+                        FieldDefinitionLocation::Client(client_field_id) => {
+                            let client_field = schema.client_field(client_field_id);
+                            match client_field.variant {
+                                ClientFieldVariant::RefetchField
+                                | ClientFieldVariant::ImperativelyLoadedField(_) => {
+                                    paths.insert(PathToRefetchField {
+                                        linked_fields: path.clone(),
+                                        field_name: client_field.name,
+                                    });
+                                }
+                                _ => {
+                                    // For non-refetch fields, we need to recurse into the selection set
+                                    // (if there is one)
+                                    match &client_field.selection_set_and_unwraps {
+                                        Some((selection_set, _unwraps)) => {
+                                            let new_paths = refetched_paths_with_path(
+                                                selection_set,
+                                                schema,
+                                                path,
+                                            );
 
-                                        paths.extend(new_paths.into_iter());
-                                    }
-                                    None => panic!("Client field has no selection set"),
-                                };
+                                            paths.extend(new_paths.into_iter());
+                                        }
+                                        None => panic!("Client field has no selection set"),
+                                    };
+                                }
                             }
                         }
                     }
-                },
+                }
                 ServerFieldSelection::LinkedField(linked_field_selection) => {
                     path.push(NameAndArguments {
                         name: linked_field_selection.name.item.into(),

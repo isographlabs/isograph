@@ -1337,7 +1337,7 @@ fn write_query_types_from_selection(
     match &selection.item {
         Selection::ServerField(field) => match field {
             ServerFieldSelection::ScalarField(scalar_field) => {
-                match scalar_field.associated_data {
+                match scalar_field.associated_data.location {
                     FieldDefinitionLocation::Server(_server_field) => {
                         query_type_declaration
                             .push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
@@ -1686,7 +1686,7 @@ fn generate_reader_ast_node(
             ServerFieldSelection::ScalarField(scalar_field) => {
                 let field_name = scalar_field.name.item;
 
-                match scalar_field.associated_data {
+                match scalar_field.associated_data.location {
                     FieldDefinitionLocation::Server(_) => {
                         let alias = scalar_field
                             .reader_alias
