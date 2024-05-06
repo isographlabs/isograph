@@ -27,7 +27,6 @@ type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSe
 pub struct RootRefetchedPath {
     pub path: PathToRefetchField,
     pub variables: Vec<VariableName>,
-    // TODO This should not be an option
     // TODO is this always the same as .path.field_name?
     pub field_name: SelectableFieldName,
 }
