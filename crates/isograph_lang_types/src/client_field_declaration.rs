@@ -47,6 +47,7 @@ pub enum IsographSelectionVariant {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct LoadableVariant {
     #[allow(dead_code)]
     fat_selection_set: bool,

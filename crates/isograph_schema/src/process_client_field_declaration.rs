@@ -7,8 +7,8 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ClientFieldDeclaration, ClientFieldDeclarationWithValidatedDirectives, SelectableServerFieldId,
-    ServerObjectId,
+    ClientFieldDeclaration, ClientFieldDeclarationWithValidatedDirectives, DeserializationError,
+    SelectableServerFieldId, ServerObjectId,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
@@ -130,8 +130,11 @@ pub enum ProcessClientFieldDeclarationError {
         client_field_name: SelectableFieldName,
     },
 
-    #[error("Invalid Isograph selection directive")]
-    InvalidIsographSelectionDirective,
+    #[error("Unable to serialize directive named \"@{directive_name}\". Message: {message}")]
+    UnableToDeserialize {
+        directive_name: IsographDirectiveName,
+        message: DeserializationError,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

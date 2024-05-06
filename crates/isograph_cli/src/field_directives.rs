@@ -1,12 +1,19 @@
 use std::{cell::RefCell, rc::Rc};
 
-use common_lang_types::{TextSource, WithLocation, WithSpan};
+use common_lang_types::{IsographDirectiveName, Location, TextSource, WithLocation, WithSpan};
+use intern::string_key::Intern;
 use isograph_lang_types::{
-    ClientFieldDeclaration, ClientFieldDeclarationWithUnvalidatedDirectives,
-    ClientFieldDeclarationWithValidatedDirectives, IsographSelectionVariant, LinkedFieldSelection,
-    ScalarFieldSelection, Selection, ServerFieldSelection,
+    from_isograph_field_directive, ClientFieldDeclaration,
+    ClientFieldDeclarationWithUnvalidatedDirectives, ClientFieldDeclarationWithValidatedDirectives,
+    IsographSelectionVariant, LinkedFieldSelection, ScalarFieldSelection, Selection,
+    ServerFieldSelection,
 };
 use isograph_schema::ProcessClientFieldDeclarationError;
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref LOADABLE_DIRECTIVE_NAME: IsographDirectiveName = "loadable".intern().into();
+}
 
 pub fn validate_isograph_field_directives(
     client_fields: Vec<(
@@ -37,7 +44,27 @@ pub fn validate_isograph_field_directives(
             Some((selection_set, unwraps)) => {
                 let sub_errors = and_then_selection_set_and_collect_errors(
                     selection_set,
-                    &|_scalar_field_selection| Ok(IsographSelectionVariant::Regular),
+                    &|scalar_field_selection| {
+                        if let Some(directive) = scalar_field_selection
+                            .directives
+                            .iter()
+                            .find(|directive| directive.item.name.item == *LOADABLE_DIRECTIVE_NAME)
+                        {
+                            let loadable_variant = from_isograph_field_directive(&directive.item)
+                                .map_err(|message| {
+                                WithLocation::new(
+                                    ProcessClientFieldDeclarationError::UnableToDeserialize {
+                                        directive_name: *LOADABLE_DIRECTIVE_NAME,
+                                        message,
+                                    },
+                                    Location::generated(),
+                                )
+                            })?;
+                            Ok(IsographSelectionVariant::Loadable(loadable_variant))
+                        } else {
+                            Ok(IsographSelectionVariant::Regular)
+                        }
+                    },
                     &|_linked_field_selection| Ok(IsographSelectionVariant::Regular),
                 );
                 match sub_errors {

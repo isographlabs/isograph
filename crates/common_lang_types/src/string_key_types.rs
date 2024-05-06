@@ -106,6 +106,7 @@ string_key_newtype!(JavascriptName);
 
 // *Not* a GraphQL directive, @component or @eager or whatnot
 // This is really poorly named.
+// TODO we should have different types for field directives and fragment directives
 string_key_newtype!(IsographDirectiveName);
 
 string_key_newtype!(FieldArgumentName);
