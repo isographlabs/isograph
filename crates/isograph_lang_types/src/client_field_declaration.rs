@@ -47,7 +47,7 @@ pub enum IsographSelectionVariant {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LoadableVariant {
     #[allow(dead_code)]
     #[serde(default)]
