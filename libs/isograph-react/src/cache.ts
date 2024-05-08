@@ -187,7 +187,7 @@ type NetworkResponseObject = {
   id?: DataId;
 };
 
-function normalizeData(
+export function normalizeData(
   environment: IsographEnvironment,
   normalizationAst: NormalizationAst,
   networkResponse: NetworkResponseObject,

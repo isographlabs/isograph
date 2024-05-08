@@ -5,7 +5,7 @@ export {
   garbageCollectEnvironment,
 } from './garbageCollection';
 export { type PromiseWrapper } from './PromiseWrapper';
-export { makeNetworkRequest, subscribe } from './cache';
+export { makeNetworkRequest, subscribe, normalizeData } from './cache';
 export {
   ROOT_ID,
   type DataId,
