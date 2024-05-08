@@ -70,6 +70,9 @@ export const PetUpdater = iso(`
         <Button variant="contained" onClick={updateTagline}>
           Set tagline
         </Button>
+        <Button variant="contained" onClick={() => pet.__refetch()}>
+          Refetch pet
+        </Button>
       </Box>
     </>
   );
