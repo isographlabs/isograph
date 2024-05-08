@@ -565,7 +565,7 @@ fn generate_refetchable_query_text<'schema>(
     let variable_text = write_variables_to_string(schema, variable_definitions.iter());
 
     query_text.push_str(&format!(
-        "query {}_refetch {} {{ node____id___id: node(id: $id) {{ ... on {} {{ \\\n",
+        "query {}_refetch {} {{ node____id___v_id: node(id: $id) {{ ... on {} {{ \\\n",
         parent_object_type.name, variable_text, parent_object_type.name,
     ));
     write_selections_for_query_text(&mut query_text, schema, &merged_selection_set, 1);
