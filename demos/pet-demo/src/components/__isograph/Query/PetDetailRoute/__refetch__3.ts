@@ -1,58 +1,40 @@
 import type {IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
-const queryText = 'query PetStatsrefetch_pet_stats ($id: ID!) {\
-refetch_pet_stats____id___v_id: pet(id: $id) {\
-stats { \
-  cuteness,\
-  energy,\
-  hunger,\
-  intelligence,\
-  sociability,\
-  weight,\
+const queryText = 'mutation Checkinmake_super ($checkin_id: ID!) {\
+make_super____checkin_id___v_checkin_id: make_checkin_super(checkin_id: $checkin_id) {\
+checkin { \
+  id,\
+  location,\
+  time,\
 }}}';
 
 const normalizationAst: NormalizationAst = [{
   kind: "Linked",
-  fieldName: "refetch_pet_stats",
+  fieldName: "make_super",
   arguments: [
     [
-      "id",
-      { kind: "Variable", name: "id" },
+      "checkin_id",
+      { kind: "Variable", name: "checkin_id" },
     ],
   ],
   selections: [
     {
       kind: "Linked",
-      fieldName: "stats",
+      fieldName: "checkin",
       arguments: null,
       selections: [
       {
         kind: "Scalar",
-        fieldName: "cuteness",
+        fieldName: "id",
         arguments: null,
       },
       {
         kind: "Scalar",
-        fieldName: "energy",
+        fieldName: "location",
         arguments: null,
       },
       {
         kind: "Scalar",
-        fieldName: "hunger",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "intelligence",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "sociability",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "weight",
+        fieldName: "time",
         arguments: null,
       },
     ],

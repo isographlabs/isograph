@@ -20,6 +20,8 @@ export const PetUpdater = iso(`
 
     set_pet_tagline
     tagline
+
+    __refetch
   }
 `)(function PetUpdaterComponent(pet) {
   const [selected, setSelected] = useState<PetId | 'NONE'>('NONE');

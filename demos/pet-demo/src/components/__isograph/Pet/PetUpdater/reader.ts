@@ -1,6 +1,7 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Pet__PetUpdater__param } from './param_type';
 import { PetUpdater as resolver } from '../../../PetUpdater.tsx';
+import Pet____refetch from '../__refetch/reader';
 import Pet__set_best_friend from '../set_best_friend/reader';
 import Pet__set_pet_tagline from '../set_pet_tagline/reader';
 
@@ -9,7 +10,7 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
     kind: "MutationField",
     alias: "set_best_friend",
     readerArtifact: Pet__set_best_friend,
-    refetchQuery: 0,
+    refetchQuery: 1,
   },
   {
     kind: "Linked",
@@ -35,13 +36,19 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
     kind: "MutationField",
     alias: "set_pet_tagline",
     readerArtifact: Pet__set_pet_tagline,
-    refetchQuery: 1,
+    refetchQuery: 2,
   },
   {
     kind: "Scalar",
     fieldName: "tagline",
     alias: null,
     arguments: null,
+  },
+  {
+    kind: "RefetchField",
+    alias: "__refetch",
+    readerArtifact: Pet____refetch,
+    refetchQuery: 0,
   },
 ];
 

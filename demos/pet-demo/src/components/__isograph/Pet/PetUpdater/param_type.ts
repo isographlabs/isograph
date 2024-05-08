@@ -1,3 +1,4 @@
+import {Pet____refetch__outputType} from '../__refetch/output_type';
 import {Pet__set_best_friend__outputType} from '../set_best_friend/output_type';
 import {Pet__set_pet_tagline__outputType} from '../set_pet_tagline/output_type';
 
@@ -9,4 +10,8 @@ export type Pet__PetUpdater__param = {
   })[],
   set_pet_tagline: Pet__set_pet_tagline__outputType,
   tagline: string,
+  /**
+A refetch field for this object.
+  */
+  __refetch: Pet____refetch__outputType,
 };

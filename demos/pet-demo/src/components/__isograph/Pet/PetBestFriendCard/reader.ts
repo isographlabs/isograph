@@ -15,7 +15,7 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
     alias: "PetUpdater",
     arguments: null,
     readerArtifact: Pet__PetUpdater,
-    usedRefetchQueries: [0, 1, ],
+    usedRefetchQueries: [0, 1, 2, ],
   },
   {
     kind: "Linked",
