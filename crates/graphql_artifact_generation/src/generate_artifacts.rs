@@ -25,10 +25,10 @@ use isograph_schema::{
     ArtifactQueueItem, ClientFieldVariant, FieldDefinitionLocation, FieldMapItem,
     ImperativelyLoadedFieldArtifactInfo, ImperativelyLoadedFieldVariant,
     MergedLinkedFieldSelection, MergedScalarFieldSelection, MergedSelectionSet,
-    MergedServerFieldSelection, NameAndArguments, ObjectTypeAndFieldNames, PathToRefetchField,
-    RefetchFieldArtifactInfo, RequiresRefinement, RootOperationName, RootRefetchedPath,
-    ValidatedClientField, ValidatedSchema, ValidatedSchemaObject, ValidatedSelection,
-    ValidatedVariableDefinition,
+    MergedServerFieldSelection, NameAndArguments, NormalizationKey, ObjectTypeAndFieldNames,
+    PathToRefetchField, RefetchFieldArtifactInfo, RequiresRefinement, RootOperationName,
+    RootRefetchedPath, ValidatedClientField, ValidatedSchema, ValidatedSchemaObject,
+    ValidatedSelection, ValidatedVariableDefinition,
 };
 
 use crate::artifact_file_contents::{ENTRYPOINT, ISO_TS, REFETCH_FIELD_NAME};
@@ -414,13 +414,39 @@ fn get_artifact_for_refetch_field(
         &merged_selection_set,
         variable_definitions,
     );
+    // ------- END HACK -------
 
-    let normalization_ast = NormalizationAst(format!(
-        "[{{ kind: \"Linked\", fieldName: \"node\", \
-        arguments: [[ \"id\", {{ kind: \"Variable\", name: \"id\" }}]], \
-        selections: {} }}]",
-        generate_normalization_ast(schema, &merged_selection_set, 0).0,
-    ));
+    // --------- HACK ---------
+    // We are manipulating the normalization AST here, and also not using it
+    // for the refetchable query text. Neither is good!
+    let id_arguments = vec![WithLocation::new(
+        SelectionFieldArgument {
+            name: WithSpan::new("id".intern().into(), Span::todo_generated()),
+            value: WithSpan::new(
+                NonConstantValue::Variable("id".intern().into()),
+                Span::todo_generated(),
+            ),
+        },
+        Location::generated(),
+    )];
+    let new_selection_set = MergedSelectionSet::new(vec![(
+        NormalizationKey::ServerField(NameAndArguments {
+            name: "node".intern().into(),
+            // TODO id argument
+            arguments: vec![],
+        }),
+        WithSpan::new(
+            MergedServerFieldSelection::LinkedField(MergedLinkedFieldSelection {
+                normalization_alias: None,
+                selection_set: merged_selection_set.to_vec(),
+                arguments: id_arguments.clone(),
+                name: WithLocation::new("node".intern().into(), Location::generated()),
+            }),
+            Span::todo_generated(),
+        ),
+    )]);
+
+    let normalization_ast = generate_normalization_ast(schema, &new_selection_set, 0);
     // ------- END HACK -------
 
     RefetchEntrypointArtifactInfo {

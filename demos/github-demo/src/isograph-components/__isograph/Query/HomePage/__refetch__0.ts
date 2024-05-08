@@ -28,75 +28,55 @@ const queryText = 'query User_refetch ($first: Int!, $id: ID!) { node____id___id
   },\
 }}}';
 
-const normalizationAst: NormalizationAst = [{ kind: "Linked", fieldName: "node", arguments: [[ "id", { kind: "Variable", name: "id" }]], selections: [
-  {
-    kind: "Scalar",
-    fieldName: "login",
-    arguments: null,
-  },
-  {
-    kind: "Scalar",
-    fieldName: "avatarUrl",
-    arguments: null,
-  },
-  {
-    kind: "Scalar",
-    fieldName: "name",
-    arguments: null,
-  },
-  {
-    kind: "Scalar",
-    fieldName: "id",
-    arguments: null,
-  },
+const normalizationAst: NormalizationAst = [
   {
     kind: "Linked",
-    fieldName: "repositories",
+    fieldName: "node",
     arguments: [
       [
-        "last",
-        { kind: "Literal", value: 10 },
+        "id",
+        { kind: "Variable", name: "id" },
       ],
     ],
     selections: [
       {
-        kind: "Linked",
-        fieldName: "edges",
+        kind: "Scalar",
+        fieldName: "login",
         arguments: null,
+      },
+      {
+        kind: "Scalar",
+        fieldName: "avatarUrl",
+        arguments: null,
+      },
+      {
+        kind: "Scalar",
+        fieldName: "name",
+        arguments: null,
+      },
+      {
+        kind: "Scalar",
+        fieldName: "id",
+        arguments: null,
+      },
+      {
+        kind: "Linked",
+        fieldName: "repositories",
+        arguments: [
+          [
+            "last",
+            { kind: "Literal", value: 10 },
+          ],
+        ],
         selections: [
           {
             kind: "Linked",
-            fieldName: "node",
+            fieldName: "edges",
             arguments: null,
             selections: [
               {
-                kind: "Scalar",
-                fieldName: "id",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "description",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "forkCount",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "name",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "nameWithOwner",
-                arguments: null,
-              },
-              {
                 kind: "Linked",
-                fieldName: "owner",
+                fieldName: "node",
                 arguments: null,
                 selections: [
                   {
@@ -106,47 +86,79 @@ const normalizationAst: NormalizationAst = [{ kind: "Linked", fieldName: "node",
                   },
                   {
                     kind: "Scalar",
-                    fieldName: "login",
+                    fieldName: "description",
                     arguments: null,
                   },
-                ],
-              },
-              {
-                kind: "Linked",
-                fieldName: "pullRequests",
-                arguments: [
-                  [
-                    "first",
-                    { kind: "Variable", name: "first" },
-                  ],
-                ],
-                selections: [
                   {
                     kind: "Scalar",
-                    fieldName: "totalCount",
+                    fieldName: "forkCount",
                     arguments: null,
                   },
-                ],
-              },
-              {
-                kind: "Scalar",
-                fieldName: "stargazerCount",
-                arguments: null,
-              },
-              {
-                kind: "Linked",
-                fieldName: "watchers",
-                arguments: [
-                  [
-                    "first",
-                    { kind: "Variable", name: "first" },
-                  ],
-                ],
-                selections: [
                   {
                     kind: "Scalar",
-                    fieldName: "totalCount",
+                    fieldName: "name",
                     arguments: null,
+                  },
+                  {
+                    kind: "Scalar",
+                    fieldName: "nameWithOwner",
+                    arguments: null,
+                  },
+                  {
+                    kind: "Linked",
+                    fieldName: "owner",
+                    arguments: null,
+                    selections: [
+                      {
+                        kind: "Scalar",
+                        fieldName: "id",
+                        arguments: null,
+                      },
+                      {
+                        kind: "Scalar",
+                        fieldName: "login",
+                        arguments: null,
+                      },
+                    ],
+                  },
+                  {
+                    kind: "Linked",
+                    fieldName: "pullRequests",
+                    arguments: [
+                      [
+                        "first",
+                        { kind: "Variable", name: "first" },
+                      ],
+                    ],
+                    selections: [
+                      {
+                        kind: "Scalar",
+                        fieldName: "totalCount",
+                        arguments: null,
+                      },
+                    ],
+                  },
+                  {
+                    kind: "Scalar",
+                    fieldName: "stargazerCount",
+                    arguments: null,
+                  },
+                  {
+                    kind: "Linked",
+                    fieldName: "watchers",
+                    arguments: [
+                      [
+                        "first",
+                        { kind: "Variable", name: "first" },
+                      ],
+                    ],
+                    selections: [
+                      {
+                        kind: "Scalar",
+                        fieldName: "totalCount",
+                        arguments: null,
+                      },
+                    ],
                   },
                 ],
               },
@@ -156,7 +168,7 @@ const normalizationAst: NormalizationAst = [{ kind: "Linked", fieldName: "node",
       },
     ],
   },
-] }];
+];
 const artifact: any = {
   kind: "RefetchQuery",
   queryText,

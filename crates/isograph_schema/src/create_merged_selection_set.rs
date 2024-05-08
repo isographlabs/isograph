@@ -88,7 +88,7 @@ pub struct MergedLinkedFieldSelection {
 ///
 /// For regular and refetch queries.
 #[derive(Clone, Debug)]
-pub struct MergedSelectionSet(Vec<WithSpan<MergedServerFieldSelection>>);
+pub struct MergedSelectionSet(pub Vec<WithSpan<MergedServerFieldSelection>>);
 
 impl std::ops::Deref for MergedSelectionSet {
     type Target = Vec<WithSpan<MergedServerFieldSelection>>;
@@ -99,7 +99,7 @@ impl std::ops::Deref for MergedSelectionSet {
 }
 
 impl MergedSelectionSet {
-    fn new(
+    pub fn new(
         mut unsorted_vec: Vec<(NormalizationKey, WithSpan<MergedServerFieldSelection>)>,
     ) -> Self {
         unsorted_vec.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
@@ -147,7 +147,7 @@ impl Into<Vec<WithSpan<MergedServerFieldSelection>>> for MergedSelectionSet {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, PartialOrd, Ord, Hash)]
-enum NormalizationKey {
+pub enum NormalizationKey {
     // __typename,
     Id,
     ServerField(NameAndArguments),
