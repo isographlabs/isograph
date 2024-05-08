@@ -29,3 +29,5 @@ impl TryFrom<SelectableServerFieldId> for ServerScalarId {
         }
     }
 }
+
+u32_newtype!(RefetchQueryIndex);

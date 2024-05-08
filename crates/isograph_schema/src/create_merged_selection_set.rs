@@ -10,7 +10,7 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ClientFieldId, SelectableServerFieldId, Selection, SelectionFieldArgument,
+    ClientFieldId, RefetchQueryIndex, SelectableServerFieldId, Selection, SelectionFieldArgument,
     ServerFieldSelection, ServerObjectId, VariableDefinition,
 };
 
@@ -169,7 +169,7 @@ pub struct RefetchFieldArtifactInfo {
     pub root_parent_object: IsographObjectTypeName,
     pub root_fetchable_field: SelectableFieldName,
     // TODO wrap in a newtype
-    pub refetch_query_index: usize,
+    pub refetch_query_index: RefetchQueryIndex,
 }
 
 #[derive(Debug, Clone)]
@@ -182,7 +182,7 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
     pub root_parent_object: IsographObjectTypeName,
     pub root_fetchable_field: SelectableFieldName,
     // TODO wrap in a newtype
-    pub refetch_query_index: usize,
+    pub refetch_query_index: RefetchQueryIndex,
     // TODO make MutationFieldResolverInfo and RefetchFieldResolverInfo
     // the same struct, with everything below wrapped in an option:
     // Mutation name
@@ -298,7 +298,7 @@ pub fn create_merged_selection_set(
                                             .object(entrypoint.parent_object_id)
                                             .name,
                                         root_fetchable_field: entrypoint.name,
-                                        refetch_query_index: index,
+                                        refetch_query_index: RefetchQueryIndex(index as u32),
                                     },
                                 ));
                                 "__refetch".intern().into()
@@ -346,7 +346,7 @@ pub fn create_merged_selection_set(
                                             .object(entrypoint.parent_object_id)
                                             .name,
                                         root_fetchable_field: entrypoint.name,
-                                        refetch_query_index: index,
+                                        refetch_query_index: RefetchQueryIndex(index as u32),
                                         mutation_field_name,
                                         server_schema_mutation_field_name,
                                         mutation_primary_field_name,

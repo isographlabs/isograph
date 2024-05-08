@@ -17,8 +17,8 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection, SelectionFieldArgument,
-    ServerFieldSelection, ServerObjectId, VariableDefinition,
+    ClientFieldId, NonConstantValue, RefetchQueryIndex, SelectableServerFieldId, Selection,
+    SelectionFieldArgument, ServerFieldSelection, ServerObjectId, VariableDefinition,
 };
 use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_client_field,
@@ -1138,8 +1138,7 @@ pub(crate) struct RefetchEntrypointArtifactInfo {
     pub query_text: QueryText,
     pub root_fetchable_field: SelectableFieldName,
     pub root_fetchable_field_parent_object: IsographObjectTypeName,
-    // TODO wrap in a newtype
-    pub refetch_query_index: usize,
+    pub refetch_query_index: RefetchQueryIndex,
 }
 
 impl RefetchEntrypointArtifactInfo {
@@ -1153,7 +1152,7 @@ impl RefetchEntrypointArtifactInfo {
 
         let relative_directory =
             generate_path(*root_fetchable_field_parent_object, *root_fetchable_field);
-        let file_name_prefix = format!("{}__{}", *REFETCH_FIELD_NAME, refetch_query_index)
+        let file_name_prefix = format!("{}__{}", *REFETCH_FIELD_NAME, refetch_query_index.0)
             .intern()
             .into();
 
@@ -1750,7 +1749,8 @@ fn generate_reader_ast_node(
                                     root_refetched_paths,
                                     path,
                                     *REFETCH_FIELD_NAME,
-                                );
+                                )
+                                .0;
                                 format!(
                                     "{indent_1}{{\n\
                                     {indent_2}kind: \"RefetchField\",\n\
@@ -1765,7 +1765,8 @@ fn generate_reader_ast_node(
                                     root_refetched_paths,
                                     path,
                                     s.mutation_field_name,
-                                );
+                                )
+                                .0;
                                 format!(
                                     "{indent_1}{{\n\
                                     {indent_2}kind: \"MutationField\",\n\
@@ -2025,7 +2026,7 @@ fn find_imperatively_fetchable_query_index(
     paths: &[RootRefetchedPath],
     path: &[NameAndArguments],
     imperatively_fetchable_field_name: SelectableFieldName,
-) -> usize {
+) -> RefetchQueryIndex {
     paths
         .iter()
         .enumerate()
@@ -2033,7 +2034,7 @@ fn find_imperatively_fetchable_query_index(
             if &path_to_field.path.linked_fields == path
                 && path_to_field.field_name == imperatively_fetchable_field_name
             {
-                Some(index)
+                Some(RefetchQueryIndex(index as u32))
             } else {
                 None
             }
