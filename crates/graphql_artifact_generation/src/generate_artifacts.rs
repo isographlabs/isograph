@@ -31,7 +31,7 @@ use isograph_schema::{
     ValidatedVariableDefinition,
 };
 
-use crate::artifact_file_contents::{ENTRYPOINT, ISO_TS};
+use crate::artifact_file_contents::{ENTRYPOINT, ISO_TS, REFETCH_FIELD_NAME};
 
 type NestedClientFieldImports = HashMap<ObjectTypeAndFieldNames, JavaScriptImports>;
 
@@ -1153,7 +1153,7 @@ impl RefetchEntrypointArtifactInfo {
 
         let relative_directory =
             generate_path(*root_fetchable_field_parent_object, *root_fetchable_field);
-        let file_name_prefix = format!("__refetch__{}", refetch_query_index)
+        let file_name_prefix = format!("{}__{}", *REFETCH_FIELD_NAME, refetch_query_index)
             .intern()
             .into();
 
@@ -1746,8 +1746,11 @@ fn generate_reader_ast_node(
                         // This is indicative of poor data modeling.
                         match client_field.variant {
                             ClientFieldVariant::RefetchField => {
-                                let refetch_query_index =
-                                    find_refetch_query_index(root_refetched_paths, path);
+                                let refetch_query_index = find_imperatively_fetchable_query_index(
+                                    root_refetched_paths,
+                                    path,
+                                    *REFETCH_FIELD_NAME,
+                                );
                                 format!(
                                     "{indent_1}{{\n\
                                     {indent_2}kind: \"RefetchField\",\n\
@@ -1758,7 +1761,7 @@ fn generate_reader_ast_node(
                                 )
                             }
                             ClientFieldVariant::ImperativelyLoadedField(ref s) => {
-                                let refetch_query_index = find_mutation_query_index(
+                                let refetch_query_index = find_imperatively_fetchable_query_index(
                                     root_refetched_paths,
                                     path,
                                     s.mutation_field_name,
@@ -2018,33 +2021,17 @@ fn generate_output_type(client_field: &ValidatedClientField) -> ClientFieldOutpu
     }
 }
 
-fn find_refetch_query_index(paths: &[RootRefetchedPath], path: &[NameAndArguments]) -> usize {
-    paths
-        .iter()
-        .enumerate()
-        .find_map(|(index, path_to_field)| {
-            if &path_to_field.path.linked_fields == path
-                && path_to_field.field_name == "__refetch".intern().into()
-            {
-                Some(index)
-            } else {
-                None
-            }
-        })
-        .expect("Expected refetch query to be found")
-}
-
-fn find_mutation_query_index(
+fn find_imperatively_fetchable_query_index(
     paths: &[RootRefetchedPath],
     path: &[NameAndArguments],
-    mutation_name: SelectableFieldName,
+    imperatively_fetchable_field_name: SelectableFieldName,
 ) -> usize {
     paths
         .iter()
         .enumerate()
         .find_map(|(index, path_to_field)| {
             if &path_to_field.path.linked_fields == path
-                && path_to_field.field_name == mutation_name
+                && path_to_field.field_name == imperatively_fetchable_field_name
             {
                 Some(index)
             } else {

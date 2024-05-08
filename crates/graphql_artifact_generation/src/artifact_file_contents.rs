@@ -14,12 +14,12 @@ use crate::generate_artifacts::{
 };
 
 lazy_static! {
-    // TODO these shouldn't be SelectableFieldName's
     pub static ref READER: ArtifactFileType = "reader".intern().into();
-    pub static ref READER_PARAM_TYPE: ArtifactFileType= "param_type".intern().into();
+    pub static ref READER_PARAM_TYPE: ArtifactFileType = "param_type".intern().into();
     pub static ref READER_OUTPUT_TYPE: ArtifactFileType = "output_type".intern().into();
     pub static ref ENTRYPOINT: ArtifactFileType = "entrypoint".intern().into();
     pub static ref ISO_TS: ArtifactFileType = "iso".intern().into();
+    pub static ref REFETCH_FIELD_NAME: SelectableFieldName = "__refetch".intern().into();
 }
 
 impl<'schema> EntrypointArtifactInfo<'schema> {
