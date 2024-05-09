@@ -12,8 +12,7 @@ use common_lang_types::{
     VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    GraphQLInputValueDefinition, GraphQLTypeAnnotation, ListTypeAnnotation, NamedTypeAnnotation,
-    NonNullTypeAnnotation,
+    GraphQLInputValueDefinition, GraphQLTypeAnnotation, ListTypeAnnotation, NonNullTypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -21,11 +20,11 @@ use isograph_lang_types::{
     SelectionFieldArgument, ServerFieldSelection, ServerObjectId, VariableDefinition,
 };
 use isograph_schema::{
-    create_merged_selection_set, into_name_and_arguments, refetched_paths_for_client_field,
-    ArtifactQueueItem, ClientFieldVariant, FieldDefinitionLocation, FieldMapItem,
-    ImperativelyLoadedFieldArtifactInfo, ImperativelyLoadedFieldVariant,
-    MergedInlineFragmentSelection, MergedLinkedFieldSelection, MergedScalarFieldSelection,
-    MergedSelectionSet, MergedServerFieldSelection, NameAndArguments, NormalizationKey,
+    create_merged_selection_set, get_aliased_mutation_field_name, into_name_and_arguments,
+    refetched_paths_for_client_field, ArtifactQueueItem, ClientFieldVariant,
+    FieldDefinitionLocation, FieldMapItem, ImperativelyLoadedFieldArtifactInfo,
+    ImperativelyLoadedFieldVariant, MergedInlineFragmentSelection, MergedLinkedFieldSelection,
+    MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection, NameAndArguments,
     ObjectTypeAndFieldNames, PathToRefetchField, RefetchFieldArtifactInfo, RequiresRefinement,
     RootOperationName, RootRefetchedPath, ValidatedClientField, ValidatedSchema,
     ValidatedSchemaObject, ValidatedSelection, ValidatedVariableDefinition,
@@ -403,51 +402,15 @@ fn get_artifact_for_refetch_field(
 
     let parent_object = schema.server_field_data.object(parent_id);
 
-    // --------- HACK ---------
-    // Merged selection sets do not support type refinements, so for now,
-    // we are hard-coding the outside of the query text (which includes
-    // `... on Type`) and the outside of the normalization AST (which can
-    // ignore the type refinement for now.)
-    let query_text = generate_refetchable_query_text(
-        parent_object,
+    let normalization_ast = generate_normalization_ast(schema, &merged_selection_set, 0);
+
+    let query_text = generate_query_text(
+        format!("{}_refetch", parent_object.name).intern().into(),
         schema,
         &merged_selection_set,
-        variable_definitions,
+        &variable_definitions,
+        &RootOperationName("query".to_string()),
     );
-    // ------- END HACK -------
-
-    // --------- HACK ---------
-    // We are manipulating the normalization AST here, and also not using it
-    // for the refetchable query text. Neither is good!
-    let id_arguments = vec![WithLocation::new(
-        SelectionFieldArgument {
-            name: WithSpan::new("id".intern().into(), Span::todo_generated()),
-            value: WithSpan::new(
-                NonConstantValue::Variable("id".intern().into()),
-                Span::todo_generated(),
-            ),
-        },
-        Location::generated(),
-    )];
-    let new_selection_set = MergedSelectionSet::new(vec![(
-        NormalizationKey::ServerField(NameAndArguments {
-            name: "node".intern().into(),
-            // TODO id argument
-            arguments: vec![],
-        }),
-        WithSpan::new(
-            MergedServerFieldSelection::LinkedField(MergedLinkedFieldSelection {
-                normalization_alias: None,
-                selection_set: merged_selection_set.to_vec(),
-                arguments: id_arguments,
-                name: WithLocation::new("node".intern().into(), Location::generated()),
-            }),
-            Span::todo_generated(),
-        ),
-    )]);
-
-    let normalization_ast = generate_normalization_ast(schema, &new_selection_set, 0);
-    // ------- END HACK -------
 
     RefetchEntrypointArtifactInfo {
         normalization_ast,
@@ -542,37 +505,6 @@ fn get_artifact_for_mutation_field<'schema>(
     }
 }
 
-fn generate_refetchable_query_text<'schema>(
-    parent_object_type: &'schema ValidatedSchemaObject,
-    schema: &'schema ValidatedSchema,
-    merged_selection_set: &MergedSelectionSet,
-    mut variable_definitions: Vec<WithSpan<ValidatedVariableDefinition>>,
-) -> QueryText {
-    let mut query_text = String::new();
-
-    variable_definitions.push(WithSpan {
-        item: VariableDefinition {
-            name: WithLocation::new("id".intern().into(), Location::generated()),
-            type_: GraphQLTypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
-                NamedTypeAnnotation(WithSpan {
-                    item: SelectableServerFieldId::Scalar(schema.id_type_id),
-                    span: Span::todo_generated(),
-                }),
-            ))),
-        },
-        span: Span::todo_generated(),
-    });
-    let variable_text = write_variables_to_string(schema, variable_definitions.iter());
-
-    query_text.push_str(&format!(
-        "query {}_refetch {} {{ node____id___v_id: node(id: $id) {{ ... on {} {{ \\\n",
-        parent_object_type.name, variable_text, parent_object_type.name,
-    ));
-    write_selections_for_query_text(&mut query_text, schema, &merged_selection_set, 1);
-    query_text.push_str("}}}");
-    QueryText(query_text)
-}
-
 fn generate_mutation_query_text<'schema>(
     parent_object_type: &'schema ValidatedSchemaObject,
     schema: &'schema ValidatedSchema,
@@ -646,21 +578,6 @@ fn generate_mutation_query_text<'schema>(
 
     query_text.push_str("}}}");
     QueryText(query_text)
-}
-
-fn get_aliased_mutation_field_name(
-    name: SelectableFieldName,
-    parameters: &[WithLocation<SelectionFieldArgument>],
-) -> String {
-    let mut s = name.to_string();
-
-    for param in parameters.iter() {
-        // TODO NonConstantValue will format to a string like "$name", but we want just "name".
-        // There is probably a better way to do this.
-        s.push_str("____");
-        s.push_str(&param.item.to_alias_str_chunk());
-    }
-    s
 }
 
 fn generate_entrypoint_artifact<'schema>(

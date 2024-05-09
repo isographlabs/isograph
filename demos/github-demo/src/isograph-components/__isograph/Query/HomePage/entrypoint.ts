@@ -3,7 +3,7 @@ import {Query__HomePage__param} from './param_type';
 import {Query__HomePage__outputType} from './output_type';
 import readerResolver from './reader';
 import refetchQuery0 from './__refetch__0';
-const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [{ artifact: refetchQuery0, allowedVariables: ["first", ] }, ];
+const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [{ artifact: refetchQuery0, allowedVariables: ["first", "id", ] }, ];
 
 const queryText = 'query HomePage ($first: Int!) {\
   viewer {\

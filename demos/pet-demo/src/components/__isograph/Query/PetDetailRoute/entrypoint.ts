@@ -7,7 +7,7 @@ import refetchQuery1 from './__refetch__1';
 import refetchQuery2 from './__refetch__2';
 import refetchQuery3 from './__refetch__3';
 import refetchQuery4 from './__refetch__4';
-const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [{ artifact: refetchQuery0, allowedVariables: [] }, { artifact: refetchQuery1, allowedVariables: [] }, { artifact: refetchQuery2, allowedVariables: [] }, { artifact: refetchQuery3, allowedVariables: [] }, { artifact: refetchQuery4, allowedVariables: [] }, ];
+const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [{ artifact: refetchQuery0, allowedVariables: ["id", ] }, { artifact: refetchQuery1, allowedVariables: ["id", ] }, { artifact: refetchQuery2, allowedVariables: ["id", ] }, { artifact: refetchQuery3, allowedVariables: ["id", ] }, { artifact: refetchQuery4, allowedVariables: ["id", ] }, ];
 
 const queryText = 'query PetDetailRoute ($id: ID!) {\
   pet____id___v_id: pet(id: $id) {\

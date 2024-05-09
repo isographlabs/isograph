@@ -7,12 +7,15 @@ use common_lang_types::{
     IsographObjectTypeName, LinkedFieldAlias, LinkedFieldName, Location, ScalarFieldAlias,
     ScalarFieldName, SelectableFieldName, Span, VariableName, WithLocation, WithSpan,
 };
-use graphql_lang_types::GraphQLInputValueDefinition;
+use graphql_lang_types::{
+    GraphQLInputValueDefinition, GraphQLTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
+};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ClientFieldId, RefetchQueryIndex, SelectableServerFieldId, Selection, SelectionFieldArgument,
-    ServerFieldSelection, ServerObjectId, VariableDefinition,
+    ClientFieldId, NonConstantValue, RefetchQueryIndex, SelectableServerFieldId, Selection,
+    SelectionFieldArgument, ServerFieldSelection, ServerObjectId, VariableDefinition,
 };
+use lazy_static::lazy_static;
 
 use crate::{
     expose_field_directive::RequiresRefinement, ArgumentKeyAndValue, ClientFieldVariant,
@@ -22,6 +25,11 @@ use crate::{
 };
 
 type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSelection>>;
+
+lazy_static! {
+    pub static ref NODE_FIELD_NAME: LinkedFieldName = "node".intern().into();
+    pub static ref TYPENAME_FIELD_NAME: ScalarFieldName = "__typename".intern().into();
+}
 
 #[derive(Debug)]
 pub struct RootRefetchedPath {
@@ -282,33 +290,49 @@ pub fn create_merged_selection_set(
                         let nested_merged_selection_set =
                             find_by_path(&merged_selection_set, &path_to_refetch_field);
 
-                        // TODO we can pre-calculate this instead of re-iterating here
-                        let reachable_variables = nested_merged_selection_set.reachable_variables();
-
-                        let definitions_of_used_variables = reachable_variables
-                            .iter()
-                            .map(|variable_name| {
-                                entrypoint
-                                    .variable_definitions
-                                    .iter()
-                                    .find(|definition| definition.item.name.item == *variable_name)
-                                    // TODO make this an error, don't panic
-                                    .expect(&format!(
-                                        "Did not find matching variable definition. \
-                                This might not be validated yet. For now, each client field \
-                                containing a __refetch field must re-defined all used variables. \
-                                Client field {} is missing variable definition {}",
-                                        entrypoint.name, variable_name
-                                    ))
-                                    .clone()
-                            })
-                            .collect();
-
-                        let field_name = match client_field_variant {
+                        let (field_name, reachable_variables) = match client_field_variant {
                             ClientFieldVariant::RefetchField => {
+                                let type_to_refine_to = schema
+                                    .server_field_data
+                                    .object(refetch_field_parent_id)
+                                    .name;
+
+                                let merged_selection_set = selection_set_wrapped_in_node_field(
+                                    nested_merged_selection_set,
+                                    // path_to_refetch_field.,
+                                    type_to_refine_to,
+                                );
+                                // TODO we can pre-calculate this instead of re-iterating here
+                                let reachable_variables =
+                                    merged_selection_set.reachable_variables();
+
+                                let mut definitions_of_used_variables =
+                                    get_used_variable_definitions(&reachable_variables, entrypoint);
+
+                                // HACK, we also add the id field
+                                definitions_of_used_variables.push(WithSpan::new(
+                                    VariableDefinition {
+                                        name: WithLocation::new(
+                                            "id".intern().into(),
+                                            Location::generated(),
+                                        ),
+                                        type_: GraphQLTypeAnnotation::NonNull(Box::new(
+                                            NonNullTypeAnnotation::Named(NamedTypeAnnotation(
+                                                WithSpan::new(
+                                                    SelectableServerFieldId::Scalar(
+                                                        schema.id_type_id,
+                                                    ),
+                                                    Span::todo_generated(),
+                                                ),
+                                            )),
+                                        )),
+                                    },
+                                    Span::todo_generated(),
+                                ));
+
                                 artifact_queue.push(ArtifactQueueItem::RefetchField(
                                     RefetchFieldArtifactInfo {
-                                        merged_selection_set: nested_merged_selection_set,
+                                        merged_selection_set,
                                         refetch_field_parent_id,
                                         variable_definitions: definitions_of_used_variables,
                                         root_parent_object: schema
@@ -319,7 +343,7 @@ pub fn create_merged_selection_set(
                                         refetch_query_index: RefetchQueryIndex(index as u32),
                                     },
                                 ));
-                                "__refetch".intern().into()
+                                ("__refetch".intern().into(), reachable_variables)
                             }
                             ClientFieldVariant::ImperativelyLoadedField(
                                 ImperativelyLoadedFieldVariant {
@@ -334,6 +358,13 @@ pub fn create_merged_selection_set(
                                     expose_field_fetchable_field_parent_id,
                                 },
                             ) => {
+                                // TODO we can pre-calculate this instead of re-iterating here
+                                let reachable_variables =
+                                    merged_selection_set.reachable_variables();
+
+                                let definitions_of_used_variables =
+                                    get_used_variable_definitions(&reachable_variables, entrypoint);
+
                                 // It's a bit weird that all exposed fields become imperatively
                                 // loaded fields. It probably makes sense to think about how we
                                 // can name the things in this block better.
@@ -372,7 +403,7 @@ pub fn create_merged_selection_set(
                                         requires_refinement,
                                     },
                                 ));
-                                mutation_field_name
+                                (mutation_field_name, reachable_variables)
                             }
                             _ => panic!("invalid client field variant"),
                         };
@@ -393,6 +424,7 @@ pub fn create_merged_selection_set(
             (merged_selection_set, root_refetched_paths)
         }
         None => {
+            // TODO it is weird that we call this without an artifact queue!
             let root_refetched_paths: Vec<_> = merge_traversal_state
                 .sorted_paths_to_refetch_fields()
                 .into_iter()
@@ -429,6 +461,36 @@ pub fn create_merged_selection_set(
             (merged_selection_set, root_refetched_paths)
         }
     }
+}
+
+fn get_used_variable_definitions(
+    reachable_variables: &HashSet<VariableName>,
+    entrypoint: &ValidatedClientField,
+) -> Vec<WithSpan<VariableDefinition<SelectableServerFieldId>>> {
+    reachable_variables
+        .iter()
+        .flat_map(|variable_name| {
+            // HACK
+            if variable_name == &"id".intern().into() {
+                None
+            } else {
+                Some(
+                    entrypoint
+                        .variable_definitions
+                        .iter()
+                        .find(|definition| definition.item.name.item == *variable_name)
+                        .expect(&format!(
+                            "Did not find matching variable definition. \
+                            This might not be validated yet. For now, each client field \
+                            containing a __refetch field must re-defined all used variables. \
+                            Client field {} is missing variable definition {}",
+                            entrypoint.name, variable_name
+                        ))
+                        .clone(),
+                )
+            }
+        })
+        .collect::<Vec<_>>()
 }
 
 fn create_merged_selection_set_with_merge_traversal_state(
@@ -829,4 +891,90 @@ fn select_typename_and_id_fields_in_merged_selection(
             }
         }
     }
+}
+
+fn selection_set_wrapped_in_node_field(
+    mut merged_selection_set: MergedSelectionSet,
+    type_to_refine_to: IsographObjectTypeName,
+) -> MergedSelectionSet {
+    let id_arguments = vec![WithLocation::new(
+        SelectionFieldArgument {
+            name: WithSpan::new("id".intern().into(), Span::todo_generated()),
+            value: WithSpan::new(
+                NonConstantValue::Variable("id".intern().into()),
+                Span::todo_generated(),
+            ),
+        },
+        Location::generated(),
+    )];
+
+    maybe_add_typename_selection(&mut merged_selection_set);
+
+    let unsorted_vec = vec![(
+        NormalizationKey::ServerField(NameAndArguments {
+            name: "node".intern().into(),
+            // TODO id argument
+            arguments: vec![],
+        }),
+        WithSpan::new(
+            MergedServerFieldSelection::LinkedField(MergedLinkedFieldSelection {
+                normalization_alias: Some(WithLocation::new(
+                    get_aliased_mutation_field_name((*NODE_FIELD_NAME).into(), &id_arguments)
+                        .intern()
+                        .into(),
+                    Location::generated(),
+                )),
+                selection_set: vec![WithSpan::new(
+                    MergedServerFieldSelection::InlineFragment(MergedInlineFragmentSelection {
+                        type_to_refine_to,
+                        selection_set: merged_selection_set.0,
+                    }),
+                    Span::todo_generated(),
+                )],
+                arguments: id_arguments,
+                name: WithLocation::new((*NODE_FIELD_NAME).into(), Location::generated()),
+            }),
+            Span::todo_generated(),
+        ),
+    )];
+    let new_selection_set = MergedSelectionSet::new(unsorted_vec);
+    new_selection_set
+}
+
+fn is_typename_selection<'a>(selection: &'a &WithSpan<MergedServerFieldSelection>) -> bool {
+    if let MergedServerFieldSelection::ScalarField(s) = &selection.item {
+        s.name.item == *TYPENAME_FIELD_NAME
+    } else {
+        false
+    }
+}
+
+fn maybe_add_typename_selection(selections: &mut MergedSelectionSet) {
+    let has_typename = selections.iter().find(is_typename_selection).is_some();
+    if !has_typename {
+        // This should be first, so this a huge bummer
+        selections.0.push(WithSpan::new(
+            MergedServerFieldSelection::ScalarField(MergedScalarFieldSelection {
+                name: WithLocation::new(*TYPENAME_FIELD_NAME, Location::generated()),
+                normalization_alias: None,
+                arguments: vec![],
+            }),
+            Span::todo_generated(),
+        ));
+    }
+}
+
+pub fn get_aliased_mutation_field_name(
+    name: SelectableFieldName,
+    parameters: &[WithLocation<SelectionFieldArgument>],
+) -> String {
+    let mut s = name.to_string();
+
+    for param in parameters.iter() {
+        // TODO NonConstantValue will format to a string like "$name", but we want just "name".
+        // There is probably a better way to do this.
+        s.push_str("____");
+        s.push_str(&param.item.to_alias_str_chunk());
+    }
+    s
 }
