@@ -439,7 +439,7 @@ fn get_artifact_for_refetch_field(
             MergedServerFieldSelection::LinkedField(MergedLinkedFieldSelection {
                 normalization_alias: None,
                 selection_set: merged_selection_set.to_vec(),
-                arguments: id_arguments.clone(),
+                arguments: id_arguments,
                 name: WithLocation::new("node".intern().into(), Location::generated()),
             }),
             Span::todo_generated(),
