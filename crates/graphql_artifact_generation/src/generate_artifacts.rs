@@ -402,7 +402,7 @@ fn get_artifact_for_refetch_field(
 
     let parent_object = schema.server_field_data.object(parent_id);
 
-    let normalization_ast = generate_normalization_ast(schema, &merged_selection_set, 0);
+    let normalization_ast = generate_normalization_ast_text(schema, &merged_selection_set, 0);
 
     let query_text = generate_query_text(
         format!("{}_refetch", parent_object.name).intern().into(),
@@ -413,7 +413,7 @@ fn get_artifact_for_refetch_field(
     );
 
     RefetchEntrypointArtifactInfo {
-        normalization_ast,
+        normalization_ast_text: normalization_ast,
         query_text,
         root_fetchable_field,
         root_fetchable_field_parent_object: root_parent_object,
@@ -476,11 +476,11 @@ fn get_artifact_for_mutation_field<'schema>(
         exposed_field_parent_object_id,
     );
 
-    let selections = generate_normalization_ast(schema, &merged_selection_set, 2);
+    let selections = generate_normalization_ast_text(schema, &merged_selection_set, 2);
     let space_2 = "  ";
     let space_4 = "    ";
     let space_6 = "      ";
-    let normalization_ast = NormalizationAst(format!(
+    let normalization_ast_text = NormalizationAstText(format!(
         "[{{\n\
         {space_2}kind: \"Linked\",\n\
         {space_2}fieldName: \"{mutation_field_name}\",\n\
@@ -497,7 +497,7 @@ fn get_artifact_for_mutation_field<'schema>(
     ));
 
     RefetchEntrypointArtifactInfo {
-        normalization_ast,
+        normalization_ast_text,
         query_text,
         root_fetchable_field,
         root_fetchable_field_parent_object: root_parent_object,
@@ -630,13 +630,14 @@ fn generate_entrypoint_artifact<'schema>(
         let refetch_query_artifact_imports =
             generate_refetch_query_artifact_imports(&root_refetched_paths);
 
-        let normalization_ast = generate_normalization_ast(schema, &merged_selection_set, 0);
+        let normalization_ast_text =
+            generate_normalization_ast_text(schema, &merged_selection_set, 0);
 
         EntrypointArtifactInfo {
             query_text,
             query_name,
             parent_type: parent_object.into(),
-            normalization_ast,
+            normalization_ast_text,
             refetch_query_artifact_import: refetch_query_artifact_imports,
         }
     } else {
@@ -937,8 +938,8 @@ pub(crate) struct ReaderAst(pub String);
 derive_display!(ReaderAst);
 
 #[derive(Debug)]
-pub(crate) struct NormalizationAst(pub String);
-derive_display!(NormalizationAst);
+pub(crate) struct NormalizationAstText(pub String);
+derive_display!(NormalizationAstText);
 
 #[derive(Debug)]
 pub(crate) struct ConvertFunction(pub String);
@@ -953,7 +954,7 @@ pub(crate) struct EntrypointArtifactInfo<'schema> {
     pub(crate) query_name: QueryOperationName,
     pub parent_type: &'schema ValidatedSchemaObject,
     pub query_text: QueryText,
-    pub normalization_ast: NormalizationAst,
+    pub normalization_ast_text: NormalizationAstText,
     pub refetch_query_artifact_import: RefetchQueryArtifactImport,
 }
 
@@ -1077,7 +1078,7 @@ impl<'schema> MutationReaderArtifactInfo<'schema> {
 
 #[derive(Debug)]
 pub(crate) struct RefetchEntrypointArtifactInfo {
-    pub normalization_ast: NormalizationAst,
+    pub normalization_ast_text: NormalizationAstText,
     pub query_text: QueryText,
     pub root_fetchable_field: SelectableFieldName,
     pub root_fetchable_field_parent_object: IsographObjectTypeName,
@@ -1787,18 +1788,18 @@ fn generate_reader_ast_node(
     }
 }
 
-fn generate_normalization_ast<'schema>(
+fn generate_normalization_ast_text<'schema>(
     schema: &'schema ValidatedSchema,
     selection_set: &[WithSpan<MergedServerFieldSelection>],
     indentation_level: u8,
-) -> NormalizationAst {
-    let mut normalization_ast = "[\n".to_string();
+) -> NormalizationAstText {
+    let mut normalization_ast_text = "[\n".to_string();
     for item in selection_set.iter() {
         let s = generate_normalization_ast_node(item, schema, indentation_level + 1);
-        normalization_ast.push_str(&s);
+        normalization_ast_text.push_str(&s);
     }
-    normalization_ast.push_str(&format!("{}]", "  ".repeat(indentation_level as usize)));
-    NormalizationAst(normalization_ast)
+    normalization_ast_text.push_str(&format!("{}]", "  ".repeat(indentation_level as usize)));
+    NormalizationAstText(normalization_ast_text)
 }
 
 fn generate_normalization_ast_node(
@@ -1839,7 +1840,7 @@ fn generate_normalization_ast_node(
                 get_serialized_field_arguments(arguments, indentation_level + 1);
 
             let selections =
-                generate_normalization_ast(schema, selection_set, indentation_level + 1);
+                generate_normalization_ast_text(schema, selection_set, indentation_level + 1);
 
             // TODO this is bad, name is a WithLocation which impl's Display
             let name = name.item;
@@ -1862,7 +1863,7 @@ fn generate_normalization_ast_node(
             let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
             let selections =
-                generate_normalization_ast(schema, selection_set, indentation_level + 1);
+                generate_normalization_ast_text(schema, selection_set, indentation_level + 1);
 
             format!(
                 "{indent}{{\n\

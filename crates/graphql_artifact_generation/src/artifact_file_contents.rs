@@ -26,7 +26,7 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
     pub(crate) fn file_contents(self) -> String {
         let EntrypointArtifactInfo {
             query_text,
-            normalization_ast,
+            normalization_ast_text: normalization_ast,
             refetch_query_artifact_import,
             query_name,
             parent_type,
@@ -363,7 +363,7 @@ impl<'schema> MutationReaderArtifactInfo<'schema> {
 impl RefetchEntrypointArtifactInfo {
     pub(crate) fn file_contents(self) -> String {
         let RefetchEntrypointArtifactInfo {
-            normalization_ast,
+            normalization_ast_text: normalization_ast,
             query_text,
             ..
         } = self;
