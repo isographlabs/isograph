@@ -20,7 +20,8 @@ export type IsographEntrypoint<
 
 export type NormalizationAstNode =
   | NormalizationScalarField
-  | NormalizationLinkedField;
+  | NormalizationLinkedField
+  | NormalizationInlineFragment;
 export type NormalizationAst = ReadonlyArray<NormalizationAstNode>;
 
 export type NormalizationScalarField = {
@@ -33,6 +34,12 @@ export type NormalizationLinkedField = {
   readonly kind: 'Linked';
   readonly fieldName: string;
   readonly arguments: Arguments | null;
+  readonly selections: NormalizationAst;
+};
+
+export type NormalizationInlineFragment = {
+  readonly kind: 'InlineFragment';
+  readonly type: string;
   readonly selections: NormalizationAst;
 };
 

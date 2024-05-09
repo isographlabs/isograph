@@ -22,6 +22,7 @@ import {
 import {
   IsographEntrypoint,
   NormalizationAst,
+  NormalizationInlineFragment,
   NormalizationLinkedField,
   NormalizationScalarField,
   RefetchQueryNormalizationArtifact,
@@ -32,6 +33,8 @@ import { Argument, ArgumentValue } from './util';
 import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
 import { FragmentReference, Variables } from './FragmentReference';
 import { areEqualObjectsWithDeepComparison } from './areEqualWithDeepComparison';
+
+const TYPENAME_FIELD_NAME = '__typename';
 
 declare global {
   interface Window {
@@ -345,7 +348,7 @@ function normalizeDataIntoRecord(
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: Set<DataId>,
-) {
+): RecordHasBeenUpdated {
   let recordHasBeenUpdated = false;
   for (const normalizationNode of normalizationAst) {
     switch (normalizationNode.kind) {
@@ -375,11 +378,32 @@ function normalizeDataIntoRecord(
           recordHasBeenUpdated || linkedFieldResultedInChange;
         break;
       }
+      case 'InlineFragment': {
+        const inlineFragmentResultedInChange = normalizeInlineFragment(
+          environment,
+          normalizationNode,
+          networkResponseParentRecord,
+          targetParentRecord,
+          targetParentRecordId,
+          variables,
+          nestedRefetchQueries,
+          mutableEncounteredIds,
+        );
+        recordHasBeenUpdated =
+          recordHasBeenUpdated || inlineFragmentResultedInChange;
+        break;
+      }
+      default: {
+        // @ts-expect-error(6133)
+        let _: never = normalizationNode;
+        throw new Error('Unexpected normalization node kind');
+      }
     }
   }
   if (recordHasBeenUpdated) {
     mutableEncounteredIds.add(targetParentRecordId);
   }
+  return recordHasBeenUpdated;
 }
 
 type RecordHasBeenUpdated = boolean;
@@ -472,6 +496,36 @@ function normalizeLinkedField(
     const link = getLink(existingValue);
     return link?.__link !== newStoreRecordId;
   }
+}
+
+/**
+ * Mutate targetParentRecord with a given linked field ast node.
+ */
+function normalizeInlineFragment(
+  environment: IsographEnvironment,
+  astNode: NormalizationInlineFragment,
+  networkResponseParentRecord: NetworkResponseObject,
+  targetParentRecord: StoreRecord,
+  targetParentRecordId: DataId,
+  variables: Variables,
+  nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
+  mutableEncounteredIds: Set<DataId>,
+): RecordHasBeenUpdated {
+  const typeToRefineTo = astNode.type;
+  if (networkResponseParentRecord[TYPENAME_FIELD_NAME] === typeToRefineTo) {
+    const hasBeenModified = normalizeDataIntoRecord(
+      environment,
+      astNode.selections,
+      networkResponseParentRecord,
+      targetParentRecord,
+      targetParentRecordId,
+      variables,
+      nestedRefetchQueries,
+      mutableEncounteredIds,
+    );
+    return hasBeenModified;
+  }
+  return false;
 }
 
 function dataIdsAreTheSame(
