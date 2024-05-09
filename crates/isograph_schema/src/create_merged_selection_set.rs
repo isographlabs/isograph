@@ -36,6 +36,8 @@ pub struct RootRefetchedPath {
 pub enum MergedServerFieldSelection {
     ScalarField(MergedScalarFieldSelection),
     LinkedField(MergedLinkedFieldSelection),
+    // TODO does this belong? This is very GraphQL specific.
+    InlineFragment(MergedInlineFragmentSelection),
 }
 
 impl MergedServerFieldSelection {
@@ -47,6 +49,13 @@ impl MergedServerFieldSelection {
             MergedServerFieldSelection::LinkedField(linked_field) => {
                 let mut reachable_variables = get_variable_selections(&linked_field.arguments);
                 for selection in linked_field.selection_set.iter() {
+                    reachable_variables.extend(selection.item.reachable_variables());
+                }
+                reachable_variables
+            }
+            MergedServerFieldSelection::InlineFragment(inline_fragment) => {
+                let mut reachable_variables = HashSet::new();
+                for selection in inline_fragment.selection_set.iter() {
                     reachable_variables.extend(selection.item.reachable_variables());
                 }
                 reachable_variables
@@ -79,6 +88,15 @@ pub struct MergedLinkedFieldSelection {
     pub normalization_alias: Option<WithLocation<LinkedFieldAlias>>,
     pub selection_set: Vec<WithSpan<MergedServerFieldSelection>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub struct MergedInlineFragmentSelection {
+    // TODO maybe this should be optional
+    pub type_to_refine_to: IsographObjectTypeName,
+    // TODO make this type more precise
+    // pub selections: NonInlineFragmentSelections
+    pub selection_set: Vec<WithSpan<MergedServerFieldSelection>>,
 }
 
 /// A merged selection set is an input for generating:
@@ -579,6 +597,9 @@ fn merge_linked_field_into_occupied_entry(
                 merge_traversal_state,
             );
         }
+        MergedServerFieldSelection::InlineFragment(_) => {
+            panic!("Unexpected inline fragment, probably a bug in Isograph");
+        }
     }
 }
 
@@ -661,7 +682,10 @@ fn merge_scalar_server_field(
                     // would create.
                 }
                 MergedServerFieldSelection::LinkedField(_) => {
-                    panic!("Unexpected linked field, probably a bug in Isograph")
+                    panic!("Unexpected linked field, probably a bug in Isograph");
+                }
+                MergedServerFieldSelection::InlineFragment(_) => {
+                    panic!("Unexpected inline fragment, probably a bug in Isograph");
                 }
             };
         }
@@ -737,6 +761,9 @@ fn HACK__merge_linked_fields(
                     ),
                 )
             }
+            MergedServerFieldSelection::InlineFragment(_inline_fragment) => {
+                panic!("Unexpectedly encountered inline fragment");
+            }
         };
     }
 
@@ -778,7 +805,10 @@ fn select_typename_and_id_fields_in_merged_selection(
                         // would create.
                     }
                     MergedServerFieldSelection::LinkedField(_) => {
-                        panic!("Unexpected linked field for id, probably a bug in Isograph")
+                        panic!("Unexpected linked field for id, probably a bug in Isograph");
+                    }
+                    MergedServerFieldSelection::InlineFragment(_) => {
+                        panic!("Unexpected inline fragment, probably a bug in Isograph");
                     }
                 };
             }

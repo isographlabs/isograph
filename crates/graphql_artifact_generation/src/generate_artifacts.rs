@@ -24,11 +24,11 @@ use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_client_field,
     ArtifactQueueItem, ClientFieldVariant, FieldDefinitionLocation, FieldMapItem,
     ImperativelyLoadedFieldArtifactInfo, ImperativelyLoadedFieldVariant,
-    MergedLinkedFieldSelection, MergedScalarFieldSelection, MergedSelectionSet,
-    MergedServerFieldSelection, NameAndArguments, NormalizationKey, ObjectTypeAndFieldNames,
-    PathToRefetchField, RefetchFieldArtifactInfo, RequiresRefinement, RootOperationName,
-    RootRefetchedPath, ValidatedClientField, ValidatedSchema, ValidatedSchemaObject,
-    ValidatedSelection, ValidatedVariableDefinition,
+    MergedInlineFragmentSelection, MergedLinkedFieldSelection, MergedScalarFieldSelection,
+    MergedSelectionSet, MergedServerFieldSelection, NameAndArguments, NormalizationKey,
+    ObjectTypeAndFieldNames, PathToRefetchField, RefetchFieldArtifactInfo, RequiresRefinement,
+    RootOperationName, RootRefetchedPath, ValidatedClientField, ValidatedSchema,
+    ValidatedSchemaObject, ValidatedSelection, ValidatedVariableDefinition,
 };
 
 use crate::artifact_file_contents::{ENTRYPOINT, ISO_TS, REFETCH_FIELD_NAME};
@@ -1323,6 +1323,21 @@ fn write_selections_for_query_text(
                     "  ".repeat(indentation_level as usize)
                 ));
             }
+            MergedServerFieldSelection::InlineFragment(inline_fragment) => {
+                query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+                query_text.push_str(&format!(
+                    "... on {} {{\\\n",
+                    inline_fragment.type_to_refine_to
+                ));
+                write_selections_for_query_text(
+                    query_text,
+                    schema,
+                    &inline_fragment.selection_set,
+                    indentation_level + 1,
+                );
+                query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+                query_text.push_str(&format!("}},\\\n"))
+            }
         }
     }
 }
@@ -1917,6 +1932,25 @@ fn generate_normalization_ast_node(
                 {indent_2}kind: \"Linked\",\n\
                 {indent_2}fieldName: \"{name}\",\n\
                 {indent_2}arguments: {serialized_arguments},\n\
+                {indent_2}selections: {selections},\n\
+                {indent}}},\n"
+            )
+        }
+        MergedServerFieldSelection::InlineFragment(inline_fragment) => {
+            let MergedInlineFragmentSelection {
+                type_to_refine_to,
+                selection_set,
+            } = inline_fragment;
+            let indent = "  ".repeat(indentation_level as usize);
+            let indent_2 = "  ".repeat((indentation_level + 1) as usize);
+
+            let selections =
+                generate_normalization_ast(schema, selection_set, indentation_level + 1);
+
+            format!(
+                "{indent}{{\n\
+                {indent_2}kind: \"InlineFragment\",\n\
+                {indent_2}type: \"{type_to_refine_to}\",\n\
                 {indent_2}selections: {selections},\n\
                 {indent}}},\n"
             )
