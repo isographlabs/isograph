@@ -430,19 +430,13 @@ fn get_artifact_for_mutation_field<'schema>(
         root_parent_object,
         refetch_query_index,
         mutation_field_name,
-        exposed_field_parent_object_id,
         variable_definitions,
+        root_operation_name,
     } = mutation_info;
 
     let parent_object = schema.server_field_data.object(parent_id);
 
     let parent_object_name = parent_object.name;
-    let exposed_field_operation_name = &schema
-        .fetchable_types
-        .get(&exposed_field_parent_object_id)
-        .expect(
-            "Expected root type to be fetchable here. This is indicative of a bug in Isograph.",
-        );
 
     let query_text = generate_query_text(
         format!("{parent_object_name}{mutation_field_name}")
@@ -451,7 +445,7 @@ fn get_artifact_for_mutation_field<'schema>(
         schema,
         &merged_selection_set,
         &variable_definitions,
-        *exposed_field_operation_name,
+        &root_operation_name,
     );
 
     let normalization_ast_text = generate_normalization_ast_text(schema, &merged_selection_set, 2);

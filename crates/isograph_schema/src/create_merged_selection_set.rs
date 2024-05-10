@@ -18,8 +18,9 @@ use lazy_static::lazy_static;
 use crate::{
     expose_field_directive::RequiresRefinement, ArgumentKeyAndValue, ClientFieldVariant,
     FieldDefinitionLocation, ImperativelyLoadedFieldVariant, NameAndArguments, PathToRefetchField,
-    ValidatedClientField, ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection,
-    ValidatedSchema, ValidatedSchemaIdField, ValidatedSchemaObject, ValidatedSelection,
+    RootOperationName, ValidatedClientField, ValidatedLinkedFieldSelection,
+    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField, ValidatedSchemaObject,
+    ValidatedSelection,
 };
 
 type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSelection>>;
@@ -214,7 +215,7 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
     // Mutation name
     pub mutation_field_name: SelectableFieldName,
 
-    pub exposed_field_parent_object_id: ServerObjectId,
+    pub root_operation_name: RootOperationName,
 }
 
 /// This struct contains everything that is available when we start
@@ -452,8 +453,14 @@ pub fn create_merged_selection_set(
                                         root_fetchable_field: entrypoint.name,
                                         refetch_query_index: RefetchQueryIndex(index as u32),
                                         mutation_field_name,
-                                        exposed_field_parent_object_id:
-                                            expose_field_fetchable_field_parent_id,
+                                        root_operation_name: schema
+                                            .fetchable_types
+                                            .get(&expose_field_fetchable_field_parent_id)
+                                            .expect(
+                                                "Expected root type to be fetchable here.\
+                                                 This is indicative of a bug in Isograph.",
+                                            )
+                                            .clone(),
                                     },
                                 ));
                                 (mutation_field_name, reachable_variables)
