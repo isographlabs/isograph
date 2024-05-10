@@ -425,7 +425,6 @@ fn get_artifact_for_mutation_field<'schema>(
 ) -> RefetchEntrypointArtifactInfo {
     let ImperativelyLoadedFieldArtifactInfo {
         merged_selection_set,
-        refetch_field_parent_id: parent_id,
         root_fetchable_field,
         root_parent_object,
         refetch_query_index,
@@ -434,12 +433,8 @@ fn get_artifact_for_mutation_field<'schema>(
         root_operation_name,
     } = mutation_info;
 
-    let parent_object = schema.server_field_data.object(parent_id);
-
-    let parent_object_name = parent_object.name;
-
     let query_text = generate_query_text(
-        format!("{parent_object_name}{mutation_field_name}")
+        format!("{root_parent_object}__{mutation_field_name}")
             .intern()
             .into(),
         schema,

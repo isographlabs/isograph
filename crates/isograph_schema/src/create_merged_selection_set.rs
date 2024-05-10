@@ -204,7 +204,6 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
     pub merged_selection_set: MergedSelectionSet,
     /// Used to look up what type to narrow on in the generated refetch query,
     /// among other things.
-    pub refetch_field_parent_id: ServerObjectId,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<SelectableServerFieldId>>>,
     pub root_parent_object: IsographObjectTypeName,
     pub root_fetchable_field: SelectableFieldName,
@@ -444,7 +443,6 @@ pub fn create_merged_selection_set(
                                 artifact_queue.push(ArtifactQueueItem::ImperativelyLoadedField(
                                     ImperativelyLoadedFieldArtifactInfo {
                                         merged_selection_set,
-                                        refetch_field_parent_id,
                                         root_parent_object: schema
                                             .server_field_data
                                             .object(entrypoint.parent_object_id)
