@@ -13,52 +13,52 @@ const queryText = 'mutation Query__make_super ($checkin_id: ID!) {\
 }';
 
 const normalizationAst: NormalizationAst = [
+  {
+    kind: "Linked",
+    fieldName: "make_checkin_super",
+    arguments: [
+      [
+        "checkin_id",
+        { kind: "Variable", name: "checkin_id" },
+      ],
+    ],
+    selections: [
       {
         kind: "Linked",
-        fieldName: "make_checkin_super",
-        arguments: [
-          [
-            "checkin_id",
-            { kind: "Variable", name: "checkin_id" },
-          ],
-        ],
+        fieldName: "checkin",
+        arguments: null,
         selections: [
           {
-            kind: "Linked",
-            fieldName: "checkin",
-            arguments: null,
+            kind: "InlineFragment",
+            type: "Checkin",
             selections: [
               {
-                kind: "InlineFragment",
-                type: "Checkin",
-                selections: [
-                  {
-                    kind: "Scalar",
-                    fieldName: "id",
-                    arguments: null,
-                  },
-                  {
-                    kind: "Scalar",
-                    fieldName: "location",
-                    arguments: null,
-                  },
-                  {
-                    kind: "Scalar",
-                    fieldName: "time",
-                    arguments: null,
-                  },
-                  {
-                    kind: "Scalar",
-                    fieldName: "__typename",
-                    arguments: null,
-                  },
-                ],
+                kind: "Scalar",
+                fieldName: "id",
+                arguments: null,
+              },
+              {
+                kind: "Scalar",
+                fieldName: "location",
+                arguments: null,
+              },
+              {
+                kind: "Scalar",
+                fieldName: "time",
+                arguments: null,
+              },
+              {
+                kind: "Scalar",
+                fieldName: "__typename",
+                arguments: null,
               },
             ],
           },
         ],
       },
-    ];
+    ],
+  },
+];
 const artifact: any = {
   kind: "RefetchQuery",
   queryText,

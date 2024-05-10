@@ -226,7 +226,7 @@ fn get_artifact_for_mutation_field<'schema>(
         &root_operation_name,
     );
 
-    let normalization_ast_text = generate_normalization_ast_text(schema, &merged_selection_set, 2);
+    let normalization_ast_text = generate_normalization_ast_text(schema, &merged_selection_set, 0);
 
     RefetchEntrypointArtifactInfo {
         normalization_ast_text,

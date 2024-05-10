@@ -13,56 +13,56 @@ const queryText = 'query Query__refetch_pet_stats ($id: ID!) {\
 }';
 
 const normalizationAst: NormalizationAst = [
+  {
+    kind: "Linked",
+    fieldName: "pet",
+    arguments: [
+      [
+        "id",
+        { kind: "Variable", name: "id" },
+      ],
+    ],
+    selections: [
       {
         kind: "Linked",
-        fieldName: "pet",
-        arguments: [
-          [
-            "id",
-            { kind: "Variable", name: "id" },
-          ],
-        ],
+        fieldName: "stats",
+        arguments: null,
         selections: [
           {
-            kind: "Linked",
-            fieldName: "stats",
+            kind: "Scalar",
+            fieldName: "cuteness",
             arguments: null,
-            selections: [
-              {
-                kind: "Scalar",
-                fieldName: "cuteness",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "energy",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "hunger",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "intelligence",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "sociability",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "weight",
-                arguments: null,
-              },
-            ],
+          },
+          {
+            kind: "Scalar",
+            fieldName: "energy",
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            fieldName: "hunger",
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            fieldName: "intelligence",
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            fieldName: "sociability",
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            fieldName: "weight",
+            arguments: null,
           },
         ],
       },
-    ];
+    ],
+  },
+];
 const artifact: any = {
   kind: "RefetchQuery",
   queryText,

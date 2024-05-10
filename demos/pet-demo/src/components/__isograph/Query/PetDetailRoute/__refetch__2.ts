@@ -38,105 +38,39 @@ const queryText = 'mutation Query__set_pet_tagline ($input: SetPetTaglineParams!
 }';
 
 const normalizationAst: NormalizationAst = [
+  {
+    kind: "Linked",
+    fieldName: "set_pet_tagline",
+    arguments: [
+      [
+        "input",
+        { kind: "Variable", name: "input" },
+      ],
+    ],
+    selections: [
       {
         kind: "Linked",
-        fieldName: "set_pet_tagline",
-        arguments: [
-          [
-            "input",
-            { kind: "Variable", name: "input" },
-          ],
-        ],
+        fieldName: "pet",
+        arguments: null,
         selections: [
           {
+            kind: "Scalar",
+            fieldName: "id",
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            fieldName: "age",
+            arguments: null,
+          },
+          {
             kind: "Linked",
-            fieldName: "pet",
+            fieldName: "best_friend_relationship",
             arguments: null,
             selections: [
               {
-                kind: "Scalar",
-                fieldName: "id",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "age",
-                arguments: null,
-              },
-              {
                 kind: "Linked",
-                fieldName: "best_friend_relationship",
-                arguments: null,
-                selections: [
-                  {
-                    kind: "Linked",
-                    fieldName: "best_friend",
-                    arguments: null,
-                    selections: [
-                      {
-                        kind: "Scalar",
-                        fieldName: "id",
-                        arguments: null,
-                      },
-                      {
-                        kind: "Scalar",
-                        fieldName: "name",
-                        arguments: null,
-                      },
-                      {
-                        kind: "Scalar",
-                        fieldName: "picture",
-                        arguments: null,
-                      },
-                    ],
-                  },
-                  {
-                    kind: "Scalar",
-                    fieldName: "picture_together",
-                    arguments: null,
-                  },
-                ],
-              },
-              {
-                kind: "Linked",
-                fieldName: "checkins",
-                arguments: null,
-                selections: [
-                  {
-                    kind: "Scalar",
-                    fieldName: "id",
-                    arguments: null,
-                  },
-                  {
-                    kind: "Scalar",
-                    fieldName: "location",
-                    arguments: null,
-                  },
-                  {
-                    kind: "Scalar",
-                    fieldName: "time",
-                    arguments: null,
-                  },
-                ],
-              },
-              {
-                kind: "Scalar",
-                fieldName: "favorite_phrase",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "name",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "nickname",
-                arguments: null,
-              },
-              {
-                kind: "Linked",
-                fieldName: "potential_new_best_friends",
+                fieldName: "best_friend",
                 arguments: null,
                 selections: [
                   {
@@ -149,55 +83,121 @@ const normalizationAst: NormalizationAst = [
                     fieldName: "name",
                     arguments: null,
                   },
-                ],
-              },
-              {
-                kind: "Linked",
-                fieldName: "stats",
-                arguments: null,
-                selections: [
                   {
                     kind: "Scalar",
-                    fieldName: "cuteness",
-                    arguments: null,
-                  },
-                  {
-                    kind: "Scalar",
-                    fieldName: "energy",
-                    arguments: null,
-                  },
-                  {
-                    kind: "Scalar",
-                    fieldName: "hunger",
-                    arguments: null,
-                  },
-                  {
-                    kind: "Scalar",
-                    fieldName: "intelligence",
-                    arguments: null,
-                  },
-                  {
-                    kind: "Scalar",
-                    fieldName: "sociability",
-                    arguments: null,
-                  },
-                  {
-                    kind: "Scalar",
-                    fieldName: "weight",
+                    fieldName: "picture",
                     arguments: null,
                   },
                 ],
               },
               {
                 kind: "Scalar",
-                fieldName: "tagline",
+                fieldName: "picture_together",
                 arguments: null,
               },
             ],
           },
+          {
+            kind: "Linked",
+            fieldName: "checkins",
+            arguments: null,
+            selections: [
+              {
+                kind: "Scalar",
+                fieldName: "id",
+                arguments: null,
+              },
+              {
+                kind: "Scalar",
+                fieldName: "location",
+                arguments: null,
+              },
+              {
+                kind: "Scalar",
+                fieldName: "time",
+                arguments: null,
+              },
+            ],
+          },
+          {
+            kind: "Scalar",
+            fieldName: "favorite_phrase",
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            fieldName: "name",
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            fieldName: "nickname",
+            arguments: null,
+          },
+          {
+            kind: "Linked",
+            fieldName: "potential_new_best_friends",
+            arguments: null,
+            selections: [
+              {
+                kind: "Scalar",
+                fieldName: "id",
+                arguments: null,
+              },
+              {
+                kind: "Scalar",
+                fieldName: "name",
+                arguments: null,
+              },
+            ],
+          },
+          {
+            kind: "Linked",
+            fieldName: "stats",
+            arguments: null,
+            selections: [
+              {
+                kind: "Scalar",
+                fieldName: "cuteness",
+                arguments: null,
+              },
+              {
+                kind: "Scalar",
+                fieldName: "energy",
+                arguments: null,
+              },
+              {
+                kind: "Scalar",
+                fieldName: "hunger",
+                arguments: null,
+              },
+              {
+                kind: "Scalar",
+                fieldName: "intelligence",
+                arguments: null,
+              },
+              {
+                kind: "Scalar",
+                fieldName: "sociability",
+                arguments: null,
+              },
+              {
+                kind: "Scalar",
+                fieldName: "weight",
+                arguments: null,
+              },
+            ],
+          },
+          {
+            kind: "Scalar",
+            fieldName: "tagline",
+            arguments: null,
+          },
         ],
       },
-    ];
+    ],
+  },
+];
 const artifact: any = {
   kind: "RefetchQuery",
   queryText,
