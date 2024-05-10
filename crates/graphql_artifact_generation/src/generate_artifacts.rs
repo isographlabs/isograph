@@ -8,19 +8,19 @@ use std::{
 
 use common_lang_types::{
     ConstExportName, DescriptionValue, FilePath, HasName, IsographObjectTypeName, PathAndContent,
-    QueryOperationName, SelectableFieldName, Span, UnvalidatedTypeName, VariableName, WithLocation,
+    QueryOperationName, SelectableFieldName, UnvalidatedTypeName, VariableName, WithLocation,
     WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, ListTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ClientFieldId, NonConstantValue, RefetchQueryIndex, SelectableServerFieldId, Selection,
-    SelectionFieldArgument, ServerFieldSelection, VariableDefinition,
+    SelectionFieldArgument, ServerFieldSelection,
 };
 use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_client_field,
-    selection_set_wrapped, ArtifactQueueItem, ClientFieldVariant, FieldDefinitionLocation,
-    FieldMapItem, ImperativelyLoadedFieldArtifactInfo, ImperativelyLoadedFieldVariant,
+    ArtifactQueueItem, ClientFieldVariant, FieldDefinitionLocation, FieldMapItem,
+    ImperativelyLoadedFieldArtifactInfo, ImperativelyLoadedFieldVariant,
     MergedInlineFragmentSelection, MergedLinkedFieldSelection, MergedScalarFieldSelection,
     MergedSelectionSet, MergedServerFieldSelection, NameAndArguments, ObjectTypeAndFieldNames,
     PathToRefetchField, RefetchFieldArtifactInfo, RootOperationName, RootRefetchedPath,
@@ -426,16 +426,12 @@ fn get_artifact_for_mutation_field<'schema>(
     let ImperativelyLoadedFieldArtifactInfo {
         merged_selection_set,
         refetch_field_parent_id: parent_id,
-        mut variable_definitions,
         root_fetchable_field,
         root_parent_object,
         refetch_query_index,
         mutation_field_name,
-        server_schema_mutation_field_name,
-        mutation_primary_field_name,
-        mutation_field_arguments,
-        requires_refinement,
         exposed_field_parent_object_id,
+        variable_definitions,
     } = mutation_info;
 
     let parent_object = schema.server_field_data.object(parent_id);
@@ -447,45 +443,6 @@ fn get_artifact_for_mutation_field<'schema>(
         .expect(
             "Expected root type to be fetchable here. This is indicative of a bug in Isograph.",
         );
-
-    let merged_selection_set = selection_set_wrapped(
-        merged_selection_set,
-        // TODO why are these types different
-        server_schema_mutation_field_name.lookup().intern().into(),
-        mutation_field_arguments
-            .into_iter()
-            .map(|x| {
-                let variable_name = x.item.name.map(|value_name| value_name.into());
-                variable_definitions.push(WithSpan {
-                    item: VariableDefinition {
-                        name: variable_name,
-                        type_: x.item.type_.clone().map(|type_name| {
-                            *schema
-                                .server_field_data
-                                .defined_types
-                                .get(&type_name.into())
-                                .expect(
-                                    "Expected type to be found, this indicates a bug in Isograph",
-                                )
-                        }),
-                    },
-                    span: Span::todo_generated(),
-                });
-                x.map(|item| SelectionFieldArgument {
-                    name: WithSpan::new(
-                        item.name.item.lookup().intern().into(),
-                        Span::todo_generated(),
-                    ),
-                    value: WithSpan::new(
-                        NonConstantValue::Variable(item.name.item.into()),
-                        Span::todo_generated(),
-                    ),
-                })
-            })
-            .collect(),
-        Some(mutation_primary_field_name.lookup().intern().into()),
-        requires_refinement,
-    );
 
     let query_text = generate_query_text(
         format!("{parent_object_name}{mutation_field_name}")

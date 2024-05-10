@@ -7,9 +7,7 @@ use common_lang_types::{
     IsographObjectTypeName, LinkedFieldAlias, LinkedFieldName, Location, ScalarFieldAlias,
     ScalarFieldName, SelectableFieldName, Span, VariableName, WithLocation, WithSpan,
 };
-use graphql_lang_types::{
-    GraphQLInputValueDefinition, GraphQLTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
-};
+use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ClientFieldId, NonConstantValue, RefetchQueryIndex, SelectableServerFieldId, Selection,
@@ -215,10 +213,6 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
     // the same struct, with everything below wrapped in an option:
     // Mutation name
     pub mutation_field_name: SelectableFieldName,
-    pub server_schema_mutation_field_name: SelectableFieldName,
-    pub mutation_primary_field_name: SelectableFieldName,
-    pub mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
-    pub requires_refinement: RequiresRefinement,
 
     pub exposed_field_parent_object_id: ServerObjectId,
 }
@@ -380,7 +374,7 @@ pub fn create_merged_selection_set(
                                 let reachable_variables =
                                     merged_selection_set.reachable_variables();
 
-                                let definitions_of_used_variables =
+                                let mut definitions_of_used_variables =
                                     get_used_variable_definitions(&reachable_variables, entrypoint);
 
                                 // It's a bit weird that all exposed fields become imperatively
@@ -401,24 +395,65 @@ pub fn create_merged_selection_set(
                                         )
                                     };
 
+                                let merged_selection_set = selection_set_wrapped(
+                                    nested_merged_selection_set,
+                                    // TODO why are these types different
+                                    server_schema_mutation_field_name.lookup().intern().into(),
+                                    mutation_field_arguments
+                                        .iter()
+                                        // TODO don't clone
+                                        .cloned()
+                                        .map(|x| {
+                                            let variable_name =
+                                                x.item.name.map(|value_name| value_name.into());
+                                            definitions_of_used_variables.push(WithSpan {
+                                                item: VariableDefinition {
+                                                    name: variable_name,
+                                                    type_: x.item.type_.clone().map(|type_name| {
+                                                        *schema
+                                                            .server_field_data
+                                                            .defined_types
+                                                            .get(&type_name.into())
+                                                            .expect(
+                                                                "Expected type to be found, \
+                                                                this indicates a bug in Isograph",
+                                                            )
+                                                    }),
+                                                },
+                                                span: Span::todo_generated(),
+                                            });
+                                            x.map(|item| SelectionFieldArgument {
+                                                name: WithSpan::new(
+                                                    item.name.item.lookup().intern().into(),
+                                                    Span::todo_generated(),
+                                                ),
+                                                value: WithSpan::new(
+                                                    NonConstantValue::Variable(
+                                                        item.name.item.into(),
+                                                    ),
+                                                    Span::todo_generated(),
+                                                ),
+                                            })
+                                        })
+                                        .collect(),
+                                    Some(mutation_primary_field_name.lookup().intern().into()),
+                                    requires_refinement,
+                                );
+
                                 artifact_queue.push(ArtifactQueueItem::ImperativelyLoadedField(
                                     ImperativelyLoadedFieldArtifactInfo {
-                                        exposed_field_parent_object_id:
-                                            expose_field_fetchable_field_parent_id,
-                                        merged_selection_set: nested_merged_selection_set,
+                                        merged_selection_set,
                                         refetch_field_parent_id,
-                                        variable_definitions: definitions_of_used_variables,
                                         root_parent_object: schema
                                             .server_field_data
                                             .object(entrypoint.parent_object_id)
                                             .name,
+                                        variable_definitions: definitions_of_used_variables,
                                         root_fetchable_field: entrypoint.name,
                                         refetch_query_index: RefetchQueryIndex(index as u32),
                                         mutation_field_name,
-                                        server_schema_mutation_field_name,
-                                        mutation_primary_field_name,
-                                        mutation_field_arguments: mutation_field_arguments.clone(),
-                                        requires_refinement,
+                                        exposed_field_parent_object_id:
+                                            expose_field_fetchable_field_parent_id,
                                     },
                                 ));
                                 (mutation_field_name, reachable_variables)
@@ -915,6 +950,7 @@ pub fn selection_set_wrapped(
     mut merged_selection_set: MergedSelectionSet,
     top_level_field: LinkedFieldName,
     top_level_field_arguments: Vec<WithLocation<SelectionFieldArgument>>,
+    // TODO support arguments and vectors of subfields
     subfield: Option<LinkedFieldName>,
     type_to_refine_to: RequiresRefinement,
 ) -> MergedSelectionSet {
