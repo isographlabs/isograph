@@ -4,8 +4,9 @@ use std::collections::{
 };
 
 use common_lang_types::{
-    IsographObjectTypeName, LinkedFieldAlias, LinkedFieldName, Location, ScalarFieldAlias,
-    ScalarFieldName, SelectableFieldName, Span, VariableName, WithLocation, WithSpan,
+    IsographObjectTypeName, LinkedFieldAlias, LinkedFieldName, Location, QueryOperationName,
+    ScalarFieldAlias, ScalarFieldName, SelectableFieldName, Span, VariableName, WithLocation,
+    WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
@@ -189,14 +190,12 @@ pub enum ArtifactQueueItem {
 #[derive(Debug, Clone)]
 pub struct RefetchFieldArtifactInfo {
     pub merged_selection_set: MergedSelectionSet,
-    /// Used to look up what type to narrow on in the generated refetch query,
-    /// among other things.
-    pub refetch_field_parent_id: ServerObjectId,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<SelectableServerFieldId>>>,
     pub root_parent_object: IsographObjectTypeName,
     pub root_fetchable_field: SelectableFieldName,
     // TODO wrap in a newtype
     pub refetch_query_index: RefetchQueryIndex,
+    pub query_name: QueryOperationName,
 }
 
 #[derive(Debug, Clone)]
@@ -209,12 +208,9 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
     pub root_fetchable_field: SelectableFieldName,
     // TODO wrap in a newtype
     pub refetch_query_index: RefetchQueryIndex,
-    // TODO make MutationFieldResolverInfo and RefetchFieldResolverInfo
-    // the same struct, with everything below wrapped in an option:
-    // Mutation name
-    pub mutation_field_name: SelectableFieldName,
 
     pub root_operation_name: RootOperationName,
+    pub query_name: QueryOperationName,
 }
 
 /// This struct contains everything that is available when we start
@@ -345,7 +341,6 @@ pub fn create_merged_selection_set(
                                 artifact_queue.push(ArtifactQueueItem::RefetchField(
                                     RefetchFieldArtifactInfo {
                                         merged_selection_set,
-                                        refetch_field_parent_id,
                                         variable_definitions: definitions_of_used_variables,
                                         root_parent_object: schema
                                             .server_field_data
@@ -353,6 +348,9 @@ pub fn create_merged_selection_set(
                                             .name,
                                         root_fetchable_field: entrypoint.name,
                                         refetch_query_index: RefetchQueryIndex(index as u32),
+                                        query_name: format!("{type_to_refine_to}_refetch")
+                                            .intern()
+                                            .into(),
                                     },
                                 ));
                                 ("__refetch".intern().into(), reachable_variables)
@@ -440,17 +438,17 @@ pub fn create_merged_selection_set(
                                     requires_refinement,
                                 );
 
+                                let root_parent_object = schema
+                                    .server_field_data
+                                    .object(entrypoint.parent_object_id)
+                                    .name;
                                 artifact_queue.push(ArtifactQueueItem::ImperativelyLoadedField(
                                     ImperativelyLoadedFieldArtifactInfo {
                                         merged_selection_set,
-                                        root_parent_object: schema
-                                            .server_field_data
-                                            .object(entrypoint.parent_object_id)
-                                            .name,
+                                        root_parent_object,
                                         variable_definitions: definitions_of_used_variables,
                                         root_fetchable_field: entrypoint.name,
                                         refetch_query_index: RefetchQueryIndex(index as u32),
-                                        mutation_field_name,
                                         root_operation_name: schema
                                             .fetchable_types
                                             .get(&expose_field_fetchable_field_parent_id)
@@ -459,6 +457,11 @@ pub fn create_merged_selection_set(
                                                  This is indicative of a bug in Isograph.",
                                             )
                                             .clone(),
+                                        query_name: format!(
+                                            "{root_parent_object}__{mutation_field_name}"
+                                        )
+                                        .intern()
+                                        .into(),
                                     },
                                 ));
                                 (mutation_field_name, reachable_variables)

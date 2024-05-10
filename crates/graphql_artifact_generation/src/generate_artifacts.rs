@@ -390,20 +390,17 @@ fn get_artifact_for_refetch_field(
 ) -> RefetchEntrypointArtifactInfo {
     let RefetchFieldArtifactInfo {
         merged_selection_set,
-        refetch_field_parent_id: parent_id,
         variable_definitions,
         root_fetchable_field,
         root_parent_object,
         refetch_query_index,
-        ..
+        query_name,
     } = refetch_info;
-
-    let parent_object = schema.server_field_data.object(parent_id);
 
     let normalization_ast = generate_normalization_ast_text(schema, &merged_selection_set, 0);
 
     let query_text = generate_query_text(
-        format!("{}_refetch", parent_object.name).intern().into(),
+        query_name,
         schema,
         &merged_selection_set,
         &variable_definitions,
@@ -428,15 +425,13 @@ fn get_artifact_for_mutation_field<'schema>(
         root_fetchable_field,
         root_parent_object,
         refetch_query_index,
-        mutation_field_name,
         variable_definitions,
         root_operation_name,
+        query_name,
     } = mutation_info;
 
     let query_text = generate_query_text(
-        format!("{root_parent_object}__{mutation_field_name}")
-            .intern()
-            .into(),
+        query_name,
         schema,
         &merged_selection_set,
         &variable_definitions,
