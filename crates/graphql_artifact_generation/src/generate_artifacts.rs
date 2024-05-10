@@ -70,7 +70,8 @@ pub fn get_artifact_path_and_content<'schema>(
 /// - Add all the entrypoints to the queue
 /// - While generating merged selection sets for entrypoints, if we encounter:
 ///   - a client field, add it the queue (but only once per client field.)
-///   - a refetch field/magic mutation field, add it to the queue
+///   - a refetch field/magic mutation field, add it to the queue (along with
+///     the path)
 /// Keep processing artifacts until the queue is empty.
 ///
 /// We *also* need to generate all (type) artifacts for all client-defined fields,
@@ -106,7 +107,8 @@ fn get_artifact_infos<'schema>(
             // What are we doing here?
             // We are generating, and throwing away, an entrypoint artifact. This has the effect of
             // encountering selected __refetch fields. Refetch fields reachable from orphaned
-            // client fields still need reader (well... type) artifacts generated.
+            // client fields still need type artifacts generated.
+            // We currently also generate unneeded reader artifacts.
             //
             // Anyway, this sucks and should be improved.
             let _ = generate_entrypoint_artifact(
