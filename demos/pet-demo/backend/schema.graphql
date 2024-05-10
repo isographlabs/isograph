@@ -16,7 +16,7 @@ interface Node {
 
 # TODO make this a union: Success | InvalidId instead of using an optional field
 type MakeCheckinSuperResponse {
-  checkin: Checkin
+  checkin: ICheckin
 }
 
 type SetBestFriendResponse {
@@ -64,7 +64,17 @@ type PetStats {
   energy: Int
 }
 
-type Checkin {
+type Checkin implements ICheckin {
+  id: ID!
+  location: String!
+  time: String!
+}
+
+"""
+This interface exists solely allow make_checkin_super to
+return an interface
+"""
+interface ICheckin {
   id: ID!
   location: String!
   time: String!

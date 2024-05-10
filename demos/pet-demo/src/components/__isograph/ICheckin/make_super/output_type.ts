@@ -15,4 +15,4 @@ const resolver = (
   makeNetworkRequest(environment, artifact, variables);
 };
 
-export type Checkin__make_super__outputType = (params: any) => void;
+export type ICheckin__make_super__outputType = (params: any) => void;

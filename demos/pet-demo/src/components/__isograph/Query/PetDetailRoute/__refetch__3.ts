@@ -2,9 +2,11 @@ import type {IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst,
 const queryText = 'mutation Checkinmake_super ($checkin_id: ID!) {\
 make_super____checkin_id___v_checkin_id: make_checkin_super(checkin_id: $checkin_id) {\
 checkin { \
+... on Checkin {\
   id,\
   location,\
   time,\
+}\
 }}}';
 
 const normalizationAst: NormalizationAst = [{

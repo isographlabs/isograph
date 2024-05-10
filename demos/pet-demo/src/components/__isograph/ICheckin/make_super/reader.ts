@@ -1,5 +1,5 @@
 import type {MutationReaderArtifact, RefetchQueryNormalizationArtifact, ReaderAst} from '@isograph/react';
-import { Checkin__make_super__param } from './param_type';
+import { ICheckin__make_super__param } from './param_type';
 const includeReadOutData = (variables: any, readOutData: any) => {
   variables.checkin_id = readOutData.id;
   return variables;
@@ -17,7 +17,7 @@ const resolver = (
 };
 
 
-const readerAst: ReaderAst<Checkin__make_super__param> = [
+const readerAst: ReaderAst<ICheckin__make_super__param> = [
   {
     kind: "Scalar",
     fieldName: "id",
@@ -27,7 +27,7 @@ const readerAst: ReaderAst<Checkin__make_super__param> = [
 ];
 
 const artifact: MutationReaderArtifact<
-  Checkin__make_super__param
+  ICheckin__make_super__param
 > = {
   kind: "MutationReaderArtifact",
   resolver,

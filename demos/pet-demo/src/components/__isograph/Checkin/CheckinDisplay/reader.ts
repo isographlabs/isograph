@@ -1,7 +1,7 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Checkin__CheckinDisplay__param } from './param_type';
 import { CheckinDisplay as resolver } from '../../../PetCheckinsCard.tsx';
-import Checkin__make_super from '../make_super/reader';
+import ICheckin__make_super from '../../ICheckin/make_super/reader';
 
 const readerAst: ReaderAst<Checkin__CheckinDisplay__param> = [
   {
@@ -19,7 +19,7 @@ const readerAst: ReaderAst<Checkin__CheckinDisplay__param> = [
   {
     kind: "MutationField",
     alias: "make_super",
-    readerArtifact: Checkin__make_super,
+    readerArtifact: ICheckin__make_super,
     refetchQuery: 0,
   },
 ];
