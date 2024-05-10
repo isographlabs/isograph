@@ -9,6 +9,7 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
   {
     kind: "MutationField",
     alias: "set_best_friend",
+    // @ts-ignore
     readerArtifact: Pet__set_best_friend,
     refetchQuery: 1,
   },
@@ -35,6 +36,7 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
   {
     kind: "MutationField",
     alias: "set_pet_tagline",
+    // @ts-ignore
     readerArtifact: Pet__set_pet_tagline,
     refetchQuery: 2,
   },

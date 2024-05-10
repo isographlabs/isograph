@@ -19,6 +19,7 @@ const readerAst: ReaderAst<Checkin__CheckinDisplay__param> = [
   {
     kind: "MutationField",
     alias: "make_super",
+    // @ts-ignore
     readerArtifact: ICheckin__make_super,
     refetchQuery: 0,
   },

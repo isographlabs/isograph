@@ -1,4 +1,4 @@
-import type {MutationReaderArtifact, RefetchQueryNormalizationArtifact, ReaderAst} from '@isograph/react';
+import type {RefetchReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Pet__set_best_friend__param } from './param_type';
 const includeReadOutData = (variables: any, readOutData: any) => {
   variables.id = readOutData.id;
@@ -26,10 +26,9 @@ const readerAst: ReaderAst<Pet__set_best_friend__param> = [
   },
 ];
 
-const artifact: MutationReaderArtifact<
-  Pet__set_best_friend__param
-> = {
-  kind: "MutationReaderArtifact",
+const artifact: RefetchReaderArtifact = {
+  kind: "RefetchReaderArtifact",
+  // @ts-ignore
   resolver,
   readerAst,
 };

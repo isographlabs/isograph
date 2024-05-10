@@ -143,7 +143,7 @@ fn get_artifact_infos<'schema>(
                 generate_refetch_reader_artifact(schema, encountered_client_field),
             ),
             ClientFieldVariant::ImperativelyLoadedField(mutation_variant) => {
-                ArtifactInfo::MutationReader(generate_mutation_reader_artifact(
+                ArtifactInfo::RefetchReader(generate_mutation_reader_artifact(
                     schema,
                     encountered_client_field,
                     mutation_variant,
@@ -154,19 +154,21 @@ fn get_artifact_infos<'schema>(
     }
 
     for imperatively_loaded_field_artifact_info in artifact_queue {
-        artifact_infos.push(ArtifactInfo::RefetchQuery(get_artifact_for_mutation_field(
-            schema,
-            imperatively_loaded_field_artifact_info,
-        )))
+        artifact_infos.push(ArtifactInfo::ImperativelyLoadedEntrypoint(
+            get_artifact_for_imperatively_loaded_field(
+                schema,
+                imperatively_loaded_field_artifact_info,
+            ),
+        ))
     }
 
     artifact_infos
 }
 
-fn get_artifact_for_mutation_field<'schema>(
+fn get_artifact_for_imperatively_loaded_field<'schema>(
     schema: &'schema ValidatedSchema,
     imperatively_loaded_field_artifact_info: ImperativelyLoadedFieldArtifactInfo,
-) -> RefetchEntrypointArtifactInfo {
+) -> ImperativelyLoadedEntrypointArtifactInfo {
     let ImperativelyLoadedFieldArtifactInfo {
         merged_selection_set,
         root_fetchable_field,
@@ -187,7 +189,7 @@ fn get_artifact_for_mutation_field<'schema>(
 
     let normalization_ast_text = generate_normalization_ast_text(schema, &merged_selection_set, 0);
 
-    RefetchEntrypointArtifactInfo {
+    ImperativelyLoadedEntrypointArtifactInfo {
         normalization_ast_text,
         query_text,
         root_fetchable_field,
@@ -441,7 +443,7 @@ fn generate_mutation_reader_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     client_field: &ValidatedClientField,
     mutation_variant: &ImperativelyLoadedFieldVariant,
-) -> MutationReaderArtifactInfo<'schema> {
+) -> RefetchReaderArtifactInfo<'schema> {
     if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
         let parent_type = schema
             .server_field_data
@@ -478,7 +480,7 @@ fn generate_mutation_reader_artifact<'schema>(
         let client_field_output_type = generate_output_type(client_field);
         let function_import_statement =
             generate_function_import_statement_for_mutation_reader(mutation_variant);
-        MutationReaderArtifactInfo {
+        RefetchReaderArtifactInfo {
             parent_type: parent_type.into(),
             client_field_name: client_field.name,
             reader_ast,
@@ -505,9 +507,8 @@ pub(crate) enum ArtifactInfo<'schema> {
     EagerReader(EagerReaderArtifactInfo<'schema>),
     ComponentReader(ComponentReaderArtifactInfo<'schema>),
     RefetchReader(RefetchReaderArtifactInfo<'schema>),
-    MutationReader(MutationReaderArtifactInfo<'schema>),
 
-    RefetchQuery(RefetchEntrypointArtifactInfo),
+    ImperativelyLoadedEntrypoint(ImperativelyLoadedEntrypointArtifactInfo),
 }
 
 impl<'schema> ArtifactInfo<'schema> {
@@ -516,7 +517,9 @@ impl<'schema> ArtifactInfo<'schema> {
             ArtifactInfo::Entrypoint(entrypoint_artifact) => {
                 vec![entrypoint_artifact.path_and_content()]
             }
-            ArtifactInfo::RefetchQuery(refetch_query) => vec![refetch_query.path_and_content()],
+            ArtifactInfo::ImperativelyLoadedEntrypoint(refetch_query) => {
+                vec![refetch_query.path_and_content()]
+            }
             ArtifactInfo::EagerReader(eager_reader_artifact) => {
                 eager_reader_artifact.path_and_content()
             }
@@ -525,9 +528,6 @@ impl<'schema> ArtifactInfo<'schema> {
             }
             ArtifactInfo::RefetchReader(refetch_reader_artifact) => {
                 refetch_reader_artifact.path_and_content()
-            }
-            ArtifactInfo::MutationReader(mutation_reader_artifact) => {
-                mutation_reader_artifact.path_and_content()
             }
         }
     }
@@ -668,32 +668,7 @@ impl<'schema> RefetchReaderArtifactInfo<'schema> {
 }
 
 #[derive(Debug)]
-pub(crate) struct MutationReaderArtifactInfo<'schema> {
-    pub parent_type: &'schema ValidatedSchemaObject,
-    pub(crate) client_field_name: SelectableFieldName,
-    pub nested_client_field_artifact_imports: NestedClientFieldImports,
-    pub client_field_output_type: ClientFieldOutputType,
-    pub reader_ast: ReaderAst,
-    pub client_field_parameter_type: ClientFieldParameterType,
-    pub function_import_statement: ClientFieldFunctionImportStatement,
-}
-
-impl<'schema> MutationReaderArtifactInfo<'schema> {
-    pub fn path_and_content(self) -> Vec<PathAndContent> {
-        let MutationReaderArtifactInfo {
-            parent_type,
-            client_field_name,
-            ..
-        } = &self;
-
-        let relative_directory = generate_path(parent_type.name, *client_field_name);
-
-        self.file_contents(&relative_directory)
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct RefetchEntrypointArtifactInfo {
+pub(crate) struct ImperativelyLoadedEntrypointArtifactInfo {
     pub normalization_ast_text: NormalizationAstText,
     pub query_text: QueryText,
     pub root_fetchable_field: SelectableFieldName,
@@ -701,9 +676,9 @@ pub(crate) struct RefetchEntrypointArtifactInfo {
     pub refetch_query_index: RefetchQueryIndex,
 }
 
-impl RefetchEntrypointArtifactInfo {
+impl ImperativelyLoadedEntrypointArtifactInfo {
     pub fn path_and_content(self) -> PathAndContent {
-        let RefetchEntrypointArtifactInfo {
+        let ImperativelyLoadedEntrypointArtifactInfo {
             root_fetchable_field,
             root_fetchable_field_parent_object,
             refetch_query_index,
@@ -1233,6 +1208,7 @@ fn generate_reader_ast_node(
                                     "{indent_1}{{\n\
                                     {indent_2}kind: \"MutationField\",\n\
                                     {indent_2}alias: \"{alias}\",\n\
+                                    {indent_2}// @ts-ignore\n\
                                     {indent_2}readerArtifact: {client_field_string},\n\
                                     {indent_2}refetchQuery: {refetch_query_index},\n\
                                     {indent_1}}},\n",

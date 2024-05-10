@@ -9,8 +9,8 @@ use lazy_static::lazy_static;
 
 use crate::generate_artifacts::{
     ClientFieldFunctionImportStatement, ClientFieldOutputType, ComponentReaderArtifactInfo,
-    EagerReaderArtifactInfo, EntrypointArtifactInfo, JavaScriptImports, MutationReaderArtifactInfo,
-    RefetchEntrypointArtifactInfo, RefetchReaderArtifactInfo,
+    EagerReaderArtifactInfo, EntrypointArtifactInfo, ImperativelyLoadedEntrypointArtifactInfo,
+    JavaScriptImports, RefetchReaderArtifactInfo,
 };
 
 lazy_static! {
@@ -253,11 +253,12 @@ impl<'schema> RefetchReaderArtifactInfo<'schema> {
             const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
             const artifact: RefetchReaderArtifact = {{\n\
             {}kind: \"RefetchReaderArtifact\",\n\
+            {}// @ts-ignore\n\
             {}resolver,\n\
             {}readerAst,\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", 
+            "  ", "  ", "  ", "  "
         );
 
         let param_type_content = format!(
@@ -285,84 +286,9 @@ impl<'schema> RefetchReaderArtifactInfo<'schema> {
     }
 }
 
-impl<'schema> MutationReaderArtifactInfo<'schema> {
-    pub(crate) fn file_contents(self, relative_directory: &PathBuf) -> Vec<PathAndContent> {
-        let MutationReaderArtifactInfo {
-            function_import_statement,
-            client_field_parameter_type,
-            client_field_output_type,
-            reader_ast,
-            nested_client_field_artifact_imports,
-            parent_type,
-            client_field_name,
-            ..
-        } = self;
-
-        let (client_field_import_statement, client_field_type_import_statement) =
-            nested_client_field_names_to_import_statement(
-                nested_client_field_artifact_imports,
-                parent_type.name,
-            );
-
-        let output_type_text = get_output_type_text(
-            &function_import_statement,
-            parent_type.name,
-            client_field_name,
-            client_field_output_type,
-        );
-        let output_type_text = format!(
-            "import {{ RefetchQueryNormalizationArtifact }} from '@isograph/react';\n\
-            {output_type_text}"
-        );
-
-        let parent_name = parent_type.name;
-        let reader_param_type = format!("{parent_name}__{client_field_name}__param");
-
-        let reader_content = format!(
-            "import type {{MutationReaderArtifact, RefetchQueryNormalizationArtifact, ReaderAst}} from '@isograph/react';\n\
-            import {{ {reader_param_type} }} from './param_type';\n\
-            {function_import_statement}\n\
-            {client_field_import_statement}\n\
-            const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
-            const artifact: MutationReaderArtifact<\n\
-            {}{reader_param_type}\n\
-            > = {{\n\
-            {}kind: \"MutationReaderArtifact\",\n\
-            {}resolver,\n\
-            {}readerAst,\n\
-            }};\n\n\
-            export default artifact;\n",
-            "  ", "  ", "  ", "  ",
-        );
-
-        let param_type_content = format!(
-            "{client_field_type_import_statement}\n\
-            export type {reader_param_type} = {client_field_parameter_type};\n",
-        );
-
-        vec![
-            PathAndContent {
-                relative_directory: relative_directory.clone(),
-                file_name_prefix: *READER,
-                file_content: reader_content,
-            },
-            PathAndContent {
-                relative_directory: relative_directory.clone(),
-                file_name_prefix: *READER_PARAM_TYPE,
-                file_content: param_type_content,
-            },
-            PathAndContent {
-                relative_directory: relative_directory.clone(),
-                file_name_prefix: *READER_OUTPUT_TYPE,
-                file_content: output_type_text,
-            },
-        ]
-    }
-}
-
-impl RefetchEntrypointArtifactInfo {
+impl ImperativelyLoadedEntrypointArtifactInfo {
     pub(crate) fn file_contents(self) -> String {
-        let RefetchEntrypointArtifactInfo {
+        let ImperativelyLoadedEntrypointArtifactInfo {
             normalization_ast_text: normalization_ast,
             query_text,
             ..

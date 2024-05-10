@@ -18,6 +18,7 @@ const readerAst: ReaderAst<Pet____refetch__param> = [
 
 const artifact: RefetchReaderArtifact = {
   kind: "RefetchReaderArtifact",
+  // @ts-ignore
   resolver,
   readerAst,
 };
