@@ -182,6 +182,7 @@ fn get_artifact_for_refetch_field(
         root_parent_object,
         refetch_query_index,
         query_name,
+        root_operation_name,
     } = refetch_info;
 
     let normalization_ast = generate_normalization_ast_text(schema, &merged_selection_set, 0);
@@ -191,7 +192,7 @@ fn get_artifact_for_refetch_field(
         schema,
         &merged_selection_set,
         &variable_definitions,
-        &RootOperationName("query".to_string()),
+        &root_operation_name,
     );
 
     RefetchEntrypointArtifactInfo {

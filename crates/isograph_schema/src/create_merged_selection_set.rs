@@ -195,6 +195,7 @@ pub struct RefetchFieldArtifactInfo {
     pub root_fetchable_field: SelectableFieldName,
     // TODO wrap in a newtype
     pub refetch_query_index: RefetchQueryIndex,
+    pub root_operation_name: RootOperationName,
     pub query_name: QueryOperationName,
 }
 
@@ -351,6 +352,7 @@ pub fn create_merged_selection_set(
                                         query_name: format!("{type_to_refine_to}__refetch")
                                             .intern()
                                             .into(),
+                                        root_operation_name: RootOperationName("query".to_string()),
                                     },
                                 ));
                                 ("__refetch".intern().into(), reachable_variables)
