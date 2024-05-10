@@ -299,10 +299,26 @@ pub fn create_merged_selection_set(
                                     .object(refetch_field_parent_id)
                                     .name;
 
-                                let merged_selection_set = selection_set_wrapped_in_node_field(
+                                let id_arguments = vec![WithLocation::new(
+                                    SelectionFieldArgument {
+                                        name: WithSpan::new(
+                                            "id".intern().into(),
+                                            Span::todo_generated(),
+                                        ),
+                                        value: WithSpan::new(
+                                            NonConstantValue::Variable("id".intern().into()),
+                                            Span::todo_generated(),
+                                        ),
+                                    },
+                                    Location::generated(),
+                                )];
+
+                                let merged_selection_set = selection_set_wrapped(
                                     nested_merged_selection_set,
-                                    // path_to_refetch_field.,
-                                    type_to_refine_to,
+                                    *NODE_FIELD_NAME,
+                                    id_arguments,
+                                    None,
+                                    RequiresRefinement::Yes(type_to_refine_to),
                                 );
                                 // TODO we can pre-calculate this instead of re-iterating here
                                 let reachable_variables =
@@ -974,54 +990,6 @@ pub fn selection_set_wrapped(
     ]);
 
     top_level_selection_set
-}
-
-fn selection_set_wrapped_in_node_field(
-    mut merged_selection_set: MergedSelectionSet,
-    type_to_refine_to: IsographObjectTypeName,
-) -> MergedSelectionSet {
-    let id_arguments = vec![WithLocation::new(
-        SelectionFieldArgument {
-            name: WithSpan::new("id".intern().into(), Span::todo_generated()),
-            value: WithSpan::new(
-                NonConstantValue::Variable("id".intern().into()),
-                Span::todo_generated(),
-            ),
-        },
-        Location::generated(),
-    )];
-
-    maybe_add_typename_selection(&mut merged_selection_set);
-
-    let unsorted_vec = vec![(
-        NormalizationKey::ServerField(NameAndArguments {
-            name: "node".intern().into(),
-            // TODO id argument
-            arguments: vec![],
-        }),
-        WithSpan::new(
-            MergedServerFieldSelection::LinkedField(MergedLinkedFieldSelection {
-                normalization_alias: Some(WithLocation::new(
-                    get_aliased_mutation_field_name((*NODE_FIELD_NAME).into(), &id_arguments)
-                        .intern()
-                        .into(),
-                    Location::generated(),
-                )),
-                selection_set: vec![WithSpan::new(
-                    MergedServerFieldSelection::InlineFragment(MergedInlineFragmentSelection {
-                        type_to_refine_to,
-                        selection_set: merged_selection_set.0,
-                    }),
-                    Span::todo_generated(),
-                )],
-                arguments: id_arguments,
-                name: WithLocation::new((*NODE_FIELD_NAME).into(), Location::generated()),
-            }),
-            Span::todo_generated(),
-        ),
-    )];
-    let new_selection_set = MergedSelectionSet::new(unsorted_vec);
-    new_selection_set
 }
 
 fn is_typename_selection<'a>(selection: &'a &WithSpan<MergedServerFieldSelection>) -> bool {
