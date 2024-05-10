@@ -723,43 +723,29 @@ fn merge_scalar_client_field(
         panic!("unsupported client field without selection set");
     }
 
-    // HACK... we can model this data better
-    if let ClientFieldVariant::RefetchField = client_field.variant {
-        merge_traversal_state.paths_to_refetch_fields.insert((
-            PathToRefetchField {
-                linked_fields: merge_traversal_state.current_path.clone(),
-                field_name: client_field.name,
-            },
-            parent_type.id,
-            ClientFieldVariant::RefetchField,
-        ));
-    } else if let ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
-        primary_field_name,
-        top_level_schema_field_name,
-        top_level_schema_field_arguments,
-        client_field_scalar_selection_name: _,
-        primary_field_return_type_object_id,
-        primary_field_field_map,
-        root_object_id,
-    }) = &client_field.variant
-    {
-        merge_traversal_state.paths_to_refetch_fields.insert((
-            PathToRefetchField {
-                linked_fields: merge_traversal_state.current_path.clone(),
-                field_name: client_field.name,
-            },
-            parent_type.id,
-            ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
-                client_field_scalar_selection_name: client_field.name,
-                top_level_schema_field_name: *top_level_schema_field_name,
-                primary_field_name: *primary_field_name,
-                top_level_schema_field_arguments: top_level_schema_field_arguments.clone(),
-                primary_field_return_type_object_id: *primary_field_return_type_object_id,
-                primary_field_field_map: primary_field_field_map.clone(),
-                root_object_id: *root_object_id,
-            }),
-        ));
-    }
+    match &client_field.variant {
+        ClientFieldVariant::RefetchField => {
+            merge_traversal_state.paths_to_refetch_fields.insert((
+                PathToRefetchField {
+                    linked_fields: merge_traversal_state.current_path.clone(),
+                    field_name: client_field.name,
+                },
+                parent_type.id,
+                ClientFieldVariant::RefetchField,
+            ));
+        }
+        ClientFieldVariant::ImperativelyLoadedField(variant) => {
+            merge_traversal_state.paths_to_refetch_fields.insert((
+                PathToRefetchField {
+                    linked_fields: merge_traversal_state.current_path.clone(),
+                    field_name: client_field.name,
+                },
+                parent_type.id,
+                ClientFieldVariant::ImperativelyLoadedField(variant.clone()),
+            ));
+        }
+        _ => {}
+    };
 }
 
 fn merge_scalar_server_field(
