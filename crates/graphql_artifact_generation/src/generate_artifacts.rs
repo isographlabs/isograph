@@ -140,14 +140,24 @@ fn get_artifact_infos<'schema>(
                     *component_name_and_path,
                 ))
             }
-            ClientFieldVariant::RefetchField => ArtifactInfo::RefetchReader(
-                generate_refetch_reader_artifact(schema, encountered_client_field),
-            ),
-            ClientFieldVariant::ImperativelyLoadedField(mutation_variant) => {
+            ClientFieldVariant::RefetchField => {
+                let function_import_statement =
+                    generate_function_import_statement_for_refetch_reader();
                 ArtifactInfo::RefetchReader(generate_mutation_reader_artifact(
                     schema,
                     encountered_client_field,
-                    &mutation_variant.field_map,
+                    function_import_statement,
+                ))
+            }
+            ClientFieldVariant::ImperativelyLoadedField(mutation_variant) => {
+                let function_import_statement =
+                    generate_function_import_statement_for_mutation_reader(
+                        &mutation_variant.field_map,
+                    );
+                ArtifactInfo::RefetchReader(generate_mutation_reader_artifact(
+                    schema,
+                    encountered_client_field,
+                    function_import_statement,
                 ))
             }
         };
@@ -387,63 +397,10 @@ fn generate_component_reader_artifact<'schema>(
     }
 }
 
-fn generate_refetch_reader_artifact<'schema>(
-    schema: &'schema ValidatedSchema,
-    client_field: &ValidatedClientField,
-) -> RefetchReaderArtifactInfo<'schema> {
-    if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
-        let parent_type = schema
-            .server_field_data
-            .object(client_field.parent_object_id);
-        let mut nested_client_field_artifact_imports = HashMap::new();
-
-        let (_merged_selection_set, root_refetched_paths) = create_merged_selection_set(
-            schema,
-            schema
-                .server_field_data
-                .object(client_field.parent_object_id)
-                .into(),
-            selection_set,
-            None,
-            None,
-            client_field,
-        );
-
-        let reader_ast = generate_reader_ast(
-            schema,
-            selection_set,
-            0,
-            &mut nested_client_field_artifact_imports,
-            &root_refetched_paths,
-        );
-
-        let client_field_parameter_type = generate_client_field_parameter_type(
-            schema,
-            &selection_set,
-            parent_type.into(),
-            &mut nested_client_field_artifact_imports,
-            0,
-        );
-        let client_field_output_type = generate_output_type(client_field);
-        let function_import_statement = generate_function_import_statement_for_refetch_reader();
-        RefetchReaderArtifactInfo {
-            parent_type: parent_type.into(),
-            client_field_name: client_field.name,
-            reader_ast,
-            nested_client_field_artifact_imports,
-            function_import_statement,
-            client_field_output_type,
-            client_field_parameter_type,
-        }
-    } else {
-        panic!("Unsupported: client fields not on query with no selection set")
-    }
-}
-
 fn generate_mutation_reader_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     client_field: &ValidatedClientField,
-    field_map: &[FieldMapItem],
+    function_import_statement: ClientFieldFunctionImportStatement,
 ) -> RefetchReaderArtifactInfo<'schema> {
     if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
         let parent_type = schema
@@ -479,8 +436,6 @@ fn generate_mutation_reader_artifact<'schema>(
             0,
         );
         let client_field_output_type = generate_output_type(client_field);
-        let function_import_statement =
-            generate_function_import_statement_for_mutation_reader(field_map);
         RefetchReaderArtifactInfo {
             parent_type: parent_type.into(),
             client_field_name: client_field.name,
