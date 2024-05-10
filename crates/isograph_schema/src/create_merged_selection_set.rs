@@ -126,6 +126,7 @@ impl std::ops::Deref for MergedSelectionSet {
 
 impl MergedSelectionSet {
     pub fn new(
+        // TODO make a normalization_key method on MergedServerFieldSelection
         mut unsorted_vec: Vec<(NormalizationKey, WithSpan<MergedServerFieldSelection>)>,
     ) -> Self {
         unsorted_vec.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
@@ -177,6 +178,7 @@ pub enum NormalizationKey {
     // __typename,
     Id,
     ServerField(NameAndArguments),
+    InlineFragment(IsographObjectTypeName),
 }
 
 #[derive(Debug)]
@@ -891,6 +893,87 @@ fn select_typename_and_id_fields_in_merged_selection(
             }
         }
     }
+}
+
+pub fn selection_set_wrapped(
+    mut merged_selection_set: MergedSelectionSet,
+    top_level_field: LinkedFieldName,
+    top_level_field_arguments: Vec<WithLocation<SelectionFieldArgument>>,
+    subfield: Option<LinkedFieldName>,
+    type_to_refine_to: RequiresRefinement,
+) -> MergedSelectionSet {
+    // We are proceeding inside out, i.e. creating
+    // `mutation_name { subfield { ...on Type { existing_selection_set }}}`
+    // first by creating the inline fragment, then subfield, etc.
+
+    // Should we wrap the selection set in a type to refine to?
+    let selection_set_with_inline_fragment = match type_to_refine_to {
+        RequiresRefinement::Yes(type_to_refine_to) => {
+            maybe_add_typename_selection(&mut merged_selection_set);
+            MergedSelectionSet::new(vec![(
+                NormalizationKey::InlineFragment(type_to_refine_to),
+                WithSpan::new(
+                    MergedServerFieldSelection::InlineFragment(MergedInlineFragmentSelection {
+                        type_to_refine_to,
+                        selection_set: merged_selection_set.0,
+                    }),
+                    Span::todo_generated(),
+                ),
+            )])
+        }
+        RequiresRefinement::No => merged_selection_set,
+    };
+
+    let selection_set_with_subfield = match subfield {
+        Some(subfield) => MergedSelectionSet::new(vec![(
+            NormalizationKey::ServerField(NameAndArguments {
+                name: subfield.into(),
+                arguments: vec![],
+            }),
+            WithSpan::new(
+                MergedServerFieldSelection::LinkedField(MergedLinkedFieldSelection {
+                    name: WithLocation::new(subfield, Location::generated()),
+                    // TODO
+                    normalization_alias: None,
+                    selection_set: selection_set_with_inline_fragment.0,
+                    arguments: vec![],
+                }),
+                Span::todo_generated(),
+            ),
+        )]),
+        None => selection_set_with_inline_fragment,
+    };
+
+    let top_level_selection_set = MergedSelectionSet::new(vec![
+        ((
+            NormalizationKey::ServerField(NameAndArguments {
+                name: top_level_field.into(),
+                // TODO provide arguments. They don't matter, because there is only one
+                // selection at this level.
+                arguments: vec![],
+            }),
+            WithSpan::new(
+                MergedServerFieldSelection::LinkedField(MergedLinkedFieldSelection {
+                    name: WithLocation::new(top_level_field, Location::generated()),
+                    normalization_alias: Some(WithLocation::new(
+                        get_aliased_mutation_field_name(
+                            top_level_field.into(),
+                            &top_level_field_arguments,
+                        )
+                        .intern()
+                        .into(),
+                        Location::generated(),
+                    )),
+
+                    selection_set: selection_set_with_subfield.0,
+                    arguments: top_level_field_arguments,
+                }),
+                Span::todo_generated(),
+            ),
+        )),
+    ]);
+
+    top_level_selection_set
 }
 
 fn selection_set_wrapped_in_node_field(

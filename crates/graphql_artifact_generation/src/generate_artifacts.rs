@@ -7,27 +7,25 @@ use std::{
 };
 
 use common_lang_types::{
-    ConstExportName, DescriptionValue, FilePath, HasName, IsographObjectTypeName, Location,
-    PathAndContent, QueryOperationName, SelectableFieldName, Span, UnvalidatedTypeName,
-    VariableName, WithLocation, WithSpan,
+    ConstExportName, DescriptionValue, FilePath, HasName, IsographObjectTypeName, PathAndContent,
+    QueryOperationName, SelectableFieldName, Span, UnvalidatedTypeName, VariableName, WithLocation,
+    WithSpan,
 };
-use graphql_lang_types::{
-    GraphQLInputValueDefinition, GraphQLTypeAnnotation, ListTypeAnnotation, NonNullTypeAnnotation,
-};
+use graphql_lang_types::{GraphQLTypeAnnotation, ListTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ClientFieldId, NonConstantValue, RefetchQueryIndex, SelectableServerFieldId, Selection,
-    SelectionFieldArgument, ServerFieldSelection, ServerObjectId, VariableDefinition,
+    SelectionFieldArgument, ServerFieldSelection, VariableDefinition,
 };
 use isograph_schema::{
-    create_merged_selection_set, get_aliased_mutation_field_name, into_name_and_arguments,
-    refetched_paths_for_client_field, ArtifactQueueItem, ClientFieldVariant,
-    FieldDefinitionLocation, FieldMapItem, ImperativelyLoadedFieldArtifactInfo,
-    ImperativelyLoadedFieldVariant, MergedInlineFragmentSelection, MergedLinkedFieldSelection,
-    MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection, NameAndArguments,
-    ObjectTypeAndFieldNames, PathToRefetchField, RefetchFieldArtifactInfo, RequiresRefinement,
-    RootOperationName, RootRefetchedPath, ValidatedClientField, ValidatedSchema,
-    ValidatedSchemaObject, ValidatedSelection, ValidatedVariableDefinition,
+    create_merged_selection_set, into_name_and_arguments, refetched_paths_for_client_field,
+    selection_set_wrapped, ArtifactQueueItem, ClientFieldVariant, FieldDefinitionLocation,
+    FieldMapItem, ImperativelyLoadedFieldArtifactInfo, ImperativelyLoadedFieldVariant,
+    MergedInlineFragmentSelection, MergedLinkedFieldSelection, MergedScalarFieldSelection,
+    MergedSelectionSet, MergedServerFieldSelection, NameAndArguments, ObjectTypeAndFieldNames,
+    PathToRefetchField, RefetchFieldArtifactInfo, RootOperationName, RootRefetchedPath,
+    ValidatedClientField, ValidatedSchema, ValidatedSchemaObject, ValidatedSelection,
+    ValidatedVariableDefinition,
 };
 
 use crate::artifact_file_contents::{ENTRYPOINT, ISO_TS, REFETCH_FIELD_NAME};
@@ -428,7 +426,7 @@ fn get_artifact_for_mutation_field<'schema>(
     let ImperativelyLoadedFieldArtifactInfo {
         merged_selection_set,
         refetch_field_parent_id: parent_id,
-        variable_definitions,
+        mut variable_definitions,
         root_fetchable_field,
         root_parent_object,
         refetch_query_index,
@@ -440,61 +438,66 @@ fn get_artifact_for_mutation_field<'schema>(
         exposed_field_parent_object_id,
     } = mutation_info;
 
-    let arguments = get_serialized_field_arguments(
-        &mutation_field_arguments
-            .iter()
-            .map(|input_value_definition| {
-                input_value_definition
-                    .clone()
-                    .map(|input_value_definition| SelectionFieldArgument {
-                        name: input_value_definition
-                            .name
-                            .map(|x| x.into())
-                            .hack_to_with_span(),
-                        value: input_value_definition
-                            .name
-                            .map(|x| NonConstantValue::Variable(x.into()))
-                            .hack_to_with_span(),
-                    })
-            })
-            .collect::<Vec<_>>(),
-        1,
-    );
-
     let parent_object = schema.server_field_data.object(parent_id);
 
-    let query_text = generate_mutation_query_text(
-        parent_object,
-        schema,
-        &merged_selection_set,
-        variable_definitions,
-        mutation_field_name,
-        server_schema_mutation_field_name,
-        mutation_primary_field_name,
-        mutation_field_arguments,
+    let parent_object_name = parent_object.name;
+    let exposed_field_operation_name = &schema
+        .fetchable_types
+        .get(&exposed_field_parent_object_id)
+        .expect(
+            "Expected root type to be fetchable here. This is indicative of a bug in Isograph.",
+        );
+
+    let merged_selection_set = selection_set_wrapped(
+        merged_selection_set,
+        // TODO why are these types different
+        server_schema_mutation_field_name.lookup().intern().into(),
+        mutation_field_arguments
+            .into_iter()
+            .map(|x| {
+                let variable_name = x.item.name.map(|value_name| value_name.into());
+                variable_definitions.push(WithSpan {
+                    item: VariableDefinition {
+                        name: variable_name,
+                        type_: x.item.type_.clone().map(|type_name| {
+                            *schema
+                                .server_field_data
+                                .defined_types
+                                .get(&type_name.into())
+                                .expect(
+                                    "Expected type to be found, this indicates a bug in Isograph",
+                                )
+                        }),
+                    },
+                    span: Span::todo_generated(),
+                });
+                x.map(|item| SelectionFieldArgument {
+                    name: WithSpan::new(
+                        item.name.item.lookup().intern().into(),
+                        Span::todo_generated(),
+                    ),
+                    value: WithSpan::new(
+                        NonConstantValue::Variable(item.name.item.into()),
+                        Span::todo_generated(),
+                    ),
+                })
+            })
+            .collect(),
+        Some(mutation_primary_field_name.lookup().intern().into()),
         requires_refinement,
-        exposed_field_parent_object_id,
     );
 
-    let selections = generate_normalization_ast_text(schema, &merged_selection_set, 2);
-    let space_2 = "  ";
-    let space_4 = "    ";
-    let space_6 = "      ";
-    let normalization_ast_text = NormalizationAstText(format!(
-        "[{{\n\
-        {space_2}kind: \"Linked\",\n\
-        {space_2}fieldName: \"{mutation_field_name}\",\n\
-        {space_2}arguments: {arguments},\n\
-        {space_2}selections: [\n\
-        {space_4}{{\n\
-        {space_6}kind: \"Linked\",\n\
-        {space_6}fieldName: \"{mutation_primary_field_name}\",\n\
-        {space_6}arguments: null,\n\
-        {space_6}selections: {selections},\n\
-        {space_4}}},\n\
-        {space_2}],\n\
-        }}]",
-    ));
+    let query_text = generate_query_text(
+        format!("{parent_object_name}{mutation_field_name}")
+            .intern()
+            .into(),
+        schema,
+        &merged_selection_set,
+        &variable_definitions,
+        *exposed_field_operation_name,
+    );
+
+    let normalization_ast_text = generate_normalization_ast_text(schema, &merged_selection_set, 2);
 
     RefetchEntrypointArtifactInfo {
         normalization_ast_text,
@@ -503,81 +506,6 @@ fn get_artifact_for_mutation_field<'schema>(
         root_fetchable_field_parent_object: root_parent_object,
         refetch_query_index,
     }
-}
-
-fn generate_mutation_query_text<'schema>(
-    parent_object_type: &'schema ValidatedSchemaObject,
-    schema: &'schema ValidatedSchema,
-    merged_selection_set: &MergedSelectionSet,
-    mut variable_definitions: Vec<WithSpan<ValidatedVariableDefinition>>,
-    mutation_field_name: SelectableFieldName,
-    server_schema_mutation_field_name: SelectableFieldName,
-    mutation_primary_field_name: SelectableFieldName,
-    mutation_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
-    requires_refinement: RequiresRefinement,
-    exposed_field_parent_object_id: ServerObjectId,
-) -> QueryText {
-    let mut query_text = String::new();
-
-    let mutation_parameters: Vec<_> = mutation_field_arguments
-        .iter()
-        .map(|argument| {
-            let variable_name = argument.item.name.map(|value_name| value_name.into());
-            variable_definitions.push(WithSpan {
-                item: VariableDefinition {
-                    name: variable_name,
-                    type_: argument.item.type_.clone().map(|type_name| {
-                        *schema
-                            .server_field_data
-                            .defined_types
-                            .get(&type_name.into())
-                            .expect("Expected type to be found, this indicates a bug in Isograph")
-                    }),
-                },
-                span: Span::todo_generated(),
-            });
-            WithLocation::new(
-                SelectionFieldArgument {
-                    name: argument.item.name.map(|x| x.into()).hack_to_with_span(),
-                    value: variable_name
-                        .map(|variable_name| NonConstantValue::Variable(variable_name))
-                        .hack_to_with_span(),
-                },
-                Location::generated(),
-            )
-        })
-        .collect();
-
-    let variable_text = write_variables_to_string(schema, &mut variable_definitions.iter());
-    let mutation_field_arguments = get_serialized_arguments_for_query_text(&mutation_parameters);
-
-    let aliased_mutation_field_name =
-        get_aliased_mutation_field_name(mutation_field_name, &mutation_parameters);
-
-    let parent_object_name = parent_object_type.name;
-
-    let exposed_field_operation_name = &schema
-        .fetchable_types
-        .get(&exposed_field_parent_object_id)
-        .expect("Expected root type to be fetchable here. This is indicative of a bug in Isograph.")
-        .0;
-
-    query_text.push_str(&format!(
-        "{exposed_field_operation_name} {parent_object_name}{mutation_field_name} {variable_text} {{\\\n\
-        {aliased_mutation_field_name}: {server_schema_mutation_field_name}{mutation_field_arguments} {{\\\n\
-        {mutation_primary_field_name} {{ \\\n",
-    ));
-
-    if let RequiresRefinement::Yes(refine_to) = requires_refinement {
-        query_text.push_str(&format!("... on {} {{\\\n", refine_to));
-        write_selections_for_query_text(&mut query_text, schema, &merged_selection_set, 1);
-        query_text.push_str("}\\\n");
-    } else {
-        write_selections_for_query_text(&mut query_text, schema, &merged_selection_set, 1);
-    }
-
-    query_text.push_str("}}}");
-    QueryText(query_text)
 }
 
 fn generate_entrypoint_artifact<'schema>(
