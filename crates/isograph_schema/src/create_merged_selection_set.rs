@@ -348,7 +348,7 @@ pub fn create_merged_selection_set(
                                             .name,
                                         root_fetchable_field: entrypoint.name,
                                         refetch_query_index: RefetchQueryIndex(index as u32),
-                                        query_name: format!("{type_to_refine_to}_refetch")
+                                        query_name: format!("{type_to_refine_to}__refetch")
                                             .intern()
                                             .into(),
                                     },
