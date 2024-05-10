@@ -22,9 +22,8 @@ use isograph_schema::{
     ImperativelyLoadedFieldArtifactInfo, ImperativelyLoadedFieldVariant,
     MergedInlineFragmentSelection, MergedLinkedFieldSelection, MergedScalarFieldSelection,
     MergedSelectionSet, MergedServerFieldSelection, NameAndArguments, ObjectTypeAndFieldNames,
-    PathToRefetchField, RefetchFieldArtifactInfo, RootOperationName, RootRefetchedPath,
-    ValidatedClientField, ValidatedSchema, ValidatedSchemaObject, ValidatedSelection,
-    ValidatedVariableDefinition,
+    PathToRefetchField, RootOperationName, RootRefetchedPath, ValidatedClientField,
+    ValidatedSchema, ValidatedSchemaObject, ValidatedSelection, ValidatedVariableDefinition,
 };
 
 use crate::{
@@ -157,9 +156,6 @@ fn get_artifact_infos<'schema>(
 
     for queue_item in artifact_queue {
         artifact_infos.push(ArtifactInfo::RefetchQuery(match queue_item {
-            ArtifactQueueItem::RefetchField(refetch_info) => {
-                get_artifact_for_refetch_field(schema, refetch_info)
-            }
             ArtifactQueueItem::ImperativelyLoadedField(mutation_info) => {
                 get_artifact_for_mutation_field(schema, mutation_info)
             }
@@ -167,41 +163,6 @@ fn get_artifact_infos<'schema>(
     }
 
     artifact_infos
-}
-
-// N.B. this was originally copied from generate_entrypoint_artifact,
-// and it could use some de-duplication
-fn get_artifact_for_refetch_field(
-    schema: &ValidatedSchema,
-    refetch_info: RefetchFieldArtifactInfo,
-) -> RefetchEntrypointArtifactInfo {
-    let RefetchFieldArtifactInfo {
-        merged_selection_set,
-        variable_definitions,
-        root_fetchable_field,
-        root_parent_object,
-        refetch_query_index,
-        query_name,
-        root_operation_name,
-    } = refetch_info;
-
-    let normalization_ast = generate_normalization_ast_text(schema, &merged_selection_set, 0);
-
-    let query_text = generate_query_text(
-        query_name,
-        schema,
-        &merged_selection_set,
-        &variable_definitions,
-        &root_operation_name,
-    );
-
-    RefetchEntrypointArtifactInfo {
-        normalization_ast_text: normalization_ast,
-        query_text,
-        root_fetchable_field,
-        root_fetchable_field_parent_object: root_parent_object,
-        refetch_query_index,
-    }
 }
 
 fn get_artifact_for_mutation_field<'schema>(

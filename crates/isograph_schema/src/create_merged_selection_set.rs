@@ -183,20 +183,7 @@ pub enum NormalizationKey {
 
 #[derive(Debug)]
 pub enum ArtifactQueueItem {
-    RefetchField(RefetchFieldArtifactInfo),
     ImperativelyLoadedField(ImperativelyLoadedFieldArtifactInfo),
-}
-
-#[derive(Debug, Clone)]
-pub struct RefetchFieldArtifactInfo {
-    pub merged_selection_set: MergedSelectionSet,
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<SelectableServerFieldId>>>,
-    pub root_parent_object: IsographObjectTypeName,
-    pub root_fetchable_field: SelectableFieldName,
-    // TODO wrap in a newtype
-    pub refetch_query_index: RefetchQueryIndex,
-    pub root_operation_name: RootOperationName,
-    pub query_name: QueryOperationName,
 }
 
 #[derive(Debug, Clone)]
@@ -339,8 +326,8 @@ pub fn create_merged_selection_set(
                                     Span::todo_generated(),
                                 ));
 
-                                artifact_queue.push(ArtifactQueueItem::RefetchField(
-                                    RefetchFieldArtifactInfo {
+                                artifact_queue.push(ArtifactQueueItem::ImperativelyLoadedField(
+                                    ImperativelyLoadedFieldArtifactInfo {
                                         merged_selection_set,
                                         variable_definitions: definitions_of_used_variables,
                                         root_parent_object: schema
