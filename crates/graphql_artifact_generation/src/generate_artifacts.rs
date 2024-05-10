@@ -18,12 +18,12 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_client_field,
-    ArtifactQueueItem, ClientFieldVariant, FieldDefinitionLocation, FieldMapItem,
-    ImperativelyLoadedFieldArtifactInfo, ImperativelyLoadedFieldVariant,
-    MergedInlineFragmentSelection, MergedLinkedFieldSelection, MergedScalarFieldSelection,
-    MergedSelectionSet, MergedServerFieldSelection, NameAndArguments, ObjectTypeAndFieldNames,
-    PathToRefetchField, RootOperationName, RootRefetchedPath, ValidatedClientField,
-    ValidatedSchema, ValidatedSchemaObject, ValidatedSelection, ValidatedVariableDefinition,
+    ClientFieldVariant, FieldDefinitionLocation, FieldMapItem, ImperativelyLoadedFieldArtifactInfo,
+    ImperativelyLoadedFieldVariant, MergedInlineFragmentSelection, MergedLinkedFieldSelection,
+    MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection, NameAndArguments,
+    ObjectTypeAndFieldNames, PathToRefetchField, RootOperationName, RootRefetchedPath,
+    ValidatedClientField, ValidatedSchema, ValidatedSchemaObject, ValidatedSelection,
+    ValidatedVariableDefinition,
 };
 
 use crate::{
@@ -154,12 +154,11 @@ fn get_artifact_infos<'schema>(
         artifact_infos.push(artifact_info);
     }
 
-    for queue_item in artifact_queue {
-        artifact_infos.push(ArtifactInfo::RefetchQuery(match queue_item {
-            ArtifactQueueItem::ImperativelyLoadedField(mutation_info) => {
-                get_artifact_for_mutation_field(schema, mutation_info)
-            }
-        }))
+    for imperatively_loaded_field_artifact_info in artifact_queue {
+        artifact_infos.push(ArtifactInfo::RefetchQuery(get_artifact_for_mutation_field(
+            schema,
+            imperatively_loaded_field_artifact_info,
+        )))
     }
 
     artifact_infos
@@ -167,7 +166,7 @@ fn get_artifact_infos<'schema>(
 
 fn get_artifact_for_mutation_field<'schema>(
     schema: &'schema ValidatedSchema,
-    mutation_info: ImperativelyLoadedFieldArtifactInfo,
+    imperatively_loaded_field_artifact_info: ImperativelyLoadedFieldArtifactInfo,
 ) -> RefetchEntrypointArtifactInfo {
     let ImperativelyLoadedFieldArtifactInfo {
         merged_selection_set,
@@ -177,7 +176,7 @@ fn get_artifact_for_mutation_field<'schema>(
         variable_definitions,
         root_operation_name,
         query_name,
-    } = mutation_info;
+    } = imperatively_loaded_field_artifact_info;
 
     let query_text = generate_query_text(
         query_name,
@@ -201,7 +200,7 @@ fn get_artifact_for_mutation_field<'schema>(
 fn generate_entrypoint_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     client_field_id: ClientFieldId,
-    artifact_queue: &mut Vec<ArtifactQueueItem>,
+    artifact_queue: &mut Vec<ImperativelyLoadedFieldArtifactInfo>,
     encountered_cliend_field_ids: &mut HashSet<ClientFieldId>,
 ) -> EntrypointArtifactInfo<'schema> {
     let fetchable_client_field = schema.client_field(client_field_id);

@@ -181,11 +181,6 @@ pub enum NormalizationKey {
     InlineFragment(IsographObjectTypeName),
 }
 
-#[derive(Debug)]
-pub enum ArtifactQueueItem {
-    ImperativelyLoadedField(ImperativelyLoadedFieldArtifactInfo),
-}
-
 #[derive(Debug, Clone)]
 pub struct ImperativelyLoadedFieldArtifactInfo {
     pub merged_selection_set: MergedSelectionSet,
@@ -243,7 +238,7 @@ pub fn create_merged_selection_set(
     parent_type: &ValidatedSchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
     // TODO consider ways to get rid of these parameters.
-    artifact_queue: Option<&mut Vec<ArtifactQueueItem>>,
+    artifact_queue: Option<&mut Vec<ImperativelyLoadedFieldArtifactInfo>>,
     encountered_client_field_ids: Option<&mut HashSet<ClientFieldId>>,
     // N.B. we call this for non-fetchable resolvers now, but that is a smell
     entrypoint: &ValidatedClientField,
@@ -326,22 +321,20 @@ pub fn create_merged_selection_set(
                                     Span::todo_generated(),
                                 ));
 
-                                artifact_queue.push(ArtifactQueueItem::ImperativelyLoadedField(
-                                    ImperativelyLoadedFieldArtifactInfo {
-                                        merged_selection_set,
-                                        variable_definitions: definitions_of_used_variables,
-                                        root_parent_object: schema
-                                            .server_field_data
-                                            .object(entrypoint.parent_object_id)
-                                            .name,
-                                        root_fetchable_field: entrypoint.name,
-                                        refetch_query_index: RefetchQueryIndex(index as u32),
-                                        query_name: format!("{type_to_refine_to}__refetch")
-                                            .intern()
-                                            .into(),
-                                        root_operation_name: RootOperationName("query".to_string()),
-                                    },
-                                ));
+                                artifact_queue.push(ImperativelyLoadedFieldArtifactInfo {
+                                    merged_selection_set,
+                                    variable_definitions: definitions_of_used_variables,
+                                    root_parent_object: schema
+                                        .server_field_data
+                                        .object(entrypoint.parent_object_id)
+                                        .name,
+                                    root_fetchable_field: entrypoint.name,
+                                    refetch_query_index: RefetchQueryIndex(index as u32),
+                                    query_name: format!("{type_to_refine_to}__refetch")
+                                        .intern()
+                                        .into(),
+                                    root_operation_name: RootOperationName("query".to_string()),
+                                });
                                 ("__refetch".intern().into(), reachable_variables)
                             }
                             ClientFieldVariant::ImperativelyLoadedField(
@@ -431,28 +424,26 @@ pub fn create_merged_selection_set(
                                     .server_field_data
                                     .object(entrypoint.parent_object_id)
                                     .name;
-                                artifact_queue.push(ArtifactQueueItem::ImperativelyLoadedField(
-                                    ImperativelyLoadedFieldArtifactInfo {
-                                        merged_selection_set,
-                                        root_parent_object,
-                                        variable_definitions: definitions_of_used_variables,
-                                        root_fetchable_field: entrypoint.name,
-                                        refetch_query_index: RefetchQueryIndex(index as u32),
-                                        root_operation_name: schema
-                                            .fetchable_types
-                                            .get(&expose_field_fetchable_field_parent_id)
-                                            .expect(
-                                                "Expected root type to be fetchable here.\
+                                artifact_queue.push(ImperativelyLoadedFieldArtifactInfo {
+                                    merged_selection_set,
+                                    root_parent_object,
+                                    variable_definitions: definitions_of_used_variables,
+                                    root_fetchable_field: entrypoint.name,
+                                    refetch_query_index: RefetchQueryIndex(index as u32),
+                                    root_operation_name: schema
+                                        .fetchable_types
+                                        .get(&expose_field_fetchable_field_parent_id)
+                                        .expect(
+                                            "Expected root type to be fetchable here.\
                                                  This is indicative of a bug in Isograph.",
-                                            )
-                                            .clone(),
-                                        query_name: format!(
-                                            "{root_parent_object}__{mutation_field_name}"
                                         )
-                                        .intern()
-                                        .into(),
-                                    },
-                                ));
+                                        .clone(),
+                                    query_name: format!(
+                                        "{root_parent_object}__{mutation_field_name}"
+                                    )
+                                    .intern()
+                                    .into(),
+                                });
                                 (mutation_field_name, reachable_variables)
                             }
                             _ => panic!("invalid client field variant"),
