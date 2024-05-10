@@ -18,9 +18,8 @@ use isograph_lang_types::{
 use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_client_field,
     ClientFieldVariant, FieldDefinitionLocation, FieldMapItem, ImperativelyLoadedFieldArtifactInfo,
-    ImperativelyLoadedFieldVariant, NameAndArguments, ObjectTypeAndFieldNames, PathToRefetchField,
-    RootRefetchedPath, ValidatedClientField, ValidatedSchema, ValidatedSchemaObject,
-    ValidatedSelection,
+    NameAndArguments, ObjectTypeAndFieldNames, PathToRefetchField, RootRefetchedPath,
+    ValidatedClientField, ValidatedSchema, ValidatedSchemaObject, ValidatedSelection,
 };
 
 use crate::{
@@ -148,7 +147,7 @@ fn get_artifact_infos<'schema>(
                 ArtifactInfo::RefetchReader(generate_mutation_reader_artifact(
                     schema,
                     encountered_client_field,
-                    mutation_variant,
+                    &mutation_variant.field_map,
                 ))
             }
         };
@@ -444,7 +443,7 @@ fn generate_refetch_reader_artifact<'schema>(
 fn generate_mutation_reader_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     client_field: &ValidatedClientField,
-    mutation_variant: &ImperativelyLoadedFieldVariant,
+    field_map: &[FieldMapItem],
 ) -> RefetchReaderArtifactInfo<'schema> {
     if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
         let parent_type = schema
@@ -481,7 +480,7 @@ fn generate_mutation_reader_artifact<'schema>(
         );
         let client_field_output_type = generate_output_type(client_field);
         let function_import_statement =
-            generate_function_import_statement_for_mutation_reader(mutation_variant);
+            generate_function_import_statement_for_mutation_reader(field_map);
         RefetchReaderArtifactInfo {
             parent_type: parent_type.into(),
             client_field_name: client_field.name,
@@ -965,9 +964,9 @@ fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctio
 }
 
 fn generate_function_import_statement_for_mutation_reader(
-    m: &ImperativelyLoadedFieldVariant,
+    field_map: &[FieldMapItem],
 ) -> ClientFieldFunctionImportStatement {
-    let include_read_out_data = get_read_out_data(&m.field_map);
+    let include_read_out_data = get_read_out_data(&field_map);
     ClientFieldFunctionImportStatement(format!(
         "{include_read_out_data}\n\
         import {{ makeNetworkRequest, type IsographEnvironment }} from '@isograph/react';\n\
