@@ -115,14 +115,19 @@ pub(crate) fn handle_compile_command(
             // TODO validate that we didn't define any new root types (as they are ignored)
         }
 
-        // TODO the ordering should be:
-        // - process schema
-        // - validate
-        // - process schema extension
-        // - validate
+        // TODO the (simplified?) validation pipeline should be:
+        //
+        // Validation state: fully unvalidated
+        // - process schema and validate
+        // - process schema extension and validate
+        // Validation state: all types have been defined
         // - add mutation fields
+        // - add refetch fields
         // - process parsed iso field definitions
-        // - validate client fields
+        // Validation state: all fields have been defined
+        // - validate fields with selection sets
+        // Validation state: fully validated
+
         let fetchable_types = schema
             .fetchable_types
             .iter()
