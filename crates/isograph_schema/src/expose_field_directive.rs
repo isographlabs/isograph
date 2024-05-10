@@ -7,7 +7,6 @@ use graphql_lang_types::{
     GraphQLInputValueDefinition,
 };
 use intern::{string_key::Intern, Lookup};
-use isograph_config::ConfigOptions;
 use isograph_lang_types::{
     ClientFieldId, IsographSelectionVariant, ScalarFieldSelection, SelectableServerFieldId,
     Selection, ServerFieldId, ServerFieldSelection, ServerObjectId,
@@ -77,7 +76,6 @@ impl UnvalidatedSchema {
     pub fn add_exposed_fields_to_parent_object_types(
         &mut self,
         parent_object_id: ServerObjectId,
-        options: ConfigOptions,
     ) -> ProcessTypeDefinitionResult<()> {
         // TODO don't clone if possible
         let parent_object = self.server_field_data.object(parent_object_id);
@@ -99,7 +97,6 @@ impl UnvalidatedSchema {
                 expose_field_directive,
                 parent_object_name,
                 parent_object_id,
-                options,
             )?;
         }
 
@@ -111,7 +108,6 @@ impl UnvalidatedSchema {
         expose_field_directive: &ExposeFieldDirective,
         parent_object_name: IsographObjectTypeName,
         parent_object_id: ServerObjectId,
-        options: ConfigOptions,
     ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
         let ExposeFieldDirective {
             expose_as,
@@ -136,18 +132,16 @@ impl UnvalidatedSchema {
             .map(|x| *x);
 
         if let Some(SelectableServerFieldId::Object(mutation_field_object_id)) = payload_id {
-            let (mutation_field_args_without_id, processed_field_map_items) =
-                skip_arguments_contained_in_field_map(
-                    self,
-                    mutation_field_arguments.clone(),
-                    // TODO make this a no-op
-                    mutation_field_payload_type_name.lookup().intern().into(),
-                    parent_object_name,
-                    mutation_field_name,
-                    // TODO don't clone
-                    field_map.clone(),
-                    options,
-                )?;
+            let processed_field_map_items = skip_arguments_contained_in_field_map(
+                self,
+                mutation_field_arguments.clone(),
+                // TODO make this a no-op
+                mutation_field_payload_type_name.lookup().intern().into(),
+                parent_object_name,
+                mutation_field_name,
+                // TODO don't clone
+                field_map.clone(),
+            )?;
 
             // payload object is the object type of the mutation field, e.g. SetBestFriendResponse
             let payload_object = self.server_field_data.object(mutation_field_object_id);
@@ -230,7 +224,6 @@ impl UnvalidatedSchema {
                         fetchable_type_original_field_name,
                         aliased_exposed_field_name: path_selectable_field_name,
                         mutation_field_arguments: mutation_field_arguments.to_vec(),
-                        filtered_mutation_field_arguments: mutation_field_args_without_id.to_vec(),
                         mutation_primary_field_return_type_object_id:
                             maybe_abstract_parent_object_id,
                         field_map: field_map.to_vec(),
@@ -345,11 +338,7 @@ fn skip_arguments_contained_in_field_map(
     mutation_object_name: IsographObjectTypeName,
     mutation_field_name: SelectableFieldName,
     field_map_items: Vec<FieldMapItem>,
-    options: ConfigOptions,
-) -> ProcessTypeDefinitionResult<(
-    Vec<WithLocation<GraphQLInputValueDefinition>>,
-    Vec<ProcessedFieldMapItem>,
-)> {
+) -> ProcessTypeDefinitionResult<Vec<ProcessedFieldMapItem>> {
     let mut processed_field_map_items = Vec::with_capacity(field_map_items.len());
     // TODO
     // We need to create entirely new arguments, which are the existing arguments minus
@@ -366,8 +355,5 @@ fn skip_arguments_contained_in_field_map(
         )?);
     }
 
-    Ok((
-        argument_map.into_arguments(schema, options),
-        processed_field_map_items,
-    ))
+    Ok(processed_field_map_items)
 }

@@ -344,7 +344,6 @@ pub fn create_merged_selection_set(
                                         server_schema_mutation_field_name,
                                     aliased_exposed_field_name: mutation_primary_field_name,
                                     mutation_field_arguments,
-                                    filtered_mutation_field_arguments: _,
                                     mutation_primary_field_return_type_object_id,
                                     field_map: _,
                                     expose_field_fetchable_field_parent_id,
@@ -740,7 +739,6 @@ fn merge_scalar_client_field(
         aliased_exposed_field_name: mutation_primary_field_name,
         fetchable_type_original_field_name: server_schema_mutation_field_name,
         mutation_field_arguments,
-        filtered_mutation_field_arguments,
         mutation_field_name: _,
         mutation_primary_field_return_type_object_id,
         field_map,
@@ -758,7 +756,6 @@ fn merge_scalar_client_field(
                 fetchable_type_original_field_name: *server_schema_mutation_field_name,
                 aliased_exposed_field_name: *mutation_primary_field_name,
                 mutation_field_arguments: mutation_field_arguments.clone(),
-                filtered_mutation_field_arguments: filtered_mutation_field_arguments.clone(),
                 mutation_primary_field_return_type_object_id:
                     *mutation_primary_field_return_type_object_id,
                 field_map: field_map.clone(),

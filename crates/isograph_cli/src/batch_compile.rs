@@ -129,8 +129,7 @@ pub(crate) fn handle_compile_command(
             .map(|(fetchable_object_id, _)| *fetchable_object_id)
             .collect::<Vec<_>>();
         for fetchable_object_id in fetchable_types.into_iter() {
-            schema
-                .add_exposed_fields_to_parent_object_types(fetchable_object_id, config.options)?;
+            schema.add_exposed_fields_to_parent_object_types(fetchable_object_id)?;
         }
 
         let canonicalized_root_path = get_canonicalized_root_path(config)?;

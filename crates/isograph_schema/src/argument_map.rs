@@ -1,22 +1,17 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    DescriptionValue, InputValueName, IsographObjectTypeName, Location, SelectableFieldName, Span,
-    StringLiteralValue, WithLocation, WithSpan,
+    InputValueName, IsographObjectTypeName, Location, SelectableFieldName, StringLiteralValue,
+    WithLocation,
 };
-use graphql_lang_types::{
-    ConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInputValueDefinition,
-    GraphQLTypeAnnotation,
-};
+use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
-use isograph_lang_types::{SelectableServerFieldId, ServerFieldId, ServerObjectId};
+use isograph_lang_types::{SelectableServerFieldId, ServerFieldId};
 
 use crate::{
-    FieldMapItem, IsographObjectTypeDefinition, ProcessObjectTypeDefinitionOutcome,
-    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
+    FieldMapItem, ProcessTypeDefinitionError, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
     UnvalidatedSchema,
 };
-use isograph_config::ConfigOptions;
 
 pub(crate) struct ArgumentMap {
     arguments: Vec<WithLocation<PotentiallyModifiedArgument>>,
@@ -145,46 +140,6 @@ impl ArgumentMap {
 
         Ok(processed_field_map_item)
     }
-
-    pub(crate) fn into_arguments(
-        self,
-        schema: &mut UnvalidatedSchema,
-        options: ConfigOptions,
-    ) -> Vec<WithLocation<GraphQLInputValueDefinition>> {
-        self.arguments
-            .into_iter()
-            .map(|with_location| {
-                with_location.map(|potentially_modified_argument| {
-                    match potentially_modified_argument {
-                        PotentiallyModifiedArgument::Unmodified(unmodified) => unmodified,
-                        PotentiallyModifiedArgument::Modified(modified) => {
-                            let ModifiedArgument {
-                                description,
-                                name,
-                                object,
-                                default_value,
-                                directives,
-                            } = modified;
-
-                            GraphQLInputValueDefinition {
-                                description,
-                                name,
-                                type_: object.map(|modified_object| {
-                                    modified_object
-                                        .create_and_get_name(schema, options)
-                                        .lookup()
-                                        .intern()
-                                        .into()
-                                }),
-                                default_value,
-                                directives,
-                            }
-                        }
-                    }
-                })
-            })
-            .collect()
-    }
 }
 
 enum PotentiallyModifiedArgument {
@@ -198,90 +153,7 @@ enum PotentiallyModifiedArgument {
 /// only deleted.
 #[derive(Debug)]
 pub(crate) struct ModifiedObject {
-    object_id: ServerObjectId,
     field_map: HashMap<SelectableFieldName, PotentiallyModifiedField>,
-}
-
-impl ModifiedObject {
-    fn create_and_get_name(
-        self,
-        schema: &mut UnvalidatedSchema,
-        options: ConfigOptions,
-    ) -> IsographObjectTypeName {
-        let original_object = schema.server_field_data.object(self.object_id);
-
-        let fields = original_object
-            .server_field_ids
-            .iter()
-            .flat_map(|field_id| {
-                let field = schema.server_field(*field_id);
-
-                // HACK alert
-                if field.name.item == "__typename".intern().into() {
-                    return None;
-                }
-
-                let potentially_modified_field = self.field_map.get(&field.name.item)?;
-
-                let new_field = match potentially_modified_field {
-                    PotentiallyModifiedField::Unmodified(_) => WithLocation::new(
-                        GraphQLFieldDefinition {
-                            description: field.description.map(|description| {
-                                WithSpan::new(description, Span::todo_generated())
-                            }),
-                            name: field.name,
-                            type_: field.associated_data.clone(),
-                            arguments: field.arguments.clone(),
-                            directives: vec![],
-                        },
-                        Location::generated(),
-                    ),
-                    PotentiallyModifiedField::Modified(_) => todo!("modified"),
-                };
-
-                Some(new_field)
-            })
-            .collect();
-
-        let item = IsographObjectTypeDefinition {
-            // TODO it looks like we throw away span info for descriptions, which makes sense?
-            description: original_object
-                .description
-                .clone()
-                .map(|description| WithSpan::new(description, Span::todo_generated())),
-            // TODO confirm that names don't have to be unique
-            name: WithLocation::new(
-                format!("{}__generated", original_object.name.lookup())
-                    .intern()
-                    .into(),
-                Location::generated(),
-            ),
-            // Very unclear what to do here
-            interfaces: vec![],
-            directives: vec![],
-            fields,
-        };
-
-        let ProcessObjectTypeDefinitionOutcome { object_id, .. } = schema
-            .process_object_type_definition(
-                item,
-                // Obviously, this is a smell
-                &mut HashMap::new(),
-                &mut HashMap::new(),
-                true,
-                options,
-            )
-            // This is not (yet) true. If you reference a non-existent type in
-            // a @exposeField directive, the compiler panics here. The solution is to
-            // process these directives after the definitions have been validated,
-            // but before resolvers hvae been validated.
-            .expect(
-                "Expected object creation to work. This is \
-                indicative of a bug in Isograph.",
-            );
-
-        schema.server_field_data.object(object_id).name
-    }
 }
 
 #[derive(Debug)]
@@ -313,11 +185,8 @@ pub(crate) struct ModifiedField {
 
 #[derive(Debug)]
 struct ModifiedArgument {
-    description: Option<WithSpan<DescriptionValue>>,
     name: WithLocation<InputValueName>,
     object: GraphQLTypeAnnotation<ModifiedObject>,
-    default_value: Option<WithLocation<ConstantValue>>,
-    directives: Vec<GraphQLDirective<ConstantValue>>,
 }
 
 impl ModifiedArgument {
@@ -348,7 +217,6 @@ impl ModifiedArgument {
                     let object = schema.server_field_data.object(object_id);
 
                     ModifiedObject {
-                        object_id,
                         field_map: object
                             .server_field_ids
                             .iter()
@@ -371,9 +239,6 @@ impl ModifiedArgument {
         // TODO We can probably avoid cloning here
         Self {
             name: unmodified.name,
-            description: unmodified.description,
-            default_value: unmodified.default_value.clone(),
-            directives: unmodified.directives.clone(),
             object,
         }
     }
