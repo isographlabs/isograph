@@ -453,7 +453,7 @@ pub fn create_merged_selection_set(
                         RootRefetchedPath {
                             path: path_to_refetch_field,
                             variables: reachable_variables_vec,
-                            field_name,
+                            field_name: field_name.into(),
                         }
                     },
                 )
@@ -491,7 +491,7 @@ pub fn create_merged_selection_set(
                     RootRefetchedPath {
                         path: path_to_refetch_field,
                         variables: reachable_variables_vec,
-                        field_name,
+                        field_name: field_name.into(),
                     }
                 })
                 .collect();

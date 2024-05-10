@@ -1,6 +1,6 @@
 use common_lang_types::{
-    DirectiveArgumentName, DirectiveName, IsographObjectTypeName, Location, SelectableFieldName,
-    Span, StringLiteralValue, ValueKeyName, WithLocation, WithSpan,
+    DirectiveArgumentName, DirectiveName, IsographObjectTypeName, LinkedFieldName, Location,
+    SelectableFieldName, Span, StringLiteralValue, ValueKeyName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     from_graph_ql_directive, ConstantValue, DeserializationError, GraphQLDirective,
@@ -121,8 +121,9 @@ impl UnvalidatedSchema {
         // TODO do not use mutation naming here
         let mutation_field = self.server_field(mutation_subfield_id);
         let mutation_field_payload_type_name = *mutation_field.associated_data.inner();
-        let mutation_field_name = expose_as.unwrap_or(mutation_field.name.item);
-        let fetchable_type_original_field_name = mutation_field.name.item;
+        let client_field_scalar_selection_name = expose_as.unwrap_or(mutation_field.name.item);
+        // TODO what is going on here. Should mutation_field have a checked way of converting to LinkedField?
+        let top_level_schema_field_name = mutation_field.name.item.lookup().intern().into();
         let mutation_field_arguments = mutation_field.arguments.clone();
         let description = mutation_field.description.clone();
         let payload_id = self
@@ -138,7 +139,7 @@ impl UnvalidatedSchema {
                 // TODO make this a no-op
                 mutation_field_payload_type_name.lookup().intern().into(),
                 parent_object_name,
-                mutation_field_name,
+                client_field_scalar_selection_name,
                 // TODO don't clone
                 field_map.clone(),
             )?;
@@ -149,11 +150,11 @@ impl UnvalidatedSchema {
 
             // TODO make this zero cost
             // TODO split path on .
-            let path_selectable_field_name = path.lookup().intern().into();
+            let primary_field_name: LinkedFieldName = path.lookup().intern().into();
 
             let primary_field = payload_object
                 .encountered_fields
-                .get(&path_selectable_field_name);
+                .get(&primary_field_name.into());
 
             let (maybe_abstract_parent_object_id, maybe_abstract_parent_type_name) =
                 match primary_field {
@@ -215,14 +216,17 @@ impl UnvalidatedSchema {
             let mutation_client_field = ClientField {
                 description,
                 // set_pet_best_friend
-                name: mutation_field_name,
+                name: client_field_scalar_selection_name,
                 id: mutation_field_client_field_id,
                 selection_set_and_unwraps: Some((fields.to_vec(), vec![])),
                 variant: ClientFieldVariant::ImperativelyLoadedField(
                     ImperativelyLoadedFieldVariant {
-                        client_field_scalar_selection_name: mutation_field_name,
-                        top_level_schema_field_name: fetchable_type_original_field_name,
-                        primary_field_name: path_selectable_field_name,
+                        client_field_scalar_selection_name: client_field_scalar_selection_name
+                            .lookup()
+                            .intern()
+                            .into(),
+                        top_level_schema_field_name,
+                        primary_field_name,
                         top_level_schema_field_arguments: mutation_field_arguments.to_vec(),
                         primary_field_return_type_object_id: maybe_abstract_parent_object_id,
                         primary_field_field_map: field_map.to_vec(),
@@ -233,14 +237,14 @@ impl UnvalidatedSchema {
                 type_and_field: ObjectTypeAndFieldNames {
                     // TODO make this zero cost?
                     type_name: maybe_abstract_parent_type_name.lookup().intern().into(), // e.g. Pet
-                    field_name: mutation_field_name, // set_pet_best_friend
+                    field_name: client_field_scalar_selection_name, // set_pet_best_friend
                 },
                 parent_object_id: maybe_abstract_parent_object_id,
             };
             self.client_fields.push(mutation_client_field);
 
             self.insert_client_field_on_object(
-                mutation_field_name,
+                client_field_scalar_selection_name,
                 maybe_abstract_parent_object_id,
                 mutation_field_client_field_id,
                 payload_object_name,

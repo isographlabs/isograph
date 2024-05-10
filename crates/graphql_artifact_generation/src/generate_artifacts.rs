@@ -1157,7 +1157,7 @@ fn generate_reader_ast_node(
                                 let refetch_query_index = find_imperatively_fetchable_query_index(
                                     root_refetched_paths,
                                     path,
-                                    s.client_field_scalar_selection_name,
+                                    s.client_field_scalar_selection_name.into(),
                                 )
                                 .0;
                                 format!(

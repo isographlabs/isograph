@@ -1,6 +1,7 @@
 use common_lang_types::{
-    ConstExportName, FilePath, IsographDirectiveName, IsographObjectTypeName, Location,
-    SelectableFieldName, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
+    ConstExportName, FilePath, IsographDirectiveName, IsographObjectTypeName, LinkedFieldName,
+    Location, ScalarFieldName, SelectableFieldName, TextSource, UnvalidatedTypeName, WithLocation,
+    WithSpan,
 };
 use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::string_key::Intern;
@@ -137,10 +138,10 @@ pub enum ProcessClientFieldDeclarationError {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ImperativelyLoadedFieldVariant {
-    pub client_field_scalar_selection_name: SelectableFieldName,
-    pub top_level_schema_field_name: SelectableFieldName,
+    pub client_field_scalar_selection_name: ScalarFieldName,
+    pub top_level_schema_field_name: LinkedFieldName,
     pub top_level_schema_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
-    pub primary_field_name: SelectableFieldName,
+    pub primary_field_name: LinkedFieldName,
     /// If this is abstract, we add a fragment spread
     pub primary_field_return_type_object_id: ServerObjectId,
     pub primary_field_field_map: Vec<FieldMapItem>,
