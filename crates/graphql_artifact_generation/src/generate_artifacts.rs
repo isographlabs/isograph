@@ -6,9 +6,8 @@ use std::{
 };
 
 use common_lang_types::{
-    ConstExportName, DescriptionValue, FilePath, HasName, IsographObjectTypeName, PathAndContent,
-    QueryOperationName, SelectableFieldName, UnvalidatedTypeName, VariableName, WithLocation,
-    WithSpan,
+    ConstExportName, DescriptionValue, FilePath, IsographObjectTypeName, PathAndContent,
+    QueryOperationName, SelectableFieldName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, ListTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
@@ -20,15 +19,15 @@ use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_client_field,
     ClientFieldVariant, FieldDefinitionLocation, FieldMapItem, ImperativelyLoadedFieldArtifactInfo,
     ImperativelyLoadedFieldVariant, MergedInlineFragmentSelection, MergedLinkedFieldSelection,
-    MergedScalarFieldSelection, MergedSelectionSet, MergedServerFieldSelection, NameAndArguments,
-    ObjectTypeAndFieldNames, PathToRefetchField, RootOperationName, RootRefetchedPath,
-    ValidatedClientField, ValidatedSchema, ValidatedSchemaObject, ValidatedSelection,
-    ValidatedVariableDefinition,
+    MergedScalarFieldSelection, MergedServerFieldSelection, NameAndArguments,
+    ObjectTypeAndFieldNames, PathToRefetchField, RootRefetchedPath, ValidatedClientField,
+    ValidatedSchema, ValidatedSchemaObject, ValidatedSelection,
 };
 
 use crate::{
     artifact_file_contents::{ENTRYPOINT, REFETCH_FIELD_NAME},
     iso_overload_file::build_iso_overload,
+    query_text::generate_query_text,
 };
 
 type NestedClientFieldImports = HashMap<ObjectTypeAndFieldNames, JavaScriptImports>;
@@ -725,26 +724,6 @@ impl RefetchEntrypointArtifactInfo {
     }
 }
 
-fn generate_query_text(
-    query_name: QueryOperationName,
-    schema: &ValidatedSchema,
-    merged_selection_set: &MergedSelectionSet,
-    query_variables: &[WithSpan<ValidatedVariableDefinition>],
-    root_operation_name: &RootOperationName,
-) -> QueryText {
-    let mut query_text = String::new();
-
-    let variable_text = write_variables_to_string(schema, query_variables.iter());
-
-    query_text.push_str(&format!(
-        "{} {} {} {{\\\n",
-        root_operation_name.0, query_name, variable_text
-    ));
-    write_selections_for_query_text(&mut query_text, schema, &merged_selection_set, 1);
-    query_text.push_str("}");
-    QueryText(query_text)
-}
-
 fn generate_refetch_query_artifact_imports(
     root_refetched_paths: &[RootRefetchedPath],
 ) -> RefetchQueryArtifactImport {
@@ -782,99 +761,6 @@ fn variable_names_to_string(variable_names: &[VariableName]) -> String {
     s.push(']');
 
     s
-}
-
-fn write_variables_to_string<'a>(
-    schema: &ValidatedSchema,
-    mut variables: impl Iterator<Item = &'a WithSpan<ValidatedVariableDefinition>> + 'a,
-) -> String {
-    let mut empty = true;
-    let mut first = true;
-    let mut variable_text = String::new();
-    variable_text.push('(');
-    while let Some(variable) = variables.next() {
-        empty = false;
-        if !first {
-            variable_text.push_str(", ");
-        } else {
-            first = false;
-        }
-        // TODO can we consume the variables here?
-        let x: GraphQLTypeAnnotation<UnvalidatedTypeName> =
-            variable.item.type_.clone().map(|input_type_id| {
-                let schema_input_type = schema
-                    .server_field_data
-                    .lookup_unvalidated_type(input_type_id);
-                schema_input_type.name().into()
-            });
-        // TODO this is dangerous, since variable.item.name is a WithLocation, which impl's Display.
-        // We should find a way to make WithLocation not impl display, without making error's hard
-        // to work with.
-        variable_text.push_str(&format!("${}: {}", variable.item.name.item, x));
-    }
-
-    if empty {
-        String::new()
-    } else {
-        variable_text.push(')');
-        variable_text
-    }
-}
-
-fn write_selections_for_query_text(
-    query_text: &mut String,
-    schema: &ValidatedSchema,
-    items: &[WithSpan<MergedServerFieldSelection>],
-    indentation_level: u8,
-) {
-    for item in items.iter() {
-        match &item.item {
-            MergedServerFieldSelection::ScalarField(scalar_field) => {
-                query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
-                if let Some(alias) = scalar_field.normalization_alias {
-                    query_text.push_str(&format!("{}: ", alias));
-                }
-                let name = scalar_field.name.item;
-                let arguments = get_serialized_arguments_for_query_text(&scalar_field.arguments);
-                query_text.push_str(&format!("{}{},\\\n", name, arguments));
-            }
-            MergedServerFieldSelection::LinkedField(linked_field) => {
-                query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
-                if let Some(alias) = linked_field.normalization_alias {
-                    // This is bad, alias is WithLocation
-                    query_text.push_str(&format!("{}: ", alias.item));
-                }
-                let name = linked_field.name.item;
-                let arguments = get_serialized_arguments_for_query_text(&linked_field.arguments);
-                query_text.push_str(&format!("{}{} {{\\\n", name, arguments));
-                write_selections_for_query_text(
-                    query_text,
-                    schema,
-                    &linked_field.selection_set,
-                    indentation_level + 1,
-                );
-                query_text.push_str(&format!(
-                    "{}}},\\\n",
-                    "  ".repeat(indentation_level as usize)
-                ));
-            }
-            MergedServerFieldSelection::InlineFragment(inline_fragment) => {
-                query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
-                query_text.push_str(&format!(
-                    "... on {} {{\\\n",
-                    inline_fragment.type_to_refine_to
-                ));
-                write_selections_for_query_text(
-                    query_text,
-                    schema,
-                    &inline_fragment.selection_set,
-                    indentation_level + 1,
-                );
-                query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
-                query_text.push_str(&format!("}},\\\n"))
-            }
-        }
-    }
 }
 
 fn generate_client_field_parameter_type(
@@ -1493,31 +1379,6 @@ fn generate_normalization_ast_node(
     }
 }
 
-fn get_serialized_arguments_for_query_text(
-    arguments: &[WithLocation<SelectionFieldArgument>],
-) -> String {
-    if arguments.is_empty() {
-        return "".to_string();
-    } else {
-        let mut arguments = arguments.iter();
-        let first = arguments.next().unwrap();
-        let mut s = format!(
-            "({}: {}",
-            first.item.name.item,
-            serialize_non_constant_value_for_graphql(&first.item.value.item)
-        );
-        for argument in arguments {
-            s.push_str(&format!(
-                ", {}: {}",
-                argument.item.name.item,
-                serialize_non_constant_value_for_graphql(&argument.item.value.item)
-            ));
-        }
-        s.push_str(")");
-        s
-    }
-}
-
 fn get_serialized_field_arguments(
     arguments: &[WithLocation<SelectionFieldArgument>],
     indentation_level: u8,
@@ -1558,13 +1419,6 @@ fn get_serialized_field_arguments(
 
     s.push_str(&format!("{}]", "  ".repeat(indentation_level as usize)));
     s
-}
-
-fn serialize_non_constant_value_for_graphql(value: &NonConstantValue) -> String {
-    match value {
-        NonConstantValue::Variable(variable_name) => format!("${}", variable_name),
-        NonConstantValue::Integer(int_value) => int_value.to_string(),
-    }
 }
 
 fn get_nested_refetch_query_text(
