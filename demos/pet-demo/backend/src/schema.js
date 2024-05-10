@@ -13,42 +13,49 @@ const picturesTogether = [
 
 const checkins = [
   {
+    __typename: 'Checkin',
     id: 'Checkin__0',
     location: 'Couch',
     pet_id: '0',
     time: '4:10pm',
   },
   {
+    __typename: 'Checkin',
     id: 'Checkin__1',
     location: 'Food bowl',
     pet_id: '0',
     time: '10:30am',
   },
   {
+    __typename: 'Checkin',
     id: 'Checkin__2',
     location: 'Doggie bed',
     pet_id: '0',
     time: '8:00am',
   },
   {
+    __typename: 'Checkin',
     id: 'Checkin__3',
     location: 'Taco Bell',
     pet_id: '1',
     time: 'Many years ago',
   },
   {
+    __typename: 'Checkin',
     id: 'Checkin__4',
     location: 'Crevice between couches',
     pet_id: '2',
     time: 'Every day',
   },
   {
+    __typename: 'Checkin',
     id: 'Checkin__5',
     location: 'Hallway',
     pet_id: '3',
     time: '3:00pm',
   },
   {
+    __typename: 'Checkin',
     id: 'Checkin__6',
     location: 'Dog park',
     pet_id: '3',
