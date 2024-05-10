@@ -20,13 +20,12 @@ use isograph_schema::{
     ClientFieldVariant, FieldDefinitionLocation, FieldMapItem, ImperativelyLoadedFieldArtifactInfo,
     NameAndArguments, ObjectTypeAndFieldNames, PathToRefetchField, RootRefetchedPath,
     ValidatedClientField, ValidatedSchema, ValidatedSchemaObject, ValidatedSelection,
+    REFETCH_FIELD_NAME,
 };
 
 use crate::{
-    artifact_file_contents::{ENTRYPOINT, REFETCH_FIELD_NAME},
-    iso_overload_file::build_iso_overload,
-    normalization_ast_text::generate_normalization_ast_text,
-    query_text::generate_query_text,
+    artifact_file_contents::ENTRYPOINT, iso_overload_file::build_iso_overload,
+    normalization_ast_text::generate_normalization_ast_text, query_text::generate_query_text,
 };
 
 type NestedClientFieldImports = HashMap<ObjectTypeAndFieldNames, JavaScriptImports>;
@@ -1141,7 +1140,7 @@ fn generate_reader_ast_node(
                                 let refetch_query_index = find_imperatively_fetchable_query_index(
                                     root_refetched_paths,
                                     path,
-                                    *REFETCH_FIELD_NAME,
+                                    (*REFETCH_FIELD_NAME).into(),
                                 )
                                 .0;
                                 format!(

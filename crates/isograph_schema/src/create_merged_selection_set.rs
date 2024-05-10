@@ -27,6 +27,7 @@ use crate::{
 type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSelection>>;
 
 lazy_static! {
+    pub static ref REFETCH_FIELD_NAME: LinkedFieldName = "__refetch".intern().into();
     pub static ref NODE_FIELD_NAME: LinkedFieldName = "node".intern().into();
     pub static ref TYPENAME_FIELD_NAME: ScalarFieldName = "__typename".intern().into();
 }
