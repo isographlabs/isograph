@@ -152,7 +152,7 @@ fn get_artifact_infos<'schema>(
             ClientFieldVariant::ImperativelyLoadedField(mutation_variant) => {
                 let function_import_statement =
                     generate_function_import_statement_for_mutation_reader(
-                        &mutation_variant.field_map,
+                        &mutation_variant.primary_field_field_map,
                     );
                 ArtifactInfo::RefetchReader(generate_mutation_reader_artifact(
                     schema,
@@ -213,7 +213,7 @@ fn generate_entrypoint_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     client_field_id: ClientFieldId,
     artifact_queue: &mut Vec<ImperativelyLoadedFieldArtifactInfo>,
-    encountered_cliend_field_ids: &mut HashSet<ClientFieldId>,
+    encountered_client_field_ids: &mut HashSet<ClientFieldId>,
 ) -> EntrypointArtifactInfo<'schema> {
     let fetchable_client_field = schema.client_field(client_field_id);
     if let Some((ref selection_set, _)) = fetchable_client_field.selection_set_and_unwraps {
@@ -226,7 +226,7 @@ fn generate_entrypoint_artifact<'schema>(
                 .object(fetchable_client_field.parent_object_id),
             selection_set,
             Some(artifact_queue),
-            Some(encountered_cliend_field_ids),
+            Some(encountered_client_field_ids),
             &fetchable_client_field,
         );
 
@@ -1157,7 +1157,7 @@ fn generate_reader_ast_node(
                                 let refetch_query_index = find_imperatively_fetchable_query_index(
                                     root_refetched_paths,
                                     path,
-                                    s.mutation_field_name,
+                                    s.client_field_scalar_selection_name,
                                 )
                                 .0;
                                 format!(

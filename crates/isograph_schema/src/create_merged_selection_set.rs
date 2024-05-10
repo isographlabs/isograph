@@ -339,14 +339,13 @@ pub fn create_merged_selection_set(
                             }
                             ClientFieldVariant::ImperativelyLoadedField(
                                 ImperativelyLoadedFieldVariant {
-                                    mutation_field_name,
-                                    fetchable_type_original_field_name:
-                                        server_schema_mutation_field_name,
-                                    aliased_exposed_field_name: mutation_primary_field_name,
-                                    mutation_field_arguments,
-                                    mutation_primary_field_return_type_object_id,
-                                    field_map: _,
-                                    expose_field_fetchable_field_parent_id,
+                                    client_field_scalar_selection_name,
+                                    top_level_schema_field_name,
+                                    top_level_schema_field_arguments,
+                                    primary_field_name,
+                                    primary_field_return_type_object_id,
+                                    primary_field_field_map: _,
+                                    root_object_id,
                                 },
                             ) => {
                                 // TODO we can pre-calculate this instead of re-iterating here
@@ -360,25 +359,24 @@ pub fn create_merged_selection_set(
                                 // loaded fields. It probably makes sense to think about how we
                                 // can name the things in this block better.
 
-                                let requires_refinement =
-                                    if mutation_primary_field_return_type_object_id
-                                        == refetch_field_parent_id
-                                    {
-                                        RequiresRefinement::No
-                                    } else {
-                                        RequiresRefinement::Yes(
-                                            schema
-                                                .server_field_data
-                                                .object(refetch_field_parent_id)
-                                                .name,
-                                        )
-                                    };
+                                let requires_refinement = if primary_field_return_type_object_id
+                                    == refetch_field_parent_id
+                                {
+                                    RequiresRefinement::No
+                                } else {
+                                    RequiresRefinement::Yes(
+                                        schema
+                                            .server_field_data
+                                            .object(refetch_field_parent_id)
+                                            .name,
+                                    )
+                                };
 
                                 let merged_selection_set = selection_set_wrapped(
                                     nested_merged_selection_set,
                                     // TODO why are these types different
-                                    server_schema_mutation_field_name.lookup().intern().into(),
-                                    mutation_field_arguments
+                                    top_level_schema_field_name.lookup().intern().into(),
+                                    top_level_schema_field_arguments
                                         .iter()
                                         // TODO don't clone
                                         .cloned()
@@ -415,7 +413,7 @@ pub fn create_merged_selection_set(
                                             })
                                         })
                                         .collect(),
-                                    Some(mutation_primary_field_name.lookup().intern().into()),
+                                    Some(primary_field_name.lookup().intern().into()),
                                     requires_refinement,
                                 );
 
@@ -431,19 +429,19 @@ pub fn create_merged_selection_set(
                                     refetch_query_index: RefetchQueryIndex(index as u32),
                                     root_operation_name: schema
                                         .fetchable_types
-                                        .get(&expose_field_fetchable_field_parent_id)
+                                        .get(&root_object_id)
                                         .expect(
                                             "Expected root type to be fetchable here.\
                                                  This is indicative of a bug in Isograph.",
                                         )
                                         .clone(),
                                     query_name: format!(
-                                        "{root_parent_object}__{mutation_field_name}"
+                                        "{root_parent_object}__{client_field_scalar_selection_name}"
                                     )
                                     .intern()
                                     .into(),
                                 });
-                                (mutation_field_name, reachable_variables)
+                                (client_field_scalar_selection_name, reachable_variables)
                             }
                             _ => panic!("invalid client field variant"),
                         };
@@ -479,7 +477,7 @@ pub fn create_merged_selection_set(
                         ClientFieldVariant::RefetchField => "__refetch".intern().into(),
                         ClientFieldVariant::ImperativelyLoadedField(
                             ImperativelyLoadedFieldVariant {
-                                mutation_field_name,
+                                client_field_scalar_selection_name: mutation_field_name,
                                 ..
                             },
                         ) => mutation_field_name,
@@ -736,13 +734,13 @@ fn merge_scalar_client_field(
             ClientFieldVariant::RefetchField,
         ));
     } else if let ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
-        aliased_exposed_field_name: mutation_primary_field_name,
-        fetchable_type_original_field_name: server_schema_mutation_field_name,
-        mutation_field_arguments,
-        mutation_field_name: _,
-        mutation_primary_field_return_type_object_id,
-        field_map,
-        expose_field_fetchable_field_parent_id: expose_field_parent_id,
+        primary_field_name,
+        top_level_schema_field_name,
+        top_level_schema_field_arguments,
+        client_field_scalar_selection_name: _,
+        primary_field_return_type_object_id,
+        primary_field_field_map,
+        root_object_id,
     }) = &client_field.variant
     {
         merge_traversal_state.paths_to_refetch_fields.insert((
@@ -752,14 +750,13 @@ fn merge_scalar_client_field(
             },
             parent_type.id,
             ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
-                mutation_field_name: client_field.name,
-                fetchable_type_original_field_name: *server_schema_mutation_field_name,
-                aliased_exposed_field_name: *mutation_primary_field_name,
-                mutation_field_arguments: mutation_field_arguments.clone(),
-                mutation_primary_field_return_type_object_id:
-                    *mutation_primary_field_return_type_object_id,
-                field_map: field_map.clone(),
-                expose_field_fetchable_field_parent_id: *expose_field_parent_id,
+                client_field_scalar_selection_name: client_field.name,
+                top_level_schema_field_name: *top_level_schema_field_name,
+                primary_field_name: *primary_field_name,
+                top_level_schema_field_arguments: top_level_schema_field_arguments.clone(),
+                primary_field_return_type_object_id: *primary_field_return_type_object_id,
+                primary_field_field_map: primary_field_field_map.clone(),
+                root_object_id: *root_object_id,
             }),
         ));
     }

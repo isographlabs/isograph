@@ -220,14 +220,13 @@ impl UnvalidatedSchema {
                 selection_set_and_unwraps: Some((fields.to_vec(), vec![])),
                 variant: ClientFieldVariant::ImperativelyLoadedField(
                     ImperativelyLoadedFieldVariant {
-                        mutation_field_name,
-                        fetchable_type_original_field_name,
-                        aliased_exposed_field_name: path_selectable_field_name,
-                        mutation_field_arguments: mutation_field_arguments.to_vec(),
-                        mutation_primary_field_return_type_object_id:
-                            maybe_abstract_parent_object_id,
-                        field_map: field_map.to_vec(),
-                        expose_field_fetchable_field_parent_id: parent_object_id,
+                        client_field_scalar_selection_name: mutation_field_name,
+                        top_level_schema_field_name: fetchable_type_original_field_name,
+                        primary_field_name: path_selectable_field_name,
+                        top_level_schema_field_arguments: mutation_field_arguments.to_vec(),
+                        primary_field_return_type_object_id: maybe_abstract_parent_object_id,
+                        primary_field_field_map: field_map.to_vec(),
+                        root_object_id: parent_object_id,
                     },
                 ),
                 variable_definitions: vec![],
