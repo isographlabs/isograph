@@ -2,6 +2,7 @@ mod batch_compile;
 mod field_directives;
 mod isograph_literals;
 mod opt;
+mod refetch_fields;
 mod schema;
 mod watch;
 mod write_artifacts;

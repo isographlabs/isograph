@@ -1,11 +1,10 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use crate::{
-    ClientField, ClientFieldVariant, EncounteredRootTypes, FieldDefinitionLocation,
-    IsographObjectTypeDefinition, ObjectTypeAndFieldNames, ProcessedRootTypes, RootOperationName,
-    RootTypes, Schema, SchemaObject, SchemaScalar, SchemaServerField, UnvalidatedClientField,
-    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField, ID_GRAPHQL_TYPE,
-    STRING_JAVASCRIPT_TYPE,
+    EncounteredRootTypes, FieldDefinitionLocation, IsographObjectTypeDefinition,
+    ProcessedRootTypes, RootOperationName, RootTypes, Schema, SchemaObject, SchemaScalar,
+    SchemaServerField, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
+    ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
 };
 use common_lang_types::{
     GraphQLObjectTypeName, GraphQLScalarTypeName, IsographObjectTypeName, Location,
@@ -20,8 +19,7 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_config::ConfigOptions;
 use isograph_lang_types::{
-    ClientFieldId, IsographSelectionVariant, ScalarFieldSelection, SelectableServerFieldId,
-    Selection, ServerFieldId, ServerFieldSelection, ServerObjectId, ServerStrongIdFieldId,
+    SelectableServerFieldId, ServerFieldId, ServerObjectId, ServerStrongIdFieldId,
 };
 use lazy_static::lazy_static;
 use serde::Deserialize;
@@ -384,7 +382,6 @@ impl UnvalidatedSchema {
         let &mut Schema {
             server_fields: ref mut schema_fields,
             server_field_data: ref mut schema_data,
-            ref mut client_fields,
             ..
         } = self;
         let next_object_id = schema_data.server_objects.len().into();
@@ -409,7 +406,7 @@ impl UnvalidatedSchema {
                 let FieldObjectIdsEtc {
                     unvalidated_schema_fields,
                     server_fields,
-                    mut encountered_fields,
+                    encountered_fields,
                     id_field,
                 } = get_field_objects_ids_and_names(
                     type_def_2.fields,
@@ -421,20 +418,12 @@ impl UnvalidatedSchema {
                     options,
                 )?;
 
-                let client_field_ids = get_client_fields_for_schema_object(
-                    &id_field,
-                    &mut encountered_fields,
-                    client_fields,
-                    next_object_id,
-                    &object_type_definition,
-                );
-
                 objects.push(SchemaObject {
                     description: object_type_definition.description.map(|d| d.item),
                     name: object_type_definition.name.item,
                     id: next_object_id,
                     server_field_ids: server_fields,
-                    client_field_ids,
+                    client_field_ids: vec![],
                     encountered_fields,
                     id_field,
                     directives: object_type_definition.directives,
@@ -605,55 +594,6 @@ impl FieldMapItem {
             to_argument_name: to_argument_name.intern().into(),
             to_field_names: split.into_iter().map(|x| x.intern().into()).collect(),
         }
-    }
-}
-
-/// Returns the client fields for a schema object that we know up-front (before processing
-/// iso literals.) This is either a refetch field (if the object is refetchable), or
-/// nothing.
-fn get_client_fields_for_schema_object(
-    id_field_id: &Option<ServerStrongIdFieldId>,
-    encountered_fields: &mut HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
-    unvalidated_client_field: &mut Vec<UnvalidatedClientField>,
-    parent_object_id: ServerObjectId,
-    type_definition: &IsographObjectTypeDefinition,
-) -> Vec<ClientFieldId> {
-    if let Some(_id_field_id) = id_field_id {
-        let next_client_field_id = unvalidated_client_field.len().into();
-        let id_field_selection = WithSpan::new(
-            Selection::ServerField(ServerFieldSelection::ScalarField(ScalarFieldSelection {
-                name: WithLocation::new("id".intern().into(), Location::generated()),
-                reader_alias: None,
-                normalization_alias: None,
-                associated_data: IsographSelectionVariant::Regular,
-                unwraps: vec![],
-                arguments: vec![],
-                directives: vec![],
-            })),
-            Span::todo_generated(),
-        );
-        unvalidated_client_field.push(ClientField {
-            description: Some("A refetch field for this object.".intern().into()),
-            name: "__refetch".intern().into(),
-            id: next_client_field_id,
-            selection_set_and_unwraps: Some((vec![id_field_selection], vec![])),
-            variant: ClientFieldVariant::RefetchField,
-            variable_definitions: vec![],
-            type_and_field: ObjectTypeAndFieldNames {
-                type_name: type_definition.name.item,
-                field_name: "__refetch".intern().into(),
-            },
-            // This is extremely likely to be wrong. What id is this? It's probably
-            // not Query or Mutation
-            parent_object_id,
-        });
-        encountered_fields.insert(
-            "__refetch".intern().into(),
-            FieldDefinitionLocation::Client(next_client_field_id),
-        );
-        vec![next_client_field_id]
-    } else {
-        vec![]
     }
 }
 

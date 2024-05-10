@@ -481,6 +481,7 @@ pub struct ClientField<
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,
 
+    // Is this used for anything except for some reason, for refetch fields?
     pub variable_definitions:
         Vec<WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
 

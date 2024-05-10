@@ -31,6 +31,7 @@ use crate::{
     isograph_literals::{
         extract_iso_literal_from_file_content, read_files_in_folder, IsoLiteralExtraction,
     },
+    refetch_fields::add_refetch_fields_to_objects,
     schema::read_schema_file,
     write_artifacts::{write_to_disk, GenerateArtifactsError},
 };
@@ -121,9 +122,8 @@ pub(crate) fn handle_compile_command(
         // - process schema and validate
         // - process schema extension and validate
         // Validation state: all types have been defined
-        // - add mutation fields
-        // - add refetch fields
-        // - process parsed iso field definitions
+        // - add mutation, refetch fields, etc. and fields to subtypes
+        // - and client fields defined in iso field literals, but don't validate
         // Validation state: all fields have been defined
         // - validate fields with selection sets
         // Validation state: fully validated
@@ -162,6 +162,8 @@ pub(crate) fn handle_compile_command(
                 .type_refinement_maps
                 .supertype_to_subtype_map,
         )?;
+
+        add_refetch_fields_to_objects(&mut schema)?;
 
         let validated_schema = Schema::validate_and_construct(schema)?;
 
@@ -443,6 +445,9 @@ pub(crate) enum BatchCompileError {
 
     #[error("Unable to convert file {path:?} to utf8.\nDetailed reason: {reason}")]
     UnableToConvertToString { path: PathBuf, reason: Utf8Error },
+
+    #[error("The __refetch field was already defined. Isograph creates it automatically; you cannot create it.")]
+    DuplicateRefetchField,
 }
 
 impl From<Vec<WithLocation<IsographLiteralParseError>>> for BatchCompileError {

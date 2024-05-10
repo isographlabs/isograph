@@ -49,7 +49,7 @@ pub(crate) type UnvalidatedSchemaData =
 pub(crate) type UnvalidatedSchemaField =
     SchemaServerField<GraphQLTypeAnnotation<UnvalidatedTypeName>>;
 
-pub(crate) type UnvalidatedClientField = ClientField<
+pub type UnvalidatedClientField = ClientField<
     <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldVariableDefinitionAssociatedData,

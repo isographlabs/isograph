@@ -11,7 +11,7 @@ export type Pet__PetUpdater__param = {
   set_pet_tagline: Pet__set_pet_tagline__outputType,
   tagline: string,
   /**
-A refetch field for this object.
+A refetch field for the Pet type.
   */
   __refetch: Pet____refetch__outputType,
 };

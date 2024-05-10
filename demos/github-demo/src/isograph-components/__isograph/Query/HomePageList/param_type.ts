@@ -16,7 +16,7 @@ The user's public profile name.
 name: (string | null),
     RepositoryList: User__RepositoryList__outputType,
     /**
-A refetch field for this object.
+A refetch field for the User type.
     */
     __refetch: User____refetch__outputType,
   },
