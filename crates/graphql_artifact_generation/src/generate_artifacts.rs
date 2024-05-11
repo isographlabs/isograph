@@ -149,10 +149,12 @@ fn get_artifact_infos<'schema>(
                 ))
             }
             ClientFieldVariant::ImperativelyLoadedField(mutation_variant) => {
-                let function_import_statement =
-                    generate_function_import_statement_for_mutation_reader(
-                        &mutation_variant.primary_field_field_map,
-                    );
+                let function_import_statement = match &mutation_variant.primary_field_info {
+                    Some(info) => generate_function_import_statement_for_mutation_reader(
+                        &info.primary_field_field_map,
+                    ),
+                    None => generate_function_import_statement_for_refetch_reader(),
+                };
                 ArtifactInfo::RefetchReader(generate_mutation_reader_artifact(
                     schema,
                     encountered_client_field,

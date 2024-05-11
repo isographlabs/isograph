@@ -343,9 +343,7 @@ pub fn create_merged_selection_set(
                                     client_field_scalar_selection_name,
                                     top_level_schema_field_name,
                                     top_level_schema_field_arguments,
-                                    primary_field_name,
-                                    primary_field_return_type_object_id,
-                                    primary_field_field_map: _,
+                                    primary_field_info,
                                     root_object_id,
                                 },
                             ) => {
@@ -360,17 +358,22 @@ pub fn create_merged_selection_set(
                                 // loaded fields. It probably makes sense to think about how we
                                 // can name the things in this block better.
 
-                                let requires_refinement = if primary_field_return_type_object_id
-                                    == refetch_field_parent_id
+                                let requires_refinement = if primary_field_info
+                                    .as_ref()
+                                    .map(|x| {
+                                        x.primary_field_return_type_object_id
+                                            != refetch_field_parent_id
+                                    })
+                                    .unwrap_or(true)
                                 {
-                                    RequiresRefinement::No
-                                } else {
                                     RequiresRefinement::Yes(
                                         schema
                                             .server_field_data
                                             .object(refetch_field_parent_id)
                                             .name,
                                     )
+                                } else {
+                                    RequiresRefinement::No
                                 };
 
                                 let merged_selection_set = selection_set_wrapped(
@@ -414,7 +417,9 @@ pub fn create_merged_selection_set(
                                             })
                                         })
                                         .collect(),
-                                    Some(primary_field_name.lookup().intern().into()),
+                                    primary_field_info
+                                        .as_ref()
+                                        .map(|x| x.primary_field_name.lookup().intern().into()),
                                     requires_refinement,
                                 );
 

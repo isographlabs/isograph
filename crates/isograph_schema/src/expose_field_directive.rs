@@ -15,8 +15,9 @@ use serde::Deserialize;
 
 use crate::{
     ArgumentMap, ClientField, ClientFieldVariant, FieldDefinitionLocation, FieldMapItem,
-    ImperativelyLoadedFieldVariant, ObjectTypeAndFieldNames, ProcessTypeDefinitionError,
-    ProcessTypeDefinitionResult, ProcessedFieldMapItem, UnvalidatedSchema,
+    ImperativelyLoadedFieldVariant, ObjectTypeAndFieldNames, PrimaryFieldInfo,
+    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
+    UnvalidatedSchema,
 };
 use lazy_static::lazy_static;
 
@@ -226,10 +227,14 @@ impl UnvalidatedSchema {
                             .intern()
                             .into(),
                         top_level_schema_field_name,
-                        primary_field_name,
                         top_level_schema_field_arguments: mutation_field_arguments.to_vec(),
-                        primary_field_return_type_object_id: maybe_abstract_parent_object_id,
-                        primary_field_field_map: field_map.to_vec(),
+
+                        primary_field_info: Some(PrimaryFieldInfo {
+                            primary_field_name,
+                            primary_field_return_type_object_id: maybe_abstract_parent_object_id,
+                            primary_field_field_map: field_map.to_vec(),
+                        }),
+
                         root_object_id: parent_object_id,
                     },
                 ),

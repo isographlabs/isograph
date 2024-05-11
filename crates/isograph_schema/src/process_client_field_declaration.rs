@@ -137,14 +137,21 @@ pub enum ProcessClientFieldDeclarationError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ImperativelyLoadedFieldVariant {
-    pub client_field_scalar_selection_name: ScalarFieldName,
-    pub top_level_schema_field_name: LinkedFieldName,
-    pub top_level_schema_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+pub struct PrimaryFieldInfo {
     pub primary_field_name: LinkedFieldName,
     /// If this is abstract, we add a fragment spread
     pub primary_field_return_type_object_id: ServerObjectId,
     pub primary_field_field_map: Vec<FieldMapItem>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ImperativelyLoadedFieldVariant {
+    pub client_field_scalar_selection_name: ScalarFieldName,
+    pub top_level_schema_field_name: LinkedFieldName,
+    pub top_level_schema_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+
+    pub primary_field_info: Option<PrimaryFieldInfo>,
+
     pub root_object_id: ServerObjectId,
 }
 
