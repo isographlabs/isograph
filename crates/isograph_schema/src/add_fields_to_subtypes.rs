@@ -1,8 +1,7 @@
 use common_lang_types::{Location, WithLocation};
 
 use crate::{
-    ClientFieldVariant, ProcessTypeDefinitionError, ProcessTypeDefinitionResult, TypeRefinementMap,
-    UnvalidatedSchema,
+    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, TypeRefinementMap, UnvalidatedSchema,
 };
 
 impl UnvalidatedSchema {
@@ -25,29 +24,13 @@ impl UnvalidatedSchema {
             let supertype_encountered_fields = supertype.encountered_fields.clone();
 
             for subtype_id in subtype_ids {
-                'field: for (supertype_field_name, defined_field) in &supertype_encountered_fields {
+                for (supertype_field_name, defined_field) in &supertype_encountered_fields {
                     match defined_field {
                         crate::FieldDefinitionLocation::Server(_) => {
                             // Should we transfer server fields??? That makes no sense for
                             // GraphQL, but ... does it make sense otherwise? Who knows.
                         }
                         crate::FieldDefinitionLocation::Client(supertype_client_field_id) => {
-                            // ------ HACK ------
-                            // We error if there are fields that are duplicated. This makes sense — defining
-                            // Interface.foo and also ConcreteType.foo is a recipe for confusion. So, if you
-                            // define a field on an abstract type, it had better not already exist on the
-                            // concrete type.
-                            //
-                            // __refetch fields are on *all* types, though. So, we have to skip those.
-                            // However, if __refetch is defined on Node (or some other suitable abstract
-                            // type), we *probably* can do this.
-                            //
-                            // What we have here is not currently a satisfactory conclusion.
-                            // ---- END HACK ----
-                            let client_field = self.client_field(*supertype_client_field_id);
-                            if matches!(client_field.variant, ClientFieldVariant::RefetchField(_)) {
-                                continue 'field;
-                            }
                             let subtype = self.server_field_data.object_mut(*subtype_id);
 
                             if let Some(_) = subtype
