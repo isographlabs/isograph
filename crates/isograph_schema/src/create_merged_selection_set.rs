@@ -8,7 +8,6 @@ use common_lang_types::{
     ScalarFieldAlias, ScalarFieldName, SelectableFieldName, Span, VariableName, WithLocation,
     WithSpan,
 };
-use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ClientFieldId, NonConstantValue, RefetchQueryIndex, SelectableServerFieldId, Selection,
@@ -245,7 +244,7 @@ pub fn create_merged_selection_set(
     entrypoint: &ValidatedClientField,
 ) -> (MergedSelectionSet, Vec<RootRefetchedPath>) {
     let mut merge_traversal_state = MergeTraversalState::new(encountered_client_field_ids);
-    let merged_selection_set = create_merged_selection_set_with_merge_traversal_state(
+    let full_merged_selection_set = create_merged_selection_set_with_merge_traversal_state(
         schema,
         parent_type,
         validated_selections,
@@ -264,80 +263,9 @@ pub fn create_merged_selection_set(
                         (path_to_refetch_field, refetch_field_parent_id, client_field_variant),
                     )| {
                         let nested_merged_selection_set =
-                            find_by_path(&merged_selection_set, &path_to_refetch_field);
+                            find_by_path(&full_merged_selection_set, &path_to_refetch_field);
 
                         let (field_name, reachable_variables) = match client_field_variant {
-                            ClientFieldVariant::RefetchField(_) => {
-                                let type_to_refine_to = schema
-                                    .server_field_data
-                                    .object(refetch_field_parent_id)
-                                    .name;
-
-                                let id_arguments = vec![WithLocation::new(
-                                    SelectionFieldArgument {
-                                        name: WithSpan::new(
-                                            "id".intern().into(),
-                                            Span::todo_generated(),
-                                        ),
-                                        value: WithSpan::new(
-                                            NonConstantValue::Variable("id".intern().into()),
-                                            Span::todo_generated(),
-                                        ),
-                                    },
-                                    Location::generated(),
-                                )];
-
-                                let merged_selection_set = selection_set_wrapped(
-                                    nested_merged_selection_set,
-                                    *NODE_FIELD_NAME,
-                                    id_arguments,
-                                    None,
-                                    RequiresRefinement::Yes(type_to_refine_to),
-                                );
-                                // TODO we can pre-calculate this instead of re-iterating here
-                                let reachable_variables =
-                                    merged_selection_set.reachable_variables();
-
-                                let mut definitions_of_used_variables =
-                                    get_used_variable_definitions(&reachable_variables, entrypoint);
-
-                                // HACK, we also add the id field
-                                definitions_of_used_variables.push(WithSpan::new(
-                                    VariableDefinition {
-                                        name: WithLocation::new(
-                                            "id".intern().into(),
-                                            Location::generated(),
-                                        ),
-                                        type_: GraphQLTypeAnnotation::NonNull(Box::new(
-                                            NonNullTypeAnnotation::Named(NamedTypeAnnotation(
-                                                WithSpan::new(
-                                                    SelectableServerFieldId::Scalar(
-                                                        schema.id_type_id,
-                                                    ),
-                                                    Span::todo_generated(),
-                                                ),
-                                            )),
-                                        )),
-                                    },
-                                    Span::todo_generated(),
-                                ));
-
-                                artifact_queue.push(ImperativelyLoadedFieldArtifactInfo {
-                                    merged_selection_set,
-                                    variable_definitions: definitions_of_used_variables,
-                                    root_parent_object: schema
-                                        .server_field_data
-                                        .object(entrypoint.parent_object_id)
-                                        .name,
-                                    root_fetchable_field: entrypoint.name,
-                                    refetch_query_index: RefetchQueryIndex(index as u32),
-                                    query_name: format!("{type_to_refine_to}__refetch")
-                                        .intern()
-                                        .into(),
-                                    root_operation_name: RootOperationName("query".to_string()),
-                                });
-                                ("__refetch".intern().into(), reachable_variables)
-                            }
                             ClientFieldVariant::ImperativelyLoadedField(
                                 ImperativelyLoadedFieldVariant {
                                     client_field_scalar_selection_name,
@@ -347,16 +275,16 @@ pub fn create_merged_selection_set(
                                     root_object_id,
                                 },
                             ) => {
+                                // This could be Pet
+                                let refetch_field_parent_type =
+                                    schema.server_field_data.object(refetch_field_parent_id);
+
                                 // TODO we can pre-calculate this instead of re-iterating here
-                                let reachable_variables =
-                                    merged_selection_set.reachable_variables();
+                                let mut reachable_variables =
+                                    nested_merged_selection_set.reachable_variables();
 
                                 let mut definitions_of_used_variables =
                                     get_used_variable_definitions(&reachable_variables, entrypoint);
-
-                                // It's a bit weird that all exposed fields become imperatively
-                                // loaded fields. It probably makes sense to think about how we
-                                // can name the things in this block better.
 
                                 let requires_refinement = if primary_field_info
                                     .as_ref()
@@ -366,17 +294,12 @@ pub fn create_merged_selection_set(
                                     })
                                     .unwrap_or(true)
                                 {
-                                    RequiresRefinement::Yes(
-                                        schema
-                                            .server_field_data
-                                            .object(refetch_field_parent_id)
-                                            .name,
-                                    )
+                                    RequiresRefinement::Yes(refetch_field_parent_type.name)
                                 } else {
                                     RequiresRefinement::No
                                 };
 
-                                let merged_selection_set = selection_set_wrapped(
+                                let wrapped_selection_set = selection_set_wrapped(
                                     nested_merged_selection_set,
                                     // TODO why are these types different
                                     top_level_schema_field_name.lookup().intern().into(),
@@ -403,6 +326,9 @@ pub fn create_merged_selection_set(
                                                 },
                                                 span: Span::todo_generated(),
                                             });
+
+                                            reachable_variables.insert(variable_name.item);
+
                                             x.map(|item| SelectionFieldArgument {
                                                 name: WithSpan::new(
                                                     item.name.item.lookup().intern().into(),
@@ -428,7 +354,7 @@ pub fn create_merged_selection_set(
                                     .object(entrypoint.parent_object_id)
                                     .name;
                                 artifact_queue.push(ImperativelyLoadedFieldArtifactInfo {
-                                    merged_selection_set,
+                                    merged_selection_set: wrapped_selection_set,
                                     root_parent_object,
                                     variable_definitions: definitions_of_used_variables,
                                     root_fetchable_field: entrypoint.name,
@@ -441,9 +367,14 @@ pub fn create_merged_selection_set(
                                                  This is indicative of a bug in Isograph.",
                                         )
                                         .clone(),
-                                    query_name: format!(
-                                        "{root_parent_object}__{client_field_scalar_selection_name}"
-                                    )
+                                    query_name: if primary_field_info.is_some() {
+                                        format!(
+                                            "{}__{}",
+                                            root_parent_object, client_field_scalar_selection_name
+                                        )
+                                    } else {
+                                        format!("{}__refetch", refetch_field_parent_type.name)
+                                    }
                                     .intern()
                                     .into(),
                                 });
@@ -465,7 +396,7 @@ pub fn create_merged_selection_set(
                 )
                 .collect();
 
-            (merged_selection_set, root_refetched_paths)
+            (full_merged_selection_set, root_refetched_paths)
         }
         None => {
             // TODO it is weird that we call this without an artifact queue!
@@ -474,13 +405,12 @@ pub fn create_merged_selection_set(
                 .into_iter()
                 .map(|(path_to_refetch_field, _, client_field_variant)| {
                     let nested_merged_selection_set =
-                        find_by_path(&merged_selection_set, &path_to_refetch_field);
+                        find_by_path(&full_merged_selection_set, &path_to_refetch_field);
 
                     // TODO we can pre-calculate this instead of re-iterating here
                     let reachable_variables = nested_merged_selection_set.reachable_variables();
 
                     let field_name = match client_field_variant {
-                        ClientFieldVariant::RefetchField(_) => "__refetch".intern().into(),
                         ClientFieldVariant::ImperativelyLoadedField(
                             ImperativelyLoadedFieldVariant {
                                 client_field_scalar_selection_name: mutation_field_name,
@@ -502,7 +432,7 @@ pub fn create_merged_selection_set(
                 })
                 .collect();
 
-            (merged_selection_set, root_refetched_paths)
+            (full_merged_selection_set, root_refetched_paths)
         }
     }
 }
@@ -730,16 +660,6 @@ fn merge_scalar_client_field(
     }
 
     match &client_field.variant {
-        ClientFieldVariant::RefetchField(variant) => {
-            merge_traversal_state.paths_to_refetch_fields.insert((
-                PathToRefetchField {
-                    linked_fields: merge_traversal_state.current_path.clone(),
-                    field_name: client_field.name,
-                },
-                parent_type.id,
-                ClientFieldVariant::RefetchField(variant.clone()),
-            ));
-        }
         ClientFieldVariant::ImperativelyLoadedField(variant) => {
             merge_traversal_state.paths_to_refetch_fields.insert((
                 PathToRefetchField {

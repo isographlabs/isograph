@@ -139,19 +139,6 @@ fn get_artifact_infos<'schema>(
                     *component_name_and_path,
                 ))
             }
-            ClientFieldVariant::RefetchField(variant) => {
-                let function_import_statement = match &variant.primary_field_info {
-                    Some(info) => generate_function_import_statement_for_mutation_reader(
-                        &info.primary_field_field_map,
-                    ),
-                    None => generate_function_import_statement_for_refetch_reader(),
-                };
-                ArtifactInfo::RefetchReader(generate_mutation_reader_artifact(
-                    schema,
-                    encountered_client_field,
-                    function_import_statement,
-                ))
-            }
             ClientFieldVariant::ImperativelyLoadedField(variant) => {
                 let function_import_statement = match &variant.primary_field_info {
                     Some(info) => generate_function_import_statement_for_mutation_reader(
@@ -1142,22 +1129,6 @@ fn generate_reader_ast_node(
 
                         // This is indicative of poor data modeling.
                         match client_field.variant {
-                            ClientFieldVariant::RefetchField(_) => {
-                                let refetch_query_index = find_imperatively_fetchable_query_index(
-                                    root_refetched_paths,
-                                    path,
-                                    (*REFETCH_FIELD_NAME).into(),
-                                )
-                                .0;
-                                format!(
-                                    "{indent_1}{{\n\
-                                    {indent_2}kind: \"RefetchField\",\n\
-                                    {indent_2}alias: \"{alias}\",\n\
-                                    {indent_2}readerArtifact: {client_field_string},\n\
-                                    {indent_2}refetchQuery: {refetch_query_index},\n\
-                                    {indent_1}}},\n",
-                                )
-                            }
                             ClientFieldVariant::ImperativelyLoadedField(ref s) => {
                                 let refetch_query_index = find_imperatively_fetchable_query_index(
                                     root_refetched_paths,
@@ -1165,15 +1136,29 @@ fn generate_reader_ast_node(
                                     s.client_field_scalar_selection_name.into(),
                                 )
                                 .0;
-                                format!(
-                                    "{indent_1}{{\n\
-                                    {indent_2}kind: \"MutationField\",\n\
-                                    {indent_2}alias: \"{alias}\",\n\
-                                    {indent_2}// @ts-ignore\n\
-                                    {indent_2}readerArtifact: {client_field_string},\n\
-                                    {indent_2}refetchQuery: {refetch_query_index},\n\
-                                    {indent_1}}},\n",
-                                )
+                                match s.primary_field_info {
+                                    Some(_) => {
+                                        format!(
+                                            "{indent_1}{{\n\
+                                            {indent_2}kind: \"MutationField\",\n\
+                                            {indent_2}alias: \"{alias}\",\n\
+                                            {indent_2}// @ts-ignore\n\
+                                            {indent_2}readerArtifact: {client_field_string},\n\
+                                            {indent_2}refetchQuery: {refetch_query_index},\n\
+                                            {indent_1}}},\n",
+                                        )
+                                    }
+                                    None => {
+                                        format!(
+                                            "{indent_1}{{\n\
+                                            {indent_2}kind: \"RefetchField\",\n\
+                                            {indent_2}alias: \"{alias}\",\n\
+                                            {indent_2}readerArtifact: {client_field_string},\n\
+                                            {indent_2}refetchQuery: {refetch_query_index},\n\
+                                            {indent_1}}},\n",
+                                        )
+                                    }
+                                }
                             }
                             _ => {
                                 format!(
@@ -1311,10 +1296,11 @@ fn generate_output_type(client_field: &ValidatedClientField) -> ClientFieldOutpu
             ClientFieldVariant::Eager(_) => {
                 ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
             }
-            ClientFieldVariant::RefetchField(_) => ClientFieldOutputType("() => void".to_string()),
-            ClientFieldVariant::ImperativelyLoadedField(_) => {
-                // TODO type these parameters
-                ClientFieldOutputType("(params: any) => void".to_string())
+            ClientFieldVariant::ImperativelyLoadedField(params) => {
+                match params.primary_field_info {
+                    Some(_) => ClientFieldOutputType("(params: any) => void".to_string()),
+                    None => ClientFieldOutputType("() => void".to_string()),
+                }
             }
         },
     }

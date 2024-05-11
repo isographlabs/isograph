@@ -150,6 +150,7 @@ pub struct ImperativelyLoadedFieldVariant {
     pub top_level_schema_field_name: LinkedFieldName,
     pub top_level_schema_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
 
+    // Note: if this is missing, this is a refetch field
     pub primary_field_info: Option<PrimaryFieldInfo>,
 
     pub root_object_id: ServerObjectId,
@@ -159,7 +160,6 @@ pub struct ImperativelyLoadedFieldVariant {
 pub enum ClientFieldVariant {
     Component((ConstExportName, FilePath)),
     Eager((ConstExportName, FilePath)),
-    RefetchField(ImperativelyLoadedFieldVariant),
     ImperativelyLoadedField(ImperativelyLoadedFieldVariant),
 }
 
