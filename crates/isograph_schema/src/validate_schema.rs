@@ -1,5 +1,5 @@
 use common_lang_types::{
-    InputTypeName, InputValueName, IsographObjectTypeName, ScalarFieldName, SelectableFieldName,
+    InputTypeName, InputValueName, IsographObjectTypeName, SelectableFieldName,
     UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation, NamedTypeAnnotation};
@@ -142,7 +142,7 @@ impl ValidatedSchema {
         if errors.is_empty() {
             let objects = objects
                 .into_iter()
-                .map(|object| transform_object_field_ids(&updated_fields, object))
+                .map(|object| transform_object_field_ids(object))
                 .collect();
 
             Ok(Self {
@@ -168,12 +168,10 @@ impl ValidatedSchema {
 }
 
 fn transform_object_field_ids(
-    schema_fields: &[ValidatedSchemaServerField],
     unvalidated_object: UnvalidatedSchemaObject,
 ) -> ValidatedSchemaObject {
     let SchemaObject {
         name,
-        server_field_ids,
         description,
         id,
         encountered_fields: unvalidated_encountered_fields,
@@ -184,21 +182,8 @@ fn transform_object_field_ids(
     let validated_encountered_fields = unvalidated_encountered_fields
         .into_iter()
         .map(|(encountered_field_name, value)| match value {
-            FieldDefinitionLocation::Server(_) => (encountered_field_name, {
-                server_field_ids
-                    .iter()
-                    .find_map(|server_field_id| {
-                        let field = &schema_fields[server_field_id.as_usize()];
-                        if field.name.item == encountered_field_name {
-                            Some(FieldDefinitionLocation::Server(*server_field_id))
-                        } else {
-                            None
-                        }
-                    })
-                    .expect(&format!(
-                        "Field {} not found, probably a bug in Isograph",
-                        encountered_field_name
-                    ))
+            FieldDefinitionLocation::Server(server_field_id) => (encountered_field_name, {
+                FieldDefinitionLocation::Server(server_field_id)
             }),
             FieldDefinitionLocation::Client(client_field_id) => (
                 encountered_field_name,
@@ -211,7 +196,6 @@ fn transform_object_field_ids(
         description,
         name,
         id,
-        server_field_ids,
         encountered_fields: validated_encountered_fields,
         id_field,
         directives,
@@ -596,37 +580,30 @@ fn validate_field_type_exists_and_is_scalar(
     let scalar_field_name = scalar_field_selection.name.item.into();
     match parent_object.encountered_fields.get(&scalar_field_name) {
         Some(defined_field_type) => match defined_field_type {
-            FieldDefinitionLocation::Server(server_field_name) => {
-                let server_field = &server_fields[server_field_name.as_usize()];
+            FieldDefinitionLocation::Server(server_field_id) => {
+                let server_field = &server_fields[server_field_id.as_usize()];
 
                 match server_field.associated_data.inner() {
                     SelectableServerFieldId::Scalar(_) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
-                        associated_data: ValidatedScalarFieldAssociatedData { location: FieldDefinitionLocation::Server(
-                            find_server_field_id(
-                                server_fields,
-                                scalar_field_selection.name.item,
-                                &parent_object.server_field_ids,
-                            )
-                            .expect("Expected to find scalar field, this probably indicates a bug in Isograph"),
-                        )},
+                        associated_data: ValidatedScalarFieldAssociatedData {
+                            location: FieldDefinitionLocation::Server(*server_field_id),
+                        },
                         reader_alias: scalar_field_selection.reader_alias,
                         normalization_alias: scalar_field_selection.normalization_alias,
                         unwraps: scalar_field_selection.unwraps,
                         arguments: scalar_field_selection.arguments,
-                        directives: scalar_field_selection.directives
+                        directives: scalar_field_selection.directives,
                     }),
-                    SelectableServerFieldId::Object(object_id) => Err(
-                        WithLocation::new(
-                            ValidateSelectionsError::FieldSelectedAsScalarButTypeIsNotScalar {
-                                field_parent_type_name: parent_object.name,
-                                field_name: scalar_field_name,
-                                target_type: "an object",
-                                target_type_name: schema_data.object(*object_id).name.into()
-                            },
-                            scalar_field_selection.name.location
-                        ),
-                    ),
+                    SelectableServerFieldId::Object(object_id) => Err(WithLocation::new(
+                        ValidateSelectionsError::FieldSelectedAsScalarButTypeIsNotScalar {
+                            field_parent_type_name: parent_object.name,
+                            field_name: scalar_field_name,
+                            target_type: "an object",
+                            target_type_name: schema_data.object(*object_id).name.into(),
+                        },
+                        scalar_field_selection.name.location,
+                    )),
                 }
             }
             FieldDefinitionLocation::Client(client_field_id) => {
@@ -716,21 +693,6 @@ fn validate_field_type_exists_and_is_linked(
             linked_field_selection.name.location,
         )),
     }
-}
-
-fn find_server_field_id(
-    server_fields: &[UnvalidatedSchemaServerField],
-    field_name: ScalarFieldName,
-    parent_server_field_ids: &[ServerFieldId],
-) -> Option<ServerFieldId> {
-    parent_server_field_ids.iter().find_map(|server_field_id| {
-        let server_field = &server_fields[server_field_id.as_usize()];
-        if server_field.name.item == field_name.into() {
-            Some(*server_field_id)
-        } else {
-            None
-        }
-    })
 }
 
 type ValidateSchemaResult<T> = Result<T, WithLocation<ValidateSchemaError>>;

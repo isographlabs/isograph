@@ -9,8 +9,8 @@ use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{SelectableServerFieldId, ServerFieldId};
 
 use crate::{
-    FieldMapItem, ProcessTypeDefinitionError, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
-    UnvalidatedSchema,
+    FieldDefinitionLocation, FieldMapItem, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
+    ProcessedFieldMapItem, UnvalidatedSchema,
 };
 
 pub(crate) struct ArgumentMap {
@@ -204,11 +204,11 @@ impl ModifiedArgument {
     ) -> Self {
         // TODO I think we have validated that the item exists already.
         // But we should double check that, and return an error if necessary
-        let object = unmodified.type_.clone().map(|x| {
+        let object = unmodified.type_.clone().map(|input_type_name| {
             let defined_type_id = *schema
                 .server_field_data
                 .defined_types
-                .get(&x.into())
+                .get(&input_type_name.into())
                 .expect(
                     "Expected type to be defined by now. This is indicative of a bug in Isograph.",
                 );
@@ -218,13 +218,13 @@ impl ModifiedArgument {
 
                     ModifiedObject {
                         field_map: object
-                            .server_field_ids
+                            .encountered_fields
                             .iter()
-                            .map(|server_field_id| {
-                                (
-                                    schema.server_field(*server_field_id).name.item,
-                                    PotentiallyModifiedField::Unmodified(*server_field_id),
-                                )
+                            .flat_map(|(name, field_id)| match field_id {
+                                FieldDefinitionLocation::Server(s) => {
+                                    Some((*name, PotentiallyModifiedField::Unmodified(*s)))
+                                }
+                                FieldDefinitionLocation::Client(_) => None,
                             })
                             .collect(),
                     }

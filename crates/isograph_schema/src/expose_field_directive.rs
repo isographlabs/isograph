@@ -322,11 +322,17 @@ impl UnvalidatedSchema {
         // TODO make this a no-op
         let field_arg = field_arg.lookup().intern().into();
 
-        // TODO avoid a linear scan?
         let field_id = mutation
-            .server_field_ids
+            .encountered_fields
             .iter()
-            .find(|field_id| self.server_field(**field_id).name.item == field_arg)
+            .find_map(|(name, field_id)| {
+                if let FieldDefinitionLocation::Server(server_field_id) = field_id {
+                    if *name == field_arg {
+                        return Some(server_field_id);
+                    }
+                }
+                None
+            })
             .ok_or_else(|| {
                 WithLocation::new(
                     ProcessTypeDefinitionError::InvalidField,

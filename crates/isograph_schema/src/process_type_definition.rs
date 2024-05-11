@@ -18,9 +18,7 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_config::ConfigOptions;
-use isograph_lang_types::{
-    SelectableServerFieldId, ServerFieldId, ServerObjectId, ServerStrongIdFieldId,
-};
+use isograph_lang_types::{SelectableServerFieldId, ServerObjectId, ServerStrongIdFieldId};
 use lazy_static::lazy_static;
 use serde::Deserialize;
 use thiserror::Error;
@@ -405,7 +403,6 @@ impl UnvalidatedSchema {
                 let type_def_2 = object_type_definition.clone();
                 let FieldObjectIdsEtc {
                     unvalidated_schema_fields,
-                    server_field_ids,
                     encountered_fields,
                     id_field,
                 } = get_field_objects_ids_and_names(
@@ -422,7 +419,6 @@ impl UnvalidatedSchema {
                     description: object_type_definition.description.map(|d| d.item),
                     name: object_type_definition.name.item,
                     id: next_object_id,
-                    server_field_ids,
                     encountered_fields,
                     id_field,
                     directives: object_type_definition.directives,
@@ -610,7 +606,6 @@ fn get_typename_type(
 
 struct FieldObjectIdsEtc {
     unvalidated_schema_fields: Vec<UnvalidatedSchemaField>,
-    server_field_ids: Vec<ServerFieldId>,
     // TODO this should be HashMap<_, WithLocation<_>> or something
     encountered_fields: HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
     // TODO this should not be a ServerFieldId, but a special type
@@ -715,7 +710,6 @@ fn get_field_objects_ids_and_names(
 
     Ok(FieldObjectIdsEtc {
         unvalidated_schema_fields: unvalidated_fields,
-        server_field_ids,
         encountered_fields,
         id_field,
     })
