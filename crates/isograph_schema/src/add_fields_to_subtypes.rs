@@ -30,7 +30,7 @@ impl UnvalidatedSchema {
                             // Should we transfer server fields??? That makes no sense for
                             // GraphQL, but ... does it make sense otherwise? Who knows.
                         }
-                        crate::FieldDefinitionLocation::Client(supertype_client_field_id) => {
+                        crate::FieldDefinitionLocation::Client(_) => {
                             let subtype = self.server_field_data.object_mut(*subtype_id);
 
                             if let Some(_) = subtype
@@ -45,7 +45,6 @@ impl UnvalidatedSchema {
                                     Location::generated(),
                                 ));
                             }
-                            subtype.client_field_ids.push(*supertype_client_field_id);
                         }
                     }
                 }

@@ -423,7 +423,6 @@ impl UnvalidatedSchema {
                     name: object_type_definition.name.item,
                     id: next_object_id,
                     server_field_ids: server_fields,
-                    client_field_ids: vec![],
                     encountered_fields,
                     id_field,
                     directives: object_type_definition.directives,

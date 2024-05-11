@@ -110,8 +110,6 @@ fn add_refetch_field_to_object(
                 },
                 parent_object_id: object.id,
             });
-
-            object.client_field_ids.push(next_client_field_id);
         }
     }
     None

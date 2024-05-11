@@ -287,7 +287,6 @@ impl UnvalidatedSchema {
                 Location::generated(),
             ));
         }
-        client_field_parent.client_field_ids.push(client_field_id);
 
         Ok(())
     }

@@ -82,8 +82,6 @@ impl UnvalidatedSchema {
             ));
         }
 
-        object.client_field_ids.push(next_client_field_id);
-
         let name = client_field_declaration.item.client_field_name.item.into();
         let variant = get_client_variant(&client_field_declaration.item);
 

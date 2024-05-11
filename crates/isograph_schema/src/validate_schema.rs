@@ -142,9 +142,7 @@ impl ValidatedSchema {
         if errors.is_empty() {
             let objects = objects
                 .into_iter()
-                .map(|object| {
-                    transform_object_field_ids(&updated_fields, &updated_client_fields, object)
-                })
+                .map(|object| transform_object_field_ids(&updated_fields, object))
                 .collect();
 
             Ok(Self {
@@ -171,7 +169,6 @@ impl ValidatedSchema {
 
 fn transform_object_field_ids(
     schema_fields: &[ValidatedSchemaServerField],
-    validated_client_fields: &[ValidatedClientField],
     unvalidated_object: UnvalidatedSchemaObject,
 ) -> ValidatedSchemaObject {
     let SchemaObject {
@@ -180,36 +177,33 @@ fn transform_object_field_ids(
         description,
         id,
         encountered_fields: unvalidated_encountered_fields,
-        client_field_ids,
         id_field,
         directives,
     } = unvalidated_object;
 
     let validated_encountered_fields = unvalidated_encountered_fields
         .into_iter()
-        .map(|(encountered_field_name, _)| {
-            for server_field_id in server_fields.iter() {
-                let field = &schema_fields[server_field_id.as_usize()];
-                if field.name.item == encountered_field_name {
-                    return (
-                        encountered_field_name,
-                        FieldDefinitionLocation::Server(field.id),
-                    );
-                }
-            }
-            for client_field_id in client_field_ids.iter() {
-                let client_field = &validated_client_fields[client_field_id.as_usize()];
-                if client_field.name == encountered_field_name {
-                    return (
-                        encountered_field_name,
-                        FieldDefinitionLocation::Client(client_field.id),
-                    );
-                }
-            }
-            panic!(
-                "field {:?} not found, probably a isograph bug but we should confirm",
-                encountered_field_name
-            );
+        .map(|(encountered_field_name, value)| match value {
+            FieldDefinitionLocation::Server(_) => (encountered_field_name, {
+                server_fields
+                    .iter()
+                    .find_map(|server_field_id| {
+                        let field = &schema_fields[server_field_id.as_usize()];
+                        if field.name.item == encountered_field_name {
+                            Some(FieldDefinitionLocation::Server(*server_field_id))
+                        } else {
+                            None
+                        }
+                    })
+                    .expect(&format!(
+                        "Field {} not found, probably a bug in Isograph",
+                        encountered_field_name
+                    ))
+            }),
+            FieldDefinitionLocation::Client(client_field_id) => (
+                encountered_field_name,
+                FieldDefinitionLocation::Client(client_field_id),
+            ),
         })
         .collect();
 
@@ -219,7 +213,6 @@ fn transform_object_field_ids(
         id,
         server_field_ids: server_fields,
         encountered_fields: validated_encountered_fields,
-        client_field_ids,
         id_field,
         directives,
     }

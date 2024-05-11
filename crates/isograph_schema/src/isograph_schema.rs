@@ -344,7 +344,6 @@ pub struct SchemaObject<TEncounteredField> {
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
     pub server_field_ids: Vec<ServerFieldId>,
-    pub client_field_ids: Vec<ClientFieldId>,
     pub encountered_fields: HashMap<SelectableFieldName, TEncounteredField>,
 }
 
