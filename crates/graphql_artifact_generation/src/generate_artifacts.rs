@@ -22,12 +22,12 @@ use isograph_schema::{
 use lazy_static::lazy_static;
 
 use crate::{
-    component_reader_artifact_info::generate_component_reader_artifact,
-    eager_reader_artifact_info::generate_eager_reader_artifact,
-    entrypoint_artifact_info::generate_entrypoint_artifact,
+    component_reader_artifact::generate_component_reader_artifact,
+    eager_reader_artifact::generate_eager_reader_artifact,
+    entrypoint_artifact::generate_entrypoint_artifact,
     imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
     iso_overload_file::build_iso_overload,
-    refetch_reader_artifact_info::generate_refetch_reader_artifact,
+    refetch_reader_artifact::generate_refetch_reader_artifact,
 };
 
 lazy_static! {
@@ -83,10 +83,10 @@ pub fn get_artifact_path_and_content<'schema>(
 ) -> Vec<PathAndContent> {
     let mut artifact_queue = vec![];
     let mut encountered_client_field_ids = HashSet::new();
-    let mut artifact_infos = vec![];
+    let mut path_and_contents = vec![];
 
     for client_field_id in schema.entrypoints.iter() {
-        artifact_infos.push(generate_entrypoint_artifact(
+        path_and_contents.push(generate_entrypoint_artifact(
             schema,
             *client_field_id,
             &mut artifact_queue,
@@ -117,7 +117,7 @@ pub fn get_artifact_path_and_content<'schema>(
 
     for encountered_client_field_id in encountered_client_field_ids {
         let encountered_client_field = schema.client_field(encountered_client_field_id);
-        let artifact_info = match &encountered_client_field.variant {
+        path_and_contents.extend(match &encountered_client_field.variant {
             ClientFieldVariant::Eager(component_name_and_path) => generate_eager_reader_artifact(
                 schema,
                 encountered_client_field,
@@ -137,20 +137,19 @@ pub fn get_artifact_path_and_content<'schema>(
             ClientFieldVariant::ImperativelyLoadedField(variant) => {
                 generate_refetch_reader_artifact(schema, encountered_client_field, variant)
             }
-        };
-        artifact_infos.extend(artifact_info);
+        });
     }
 
     for imperatively_loaded_field_artifact_info in artifact_queue {
-        artifact_infos.push(get_artifact_for_imperatively_loaded_field(
+        path_and_contents.push(get_artifact_for_imperatively_loaded_field(
             schema,
             imperatively_loaded_field_artifact_info,
         ))
     }
 
-    artifact_infos.push(build_iso_overload(schema));
+    path_and_contents.push(build_iso_overload(schema));
 
-    artifact_infos
+    path_and_contents
 }
 
 #[derive(Debug)]
