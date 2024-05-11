@@ -97,24 +97,6 @@ pub fn get_artifact_path_and_content<'schema>(
         encountered_client_field_ids.insert(*client_field_id);
     }
 
-    for client_defined_field in client_defined_fields(schema) {
-        if encountered_client_field_ids.insert(client_defined_field.id) {
-            // What are we doing here?
-            // We are generating, and throwing away, an entrypoint artifact. This has the effect of
-            // encountering selected __refetch fields. Refetch fields reachable from orphaned
-            // client fields still need type artifacts generated.
-            // We currently also generate unneeded reader artifacts.
-            //
-            // Anyway, this sucks and should be improved.
-            let _ = generate_entrypoint_artifact(
-                schema,
-                client_defined_field.id,
-                &mut vec![],
-                &mut encountered_client_field_ids,
-            );
-        }
-    }
-
     for encountered_client_field_id in encountered_client_field_ids {
         let encountered_client_field = schema.client_field(encountered_client_field_id);
         path_and_contents.extend(match &encountered_client_field.variant {
