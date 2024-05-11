@@ -12,24 +12,21 @@ use common_lang_types::{
 use intern::Lookup;
 use isograph_lang_types::{NonConstantValue, SelectionFieldArgument};
 use isograph_schema::{
-    create_merged_selection_set, ClientFieldVariant, FieldMapItem, ObjectTypeAndFieldNames,
-    SchemaObject, ValidatedClientField, ValidatedSchema,
+    ClientFieldVariant, FieldMapItem, ObjectTypeAndFieldNames, ValidatedClientField,
+    ValidatedSchema,
 };
 
 use crate::{
     component_reader_artifact_info::{
         generate_component_reader_artifact, ComponentReaderArtifactInfo,
     },
-    eager_reader_artifact_info::{
-        generate_client_field_parameter_type, generate_eager_reader_artifact,
-        EagerReaderArtifactInfo,
-    },
+    eager_reader_artifact_info::{generate_eager_reader_artifact, EagerReaderArtifactInfo},
     entrypoint_artifact_info::{generate_entrypoint_artifact, EntrypointArtifactInfo},
     imperatively_loaded_fields::{
         get_artifact_for_imperatively_loaded_field, ImperativelyLoadedEntrypointArtifactInfo,
     },
     iso_overload_file::build_iso_overload,
-    reader_ast::generate_reader_ast,
+    refetch_reader_artifact_info::{generate_refetch_reader_artifact, RefetchReaderArtifactInfo},
 };
 
 pub(crate) type NestedClientFieldImports = HashMap<ObjectTypeAndFieldNames, JavaScriptImports>;
@@ -150,7 +147,7 @@ fn get_artifact_infos<'schema>(
                     ),
                     None => generate_function_import_statement_for_refetch_reader(),
                 };
-                ArtifactInfo::RefetchReader(generate_mutation_reader_artifact(
+                ArtifactInfo::RefetchReader(generate_refetch_reader_artifact(
                     schema,
                     encountered_client_field,
                     function_import_statement,
@@ -170,59 +167,6 @@ fn get_artifact_infos<'schema>(
     }
 
     artifact_infos
-}
-
-fn generate_mutation_reader_artifact<'schema>(
-    schema: &'schema ValidatedSchema,
-    client_field: &ValidatedClientField,
-    function_import_statement: ClientFieldFunctionImportStatement,
-) -> RefetchReaderArtifactInfo<'schema> {
-    if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
-        let parent_type = schema
-            .server_field_data
-            .object(client_field.parent_object_id);
-        let mut nested_client_field_artifact_imports = HashMap::new();
-
-        let (_merged_selection_set, root_refetched_paths) = create_merged_selection_set(
-            schema,
-            schema
-                .server_field_data
-                .object(client_field.parent_object_id)
-                .into(),
-            selection_set,
-            None,
-            None,
-            client_field,
-        );
-
-        let reader_ast = generate_reader_ast(
-            schema,
-            selection_set,
-            0,
-            &mut nested_client_field_artifact_imports,
-            &root_refetched_paths,
-        );
-
-        let client_field_parameter_type = generate_client_field_parameter_type(
-            schema,
-            &selection_set,
-            parent_type.into(),
-            &mut nested_client_field_artifact_imports,
-            0,
-        );
-        let client_field_output_type = generate_output_type(client_field);
-        RefetchReaderArtifactInfo {
-            parent_type: parent_type.into(),
-            client_field_name: client_field.name,
-            reader_ast,
-            nested_client_field_artifact_imports,
-            function_import_statement,
-            client_field_output_type,
-            client_field_parameter_type,
-        }
-    } else {
-        panic!("Unsupported: client fields not on query with no selection set")
-    }
 }
 
 /// A data structure that contains enough information to infallibly
@@ -295,31 +239,6 @@ derive_display!(ConvertFunction);
 #[derive(Debug)]
 pub(crate) struct RefetchQueryArtifactImport(pub String);
 derive_display!(RefetchQueryArtifactImport);
-
-#[derive(Debug)]
-pub(crate) struct RefetchReaderArtifactInfo<'schema> {
-    pub parent_type: &'schema SchemaObject,
-    pub(crate) client_field_name: SelectableFieldName,
-    pub nested_client_field_artifact_imports: NestedClientFieldImports,
-    pub client_field_output_type: ClientFieldOutputType,
-    pub reader_ast: ReaderAst,
-    pub client_field_parameter_type: ClientFieldParameterType,
-    pub function_import_statement: ClientFieldFunctionImportStatement,
-}
-
-impl<'schema> RefetchReaderArtifactInfo<'schema> {
-    pub fn path_and_content(self) -> Vec<PathAndContent> {
-        let RefetchReaderArtifactInfo {
-            parent_type,
-            client_field_name,
-            ..
-        } = &self;
-
-        let relative_directory = generate_path(parent_type.name, *client_field_name);
-
-        self.file_contents(&relative_directory)
-    }
-}
 
 fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctionImportStatement {
     let content = format!(
