@@ -173,7 +173,8 @@ pub(crate) fn handle_compile_command(
             &config.artifact_directory,
         );
 
-        let total_artifacts_written = write_to_disk(paths_and_content, &config.artifact_directory)?;
+        let total_artifacts_written =
+            write_to_disk(paths_and_content.into_iter(), &config.artifact_directory)?;
 
         Ok(CompilationStats {
             client_field_count,

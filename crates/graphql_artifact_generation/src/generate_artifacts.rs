@@ -17,18 +17,12 @@ use isograph_schema::{
 use lazy_static::lazy_static;
 
 use crate::{
-    component_reader_artifact_info::{
-        generate_component_reader_artifact, ComponentReaderArtifactInfo,
-    },
-    eager_reader_artifact_info::{generate_eager_reader_artifact, EagerReaderArtifactInfo},
-    entrypoint_artifact_info::{generate_entrypoint_artifact, EntrypointArtifactInfo},
-    imperatively_loaded_fields::{
-        get_artifact_for_imperatively_loaded_field, ImperativelyLoadedEntrypointArtifactInfo,
-    },
+    component_reader_artifact_info::generate_component_reader_artifact,
+    eager_reader_artifact_info::generate_eager_reader_artifact,
+    entrypoint_artifact_info::generate_entrypoint_artifact,
+    imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
     iso_overload_file::build_iso_overload,
-    refetch_reader_artifact_info::{
-        generate_refetch_reader_artifact_info, RefetchReaderArtifactInfo,
-    },
+    refetch_reader_artifact_info::generate_refetch_reader_artifact_info,
 };
 
 lazy_static! {
@@ -62,19 +56,6 @@ pub(crate) fn client_defined_fields<'a>(
     })
 }
 
-pub fn get_artifact_path_and_content<'schema>(
-    schema: &'schema ValidatedSchema,
-    project_root: &PathBuf,
-    artifact_directory: &PathBuf,
-) -> impl Iterator<Item = PathAndContent> + 'schema {
-    let artifact_infos = get_artifact_infos(schema, project_root, artifact_directory);
-    artifact_infos
-        .into_iter()
-        .map(ArtifactInfo::to_path_and_content)
-        .flatten()
-        .chain(std::iter::once(build_iso_overload(schema)))
-}
-
 /// Get all artifacts according to the following scheme:
 /// - Add all the entrypoints to the queue
 /// - While generating merged selection sets for entrypoints, if we encounter:
@@ -90,22 +71,25 @@ pub fn get_artifact_path_and_content<'schema>(
 /// readers, etc.
 ///
 /// TODO The artifact queue abstraction doesn't make much sense here.
-fn get_artifact_infos<'schema>(
+pub fn get_artifact_path_and_content<'schema>(
     schema: &'schema ValidatedSchema,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
-) -> Vec<ArtifactInfo<'schema>> {
+) -> Vec<PathAndContent> {
     let mut artifact_queue = vec![];
     let mut encountered_client_field_ids = HashSet::new();
     let mut artifact_infos = vec![];
 
     for client_field_id in schema.entrypoints.iter() {
-        artifact_infos.push(ArtifactInfo::Entrypoint(generate_entrypoint_artifact(
-            schema,
-            *client_field_id,
-            &mut artifact_queue,
-            &mut encountered_client_field_ids,
-        )));
+        artifact_infos.push(
+            generate_entrypoint_artifact(
+                schema,
+                *client_field_id,
+                &mut artifact_queue,
+                &mut encountered_client_field_ids,
+            )
+            .path_and_content(),
+        );
 
         // We also need to generate reader artifacts for the entrypoint client fields themselves
         encountered_client_field_ids.insert(*client_field_id);
@@ -132,80 +116,45 @@ fn get_artifact_infos<'schema>(
     for encountered_client_field_id in encountered_client_field_ids {
         let encountered_client_field = schema.client_field(encountered_client_field_id);
         let artifact_info = match &encountered_client_field.variant {
-            ClientFieldVariant::Eager(component_name_and_path) => {
-                ArtifactInfo::EagerReader(generate_eager_reader_artifact(
-                    schema,
-                    encountered_client_field,
-                    project_root,
-                    artifact_directory,
-                    *component_name_and_path,
-                ))
-            }
+            ClientFieldVariant::Eager(component_name_and_path) => generate_eager_reader_artifact(
+                schema,
+                encountered_client_field,
+                project_root,
+                artifact_directory,
+                *component_name_and_path,
+            )
+            .path_and_content(),
             ClientFieldVariant::Component(component_name_and_path) => {
-                ArtifactInfo::ComponentReader(generate_component_reader_artifact(
+                generate_component_reader_artifact(
                     schema,
                     encountered_client_field,
                     project_root,
                     artifact_directory,
                     *component_name_and_path,
-                ))
+                )
+                .path_and_content()
             }
-            ClientFieldVariant::ImperativelyLoadedField(variant) => ArtifactInfo::RefetchReader(
-                generate_refetch_reader_artifact_info(schema, encountered_client_field, variant),
-            ),
+            ClientFieldVariant::ImperativelyLoadedField(variant) => {
+                generate_refetch_reader_artifact_info(schema, encountered_client_field, variant)
+                    .path_and_content()
+            }
         };
-        artifact_infos.push(artifact_info);
+        artifact_infos.extend(artifact_info);
     }
 
     for imperatively_loaded_field_artifact_info in artifact_queue {
-        artifact_infos.push(ArtifactInfo::ImperativelyLoadedEntrypoint(
+        artifact_infos.push(
             get_artifact_for_imperatively_loaded_field(
                 schema,
                 imperatively_loaded_field_artifact_info,
-            ),
-        ))
+            )
+            .path_and_content(),
+        )
     }
+
+    artifact_infos.push(build_iso_overload(schema));
 
     artifact_infos
-}
-
-/// A data structure that contains enough information to infallibly
-/// generate the contents of the generated file (e.g. of the entrypoint
-/// artifact), as well as the path to the generated file.
-#[derive(Debug)]
-pub(crate) enum ArtifactInfo<'schema> {
-    Entrypoint(EntrypointArtifactInfo<'schema>),
-
-    // These artifact types all generate reader.ts files, but they
-    // are different. Namely, they have different types of resolvers and
-    // different types of exported artifacts.
-    EagerReader(EagerReaderArtifactInfo<'schema>),
-    ComponentReader(ComponentReaderArtifactInfo<'schema>),
-    RefetchReader(RefetchReaderArtifactInfo<'schema>),
-
-    ImperativelyLoadedEntrypoint(ImperativelyLoadedEntrypointArtifactInfo),
-}
-
-impl<'schema> ArtifactInfo<'schema> {
-    pub fn to_path_and_content(self) -> Vec<PathAndContent> {
-        match self {
-            ArtifactInfo::Entrypoint(entrypoint_artifact) => {
-                vec![entrypoint_artifact.path_and_content()]
-            }
-            ArtifactInfo::ImperativelyLoadedEntrypoint(refetch_query) => {
-                vec![refetch_query.path_and_content()]
-            }
-            ArtifactInfo::EagerReader(eager_reader_artifact) => {
-                eager_reader_artifact.path_and_content()
-            }
-            ArtifactInfo::ComponentReader(component_reader_artifact) => {
-                component_reader_artifact.path_and_content()
-            }
-            ArtifactInfo::RefetchReader(refetch_reader_artifact) => {
-                refetch_reader_artifact.path_and_content()
-            }
-        }
-    }
 }
 
 #[derive(Debug)]
