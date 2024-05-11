@@ -7,29 +7,28 @@ use isograph_schema::{
 };
 
 use crate::{
-    eager_reader_artifact_info::generate_client_field_parameter_type,
     generate_artifacts::{
-        generate_output_type, generate_path, get_output_type_text,
-        nested_client_field_names_to_import_statement, ClientFieldFunctionImportStatement,
-        ClientFieldOutputType, ClientFieldParameterType, NestedClientFieldImports, ReaderAst,
-        READER, READER_OUTPUT_TYPE, READER_PARAM_TYPE,
+        generate_client_field_parameter_type, generate_output_type, generate_path,
+        get_output_type_text, nested_client_field_names_to_import_statement,
+        ClientFieldFunctionImportStatement, ClientFieldOutputType, ClientFieldParameterType,
+        NestedClientFieldImports, ReaderAst, READER, READER_OUTPUT_TYPE, READER_PARAM_TYPE,
     },
     reader_ast::generate_reader_ast,
 };
 
 #[derive(Debug)]
-pub(crate) struct RefetchReaderArtifactInfo<'schema> {
-    pub parent_type: &'schema SchemaObject,
-    pub(crate) client_field_name: SelectableFieldName,
-    pub nested_client_field_artifact_imports: NestedClientFieldImports,
-    pub client_field_output_type: ClientFieldOutputType,
-    pub reader_ast: ReaderAst,
-    pub client_field_parameter_type: ClientFieldParameterType,
-    pub function_import_statement: ClientFieldFunctionImportStatement,
+struct RefetchReaderArtifactInfo<'schema> {
+    parent_type: &'schema SchemaObject,
+    client_field_name: SelectableFieldName,
+    nested_client_field_artifact_imports: NestedClientFieldImports,
+    client_field_output_type: ClientFieldOutputType,
+    reader_ast: ReaderAst,
+    client_field_parameter_type: ClientFieldParameterType,
+    function_import_statement: ClientFieldFunctionImportStatement,
 }
 
 impl<'schema> RefetchReaderArtifactInfo<'schema> {
-    pub fn path_and_content(self) -> Vec<PathAndContent> {
+    fn path_and_content(self) -> Vec<PathAndContent> {
         let RefetchReaderArtifactInfo {
             parent_type,
             client_field_name,
@@ -41,7 +40,7 @@ impl<'schema> RefetchReaderArtifactInfo<'schema> {
         self.file_contents(&relative_directory)
     }
 
-    pub(crate) fn file_contents(self, relative_directory: &PathBuf) -> Vec<PathAndContent> {
+    fn file_contents(self, relative_directory: &PathBuf) -> Vec<PathAndContent> {
         let RefetchReaderArtifactInfo {
             function_import_statement,
             client_field_parameter_type,
@@ -114,11 +113,11 @@ impl<'schema> RefetchReaderArtifactInfo<'schema> {
     }
 }
 
-pub(crate) fn generate_refetch_reader_artifact_info<'schema>(
-    schema: &'schema ValidatedSchema,
+pub(crate) fn generate_refetch_reader_artifact(
+    schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
     variant: &ImperativelyLoadedFieldVariant,
-) -> RefetchReaderArtifactInfo<'schema> {
+) -> Vec<PathAndContent> {
     if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
         let function_import_statement = match &variant.primary_field_info {
             Some(info) => generate_function_import_statement_for_mutation_reader(
@@ -168,6 +167,7 @@ pub(crate) fn generate_refetch_reader_artifact_info<'schema>(
             client_field_output_type,
             client_field_parameter_type,
         }
+        .path_and_content()
     } else {
         panic!("Unsupported: client fields not on query with no selection set")
     }

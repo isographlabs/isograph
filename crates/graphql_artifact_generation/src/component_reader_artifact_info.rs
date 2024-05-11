@@ -6,8 +6,8 @@ use isograph_schema::{
 };
 
 use crate::{
-    eager_reader_artifact_info::generate_client_field_parameter_type,
     generate_artifacts::{
+        generate_client_field_parameter_type,
         generate_function_import_statement_for_eager_or_component, generate_output_type,
         generate_path, get_output_type_text, nested_client_field_names_to_import_statement,
         ClientFieldFunctionImportStatement, ClientFieldOutputType, ClientFieldParameterType,
@@ -16,13 +16,13 @@ use crate::{
     reader_ast::generate_reader_ast,
 };
 
-pub(crate) fn generate_component_reader_artifact<'schema>(
-    schema: &'schema ValidatedSchema,
+pub(crate) fn generate_component_reader_artifact(
+    schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
     component_name_and_path: (ConstExportName, FilePath),
-) -> ComponentReaderArtifactInfo<'schema> {
+) -> Vec<PathAndContent> {
     if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
         let parent_type = schema
             .server_field_data
@@ -71,6 +71,7 @@ pub(crate) fn generate_component_reader_artifact<'schema>(
             client_field_output_type,
             client_field_parameter_type,
         }
+        .path_and_content()
     } else {
         panic!("Unsupported: client fields not on query with no selection set")
     }

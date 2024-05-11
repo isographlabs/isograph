@@ -70,7 +70,7 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
 pub(crate) fn get_artifact_for_imperatively_loaded_field<'schema>(
     schema: &'schema ValidatedSchema,
     imperatively_loaded_field_artifact_info: ImperativelyLoadedFieldArtifactInfo,
-) -> ImperativelyLoadedEntrypointArtifactInfo {
+) -> PathAndContent {
     let ImperativelyLoadedFieldArtifactInfo {
         merged_selection_set,
         root_fetchable_field,
@@ -98,4 +98,5 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field<'schema>(
         root_fetchable_field_parent_object: root_parent_object,
         refetch_query_index,
     }
+    .path_and_content()
 }

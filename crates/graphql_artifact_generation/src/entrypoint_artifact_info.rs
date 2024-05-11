@@ -16,20 +16,20 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub(crate) struct EntrypointArtifactInfo<'schema> {
-    pub(crate) query_name: QueryOperationName,
-    pub parent_type: &'schema SchemaObject,
-    pub query_text: QueryText,
-    pub normalization_ast_text: NormalizationAstText,
-    pub refetch_query_artifact_import: RefetchQueryArtifactImport,
+struct EntrypointArtifactInfo<'schema> {
+    query_name: QueryOperationName,
+    parent_type: &'schema SchemaObject,
+    query_text: QueryText,
+    normalization_ast_text: NormalizationAstText,
+    refetch_query_artifact_import: RefetchQueryArtifactImport,
 }
 
-pub(crate) fn generate_entrypoint_artifact<'schema>(
-    schema: &'schema ValidatedSchema,
+pub(crate) fn generate_entrypoint_artifact(
+    schema: &ValidatedSchema,
     client_field_id: ClientFieldId,
     artifact_queue: &mut Vec<ImperativelyLoadedFieldArtifactInfo>,
     encountered_client_field_ids: &mut HashSet<ClientFieldId>,
-) -> EntrypointArtifactInfo<'schema> {
+) -> PathAndContent {
     let fetchable_client_field = schema.client_field(client_field_id);
     if let Some((ref selection_set, _)) = fetchable_client_field.selection_set_and_unwraps {
         let query_name = fetchable_client_field.name.into();
@@ -84,6 +84,7 @@ pub(crate) fn generate_entrypoint_artifact<'schema>(
             normalization_ast_text,
             refetch_query_artifact_import: refetch_query_artifact_imports,
         }
+        .path_and_content()
     } else {
         // TODO convert to error
         todo!("Unsupported: client fields on query with no selection set")
@@ -118,7 +119,7 @@ fn generate_refetch_query_artifact_imports(
 }
 
 impl<'schema> EntrypointArtifactInfo<'schema> {
-    pub fn path_and_content(self) -> PathAndContent {
+    fn path_and_content(self) -> PathAndContent {
         let EntrypointArtifactInfo {
             query_name,
             parent_type,
@@ -134,7 +135,7 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
         }
     }
 
-    pub(crate) fn file_contents(self) -> String {
+    fn file_contents(self) -> String {
         let EntrypointArtifactInfo {
             query_text,
             normalization_ast_text,
