@@ -1,4 +1,3 @@
-mod artifact_file_contents;
 mod component_reader_artifact_info;
 mod eager_reader_artifact_info;
 mod entrypoint_artifact_info;

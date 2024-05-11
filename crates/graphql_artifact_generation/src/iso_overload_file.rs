@@ -4,7 +4,7 @@ use std::{cmp::Ordering, path::PathBuf};
 use common_lang_types::{PathAndContent, SelectableFieldName};
 use isograph_schema::{ClientFieldVariant, ValidatedClientField, ValidatedSchema};
 
-use crate::{artifact_file_contents::ISO_TS, generate_artifacts::client_defined_fields};
+use crate::generate_artifacts::{client_defined_fields, ISO_TS};
 
 fn build_iso_overload_for_entrypoint<'schema>(
     validated_client_field: &ValidatedClientField,

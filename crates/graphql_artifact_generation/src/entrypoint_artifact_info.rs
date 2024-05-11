@@ -8,9 +8,8 @@ use isograph_schema::{
 };
 
 use crate::{
-    artifact_file_contents::ENTRYPOINT,
     generate_artifacts::{
-        generate_path, NormalizationAstText, QueryText, RefetchQueryArtifactImport,
+        generate_path, NormalizationAstText, QueryText, RefetchQueryArtifactImport, ENTRYPOINT,
     },
     normalization_ast_text::generate_normalization_ast_text,
     query_text::generate_query_text,

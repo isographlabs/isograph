@@ -16,15 +16,12 @@ use isograph_schema::{
 };
 
 use crate::{
-    artifact_file_contents::{
-        get_output_type_text, nested_client_field_names_to_import_statement, READER,
-        READER_OUTPUT_TYPE, READER_PARAM_TYPE,
-    },
     generate_artifacts::{
         generate_function_import_statement_for_eager_or_component, generate_output_type,
-        generate_path, ClientFieldFunctionImportStatement, ClientFieldOutputType,
-        ClientFieldParameterType, JavaScriptImports, NestedClientFieldImports, ReaderAst,
-        TypeImportName,
+        generate_path, get_output_type_text, nested_client_field_names_to_import_statement,
+        ClientFieldFunctionImportStatement, ClientFieldOutputType, ClientFieldParameterType,
+        JavaScriptImports, NestedClientFieldImports, ReaderAst, TypeImportName, READER,
+        READER_OUTPUT_TYPE, READER_PARAM_TYPE,
     },
     reader_ast::generate_reader_ast,
 };
