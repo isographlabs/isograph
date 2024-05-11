@@ -9,7 +9,7 @@ use lazy_static::lazy_static;
 
 use crate::generate_artifacts::{
     ClientFieldFunctionImportStatement, ClientFieldOutputType, ComponentReaderArtifactInfo,
-    EagerReaderArtifactInfo, EntrypointArtifactInfo, JavaScriptImports, RefetchReaderArtifactInfo,
+    EagerReaderArtifactInfo, JavaScriptImports, RefetchReaderArtifactInfo,
 };
 
 lazy_static! {
@@ -18,43 +18,6 @@ lazy_static! {
     pub static ref READER_OUTPUT_TYPE: ArtifactFileType = "output_type".intern().into();
     pub static ref ENTRYPOINT: ArtifactFileType = "entrypoint".intern().into();
     pub static ref ISO_TS: ArtifactFileType = "iso".intern().into();
-}
-
-impl<'schema> EntrypointArtifactInfo<'schema> {
-    pub(crate) fn file_contents(self) -> String {
-        let EntrypointArtifactInfo {
-            query_text,
-            normalization_ast_text: normalization_ast,
-            refetch_query_artifact_import,
-            query_name,
-            parent_type,
-        } = self;
-        let entrypoint_params_typename = format!("{}__{}__param", parent_type.name, query_name);
-        let entrypoint_output_type_name =
-            format!("{}__{}__outputType", parent_type.name, query_name);
-        format!(
-            "import type {{IsographEntrypoint, \
-            NormalizationAst, RefetchQueryNormalizationArtifactWrapper}} from '@isograph/react';\n\
-            import {{{entrypoint_params_typename}}} from './param_type';\n\
-            import {{{entrypoint_output_type_name}}} from './output_type';\n\
-            import readerResolver from './reader';\n\
-            {refetch_query_artifact_import}\n\n\
-            const queryText = '{query_text}';\n\n\
-            const normalizationAst: NormalizationAst = {normalization_ast};\n\
-            const artifact: IsographEntrypoint<\n\
-            {}{entrypoint_params_typename},\n\
-            {}{entrypoint_output_type_name}\n\
-            > = {{\n\
-            {}kind: \"Entrypoint\",\n\
-            {}queryText,\n\
-            {}normalizationAst,\n\
-            {}nestedRefetchQueries,\n\
-            {}readerArtifact: readerResolver,\n\
-            }};\n\n\
-            export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ", "  ",
-        )
-    }
 }
 
 impl<'schema> EagerReaderArtifactInfo<'schema> {

@@ -1,4 +1,5 @@
 mod artifact_file_contents;
+mod entrypoint_artifact_info;
 mod generate_artifacts;
 mod imperatively_loaded_fields;
 mod iso_overload_file;

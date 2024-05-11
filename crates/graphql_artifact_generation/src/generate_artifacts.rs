@@ -7,28 +7,26 @@ use std::{
 
 use common_lang_types::{
     ConstExportName, DescriptionValue, FilePath, IsographObjectTypeName, PathAndContent,
-    QueryOperationName, SelectableFieldName, VariableName, WithLocation, WithSpan,
+    SelectableFieldName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, ListTypeAnnotation, NonNullTypeAnnotation};
 use intern::Lookup;
 use isograph_lang_types::{
-    ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection, SelectionFieldArgument,
+    NonConstantValue, SelectableServerFieldId, Selection, SelectionFieldArgument,
     ServerFieldSelection,
 };
 use isograph_schema::{
     create_merged_selection_set, ClientFieldVariant, FieldDefinitionLocation, FieldMapItem,
-    ImperativelyLoadedFieldArtifactInfo, ObjectTypeAndFieldNames, RootRefetchedPath, SchemaObject,
-    ValidatedClientField, ValidatedSchema, ValidatedSelection,
+    ObjectTypeAndFieldNames, SchemaObject, ValidatedClientField, ValidatedSchema,
+    ValidatedSelection,
 };
 
 use crate::{
-    artifact_file_contents::ENTRYPOINT,
+    entrypoint_artifact_info::{generate_entrypoint_artifact, EntrypointArtifactInfo},
     imperatively_loaded_fields::{
         get_artifact_for_imperatively_loaded_field, ImperativelyLoadedEntrypointArtifactInfo,
     },
     iso_overload_file::build_iso_overload,
-    normalization_ast_text::generate_normalization_ast_text,
-    query_text::generate_query_text,
     reader_ast::generate_reader_ast,
 };
 
@@ -170,72 +168,6 @@ fn get_artifact_infos<'schema>(
     }
 
     artifact_infos
-}
-
-fn generate_entrypoint_artifact<'schema>(
-    schema: &'schema ValidatedSchema,
-    client_field_id: ClientFieldId,
-    artifact_queue: &mut Vec<ImperativelyLoadedFieldArtifactInfo>,
-    encountered_client_field_ids: &mut HashSet<ClientFieldId>,
-) -> EntrypointArtifactInfo<'schema> {
-    let fetchable_client_field = schema.client_field(client_field_id);
-    if let Some((ref selection_set, _)) = fetchable_client_field.selection_set_and_unwraps {
-        let query_name = fetchable_client_field.name.into();
-
-        let (merged_selection_set, root_refetched_paths) = create_merged_selection_set(
-            schema,
-            schema
-                .server_field_data
-                .object(fetchable_client_field.parent_object_id),
-            selection_set,
-            Some(artifact_queue),
-            Some(encountered_client_field_ids),
-            &fetchable_client_field,
-        );
-
-        // TODO when we do not call generate_entrypoint_artifact extraneously,
-        // we can panic instead of using a default entrypoint type
-        // TODO model this better so that the RootOperationName is somehow a
-        // parameter
-        let root_operation_name = schema
-            .fetchable_types
-            .get(&fetchable_client_field.parent_object_id)
-            .unwrap_or_else(|| {
-                schema
-                    .fetchable_types
-                    .iter()
-                    .next()
-                    .expect("Expected at least one fetchable type to exist")
-                    .1
-            });
-
-        let parent_object = schema
-            .server_field_data
-            .object(fetchable_client_field.parent_object_id);
-        let query_text = generate_query_text(
-            query_name,
-            schema,
-            &merged_selection_set,
-            &fetchable_client_field.variable_definitions,
-            root_operation_name,
-        );
-        let refetch_query_artifact_imports =
-            generate_refetch_query_artifact_imports(&root_refetched_paths);
-
-        let normalization_ast_text =
-            generate_normalization_ast_text(schema, &merged_selection_set, 0);
-
-        EntrypointArtifactInfo {
-            query_text,
-            query_name,
-            parent_type: parent_object.into(),
-            normalization_ast_text,
-            refetch_query_artifact_import: refetch_query_artifact_imports,
-        }
-    } else {
-        // TODO convert to error
-        todo!("Unsupported: client fields on query with no selection set")
-    }
 }
 
 fn generate_eager_reader_artifact<'schema>(
@@ -485,33 +417,6 @@ pub(crate) struct RefetchQueryArtifactImport(pub String);
 derive_display!(RefetchQueryArtifactImport);
 
 #[derive(Debug)]
-pub(crate) struct EntrypointArtifactInfo<'schema> {
-    pub(crate) query_name: QueryOperationName,
-    pub parent_type: &'schema SchemaObject,
-    pub query_text: QueryText,
-    pub normalization_ast_text: NormalizationAstText,
-    pub refetch_query_artifact_import: RefetchQueryArtifactImport,
-}
-
-impl<'schema> EntrypointArtifactInfo<'schema> {
-    pub fn path_and_content(self) -> PathAndContent {
-        let EntrypointArtifactInfo {
-            query_name,
-            parent_type,
-            ..
-        } = &self;
-
-        let directory = generate_path(parent_type.name, (*query_name).into());
-
-        PathAndContent {
-            relative_directory: directory,
-            file_content: self.file_contents(),
-            file_name_prefix: *ENTRYPOINT,
-        }
-    }
-}
-
-#[derive(Debug)]
 pub(crate) struct EagerReaderArtifactInfo<'schema> {
     pub parent_type: &'schema SchemaObject,
     pub(crate) client_field_name: SelectableFieldName,
@@ -584,45 +489,6 @@ impl<'schema> RefetchReaderArtifactInfo<'schema> {
 
         self.file_contents(&relative_directory)
     }
-}
-
-fn generate_refetch_query_artifact_imports(
-    root_refetched_paths: &[RootRefetchedPath],
-) -> RefetchQueryArtifactImport {
-    // TODO name the refetch queries with the path, or something, instead of
-    // with indexes.
-    let mut output = String::new();
-    let mut array_syntax = String::new();
-    for (query_index, RootRefetchedPath { variables, .. }) in
-        root_refetched_paths.iter().enumerate()
-    {
-        output.push_str(&format!(
-            "import refetchQuery{} from './__refetch__{}';\n",
-            query_index, query_index,
-        ));
-        let variable_names_str = variable_names_to_string(&variables);
-        array_syntax.push_str(&format!(
-            "{{ artifact: refetchQuery{}, allowedVariables: {} }}, ",
-            query_index, variable_names_str
-        ));
-    }
-    output.push_str(&format!(
-        "const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [{}];",
-        array_syntax
-    ));
-    RefetchQueryArtifactImport(output)
-}
-
-fn variable_names_to_string(variable_names: &[VariableName]) -> String {
-    let mut s = "[".to_string();
-
-    for variable in variable_names {
-        s.push_str(&format!("\"{}\", ", variable));
-    }
-
-    s.push(']');
-
-    s
 }
 
 fn generate_client_field_parameter_type(
