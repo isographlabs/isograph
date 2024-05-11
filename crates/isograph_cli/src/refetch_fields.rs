@@ -10,7 +10,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientField, ClientFieldVariant, FieldDefinitionLocation, ImperativelyLoadedFieldVariant,
-    ObjectTypeAndFieldNames, UnvalidatedClientField, UnvalidatedSchema, UnvalidatedSchemaObject,
+    ObjectTypeAndFieldNames, SchemaObject, UnvalidatedClientField, UnvalidatedSchema,
     NODE_FIELD_NAME, REFETCH_FIELD_NAME,
 };
 
@@ -40,7 +40,7 @@ pub fn add_refetch_fields_to_objects(
 }
 
 fn add_refetch_field_to_object(
-    object: &mut UnvalidatedSchemaObject,
+    object: &mut SchemaObject,
     client_fields: &mut Vec<UnvalidatedClientField>,
     query_id: ServerObjectId,
 ) -> Option<Result<(), BatchCompileError>> {

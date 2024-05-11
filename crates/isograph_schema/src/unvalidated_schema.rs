@@ -11,7 +11,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ClientField, FieldDefinitionLocation, Schema, SchemaObject, SchemaScalar, SchemaServerField,
+    ClientField, FieldDefinitionLocation, Schema, SchemaScalar, SchemaServerField,
     SchemaValidationState, ServerFieldData,
 };
 use lazy_static::lazy_static;
@@ -28,22 +28,15 @@ impl SchemaValidationState for UnvalidatedSchemaState {
     type ClientFieldSelectionScalarFieldAssociatedData = IsographSelectionVariant;
     type ClientFieldSelectionLinkedFieldAssociatedData = IsographSelectionVariant;
     type ClientFieldVariableDefinitionAssociatedData = UnvalidatedTypeName;
-    type EncounteredField = UnvalidatedObjectFieldInfo;
     type Entrypoint = (TextSource, WithSpan<EntrypointTypeAndField>);
 }
 
 pub type UnvalidatedSchema = Schema<UnvalidatedSchemaState>;
 
-pub type UnvalidatedSchemaObject =
-    SchemaObject<<UnvalidatedSchemaState as SchemaValidationState>::EncounteredField>;
-
 /// On unvalidated schema objects, the encountered types are either a type annotation
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
 /// client field.)
 pub type UnvalidatedObjectFieldInfo = FieldDefinitionLocation<ServerFieldId, ClientFieldId>;
-
-pub(crate) type UnvalidatedSchemaData =
-    ServerFieldData<<UnvalidatedSchemaState as SchemaValidationState>::EncounteredField>;
 
 pub(crate) type UnvalidatedSchemaField =
     SchemaServerField<GraphQLTypeAnnotation<UnvalidatedTypeName>>;

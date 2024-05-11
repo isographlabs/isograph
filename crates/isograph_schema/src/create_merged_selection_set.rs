@@ -18,9 +18,8 @@ use lazy_static::lazy_static;
 use crate::{
     expose_field_directive::RequiresRefinement, ArgumentKeyAndValue, ClientFieldVariant,
     FieldDefinitionLocation, ImperativelyLoadedFieldVariant, NameAndArguments, PathToRefetchField,
-    RootOperationName, ValidatedClientField, ValidatedLinkedFieldSelection,
-    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField, ValidatedSchemaObject,
-    ValidatedSelection,
+    RootOperationName, SchemaObject, ValidatedClientField, ValidatedLinkedFieldSelection,
+    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection,
 };
 
 type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSelection>>;
@@ -235,7 +234,7 @@ impl<'a> MergeTraversalState<'a> {
 
 pub fn create_merged_selection_set(
     schema: &ValidatedSchema,
-    parent_type: &ValidatedSchemaObject,
+    parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
     // TODO consider ways to get rid of these parameters.
     artifact_queue: Option<&mut Vec<ImperativelyLoadedFieldArtifactInfo>>,
@@ -469,7 +468,7 @@ fn get_used_variable_definitions(
 
 fn create_merged_selection_set_with_merge_traversal_state(
     schema: &ValidatedSchema,
-    parent_type: &ValidatedSchemaObject,
+    parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut MergeTraversalState<'_>,
 ) -> MergedSelectionSet {
@@ -497,7 +496,7 @@ fn create_merged_selection_set_with_merge_traversal_state(
 fn merge_selections_into_set(
     schema: &ValidatedSchema,
     merged_selection_map: &mut MergedSelectionMap,
-    parent_type: &ValidatedSchemaObject,
+    parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut MergeTraversalState<'_>,
 ) {
@@ -640,7 +639,7 @@ fn merge_linked_field_into_occupied_entry(
 }
 
 fn merge_scalar_client_field(
-    parent_type: &ValidatedSchemaObject,
+    parent_type: &SchemaObject,
     schema: &ValidatedSchema,
     merged_selection_map: &mut MergedSelectionMap,
     merge_traversal_state: &mut MergeTraversalState<'_>,
@@ -734,7 +733,7 @@ fn HACK__merge_linked_fields(
     schema: &ValidatedSchema,
     existing_selection_set: &mut Vec<WithSpan<MergedServerFieldSelection>>,
     new_selection_set: &[WithSpan<ValidatedSelection>],
-    linked_field_parent_type: &ValidatedSchemaObject,
+    linked_field_parent_type: &SchemaObject,
     merge_traversal_state: &mut MergeTraversalState<'_>,
 ) {
     let mut merged_selection_set = HashMap::new();
@@ -796,7 +795,7 @@ fn HACK__merge_linked_fields(
 fn select_typename_and_id_fields_in_merged_selection(
     schema: &ValidatedSchema,
     merged_selection_map: &mut MergedSelectionMap,
-    parent_type: &ValidatedSchemaObject,
+    parent_type: &SchemaObject,
 ) {
     // TODO add __typename field or whatnot
 

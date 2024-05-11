@@ -50,13 +50,6 @@ pub trait SchemaValidationState: Debug {
     /// - Validated: FieldDefinition
     type ClientFieldVariableDefinitionAssociatedData: Debug;
 
-    /// On objects, what does the HashMap of encountered types contain
-    /// - Unvalidated: UnvalidatedObjectFieldInfo
-    ///   i.e. DefinedField<TypeAnnotation<UnvalidatedTypeName>, ClientFieldId>
-    /// - Validated: ValidatedFieldDefinitionLocation
-    ///   i.e. DefinedField<ServerFieldId, ClientFieldId>
-    type EncounteredField: Debug;
-
     /// What we store in entrypoints
     /// - Unvalidated: (TextSource, WithSpan<ObjectTypeAndField>)
     /// - Validated: (ObjectId, ClientFieldId)
@@ -88,7 +81,7 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
     >,
     // TODO consider whether this belongs here. It could just be a free variable.
     pub entrypoints: Vec<TSchemaValidationState::Entrypoint>,
-    pub server_field_data: ServerFieldData<TSchemaValidationState::EncounteredField>,
+    pub server_field_data: ServerFieldData,
 
     // Well known types
     pub id_type_id: ServerScalarId,
@@ -135,8 +128,8 @@ impl<TFieldAssociatedData, TClientFieldType>
 }
 
 #[derive(Debug)]
-pub struct ServerFieldData<TEncounteredField> {
-    pub server_objects: Vec<SchemaObject<TEncounteredField>>,
+pub struct ServerFieldData {
+    pub server_objects: Vec<SchemaObject>,
     pub server_scalars: Vec<SchemaScalar>,
     pub defined_types: HashMap<UnvalidatedTypeName, SelectableServerFieldId>,
 }
@@ -201,16 +194,13 @@ impl<
     }
 }
 
-impl<TEncounteredField> ServerFieldData<TEncounteredField> {
+impl ServerFieldData {
     /// Get a reference to a given scalar type by its id.
     pub fn scalar(&self, scalar_id: ServerScalarId) -> &SchemaScalar {
         &self.server_scalars[scalar_id.as_usize()]
     }
 
-    pub fn lookup_unvalidated_type(
-        &self,
-        type_id: SelectableServerFieldId,
-    ) -> SchemaType<TEncounteredField> {
+    pub fn lookup_unvalidated_type(&self, type_id: SelectableServerFieldId) -> SchemaType {
         match type_id {
             SelectableServerFieldId::Object(id) => {
                 SchemaType::Object(self.server_objects.get(id.as_usize()).unwrap())
@@ -222,26 +212,23 @@ impl<TEncounteredField> ServerFieldData<TEncounteredField> {
     }
 
     /// Get a reference to a given object type by its id.
-    pub fn object(&self, object_id: ServerObjectId) -> &SchemaObject<TEncounteredField> {
+    pub fn object(&self, object_id: ServerObjectId) -> &SchemaObject {
         &self.server_objects[object_id.as_usize()]
     }
 
     /// Get a mutable reference to a given object type by its id.
-    pub fn object_mut(
-        &mut self,
-        object_id: ServerObjectId,
-    ) -> &mut SchemaObject<TEncounteredField> {
+    pub fn object_mut(&mut self, object_id: ServerObjectId) -> &mut SchemaObject {
         &mut self.server_objects[object_id.as_usize()]
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum SchemaType<'a, TEncounteredField> {
-    Object(&'a SchemaObject<TEncounteredField>),
+pub enum SchemaType<'a> {
+    Object(&'a SchemaObject),
     Scalar(&'a SchemaScalar),
 }
 
-impl<'a, T> HasName for SchemaType<'a, T> {
+impl<'a> HasName for SchemaType<'a> {
     type Name = UnvalidatedTypeName;
 
     fn name(&self) -> Self::Name {
@@ -253,8 +240,8 @@ impl<'a, T> HasName for SchemaType<'a, T> {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum SchemaOutputType<'a, TSchemaValidationState: SchemaValidationState> {
-    Object(&'a SchemaObject<TSchemaValidationState>),
+pub enum SchemaOutputType<'a> {
+    Object(&'a SchemaObject),
     Scalar(&'a SchemaScalar),
     // excludes input object
 }
@@ -334,7 +321,7 @@ impl From<GraphQLInputObjectTypeDefinition> for IsographObjectTypeDefinition {
 
 /// An object type in the schema.
 #[derive(Debug)]
-pub struct SchemaObject<TEncounteredField> {
+pub struct SchemaObject {
     pub description: Option<DescriptionValue>,
     pub name: IsographObjectTypeName,
     pub id: ServerObjectId,
@@ -343,7 +330,8 @@ pub struct SchemaObject<TEncounteredField> {
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
-    pub encountered_fields: HashMap<SelectableFieldName, TEncounteredField>,
+    pub encountered_fields:
+        HashMap<SelectableFieldName, FieldDefinitionLocation<ServerFieldId, ClientFieldId>>,
 }
 
 /// In GraphQL, ValidRefinement's are essentially the concrete types that an interface or

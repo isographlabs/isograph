@@ -18,9 +18,8 @@ use isograph_lang_types::{
 use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_client_field,
     ClientFieldVariant, FieldDefinitionLocation, FieldMapItem, ImperativelyLoadedFieldArtifactInfo,
-    NameAndArguments, ObjectTypeAndFieldNames, PathToRefetchField, RootRefetchedPath,
-    ValidatedClientField, ValidatedSchema, ValidatedSchemaObject, ValidatedSelection,
-    REFETCH_FIELD_NAME,
+    NameAndArguments, ObjectTypeAndFieldNames, PathToRefetchField, RootRefetchedPath, SchemaObject,
+    ValidatedClientField, ValidatedSchema, ValidatedSelection, REFETCH_FIELD_NAME,
 };
 
 use crate::{
@@ -516,7 +515,7 @@ derive_display!(RefetchQueryArtifactImport);
 #[derive(Debug)]
 pub(crate) struct EntrypointArtifactInfo<'schema> {
     pub(crate) query_name: QueryOperationName,
-    pub parent_type: &'schema ValidatedSchemaObject,
+    pub parent_type: &'schema SchemaObject,
     pub query_text: QueryText,
     pub normalization_ast_text: NormalizationAstText,
     pub refetch_query_artifact_import: RefetchQueryArtifactImport,
@@ -542,7 +541,7 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
 
 #[derive(Debug)]
 pub(crate) struct EagerReaderArtifactInfo<'schema> {
-    pub parent_type: &'schema ValidatedSchemaObject,
+    pub parent_type: &'schema SchemaObject,
     pub(crate) client_field_name: SelectableFieldName,
     pub nested_client_field_artifact_imports: NestedClientFieldImports,
     pub client_field_output_type: ClientFieldOutputType,
@@ -567,7 +566,7 @@ impl<'schema> EagerReaderArtifactInfo<'schema> {
 
 #[derive(Debug)]
 pub(crate) struct ComponentReaderArtifactInfo<'schema> {
-    pub parent_type: &'schema ValidatedSchemaObject,
+    pub parent_type: &'schema SchemaObject,
     pub(crate) client_field_name: SelectableFieldName,
     pub nested_client_field_artifact_imports: NestedClientFieldImports,
     pub client_field_output_type: ClientFieldOutputType,
@@ -592,7 +591,7 @@ impl<'schema> ComponentReaderArtifactInfo<'schema> {
 
 #[derive(Debug)]
 pub(crate) struct RefetchReaderArtifactInfo<'schema> {
-    pub parent_type: &'schema ValidatedSchemaObject,
+    pub parent_type: &'schema SchemaObject,
     pub(crate) client_field_name: SelectableFieldName,
     pub nested_client_field_artifact_imports: NestedClientFieldImports,
     pub client_field_output_type: ClientFieldOutputType,
@@ -689,7 +688,7 @@ fn variable_names_to_string(variable_names: &[VariableName]) -> String {
 fn generate_client_field_parameter_type(
     schema: &ValidatedSchema,
     selection_set: &[WithSpan<ValidatedSelection>],
-    parent_type: &ValidatedSchemaObject,
+    parent_type: &SchemaObject,
     nested_client_field_imports: &mut NestedClientFieldImports,
     indentation_level: u8,
 ) -> ClientFieldParameterType {
@@ -714,7 +713,7 @@ fn write_query_types_from_selection(
     schema: &ValidatedSchema,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
-    parent_type: &ValidatedSchemaObject,
+    parent_type: &SchemaObject,
     nested_client_field_imports: &mut NestedClientFieldImports,
     indentation_level: u8,
 ) {

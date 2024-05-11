@@ -14,9 +14,8 @@ use crate::{
     refetched_paths::refetched_paths_with_path, ClientField, FieldDefinitionLocation,
     NameAndArguments, PathToRefetchField, Schema, SchemaIdField, SchemaObject, SchemaServerField,
     SchemaValidationState, ServerFieldData, UnvalidatedClientField,
-    UnvalidatedLinkedFieldSelection, UnvalidatedSchema, UnvalidatedSchemaData,
-    UnvalidatedSchemaField, UnvalidatedSchemaObject, UnvalidatedSchemaServerField,
-    ValidateEntrypointDeclarationError,
+    UnvalidatedLinkedFieldSelection, UnvalidatedSchema, UnvalidatedSchemaField,
+    UnvalidatedSchemaServerField, ValidateEntrypointDeclarationError,
 };
 
 pub type ValidatedSchemaServerField =
@@ -45,9 +44,6 @@ pub type ValidatedClientField = ClientField<
 /// The validated defined field that shows up in the TScalarField generic.
 pub type ValidatedFieldDefinitionLocation = FieldDefinitionLocation<ServerFieldId, ClientFieldId>;
 
-pub type ValidatedSchemaObject =
-    SchemaObject<<ValidatedSchemaState as SchemaValidationState>::EncounteredField>;
-
 pub type ValidatedSchemaIdField = SchemaIdField<NamedTypeAnnotation<ServerScalarId>>;
 
 #[derive(Debug)]
@@ -67,7 +63,6 @@ impl SchemaValidationState for ValidatedSchemaState {
     type ClientFieldSelectionScalarFieldAssociatedData = ValidatedScalarFieldAssociatedData;
     type ClientFieldSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
     type ClientFieldVariableDefinitionAssociatedData = SelectableServerFieldId;
-    type EncounteredField = ValidatedFieldDefinitionLocation;
     type Entrypoint = ClientFieldId;
 }
 
@@ -167,9 +162,7 @@ impl ValidatedSchema {
     }
 }
 
-fn transform_object_field_ids(
-    unvalidated_object: UnvalidatedSchemaObject,
-) -> ValidatedSchemaObject {
+fn transform_object_field_ids(unvalidated_object: SchemaObject) -> SchemaObject {
     let SchemaObject {
         name,
         description,
@@ -204,7 +197,7 @@ fn transform_object_field_ids(
 
 fn validate_and_transform_fields(
     fields: Vec<UnvalidatedSchemaField>,
-    schema_data: &UnvalidatedSchemaData,
+    schema_data: &ServerFieldData,
 ) -> Result<Vec<ValidatedSchemaServerField>, Vec<WithLocation<ValidateSchemaError>>> {
     get_all_errors_or_all_ok_iter(
         fields
@@ -255,7 +248,7 @@ fn get_all_errors_or_all_ok_iter<T, E>(
 
 fn validate_and_transform_field(
     field: UnvalidatedSchemaField,
-    schema_data: &UnvalidatedSchemaData,
+    schema_data: &ServerFieldData,
 ) -> Result<ValidatedSchemaServerField, impl Iterator<Item = WithLocation<ValidateSchemaError>>> {
     // TODO rewrite as field.map(...).transpose()
     let (empty_field, server_field_type) = field.split();
@@ -305,7 +298,7 @@ fn validate_and_transform_field(
 }
 
 fn validate_server_field_type_exists(
-    schema_data: &UnvalidatedSchemaData,
+    schema_data: &ServerFieldData,
     server_field_type: &GraphQLTypeAnnotation<UnvalidatedTypeName>,
     field: &SchemaServerField<()>,
 ) -> ValidateSchemaResult<GraphQLTypeAnnotation<SelectableServerFieldId>> {
@@ -326,7 +319,7 @@ fn validate_server_field_type_exists(
 
 fn validate_server_field_argument(
     argument: WithLocation<GraphQLInputValueDefinition>,
-    schema_data: &UnvalidatedSchemaData,
+    schema_data: &ServerFieldData,
     parent_type_id: ServerObjectId,
     name: WithLocation<SelectableFieldName>,
 ) -> ValidateSchemaResult<WithLocation<GraphQLInputValueDefinition>> {
@@ -353,7 +346,7 @@ fn validate_server_field_argument(
 
 fn validate_and_transform_client_fields(
     client_fields: Vec<UnvalidatedClientField>,
-    schema_data: &UnvalidatedSchemaData,
+    schema_data: &ServerFieldData,
     server_fields: &[UnvalidatedSchemaServerField],
 ) -> Result<Vec<ValidatedClientField>, Vec<WithLocation<ValidateSchemaError>>> {
     get_all_errors_or_all_ok(client_fields.into_iter().map(|client_field| {
@@ -362,7 +355,7 @@ fn validate_and_transform_client_fields(
 }
 
 fn validate_client_field_selection_set(
-    schema_data: &UnvalidatedSchemaData,
+    schema_data: &ServerFieldData,
     unvalidated_client_field: UnvalidatedClientField,
     server_fields: &[UnvalidatedSchemaServerField],
 ) -> ValidateSchemaResult<ValidatedClientField> {
@@ -410,7 +403,7 @@ fn validate_client_field_selection_set(
 }
 
 fn validate_variable_definitions(
-    schema_data: &UnvalidatedSchemaData,
+    schema_data: &ServerFieldData,
     variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
 ) -> ValidateSchemaResult<Vec<WithSpan<ValidatedVariableDefinition>>> {
     variable_definitions
@@ -443,7 +436,7 @@ fn validate_variable_definitions(
 
 fn validate_selections_error_to_validate_schema_error(
     err: WithLocation<ValidateSelectionsError>,
-    parent_object: &UnvalidatedSchemaObject,
+    parent_object: &SchemaObject,
     client_field_name: SelectableFieldName,
 ) -> WithLocation<ValidateSchemaError> {
     err.map(|item| match item {
@@ -518,9 +511,9 @@ enum ValidateSelectionsError {
 }
 
 fn validate_client_field_definition_selections_exist_and_types_match(
-    schema_data: &UnvalidatedSchemaData,
+    schema_data: &ServerFieldData,
     selection_set: Vec<WithSpan<UnvalidatedSelection>>,
-    parent_object: &UnvalidatedSchemaObject,
+    parent_object: &SchemaObject,
     server_fields: &[UnvalidatedSchemaServerField],
 ) -> ValidateSelectionsResult<Vec<WithSpan<ValidatedSelection>>> {
     // Currently, we only check that each field exists and has an appropriate type, not that
@@ -541,8 +534,8 @@ fn validate_client_field_definition_selections_exist_and_types_match(
 
 fn validate_client_field_definition_selection_exists_and_type_matches(
     selection: WithSpan<UnvalidatedSelection>,
-    parent_object: &UnvalidatedSchemaObject,
-    schema_data: &UnvalidatedSchemaData,
+    parent_object: &SchemaObject,
+    schema_data: &ServerFieldData,
     server_fields: &[UnvalidatedSchemaServerField],
 ) -> ValidateSelectionsResult<WithSpan<ValidatedSelection>> {
     selection.and_then(|selection| {
@@ -572,8 +565,8 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
 /// Given that we selected a scalar field, the field should exist on the parent,
 /// and type should be a resolver (which is a scalar) or a server scalar type.
 fn validate_field_type_exists_and_is_scalar(
-    schema_data: &UnvalidatedSchemaData,
-    parent_object: &UnvalidatedSchemaObject,
+    schema_data: &ServerFieldData,
+    parent_object: &SchemaObject,
     scalar_field_selection: UnvalidatedScalarFieldSelection,
     server_fields: &[UnvalidatedSchemaServerField],
 ) -> ValidateSelectionsResult<ValidatedScalarFieldSelection> {
@@ -631,8 +624,8 @@ fn validate_field_type_exists_and_is_scalar(
 /// Given that we selected a linked field, the field should exist on the parent,
 /// and type should be a server interface, object or union.
 fn validate_field_type_exists_and_is_linked(
-    schema_data: &UnvalidatedSchemaData,
-    parent_object: &UnvalidatedSchemaObject,
+    schema_data: &ServerFieldData,
+    parent_object: &SchemaObject,
     linked_field_selection: UnvalidatedLinkedFieldSelection,
     server_fields: &[UnvalidatedSchemaServerField],
 ) -> ValidateSelectionsResult<ValidatedLinkedFieldSelection> {
