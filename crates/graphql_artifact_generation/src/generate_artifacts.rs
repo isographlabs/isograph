@@ -12,8 +12,7 @@ use common_lang_types::{
 use intern::Lookup;
 use isograph_lang_types::{NonConstantValue, SelectionFieldArgument};
 use isograph_schema::{
-    ClientFieldVariant, FieldMapItem, ObjectTypeAndFieldNames, ValidatedClientField,
-    ValidatedSchema,
+    ClientFieldVariant, ObjectTypeAndFieldNames, ValidatedClientField, ValidatedSchema,
 };
 
 use crate::{
@@ -26,7 +25,9 @@ use crate::{
         get_artifact_for_imperatively_loaded_field, ImperativelyLoadedEntrypointArtifactInfo,
     },
     iso_overload_file::build_iso_overload,
-    refetch_reader_artifact_info::{generate_refetch_reader_artifact, RefetchReaderArtifactInfo},
+    refetch_reader_artifact_info::{
+        generate_refetch_reader_artifact_info, RefetchReaderArtifactInfo,
+    },
 };
 
 pub(crate) type NestedClientFieldImports = HashMap<ObjectTypeAndFieldNames, JavaScriptImports>;
@@ -140,19 +141,9 @@ fn get_artifact_infos<'schema>(
                     *component_name_and_path,
                 ))
             }
-            ClientFieldVariant::ImperativelyLoadedField(variant) => {
-                let function_import_statement = match &variant.primary_field_info {
-                    Some(info) => generate_function_import_statement_for_mutation_reader(
-                        &info.primary_field_field_map,
-                    ),
-                    None => generate_function_import_statement_for_refetch_reader(),
-                };
-                ArtifactInfo::RefetchReader(generate_refetch_reader_artifact(
-                    schema,
-                    encountered_client_field,
-                    function_import_statement,
-                ))
-            }
+            ClientFieldVariant::ImperativelyLoadedField(variant) => ArtifactInfo::RefetchReader(
+                generate_refetch_reader_artifact_info(schema, encountered_client_field, variant),
+            ),
         };
         artifact_infos.push(artifact_info);
     }
@@ -176,7 +167,7 @@ fn get_artifact_infos<'schema>(
 pub(crate) enum ArtifactInfo<'schema> {
     Entrypoint(EntrypointArtifactInfo<'schema>),
 
-    // These four artifact types all generate reader.ts files, but they
+    // These artifact types all generate reader.ts files, but they
     // are different. Namely, they have different types of resolvers and
     // different types of exported artifacts.
     EagerReader(EagerReaderArtifactInfo<'schema>),
@@ -240,43 +231,6 @@ derive_display!(ConvertFunction);
 pub(crate) struct RefetchQueryArtifactImport(pub String);
 derive_display!(RefetchQueryArtifactImport);
 
-fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctionImportStatement {
-    let content = format!(
-        "import {{ makeNetworkRequest, type IsographEnvironment }} \
-        from '@isograph/react';\n\
-        const resolver = (\n\
-        {}environment: IsographEnvironment,\n\
-        {}artifact: RefetchQueryNormalizationArtifact,\n\
-        {}variables: any\n\
-        ) => () => \
-        makeNetworkRequest(environment, artifact, variables);",
-        "  ", "  ", "  "
-    );
-    ClientFieldFunctionImportStatement(content)
-}
-
-fn generate_function_import_statement_for_mutation_reader(
-    field_map: &[FieldMapItem],
-) -> ClientFieldFunctionImportStatement {
-    let include_read_out_data = get_read_out_data(&field_map);
-    ClientFieldFunctionImportStatement(format!(
-        "{include_read_out_data}\n\
-        import {{ makeNetworkRequest, type IsographEnvironment }} from '@isograph/react';\n\
-        const resolver = (\n\
-        {}environment: IsographEnvironment,\n\
-        {}artifact: RefetchQueryNormalizationArtifact,\n\
-        {}readOutData: any,\n\
-        {}filteredVariables: any\n\
-        ) => (mutationParams: any) => {{\n\
-        {}const variables = includeReadOutData({{...filteredVariables, \
-        ...mutationParams}}, readOutData);\n\
-        {}makeNetworkRequest(environment, artifact, variables);\n\
-        }};\n\
-        ",
-        "  ", "  ", "  ", "  ", "  ", "  "
-    ))
-}
-
 pub(crate) fn generate_function_import_statement_for_eager_or_component(
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
@@ -306,44 +260,6 @@ pub(crate) fn generate_function_import_statement_for_eager_or_component(
             "This path should be stringifiable. This probably is indicative of a bug in Relay."
         )
     ))
-}
-
-fn get_read_out_data(field_map: &[FieldMapItem]) -> String {
-    let spaces = "  ";
-    let mut s = "const includeReadOutData = (variables: any, readOutData: any) => {\n".to_string();
-
-    for item in field_map.iter() {
-        // This is super hacky and due to the fact that argument names and field names are
-        // treated differently, because that's how it is in the GraphQL spec.
-        let split_to_arg = item.split_to_arg();
-        let mut path_segments = Vec::with_capacity(1 + split_to_arg.to_field_names.len());
-        path_segments.push(split_to_arg.to_argument_name);
-        path_segments.extend(split_to_arg.to_field_names.into_iter());
-
-        let last_index = path_segments.len() - 1;
-        let mut path_so_far = "".to_string();
-        for (index, path_segment) in path_segments.into_iter().enumerate() {
-            let is_last = last_index == index;
-            let path_segment_item = path_segment;
-
-            if is_last {
-                let from_value = item.from;
-                s.push_str(&format!(
-                    "{spaces}variables.{path_so_far}{path_segment_item} = \
-                    readOutData.{from_value};\n"
-                ));
-            } else {
-                s.push_str(&format!(
-                    "{spaces}variables.{path_so_far}{path_segment_item} = \
-                    variables.{path_so_far}{path_segment_item} ?? {{}};\n"
-                ));
-                path_so_far.push_str(&format!("{path_segment_item}."));
-            }
-        }
-    }
-
-    s.push_str(&format!("{spaces}return variables;\n}};\n"));
-    s
 }
 
 #[derive(Debug)]

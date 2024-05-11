@@ -2,7 +2,8 @@ use std::{collections::HashMap, path::PathBuf};
 
 use common_lang_types::{PathAndContent, SelectableFieldName};
 use isograph_schema::{
-    create_merged_selection_set, SchemaObject, ValidatedClientField, ValidatedSchema,
+    create_merged_selection_set, FieldMapItem, ImperativelyLoadedFieldVariant, SchemaObject,
+    ValidatedClientField, ValidatedSchema,
 };
 
 use crate::{
@@ -115,12 +116,18 @@ impl<'schema> RefetchReaderArtifactInfo<'schema> {
     }
 }
 
-pub(crate) fn generate_refetch_reader_artifact<'schema>(
+pub(crate) fn generate_refetch_reader_artifact_info<'schema>(
     schema: &'schema ValidatedSchema,
     client_field: &ValidatedClientField,
-    function_import_statement: ClientFieldFunctionImportStatement,
+    variant: &ImperativelyLoadedFieldVariant,
 ) -> RefetchReaderArtifactInfo<'schema> {
     if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
+        let function_import_statement = match &variant.primary_field_info {
+            Some(info) => generate_function_import_statement_for_mutation_reader(
+                &info.primary_field_field_map,
+            ),
+            None => generate_function_import_statement_for_refetch_reader(),
+        };
         let parent_type = schema
             .server_field_data
             .object(client_field.parent_object_id);
@@ -166,4 +173,79 @@ pub(crate) fn generate_refetch_reader_artifact<'schema>(
     } else {
         panic!("Unsupported: client fields not on query with no selection set")
     }
+}
+
+fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctionImportStatement {
+    let content = format!(
+        "import {{ makeNetworkRequest, type IsographEnvironment }} \
+        from '@isograph/react';\n\
+        const resolver = (\n\
+        {}environment: IsographEnvironment,\n\
+        {}artifact: RefetchQueryNormalizationArtifact,\n\
+        {}variables: any\n\
+        ) => () => \
+        makeNetworkRequest(environment, artifact, variables);",
+        "  ", "  ", "  "
+    );
+    ClientFieldFunctionImportStatement(content)
+}
+
+fn generate_function_import_statement_for_mutation_reader(
+    field_map: &[FieldMapItem],
+) -> ClientFieldFunctionImportStatement {
+    let include_read_out_data = get_read_out_data(&field_map);
+    ClientFieldFunctionImportStatement(format!(
+        "{include_read_out_data}\n\
+        import {{ makeNetworkRequest, type IsographEnvironment }} from '@isograph/react';\n\
+        const resolver = (\n\
+        {}environment: IsographEnvironment,\n\
+        {}artifact: RefetchQueryNormalizationArtifact,\n\
+        {}readOutData: any,\n\
+        {}filteredVariables: any\n\
+        ) => (mutationParams: any) => {{\n\
+        {}const variables = includeReadOutData({{...filteredVariables, \
+        ...mutationParams}}, readOutData);\n\
+        {}makeNetworkRequest(environment, artifact, variables);\n\
+        }};\n\
+        ",
+        "  ", "  ", "  ", "  ", "  ", "  "
+    ))
+}
+
+fn get_read_out_data(field_map: &[FieldMapItem]) -> String {
+    let spaces = "  ";
+    let mut s = "const includeReadOutData = (variables: any, readOutData: any) => {\n".to_string();
+
+    for item in field_map.iter() {
+        // This is super hacky and due to the fact that argument names and field names are
+        // treated differently, because that's how it is in the GraphQL spec.
+        let split_to_arg = item.split_to_arg();
+        let mut path_segments = Vec::with_capacity(1 + split_to_arg.to_field_names.len());
+        path_segments.push(split_to_arg.to_argument_name);
+        path_segments.extend(split_to_arg.to_field_names.into_iter());
+
+        let last_index = path_segments.len() - 1;
+        let mut path_so_far = "".to_string();
+        for (index, path_segment) in path_segments.into_iter().enumerate() {
+            let is_last = last_index == index;
+            let path_segment_item = path_segment;
+
+            if is_last {
+                let from_value = item.from;
+                s.push_str(&format!(
+                    "{spaces}variables.{path_so_far}{path_segment_item} = \
+                    readOutData.{from_value};\n"
+                ));
+            } else {
+                s.push_str(&format!(
+                    "{spaces}variables.{path_so_far}{path_segment_item} = \
+                    variables.{path_so_far}{path_segment_item} ?? {{}};\n"
+                ));
+                path_so_far.push_str(&format!("{path_segment_item}."));
+            }
+        }
+    }
+
+    s.push_str(&format!("{spaces}return variables;\n}};\n"));
+    s
 }
