@@ -1,5 +1,6 @@
 mod artifact_file_contents;
 mod generate_artifacts;
+mod imperatively_loaded_fields;
 mod iso_overload_file;
 mod normalization_ast_text;
 mod query_text;

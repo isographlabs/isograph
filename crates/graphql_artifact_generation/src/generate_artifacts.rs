@@ -10,7 +10,7 @@ use common_lang_types::{
     QueryOperationName, SelectableFieldName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, ListTypeAnnotation, NonNullTypeAnnotation};
-use intern::{string_key::Intern, Lookup};
+use intern::Lookup;
 use isograph_lang_types::{
     ClientFieldId, NonConstantValue, RefetchQueryIndex, SelectableServerFieldId, Selection,
     SelectionFieldArgument, ServerFieldSelection,
@@ -19,12 +19,17 @@ use isograph_schema::{
     create_merged_selection_set, into_name_and_arguments, refetched_paths_for_client_field,
     ClientFieldVariant, FieldDefinitionLocation, FieldMapItem, ImperativelyLoadedFieldArtifactInfo,
     NameAndArguments, ObjectTypeAndFieldNames, PathToRefetchField, RootRefetchedPath, SchemaObject,
-    ValidatedClientField, ValidatedSchema, ValidatedSelection, REFETCH_FIELD_NAME,
+    ValidatedClientField, ValidatedSchema, ValidatedSelection,
 };
 
 use crate::{
-    artifact_file_contents::ENTRYPOINT, iso_overload_file::build_iso_overload,
-    normalization_ast_text::generate_normalization_ast_text, query_text::generate_query_text,
+    artifact_file_contents::ENTRYPOINT,
+    imperatively_loaded_fields::{
+        get_artifact_for_imperatively_loaded_field, ImperativelyLoadedEntrypointArtifactInfo,
+    },
+    iso_overload_file::build_iso_overload,
+    normalization_ast_text::generate_normalization_ast_text,
+    query_text::generate_query_text,
 };
 
 type NestedClientFieldImports = HashMap<ObjectTypeAndFieldNames, JavaScriptImports>;
@@ -165,39 +170,6 @@ fn get_artifact_infos<'schema>(
     }
 
     artifact_infos
-}
-
-fn get_artifact_for_imperatively_loaded_field<'schema>(
-    schema: &'schema ValidatedSchema,
-    imperatively_loaded_field_artifact_info: ImperativelyLoadedFieldArtifactInfo,
-) -> ImperativelyLoadedEntrypointArtifactInfo {
-    let ImperativelyLoadedFieldArtifactInfo {
-        merged_selection_set,
-        root_fetchable_field,
-        root_parent_object,
-        refetch_query_index,
-        variable_definitions,
-        root_operation_name,
-        query_name,
-    } = imperatively_loaded_field_artifact_info;
-
-    let query_text = generate_query_text(
-        query_name,
-        schema,
-        &merged_selection_set,
-        &variable_definitions,
-        &root_operation_name,
-    );
-
-    let normalization_ast_text = generate_normalization_ast_text(schema, &merged_selection_set, 0);
-
-    ImperativelyLoadedEntrypointArtifactInfo {
-        normalization_ast_text,
-        query_text,
-        root_fetchable_field,
-        root_fetchable_field_parent_object: root_parent_object,
-        refetch_query_index,
-    }
 }
 
 fn generate_entrypoint_artifact<'schema>(
@@ -611,38 +583,6 @@ impl<'schema> RefetchReaderArtifactInfo<'schema> {
         let relative_directory = generate_path(parent_type.name, *client_field_name);
 
         self.file_contents(&relative_directory)
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct ImperativelyLoadedEntrypointArtifactInfo {
-    pub normalization_ast_text: NormalizationAstText,
-    pub query_text: QueryText,
-    pub root_fetchable_field: SelectableFieldName,
-    pub root_fetchable_field_parent_object: IsographObjectTypeName,
-    pub refetch_query_index: RefetchQueryIndex,
-}
-
-impl ImperativelyLoadedEntrypointArtifactInfo {
-    pub fn path_and_content(self) -> PathAndContent {
-        let ImperativelyLoadedEntrypointArtifactInfo {
-            root_fetchable_field,
-            root_fetchable_field_parent_object,
-            refetch_query_index,
-            ..
-        } = &self;
-
-        let relative_directory =
-            generate_path(*root_fetchable_field_parent_object, *root_fetchable_field);
-        let file_name_prefix = format!("{}__{}", *REFETCH_FIELD_NAME, refetch_query_index.0)
-            .intern()
-            .into();
-
-        PathAndContent {
-            file_content: self.file_contents(),
-            relative_directory,
-            file_name_prefix,
-        }
     }
 }
 
@@ -1325,6 +1265,9 @@ fn find_imperatively_fetchable_query_index(
         .expect("Expected refetch query to be found")
 }
 
-fn generate_path(object_name: IsographObjectTypeName, field_name: SelectableFieldName) -> PathBuf {
+pub fn generate_path(
+    object_name: IsographObjectTypeName,
+    field_name: SelectableFieldName,
+) -> PathBuf {
     PathBuf::from(object_name.lookup()).join(field_name.lookup())
 }

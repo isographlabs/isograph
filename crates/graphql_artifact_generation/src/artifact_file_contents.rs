@@ -9,8 +9,7 @@ use lazy_static::lazy_static;
 
 use crate::generate_artifacts::{
     ClientFieldFunctionImportStatement, ClientFieldOutputType, ComponentReaderArtifactInfo,
-    EagerReaderArtifactInfo, EntrypointArtifactInfo, ImperativelyLoadedEntrypointArtifactInfo,
-    JavaScriptImports, RefetchReaderArtifactInfo,
+    EagerReaderArtifactInfo, EntrypointArtifactInfo, JavaScriptImports, RefetchReaderArtifactInfo,
 };
 
 lazy_static! {
@@ -282,32 +281,6 @@ impl<'schema> RefetchReaderArtifactInfo<'schema> {
                 file_content: output_type_text,
             },
         ]
-    }
-}
-
-impl ImperativelyLoadedEntrypointArtifactInfo {
-    pub(crate) fn file_contents(self) -> String {
-        let ImperativelyLoadedEntrypointArtifactInfo {
-            normalization_ast_text: normalization_ast,
-            query_text,
-            ..
-        } = self;
-
-        format!(
-            "import type {{IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact}} from '@isograph/react';\n\
-            const queryText = '{query_text}';\n\n\
-            const normalizationAst: NormalizationAst = {normalization_ast};\n\
-            const artifact: any = {{\n\
-            {}kind: \"RefetchQuery\",\n\
-            {}queryText,\n\
-            {}normalizationAst,\n\
-            }};\n\n\
-            export default artifact;\n",
-            "  ",
-            "  ",
-            "  ",
-
-        )
     }
 }
 
