@@ -405,7 +405,7 @@ impl UnvalidatedSchema {
                 let type_def_2 = object_type_definition.clone();
                 let FieldObjectIdsEtc {
                     unvalidated_schema_fields,
-                    server_fields,
+                    server_field_ids,
                     encountered_fields,
                     id_field,
                 } = get_field_objects_ids_and_names(
@@ -422,7 +422,7 @@ impl UnvalidatedSchema {
                     description: object_type_definition.description.map(|d| d.item),
                     name: object_type_definition.name.item,
                     id: next_object_id,
-                    server_field_ids: server_fields,
+                    server_field_ids,
                     encountered_fields,
                     id_field,
                     directives: object_type_definition.directives,
@@ -610,7 +610,7 @@ fn get_typename_type(
 
 struct FieldObjectIdsEtc {
     unvalidated_schema_fields: Vec<UnvalidatedSchemaField>,
-    server_fields: Vec<ServerFieldId>,
+    server_field_ids: Vec<ServerFieldId>,
     // TODO this should be HashMap<_, WithLocation<_>> or something
     encountered_fields: HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
     // TODO this should not be a ServerFieldId, but a special type
@@ -632,7 +632,7 @@ fn get_field_objects_ids_and_names(
     let new_field_count = new_fields.len();
     let mut encountered_fields = HashMap::with_capacity(new_field_count);
     let mut unvalidated_fields = Vec::with_capacity(new_field_count);
-    let mut field_ids = Vec::with_capacity(new_field_count + 1); // +1 for the typename
+    let mut server_field_ids = Vec::with_capacity(new_field_count + 1); // +1 for the typename
     let mut id_field = None;
     let id_name = "id".intern().into();
     for (current_field_index, field) in new_fields.into_iter().enumerate() {
@@ -663,7 +663,7 @@ fn get_field_objects_ids_and_names(
                     parent_type_id,
                     arguments: field.item.arguments,
                 });
-                field_ids.push(current_field_id.into());
+                server_field_ids.push(current_field_id.into());
             }
             Some(_) => {
                 return Err(WithLocation::new(
@@ -683,9 +683,9 @@ fn get_field_objects_ids_and_names(
     // TODO: the only way to determine that a field is a magic __typename field is
     // to check the name! That's a bit unfortunate. We should model these differently,
     // perhaps fields should contain an enum (IdField, TypenameField, ActualField)
-    let typename_field_id = (next_field_id + field_ids.len()).into();
+    let typename_field_id = (next_field_id + server_field_ids.len()).into();
     let typename_name = WithLocation::new("__typename".intern().into(), Location::generated());
-    field_ids.push(typename_field_id);
+    server_field_ids.push(typename_field_id);
     unvalidated_fields.push(SchemaServerField {
         description: None,
         name: typename_name,
@@ -715,7 +715,7 @@ fn get_field_objects_ids_and_names(
 
     Ok(FieldObjectIdsEtc {
         unvalidated_schema_fields: unvalidated_fields,
-        server_fields: field_ids,
+        server_field_ids,
         encountered_fields,
         id_field,
     })

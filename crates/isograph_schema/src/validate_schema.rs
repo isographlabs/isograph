@@ -173,7 +173,7 @@ fn transform_object_field_ids(
 ) -> ValidatedSchemaObject {
     let SchemaObject {
         name,
-        server_field_ids: server_fields,
+        server_field_ids,
         description,
         id,
         encountered_fields: unvalidated_encountered_fields,
@@ -185,7 +185,7 @@ fn transform_object_field_ids(
         .into_iter()
         .map(|(encountered_field_name, value)| match value {
             FieldDefinitionLocation::Server(_) => (encountered_field_name, {
-                server_fields
+                server_field_ids
                     .iter()
                     .find_map(|server_field_id| {
                         let field = &schema_fields[server_field_id.as_usize()];
@@ -211,7 +211,7 @@ fn transform_object_field_ids(
         description,
         name,
         id,
-        server_field_ids: server_fields,
+        server_field_ids,
         encountered_fields: validated_encountered_fields,
         id_field,
         directives,
@@ -732,9 +732,9 @@ fn validate_field_type_exists_and_is_linked(
 fn find_server_field_id(
     server_fields: &[UnvalidatedSchemaServerField],
     field_name: ScalarFieldName,
-    parent_server_fields: &[ServerFieldId],
+    parent_server_field_ids: &[ServerFieldId],
 ) -> Option<ServerFieldId> {
-    parent_server_fields.iter().find_map(|server_field_id| {
+    parent_server_field_ids.iter().find_map(|server_field_id| {
         let server_field = &server_fields[server_field_id.as_usize()];
         if server_field.name.item == field_name.into() {
             Some(*server_field_id)
