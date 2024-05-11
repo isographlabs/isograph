@@ -1,4 +1,5 @@
 mod artifact_file_contents;
+mod eager_reader_artifact_info;
 mod entrypoint_artifact_info;
 mod generate_artifacts;
 mod imperatively_loaded_fields;

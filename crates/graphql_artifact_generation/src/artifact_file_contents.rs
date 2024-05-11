@@ -9,7 +9,7 @@ use lazy_static::lazy_static;
 
 use crate::generate_artifacts::{
     ClientFieldFunctionImportStatement, ClientFieldOutputType, ComponentReaderArtifactInfo,
-    EagerReaderArtifactInfo, JavaScriptImports, RefetchReaderArtifactInfo,
+    JavaScriptImports, RefetchReaderArtifactInfo,
 };
 
 lazy_static! {
@@ -18,80 +18,6 @@ lazy_static! {
     pub static ref READER_OUTPUT_TYPE: ArtifactFileType = "output_type".intern().into();
     pub static ref ENTRYPOINT: ArtifactFileType = "entrypoint".intern().into();
     pub static ref ISO_TS: ArtifactFileType = "iso".intern().into();
-}
-
-impl<'schema> EagerReaderArtifactInfo<'schema> {
-    pub(crate) fn file_contents(self, relative_directory: &PathBuf) -> Vec<PathAndContent> {
-        let EagerReaderArtifactInfo {
-            function_import_statement,
-            client_field_parameter_type,
-            client_field_output_type,
-            reader_ast,
-            nested_client_field_artifact_imports,
-            parent_type,
-            client_field_name,
-            ..
-        } = self;
-
-        let (client_field_import_statement, client_field_type_import_statement) =
-            nested_client_field_names_to_import_statement(
-                nested_client_field_artifact_imports,
-                parent_type.name,
-            );
-
-        let output_type_text = get_output_type_text(
-            &function_import_statement,
-            parent_type.name,
-            client_field_name,
-            client_field_output_type,
-        );
-
-        let parent_name = parent_type.name;
-        let reader_param_type = format!("{parent_name}__{client_field_name}__param");
-        let reader_output_type = format!("{parent_name}__{client_field_name}__outputType");
-
-        let reader_content = format!(
-            "import type {{EagerReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact}} from '@isograph/react';\n\
-            import {{ {reader_param_type} }} from './param_type';\n\
-            import {{ {reader_output_type} }} from './output_type';\n\
-            {function_import_statement}\n\
-            {client_field_import_statement}\n\
-            const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
-            const artifact: EagerReaderArtifact<\n\
-            {}{reader_param_type},\n\
-            {}{reader_output_type}\n\
-            > = {{\n\
-            {}kind: \"EagerReaderArtifact\",\n\
-            {}resolver,\n\
-            {}readerAst,\n\
-            }};\n\n\
-            export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ",
-        );
-
-        let param_type_content = format!(
-            "{client_field_type_import_statement}\n\
-            export type {reader_param_type} = {client_field_parameter_type};\n",
-        );
-
-        vec![
-            PathAndContent {
-                relative_directory: relative_directory.clone(),
-                file_name_prefix: *READER,
-                file_content: reader_content,
-            },
-            PathAndContent {
-                relative_directory: relative_directory.clone(),
-                file_name_prefix: *READER_PARAM_TYPE,
-                file_content: param_type_content,
-            },
-            PathAndContent {
-                relative_directory: relative_directory.clone(),
-                file_name_prefix: *READER_OUTPUT_TYPE,
-                file_content: output_type_text,
-            },
-        ]
-    }
 }
 
 impl<'schema> ComponentReaderArtifactInfo<'schema> {
@@ -247,7 +173,7 @@ impl<'schema> RefetchReaderArtifactInfo<'schema> {
     }
 }
 
-fn nested_client_field_names_to_import_statement(
+pub(crate) fn nested_client_field_names_to_import_statement(
     nested_client_field_imports: HashMap<ObjectTypeAndFieldNames, JavaScriptImports>,
     current_file_type_name: IsographObjectTypeName,
 ) -> (String, String) {
@@ -313,7 +239,8 @@ fn write_client_field_import(
     client_field_import_statement.push_str(&s_client_field_import);
     client_field_type_import_statement.push_str(&s_client_field_type_import);
 }
-fn get_output_type_text(
+
+pub(crate) fn get_output_type_text(
     function_import_statement: &ClientFieldFunctionImportStatement,
     parent_type_name: IsographObjectTypeName,
     field_name: SelectableFieldName,
