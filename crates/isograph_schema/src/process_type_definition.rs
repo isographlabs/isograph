@@ -636,19 +636,19 @@ fn get_field_objects_ids_and_names(
     let mut id_field = None;
     let id_name = "id".intern().into();
     for (current_field_index, field) in new_fields.into_iter().enumerate() {
-        // TODO use entry
+        let next_server_field_id_usize = next_field_id + current_field_index;
+        let next_server_field_id = next_server_field_id_usize.into();
+
         match encountered_fields.insert(
             field.item.name.item,
-            FieldDefinitionLocation::Server(field.item.type_.clone()),
+            FieldDefinitionLocation::Server(next_server_field_id),
         ) {
             None => {
-                let current_field_id = next_field_id + current_field_index;
-
                 // TODO check for @strong directive instead!
                 if may_have_field_id && field.item.name.item == id_name {
                     set_and_validate_id_field(
                         &mut id_field,
-                        current_field_id,
+                        next_server_field_id_usize,
                         &field,
                         parent_type_name,
                         options,
@@ -658,12 +658,12 @@ fn get_field_objects_ids_and_names(
                 unvalidated_fields.push(SchemaServerField {
                     description: field.item.description.map(|d| d.item),
                     name: field.item.name,
-                    id: current_field_id.into(),
+                    id: next_server_field_id,
                     associated_data: field.item.type_,
                     parent_type_id,
                     arguments: field.item.arguments,
                 });
-                server_field_ids.push(current_field_id.into());
+                server_field_ids.push(next_server_field_id);
             }
             Some(_) => {
                 return Err(WithLocation::new(
@@ -698,7 +698,7 @@ fn get_field_objects_ids_and_names(
     if encountered_fields
         .insert(
             typename_name.item,
-            FieldDefinitionLocation::Server(typename_type),
+            FieldDefinitionLocation::Server(typename_field_id),
         )
         .is_some()
     {

@@ -159,9 +159,11 @@ impl UnvalidatedSchema {
 
             let (maybe_abstract_parent_object_id, maybe_abstract_parent_type_name) =
                 match primary_field {
-                    Some(FieldDefinitionLocation::Server(server_field)) => {
+                    Some(FieldDefinitionLocation::Server(server_field_id)) => {
+                        let server_field = self.server_field(*server_field_id);
+
                         // This is the parent type name (Pet)
-                        let inner = server_field.inner();
+                        let inner = server_field.associated_data.inner();
 
                         // TODO validate that the payload object has no plural fields in between
 

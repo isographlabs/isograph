@@ -597,15 +597,10 @@ fn validate_field_type_exists_and_is_scalar(
     match parent_object.encountered_fields.get(&scalar_field_name) {
         Some(defined_field_type) => match defined_field_type {
             FieldDefinitionLocation::Server(server_field_name) => {
-                let field_type_id = *schema_data
-                    .defined_types
-                    .get(server_field_name.inner())
-                    .expect(
-                        "Expected field type to be defined, which I think \
-                        was validated earlier, probably indicates a bug in Isograph",
-                    );
-                match field_type_id {
-                    SelectableServerFieldId::Scalar(_scalar_id) => Ok(ScalarFieldSelection {
+                let server_field = &server_fields[server_field_name.as_usize()];
+
+                match server_field.associated_data.inner() {
+                    SelectableServerFieldId::Scalar(_) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
                         associated_data: ValidatedScalarFieldAssociatedData { location: FieldDefinitionLocation::Server(
                             find_server_field_id(
@@ -621,13 +616,13 @@ fn validate_field_type_exists_and_is_scalar(
                         arguments: scalar_field_selection.arguments,
                         directives: scalar_field_selection.directives
                     }),
-                    SelectableServerFieldId::Object(_) => Err(
+                    SelectableServerFieldId::Object(object_id) => Err(
                         WithLocation::new(
                             ValidateSelectionsError::FieldSelectedAsScalarButTypeIsNotScalar {
                                 field_parent_type_name: parent_object.name,
                                 field_name: scalar_field_name,
                                 target_type: "an object",
-                                target_type_name: *server_field_name.inner(),
+                                target_type_name: schema_data.object(*object_id).name.into()
                             },
                             scalar_field_selection.name.location
                         ),
@@ -667,21 +662,15 @@ fn validate_field_type_exists_and_is_linked(
     let linked_field_name = linked_field_selection.name.item.into();
     match (&parent_object.encountered_fields).get(&linked_field_name) {
         Some(defined_field_type) => match defined_field_type {
-            FieldDefinitionLocation::Server(server_field_name) => {
-                let field_type_id = *schema_data
-                    .defined_types
-                    .get(server_field_name.inner())
-                    .expect(
-                        "Expected field type to be defined, which I \
-                            think was validated earlier, probably indicates a bug in Isograph",
-                    );
-                match field_type_id {
-                    SelectableServerFieldId::Scalar(_) => Err(WithLocation::new(
+            FieldDefinitionLocation::Server(server_field_id) => {
+                let server_field = &server_fields[server_field_id.as_usize()];
+                match server_field.associated_data.inner() {
+                    SelectableServerFieldId::Scalar(scalar_id) => Err(WithLocation::new(
                         ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsScalar {
                             field_parent_type_name: parent_object.name,
                             field_name: linked_field_name,
                             target_type: "a scalar",
-                            target_type_name: *server_field_name.inner(),
+                            target_type_name: schema_data.scalar(*scalar_id).name.item.into(),
                         },
                         linked_field_selection.name.location,
                     )),
@@ -706,7 +695,7 @@ fn validate_field_type_exists_and_is_linked(
                                 ).collect::<Result<Vec<_>, _>>()?,
                                 unwraps: linked_field_selection.unwraps,
                                 associated_data: ValidatedLinkedFieldAssociatedData {
-                                    parent_object_id: object_id,
+                                    parent_object_id: *object_id,
                                 },
                                 arguments: linked_field_selection.arguments,
                                 directives: linked_field_selection.directives

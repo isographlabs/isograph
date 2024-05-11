@@ -7,7 +7,7 @@ use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ClientFieldId, EntrypointTypeAndField, IsographSelectionVariant, LinkedFieldSelection,
-    SelectableServerFieldId, ServerScalarId,
+    SelectableServerFieldId, ServerFieldId, ServerScalarId,
 };
 
 use crate::{
@@ -40,8 +40,7 @@ pub type UnvalidatedSchemaObject =
 /// On unvalidated schema objects, the encountered types are either a type annotation
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
 /// client field.)
-pub type UnvalidatedObjectFieldInfo =
-    FieldDefinitionLocation<GraphQLTypeAnnotation<UnvalidatedTypeName>, ClientFieldId>;
+pub type UnvalidatedObjectFieldInfo = FieldDefinitionLocation<ServerFieldId, ClientFieldId>;
 
 pub(crate) type UnvalidatedSchemaData =
     ServerFieldData<<UnvalidatedSchemaState as SchemaValidationState>::EncounteredField>;
