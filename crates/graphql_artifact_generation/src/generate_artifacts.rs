@@ -17,6 +17,9 @@ use isograph_schema::{
 };
 
 use crate::{
+    component_reader_artifact_info::{
+        generate_component_reader_artifact, ComponentReaderArtifactInfo,
+    },
     eager_reader_artifact_info::{
         generate_client_field_parameter_type, generate_eager_reader_artifact,
         EagerReaderArtifactInfo,
@@ -169,66 +172,6 @@ fn get_artifact_infos<'schema>(
     artifact_infos
 }
 
-fn generate_component_reader_artifact<'schema>(
-    schema: &'schema ValidatedSchema,
-    client_field: &ValidatedClientField,
-    project_root: &PathBuf,
-    artifact_directory: &PathBuf,
-    component_name_and_path: (ConstExportName, FilePath),
-) -> ComponentReaderArtifactInfo<'schema> {
-    if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
-        let parent_type = schema
-            .server_field_data
-            .object(client_field.parent_object_id);
-        let mut nested_client_field_artifact_imports = HashMap::new();
-
-        let (_merged_selection_set, root_refetched_paths) = create_merged_selection_set(
-            schema,
-            schema
-                .server_field_data
-                .object(client_field.parent_object_id)
-                .into(),
-            selection_set,
-            None,
-            None,
-            client_field,
-        );
-
-        let reader_ast = generate_reader_ast(
-            schema,
-            selection_set,
-            0,
-            &mut nested_client_field_artifact_imports,
-            &root_refetched_paths,
-        );
-
-        let client_field_parameter_type = generate_client_field_parameter_type(
-            schema,
-            &selection_set,
-            parent_type.into(),
-            &mut nested_client_field_artifact_imports,
-            0,
-        );
-        let client_field_output_type = generate_output_type(client_field);
-        let function_import_statement = generate_function_import_statement_for_eager_or_component(
-            project_root,
-            artifact_directory,
-            component_name_and_path,
-        );
-        ComponentReaderArtifactInfo {
-            parent_type: parent_type.into(),
-            client_field_name: client_field.name,
-            reader_ast,
-            nested_client_field_artifact_imports,
-            function_import_statement,
-            client_field_output_type,
-            client_field_parameter_type,
-        }
-    } else {
-        panic!("Unsupported: client fields not on query with no selection set")
-    }
-}
-
 fn generate_mutation_reader_artifact<'schema>(
     schema: &'schema ValidatedSchema,
     client_field: &ValidatedClientField,
@@ -352,31 +295,6 @@ derive_display!(ConvertFunction);
 #[derive(Debug)]
 pub(crate) struct RefetchQueryArtifactImport(pub String);
 derive_display!(RefetchQueryArtifactImport);
-
-#[derive(Debug)]
-pub(crate) struct ComponentReaderArtifactInfo<'schema> {
-    pub parent_type: &'schema SchemaObject,
-    pub(crate) client_field_name: SelectableFieldName,
-    pub nested_client_field_artifact_imports: NestedClientFieldImports,
-    pub client_field_output_type: ClientFieldOutputType,
-    pub reader_ast: ReaderAst,
-    pub client_field_parameter_type: ClientFieldParameterType,
-    pub function_import_statement: ClientFieldFunctionImportStatement,
-}
-
-impl<'schema> ComponentReaderArtifactInfo<'schema> {
-    pub fn path_and_content(self) -> Vec<PathAndContent> {
-        let ComponentReaderArtifactInfo {
-            parent_type,
-            client_field_name,
-            ..
-        } = &self;
-
-        let relative_directory = generate_path(parent_type.name, *client_field_name);
-
-        self.file_contents(&relative_directory)
-    }
-}
 
 #[derive(Debug)]
 pub(crate) struct RefetchReaderArtifactInfo<'schema> {
