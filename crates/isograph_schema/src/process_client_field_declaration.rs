@@ -159,7 +159,7 @@ pub struct ImperativelyLoadedFieldVariant {
 pub enum ClientFieldVariant {
     Component((ConstExportName, FilePath)),
     Eager((ConstExportName, FilePath)),
-    RefetchField,
+    RefetchField(ImperativelyLoadedFieldVariant),
     ImperativelyLoadedField(ImperativelyLoadedFieldVariant),
 }
 

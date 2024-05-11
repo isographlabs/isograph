@@ -26,7 +26,7 @@ pub fn refetched_paths_with_path(
                         FieldDefinitionLocation::Client(client_field_id) => {
                             let client_field = schema.client_field(client_field_id);
                             match client_field.variant {
-                                ClientFieldVariant::RefetchField
+                                ClientFieldVariant::RefetchField(_)
                                 | ClientFieldVariant::ImperativelyLoadedField(_) => {
                                     paths.insert(PathToRefetchField {
                                         linked_fields: path.clone(),

@@ -45,7 +45,7 @@ impl UnvalidatedSchema {
                             // What we have here is not currently a satisfactory conclusion.
                             // ---- END HACK ----
                             let client_field = self.client_field(*supertype_client_field_id);
-                            if matches!(client_field.variant, ClientFieldVariant::RefetchField) {
+                            if matches!(client_field.variant, ClientFieldVariant::RefetchField(_)) {
                                 continue 'field;
                             }
                             let subtype = self.server_field_data.object_mut(*subtype_id);

@@ -27,7 +27,7 @@ use crate::{
 type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSelection>>;
 
 lazy_static! {
-    pub static ref REFETCH_FIELD_NAME: LinkedFieldName = "__refetch".intern().into();
+    pub static ref REFETCH_FIELD_NAME: ScalarFieldName = "__refetch".intern().into();
     pub static ref NODE_FIELD_NAME: LinkedFieldName = "node".intern().into();
     pub static ref TYPENAME_FIELD_NAME: ScalarFieldName = "__typename".intern().into();
 }
@@ -267,7 +267,7 @@ pub fn create_merged_selection_set(
                             find_by_path(&merged_selection_set, &path_to_refetch_field);
 
                         let (field_name, reachable_variables) = match client_field_variant {
-                            ClientFieldVariant::RefetchField => {
+                            ClientFieldVariant::RefetchField(_) => {
                                 let type_to_refine_to = schema
                                     .server_field_data
                                     .object(refetch_field_parent_id)
@@ -480,7 +480,7 @@ pub fn create_merged_selection_set(
                     let reachable_variables = nested_merged_selection_set.reachable_variables();
 
                     let field_name = match client_field_variant {
-                        ClientFieldVariant::RefetchField => "__refetch".intern().into(),
+                        ClientFieldVariant::RefetchField(_) => "__refetch".intern().into(),
                         ClientFieldVariant::ImperativelyLoadedField(
                             ImperativelyLoadedFieldVariant {
                                 client_field_scalar_selection_name: mutation_field_name,
@@ -730,14 +730,14 @@ fn merge_scalar_client_field(
     }
 
     match &client_field.variant {
-        ClientFieldVariant::RefetchField => {
+        ClientFieldVariant::RefetchField(variant) => {
             merge_traversal_state.paths_to_refetch_fields.insert((
                 PathToRefetchField {
                     linked_fields: merge_traversal_state.current_path.clone(),
                     field_name: client_field.name,
                 },
                 parent_type.id,
-                ClientFieldVariant::RefetchField,
+                ClientFieldVariant::RefetchField(variant.clone()),
             ));
         }
         ClientFieldVariant::ImperativelyLoadedField(variant) => {
