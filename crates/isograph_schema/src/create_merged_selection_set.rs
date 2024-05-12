@@ -188,7 +188,6 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
     pub variable_definitions: Vec<WithSpan<VariableDefinition<SelectableServerFieldId>>>,
     pub root_parent_object: IsographObjectTypeName,
     pub root_fetchable_field: SelectableFieldName,
-    // TODO wrap in a newtype
     pub refetch_query_index: RefetchQueryIndex,
 
     pub root_operation_name: RootOperationName,
