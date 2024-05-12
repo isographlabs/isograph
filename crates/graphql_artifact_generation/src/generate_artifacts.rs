@@ -62,20 +62,29 @@ pub(crate) fn client_defined_fields<'a>(
 }
 
 /// Get all artifacts according to the following scheme:
-/// - Add all the entrypoints to the queue
-/// - While generating merged selection sets for entrypoints, if we encounter:
-///   - a client field, add it the queue (but only once per client field.)
-///   - a refetch field/magic mutation field, add it to the queue (along with
-///     the path)
-/// Keep processing artifacts until the queue is empty.
 ///
-/// We *also* need to generate all (type) artifacts for all client-defined fields,
-/// (i.e. including unreachable ones), because they are referenced in iso.ts.
-/// So we separately add those to the encountered_client_field_ids set and generate full
-/// artifacts. In the future, we should just generate types for these client fields, not
-/// readers, etc.
+/// For each entrypoint, generate an entrypoint artifact.
+/// - While creating the artifact's merged selection set:
+///   - note imperative client fields (e.g. __refetch, exposeAs and
+///     @loadable fields.) and their path, and queue up imperative
+///     field artifacts
 ///
-/// TODO The artifact queue abstraction doesn't make much sense here.
+/// For each hand-written client field, generate
+/// - parameter in type/field/parameter_type.ts
+/// - output type artifacts
+///   - note that we only really need to do this for client fields
+///     reachable from other client fields and those that serve
+///     as entrypoints
+/// - reader artifacts in type/field/reader.ts
+///   - note that we only need readers if an entrypoint shows up as part
+///     of an entrypoint, but it doesn't seem to hurt to have readers for
+///     all hand-written fields, since one may want to debug a reader.
+///
+/// For each imperative field artifact, generate:
+/// - reader (i.e. to select id field), in type/field/imperative_reader.ts
+/// - entrypoint + output type in root_type/field/imperative_field_N.ts (if slim)
+/// - entrypoint + output type in type/field/entrypoint.ts (if not slim)
+/// - if readable, reader in type/field/reader.ts
 pub fn get_artifact_path_and_content<'schema>(
     schema: &'schema ValidatedSchema,
     project_root: &PathBuf,
