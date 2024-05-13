@@ -198,6 +198,7 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
 struct PathToRefetchFieldInfo {
     refetch_field_parent_id: ServerObjectId,
     imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant,
+    extra_selections: MergedSelectionMap,
 }
 
 /// This struct contains everything that is available when we start
@@ -267,6 +268,7 @@ pub fn create_merged_selection_set(
                     let PathToRefetchFieldInfo {
                         refetch_field_parent_id,
                         imperatively_loaded_field_variant,
+                        extra_selections: _,
                     } = info;
                     let nested_merged_selection_set =
                         find_by_path(&full_merged_selection_set, &path_to_refetch_field);
@@ -609,6 +611,7 @@ fn maybe_note_path_to_refetch_fields(
                 PathToRefetchFieldInfo {
                     refetch_field_parent_id: parent_type.id,
                     imperatively_loaded_field_variant: variant.clone(),
+                    extra_selections: HashMap::new(),
                 },
             );
         }
