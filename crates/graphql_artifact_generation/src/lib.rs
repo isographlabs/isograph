@@ -1,4 +1,3 @@
-mod component_reader_artifact;
 mod eager_reader_artifact;
 mod entrypoint_artifact;
 mod generate_artifacts;

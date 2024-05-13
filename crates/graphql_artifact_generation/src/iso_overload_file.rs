@@ -2,9 +2,9 @@ use intern::Lookup;
 use std::{cmp::Ordering, path::PathBuf};
 
 use common_lang_types::{PathAndContent, SelectableFieldName};
-use isograph_schema::{ClientFieldVariant, ValidatedClientField, ValidatedSchema};
+use isograph_schema::{UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema};
 
-use crate::generate_artifacts::{client_defined_fields, ISO_TS};
+use crate::generate_artifacts::{user_written_fields, ISO_TS};
 
 fn build_iso_overload_for_entrypoint<'schema>(
     validated_client_field: &ValidatedClientField,
@@ -33,8 +33,9 @@ export function iso<T>(
 }
 
 fn build_iso_overload_for_client_defined_field(
-    client_field: &ValidatedClientField,
+    client_field_and_variant: (&ValidatedClientField, UserWrittenComponentVariant),
 ) -> (String, String) {
+    let (client_field, variant) = client_field_and_variant;
     let mut s: String = "".to_string();
     let import = format!(
         "import {{ {}__param }} from './{}/{}/param_type';\n",
@@ -46,7 +47,7 @@ fn build_iso_overload_for_client_defined_field(
         "field {}.{}",
         client_field.type_and_field.type_name, client_field.type_and_field.field_name
     );
-    if matches!(client_field.variant, ClientFieldVariant::Component(_)) {
+    if matches!(variant, UserWrittenComponentVariant::Component) {
         s.push_str(&format!(
             "
 export function iso<T>(
@@ -118,7 +119,7 @@ type MatchesWhitespaceAndString<
 > = Whitespace<T> extends `${TString}${string}` ? T : never;\n",
     );
 
-    let client_defined_field_overloads = sorted_client_defined_fields(schema)
+    let client_defined_field_overloads = sorted_user_written_fields(schema)
         .into_iter()
         .map(build_iso_overload_for_client_defined_field);
     for (import, field_overload) in client_defined_field_overloads {
@@ -156,19 +157,22 @@ export function iso(_isographLiteralText: string):
     }
 }
 
-fn sorted_client_defined_fields(schema: &ValidatedSchema) -> Vec<&ValidatedClientField> {
-    let mut fields = client_defined_fields(schema).collect::<Vec<_>>();
+fn sorted_user_written_fields(
+    schema: &ValidatedSchema,
+) -> Vec<(&ValidatedClientField, UserWrittenComponentVariant)> {
+    let mut fields = user_written_fields(schema).collect::<Vec<_>>();
     fields.sort_by(|client_field_1, client_field_2| {
         match client_field_1
+            .0
             .type_and_field
             .type_name
-            .cmp(&client_field_2.type_and_field.type_name)
+            .cmp(&client_field_2.0.type_and_field.type_name)
         {
             Ordering::Less => Ordering::Less,
             Ordering::Greater => Ordering::Greater,
             Ordering::Equal => sort_field_name(
-                client_field_1.type_and_field.field_name,
-                client_field_2.type_and_field.field_name,
+                client_field_1.0.type_and_field.field_name,
+                client_field_2.0.type_and_field.field_name,
             ),
         }
     });

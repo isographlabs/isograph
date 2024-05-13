@@ -154,10 +154,16 @@ pub struct ImperativelyLoadedFieldVariant {
     pub root_object_id: ServerObjectId,
 }
 
+// TODO Component is a GraphQL-ism
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum UserWrittenComponentVariant {
+    Eager,
+    Component,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ClientFieldVariant {
-    Component((ConstExportName, FilePath)),
-    Eager((ConstExportName, FilePath)),
+    UserWritten((ConstExportName, FilePath, UserWrittenComponentVariant)),
     ImperativelyLoadedField(ImperativelyLoadedFieldVariant),
 }
 
@@ -170,14 +176,16 @@ fn get_client_variant<TScalarField, TLinkedField>(
 ) -> ClientFieldVariant {
     for directive in client_field_declaration.directives.iter() {
         if directive.item.name.item == *COMPONENT {
-            return ClientFieldVariant::Component((
+            return ClientFieldVariant::UserWritten((
                 client_field_declaration.const_export_name,
                 client_field_declaration.definition_path,
+                UserWrittenComponentVariant::Component,
             ));
         }
     }
-    return ClientFieldVariant::Eager((
+    return ClientFieldVariant::UserWritten((
         client_field_declaration.const_export_name,
         client_field_declaration.definition_path,
+        UserWrittenComponentVariant::Eager,
     ));
 }

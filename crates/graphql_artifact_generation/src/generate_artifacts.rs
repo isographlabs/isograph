@@ -2,12 +2,11 @@ use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     fmt::{self, Debug, Display},
     path::PathBuf,
-    str::FromStr,
 };
 
 use common_lang_types::{
-    ArtifactFileType, ConstExportName, DescriptionValue, FilePath, IsographObjectTypeName,
-    PathAndContent, SelectableFieldName, WithLocation, WithSpan,
+    ArtifactFileType, DescriptionValue, IsographObjectTypeName, PathAndContent,
+    SelectableFieldName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, ListTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
@@ -17,12 +16,11 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, FieldDefinitionLocation, ObjectTypeAndFieldNames, SchemaObject,
-    ValidatedClientField, ValidatedSchema, ValidatedSelection,
+    UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema, ValidatedSelection,
 };
 use lazy_static::lazy_static;
 
 use crate::{
-    component_reader_artifact::generate_component_reader_artifact,
     eager_reader_artifact::generate_eager_reader_artifact,
     entrypoint_artifact::generate_entrypoint_artifact,
     imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
@@ -50,15 +48,16 @@ macro_rules! derive_display {
     };
 }
 
-pub(crate) fn client_defined_fields<'a>(
+pub(crate) fn user_written_fields<'a>(
     schema: &'a ValidatedSchema,
-) -> impl Iterator<Item = &'a ValidatedClientField> + 'a {
-    schema.client_fields.iter().filter(|client_field| {
-        matches!(
-            client_field.variant,
-            ClientFieldVariant::Component(_) | ClientFieldVariant::Eager(_)
-        )
-    })
+) -> impl Iterator<Item = (&'a ValidatedClientField, UserWrittenComponentVariant)> + 'a {
+    schema
+        .client_fields
+        .iter()
+        .filter_map(|client_field| match client_field.variant {
+            ClientFieldVariant::UserWritten(info) => Some((client_field, info.2)),
+            ClientFieldVariant::ImperativelyLoadedField(_) => None,
+        })
 }
 
 /// Get all artifacts according to the following scheme:
@@ -109,15 +108,8 @@ pub fn get_artifact_path_and_content<'schema>(
     for encountered_client_field_id in encountered_client_field_ids {
         let encountered_client_field = schema.client_field(encountered_client_field_id);
         path_and_contents.extend(match &encountered_client_field.variant {
-            ClientFieldVariant::Eager(component_name_and_path) => generate_eager_reader_artifact(
-                schema,
-                encountered_client_field,
-                project_root,
-                artifact_directory,
-                *component_name_and_path,
-            ),
-            ClientFieldVariant::Component(component_name_and_path) => {
-                generate_component_reader_artifact(
+            ClientFieldVariant::UserWritten(component_name_and_path) => {
+                generate_eager_reader_artifact(
                     schema,
                     encountered_client_field,
                     project_root,
@@ -175,37 +167,6 @@ derive_display!(ConvertFunction);
 pub(crate) struct RefetchQueryArtifactImport(pub String);
 derive_display!(RefetchQueryArtifactImport);
 
-pub(crate) fn generate_function_import_statement_for_eager_or_component(
-    project_root: &PathBuf,
-    artifact_directory: &PathBuf,
-    (file_name, path): (ConstExportName, FilePath),
-) -> ClientFieldFunctionImportStatement {
-    let path_to_client_field = project_root.join(
-        PathBuf::from_str(path.lookup())
-            .expect("paths should be legal here. This is indicative of a bug in Isograph."),
-    );
-    let relative_path =
-        // artifact directory includes __isograph, so artifact_directory.join("Type/Field")
-        // is a directory "two levels deep" within the artifact_directory.
-        //
-        // So diff_paths(path_to_client_field, artifact_directory.join("Type/Field"))
-        // is a lazy way of saying "make a relative path from two levels deep in the artifact
-        // dir to the client field".
-        //
-        // Since we will always go ../../../ the Type/Field part will never show up
-        // in the output.
-        //
-        // Anyway, TODO do better.
-        pathdiff::diff_paths(path_to_client_field, artifact_directory.join("Type/Field"))
-            .expect("Relative path should work");
-    ClientFieldFunctionImportStatement(format!(
-        "import {{ {file_name} as resolver }} from '{}';",
-        relative_path.to_str().expect(
-            "This path should be stringifiable. This probably is indicative of a bug in Relay."
-        )
-    ))
-}
-
 #[derive(Debug)]
 pub(crate) struct TypeImportName(pub String);
 derive_display!(TypeImportName);
@@ -261,12 +222,14 @@ pub(crate) fn get_serialized_field_arguments(
 pub(crate) fn generate_output_type(client_field: &ValidatedClientField) -> ClientFieldOutputType {
     match &client_field.variant {
         variant => match variant {
-            ClientFieldVariant::Component(_) => {
-                ClientFieldOutputType("(React.FC<ExtractSecondParam<typeof resolver>>)".to_string())
-            }
-            ClientFieldVariant::Eager(_) => {
-                ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
-            }
+            ClientFieldVariant::UserWritten(x) => match x.2 {
+                UserWrittenComponentVariant::Eager => {
+                    ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
+                }
+                UserWrittenComponentVariant::Component => ClientFieldOutputType(
+                    "(React.FC<ExtractSecondParam<typeof resolver>>)".to_string(),
+                ),
+            },
             ClientFieldVariant::ImperativelyLoadedField(params) => {
                 match params.primary_field_info {
                     Some(_) => ClientFieldOutputType("(params: any) => void".to_string()),
