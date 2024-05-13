@@ -64,7 +64,7 @@ impl UnvalidatedSchema {
                 }
             }
             SelectableServerFieldId::Scalar(scalar_id) => {
-                let scalar_name = self.server_field_data.server_scalars[scalar_id.as_usize()].name;
+                let scalar_name = self.server_field_data.scalar(*scalar_id).name;
                 Err(WithLocation::new(
                     ValidateEntrypointDeclarationError::InvalidParentType {
                         parent_type: "scalar",

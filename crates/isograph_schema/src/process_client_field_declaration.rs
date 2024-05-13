@@ -39,7 +39,7 @@ impl UnvalidatedSchema {
                     .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?;
             }
             SelectableServerFieldId::Scalar(scalar_id) => {
-                let scalar_name = self.server_field_data.server_scalars[scalar_id.as_usize()].name;
+                let scalar_name = self.server_field_data.scalar(*scalar_id).name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
                         parent_type_name: scalar_name.item.into(),
