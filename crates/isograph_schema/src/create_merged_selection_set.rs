@@ -199,7 +199,11 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
 /// A mutable reference to this struct is passed down to all children.
 #[derive(Debug)]
 struct MergeTraversalState<'a> {
-    paths_to_refetch_fields: HashSet<(PathToRefetchField, ServerObjectId, ClientFieldVariant)>,
+    paths_to_refetch_fields: HashSet<(
+        PathToRefetchField,
+        ServerObjectId,
+        ImperativelyLoadedFieldVariant,
+    )>,
     /// As we traverse selection sets, we need to keep track of the path we have
     /// taken so far. This is because when we encounter a refetch query, we need
     /// to take note of the path we took to reach that query, but continue
@@ -224,7 +228,11 @@ impl<'a> MergeTraversalState<'a> {
 
     pub fn sorted_paths_to_refetch_fields(
         self,
-    ) -> Vec<(PathToRefetchField, ServerObjectId, ClientFieldVariant)> {
+    ) -> Vec<(
+        PathToRefetchField,
+        ServerObjectId,
+        ImperativelyLoadedFieldVariant,
+    )> {
         let mut paths = self.paths_to_refetch_fields.into_iter().collect::<Vec<_>>();
         paths.sort();
         paths
@@ -258,25 +266,24 @@ pub fn create_merged_selection_set(
                 .map(
                     |(
                         index,
-                        (path_to_refetch_field, refetch_field_parent_id, client_field_variant),
+                        (
+                            path_to_refetch_field,
+                            refetch_field_parent_id,
+                            imperatively_loaded_variant,
+                        ),
                     )| {
                         let nested_merged_selection_set =
                             find_by_path(&full_merged_selection_set, &path_to_refetch_field);
 
                         let (field_name, reachable_variables, artifact_info) =
-                            match client_field_variant {
-                                ClientFieldVariant::ImperativelyLoadedField(variant) => {
-                                    process_imperatively_loaded_field(
-                                        schema,
-                                        variant,
-                                        refetch_field_parent_id,
-                                        nested_merged_selection_set,
-                                        entrypoint,
-                                        index,
-                                    )
-                                }
-                                _ => panic!("invalid client field variant"),
-                            };
+                            process_imperatively_loaded_field(
+                                schema,
+                                imperatively_loaded_variant,
+                                refetch_field_parent_id,
+                                nested_merged_selection_set,
+                                entrypoint,
+                                index,
+                            );
                         artifact_queue.push(artifact_info);
 
                         RootRefetchedPath {
@@ -295,22 +302,14 @@ pub fn create_merged_selection_set(
             let root_refetched_paths: Vec<_> = merge_traversal_state
                 .sorted_paths_to_refetch_fields()
                 .into_iter()
-                .map(|(path_to_refetch_field, _, client_field_variant)| {
+                .map(|(path_to_refetch_field, _, imperatively_loaded_variant)| {
                     let nested_merged_selection_set =
                         find_by_path(&full_merged_selection_set, &path_to_refetch_field);
 
                     // TODO we can pre-calculate this instead of re-iterating here
                     let reachable_variables = nested_merged_selection_set.reachable_variables();
 
-                    let field_name = match client_field_variant {
-                        ClientFieldVariant::ImperativelyLoadedField(
-                            ImperativelyLoadedFieldVariant {
-                                client_field_scalar_selection_name: mutation_field_name,
-                                ..
-                            },
-                        ) => mutation_field_name,
-                        _ => panic!("invalid client field variant"),
-                    };
+                    let field_name = imperatively_loaded_variant.client_field_scalar_selection_name;
 
                     let mut reachable_variables_vec: Vec<_> =
                         reachable_variables.into_iter().collect();
@@ -690,7 +689,7 @@ fn merge_scalar_client_field(
                     field_name: client_field.name,
                 },
                 parent_type.id,
-                ClientFieldVariant::ImperativelyLoadedField(variant.clone()),
+                variant.clone(),
             ));
         }
         _ => {}
