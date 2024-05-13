@@ -194,16 +194,19 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
     pub query_name: QueryOperationName,
 }
 
+#[derive(Eq, PartialEq, PartialOrd, Ord, Hash, Debug)]
+struct PathToRefetchFieldInfo {
+    path_to_refetch_field: PathToRefetchField,
+    refetch_field_parent_id: ServerObjectId,
+    imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant,
+}
+
 /// This struct contains everything that is available when we start
 /// generating a merged selection set for a given fetchable resolver root.
 /// A mutable reference to this struct is passed down to all children.
 #[derive(Debug)]
 struct MergeTraversalState<'a> {
-    paths_to_refetch_fields: HashSet<(
-        PathToRefetchField,
-        ServerObjectId,
-        ImperativelyLoadedFieldVariant,
-    )>,
+    paths_to_refetch_fields: HashSet<PathToRefetchFieldInfo>,
     /// As we traverse selection sets, we need to keep track of the path we have
     /// taken so far. This is because when we encounter a refetch query, we need
     /// to take note of the path we took to reach that query, but continue
@@ -226,13 +229,7 @@ impl<'a> MergeTraversalState<'a> {
         }
     }
 
-    pub fn sorted_paths_to_refetch_fields(
-        self,
-    ) -> Vec<(
-        PathToRefetchField,
-        ServerObjectId,
-        ImperativelyLoadedFieldVariant,
-    )> {
+    pub fn sorted_paths_to_refetch_fields(self) -> Vec<PathToRefetchFieldInfo> {
         let mut paths = self.paths_to_refetch_fields.into_iter().collect::<Vec<_>>();
         paths.sort();
         paths
@@ -263,36 +260,32 @@ pub fn create_merged_selection_set(
                 .sorted_paths_to_refetch_fields()
                 .into_iter()
                 .enumerate()
-                .map(
-                    |(
-                        index,
-                        (
-                            path_to_refetch_field,
+                .map(|(index, info)| {
+                    let PathToRefetchFieldInfo {
+                        path_to_refetch_field,
+                        refetch_field_parent_id,
+                        imperatively_loaded_field_variant,
+                    } = info;
+                    let nested_merged_selection_set =
+                        find_by_path(&full_merged_selection_set, &path_to_refetch_field);
+
+                    let (field_name, reachable_variables, artifact_info) =
+                        process_imperatively_loaded_field(
+                            schema,
+                            imperatively_loaded_field_variant,
                             refetch_field_parent_id,
-                            imperatively_loaded_variant,
-                        ),
-                    )| {
-                        let nested_merged_selection_set =
-                            find_by_path(&full_merged_selection_set, &path_to_refetch_field);
+                            nested_merged_selection_set,
+                            entrypoint,
+                            index,
+                        );
+                    artifact_queue.push(artifact_info);
 
-                        let (field_name, reachable_variables, artifact_info) =
-                            process_imperatively_loaded_field(
-                                schema,
-                                imperatively_loaded_variant,
-                                refetch_field_parent_id,
-                                nested_merged_selection_set,
-                                entrypoint,
-                                index,
-                            );
-                        artifact_queue.push(artifact_info);
-
-                        RootRefetchedPath {
-                            path: path_to_refetch_field,
-                            variables: reachable_variables,
-                            field_name: field_name.into(),
-                        }
-                    },
-                )
+                    RootRefetchedPath {
+                        path: path_to_refetch_field,
+                        variables: reachable_variables,
+                        field_name: field_name.into(),
+                    }
+                })
                 .collect();
 
             (full_merged_selection_set, root_refetched_paths)
@@ -302,14 +295,20 @@ pub fn create_merged_selection_set(
             let root_refetched_paths: Vec<_> = merge_traversal_state
                 .sorted_paths_to_refetch_fields()
                 .into_iter()
-                .map(|(path_to_refetch_field, _, imperatively_loaded_variant)| {
+                .map(|info| {
+                    let PathToRefetchFieldInfo {
+                        path_to_refetch_field,
+                        imperatively_loaded_field_variant,
+                        ..
+                    } = info;
                     let nested_merged_selection_set =
                         find_by_path(&full_merged_selection_set, &path_to_refetch_field);
 
                     // TODO we can pre-calculate this instead of re-iterating here
                     let reachable_variables = nested_merged_selection_set.reachable_variables();
 
-                    let field_name = imperatively_loaded_variant.client_field_scalar_selection_name;
+                    let field_name =
+                        imperatively_loaded_field_variant.client_field_scalar_selection_name;
 
                     let mut reachable_variables_vec: Vec<_> =
                         reachable_variables.into_iter().collect();
@@ -601,14 +600,16 @@ fn maybe_note_path_to_refetch_fields(
 ) {
     match &client_field.variant {
         ClientFieldVariant::ImperativelyLoadedField(variant) => {
-            merge_traversal_state.paths_to_refetch_fields.insert((
-                PathToRefetchField {
-                    linked_fields: merge_traversal_state.current_path.clone(),
-                    field_name: client_field.name,
-                },
-                parent_type.id,
-                variant.clone(),
-            ));
+            merge_traversal_state
+                .paths_to_refetch_fields
+                .insert(PathToRefetchFieldInfo {
+                    path_to_refetch_field: PathToRefetchField {
+                        linked_fields: merge_traversal_state.current_path.clone(),
+                        field_name: client_field.name,
+                    },
+                    refetch_field_parent_id: parent_type.id,
+                    imperatively_loaded_field_variant: variant.clone(),
+                });
         }
         _ => {}
     };
