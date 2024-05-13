@@ -1,10 +1,10 @@
 use intern::Lookup;
 use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
-use common_lang_types::{ConstExportName, FilePath, PathAndContent, SelectableFieldName};
+use common_lang_types::{PathAndContent, SelectableFieldName};
 use isograph_schema::{
-    create_merged_selection_set, SchemaObject, UserWrittenComponentVariant, ValidatedClientField,
-    ValidatedSchema,
+    create_merged_selection_set, SchemaObject, UserWrittenClientFieldInfo,
+    UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema,
 };
 
 use crate::{
@@ -22,9 +22,9 @@ pub fn generate_eager_reader_artifact<'schema>(
     client_field: &ValidatedClientField,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
-    component_name_and_path: (ConstExportName, FilePath, UserWrittenComponentVariant),
+    info: UserWrittenClientFieldInfo,
 ) -> Vec<PathAndContent> {
-    let user_written_component_variant = component_name_and_path.2;
+    let user_written_component_variant = info.user_written_component_variant;
     if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
         let parent_type = schema
             .server_field_data
@@ -61,11 +61,8 @@ pub fn generate_eager_reader_artifact<'schema>(
             0,
         );
         let client_field_output_type = generate_output_type(client_field);
-        let function_import_statement = generate_function_import_statement(
-            project_root,
-            artifact_directory,
-            component_name_and_path,
-        );
+        let function_import_statement =
+            generate_function_import_statement(project_root, artifact_directory, info);
         EagerReaderArtifactInfo {
             parent_type: parent_type.into(),
             client_field_name: client_field.name,
@@ -219,10 +216,11 @@ impl<'schema> EagerReaderArtifactInfo<'schema> {
 fn generate_function_import_statement(
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
-    (file_name, path, _is_eager): (ConstExportName, FilePath, UserWrittenComponentVariant),
+    user_written_client_field_info: UserWrittenClientFieldInfo,
 ) -> ClientFieldFunctionImportStatement {
+    let const_export_name = user_written_client_field_info.const_export_name;
     let path_to_client_field = project_root.join(
-        PathBuf::from_str(path.lookup())
+        PathBuf::from_str(user_written_client_field_info.file_path.lookup())
             .expect("paths should be legal here. This is indicative of a bug in Isograph."),
     );
     let relative_path =
@@ -240,7 +238,7 @@ fn generate_function_import_statement(
         pathdiff::diff_paths(path_to_client_field, artifact_directory.join("Type/Field"))
             .expect("Relative path should work");
     ClientFieldFunctionImportStatement(format!(
-        "import {{ {file_name} as resolver }} from '{}';",
+        "import {{ {const_export_name} as resolver }} from '{}';",
         relative_path.to_str().expect(
             "This path should be stringifiable. This probably is indicative of a bug in Relay."
         )

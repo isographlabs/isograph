@@ -161,9 +161,17 @@ pub enum UserWrittenComponentVariant {
     Component,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct UserWrittenClientFieldInfo {
+    // TODO use a shared struct
+    pub const_export_name: ConstExportName,
+    pub file_path: FilePath,
+    pub user_written_component_variant: UserWrittenComponentVariant,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ClientFieldVariant {
-    UserWritten((ConstExportName, FilePath, UserWrittenComponentVariant)),
+    UserWritten(UserWrittenClientFieldInfo),
     ImperativelyLoadedField(ImperativelyLoadedFieldVariant),
 }
 
@@ -176,16 +184,16 @@ fn get_client_variant<TScalarField, TLinkedField>(
 ) -> ClientFieldVariant {
     for directive in client_field_declaration.directives.iter() {
         if directive.item.name.item == *COMPONENT {
-            return ClientFieldVariant::UserWritten((
-                client_field_declaration.const_export_name,
-                client_field_declaration.definition_path,
-                UserWrittenComponentVariant::Component,
-            ));
+            return ClientFieldVariant::UserWritten(UserWrittenClientFieldInfo {
+                const_export_name: client_field_declaration.const_export_name,
+                file_path: client_field_declaration.definition_path,
+                user_written_component_variant: UserWrittenComponentVariant::Component,
+            });
         }
     }
-    return ClientFieldVariant::UserWritten((
-        client_field_declaration.const_export_name,
-        client_field_declaration.definition_path,
-        UserWrittenComponentVariant::Eager,
-    ));
+    return ClientFieldVariant::UserWritten(UserWrittenClientFieldInfo {
+        const_export_name: client_field_declaration.const_export_name,
+        file_path: client_field_declaration.definition_path,
+        user_written_component_variant: UserWrittenComponentVariant::Eager,
+    });
 }

@@ -55,7 +55,9 @@ pub(crate) fn user_written_fields<'a>(
         .client_fields
         .iter()
         .filter_map(|client_field| match client_field.variant {
-            ClientFieldVariant::UserWritten(info) => Some((client_field, info.2)),
+            ClientFieldVariant::UserWritten(info) => {
+                Some((client_field, info.user_written_component_variant))
+            }
             ClientFieldVariant::ImperativelyLoadedField(_) => None,
         })
 }
@@ -108,15 +110,13 @@ pub fn get_artifact_path_and_content<'schema>(
     for encountered_client_field_id in encountered_client_field_ids {
         let encountered_client_field = schema.client_field(encountered_client_field_id);
         path_and_contents.extend(match &encountered_client_field.variant {
-            ClientFieldVariant::UserWritten(component_name_and_path) => {
-                generate_eager_reader_artifact(
-                    schema,
-                    encountered_client_field,
-                    project_root,
-                    artifact_directory,
-                    *component_name_and_path,
-                )
-            }
+            ClientFieldVariant::UserWritten(info) => generate_eager_reader_artifact(
+                schema,
+                encountered_client_field,
+                project_root,
+                artifact_directory,
+                *info,
+            ),
             ClientFieldVariant::ImperativelyLoadedField(variant) => {
                 generate_refetch_reader_artifact(schema, encountered_client_field, variant)
             }
@@ -222,7 +222,7 @@ pub(crate) fn get_serialized_field_arguments(
 pub(crate) fn generate_output_type(client_field: &ValidatedClientField) -> ClientFieldOutputType {
     match &client_field.variant {
         variant => match variant {
-            ClientFieldVariant::UserWritten(x) => match x.2 {
+            ClientFieldVariant::UserWritten(info) => match info.user_written_component_variant {
                 UserWrittenComponentVariant::Eager => {
                     ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
                 }
