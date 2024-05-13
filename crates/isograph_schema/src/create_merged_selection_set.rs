@@ -194,9 +194,8 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
     pub query_name: QueryOperationName,
 }
 
-#[derive(Eq, PartialEq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Eq, PartialEq, Debug)]
 struct PathToRefetchFieldInfo {
-    path_to_refetch_field: PathToRefetchField,
     refetch_field_parent_id: ServerObjectId,
     imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant,
 }
@@ -206,7 +205,7 @@ struct PathToRefetchFieldInfo {
 /// A mutable reference to this struct is passed down to all children.
 #[derive(Debug)]
 struct MergeTraversalState<'a> {
-    paths_to_refetch_fields: HashSet<PathToRefetchFieldInfo>,
+    paths_to_refetch_fields: HashMap<PathToRefetchField, PathToRefetchFieldInfo>,
     /// As we traverse selection sets, we need to keep track of the path we have
     /// taken so far. This is because when we encounter a refetch query, we need
     /// to take note of the path we took to reach that query, but continue
@@ -229,9 +228,13 @@ impl<'a> MergeTraversalState<'a> {
         }
     }
 
-    pub fn sorted_paths_to_refetch_fields(self) -> Vec<PathToRefetchFieldInfo> {
+    pub fn sorted_paths_to_refetch_fields(
+        self,
+    ) -> Vec<(PathToRefetchField, PathToRefetchFieldInfo)> {
         let mut paths = self.paths_to_refetch_fields.into_iter().collect::<Vec<_>>();
-        paths.sort();
+
+        paths.sort_by_cached_key(|(k, _)| k.clone());
+
         paths
     }
 }
@@ -260,9 +263,8 @@ pub fn create_merged_selection_set(
                 .sorted_paths_to_refetch_fields()
                 .into_iter()
                 .enumerate()
-                .map(|(index, info)| {
+                .map(|(index, (path_to_refetch_field, info))| {
                     let PathToRefetchFieldInfo {
-                        path_to_refetch_field,
                         refetch_field_parent_id,
                         imperatively_loaded_field_variant,
                     } = info;
@@ -295,9 +297,8 @@ pub fn create_merged_selection_set(
             let root_refetched_paths: Vec<_> = merge_traversal_state
                 .sorted_paths_to_refetch_fields()
                 .into_iter()
-                .map(|info| {
+                .map(|(path_to_refetch_field, info)| {
                     let PathToRefetchFieldInfo {
-                        path_to_refetch_field,
                         imperatively_loaded_field_variant,
                         ..
                     } = info;
@@ -600,16 +601,16 @@ fn maybe_note_path_to_refetch_fields(
 ) {
     match &client_field.variant {
         ClientFieldVariant::ImperativelyLoadedField(variant) => {
-            merge_traversal_state
-                .paths_to_refetch_fields
-                .insert(PathToRefetchFieldInfo {
-                    path_to_refetch_field: PathToRefetchField {
-                        linked_fields: merge_traversal_state.current_path.clone(),
-                        field_name: client_field.name,
-                    },
+            merge_traversal_state.paths_to_refetch_fields.insert(
+                PathToRefetchField {
+                    linked_fields: merge_traversal_state.current_path.clone(),
+                    field_name: client_field.name,
+                },
+                PathToRefetchFieldInfo {
                     refetch_field_parent_id: parent_type.id,
                     imperatively_loaded_field_variant: variant.clone(),
-                });
+                },
+            );
         }
         _ => {}
     };
