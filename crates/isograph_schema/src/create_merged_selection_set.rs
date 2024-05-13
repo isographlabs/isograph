@@ -538,12 +538,18 @@ fn merge_selections_into_set(
                             {
                                 encountered_client_field_ids.insert(*client_field_id);
                             }
+                            let client_field = schema.client_field(*client_field_id);
+                            maybe_note_path_to_refetch_fields(
+                                client_field,
+                                merge_traversal_state,
+                                parent_type,
+                            );
                             merge_scalar_client_field(
                                 parent_type,
                                 schema,
                                 merged_selection_map,
                                 merge_traversal_state,
-                                *client_field_id,
+                                client_field,
                             )
                         }
                     };
@@ -586,6 +592,26 @@ fn merge_selections_into_set(
             },
         }
     }
+}
+
+fn maybe_note_path_to_refetch_fields(
+    client_field: &ValidatedClientField,
+    merge_traversal_state: &mut MergeTraversalState,
+    parent_type: &SchemaObject,
+) {
+    match &client_field.variant {
+        ClientFieldVariant::ImperativelyLoadedField(variant) => {
+            merge_traversal_state.paths_to_refetch_fields.insert((
+                PathToRefetchField {
+                    linked_fields: merge_traversal_state.current_path.clone(),
+                    field_name: client_field.name,
+                },
+                parent_type.id,
+                variant.clone(),
+            ));
+        }
+        _ => {}
+    };
 }
 
 fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
@@ -666,9 +692,8 @@ fn merge_scalar_client_field(
     schema: &ValidatedSchema,
     merged_selection_map: &mut MergedSelectionMap,
     merge_traversal_state: &mut MergeTraversalState<'_>,
-    client_field_id: ClientFieldId,
+    client_field: &ValidatedClientField,
 ) {
-    let client_field = schema.client_field(client_field_id);
     if let Some((ref selection_set, _)) = client_field.selection_set_and_unwraps {
         merge_selections_into_set(
             schema,
@@ -680,20 +705,6 @@ fn merge_scalar_client_field(
     } else {
         panic!("unsupported client field without selection set");
     }
-
-    match &client_field.variant {
-        ClientFieldVariant::ImperativelyLoadedField(variant) => {
-            merge_traversal_state.paths_to_refetch_fields.insert((
-                PathToRefetchField {
-                    linked_fields: merge_traversal_state.current_path.clone(),
-                    field_name: client_field.name,
-                },
-                parent_type.id,
-                variant.clone(),
-            ));
-        }
-        _ => {}
-    };
 }
 
 fn merge_scalar_server_field(
