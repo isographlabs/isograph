@@ -42,7 +42,7 @@ pub fn validate_isograph_field_directives(
         } = with_span.item;
         match selection_set_and_unwraps {
             Some((selection_set, unwraps)) => {
-                let sub_errors = and_then_selection_set_and_collect_errors(
+                let selecton_set_or_errors = and_then_selection_set_and_collect_errors(
                     selection_set,
                     &|scalar_field_selection| {
                         if let Some(directive) = scalar_field_selection
@@ -67,7 +67,7 @@ pub fn validate_isograph_field_directives(
                     },
                     &|_linked_field_selection| Ok(IsographSelectionVariant::Regular),
                 );
-                match sub_errors {
+                match selecton_set_or_errors {
                     Ok(new_selection_set) => transformed_client_fields.push(
                         (WithSpan::new(
                             ClientFieldDeclarationWithValidatedDirectives {

@@ -51,7 +51,7 @@ pub enum IsographSelectionVariant {
 pub struct LoadableVariant {
     #[allow(dead_code)]
     #[serde(default)]
-    fat_selection_set: bool,
+    complete_selection_set: bool,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
