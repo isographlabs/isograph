@@ -32,7 +32,7 @@ pub enum IsographLiteralParseError {
         suggested_const_export_name: ScalarFieldName,
     },
 
-    #[error("Expected a valid value, like $foo or 42")]
+    #[error("Expected a valid value, like $foo, 42, true or false")]
     ExpectedNonConstantValue,
 
     #[error("Descriptions are currently disallowed")]
@@ -58,6 +58,9 @@ pub enum IsographLiteralParseError {
         this client field declaration"
     )]
     DuplicateNameOrAlias { name_or_alias: FieldNameOrAlias },
+
+    #[error("Expected a boolean value (true or false).")]
+    ExpectedBoolean,
 }
 
 impl From<LowLevelParseError> for IsographLiteralParseError {

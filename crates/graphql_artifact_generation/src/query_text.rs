@@ -150,5 +150,6 @@ fn serialize_non_constant_value_for_graphql(value: &NonConstantValue) -> String 
     match value {
         NonConstantValue::Variable(variable_name) => format!("${}", variable_name),
         NonConstantValue::Integer(int_value) => int_value.to_string(),
+        NonConstantValue::Boolean(bool) => bool.to_string(),
     }
 }

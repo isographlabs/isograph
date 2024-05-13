@@ -250,6 +250,7 @@ impl SelectionFieldArgument {
 pub enum NonConstantValue {
     Variable(VariableName),
     Integer(u64),
+    Boolean(bool),
 }
 
 impl NonConstantValue {
@@ -257,6 +258,7 @@ impl NonConstantValue {
         match self {
             NonConstantValue::Variable(name) => vec![*name],
             NonConstantValue::Integer(_) => vec![],
+            NonConstantValue::Boolean(_) => vec![],
         }
     }
 
@@ -265,6 +267,7 @@ impl NonConstantValue {
             NonConstantValue::Variable(name) => format!("v_{}", name),
             // l for literal, i.e. this is shared with others
             NonConstantValue::Integer(int_value) => format!("l_{}", int_value),
+            NonConstantValue::Boolean(bool) => format!("l_{}", bool),
         }
     }
 }
