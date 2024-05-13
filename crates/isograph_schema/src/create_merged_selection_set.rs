@@ -263,131 +263,25 @@ pub fn create_merged_selection_set(
                         let nested_merged_selection_set =
                             find_by_path(&full_merged_selection_set, &path_to_refetch_field);
 
-                        let (field_name, reachable_variables) = match client_field_variant {
-                            ClientFieldVariant::ImperativelyLoadedField(
-                                ImperativelyLoadedFieldVariant {
-                                    client_field_scalar_selection_name,
-                                    top_level_schema_field_name,
-                                    top_level_schema_field_arguments,
-                                    primary_field_info,
-                                    root_object_id,
-                                },
-                            ) => {
-                                // This could be Pet
-                                let refetch_field_parent_type =
-                                    schema.server_field_data.object(refetch_field_parent_id);
-
-                                // TODO we can pre-calculate this instead of re-iterating here
-                                let mut reachable_variables =
-                                    nested_merged_selection_set.reachable_variables();
-
-                                let mut definitions_of_used_variables =
-                                    get_used_variable_definitions(&reachable_variables, entrypoint);
-
-                                let requires_refinement = if primary_field_info
-                                    .as_ref()
-                                    .map(|x| {
-                                        x.primary_field_return_type_object_id
-                                            != refetch_field_parent_id
-                                    })
-                                    .unwrap_or(true)
-                                {
-                                    RequiresRefinement::Yes(refetch_field_parent_type.name)
-                                } else {
-                                    RequiresRefinement::No
-                                };
-
-                                let wrapped_selection_set = selection_set_wrapped(
-                                    nested_merged_selection_set,
-                                    // TODO why are these types different
-                                    top_level_schema_field_name.lookup().intern().into(),
-                                    top_level_schema_field_arguments
-                                        .iter()
-                                        // TODO don't clone
-                                        .cloned()
-                                        .map(|x| {
-                                            let variable_name =
-                                                x.item.name.map(|value_name| value_name.into());
-                                            definitions_of_used_variables.push(WithSpan {
-                                                item: VariableDefinition {
-                                                    name: variable_name,
-                                                    type_: x.item.type_.clone().map(|type_name| {
-                                                        *schema
-                                                            .server_field_data
-                                                            .defined_types
-                                                            .get(&type_name.into())
-                                                            .expect(
-                                                                "Expected type to be found, \
-                                                                this indicates a bug in Isograph",
-                                                            )
-                                                    }),
-                                                },
-                                                span: Span::todo_generated(),
-                                            });
-
-                                            reachable_variables.insert(variable_name.item);
-
-                                            x.map(|item| SelectionFieldArgument {
-                                                name: WithSpan::new(
-                                                    item.name.item.lookup().intern().into(),
-                                                    Span::todo_generated(),
-                                                ),
-                                                value: WithSpan::new(
-                                                    NonConstantValue::Variable(
-                                                        item.name.item.into(),
-                                                    ),
-                                                    Span::todo_generated(),
-                                                ),
-                                            })
-                                        })
-                                        .collect(),
-                                    primary_field_info
-                                        .as_ref()
-                                        .map(|x| x.primary_field_name.lookup().intern().into()),
-                                    requires_refinement,
-                                );
-
-                                let root_parent_object = schema
-                                    .server_field_data
-                                    .object(entrypoint.parent_object_id)
-                                    .name;
-                                artifact_queue.push(ImperativelyLoadedFieldArtifactInfo {
-                                    merged_selection_set: wrapped_selection_set,
-                                    root_parent_object,
-                                    variable_definitions: definitions_of_used_variables,
-                                    root_fetchable_field: entrypoint.name,
-                                    refetch_query_index: RefetchQueryIndex(index as u32),
-                                    root_operation_name: schema
-                                        .fetchable_types
-                                        .get(&root_object_id)
-                                        .expect(
-                                            "Expected root type to be fetchable here.\
-                                                 This is indicative of a bug in Isograph.",
-                                        )
-                                        .clone(),
-                                    query_name: if primary_field_info.is_some() {
-                                        format!(
-                                            "{}__{}",
-                                            root_parent_object, client_field_scalar_selection_name
-                                        )
-                                    } else {
-                                        format!("{}__refetch", refetch_field_parent_type.name)
-                                    }
-                                    .intern()
-                                    .into(),
-                                });
-                                (client_field_scalar_selection_name, reachable_variables)
-                            }
-                            _ => panic!("invalid client field variant"),
-                        };
-
-                        let mut reachable_variables_vec: Vec<_> =
-                            reachable_variables.into_iter().collect();
-                        reachable_variables_vec.sort();
+                        let (field_name, reachable_variables, artifact_info) =
+                            match client_field_variant {
+                                ClientFieldVariant::ImperativelyLoadedField(variant) => {
+                                    process_imperatively_loaded_field(
+                                        schema,
+                                        variant,
+                                        refetch_field_parent_id,
+                                        nested_merged_selection_set,
+                                        entrypoint,
+                                        index,
+                                    )
+                                }
+                                _ => panic!("invalid client field variant"),
+                            };
+                        artifact_queue.push(artifact_info);
 
                         RootRefetchedPath {
                             path: path_to_refetch_field,
-                            variables: reachable_variables_vec,
+                            variables: reachable_variables,
                             field_name: field_name.into(),
                         }
                     },
@@ -433,6 +327,137 @@ pub fn create_merged_selection_set(
             (full_merged_selection_set, root_refetched_paths)
         }
     }
+}
+
+fn process_imperatively_loaded_field(
+    schema: &ValidatedSchema,
+    variant: ImperativelyLoadedFieldVariant,
+    refetch_field_parent_id: ServerObjectId,
+    nested_merged_selection_set: MergedSelectionSet,
+    entrypoint: &ValidatedClientField,
+    index: usize,
+) -> (
+    ScalarFieldName,
+    Vec<VariableName>,
+    ImperativelyLoadedFieldArtifactInfo,
+) {
+    let ImperativelyLoadedFieldVariant {
+        client_field_scalar_selection_name,
+        top_level_schema_field_name,
+        top_level_schema_field_arguments,
+        primary_field_info,
+        root_object_id,
+    } = variant;
+    let client_field_scalar_selection_name = client_field_scalar_selection_name;
+    // This could be Pet
+    let refetch_field_parent_type = schema.server_field_data.object(refetch_field_parent_id);
+
+    // TODO we can pre-calculate this instead of re-iterating here
+    let mut reachable_variables = nested_merged_selection_set.reachable_variables();
+
+    let mut definitions_of_used_variables =
+        get_used_variable_definitions(&reachable_variables, entrypoint);
+
+    let requires_refinement = if primary_field_info
+        .as_ref()
+        .map(|x| x.primary_field_return_type_object_id != refetch_field_parent_id)
+        .unwrap_or(true)
+    {
+        RequiresRefinement::Yes(refetch_field_parent_type.name)
+    } else {
+        RequiresRefinement::No
+    };
+
+    let wrapped_selection_set = selection_set_wrapped(
+        nested_merged_selection_set,
+        // TODO why are these types different
+        top_level_schema_field_name.lookup().intern().into(),
+        top_level_schema_field_arguments
+            .iter()
+            // TODO don't clone
+            .cloned()
+            .map(|x| {
+                let variable_name = x.item.name.map(|value_name| value_name.into());
+                definitions_of_used_variables.push(WithSpan {
+                    item: VariableDefinition {
+                        name: variable_name,
+                        type_: x.item.type_.clone().map(|type_name| {
+                            *schema
+                                .server_field_data
+                                .defined_types
+                                .get(&type_name.into())
+                                .expect(
+                                    "Expected type to be found, \
+                                                                this indicates a bug in Isograph",
+                                )
+                        }),
+                    },
+                    span: Span::todo_generated(),
+                });
+
+                reachable_variables.insert(variable_name.item);
+
+                x.map(|item| SelectionFieldArgument {
+                    name: WithSpan::new(
+                        item.name.item.lookup().intern().into(),
+                        Span::todo_generated(),
+                    ),
+                    value: WithSpan::new(
+                        NonConstantValue::Variable(item.name.item.into()),
+                        Span::todo_generated(),
+                    ),
+                })
+            })
+            .collect(),
+        primary_field_info
+            .as_ref()
+            .map(|x| x.primary_field_name.lookup().intern().into()),
+        requires_refinement,
+    );
+
+    let root_parent_object = schema
+        .server_field_data
+        .object(entrypoint.parent_object_id)
+        .name;
+
+    let root_operation_name = schema
+        .fetchable_types
+        .get(&root_object_id)
+        .expect(
+            "Expected root type to be fetchable here.\
+                                                 This is indicative of a bug in Isograph.",
+        )
+        .clone();
+
+    let query_name = if primary_field_info.is_some() {
+        format!(
+            "{}__{}",
+            root_parent_object, client_field_scalar_selection_name
+        )
+    } else {
+        format!("{}__refetch", refetch_field_parent_type.name)
+    }
+    .intern()
+    .into();
+
+    let artifact_info = ImperativelyLoadedFieldArtifactInfo {
+        merged_selection_set: wrapped_selection_set,
+        root_parent_object,
+        variable_definitions: definitions_of_used_variables,
+        root_fetchable_field: entrypoint.name,
+        refetch_query_index: RefetchQueryIndex(index as u32),
+        root_operation_name,
+        query_name,
+    };
+
+    let mut reachable_variables_vec: Vec<_> = reachable_variables.into_iter().collect();
+    reachable_variables_vec.sort();
+
+    (
+        client_field_scalar_selection_name,
+        reachable_variables_vec,
+        artifact_info,
+    )
 }
 
 fn get_used_variable_definitions(
