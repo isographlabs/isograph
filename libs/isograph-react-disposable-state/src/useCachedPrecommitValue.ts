@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ParentCache } from './ParentCache';
 import { useHasCommittedRef } from './useHasCommittedRef';
-import { ItemCleanupPair } from '@isograph/disposable-types/dist';
+import { ItemCleanupPair } from '@isograph/disposable-types';
 
 /**
  * usePrecommitValue<T>
