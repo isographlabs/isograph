@@ -44,7 +44,7 @@ export const PetStatsCard = iso(`
           variant="contained"
           onClick={() => pet.stats?.refetch_pet_stats({ id: pet.id })}
         >
-          Refetch pet??
+          Refetch pet
         </Button>
       </CardContent>
     </Card>
