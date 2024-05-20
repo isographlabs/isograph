@@ -2,6 +2,7 @@ import React from 'react';
 import { Container } from '@mui/material';
 import { useLazyReference, useResult } from '@isograph/react';
 import { iso } from '@iso';
+import { useRouter } from 'next/router';
 
 export type PetId = string;
 
@@ -16,10 +17,28 @@ export type PetDetailRoute = {
   id: PetId;
 };
 
-export function GraphQLConfDemo(props: {}) {
-  const [currentRoute, setCurrentRoute] = React.useState<Route>({
-    kind: 'Home',
-  });
+function toRoute(route: Route): string {
+  switch (route.kind) {
+    case 'Home': {
+      return '/';
+    }
+    case 'PetDetail': {
+      return `/pet/${route.id}`;
+    }
+  }
+}
+
+export function GraphQLConfDemo(props: { initialState: Route }) {
+  const router = useRouter();
+  const [currentRoute, setCurrentRoute] = React.useState<Route>(
+    props.initialState,
+  );
+
+  const updateRoute = (route: Route) => {
+    setCurrentRoute(route);
+    router.push(toRoute(route));
+  };
+
   return (
     <React.Suspense
       fallback={
@@ -28,7 +47,7 @@ export function GraphQLConfDemo(props: {}) {
         </Container>
       }
     >
-      <Router route={currentRoute} setRoute={setCurrentRoute} />
+      <Router route={currentRoute} setRoute={updateRoute} />
     </React.Suspense>
   );
 }
