@@ -84,6 +84,7 @@ function PetDetailRouteLoader({
   return <Component navigateTo={navigateTo} />;
 }
 
+// If window.__LOG is true, Isograph will log a bunch of diagnostics.
 if (typeof window !== 'undefined') {
   window.__LOG = true;
 }
