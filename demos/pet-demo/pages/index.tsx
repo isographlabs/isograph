@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import { GraphQLConfDemo } from '@/src/components/router';
-import { createTheme, ThemeProvider } from '@mui/material/styles';
+import ThemeProvider from '@/src/theme';
 
 export default function Home() {
   return (
@@ -8,27 +8,9 @@ export default function Home() {
       <Head>
         <title>Robert&apos;s Pet List 3000</title>
       </Head>
-      <ThemeProvider theme={theme}>
+      <ThemeProvider>
         <GraphQLConfDemo initialState={{ kind: 'Home' }} />
       </ThemeProvider>
     </>
   );
 }
-
-const theme = createTheme({
-  spacing: 4,
-  palette: {
-    primary: {
-      light: '#788caf',
-      main: '#385276',
-      dark: '#1a2f4a',
-      contrastText: '#fff',
-    },
-    secondary: {
-      light: '#ff7961',
-      main: '#f28800',
-      dark: '#e86600',
-      contrastText: '#000',
-    },
-  },
-});
