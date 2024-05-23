@@ -319,8 +319,9 @@ function callSubscriptions(
         return subscription.callback();
       }
       default: {
-        // @ts-expect-error(6133)
+        // Ensure we have covered all variants
         const _: never = subscription;
+        _;
         throw new Error('Unexpected case');
       }
     }
@@ -394,8 +395,9 @@ function normalizeDataIntoRecord(
         break;
       }
       default: {
-        // @ts-expect-error(6133)
+        // Ensure we have covered all variants
         let _: never = normalizationNode;
+        _;
         throw new Error('Unexpected normalization node kind');
       }
     }
@@ -650,8 +652,9 @@ function getStoreKeyChunkForArgumentValue(
     }
     default: {
       // TODO configure eslint to allow unused vars starting with _
-      // @ts-expect-error
+      // Ensure we have covered all variants
       const _: never = argumentValue;
+      _;
       throw new Error('Unexpected case');
     }
   }
@@ -681,8 +684,9 @@ function getNetworkResponseKey(
           break;
         }
         default: {
-          // @ts-expect-error
+          // Ensure we have covered all variants
           let _: never = argumentValue;
+          _;
           throw new Error('Unexpected case');
         }
       }

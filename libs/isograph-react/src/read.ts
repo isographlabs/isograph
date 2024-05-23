@@ -305,6 +305,12 @@ function readData<TReadFromStore>(
         }
         break;
       }
+      default: {
+        // Ensure we have covered all variants
+        let _: never = field;
+        _;
+        throw new Error('Unexpected case.');
+      }
     }
   }
   return {
