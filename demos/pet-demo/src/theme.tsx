@@ -18,6 +18,8 @@ const theme = createTheme({
   },
 });
 
-export default ({ children }: any): React.ReactNode => {
+export default function PetDemoThemeProvider({
+  children,
+}: any): React.ReactNode {
   return <ThemeProvider theme={theme}>{children}</ThemeProvider>;
-};
+}
