@@ -44,7 +44,7 @@ pub(crate) enum SourceArtifact {
 }
 
 pub(crate) type NestedClientFieldImports =
-    HashMap<(ObjectTypeAndFieldNames, SourceArtifact), JavaScriptImports>;
+    HashMap<(ObjectTypeAndFieldNames, SourceArtifact, ArtifactFileType), JavaScriptImports>;
 
 macro_rules! derive_display {
     ($type:ident) => {
@@ -184,7 +184,6 @@ pub struct JavaScriptImports {
     // TODO make this Option<String> or something
     pub(crate) default_import: bool,
     pub(crate) types: Vec<TypeImportName>,
-    pub(crate) artifact_file_type: ArtifactFileType,
 }
 
 pub(crate) fn get_serialized_field_arguments(
@@ -278,7 +277,7 @@ pub(crate) fn nested_client_field_names_to_import_statement(
     let mut nested_client_field_imports: Vec<_> = nested_client_field_imports.into_iter().collect();
     nested_client_field_imports.sort_by(|(a, _), (b, _)| a.cmp(b));
 
-    for ((nested_client_field_name, source_artifact), javascript_import) in
+    for ((nested_client_field_name, source_artifact, artifact_file_type), javascript_import) in
         nested_client_field_imports
     {
         write_import_statement(
@@ -289,6 +288,7 @@ pub(crate) fn nested_client_field_names_to_import_statement(
                 SourceArtifact::ParamType => &mut param_type_import_statement,
             },
             current_file_type_name,
+            artifact_file_type,
         );
     }
     (reader_import_statement, param_type_import_statement)
@@ -299,6 +299,7 @@ fn write_import_statement(
     nested_client_field_name: ObjectTypeAndFieldNames,
     client_field_import_statement: &mut String,
     current_file_type_name: IsographObjectTypeName,
+    artifact_file_type: ArtifactFileType,
 ) {
     if !javascript_import.default_import && javascript_import.types.is_empty() {
         panic!(
@@ -327,8 +328,7 @@ fn write_import_statement(
 
     import_statement.push_str(&format!(
         "from '{}';\n",
-        nested_client_field_name
-            .relative_path(current_file_type_name, javascript_import.artifact_file_type)
+        nested_client_field_name.relative_path(current_file_type_name, artifact_file_type)
     ));
 
     client_field_import_statement.push_str(&import_statement);
@@ -430,9 +430,11 @@ fn write_query_types_from_selection(
                         query_type_declaration
                             .push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
 
-                        match nested_client_field_imports
-                            .entry((client_field.type_and_field, SourceArtifact::ParamType))
-                        {
+                        match nested_client_field_imports.entry((
+                            client_field.type_and_field,
+                            SourceArtifact::ParamType,
+                            *RESOLVER_OUTPUT_TYPE,
+                        )) {
                             Entry::Occupied(mut occupied) => {
                                 occupied.get_mut().types.push(TypeImportName(format!(
                                     "{}__outputType",
@@ -446,7 +448,6 @@ fn write_query_types_from_selection(
                                         "{}__outputType",
                                         client_field.type_and_field.underscore_separated()
                                     ))],
-                                    artifact_file_type: *RESOLVER_OUTPUT_TYPE,
                                 });
                             }
                         }

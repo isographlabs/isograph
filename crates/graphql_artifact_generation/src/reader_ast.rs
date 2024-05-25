@@ -71,7 +71,7 @@ fn generate_reader_ast_node(
                             &root_refetched_paths,
                             &client_field_refetched_paths,
                         );
-                        let file_name = match client_field.variant {
+                        let artifact_file_type = match client_field.variant {
                             ClientFieldVariant::UserWritten(_) => *RESOLVER_READER,
                             ClientFieldVariant::ImperativelyLoadedField(_) => *REFETCH_READER,
                         };
@@ -79,6 +79,7 @@ fn generate_reader_ast_node(
                         match nested_client_field_imports.entry((
                             client_field.type_and_field,
                             SourceArtifact::ResolverOrRefetchReader,
+                            artifact_file_type,
                         )) {
                             Entry::Occupied(mut occupied) => {
                                 occupied.get_mut().default_import = true;
@@ -87,7 +88,6 @@ fn generate_reader_ast_node(
                                 vacant.insert(JavaScriptImports {
                                     default_import: true,
                                     types: vec![],
-                                    artifact_file_type: file_name,
                                 });
                             }
                         }
