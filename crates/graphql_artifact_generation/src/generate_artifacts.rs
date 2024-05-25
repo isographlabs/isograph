@@ -37,7 +37,14 @@ lazy_static! {
     pub static ref ISO_TS: ArtifactFileType = "iso".intern().into();
 }
 
-pub(crate) type NestedClientFieldImports = HashMap<ObjectTypeAndFieldNames, JavaScriptImports>;
+#[derive(Hash, Eq, PartialEq, Debug, PartialOrd, Ord)]
+pub(crate) enum SourceArtifact {
+    ResolverOrRefetchReader,
+    ParamType,
+}
+
+pub(crate) type NestedClientFieldImports =
+    HashMap<(ObjectTypeAndFieldNames, SourceArtifact), JavaScriptImports>;
 
 macro_rules! derive_display {
     ($type:ident) => {
@@ -177,7 +184,7 @@ pub struct JavaScriptImports {
     // TODO make this Option<String> or something
     pub(crate) default_import: bool,
     pub(crate) types: Vec<TypeImportName>,
-    pub(crate) file_name: ArtifactFileType,
+    pub(crate) artifact_file_type: ArtifactFileType,
 }
 
 pub(crate) fn get_serialized_field_arguments(
@@ -261,7 +268,7 @@ pub fn generate_path(
 }
 
 pub(crate) fn nested_client_field_names_to_import_statement(
-    nested_client_field_imports: HashMap<ObjectTypeAndFieldNames, JavaScriptImports>,
+    nested_client_field_imports: NestedClientFieldImports,
     current_file_type_name: IsographObjectTypeName,
 ) -> (String, String) {
     let mut client_field_import_statement = String::new();
@@ -271,12 +278,16 @@ pub(crate) fn nested_client_field_names_to_import_statement(
     let mut nested_client_field_imports: Vec<_> = nested_client_field_imports.into_iter().collect();
     nested_client_field_imports.sort_by(|(a, _), (b, _)| a.cmp(b));
 
-    for (nested_client_field_name, javascript_import) in nested_client_field_imports {
-        write_client_field_import(
+    for ((nested_client_field_name, source_artifact), javascript_import) in
+        nested_client_field_imports
+    {
+        write_import_statement(
             javascript_import,
             nested_client_field_name,
-            &mut client_field_import_statement,
-            &mut client_field_type_import_statement,
+            match source_artifact {
+                SourceArtifact::ResolverOrRefetchReader => &mut client_field_import_statement,
+                SourceArtifact::ParamType => &mut client_field_type_import_statement,
+            },
             current_file_type_name,
         );
     }
@@ -286,11 +297,10 @@ pub(crate) fn nested_client_field_names_to_import_statement(
     )
 }
 
-fn write_client_field_import(
+fn write_import_statement(
     javascript_import: JavaScriptImports,
     nested_client_field_name: ObjectTypeAndFieldNames,
     client_field_import_statement: &mut String,
-    client_field_type_import_statement: &mut String,
     current_file_type_name: IsographObjectTypeName,
 ) {
     if !javascript_import.default_import && javascript_import.types.is_empty() {
@@ -300,32 +310,31 @@ fn write_client_field_import(
         );
     }
 
-    let mut s_client_field_import = "".to_string();
-    let mut s_client_field_type_import = "".to_string();
+    let mut import_statement = "import ".to_string();
 
     if javascript_import.default_import {
-        s_client_field_import.push_str(&format!(
-            "import {} from '{}';\n",
+        import_statement.push_str(&format!(
+            "{} ",
             nested_client_field_name.underscore_separated(),
-            nested_client_field_name
-                .relative_path(current_file_type_name, javascript_import.file_name)
         ));
     }
 
     let mut types = javascript_import.types.iter();
     if let Some(first) = types.next() {
-        s_client_field_type_import.push_str(&format!("import {{{}", first));
+        import_statement.push_str(&format!("{{{}", first));
         for value in types {
-            s_client_field_type_import.push_str(&format!(", {}", value));
+            import_statement.push_str(&format!(", {}", value));
         }
-        s_client_field_type_import.push_str(&format!(
-            "}} from '{}';\n",
-            nested_client_field_name.relative_path(current_file_type_name, *RESOLVER_OUTPUT_TYPE)
-        ));
+        import_statement.push_str("} ");
     }
 
-    client_field_import_statement.push_str(&s_client_field_import);
-    client_field_type_import_statement.push_str(&s_client_field_type_import);
+    import_statement.push_str(&format!(
+        "from '{}';\n",
+        nested_client_field_name
+            .relative_path(current_file_type_name, javascript_import.artifact_file_type)
+    ));
+
+    client_field_import_statement.push_str(&import_statement);
 }
 
 pub(crate) fn get_output_type_text(
@@ -424,7 +433,9 @@ fn write_query_types_from_selection(
                         query_type_declaration
                             .push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
 
-                        match nested_client_field_imports.entry(client_field.type_and_field) {
+                        match nested_client_field_imports
+                            .entry((client_field.type_and_field, SourceArtifact::ParamType))
+                        {
                             Entry::Occupied(mut occupied) => {
                                 occupied.get_mut().types.push(TypeImportName(format!(
                                     "{}__outputType",
@@ -438,7 +449,7 @@ fn write_query_types_from_selection(
                                         "{}__outputType",
                                         client_field.type_and_field.underscore_separated()
                                     ))],
-                                    file_name: *RESOLVER_OUTPUT_TYPE,
+                                    artifact_file_type: *RESOLVER_OUTPUT_TYPE,
                                 });
                             }
                         }
