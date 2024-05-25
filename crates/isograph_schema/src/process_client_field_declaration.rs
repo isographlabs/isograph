@@ -13,7 +13,7 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    ClientField, FieldDefinitionLocation, FieldMapItem, ObjectTypeAndFieldNames, UnvalidatedSchema,
+    ClientField, FieldDefinitionLocation, FieldMapItem, ObjectTypeAndFieldName, UnvalidatedSchema,
 };
 
 impl UnvalidatedSchema {
@@ -92,7 +92,7 @@ impl UnvalidatedSchema {
             selection_set_and_unwraps: client_field_declaration.item.selection_set_and_unwraps,
             variant,
             variable_definitions: client_field_declaration.item.variable_definitions,
-            type_and_field: ObjectTypeAndFieldNames {
+            type_and_field: ObjectTypeAndFieldName {
                 type_name: object.name,
                 field_name: name,
             },

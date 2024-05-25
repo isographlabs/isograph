@@ -9,8 +9,8 @@ use isograph_schema::{
 };
 
 use crate::generate_artifacts::{
-    get_serialized_field_arguments, JavaScriptImports, NestedClientFieldImports, ReaderAst,
-    SourceArtifact, REFETCH_READER, RESOLVER_READER,
+    get_serialized_field_arguments, JavaScriptImports, NestedClientFieldImportKey,
+    NestedClientFieldImports, ReaderAst, SourceArtifact, REFETCH_READER, RESOLVER_READER,
 };
 
 fn generate_reader_ast_node(
@@ -76,11 +76,11 @@ fn generate_reader_ast_node(
                             ClientFieldVariant::ImperativelyLoadedField(_) => *REFETCH_READER,
                         };
 
-                        match nested_client_field_imports.entry((
-                            client_field.type_and_field,
-                            SourceArtifact::ResolverOrRefetchReader,
+                        match nested_client_field_imports.entry(NestedClientFieldImportKey {
+                            object_type_and_field: client_field.type_and_field,
+                            source_artifact: SourceArtifact::ResolverOrRefetchReader,
                             artifact_file_type,
-                        )) {
+                        }) {
                             Entry::Occupied(mut occupied) => {
                                 occupied.get_mut().default_import = true;
                             }

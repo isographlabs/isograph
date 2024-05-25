@@ -410,12 +410,12 @@ impl<TData: Copy> TryFrom<SchemaServerField<TData>> for SchemaIdField<TData> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Ord, PartialOrd, Clone, Copy)]
-pub struct ObjectTypeAndFieldNames {
+pub struct ObjectTypeAndFieldName {
     pub type_name: IsographObjectTypeName,
     pub field_name: SelectableFieldName,
 }
 
-impl ObjectTypeAndFieldNames {
+impl ObjectTypeAndFieldName {
     pub fn underscore_separated(&self) -> String {
         format!("{}__{}", self.type_name, self.field_name)
     }
@@ -425,7 +425,7 @@ impl ObjectTypeAndFieldNames {
         current_file_type_name: IsographObjectTypeName,
         file_type: ArtifactFileType,
     ) -> String {
-        let ObjectTypeAndFieldNames {
+        let ObjectTypeAndFieldName {
             type_name,
             field_name,
         } = *self;
@@ -473,7 +473,7 @@ pub struct ClientField<
 
     // TODO this is probably unused
     // Why is this not calculated when needed?
-    pub type_and_field: ObjectTypeAndFieldNames,
+    pub type_and_field: ObjectTypeAndFieldName,
 
     // TODO should this be TypeWithFieldsId???
     pub parent_object_id: ServerObjectId,

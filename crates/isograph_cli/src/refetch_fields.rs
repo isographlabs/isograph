@@ -10,7 +10,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientField, ClientFieldVariant, FieldDefinitionLocation, ImperativelyLoadedFieldVariant,
-    ObjectTypeAndFieldNames, SchemaObject, UnvalidatedClientField, UnvalidatedSchema,
+    ObjectTypeAndFieldName, SchemaObject, UnvalidatedClientField, UnvalidatedSchema,
     NODE_FIELD_NAME, REFETCH_FIELD_NAME,
 };
 
@@ -104,7 +104,7 @@ fn add_refetch_field_to_object(
                     },
                 ),
                 variable_definitions: vec![],
-                type_and_field: ObjectTypeAndFieldNames {
+                type_and_field: ObjectTypeAndFieldName {
                     type_name: object.name,
                     field_name: "__refetch".intern().into(),
                 },
