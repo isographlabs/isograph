@@ -1,7 +1,7 @@
 import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Query__PetDetailRoute__param} from './param_type';
 import {Query__PetDetailRoute__outputType} from './output_type';
-import readerResolver from './reader';
+import readerResolver from './resolver_reader';
 import refetchQuery0 from './__refetch__0';
 import refetchQuery1 from './__refetch__1';
 import refetchQuery2 from './__refetch__2';

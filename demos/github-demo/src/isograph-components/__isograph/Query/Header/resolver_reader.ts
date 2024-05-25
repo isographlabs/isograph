@@ -1,26 +1,26 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
-import { Query__HomeRoute__param } from './param_type';
-import { HomeRoute as resolver } from '../../../HomeRoute.tsx';
-import Pet__PetSummaryCard from '../../Pet/PetSummaryCard/reader';
+import { Query__Header__param } from './param_type';
+import { Header as resolver } from '../../../header.tsx';
+import User__Avatar from '../../User/Avatar/resolver_reader';
 
-const readerAst: ReaderAst<Query__HomeRoute__param> = [
+const readerAst: ReaderAst<Query__Header__param> = [
   {
     kind: "Linked",
-    fieldName: "pets",
+    fieldName: "viewer",
     alias: null,
     arguments: null,
     selections: [
       {
         kind: "Scalar",
-        fieldName: "id",
+        fieldName: "name",
         alias: null,
         arguments: null,
       },
       {
         kind: "Resolver",
-        alias: "PetSummaryCard",
+        alias: "Avatar",
         arguments: null,
-        readerArtifact: Pet__PetSummaryCard,
+        readerArtifact: User__Avatar,
         usedRefetchQueries: [],
       },
     ],
@@ -28,11 +28,11 @@ const readerAst: ReaderAst<Query__HomeRoute__param> = [
 ];
 
 const artifact: ComponentReaderArtifact<
-  Query__HomeRoute__param,
+  Query__Header__param,
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  componentName: "Query.HomeRoute",
+  componentName: "Query.Header",
   resolver,
   readerAst,
 };

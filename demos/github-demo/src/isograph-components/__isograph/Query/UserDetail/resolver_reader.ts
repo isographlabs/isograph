@@ -1,7 +1,7 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Query__UserDetail__param } from './param_type';
 import { UserDetail as resolver } from '../../../UserDetail.tsx';
-import User__RepositoryList from '../../User/RepositoryList/reader';
+import User__RepositoryList from '../../User/RepositoryList/resolver_reader';
 
 const readerAst: ReaderAst<Query__UserDetail__param> = [
   {

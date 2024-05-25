@@ -1,8 +1,8 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Query__HomePageList__param } from './param_type';
 import { HomePageList as resolver } from '../../../HomePageList.tsx';
-import User__RepositoryList from '../../User/RepositoryList/reader';
-import User____refetch from '../../User/__refetch/reader';
+import User__RepositoryList from '../../User/RepositoryList/resolver_reader';
+import User____refetch from '../../User/__refetch/resolver_reader';
 
 const readerAst: ReaderAst<Query__HomePageList__param> = [
   {

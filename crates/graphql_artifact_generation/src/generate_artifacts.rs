@@ -29,7 +29,7 @@ use crate::{
 };
 
 lazy_static! {
-    pub static ref RESOLVER_READER: ArtifactFileType = "reader".intern().into();
+    pub static ref RESOLVER_READER: ArtifactFileType = "resolver_reader".intern().into();
     pub static ref RESOLVER_PARAM_TYPE: ArtifactFileType = "param_type".intern().into();
     pub static ref RESOLVER_OUTPUT_TYPE: ArtifactFileType = "output_type".intern().into();
     pub static ref ENTRYPOINT: ArtifactFileType = "entrypoint".intern().into();

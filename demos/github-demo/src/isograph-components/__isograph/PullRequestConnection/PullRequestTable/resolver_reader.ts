@@ -1,9 +1,9 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { PullRequestConnection__PullRequestTable__param } from './param_type';
 import { PullRequestTable as resolver } from '../../../PullRequestTable.tsx';
-import Actor__UserLink from '../../Actor/UserLink/reader';
-import PullRequest__PullRequestLink from '../../PullRequest/PullRequestLink/reader';
-import PullRequest__createdAtFormatted from '../../PullRequest/createdAtFormatted/reader';
+import Actor__UserLink from '../../Actor/UserLink/resolver_reader';
+import PullRequest__PullRequestLink from '../../PullRequest/PullRequestLink/resolver_reader';
+import PullRequest__createdAtFormatted from '../../PullRequest/createdAtFormatted/resolver_reader';
 
 const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
   {

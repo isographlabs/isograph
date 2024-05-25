@@ -1,7 +1,7 @@
 import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Mutation__SetTagline__param} from './param_type';
 import {Mutation__SetTagline__outputType} from './output_type';
-import readerResolver from './reader';
+import readerResolver from './resolver_reader';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
 const queryText = 'mutation SetTagline ($input: SetPetTaglineParams!) {\

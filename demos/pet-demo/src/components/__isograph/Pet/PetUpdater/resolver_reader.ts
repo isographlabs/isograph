@@ -1,9 +1,9 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Pet__PetUpdater__param } from './param_type';
 import { PetUpdater as resolver } from '../../../PetUpdater.tsx';
-import Pet____refetch from '../__refetch/reader';
-import Pet__set_best_friend from '../set_best_friend/reader';
-import Pet__set_pet_tagline from '../set_pet_tagline/reader';
+import Pet____refetch from '../__refetch/resolver_reader';
+import Pet__set_best_friend from '../set_best_friend/resolver_reader';
+import Pet__set_pet_tagline from '../set_pet_tagline/resolver_reader';
 
 const readerAst: ReaderAst<Pet__PetUpdater__param> = [
   {

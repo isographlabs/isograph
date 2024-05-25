@@ -1,11 +1,11 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Query__PetDetailRoute__param } from './param_type';
 import { PetDetailRoute as resolver } from '../../../PetDetailRoute.tsx';
-import Pet__PetBestFriendCard from '../../Pet/PetBestFriendCard/reader';
-import Pet__PetCheckinsCard from '../../Pet/PetCheckinsCard/reader';
-import Pet__PetPhraseCard from '../../Pet/PetPhraseCard/reader';
-import Pet__PetStatsCard from '../../Pet/PetStatsCard/reader';
-import Pet__PetTaglineCard from '../../Pet/PetTaglineCard/reader';
+import Pet__PetBestFriendCard from '../../Pet/PetBestFriendCard/resolver_reader';
+import Pet__PetCheckinsCard from '../../Pet/PetCheckinsCard/resolver_reader';
+import Pet__PetPhraseCard from '../../Pet/PetPhraseCard/resolver_reader';
+import Pet__PetStatsCard from '../../Pet/PetStatsCard/resolver_reader';
+import Pet__PetTaglineCard from '../../Pet/PetTaglineCard/resolver_reader';
 
 const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
   {
