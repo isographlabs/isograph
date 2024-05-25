@@ -30,6 +30,7 @@ use crate::{
 
 lazy_static! {
     pub static ref RESOLVER_READER: ArtifactFileType = "resolver_reader".intern().into();
+    pub static ref REFETCH_READER: ArtifactFileType = "refetch_reader".intern().into();
     pub static ref RESOLVER_PARAM_TYPE: ArtifactFileType = "param_type".intern().into();
     pub static ref RESOLVER_OUTPUT_TYPE: ArtifactFileType = "output_type".intern().into();
     pub static ref ENTRYPOINT: ArtifactFileType = "entrypoint".intern().into();
@@ -173,8 +174,10 @@ derive_display!(TypeImportName);
 
 #[derive(Debug)]
 pub struct JavaScriptImports {
+    // TODO make this Option<String> or something
     pub(crate) default_import: bool,
     pub(crate) types: Vec<TypeImportName>,
+    pub(crate) file_name: ArtifactFileType,
 }
 
 pub(crate) fn get_serialized_field_arguments(
@@ -304,7 +307,8 @@ fn write_client_field_import(
         s_client_field_import.push_str(&format!(
             "import {} from '{}';\n",
             nested_client_field_name.underscore_separated(),
-            nested_client_field_name.relative_path(current_file_type_name, *RESOLVER_READER)
+            nested_client_field_name
+                .relative_path(current_file_type_name, javascript_import.file_name)
         ));
     }
 
@@ -434,6 +438,7 @@ fn write_query_types_from_selection(
                                         "{}__outputType",
                                         client_field.type_and_field.underscore_separated()
                                     ))],
+                                    file_name: *RESOLVER_OUTPUT_TYPE,
                                 });
                             }
                         }

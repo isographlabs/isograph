@@ -11,8 +11,8 @@ use crate::{
         generate_client_field_parameter_type, generate_output_type, generate_path,
         get_output_type_text, nested_client_field_names_to_import_statement,
         ClientFieldFunctionImportStatement, ClientFieldOutputType, ClientFieldParameterType,
-        NestedClientFieldImports, ReaderAst, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE,
-        RESOLVER_READER,
+        NestedClientFieldImports, ReaderAst, REFETCH_READER, RESOLVER_OUTPUT_TYPE,
+        RESOLVER_PARAM_TYPE,
     },
     reader_ast::generate_reader_ast,
 };
@@ -98,7 +98,7 @@ impl<'schema> RefetchReaderArtifactInfo<'schema> {
         vec![
             PathAndContent {
                 relative_directory: relative_directory.clone(),
-                file_name_prefix: *RESOLVER_READER,
+                file_name_prefix: *REFETCH_READER,
                 file_content: reader_content,
             },
             PathAndContent {
