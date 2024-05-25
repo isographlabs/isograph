@@ -271,8 +271,8 @@ pub(crate) fn nested_client_field_names_to_import_statement(
     nested_client_field_imports: NestedClientFieldImports,
     current_file_type_name: IsographObjectTypeName,
 ) -> (String, String) {
-    let mut client_field_import_statement = String::new();
-    let mut client_field_type_import_statement = String::new();
+    let mut reader_import_statement = String::new();
+    let mut param_type_import_statement = String::new();
 
     // TODO we should always sort outputs. We should find a nice generic way to ensure that.
     let mut nested_client_field_imports: Vec<_> = nested_client_field_imports.into_iter().collect();
@@ -285,16 +285,13 @@ pub(crate) fn nested_client_field_names_to_import_statement(
             javascript_import,
             nested_client_field_name,
             match source_artifact {
-                SourceArtifact::ResolverOrRefetchReader => &mut client_field_import_statement,
-                SourceArtifact::ParamType => &mut client_field_type_import_statement,
+                SourceArtifact::ResolverOrRefetchReader => &mut reader_import_statement,
+                SourceArtifact::ParamType => &mut param_type_import_statement,
             },
             current_file_type_name,
         );
     }
-    (
-        client_field_import_statement,
-        client_field_type_import_statement,
-    )
+    (reader_import_statement, param_type_import_statement)
 }
 
 fn write_import_statement(

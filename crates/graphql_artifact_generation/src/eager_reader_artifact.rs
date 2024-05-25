@@ -119,7 +119,7 @@ impl<'schema> EagerReaderArtifactInfo<'schema> {
             ..
         } = self;
 
-        let (client_field_import_statement, client_field_type_import_statement) =
+        let (reader_import_statement, param_type_import_statement) =
             nested_client_field_names_to_import_statement(
                 nested_client_field_artifact_imports,
                 parent_type.name,
@@ -146,7 +146,7 @@ impl<'schema> EagerReaderArtifactInfo<'schema> {
                         import {{ {reader_param_type} }} from './{param_type_file_name}';\n\
                         import {{ {reader_output_type} }} from './{output_type_file_name}';\n\
                         {function_import_statement}\n\
-                        {client_field_import_statement}\n\
+                        {reader_import_statement}\n\
                         const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
                         const artifact: EagerReaderArtifact<\n\
                         {}{reader_param_type},\n\
@@ -170,7 +170,7 @@ impl<'schema> EagerReaderArtifactInfo<'schema> {
                         ReaderAst, RefetchQueryNormalizationArtifact}} from '@isograph/react';\n\
                         import {{ {reader_param_type} }} from './{param_type_file_name}';\n\
                         {function_import_statement}\n\
-                        {client_field_import_statement}\n\
+                        {reader_import_statement}\n\
                         const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
                         const artifact: ComponentReaderArtifact<\n\
                         {}{reader_param_type},\n\
@@ -193,7 +193,7 @@ impl<'schema> EagerReaderArtifactInfo<'schema> {
             };
 
         let param_type_content = format!(
-            "{client_field_type_import_statement}\n\
+            "{param_type_import_statement}\n\
             export type {reader_param_type} = {client_field_parameter_type};\n",
         );
 
