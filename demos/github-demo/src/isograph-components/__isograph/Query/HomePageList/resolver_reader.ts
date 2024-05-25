@@ -2,7 +2,7 @@ import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQuer
 import { Query__HomePageList__param } from './param_type';
 import { HomePageList as resolver } from '../../../HomePageList.tsx';
 import User__RepositoryList__resolver_reader from '../../User/RepositoryList/resolver_reader';
-import User____refetch__resolver_reader from '../../User/__refetch/refetch_reader';
+import User____refetch__refetch_reader from '../../User/__refetch/refetch_reader';
 
 const readerAst: ReaderAst<Query__HomePageList__param> = [
   {
@@ -33,7 +33,7 @@ const readerAst: ReaderAst<Query__HomePageList__param> = [
       {
         kind: "RefetchField",
         alias: "__refetch",
-        readerArtifact: User____refetch__resolver_reader,
+        readerArtifact: User____refetch__refetch_reader,
         refetchQuery: 0,
       },
     ],

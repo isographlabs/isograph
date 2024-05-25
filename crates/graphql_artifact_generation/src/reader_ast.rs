@@ -61,10 +61,17 @@ fn generate_reader_ast_node(
                         );
                         let indent_1 = "  ".repeat(indentation_level as usize);
                         let indent_2 = "  ".repeat((indentation_level + 1) as usize);
-                        let reader_artifact_import_name = format!(
-                            "{}__resolver_reader",
-                            client_field.type_and_field.underscore_separated()
-                        );
+                        // TODO this is indicative of bad data modeling
+                        let reader_artifact_import_name = match client_field.variant {
+                            ClientFieldVariant::UserWritten(_) => format!(
+                                "{}__resolver_reader",
+                                client_field.type_and_field.underscore_separated()
+                            ),
+                            ClientFieldVariant::ImperativelyLoadedField(_) => format!(
+                                "{}__refetch_reader",
+                                client_field.type_and_field.underscore_separated()
+                            ),
+                        };
 
                         let client_field_refetched_paths =
                             refetched_paths_for_client_field(client_field, schema, path);
