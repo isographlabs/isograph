@@ -182,14 +182,13 @@ pub(crate) struct RefetchQueryArtifactImport(pub String);
 derive_display!(RefetchQueryArtifactImport);
 
 #[derive(Debug)]
-pub(crate) struct TypeImportName(pub String);
-derive_display!(TypeImportName);
+pub(crate) struct JavascriptVariableName(pub String);
+derive_display!(JavascriptVariableName);
 
 #[derive(Debug)]
 pub struct JavaScriptImports {
-    // TODO make this Option<String> or something
-    pub(crate) default_import: bool,
-    pub(crate) types: Vec<TypeImportName>,
+    pub(crate) default_import: Option<JavascriptVariableName>,
+    pub(crate) types: Vec<JavascriptVariableName>,
 }
 
 pub(crate) fn get_serialized_field_arguments(
@@ -313,7 +312,7 @@ fn write_import_statement(
     current_file_type_name: IsographObjectTypeName,
     artifact_file_type: ArtifactFileType,
 ) {
-    if !javascript_import.default_import && javascript_import.types.is_empty() {
+    if !javascript_import.default_import.is_some() && javascript_import.types.is_empty() {
         panic!(
             "Client field imports should not be created in an empty state. \
             This is indicative of a bug in Isograph."
@@ -322,11 +321,8 @@ fn write_import_statement(
 
     let mut import_statement = "import ".to_string();
 
-    if javascript_import.default_import {
-        import_statement.push_str(&format!(
-            "{} ",
-            nested_client_field_name.underscore_separated(),
-        ));
+    if let Some(import_name) = javascript_import.default_import {
+        import_statement.push_str(&format!("{} ", import_name,));
     }
 
     let mut types = javascript_import.types.iter();
@@ -448,15 +444,18 @@ fn write_query_types_from_selection(
                             artifact_file_type: *RESOLVER_OUTPUT_TYPE,
                         }) {
                             Entry::Occupied(mut occupied) => {
-                                occupied.get_mut().types.push(TypeImportName(format!(
-                                    "{}__outputType",
-                                    client_field.type_and_field.underscore_separated()
-                                )));
+                                occupied
+                                    .get_mut()
+                                    .types
+                                    .push(JavascriptVariableName(format!(
+                                        "{}__outputType",
+                                        client_field.type_and_field.underscore_separated()
+                                    )));
                             }
                             Entry::Vacant(vacant) => {
                                 vacant.insert(JavaScriptImports {
-                                    default_import: false,
-                                    types: vec![TypeImportName(format!(
+                                    default_import: None,
+                                    types: vec![JavascriptVariableName(format!(
                                         "{}__outputType",
                                         client_field.type_and_field.underscore_separated()
                                     ))],

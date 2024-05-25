@@ -82,11 +82,18 @@ fn generate_reader_ast_node(
                             artifact_file_type,
                         }) {
                             Entry::Occupied(mut occupied) => {
-                                occupied.get_mut().default_import = true;
+                                occupied.get_mut().default_import =
+                                    Some(crate::generate_artifacts::JavascriptVariableName(
+                                        client_field.type_and_field.underscore_separated(),
+                                    ));
                             }
                             Entry::Vacant(vacant) => {
                                 vacant.insert(JavaScriptImports {
-                                    default_import: true,
+                                    default_import: Some(
+                                        crate::generate_artifacts::JavascriptVariableName(
+                                            client_field.type_and_field.underscore_separated(),
+                                        ),
+                                    ),
                                     types: vec![],
                                 });
                             }
