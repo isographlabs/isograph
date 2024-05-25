@@ -193,7 +193,7 @@ function readData<TReadFromStore>(
         target[field.alias ?? field.fieldName] = data.data;
         break;
       }
-      case 'RefetchField': {
+      case 'ImperativelyLoadedField': {
         const data = readData(
           environment,
           field.readerArtifact.readerAst,
@@ -213,44 +213,6 @@ function readData<TReadFromStore>(
           const refetchQueryIndex = field.refetchQuery;
           if (refetchQueryIndex == null) {
             throw new Error('refetchQuery is null in RefetchField');
-          }
-          const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
-          const refetchQueryArtifact = refetchQuery.artifact;
-          const allowedVariables = refetchQuery.allowedVariables;
-
-          target[field.alias] = field.readerArtifact.resolver(
-            environment,
-            // resolvers for refetch fields take 3 args, and this is not reflected in types
-            refetchQueryArtifact,
-            {
-              // @ts-expect-error
-              ...data.data,
-              ...filterVariables(variables, allowedVariables),
-            },
-          );
-        }
-        break;
-      }
-      case 'MutationField': {
-        const data = readData(
-          environment,
-          field.readerArtifact.readerAst,
-          root,
-          variables,
-          // Mutation don't need refetch query artifacts
-          [],
-          mutableEncounteredRecords,
-        );
-        if (data.kind === 'MissingData') {
-          return {
-            kind: 'MissingData',
-            reason: 'Missing data for ' + field.alias + ' on root ' + root,
-            nestedReason: data,
-          };
-        } else {
-          const refetchQueryIndex = field.refetchQuery;
-          if (refetchQueryIndex == null) {
-            throw new Error('refetchQuery is null in MutationField');
           }
           const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
           const refetchQueryArtifact = refetchQuery.artifact;

@@ -65,9 +65,8 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
         arguments: null,
       },
       {
-        kind: "MutationField",
+        kind: "ImperativelyLoadedField",
         alias: "refetch_pet_stats",
-        // @ts-ignore
         readerArtifact: PetStats__refetch_pet_stats__refetch_reader,
         refetchQuery: 0,
       },

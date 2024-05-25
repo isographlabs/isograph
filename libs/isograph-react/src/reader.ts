@@ -64,8 +64,7 @@ export type ReaderAstNode =
   | ReaderScalarField
   | ReaderLinkedField
   | ReaderResolverField
-  | ReaderRefetchField
-  | ReaderMutationField;
+  | ReaderImperativelyLoadedField;
 
 // @ts-ignore
 export type ReaderAst<TReadFromStore> = ReadonlyArray<ReaderAstNode>;
@@ -98,17 +97,9 @@ export type ReaderResolverField = {
   readonly usedRefetchQueries: number[];
 };
 
-export type ReaderRefetchField = {
-  readonly kind: 'RefetchField';
+export type ReaderImperativelyLoadedField = {
+  readonly kind: 'ImperativelyLoadedField';
   readonly alias: string;
-  readonly readerArtifact: RefetchReaderArtifact;
-  readonly refetchQuery: number;
-};
-
-export type ReaderMutationField = {
-  readonly kind: 'MutationField';
-  readonly alias: string;
-  // TODO don't pass any here
   readonly readerArtifact: MutationReaderArtifact<any>;
   readonly refetchQuery: number;
 };

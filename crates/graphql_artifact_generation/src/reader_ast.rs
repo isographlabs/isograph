@@ -93,29 +93,14 @@ fn generate_reader_ast_node(
                                 )
                                 .0;
 
-                                match s.primary_field_info {
-                                    Some(_) => {
-                                        format!(
-                                            "{indent_1}{{\n\
-                                            {indent_2}kind: \"MutationField\",\n\
-                                            {indent_2}alias: \"{alias}\",\n\
-                                            {indent_2}// @ts-ignore\n\
-                                            {indent_2}readerArtifact: {reader_artifact_import_name},\n\
-                                            {indent_2}refetchQuery: {refetch_query_index},\n\
-                                            {indent_1}}},\n",
-                                        )
-                                    }
-                                    None => {
-                                        format!(
-                                            "{indent_1}{{\n\
-                                            {indent_2}kind: \"RefetchField\",\n\
-                                            {indent_2}alias: \"{alias}\",\n\
-                                            {indent_2}readerArtifact: {reader_artifact_import_name},\n\
-                                            {indent_2}refetchQuery: {refetch_query_index},\n\
-                                            {indent_1}}},\n",
-                                        )
-                                    }
-                                }
+                                format!(
+                                    "{indent_1}{{\n\
+                                    {indent_2}kind: \"ImperativelyLoadedField\",\n\
+                                    {indent_2}alias: \"{alias}\",\n\
+                                    {indent_2}readerArtifact: {reader_artifact_import_name},\n\
+                                    {indent_2}refetchQuery: {refetch_query_index},\n\
+                                    {indent_1}}},\n",
+                                )
                             }
                             ClientFieldVariant::UserWritten(_) => {
                                 let reader_artifact_import_name = format!(

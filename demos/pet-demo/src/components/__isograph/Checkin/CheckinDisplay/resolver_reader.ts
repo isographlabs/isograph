@@ -17,9 +17,8 @@ const readerAst: ReaderAst<Checkin__CheckinDisplay__param> = [
     arguments: null,
   },
   {
-    kind: "MutationField",
+    kind: "ImperativelyLoadedField",
     alias: "make_super",
-    // @ts-ignore
     readerArtifact: ICheckin__make_super__refetch_reader,
     refetchQuery: 0,
   },

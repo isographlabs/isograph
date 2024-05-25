@@ -7,9 +7,8 @@ import Pet__set_pet_tagline__refetch_reader from '../set_pet_tagline/refetch_rea
 
 const readerAst: ReaderAst<Pet__PetUpdater__param> = [
   {
-    kind: "MutationField",
+    kind: "ImperativelyLoadedField",
     alias: "set_best_friend",
-    // @ts-ignore
     readerArtifact: Pet__set_best_friend__refetch_reader,
     refetchQuery: 1,
   },
@@ -34,9 +33,8 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
     ],
   },
   {
-    kind: "MutationField",
+    kind: "ImperativelyLoadedField",
     alias: "set_pet_tagline",
-    // @ts-ignore
     readerArtifact: Pet__set_pet_tagline__refetch_reader,
     refetchQuery: 2,
   },
@@ -47,7 +45,7 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
     arguments: null,
   },
   {
-    kind: "RefetchField",
+    kind: "ImperativelyLoadedField",
     alias: "__refetch",
     readerArtifact: Pet____refetch__refetch_reader,
     refetchQuery: 0,

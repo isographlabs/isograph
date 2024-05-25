@@ -1,6 +1,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use common_lang_types::{PathAndContent, SelectableFieldName};
+use intern::string_key::Intern;
 use isograph_schema::{
     create_merged_selection_set, FieldMapItem, ImperativelyLoadedFieldVariant, SchemaObject,
     ValidatedClientField, ValidatedSchema,
@@ -176,16 +177,24 @@ pub(crate) fn generate_refetch_reader_artifact(
 }
 
 fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctionImportStatement {
+    let include_read_out_data = get_read_out_data(&vec![FieldMapItem {
+        from: "id".intern().into(),
+        to: "id".intern().into(),
+    }]);
+    let indent = "  ";
     let content = format!(
-        "import {{ makeNetworkRequest, type IsographEnvironment }} \
+        "{include_read_out_data}\n\
+        import {{ makeNetworkRequest, type IsographEnvironment }} \
         from '@isograph/react';\n\
         const resolver = (\n\
-        {}environment: IsographEnvironment,\n\
-        {}artifact: RefetchQueryNormalizationArtifact,\n\
-        {}variables: any\n\
-        ) => () => \
-        makeNetworkRequest(environment, artifact, variables);",
-        "  ", "  ", "  "
+        {indent}environment: IsographEnvironment,\n\
+        {indent}artifact: RefetchQueryNormalizationArtifact,\n\
+        {indent}readOutData: any,\n\
+        {indent}filteredVariables: any\n\
+        ) => () => {{\n\
+        {indent}const variables = includeReadOutData(filteredVariables, readOutData);\n\
+        {indent}return makeNetworkRequest(environment, artifact, variables);\n\
+        }};\n"
     );
     ClientFieldFunctionImportStatement(content)
 }
