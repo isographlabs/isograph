@@ -1,7 +1,7 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { PullRequest__CommentList__param } from './param_type';
 import { CommentList as resolver } from '../../../CommentList.tsx';
-import IssueComment__formattedCommentCreationDate from '../../IssueComment/formattedCommentCreationDate/resolver_reader';
+import IssueComment__formattedCommentCreationDate__resolver_reader from '../../IssueComment/formattedCommentCreationDate/resolver_reader';
 
 const readerAst: ReaderAst<PullRequest__CommentList__param> = [
   {
@@ -43,7 +43,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
                 kind: "Resolver",
                 alias: "formattedCommentCreationDate",
                 arguments: null,
-                readerArtifact: IssueComment__formattedCommentCreationDate,
+                readerArtifact: IssueComment__formattedCommentCreationDate__resolver_reader,
                 usedRefetchQueries: [],
               },
               {

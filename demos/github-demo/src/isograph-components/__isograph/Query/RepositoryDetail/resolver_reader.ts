@@ -1,9 +1,9 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Query__RepositoryDetail__param } from './param_type';
 import { RepositoryDetail as resolver } from '../../../RepositoryDetail.tsx';
-import PullRequestConnection__PullRequestTable from '../../PullRequestConnection/PullRequestTable/resolver_reader';
-import Repository__RepositoryLink from '../../Repository/RepositoryLink/resolver_reader';
-import Starrable__IsStarred from '../../Starrable/IsStarred/resolver_reader';
+import PullRequestConnection__PullRequestTable__resolver_reader from '../../PullRequestConnection/PullRequestTable/resolver_reader';
+import Repository__RepositoryLink__resolver_reader from '../../Repository/RepositoryLink/resolver_reader';
+import Starrable__IsStarred__resolver_reader from '../../Starrable/IsStarred/resolver_reader';
 
 const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
   {
@@ -26,7 +26,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
         kind: "Resolver",
         alias: "IsStarred",
         arguments: null,
-        readerArtifact: Starrable__IsStarred,
+        readerArtifact: Starrable__IsStarred__resolver_reader,
         usedRefetchQueries: [],
       },
       {
@@ -45,7 +45,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
             kind: "Resolver",
             alias: "RepositoryLink",
             arguments: null,
-            readerArtifact: Repository__RepositoryLink,
+            readerArtifact: Repository__RepositoryLink__resolver_reader,
             usedRefetchQueries: [],
           },
           {
@@ -71,7 +71,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
             kind: "Resolver",
             alias: "PullRequestTable",
             arguments: null,
-            readerArtifact: PullRequestConnection__PullRequestTable,
+            readerArtifact: PullRequestConnection__PullRequestTable__resolver_reader,
             usedRefetchQueries: [],
           },
         ],

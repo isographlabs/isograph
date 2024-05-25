@@ -1,7 +1,7 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Pet__PetCheckinsCard__param } from './param_type';
 import { PetCheckinsCard as resolver } from '../../../PetCheckinsCard.tsx';
-import Checkin__CheckinDisplay from '../../Checkin/CheckinDisplay/resolver_reader';
+import Checkin__CheckinDisplay__resolver_reader from '../../Checkin/CheckinDisplay/resolver_reader';
 
 const readerAst: ReaderAst<Pet__PetCheckinsCard__param> = [
   {
@@ -20,7 +20,7 @@ const readerAst: ReaderAst<Pet__PetCheckinsCard__param> = [
         kind: "Resolver",
         alias: "CheckinDisplay",
         arguments: null,
-        readerArtifact: Checkin__CheckinDisplay,
+        readerArtifact: Checkin__CheckinDisplay__resolver_reader,
         usedRefetchQueries: [0, ],
       },
       {

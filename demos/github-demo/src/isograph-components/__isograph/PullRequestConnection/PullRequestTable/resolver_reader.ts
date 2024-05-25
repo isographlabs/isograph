@@ -1,9 +1,9 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { PullRequestConnection__PullRequestTable__param } from './param_type';
 import { PullRequestTable as resolver } from '../../../PullRequestTable.tsx';
-import Actor__UserLink from '../../Actor/UserLink/resolver_reader';
-import PullRequest__PullRequestLink from '../../PullRequest/PullRequestLink/resolver_reader';
-import PullRequest__createdAtFormatted from '../../PullRequest/createdAtFormatted/resolver_reader';
+import Actor__UserLink__resolver_reader from '../../Actor/UserLink/resolver_reader';
+import PullRequest__PullRequestLink__resolver_reader from '../../PullRequest/PullRequestLink/resolver_reader';
+import PullRequest__createdAtFormatted__resolver_reader from '../../PullRequest/createdAtFormatted/resolver_reader';
 
 const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
   {
@@ -28,7 +28,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
             kind: "Resolver",
             alias: "PullRequestLink",
             arguments: null,
-            readerArtifact: PullRequest__PullRequestLink,
+            readerArtifact: PullRequest__PullRequestLink__resolver_reader,
             usedRefetchQueries: [],
           },
           {
@@ -53,7 +53,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
                 kind: "Resolver",
                 alias: "UserLink",
                 arguments: null,
-                readerArtifact: Actor__UserLink,
+                readerArtifact: Actor__UserLink__resolver_reader,
                 usedRefetchQueries: [],
               },
               {
@@ -80,7 +80,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
             kind: "Resolver",
             alias: "createdAtFormatted",
             arguments: null,
-            readerArtifact: PullRequest__createdAtFormatted,
+            readerArtifact: PullRequest__createdAtFormatted__resolver_reader,
             usedRefetchQueries: [],
           },
         ],

@@ -1,7 +1,7 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Query__Header__param } from './param_type';
 import { Header as resolver } from '../../../header.tsx';
-import User__Avatar from '../../User/Avatar/resolver_reader';
+import User__Avatar__resolver_reader from '../../User/Avatar/resolver_reader';
 
 const readerAst: ReaderAst<Query__Header__param> = [
   {
@@ -20,7 +20,7 @@ const readerAst: ReaderAst<Query__Header__param> = [
         kind: "Resolver",
         alias: "Avatar",
         arguments: null,
-        readerArtifact: User__Avatar,
+        readerArtifact: User__Avatar__resolver_reader,
         usedRefetchQueries: [],
       },
     ],

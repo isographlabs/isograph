@@ -1,7 +1,7 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Query__HomeRoute__param } from './param_type';
 import { HomeRoute as resolver } from '../../../HomeRoute.tsx';
-import Pet__PetSummaryCard from '../../Pet/PetSummaryCard/resolver_reader';
+import Pet__PetSummaryCard__resolver_reader from '../../Pet/PetSummaryCard/resolver_reader';
 
 const readerAst: ReaderAst<Query__HomeRoute__param> = [
   {
@@ -20,7 +20,7 @@ const readerAst: ReaderAst<Query__HomeRoute__param> = [
         kind: "Resolver",
         alias: "PetSummaryCard",
         arguments: null,
-        readerArtifact: Pet__PetSummaryCard,
+        readerArtifact: Pet__PetSummaryCard__resolver_reader,
         usedRefetchQueries: [],
       },
     ],

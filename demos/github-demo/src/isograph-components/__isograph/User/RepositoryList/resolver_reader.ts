@@ -1,7 +1,7 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { User__RepositoryList__param } from './param_type';
 import { RepositoryList as resolver } from '../../../UserRepositoryList.tsx';
-import Repository__RepositoryLink from '../../Repository/RepositoryLink/resolver_reader';
+import Repository__RepositoryLink__resolver_reader from '../../Repository/RepositoryLink/resolver_reader';
 
 const readerAst: ReaderAst<User__RepositoryList__param> = [
   {
@@ -37,7 +37,7 @@ const readerAst: ReaderAst<User__RepositoryList__param> = [
                 kind: "Resolver",
                 alias: "RepositoryLink",
                 arguments: null,
-                readerArtifact: Repository__RepositoryLink,
+                readerArtifact: Repository__RepositoryLink__resolver_reader,
                 usedRefetchQueries: [],
               },
               {
