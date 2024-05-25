@@ -29,9 +29,9 @@ use crate::{
 };
 
 lazy_static! {
-    pub static ref READER: ArtifactFileType = "reader".intern().into();
-    pub static ref READER_PARAM_TYPE: ArtifactFileType = "param_type".intern().into();
-    pub static ref READER_OUTPUT_TYPE: ArtifactFileType = "output_type".intern().into();
+    pub static ref RESOLVER_READER: ArtifactFileType = "reader".intern().into();
+    pub static ref RESOLVER_PARAM_TYPE: ArtifactFileType = "param_type".intern().into();
+    pub static ref RESOLVER_OUTPUT_TYPE: ArtifactFileType = "output_type".intern().into();
     pub static ref ENTRYPOINT: ArtifactFileType = "entrypoint".intern().into();
     pub static ref ISO_TS: ArtifactFileType = "iso".intern().into();
 }
@@ -304,7 +304,7 @@ fn write_client_field_import(
         s_client_field_import.push_str(&format!(
             "import {} from '{}';\n",
             nested_client_field_name.underscore_separated(),
-            nested_client_field_name.relative_path(current_file_type_name, *READER)
+            nested_client_field_name.relative_path(current_file_type_name, *RESOLVER_READER)
         ));
     }
 
@@ -316,7 +316,7 @@ fn write_client_field_import(
         }
         s_client_field_type_import.push_str(&format!(
             "}} from '{}';\n",
-            nested_client_field_name.relative_path(current_file_type_name, *READER_OUTPUT_TYPE)
+            nested_client_field_name.relative_path(current_file_type_name, *RESOLVER_OUTPUT_TYPE)
         ));
     }
 

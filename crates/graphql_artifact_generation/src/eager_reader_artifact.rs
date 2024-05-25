@@ -12,7 +12,8 @@ use crate::{
         generate_client_field_parameter_type, generate_output_type, generate_path,
         get_output_type_text, nested_client_field_names_to_import_statement,
         ClientFieldFunctionImportStatement, ClientFieldOutputType, ClientFieldParameterType,
-        NestedClientFieldImports, ReaderAst, READER, READER_OUTPUT_TYPE, READER_PARAM_TYPE,
+        NestedClientFieldImports, ReaderAst, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE,
+        RESOLVER_READER,
     },
     reader_ast::generate_reader_ast,
 };
@@ -136,12 +137,14 @@ impl<'schema> EagerReaderArtifactInfo<'schema> {
         let (reader_content, final_output_type_text) =
             if let UserWrittenComponentVariant::Eager = user_written_component_variant {
                 let reader_output_type = format!("{parent_name}__{client_field_name}__outputType");
+                let param_type_file_name = *RESOLVER_PARAM_TYPE;
+                let output_type_file_name = *RESOLVER_OUTPUT_TYPE;
                 (
                     format!(
                         "import type {{EagerReaderArtifact, ReaderAst, \
                         RefetchQueryNormalizationArtifact}} from '@isograph/react';\n\
-                        import {{ {reader_param_type} }} from './param_type';\n\
-                        import {{ {reader_output_type} }} from './output_type';\n\
+                        import {{ {reader_param_type} }} from './{param_type_file_name}';\n\
+                        import {{ {reader_output_type} }} from './{output_type_file_name}';\n\
                         {function_import_statement}\n\
                         {client_field_import_statement}\n\
                         const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
@@ -160,11 +163,12 @@ impl<'schema> EagerReaderArtifactInfo<'schema> {
                 )
             } else {
                 let component_name = format!("{}.{}", parent_name, client_field_name);
+                let param_type_file_name = *RESOLVER_PARAM_TYPE;
                 (
                     format!(
                         "import type {{ComponentReaderArtifact, ExtractSecondParam, \
                         ReaderAst, RefetchQueryNormalizationArtifact}} from '@isograph/react';\n\
-                        import {{ {reader_param_type} }} from './param_type';\n\
+                        import {{ {reader_param_type} }} from './{param_type_file_name}';\n\
                         {function_import_statement}\n\
                         {client_field_import_statement}\n\
                         const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
@@ -196,17 +200,17 @@ impl<'schema> EagerReaderArtifactInfo<'schema> {
         vec![
             PathAndContent {
                 relative_directory: relative_directory.clone(),
-                file_name_prefix: *READER,
+                file_name_prefix: *RESOLVER_READER,
                 file_content: reader_content,
             },
             PathAndContent {
                 relative_directory: relative_directory.clone(),
-                file_name_prefix: *READER_PARAM_TYPE,
+                file_name_prefix: *RESOLVER_PARAM_TYPE,
                 file_content: param_type_content,
             },
             PathAndContent {
                 relative_directory: relative_directory.clone(),
-                file_name_prefix: *READER_OUTPUT_TYPE,
+                file_name_prefix: *RESOLVER_OUTPUT_TYPE,
                 file_content: final_output_type_text,
             },
         ]

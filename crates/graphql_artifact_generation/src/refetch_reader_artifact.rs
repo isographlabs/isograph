@@ -11,7 +11,8 @@ use crate::{
         generate_client_field_parameter_type, generate_output_type, generate_path,
         get_output_type_text, nested_client_field_names_to_import_statement,
         ClientFieldFunctionImportStatement, ClientFieldOutputType, ClientFieldParameterType,
-        NestedClientFieldImports, ReaderAst, READER, READER_OUTPUT_TYPE, READER_PARAM_TYPE,
+        NestedClientFieldImports, ReaderAst, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE,
+        RESOLVER_READER,
     },
     reader_ast::generate_reader_ast,
 };
@@ -71,10 +72,11 @@ impl<'schema> RefetchReaderArtifactInfo<'schema> {
 
         let parent_name = parent_type.name;
         let reader_param_type = format!("{parent_name}__{client_field_name}__param");
+        let param_type_file_name = *RESOLVER_PARAM_TYPE;
 
         let reader_content = format!(
             "import type {{RefetchReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact}} from '@isograph/react';\n\
-            import {{ {reader_param_type} }} from './param_type';\n\
+            import {{ {reader_param_type} }} from './{param_type_file_name}';\n\
             {function_import_statement}\n\
             {client_field_import_statement}\n\
             const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
@@ -96,17 +98,17 @@ impl<'schema> RefetchReaderArtifactInfo<'schema> {
         vec![
             PathAndContent {
                 relative_directory: relative_directory.clone(),
-                file_name_prefix: *READER,
+                file_name_prefix: *RESOLVER_READER,
                 file_content: reader_content,
             },
             PathAndContent {
                 relative_directory: relative_directory.clone(),
-                file_name_prefix: *READER_PARAM_TYPE,
+                file_name_prefix: *RESOLVER_PARAM_TYPE,
                 file_content: param_type_content,
             },
             PathAndContent {
                 relative_directory: relative_directory.clone(),
-                file_name_prefix: *READER_OUTPUT_TYPE,
+                file_name_prefix: *RESOLVER_OUTPUT_TYPE,
                 file_content: output_type_text,
             },
         ]

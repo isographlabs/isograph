@@ -10,6 +10,7 @@ use isograph_schema::{
 use crate::{
     generate_artifacts::{
         generate_path, NormalizationAstText, QueryText, RefetchQueryArtifactImport, ENTRYPOINT,
+        RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
     },
     normalization_ast_text::generate_normalization_ast_text,
     query_text::generate_query_text,
@@ -146,12 +147,16 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
         let entrypoint_params_typename = format!("{}__{}__param", parent_type.name, query_name);
         let entrypoint_output_type_name =
             format!("{}__{}__outputType", parent_type.name, query_name);
+
+        let resolver_reader_file_name = *RESOLVER_READER;
+        let param_type_file_name = *RESOLVER_PARAM_TYPE;
+        let output_type_file_name = *RESOLVER_OUTPUT_TYPE;
         format!(
             "import type {{IsographEntrypoint, \
             NormalizationAst, RefetchQueryNormalizationArtifactWrapper}} from '@isograph/react';\n\
-            import {{{entrypoint_params_typename}}} from './param_type';\n\
-            import {{{entrypoint_output_type_name}}} from './output_type';\n\
-            import readerResolver from './reader';\n\
+            import {{{entrypoint_params_typename}}} from './{param_type_file_name}';\n\
+            import {{{entrypoint_output_type_name}}} from './{output_type_file_name}';\n\
+            import readerResolver from './{resolver_reader_file_name}';\n\
             {refetch_query_artifact_import}\n\n\
             const queryText = '{query_text}';\n\n\
             const normalizationAst: NormalizationAst = {normalization_ast_text};\n\
