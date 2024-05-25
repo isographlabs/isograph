@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
+    collections::{hash_map::Entry, HashMap},
     fmt::{self, Debug, Display},
     path::PathBuf,
 };
@@ -15,8 +15,9 @@ use isograph_lang_types::{
     ServerFieldSelection,
 };
 use isograph_schema::{
-    ClientFieldVariant, FieldDefinitionLocation, ObjectTypeAndFieldName, SchemaObject,
-    UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema, ValidatedSelection,
+    ClientFieldVariant, EncounteredClientFieldInfo, FieldDefinitionLocation,
+    ObjectTypeAndFieldName, SchemaObject, UserWrittenComponentVariant, ValidatedClientField,
+    ValidatedSchema, ValidatedSelection,
 };
 use lazy_static::lazy_static;
 
@@ -67,7 +68,7 @@ pub fn get_artifact_path_and_content<'schema>(
     artifact_directory: &PathBuf,
 ) -> Vec<PathAndContent> {
     let mut artifact_queue = vec![];
-    let mut encountered_client_field_ids = HashSet::new();
+    let mut encountered_client_field_infos = HashMap::new();
     let mut path_and_contents = vec![];
 
     for client_field_id in schema.entrypoints.iter() {
@@ -75,14 +76,14 @@ pub fn get_artifact_path_and_content<'schema>(
             schema,
             *client_field_id,
             &mut artifact_queue,
-            &mut encountered_client_field_ids,
+            &mut encountered_client_field_infos,
         ));
 
         // We also need to generate reader artifacts for the entrypoint client fields themselves
-        encountered_client_field_ids.insert(*client_field_id);
+        encountered_client_field_infos.insert(*client_field_id, EncounteredClientFieldInfo {});
     }
 
-    for encountered_client_field_id in encountered_client_field_ids {
+    for (encountered_client_field_id, _info) in encountered_client_field_infos {
         let encountered_client_field = schema.client_field(encountered_client_field_id);
         path_and_contents.extend(match &encountered_client_field.variant {
             ClientFieldVariant::UserWritten(info) => generate_eager_reader_artifact(

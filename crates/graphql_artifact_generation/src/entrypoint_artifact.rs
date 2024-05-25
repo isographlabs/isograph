@@ -1,10 +1,8 @@
-use std::collections::HashSet;
-
 use common_lang_types::{PathAndContent, QueryOperationName, VariableName};
 use isograph_lang_types::ClientFieldId;
 use isograph_schema::{
-    create_merged_selection_set, ImperativelyLoadedFieldArtifactInfo, RootRefetchedPath,
-    SchemaObject, ValidatedSchema,
+    create_merged_selection_set, EncounteredClientFieldInfoMap,
+    ImperativelyLoadedFieldArtifactInfo, RootRefetchedPath, SchemaObject, ValidatedSchema,
 };
 
 use crate::{
@@ -29,7 +27,7 @@ pub(crate) fn generate_entrypoint_artifact(
     schema: &ValidatedSchema,
     client_field_id: ClientFieldId,
     artifact_queue: &mut Vec<ImperativelyLoadedFieldArtifactInfo>,
-    encountered_client_field_ids: &mut HashSet<ClientFieldId>,
+    encountered_client_field_infos: &mut EncounteredClientFieldInfoMap,
 ) -> PathAndContent {
     let fetchable_client_field = schema.client_field(client_field_id);
     if let Some((ref selection_set, _)) = fetchable_client_field.selection_set_and_unwraps {
@@ -42,7 +40,7 @@ pub(crate) fn generate_entrypoint_artifact(
                 .object(fetchable_client_field.parent_object_id),
             selection_set,
             Some(artifact_queue),
-            Some(encountered_client_field_ids),
+            Some(encountered_client_field_infos),
             &fetchable_client_field,
         );
 

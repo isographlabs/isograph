@@ -217,11 +217,13 @@ struct MergeTraversalState<'a> {
     /// needed for each refetch query. At this point, we have enough information
     /// to generate the refetch query.
     current_path: Vec<NameAndArguments>,
-    encountered_client_field_ids: Option<&'a mut HashSet<ClientFieldId>>,
+    encountered_client_field_ids: Option<&'a mut EncounteredClientFieldInfoMap>,
 }
 
 impl<'a> MergeTraversalState<'a> {
-    pub fn new(encountered_client_field_ids: Option<&'a mut HashSet<ClientFieldId>>) -> Self {
+    pub fn new(
+        encountered_client_field_ids: Option<&'a mut EncounteredClientFieldInfoMap>,
+    ) -> Self {
         Self {
             paths_to_refetch_fields: Default::default(),
             current_path: vec![],
@@ -240,13 +242,18 @@ impl<'a> MergeTraversalState<'a> {
     }
 }
 
+pub type EncounteredClientFieldInfoMap = HashMap<ClientFieldId, EncounteredClientFieldInfo>;
+
+#[derive(Debug)]
+pub struct EncounteredClientFieldInfo {}
+
 pub fn create_merged_selection_set(
     schema: &ValidatedSchema,
     parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
     // TODO consider ways to get rid of these parameters.
     artifact_queue: Option<&mut Vec<ImperativelyLoadedFieldArtifactInfo>>,
-    encountered_client_field_ids: Option<&mut HashSet<ClientFieldId>>,
+    encountered_client_field_ids: Option<&mut EncounteredClientFieldInfoMap>,
     // N.B. we call this for non-fetchable resolvers now, but that is a smell
     entrypoint: &ValidatedClientField,
 ) -> (MergedSelectionSet, Vec<RootRefetchedPath>) {
@@ -538,7 +545,8 @@ fn merge_selections_into_set(
                             if let Some(ref mut encountered_client_field_ids) =
                                 merge_traversal_state.encountered_client_field_ids
                             {
-                                encountered_client_field_ids.insert(*client_field_id);
+                                encountered_client_field_ids
+                                    .insert(*client_field_id, EncounteredClientFieldInfo {});
                             }
                             let client_field = schema.client_field(*client_field_id);
                             maybe_note_path_to_refetch_fields(
