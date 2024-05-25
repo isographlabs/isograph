@@ -2,9 +2,11 @@ use intern::Lookup;
 use std::{cmp::Ordering, path::PathBuf};
 
 use common_lang_types::{PathAndContent, SelectableFieldName};
-use isograph_schema::{UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema};
+use isograph_schema::{
+    ClientFieldVariant, UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema,
+};
 
-use crate::generate_artifacts::{user_written_fields, ISO_TS};
+use crate::generate_artifacts::ISO_TS;
 
 fn build_iso_overload_for_entrypoint<'schema>(
     validated_client_field: &ValidatedClientField,
@@ -223,4 +225,18 @@ fn sort_field_name(field_1: SelectableFieldName, field_2: SelectableFieldName) -
     } else {
         field_1.cmp(&field_2)
     }
+}
+
+fn user_written_fields<'a>(
+    schema: &'a ValidatedSchema,
+) -> impl Iterator<Item = (&'a ValidatedClientField, UserWrittenComponentVariant)> + 'a {
+    schema
+        .client_fields
+        .iter()
+        .filter_map(|client_field| match client_field.variant {
+            ClientFieldVariant::UserWritten(info) => {
+                Some((client_field, info.user_written_component_variant))
+            }
+            ClientFieldVariant::ImperativelyLoadedField(_) => None,
+        })
 }

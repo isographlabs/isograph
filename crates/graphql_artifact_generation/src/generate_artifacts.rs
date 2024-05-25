@@ -37,45 +37,6 @@ lazy_static! {
     pub static ref ISO_TS: ArtifactFileType = "iso".intern().into();
 }
 
-#[derive(Hash, Eq, PartialEq, Debug, PartialOrd, Ord)]
-pub(crate) enum SourceArtifact {
-    ResolverOrRefetchReader,
-    ParamType,
-}
-
-#[derive(Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
-pub struct NestedClientFieldImportKey {
-    pub object_type_and_field: ObjectTypeAndFieldName,
-    pub source_artifact: SourceArtifact,
-    pub artifact_file_type: ArtifactFileType,
-}
-
-pub(crate) type NestedClientFieldImports = HashMap<NestedClientFieldImportKey, JavaScriptImports>;
-
-macro_rules! derive_display {
-    ($type:ident) => {
-        impl fmt::Display for $type {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                fmt::Display::fmt(&self.0, f)
-            }
-        }
-    };
-}
-
-pub(crate) fn user_written_fields<'a>(
-    schema: &'a ValidatedSchema,
-) -> impl Iterator<Item = (&'a ValidatedClientField, UserWrittenComponentVariant)> + 'a {
-    schema
-        .client_fields
-        .iter()
-        .filter_map(|client_field| match client_field.variant {
-            ClientFieldVariant::UserWritten(info) => {
-                Some((client_field, info.user_written_component_variant))
-            }
-            ClientFieldVariant::ImperativelyLoadedField(_) => None,
-        })
-}
-
 /// Get all artifacts according to the following scheme:
 ///
 /// For each entrypoint, generate an entrypoint artifact.
@@ -149,47 +110,20 @@ pub fn get_artifact_path_and_content<'schema>(
     path_and_contents
 }
 
-#[derive(Debug)]
-pub(crate) struct ClientFieldParameterType(pub String);
-derive_display!(ClientFieldParameterType);
-
-#[derive(Debug)]
-pub(crate) struct QueryText(pub String);
-derive_display!(QueryText);
-
-#[derive(Debug)]
-pub(crate) struct ClientFieldFunctionImportStatement(pub String);
-derive_display!(ClientFieldFunctionImportStatement);
-
-#[derive(Debug)]
-pub(crate) struct ClientFieldOutputType(pub String);
-derive_display!(ClientFieldOutputType);
-
-#[derive(Debug)]
-pub(crate) struct ReaderAst(pub String);
-derive_display!(ReaderAst);
-
-#[derive(Debug)]
-pub(crate) struct NormalizationAstText(pub String);
-derive_display!(NormalizationAstText);
-
-#[derive(Debug)]
-pub(crate) struct ConvertFunction(pub String);
-derive_display!(ConvertFunction);
-
-#[derive(Debug)]
-pub(crate) struct RefetchQueryArtifactImport(pub String);
-derive_display!(RefetchQueryArtifactImport);
-
-#[derive(Debug)]
-pub(crate) struct JavascriptVariableName(pub String);
-derive_display!(JavascriptVariableName);
-
-#[derive(Debug)]
-pub struct JavaScriptImports {
-    pub(crate) default_import: Option<JavascriptVariableName>,
-    pub(crate) types: Vec<JavascriptVariableName>,
+#[derive(Hash, Eq, PartialEq, Debug, PartialOrd, Ord)]
+pub(crate) enum SourceArtifact {
+    ResolverOrRefetchReader,
+    ParamType,
 }
+
+#[derive(Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
+pub struct NestedClientFieldImportKey {
+    pub object_type_and_field: ObjectTypeAndFieldName,
+    pub source_artifact: SourceArtifact,
+    pub artifact_file_type: ArtifactFileType,
+}
+
+pub(crate) type NestedClientFieldImports = HashMap<NestedClientFieldImportKey, JavaScriptImports>;
 
 pub(crate) fn get_serialized_field_arguments(
     arguments: &[WithLocation<SelectionFieldArgument>],
@@ -570,4 +504,56 @@ fn print_non_null_type_annotation<T: Display>(non_null: &NonNullTypeAnnotation<T
             print_list_type_annotation(list, s);
         }
     }
+}
+
+macro_rules! derive_display {
+    ($type:ident) => {
+        impl fmt::Display for $type {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                fmt::Display::fmt(&self.0, f)
+            }
+        }
+    };
+}
+
+#[derive(Debug)]
+pub(crate) struct ClientFieldParameterType(pub String);
+derive_display!(ClientFieldParameterType);
+
+#[derive(Debug)]
+pub(crate) struct QueryText(pub String);
+derive_display!(QueryText);
+
+#[derive(Debug)]
+pub(crate) struct ClientFieldFunctionImportStatement(pub String);
+derive_display!(ClientFieldFunctionImportStatement);
+
+#[derive(Debug)]
+pub(crate) struct ClientFieldOutputType(pub String);
+derive_display!(ClientFieldOutputType);
+
+#[derive(Debug)]
+pub(crate) struct ReaderAst(pub String);
+derive_display!(ReaderAst);
+
+#[derive(Debug)]
+pub(crate) struct NormalizationAstText(pub String);
+derive_display!(NormalizationAstText);
+
+#[derive(Debug)]
+pub(crate) struct ConvertFunction(pub String);
+derive_display!(ConvertFunction);
+
+#[derive(Debug)]
+pub(crate) struct RefetchQueryArtifactImport(pub String);
+derive_display!(RefetchQueryArtifactImport);
+
+#[derive(Debug)]
+pub(crate) struct JavascriptVariableName(pub String);
+derive_display!(JavascriptVariableName);
+
+#[derive(Debug)]
+pub struct JavaScriptImports {
+    pub(crate) default_import: Option<JavascriptVariableName>,
+    pub(crate) types: Vec<JavascriptVariableName>,
 }
