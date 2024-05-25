@@ -5,8 +5,8 @@ use std::{
 };
 
 use common_lang_types::{
-    ArtifactFileType, DescriptionValue, IsographObjectTypeName, PathAndContent,
-    SelectableFieldName, WithLocation, WithSpan,
+    ArtifactFileType, DescriptionValue, IsographObjectTypeName, JavascriptVariableName,
+    PathAndContent, SelectableFieldName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, ListTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
@@ -378,21 +378,24 @@ fn write_query_types_from_selection(
                             artifact_file_type: *RESOLVER_OUTPUT_TYPE,
                         }) {
                             Entry::Occupied(mut occupied) => {
-                                occupied
-                                    .get_mut()
-                                    .types
-                                    .push(JavascriptVariableName(format!(
+                                occupied.get_mut().types.push(
+                                    format!(
                                         "{}__outputType",
                                         client_field.type_and_field.underscore_separated()
-                                    )));
+                                    )
+                                    .intern()
+                                    .into(),
+                                );
                             }
                             Entry::Vacant(vacant) => {
                                 vacant.insert(JavaScriptImports {
                                     default_import: None,
-                                    types: vec![JavascriptVariableName(format!(
+                                    types: vec![format!(
                                         "{}__outputType",
                                         client_field.type_and_field.underscore_separated()
-                                    ))],
+                                    )
+                                    .intern()
+                                    .into()],
                                 });
                             }
                         }
@@ -547,10 +550,6 @@ derive_display!(ConvertFunction);
 #[derive(Debug)]
 pub(crate) struct RefetchQueryArtifactImport(pub String);
 derive_display!(RefetchQueryArtifactImport);
-
-#[derive(Debug)]
-pub(crate) struct JavascriptVariableName(pub String);
-derive_display!(JavascriptVariableName);
 
 #[derive(Debug)]
 pub struct JavaScriptImports {
