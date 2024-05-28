@@ -92,10 +92,8 @@ pub fn get_artifact_path_and_content<'schema>(
         merged_selection_sets.insert(*client_field_id, merged_selection_set);
     }
 
-    let paths = sorted_paths_to_refetch_fields(&encountered_client_field_infos);
-
-    for (encountered_client_field_id, _) in encountered_client_field_infos {
-        let encountered_client_field = schema.client_field(encountered_client_field_id);
+    for (encountered_client_field_id, _) in &encountered_client_field_infos {
+        let encountered_client_field = schema.client_field(*encountered_client_field_id);
         path_and_contents.extend(match &encountered_client_field.variant {
             ClientFieldVariant::UserWritten(info) => generate_eager_reader_artifact(
                 schema,
@@ -110,6 +108,7 @@ pub fn get_artifact_path_and_content<'schema>(
         });
     }
 
+    let paths = sorted_paths_to_refetch_fields(encountered_client_field_infos);
     for (index, (path_to_refetch_field, path_to_refetch_field_info, parent_client_field_id)) in
         paths.into_iter().enumerate()
     {
@@ -136,12 +135,12 @@ pub fn get_artifact_path_and_content<'schema>(
 }
 
 fn sorted_paths_to_refetch_fields(
-    encountered_client_field_infos: &EncounteredClientFieldInfoMap,
+    encountered_client_field_infos: EncounteredClientFieldInfoMap,
 ) -> Vec<(PathToRefetchField, PathToRefetchFieldInfo, ClientFieldId)> {
     let mut out = vec![];
 
-    for info in encountered_client_field_infos.iter() {
-        out.extend(info.1.paths_to_refetch_fields.iter().cloned())
+    for info in encountered_client_field_infos {
+        out.extend(info.1.paths_to_refetch_fields.into_iter())
     }
 
     out.sort_by_cached_key(|(a, _, _)| a.clone());
