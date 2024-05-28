@@ -33,7 +33,10 @@ lazy_static! {
 #[derive(Debug)]
 pub struct RootRefetchedPath {
     pub path: PathToRefetchField,
-    pub variables: Vec<VariableName>,
+    // The variables that are reachable from the merged selection set
+    pub reachable_variables: Vec<VariableName>,
+    // The variables that must be passed to the field itself
+    pub field_variables: Vec<VariableName>,
     // TODO is this always the same as .path.field_name?
     pub field_name: SelectableFieldName,
 }
@@ -267,36 +270,58 @@ pub fn create_merged_selection_set(
         &mut merge_traversal_state,
     );
 
-    let root_refetched_paths: Vec<_> = merge_traversal_state
+    let root_refetched_paths = merge_traversal_state
         .sorted_paths_to_refetch_fields()
         .into_iter()
-        .enumerate()
-        .map(|(index, (path_to_refetch_field, info))| {
-            // TODO do not call this here
-            let (root_refetched_path, _) = get_root_refetched_path_and_artifact_info(
-                info,
-                &full_merged_selection_set,
-                path_to_refetch_field,
-                schema,
-                entrypoint,
-                index,
-            );
-
-            root_refetched_path
+        .map(|(path_to_refetch_field, info)| {
+            get_root_refetched_path(info, &full_merged_selection_set, path_to_refetch_field)
         })
         .collect();
 
     (full_merged_selection_set, root_refetched_paths)
 }
 
-pub fn get_root_refetched_path_and_artifact_info(
+pub fn get_root_refetched_path(
+    info: PathToRefetchFieldInfo,
+    full_merged_selection_set: &MergedSelectionSet,
+    path_to_refetch_field: PathToRefetchField,
+) -> RootRefetchedPath {
+    let PathToRefetchFieldInfo {
+        imperatively_loaded_field_variant,
+        ..
+    } = info;
+    let nested_merged_selection_set =
+        find_by_path(full_merged_selection_set, &path_to_refetch_field);
+
+    // TODO we can pre-calculate this instead of re-iterating here
+    let reachable_variables = nested_merged_selection_set.reachable_variables();
+    let mut reachable_variables_vec: Vec<_> = reachable_variables.into_iter().collect();
+    reachable_variables_vec.sort();
+
+    RootRefetchedPath {
+        path: path_to_refetch_field,
+
+        reachable_variables: reachable_variables_vec,
+        field_variables: imperatively_loaded_field_variant
+            .top_level_schema_field_arguments
+            .iter()
+            .map(|x| x.item.name.item.lookup().intern().into())
+            .collect(),
+
+        field_name: imperatively_loaded_field_variant
+            .client_field_scalar_selection_name
+            .into(),
+    }
+}
+
+pub fn get_imperatively_loaded_artifact_info(
     info: PathToRefetchFieldInfo,
     full_merged_selection_set: &MergedSelectionSet,
     path_to_refetch_field: PathToRefetchField,
     schema: &ValidatedSchema,
     entrypoint: &ValidatedClientField,
     index: usize,
-) -> (RootRefetchedPath, ImperativelyLoadedFieldArtifactInfo) {
+) -> ImperativelyLoadedFieldArtifactInfo {
     let PathToRefetchFieldInfo {
         refetch_field_parent_id,
         imperatively_loaded_field_variant,
@@ -305,7 +330,7 @@ pub fn get_root_refetched_path_and_artifact_info(
     let nested_merged_selection_set =
         find_by_path(full_merged_selection_set, &path_to_refetch_field);
 
-    let (field_name, reachable_variables, artifact_info) = process_imperatively_loaded_field(
+    let artifact_info = process_imperatively_loaded_field(
         schema,
         imperatively_loaded_field_variant,
         refetch_field_parent_id,
@@ -314,14 +339,7 @@ pub fn get_root_refetched_path_and_artifact_info(
         index,
     );
 
-    (
-        RootRefetchedPath {
-            path: path_to_refetch_field,
-            variables: reachable_variables,
-            field_name: field_name.into(),
-        },
-        artifact_info,
-    )
+    artifact_info
 }
 
 fn process_imperatively_loaded_field(
@@ -331,11 +349,7 @@ fn process_imperatively_loaded_field(
     nested_merged_selection_set: MergedSelectionSet,
     entrypoint: &ValidatedClientField,
     index: usize,
-) -> (
-    ScalarFieldName,
-    Vec<VariableName>,
-    ImperativelyLoadedFieldArtifactInfo,
-) {
+) -> ImperativelyLoadedFieldArtifactInfo {
     let ImperativelyLoadedFieldVariant {
         client_field_scalar_selection_name,
         top_level_schema_field_name,
@@ -348,7 +362,7 @@ fn process_imperatively_loaded_field(
     let refetch_field_parent_type = schema.server_field_data.object(refetch_field_parent_id);
 
     // TODO we can pre-calculate this instead of re-iterating here
-    let mut reachable_variables = nested_merged_selection_set.reachable_variables();
+    let reachable_variables = nested_merged_selection_set.reachable_variables();
 
     let mut definitions_of_used_variables =
         get_used_variable_definitions(&reachable_variables, entrypoint);
@@ -383,14 +397,12 @@ fn process_imperatively_loaded_field(
                                 .get(&type_name.into())
                                 .expect(
                                     "Expected type to be found, \
-                                                                this indicates a bug in Isograph",
+                                    this indicates a bug in Isograph",
                                 )
                         }),
                     },
                     span: Span::todo_generated(),
                 });
-
-                reachable_variables.insert(variable_name.item);
 
                 x.map(|item| SelectionFieldArgument {
                     name: WithSpan::new(
@@ -420,7 +432,7 @@ fn process_imperatively_loaded_field(
         .get(&root_object_id)
         .expect(
             "Expected root type to be fetchable here.\
-                                                 This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         )
         .clone();
 
@@ -435,7 +447,7 @@ fn process_imperatively_loaded_field(
     .intern()
     .into();
 
-    let artifact_info = ImperativelyLoadedFieldArtifactInfo {
+    ImperativelyLoadedFieldArtifactInfo {
         merged_selection_set: wrapped_selection_set,
         root_parent_object,
         variable_definitions: definitions_of_used_variables,
@@ -443,16 +455,7 @@ fn process_imperatively_loaded_field(
         refetch_query_index: RefetchQueryIndex(index as u32),
         root_operation_name,
         query_name,
-    };
-
-    let mut reachable_variables_vec: Vec<_> = reachable_variables.into_iter().collect();
-    reachable_variables_vec.sort();
-
-    (
-        client_field_scalar_selection_name,
-        reachable_variables_vec,
-        artifact_info,
-    )
+    }
 }
 
 fn get_used_variable_definitions(

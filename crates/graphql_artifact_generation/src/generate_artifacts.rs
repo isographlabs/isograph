@@ -15,7 +15,7 @@ use isograph_lang_types::{
     ServerFieldSelection,
 };
 use isograph_schema::{
-    get_root_refetched_path_and_artifact_info, ClientFieldVariant, EncounteredClientFieldInfo,
+    get_imperatively_loaded_artifact_info, ClientFieldVariant, EncounteredClientFieldInfo,
     EncounteredClientFieldInfoMap, FieldDefinitionLocation, ObjectTypeAndFieldName,
     PathToRefetchField, PathToRefetchFieldInfo, SchemaObject, UserWrittenComponentVariant,
     ValidatedClientField, ValidatedSchema, ValidatedSelection,
@@ -113,7 +113,7 @@ pub fn get_artifact_path_and_content<'schema>(
     for (index, (path_to_refetch_field, path_to_refetch_field_info, parent_client_field_id)) in
         paths.into_iter().enumerate()
     {
-        let (_, artifact_info) = get_root_refetched_path_and_artifact_info(
+        let artifact_info = get_imperatively_loaded_artifact_info(
             path_to_refetch_field_info,
             merged_selection_sets
                 .get(&parent_client_field_id)

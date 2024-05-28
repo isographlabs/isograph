@@ -68,8 +68,8 @@ pub(crate) fn generate_entrypoint_artifact(
             &fetchable_client_field.variable_definitions,
             root_operation_name,
         );
-        let refetch_query_artifact_imports =
-            generate_refetch_query_artifact_imports(&root_refetched_paths);
+        let refetch_query_artifact_import =
+            generate_refetch_query_artifact_import(&root_refetched_paths);
 
         let normalization_ast_text =
             generate_normalization_ast_text(schema, &merged_selection_set, 0);
@@ -80,7 +80,7 @@ pub(crate) fn generate_entrypoint_artifact(
                 query_name,
                 parent_type: parent_object.into(),
                 normalization_ast_text,
-                refetch_query_artifact_import: refetch_query_artifact_imports,
+                refetch_query_artifact_import,
             }
             .path_and_content(),
             merged_selection_set,
@@ -91,21 +91,27 @@ pub(crate) fn generate_entrypoint_artifact(
     }
 }
 
-fn generate_refetch_query_artifact_imports(
+fn generate_refetch_query_artifact_import(
     root_refetched_paths: &[RootRefetchedPath],
 ) -> RefetchQueryArtifactImport {
     // TODO name the refetch queries with the path, or something, instead of
     // with indexes.
     let mut output = String::new();
     let mut array_syntax = String::new();
-    for (query_index, RootRefetchedPath { variables, .. }) in
-        root_refetched_paths.iter().enumerate()
+    for (
+        query_index,
+        RootRefetchedPath {
+            reachable_variables,
+            field_variables,
+            ..
+        },
+    ) in root_refetched_paths.iter().enumerate()
     {
         output.push_str(&format!(
             "import refetchQuery{} from './__refetch__{}';\n",
             query_index, query_index,
         ));
-        let variable_names_str = variable_names_to_string(&variables);
+        let variable_names_str = variable_names_to_string(&reachable_variables, &field_variables);
         array_syntax.push_str(&format!(
             "  {{ artifact: refetchQuery{}, allowedVariables: {} }},\n",
             query_index, variable_names_str
@@ -180,10 +186,16 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
     }
 }
 
-fn variable_names_to_string(variable_names: &[VariableName]) -> String {
+fn variable_names_to_string(
+    variable_names: &[VariableName],
+    field_variables: &[VariableName],
+) -> String {
     let mut s = "[".to_string();
 
     for variable in variable_names {
+        s.push_str(&format!("\"{}\", ", variable));
+    }
+    for variable in field_variables {
         s.push_str(&format!("\"{}\", ", variable));
     }
 
