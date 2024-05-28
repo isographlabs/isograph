@@ -107,12 +107,17 @@ fn generate_refetch_query_artifact_imports(
         ));
         let variable_names_str = variable_names_to_string(&variables);
         array_syntax.push_str(&format!(
-            "{{ artifact: refetchQuery{}, allowedVariables: {} }}, ",
+            "  {{ artifact: refetchQuery{}, allowedVariables: {} }},\n",
             query_index, variable_names_str
         ));
     }
     output.push_str(&format!(
-        "const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [{}];",
+        "const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [{}{}];",
+        if root_refetched_paths.is_empty() {
+            ""
+        } else {
+            "\n"
+        },
         array_syntax
     ));
     RefetchQueryArtifactImport(output)
