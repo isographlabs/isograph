@@ -100,6 +100,6 @@ export type ReaderResolverField = {
 export type ReaderImperativelyLoadedField = {
   readonly kind: 'ImperativelyLoadedField';
   readonly alias: string;
-  readonly readerArtifact: MutationReaderArtifact<any>;
+  readonly readerArtifact: MutationReaderArtifact<any> | RefetchReaderArtifact;
   readonly refetchQuery: number;
 };

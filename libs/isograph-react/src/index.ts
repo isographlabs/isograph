@@ -34,8 +34,6 @@ export {
   ReaderAst,
   ReaderAstNode,
   ReaderLinkedField,
-  ReaderMutationField,
-  ReaderRefetchField,
   ReaderResolverField,
   ReaderResolverVariant,
   ReaderScalarField,
