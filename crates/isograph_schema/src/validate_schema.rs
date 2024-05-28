@@ -11,8 +11,7 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    refetched_paths::refetched_paths_with_path, ClientField, FieldDefinitionLocation,
-    NameAndArguments, PathToRefetchField, Schema, SchemaIdField, SchemaObject, SchemaServerField,
+    ClientField, FieldDefinitionLocation, Schema, SchemaIdField, SchemaObject, SchemaServerField,
     SchemaValidationState, ServerFieldData, UnvalidatedClientField,
     UnvalidatedLinkedFieldSelection, UnvalidatedSchema, UnvalidatedSchemaField,
     UnvalidatedSchemaServerField, ValidateEntrypointDeclarationError,
@@ -782,18 +781,4 @@ pub enum ValidateSchemaError {
     ErrorValidatingEntrypointDeclaration {
         message: ValidateEntrypointDeclarationError,
     },
-}
-
-pub fn refetched_paths_for_client_field(
-    validated_client_field: &ValidatedClientField,
-    schema: &ValidatedSchema,
-    path: &mut Vec<NameAndArguments>,
-) -> Vec<PathToRefetchField> {
-    let path_set = match &validated_client_field.selection_set_and_unwraps {
-        Some((selection_set, _)) => refetched_paths_with_path(&selection_set, schema, path),
-        None => panic!("unexpected non-existent selection set on client field"),
-    };
-    let mut paths: Vec<_> = path_set.into_iter().collect();
-    paths.sort();
-    paths
 }

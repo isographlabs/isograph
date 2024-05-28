@@ -1,12 +1,12 @@
-use std::collections::hash_map::Entry;
+use std::collections::{hash_map::Entry, HashSet};
 
 use common_lang_types::{ArtifactFileType, JavascriptVariableName, SelectableFieldName, WithSpan};
 use intern::string_key::Intern;
 use isograph_lang_types::{RefetchQueryIndex, Selection, ServerFieldSelection};
 use isograph_schema::{
-    into_name_and_arguments, refetched_paths_for_client_field, ClientFieldVariant,
-    FieldDefinitionLocation, NameAndArguments, PathToRefetchField, RootRefetchedPath,
-    ValidatedClientField, ValidatedSchema, ValidatedSelection,
+    into_name_and_arguments, ArgumentKeyAndValue, ClientFieldVariant, FieldDefinitionLocation,
+    NameAndArguments, PathToRefetchField, RootRefetchedPath, ValidatedClientField, ValidatedSchema,
+    ValidatedSelection,
 };
 
 use crate::generate_artifacts::{
@@ -285,4 +285,92 @@ pub(crate) fn generate_reader_ast<'schema>(
         // (and in theory some entrypoints).
         &mut vec![],
     )
+}
+
+fn refetched_paths_for_client_field(
+    validated_client_field: &ValidatedClientField,
+    schema: &ValidatedSchema,
+    path: &mut Vec<NameAndArguments>,
+) -> Vec<PathToRefetchField> {
+    let path_set = match &validated_client_field.selection_set_and_unwraps {
+        Some((selection_set, _)) => refetched_paths_with_path(&selection_set, schema, path),
+        None => panic!("unexpected non-existent selection set on client field"),
+    };
+    let mut paths: Vec<_> = path_set.into_iter().collect();
+    paths.sort();
+    paths
+}
+
+fn refetched_paths_with_path(
+    selection_set: &[WithSpan<ValidatedSelection>],
+    schema: &ValidatedSchema,
+    path: &mut Vec<NameAndArguments>,
+) -> HashSet<PathToRefetchField> {
+    let mut paths = HashSet::default();
+
+    for selection in selection_set {
+        match &selection.item {
+            Selection::ServerField(field) => match field {
+                ServerFieldSelection::ScalarField(scalar) => {
+                    match scalar.associated_data.location {
+                        FieldDefinitionLocation::Server(_) => {
+                            // Do nothing, we encountered a server field
+                        }
+                        FieldDefinitionLocation::Client(client_field_id) => {
+                            let client_field = schema.client_field(client_field_id);
+                            match client_field.variant {
+                                ClientFieldVariant::ImperativelyLoadedField(_) => {
+                                    paths.insert(PathToRefetchField {
+                                        linked_fields: path.clone(),
+                                        field_name: client_field.name,
+                                    });
+                                }
+                                _ => {
+                                    // For non-refetch fields, we need to recurse into the selection set
+                                    // (if there is one)
+                                    match &client_field.selection_set_and_unwraps {
+                                        Some((selection_set, _unwraps)) => {
+                                            let new_paths = refetched_paths_with_path(
+                                                selection_set,
+                                                schema,
+                                                path,
+                                            );
+
+                                            paths.extend(new_paths.into_iter());
+                                        }
+                                        None => panic!("Client field has no selection set"),
+                                    };
+                                }
+                            }
+                        }
+                    }
+                }
+                ServerFieldSelection::LinkedField(linked_field_selection) => {
+                    path.push(NameAndArguments {
+                        name: linked_field_selection.name.item.into(),
+                        arguments: linked_field_selection
+                            .arguments
+                            .iter()
+                            .map(|x| ArgumentKeyAndValue {
+                                key: x.item.name.item,
+                                value: x.item.value.item.clone(),
+                            })
+                            .collect::<Vec<_>>(),
+                    });
+
+                    let new_paths = refetched_paths_with_path(
+                        &linked_field_selection.selection_set,
+                        schema,
+                        path,
+                    );
+
+                    paths.extend(new_paths.into_iter());
+
+                    path.pop();
+                }
+            },
+        };
+    }
+
+    paths
 }

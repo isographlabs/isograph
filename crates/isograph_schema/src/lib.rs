@@ -5,7 +5,6 @@ mod expose_field_directive;
 mod isograph_schema;
 mod process_client_field_declaration;
 mod process_type_definition;
-pub(crate) mod refetched_paths;
 mod root_types;
 mod unvalidated_schema;
 mod validate_entrypoint;
