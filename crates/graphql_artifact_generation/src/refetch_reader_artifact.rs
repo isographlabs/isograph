@@ -141,7 +141,6 @@ pub(crate) fn generate_refetch_reader_artifact(
                 .into(),
             selection_set,
             None,
-            None,
             client_field,
         );
 

@@ -1,8 +1,8 @@
 use common_lang_types::{PathAndContent, QueryOperationName, VariableName};
 use isograph_lang_types::ClientFieldId;
 use isograph_schema::{
-    create_merged_selection_set, EncounteredClientFieldInfoMap,
-    ImperativelyLoadedFieldArtifactInfo, RootRefetchedPath, SchemaObject, ValidatedSchema,
+    create_merged_selection_set, EncounteredClientFieldInfoMap, MergedSelectionSet,
+    RootRefetchedPath, SchemaObject, ValidatedSchema,
 };
 
 use crate::{
@@ -26,9 +26,8 @@ struct EntrypointArtifactInfo<'schema> {
 pub(crate) fn generate_entrypoint_artifact(
     schema: &ValidatedSchema,
     client_field_id: ClientFieldId,
-    artifact_queue: &mut Vec<ImperativelyLoadedFieldArtifactInfo>,
     encountered_client_field_infos: &mut EncounteredClientFieldInfoMap,
-) -> PathAndContent {
+) -> (PathAndContent, MergedSelectionSet) {
     let fetchable_client_field = schema.client_field(client_field_id);
     if let Some((ref selection_set, _)) = fetchable_client_field.selection_set_and_unwraps {
         let query_name = fetchable_client_field.name.into();
@@ -39,7 +38,6 @@ pub(crate) fn generate_entrypoint_artifact(
                 .server_field_data
                 .object(fetchable_client_field.parent_object_id),
             selection_set,
-            Some(artifact_queue),
             Some(encountered_client_field_infos),
             &fetchable_client_field,
         );
@@ -76,14 +74,17 @@ pub(crate) fn generate_entrypoint_artifact(
         let normalization_ast_text =
             generate_normalization_ast_text(schema, &merged_selection_set, 0);
 
-        EntrypointArtifactInfo {
-            query_text,
-            query_name,
-            parent_type: parent_object.into(),
-            normalization_ast_text,
-            refetch_query_artifact_import: refetch_query_artifact_imports,
-        }
-        .path_and_content()
+        (
+            EntrypointArtifactInfo {
+                query_text,
+                query_name,
+                parent_type: parent_object.into(),
+                normalization_ast_text,
+                refetch_query_artifact_import: refetch_query_artifact_imports,
+            }
+            .path_and_content(),
+            merged_selection_set,
+        )
     } else {
         // TODO convert to error
         todo!("Unsupported: client fields on query with no selection set")

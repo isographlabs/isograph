@@ -42,7 +42,6 @@ pub fn generate_eager_reader_artifact<'schema>(
                 .into(),
             selection_set,
             None,
-            None,
             client_field,
         );
 

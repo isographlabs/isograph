@@ -11,13 +11,14 @@ use common_lang_types::{
 use graphql_lang_types::{GraphQLTypeAnnotation, ListTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    NonConstantValue, SelectableServerFieldId, Selection, SelectionFieldArgument,
+    ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection, SelectionFieldArgument,
     ServerFieldSelection,
 };
 use isograph_schema::{
-    ClientFieldVariant, EncounteredClientFieldInfo, FieldDefinitionLocation,
-    ObjectTypeAndFieldName, SchemaObject, UserWrittenComponentVariant, ValidatedClientField,
-    ValidatedSchema, ValidatedSelection,
+    get_root_refetched_path_and_artifact_info, ClientFieldVariant, EncounteredClientFieldInfo,
+    EncounteredClientFieldInfoMap, FieldDefinitionLocation, ObjectTypeAndFieldName,
+    PathToRefetchField, PathToRefetchFieldInfo, SchemaObject, UserWrittenComponentVariant,
+    ValidatedClientField, ValidatedSchema, ValidatedSelection,
 };
 use lazy_static::lazy_static;
 
@@ -67,23 +68,33 @@ pub fn get_artifact_path_and_content<'schema>(
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
 ) -> Vec<PathAndContent> {
-    let mut artifact_queue = vec![];
     let mut encountered_client_field_infos = HashMap::new();
     let mut path_and_contents = vec![];
+    let mut merged_selection_sets = HashMap::new();
 
     for client_field_id in schema.entrypoints.iter() {
-        path_and_contents.push(generate_entrypoint_artifact(
+        let (entrypoint_artifact, merged_selection_set) = generate_entrypoint_artifact(
             schema,
             *client_field_id,
-            &mut artifact_queue,
             &mut encountered_client_field_infos,
-        ));
+        );
+        path_and_contents.push(entrypoint_artifact);
 
         // We also need to generate reader artifacts for the entrypoint client fields themselves
-        encountered_client_field_infos.insert(*client_field_id, EncounteredClientFieldInfo {});
+        match encountered_client_field_infos.entry(*client_field_id) {
+            Entry::Occupied(_) => {}
+            Entry::Vacant(vacant) => {
+                vacant.insert(EncounteredClientFieldInfo {
+                    paths_to_refetch_fields: vec![],
+                });
+            }
+        }
+        merged_selection_sets.insert(*client_field_id, merged_selection_set);
     }
 
-    for (encountered_client_field_id, _info) in encountered_client_field_infos {
+    let paths = sorted_paths_to_refetch_fields(&encountered_client_field_infos);
+
+    for (encountered_client_field_id, _) in encountered_client_field_infos {
         let encountered_client_field = schema.client_field(encountered_client_field_id);
         path_and_contents.extend(match &encountered_client_field.variant {
             ClientFieldVariant::UserWritten(info) => generate_eager_reader_artifact(
@@ -99,16 +110,42 @@ pub fn get_artifact_path_and_content<'schema>(
         });
     }
 
-    for imperatively_loaded_field_artifact_info in artifact_queue {
+    for (index, (path_to_refetch_field, path_to_refetch_field_info, parent_client_field_id)) in
+        paths.into_iter().enumerate()
+    {
+        let (_, artifact_info) = get_root_refetched_path_and_artifact_info(
+            path_to_refetch_field_info,
+            merged_selection_sets
+                .get(&parent_client_field_id)
+                .expect("Expect complete selection set to be found"),
+            path_to_refetch_field,
+            schema,
+            schema.client_field(parent_client_field_id),
+            index,
+        );
+
         path_and_contents.push(get_artifact_for_imperatively_loaded_field(
             schema,
-            imperatively_loaded_field_artifact_info,
+            artifact_info,
         ))
     }
 
     path_and_contents.push(build_iso_overload(schema));
 
     path_and_contents
+}
+
+fn sorted_paths_to_refetch_fields(
+    encountered_client_field_infos: &EncounteredClientFieldInfoMap,
+) -> Vec<(PathToRefetchField, PathToRefetchFieldInfo, ClientFieldId)> {
+    let mut out = vec![];
+
+    for info in encountered_client_field_infos.iter() {
+        out.extend(info.1.paths_to_refetch_fields.iter().cloned())
+    }
+
+    out.sort_by_cached_key(|(a, _, _)| a.clone());
+    out
 }
 
 #[derive(Hash, Eq, PartialEq, Debug, PartialOrd, Ord)]

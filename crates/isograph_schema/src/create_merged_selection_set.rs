@@ -139,7 +139,7 @@ impl MergedSelectionSet {
             .collect()
     }
 }
-fn find_by_path(
+pub fn find_by_path(
     mut root: &[WithSpan<MergedServerFieldSelection>],
     path: &PathToRefetchField,
 ) -> MergedSelectionSet {
@@ -194,8 +194,8 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
     pub query_name: QueryOperationName,
 }
 
-#[derive(Eq, PartialEq, Debug)]
-struct PathToRefetchFieldInfo {
+#[derive(Eq, PartialEq, Debug, Clone)]
+pub struct PathToRefetchFieldInfo {
     refetch_field_parent_id: ServerObjectId,
     imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant,
     extra_selections: MergedSelectionMap,
@@ -218,22 +218,23 @@ struct MergeTraversalState<'a> {
     /// to generate the refetch query.
     current_path: Vec<NameAndArguments>,
     encountered_client_field_ids: Option<&'a mut EncounteredClientFieldInfoMap>,
+    parent_client_field_id: ClientFieldId,
 }
 
 impl<'a> MergeTraversalState<'a> {
-    pub fn new(
+    fn new(
         encountered_client_field_ids: Option<&'a mut EncounteredClientFieldInfoMap>,
+        parent_client_field_id: ClientFieldId,
     ) -> Self {
         Self {
             paths_to_refetch_fields: Default::default(),
             current_path: vec![],
             encountered_client_field_ids,
+            parent_client_field_id,
         }
     }
 
-    pub fn sorted_paths_to_refetch_fields(
-        self,
-    ) -> Vec<(PathToRefetchField, PathToRefetchFieldInfo)> {
+    fn sorted_paths_to_refetch_fields(self) -> Vec<(PathToRefetchField, PathToRefetchFieldInfo)> {
         let mut paths = self.paths_to_refetch_fields.into_iter().collect::<Vec<_>>();
 
         paths.sort_by_cached_key(|(k, _)| k.clone());
@@ -245,19 +246,20 @@ impl<'a> MergeTraversalState<'a> {
 pub type EncounteredClientFieldInfoMap = HashMap<ClientFieldId, EncounteredClientFieldInfo>;
 
 #[derive(Debug)]
-pub struct EncounteredClientFieldInfo {}
+pub struct EncounteredClientFieldInfo {
+    pub paths_to_refetch_fields: Vec<(PathToRefetchField, PathToRefetchFieldInfo, ClientFieldId)>,
+}
 
 pub fn create_merged_selection_set(
     schema: &ValidatedSchema,
     parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
-    // TODO consider ways to get rid of these parameters.
-    artifact_queue: Option<&mut Vec<ImperativelyLoadedFieldArtifactInfo>>,
     encountered_client_field_ids: Option<&mut EncounteredClientFieldInfoMap>,
     // N.B. we call this for non-fetchable resolvers now, but that is a smell
     entrypoint: &ValidatedClientField,
 ) -> (MergedSelectionSet, Vec<RootRefetchedPath>) {
-    let mut merge_traversal_state = MergeTraversalState::new(encountered_client_field_ids);
+    let mut merge_traversal_state =
+        MergeTraversalState::new(encountered_client_field_ids, entrypoint.id);
     let full_merged_selection_set = create_merged_selection_set_with_merge_traversal_state(
         schema,
         parent_type,
@@ -265,56 +267,29 @@ pub fn create_merged_selection_set(
         &mut merge_traversal_state,
     );
 
-    match artifact_queue {
-        Some(artifact_queue) => {
-            let root_refetched_paths: Vec<_> = merge_traversal_state
-                .sorted_paths_to_refetch_fields()
-                .into_iter()
-                .enumerate()
-                .map(|(index, (path_to_refetch_field, info))| {
-                    let (root_refetched_path, artifact_info) =
-                        get_root_refetched_path_and_artifact_info(
-                            info,
-                            &full_merged_selection_set,
-                            path_to_refetch_field,
-                            schema,
-                            entrypoint,
-                            index,
-                        );
+    let root_refetched_paths: Vec<_> = merge_traversal_state
+        .sorted_paths_to_refetch_fields()
+        .into_iter()
+        .enumerate()
+        .map(|(index, (path_to_refetch_field, info))| {
+            // TODO do not call this here
+            let (root_refetched_path, _) = get_root_refetched_path_and_artifact_info(
+                info,
+                &full_merged_selection_set,
+                path_to_refetch_field,
+                schema,
+                entrypoint,
+                index,
+            );
 
-                    artifact_queue.push(artifact_info);
-                    root_refetched_path
-                })
-                .collect();
+            root_refetched_path
+        })
+        .collect();
 
-            (full_merged_selection_set, root_refetched_paths)
-        }
-        None => {
-            // TODO it is weird that we call this without an artifact queue!
-            let root_refetched_paths: Vec<_> = merge_traversal_state
-                .sorted_paths_to_refetch_fields()
-                .into_iter()
-                .enumerate()
-                .map(|(index, (path_to_refetch_field, info))| {
-                    // TODO do not generate an info here
-                    get_root_refetched_path_and_artifact_info(
-                        info,
-                        &full_merged_selection_set,
-                        path_to_refetch_field,
-                        schema,
-                        entrypoint,
-                        index,
-                    )
-                    .0
-                })
-                .collect();
-
-            (full_merged_selection_set, root_refetched_paths)
-        }
-    }
+    (full_merged_selection_set, root_refetched_paths)
 }
 
-fn get_root_refetched_path_and_artifact_info(
+pub fn get_root_refetched_path_and_artifact_info(
     info: PathToRefetchFieldInfo,
     full_merged_selection_set: &MergedSelectionSet,
     path_to_refetch_field: PathToRefetchField,
@@ -554,13 +529,59 @@ fn merge_selections_into_set(
                             merge_scalar_server_field(scalar_field, merged_selection_map, span);
                         }
                         FieldDefinitionLocation::Client(client_field_id) => {
+                            let client_field = schema.client_field(*client_field_id);
                             if let Some(ref mut encountered_client_field_ids) =
                                 merge_traversal_state.encountered_client_field_ids
                             {
-                                encountered_client_field_ids
-                                    .insert(*client_field_id, EncounteredClientFieldInfo {});
+                                match encountered_client_field_ids.entry(*client_field_id) {
+                                    Entry::Occupied(mut occupied) => match &client_field.variant {
+                                        ClientFieldVariant::ImperativelyLoadedField(variant) => {
+                                            occupied.get_mut().paths_to_refetch_fields.push((
+                                                PathToRefetchField {
+                                                    linked_fields: merge_traversal_state
+                                                        .current_path
+                                                        .clone(),
+                                                    field_name: client_field.name,
+                                                },
+                                                PathToRefetchFieldInfo {
+                                                    refetch_field_parent_id: parent_type.id,
+                                                    imperatively_loaded_field_variant: variant
+                                                        .clone(),
+                                                    extra_selections: HashMap::new(),
+                                                },
+                                                merge_traversal_state.parent_client_field_id,
+                                            ))
+                                        }
+                                        _ => {}
+                                    },
+                                    Entry::Vacant(vacant) => {
+                                        vacant.insert(EncounteredClientFieldInfo {
+                                            paths_to_refetch_fields: match &client_field.variant {
+                                                ClientFieldVariant::ImperativelyLoadedField(
+                                                    variant,
+                                                ) => vec![(
+                                                    PathToRefetchField {
+                                                        linked_fields: merge_traversal_state
+                                                            .current_path
+                                                            .clone(),
+                                                        field_name: client_field.name,
+                                                    },
+                                                    PathToRefetchFieldInfo {
+                                                        refetch_field_parent_id: parent_type.id,
+                                                        imperatively_loaded_field_variant: variant
+                                                            .clone(),
+                                                        extra_selections: HashMap::new(),
+                                                    },
+                                                    merge_traversal_state.parent_client_field_id,
+                                                )],
+                                                _ => {
+                                                    vec![]
+                                                }
+                                            },
+                                        });
+                                    }
+                                }
                             }
-                            let client_field = schema.client_field(*client_field_id);
                             maybe_note_path_to_refetch_fields(
                                 client_field,
                                 merge_traversal_state,
