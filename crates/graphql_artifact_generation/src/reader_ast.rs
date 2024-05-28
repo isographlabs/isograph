@@ -55,7 +55,7 @@ fn generate_reader_ast_node(
                         // This field is a client field, so we need to look up the field in the
                         // schema.
                         let alias = scalar_field.name_or_alias().item;
-                        let client_field = schema.client_field(client_field_id);
+                        let nested_client_field = schema.client_field(client_field_id);
                         let arguments = get_serialized_field_arguments(
                             &scalar_field.arguments,
                             indentation_level + 1,
@@ -63,26 +63,26 @@ fn generate_reader_ast_node(
                         let indent_1 = "  ".repeat(indentation_level as usize);
                         let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
-                        let client_field_refetched_paths =
-                            refetched_paths_for_client_field(client_field, schema, path);
+                        let paths_to_refetch_field_in_client_field =
+                            refetched_paths_for_client_field(nested_client_field, schema, path);
 
                         let nested_refetch_queries = get_nested_refetch_query_text(
                             &root_refetched_paths,
-                            &client_field_refetched_paths,
+                            &paths_to_refetch_field_in_client_field,
                         );
 
                         // This is indicative of poor data modeling.
-                        match client_field.variant {
+                        match nested_client_field.variant {
                             ClientFieldVariant::ImperativelyLoadedField(ref s) => {
                                 let reader_artifact_import_name = format!(
                                     "{}__refetch_reader",
-                                    client_field.type_and_field.underscore_separated()
+                                    nested_client_field.type_and_field.underscore_separated()
                                 )
                                 .intern()
                                 .into();
                                 insert_default_import_into_nested_client_field_imports(
                                     nested_client_field_imports,
-                                    client_field,
+                                    nested_client_field,
                                     *REFETCH_READER,
                                     reader_artifact_import_name,
                                 );
@@ -105,13 +105,13 @@ fn generate_reader_ast_node(
                             ClientFieldVariant::UserWritten(_) => {
                                 let reader_artifact_import_name = format!(
                                     "{}__resolver_reader",
-                                    client_field.type_and_field.underscore_separated()
+                                    nested_client_field.type_and_field.underscore_separated()
                                 )
                                 .intern()
                                 .into();
                                 insert_default_import_into_nested_client_field_imports(
                                     nested_client_field_imports,
-                                    client_field,
+                                    nested_client_field,
                                     *RESOLVER_READER,
                                     reader_artifact_import_name,
                                 );
@@ -217,10 +217,10 @@ fn generate_reader_ast_with_path<'schema>(
 
 fn get_nested_refetch_query_text(
     root_refetched_paths: &[RootRefetchedPath],
-    nested_refetch_queries: &[PathToRefetchField],
+    paths_to_refetch_fields_in_client_field: &[PathToRefetchField],
 ) -> String {
     let mut s = "[".to_string();
-    for nested_refetch_query in nested_refetch_queries.iter() {
+    for nested_refetch_query in paths_to_refetch_fields_in_client_field.iter() {
         let mut found_at_least_one = false;
         for index in root_refetched_paths
             .iter()
@@ -288,12 +288,17 @@ pub(crate) fn generate_reader_ast<'schema>(
 }
 
 fn refetched_paths_for_client_field(
-    validated_client_field: &ValidatedClientField,
+    nested_client_field: &ValidatedClientField,
     schema: &ValidatedSchema,
     path: &mut Vec<NameAndArguments>,
 ) -> Vec<PathToRefetchField> {
-    let path_set = match &validated_client_field.selection_set_and_unwraps {
-        Some((selection_set, _)) => refetched_paths_with_path(&selection_set, schema, path),
+    let path_set = match &nested_client_field.selection_set_and_unwraps {
+        Some((selection_set, _)) => {
+            // Here, path is acting as a prefix. We will recieve (for example) foo.bar, and
+            // the client field may have a refetch query at baz.__refetch. In this case,
+            // this method would return something containing foo.bar.baz.__refetch
+            refetched_paths_with_path(&selection_set, schema, path)
+        }
         None => panic!("unexpected non-existent selection set on client field"),
     };
     let mut paths: Vec<_> = path_set.into_iter().collect();
