@@ -220,19 +220,19 @@ struct MergeTraversalState<'a> {
     /// needed for each refetch query. At this point, we have enough information
     /// to generate the refetch query.
     current_path: Vec<NameAndArguments>,
-    encountered_client_field_ids: Option<&'a mut EncounteredClientFieldInfoMap>,
+    encountered_client_fields: Option<&'a mut EncounteredClientFieldInfoMap>,
     parent_client_field_id: ClientFieldId,
 }
 
 impl<'a> MergeTraversalState<'a> {
     fn new(
-        encountered_client_field_ids: Option<&'a mut EncounteredClientFieldInfoMap>,
+        encountered_client_fields: Option<&'a mut EncounteredClientFieldInfoMap>,
         parent_client_field_id: ClientFieldId,
     ) -> Self {
         Self {
             paths_to_refetch_fields: Default::default(),
             current_path: vec![],
-            encountered_client_field_ids,
+            encountered_client_fields,
             parent_client_field_id,
         }
     }
@@ -257,12 +257,12 @@ pub fn create_merged_selection_set(
     schema: &ValidatedSchema,
     parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
-    encountered_client_field_ids: Option<&mut EncounteredClientFieldInfoMap>,
+    encountered_client_fields: Option<&mut EncounteredClientFieldInfoMap>,
     // N.B. we call this for non-fetchable resolvers now, but that is a smell
     entrypoint: &ValidatedClientField,
 ) -> (MergedSelectionSet, Vec<RootRefetchedPath>) {
     let mut merge_traversal_state =
-        MergeTraversalState::new(encountered_client_field_ids, entrypoint.id);
+        MergeTraversalState::new(encountered_client_fields, entrypoint.id);
     let full_merged_selection_set = create_merged_selection_set_with_merge_traversal_state(
         schema,
         parent_type,
@@ -533,10 +533,10 @@ fn merge_selections_into_set(
                         }
                         FieldDefinitionLocation::Client(client_field_id) => {
                             let client_field = schema.client_field(*client_field_id);
-                            if let Some(ref mut encountered_client_field_ids) =
-                                merge_traversal_state.encountered_client_field_ids
+                            if let Some(ref mut encountered_client_fields) =
+                                merge_traversal_state.encountered_client_fields
                             {
-                                match encountered_client_field_ids.entry(*client_field_id) {
+                                match encountered_client_fields.entry(*client_field_id) {
                                     Entry::Occupied(mut occupied) => match &client_field.variant {
                                         ClientFieldVariant::ImperativelyLoadedField(variant) => {
                                             occupied.get_mut().paths_to_refetch_fields.push((
