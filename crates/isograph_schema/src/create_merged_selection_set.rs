@@ -250,6 +250,8 @@ pub type EncounteredClientFieldInfoMap = HashMap<ClientFieldId, EncounteredClien
 
 #[derive(Debug)]
 pub struct EncounteredClientFieldInfo {
+    // Should this be a HashMap? We are duplicating work if the same item is
+    // reachable at the same path multiple times.
     pub paths_to_refetch_fields: Vec<(PathToRefetchField, PathToRefetchFieldInfo, ClientFieldId)>,
 }
 
@@ -536,54 +538,14 @@ fn merge_selections_into_set(
                             if let Some(ref mut encountered_client_fields) =
                                 merge_traversal_state.encountered_client_fields
                             {
-                                match encountered_client_fields.entry(*client_field_id) {
-                                    Entry::Occupied(mut occupied) => match &client_field.variant {
-                                        ClientFieldVariant::ImperativelyLoadedField(variant) => {
-                                            occupied.get_mut().paths_to_refetch_fields.push((
-                                                PathToRefetchField {
-                                                    linked_fields: merge_traversal_state
-                                                        .current_path
-                                                        .clone(),
-                                                    field_name: client_field.name,
-                                                },
-                                                PathToRefetchFieldInfo {
-                                                    refetch_field_parent_id: parent_type.id,
-                                                    imperatively_loaded_field_variant: variant
-                                                        .clone(),
-                                                    extra_selections: HashMap::new(),
-                                                },
-                                                merge_traversal_state.parent_client_field_id,
-                                            ))
-                                        }
-                                        _ => {}
-                                    },
-                                    Entry::Vacant(vacant) => {
-                                        vacant.insert(EncounteredClientFieldInfo {
-                                            paths_to_refetch_fields: match &client_field.variant {
-                                                ClientFieldVariant::ImperativelyLoadedField(
-                                                    variant,
-                                                ) => vec![(
-                                                    PathToRefetchField {
-                                                        linked_fields: merge_traversal_state
-                                                            .current_path
-                                                            .clone(),
-                                                        field_name: client_field.name,
-                                                    },
-                                                    PathToRefetchFieldInfo {
-                                                        refetch_field_parent_id: parent_type.id,
-                                                        imperatively_loaded_field_variant: variant
-                                                            .clone(),
-                                                        extra_selections: HashMap::new(),
-                                                    },
-                                                    merge_traversal_state.parent_client_field_id,
-                                                )],
-                                                _ => {
-                                                    vec![]
-                                                }
-                                            },
-                                        });
-                                    }
-                                }
+                                maybe_note_encountered_client_field(
+                                    encountered_client_fields,
+                                    client_field_id,
+                                    client_field,
+                                    merge_traversal_state.current_path.clone(),
+                                    merge_traversal_state.parent_client_field_id,
+                                    parent_type,
+                                );
                             }
                             maybe_note_path_to_refetch_fields(
                                 client_field,
@@ -636,6 +598,60 @@ fn merge_selections_into_set(
                     merge_traversal_state.current_path.pop();
                 }
             },
+        }
+    }
+}
+
+fn maybe_note_encountered_client_field(
+    // Why are there two &mut's here??
+    encountered_client_fields: &mut EncounteredClientFieldInfoMap,
+    client_field_id: &ClientFieldId,
+    client_field: &ValidatedClientField,
+    linked_fields_in_path: Vec<NameAndArguments>,
+    parent_client_field_id: ClientFieldId,
+    parent_type: &SchemaObject,
+) {
+    match encountered_client_fields.entry(*client_field_id) {
+        Entry::Occupied(mut occupied) => match &client_field.variant {
+            ClientFieldVariant::ImperativelyLoadedField(variant) => {
+                occupied.get_mut().paths_to_refetch_fields.push((
+                    PathToRefetchField {
+                        linked_fields: linked_fields_in_path,
+                        field_name: client_field.name,
+                    },
+                    PathToRefetchFieldInfo {
+                        refetch_field_parent_id: parent_type.id,
+                        imperatively_loaded_field_variant: variant.clone(),
+                        extra_selections: HashMap::new(),
+                    },
+                    parent_client_field_id,
+                ))
+            }
+            _ => {
+                // Since we have already encountered this client field, we do not need
+                // to do anything, as we are just re-encountering it.
+            }
+        },
+        Entry::Vacant(vacant) => {
+            vacant.insert(EncounteredClientFieldInfo {
+                paths_to_refetch_fields: match &client_field.variant {
+                    ClientFieldVariant::ImperativelyLoadedField(variant) => vec![(
+                        PathToRefetchField {
+                            linked_fields: linked_fields_in_path,
+                            field_name: client_field.name,
+                        },
+                        PathToRefetchFieldInfo {
+                            refetch_field_parent_id: parent_type.id,
+                            imperatively_loaded_field_variant: variant.clone(),
+                            extra_selections: HashMap::new(),
+                        },
+                        parent_client_field_id,
+                    )],
+                    _ => {
+                        vec![]
+                    }
+                },
+            });
         }
     }
 }
