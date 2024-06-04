@@ -28,6 +28,8 @@ export class ParentCache<T> {
   private __cacheItem: CacheItem<T> | null = null;
   private readonly __factory: Factory<T>;
 
+  // TODO pass an onEmpty function, which can e.g. remove this ParentCache
+  // from some parent object.
   constructor(factory: Factory<T>) {
     this.__factory = factory;
   }
