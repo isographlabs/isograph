@@ -546,13 +546,10 @@ fn merge_selections_into_set(
                         }
                         FieldDefinitionLocation::Client(client_field_id) => {
                             let client_field = schema.client_field(*client_field_id);
-                            maybe_note_encountered_client_field(
-                                merge_traversal_state.encountered_client_fields,
-                                client_field_id,
+                            note_encountered_client_field(
                                 client_field,
-                                merge_traversal_state.current_path.clone(),
-                                merge_traversal_state.parent_client_field_id,
                                 parent_type,
+                                merge_traversal_state,
                             );
                             maybe_note_path_to_refetch_fields(
                                 client_field,
@@ -609,18 +606,15 @@ fn merge_selections_into_set(
     }
 }
 
-fn maybe_note_encountered_client_field(
-    encountered_client_fields: &mut EncounteredClientFieldInfoMap,
-    client_field_id: &ClientFieldId,
+fn note_encountered_client_field(
     client_field: &ValidatedClientField,
-    linked_fields_in_path: Vec<NameAndArguments>,
-    parent_client_field_id: ClientFieldId,
     parent_type: &SchemaObject,
+    merge_traversal_state: &mut MergeTraversalState,
 ) {
     let get_path_to_refetch_etc = |variant: ImperativelyLoadedFieldVariant| {
         (
             PathToRefetchField {
-                linked_fields: linked_fields_in_path,
+                linked_fields: merge_traversal_state.current_path.clone(),
                 field_name: client_field.name,
             },
             PathToRefetchFieldInfo {
@@ -628,10 +622,13 @@ fn maybe_note_encountered_client_field(
                 imperatively_loaded_field_variant: variant,
                 extra_selections: HashMap::new(),
             },
-            parent_client_field_id,
+            merge_traversal_state.parent_client_field_id,
         )
     };
-    match encountered_client_fields.entry(*client_field_id) {
+    match merge_traversal_state
+        .encountered_client_fields
+        .entry(client_field.id)
+    {
         Entry::Occupied(mut occupied) => match &client_field.variant {
             ClientFieldVariant::ImperativelyLoadedField(variant) => occupied
                 .get_mut()
@@ -657,6 +654,7 @@ fn maybe_note_encountered_client_field(
     }
 }
 
+// TODO remove
 fn maybe_note_path_to_refetch_fields(
     client_field: &ValidatedClientField,
     merge_traversal_state: &mut MergeTraversalState,
