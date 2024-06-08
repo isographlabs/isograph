@@ -220,7 +220,7 @@ struct MergeTraversalState<'a> {
     /// needed for each refetch query. At this point, we have enough information
     /// to generate the refetch query.
     current_path: Vec<NameAndArguments>,
-    encountered_client_fields: Option<&'a mut EncounteredClientFieldInfoMap>,
+    encountered_client_fields: &'a mut EncounteredClientFieldInfoMap,
 
     /// The (immutable) id of the entrypoint or reader, where we started doing this traversal
     /// TODO: make this &'a ValidatedClientField
@@ -235,7 +235,7 @@ struct MergeTraversalState<'a> {
 
 impl<'a> MergeTraversalState<'a> {
     fn new(
-        encountered_client_fields: Option<&'a mut EncounteredClientFieldInfoMap>,
+        encountered_client_fields: &'a mut EncounteredClientFieldInfoMap,
         parent_client_field_id: ClientFieldId,
     ) -> Self {
         Self {
@@ -270,7 +270,7 @@ pub fn create_merged_selection_set(
     schema: &ValidatedSchema,
     parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
-    encountered_client_fields: Option<&mut EncounteredClientFieldInfoMap>,
+    encountered_client_fields: &mut EncounteredClientFieldInfoMap,
     // N.B. we call this for non-fetchable resolvers now, but that is a smell
     entrypoint: &ValidatedClientField,
 ) -> (MergedSelectionSet, Vec<RootRefetchedPath>) {
@@ -546,18 +546,14 @@ fn merge_selections_into_set(
                         }
                         FieldDefinitionLocation::Client(client_field_id) => {
                             let client_field = schema.client_field(*client_field_id);
-                            if let Some(ref mut encountered_client_fields) =
-                                merge_traversal_state.encountered_client_fields
-                            {
-                                maybe_note_encountered_client_field(
-                                    encountered_client_fields,
-                                    client_field_id,
-                                    client_field,
-                                    merge_traversal_state.current_path.clone(),
-                                    merge_traversal_state.parent_client_field_id,
-                                    parent_type,
-                                );
-                            }
+                            maybe_note_encountered_client_field(
+                                merge_traversal_state.encountered_client_fields,
+                                client_field_id,
+                                client_field,
+                                merge_traversal_state.current_path.clone(),
+                                merge_traversal_state.parent_client_field_id,
+                                parent_type,
+                            );
                             maybe_note_path_to_refetch_fields(
                                 client_field,
                                 merge_traversal_state,

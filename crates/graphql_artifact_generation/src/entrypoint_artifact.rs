@@ -38,7 +38,7 @@ pub(crate) fn generate_entrypoint_artifact(
                 .server_field_data
                 .object(fetchable_client_field.parent_object_id),
             selection_set,
-            Some(encountered_client_field_infos),
+            encountered_client_field_infos,
             &fetchable_client_field,
         );
 

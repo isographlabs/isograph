@@ -42,7 +42,7 @@ pub fn generate_eager_reader_artifact<'schema>(
                 .object(client_field.parent_object_id)
                 .into(),
             selection_set,
-            None,
+            &mut HashMap::new(),
             client_field,
         );
 
