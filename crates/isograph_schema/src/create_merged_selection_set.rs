@@ -603,7 +603,6 @@ fn merge_selections_into_set(
 }
 
 fn maybe_note_encountered_client_field(
-    // Why are there two &mut's here??
     encountered_client_fields: &mut EncounteredClientFieldInfoMap,
     client_field_id: &ClientFieldId,
     client_field: &ValidatedClientField,
@@ -611,22 +610,26 @@ fn maybe_note_encountered_client_field(
     parent_client_field_id: ClientFieldId,
     parent_type: &SchemaObject,
 ) {
+    let get_path_to_refetch_etc = |variant: ImperativelyLoadedFieldVariant| {
+        (
+            PathToRefetchField {
+                linked_fields: linked_fields_in_path,
+                field_name: client_field.name,
+            },
+            PathToRefetchFieldInfo {
+                refetch_field_parent_id: parent_type.id,
+                imperatively_loaded_field_variant: variant,
+                extra_selections: HashMap::new(),
+            },
+            parent_client_field_id,
+        )
+    };
     match encountered_client_fields.entry(*client_field_id) {
         Entry::Occupied(mut occupied) => match &client_field.variant {
-            ClientFieldVariant::ImperativelyLoadedField(variant) => {
-                occupied.get_mut().paths_to_refetch_fields.push((
-                    PathToRefetchField {
-                        linked_fields: linked_fields_in_path,
-                        field_name: client_field.name,
-                    },
-                    PathToRefetchFieldInfo {
-                        refetch_field_parent_id: parent_type.id,
-                        imperatively_loaded_field_variant: variant.clone(),
-                        extra_selections: HashMap::new(),
-                    },
-                    parent_client_field_id,
-                ))
-            }
+            ClientFieldVariant::ImperativelyLoadedField(variant) => occupied
+                .get_mut()
+                .paths_to_refetch_fields
+                .push(get_path_to_refetch_etc(variant.clone())),
             _ => {
                 // Since we have already encountered this client field, we do not need
                 // to do anything, as we are just re-encountering it.
@@ -635,18 +638,9 @@ fn maybe_note_encountered_client_field(
         Entry::Vacant(vacant) => {
             vacant.insert(EncounteredClientFieldInfo {
                 paths_to_refetch_fields: match &client_field.variant {
-                    ClientFieldVariant::ImperativelyLoadedField(variant) => vec![(
-                        PathToRefetchField {
-                            linked_fields: linked_fields_in_path,
-                            field_name: client_field.name,
-                        },
-                        PathToRefetchFieldInfo {
-                            refetch_field_parent_id: parent_type.id,
-                            imperatively_loaded_field_variant: variant.clone(),
-                            extra_selections: HashMap::new(),
-                        },
-                        parent_client_field_id,
-                    )],
+                    ClientFieldVariant::ImperativelyLoadedField(variant) => {
+                        vec![get_path_to_refetch_etc(variant.clone())]
+                    }
                     _ => {
                         vec![]
                     }
