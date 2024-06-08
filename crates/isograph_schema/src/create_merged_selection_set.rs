@@ -221,7 +221,16 @@ struct MergeTraversalState<'a> {
     /// to generate the refetch query.
     current_path: Vec<NameAndArguments>,
     encountered_client_fields: Option<&'a mut EncounteredClientFieldInfoMap>,
+
+    /// The (immutable) id of the entrypoint or reader, where we started doing this traversal
+    /// TODO: make this &'a ValidatedClientField
     parent_client_field_id: ClientFieldId,
+
+    /// The (mutable) id of the current client field we are processing.
+    /// TODO: make this &'a ValidatedClientField
+    current_client_field_id: ClientFieldId,
+    /// The (mutable) current path to the current client field we are processing.
+    path_to_current_client_field: Vec<NameAndArguments>,
 }
 
 impl<'a> MergeTraversalState<'a> {
@@ -234,6 +243,8 @@ impl<'a> MergeTraversalState<'a> {
             current_path: vec![],
             encountered_client_fields,
             parent_client_field_id,
+            current_client_field_id: parent_client_field_id,
+            path_to_current_client_field: vec![],
         }
     }
 
@@ -754,6 +765,15 @@ fn merge_scalar_client_field(
     client_field: &ValidatedClientField,
 ) {
     if let Some((ref selection_set, _)) = client_field.selection_set_and_unwraps {
+        // TODO replace this with something like
+        // merge_traversal_state.enter_client_field(|new_traversal_state: &mut MergeTraversalState| { ... });
+        let old_id = merge_traversal_state.current_client_field_id;
+        let old_path = std::mem::replace(
+            &mut merge_traversal_state.path_to_current_client_field,
+            merge_traversal_state.current_path.clone(),
+        );
+        merge_traversal_state.current_client_field_id = client_field.id;
+
         merge_selections_into_set(
             schema,
             merged_selection_map,
@@ -761,6 +781,9 @@ fn merge_scalar_client_field(
             selection_set,
             merge_traversal_state,
         );
+
+        merge_traversal_state.current_client_field_id = old_id;
+        merge_traversal_state.path_to_current_client_field = old_path;
     } else {
         panic!("unsupported client field without selection set");
     }
