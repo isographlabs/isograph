@@ -531,7 +531,6 @@ dependencies = [
  "notify-debouncer-full",
  "pretty-duration",
  "regex",
- "structopt",
  "thiserror",
  "tokio",
 ]
