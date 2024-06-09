@@ -1,0 +1,26 @@
+[package]
+name = "isograph_compiler"
+version = "0.0.4"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+structopt = "0.3.26"
+thiserror = "1.0.40"
+intern = { git = "https://github.com/facebook/relay.git", tag = "v16.2.0" }
+graphql_schema_parser = { path = "../graphql_schema_parser" }
+graphql_lang_types = { path = "../graphql_lang_types" }
+isograph_config = { path = "../isograph_config" }
+isograph_schema = { path = "../isograph_schema" }
+isograph_lang_parser = { path = "../isograph_lang_parser" }
+isograph_lang_types = { path = "../isograph_lang_types" }
+common_lang_types = { path = "../common_lang_types" }
+graphql_artifact_generation = { path = "../graphql_artifact_generation" }
+lazy_static = "1.4"
+regex = "1.6.0"
+colored = "2.0.4"
+notify = "6.1.1"
+tokio = { version="1.35.0", features=["full"] }
+notify-debouncer-full = "0.3.1"
+pretty-duration = "0.1.1"
+

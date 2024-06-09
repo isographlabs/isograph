@@ -500,6 +500,23 @@ name = "isograph_cli"
 version = "0.0.4"
 dependencies = [
  "colored",
+ "isograph_compiler",
+ "isograph_config",
+ "lazy_static",
+ "notify",
+ "notify-debouncer-full",
+ "pretty-duration",
+ "regex",
+ "structopt",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "isograph_compiler"
+version = "0.0.4"
+dependencies = [
+ "colored",
  "common_lang_types",
  "graphql_artifact_generation",
  "graphql_lang_types",

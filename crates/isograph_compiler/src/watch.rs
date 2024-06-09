@@ -9,7 +9,7 @@ use tokio::{runtime::Handle, sync::mpsc::Receiver, task::JoinError};
 
 use crate::batch_compile::compile_and_print;
 
-pub(crate) async fn handle_watch_command(
+pub async fn handle_watch_command(
     config: CompilerConfig,
 ) -> Result<Result<(), Vec<Error>>, JoinError> {
     let _ = compile_and_print(&config);
