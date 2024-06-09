@@ -1,11 +1,11 @@
 mod opt;
 
-use isograph_compiler::compile_and_print;
 use colored::Colorize;
+use isograph_compiler::compile_and_print;
+use isograph_compiler::handle_watch_command;
 use isograph_config::create_config;
 use opt::CliOptions;
 use structopt::StructOpt;
-use isograph_compiler::handle_watch_command;
 
 #[tokio::main]
 async fn main() {

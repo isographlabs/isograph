@@ -57,9 +57,7 @@ impl<T> WithDuration<T> {
     }
 }
 
-pub fn compile_and_print(
-    config: &CompilerConfig,
-) -> Result<CompilationStats, BatchCompileError> {
+pub fn compile_and_print(config: &CompilerConfig) -> Result<CompilationStats, BatchCompileError> {
     eprintln!("{}", "Starting to compile.".cyan());
 
     let result = handle_compile_command(config);

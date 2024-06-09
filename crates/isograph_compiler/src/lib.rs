@@ -6,5 +6,5 @@ mod schema;
 pub mod watch;
 mod write_artifacts;
 
-pub use watch::handle_watch_command;
 pub use batch_compile::compile_and_print;
+pub use watch::handle_watch_command;
