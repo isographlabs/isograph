@@ -134,14 +134,13 @@ pub(crate) fn generate_refetch_reader_artifact(
         let mut nested_client_field_artifact_imports = HashMap::new();
 
         // TODO do not call create_merge_selection_set
-        let (_merged_selection_set, root_refetched_paths) = create_merged_selection_set(
+        let (_merged_selection_set, root_refetched_paths, _, _) = create_merged_selection_set(
             schema,
             schema
                 .server_field_data
                 .object(client_field.parent_object_id)
                 .into(),
             selection_set,
-            &mut HashMap::new(),
             client_field,
         );
 

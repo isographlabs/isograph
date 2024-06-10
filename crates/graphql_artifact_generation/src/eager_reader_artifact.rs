@@ -33,7 +33,7 @@ pub fn generate_eager_reader_artifact<'schema>(
         let mut nested_client_field_artifact_imports = HashMap::new();
 
         // TODO do not call this here. We are calling this to get the root_refetched_paths,
-        let (_merged_selection_set, root_refetched_paths) = create_merged_selection_set(
+        let (_merged_selection_set, root_refetched_paths, _, _) = create_merged_selection_set(
             schema,
             // TODO here we are assuming that the client field is only on the Query type.
             // That restriction should be loosened.
@@ -42,7 +42,6 @@ pub fn generate_eager_reader_artifact<'schema>(
                 .object(client_field.parent_object_id)
                 .into(),
             selection_set,
-            &mut HashMap::new(),
             client_field,
         );
 

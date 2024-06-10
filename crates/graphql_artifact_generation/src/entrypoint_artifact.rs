@@ -1,7 +1,9 @@
+use std::collections::{HashMap, HashSet};
+
 use common_lang_types::{PathAndContent, QueryOperationName, VariableName};
 use isograph_lang_types::ClientFieldId;
 use isograph_schema::{
-    create_merged_selection_set, EncounteredClientFieldInfoMap, MergedSelectionSet,
+    create_merged_selection_set, MergedSelectionSet, PathToRefetchField, PathToRefetchFieldInfo,
     RootRefetchedPath, SchemaObject, ValidatedSchema,
 };
 
@@ -25,21 +27,28 @@ struct EntrypointArtifactInfo<'schema> {
 
 pub(crate) fn generate_entrypoint_artifact(
     schema: &ValidatedSchema,
-    client_field_id: ClientFieldId,
-    encountered_client_field_infos: &mut EncounteredClientFieldInfoMap,
-) -> (PathAndContent, MergedSelectionSet) {
-    let fetchable_client_field = schema.client_field(client_field_id);
-    if let Some((ref selection_set, _)) = fetchable_client_field.selection_set_and_unwraps {
-        let query_name = fetchable_client_field.name.into();
+    entrypoint_id: ClientFieldId,
+) -> (
+    PathAndContent,
+    MergedSelectionSet,
+    // encountered client fields
+    HashSet<ClientFieldId>,
+    HashMap<PathToRefetchField, PathToRefetchFieldInfo>,
+) {
+    let entrypoint = schema.client_field(entrypoint_id);
+    if let Some((ref selection_set, _)) = entrypoint.selection_set_and_unwraps {
+        let query_name = entrypoint.name.into();
 
-        let (merged_selection_set, root_refetched_paths) = create_merged_selection_set(
+        let (
+            merged_selection_set,
+            root_refetched_paths,
+            encountered_client_fields,
+            paths_to_refetch_fields,
+        ) = create_merged_selection_set(
             schema,
-            schema
-                .server_field_data
-                .object(fetchable_client_field.parent_object_id),
+            schema.server_field_data.object(entrypoint.parent_object_id),
             selection_set,
-            encountered_client_field_infos,
-            &fetchable_client_field,
+            &entrypoint,
         );
 
         // TODO when we do not call generate_entrypoint_artifact extraneously,
@@ -48,7 +57,7 @@ pub(crate) fn generate_entrypoint_artifact(
         // parameter
         let root_operation_name = schema
             .fetchable_types
-            .get(&fetchable_client_field.parent_object_id)
+            .get(&entrypoint.parent_object_id)
             .unwrap_or_else(|| {
                 schema
                     .fetchable_types
@@ -58,14 +67,12 @@ pub(crate) fn generate_entrypoint_artifact(
                     .1
             });
 
-        let parent_object = schema
-            .server_field_data
-            .object(fetchable_client_field.parent_object_id);
+        let parent_object = schema.server_field_data.object(entrypoint.parent_object_id);
         let query_text = generate_query_text(
             query_name,
             schema,
             &merged_selection_set,
-            &fetchable_client_field.variable_definitions,
+            &entrypoint.variable_definitions,
             root_operation_name,
         );
         let refetch_query_artifact_import =
@@ -74,16 +81,19 @@ pub(crate) fn generate_entrypoint_artifact(
         let normalization_ast_text =
             generate_normalization_ast_text(schema, &merged_selection_set, 0);
 
+        let entrypoint_artifact_info = EntrypointArtifactInfo {
+            query_text,
+            query_name,
+            parent_type: parent_object.into(),
+            normalization_ast_text,
+            refetch_query_artifact_import,
+        };
+
         (
-            EntrypointArtifactInfo {
-                query_text,
-                query_name,
-                parent_type: parent_object.into(),
-                normalization_ast_text,
-                refetch_query_artifact_import,
-            }
-            .path_and_content(),
+            entrypoint_artifact_info.path_and_content(),
             merged_selection_set,
+            encountered_client_fields,
+            paths_to_refetch_fields,
         )
     } else {
         // TODO convert to error

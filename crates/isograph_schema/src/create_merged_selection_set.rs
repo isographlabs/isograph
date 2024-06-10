@@ -208,7 +208,7 @@ pub struct PathToRefetchFieldInfo {
 /// generating a merged selection set for a given fetchable resolver root.
 /// A mutable reference to this struct is passed down to all children.
 #[derive(Debug)]
-struct MergeTraversalState<'a> {
+struct MergeTraversalState {
     paths_to_refetch_fields: HashMap<PathToRefetchField, PathToRefetchFieldInfo>,
     /// As we traverse selection sets, we need to keep track of the path we have
     /// taken so far. This is because when we encounter a refetch query, we need
@@ -220,11 +220,11 @@ struct MergeTraversalState<'a> {
     /// needed for each refetch query. At this point, we have enough information
     /// to generate the refetch query.
     current_path: Vec<NameAndArguments>,
-    encountered_client_fields: &'a mut EncounteredClientFieldInfoMap,
 
-    /// The (immutable) id of the entrypoint or reader, where we started doing this traversal
-    /// TODO: make this &'a ValidatedClientField
-    parent_client_field_id: ClientFieldId,
+    // The (mutable) ids of all client fields we have encountered
+    // (TODO: only collect those for which we need to generate a reader,
+    // once fire-and-forget fields are possible.)
+    encountered_client_fields: HashSet<ClientFieldId>,
 
     /// The (mutable) id of the current client field we are processing.
     /// TODO: make this &'a ValidatedClientField
@@ -233,17 +233,13 @@ struct MergeTraversalState<'a> {
     path_to_current_client_field: Vec<NameAndArguments>,
 }
 
-impl<'a> MergeTraversalState<'a> {
-    fn new(
-        encountered_client_fields: &'a mut EncounteredClientFieldInfoMap,
-        parent_client_field_id: ClientFieldId,
-    ) -> Self {
+impl MergeTraversalState {
+    fn new(entrypoint_id: ClientFieldId) -> Self {
         Self {
             paths_to_refetch_fields: Default::default(),
             current_path: vec![],
-            encountered_client_fields,
-            parent_client_field_id,
-            current_client_field_id: parent_client_field_id,
+            encountered_client_fields: HashSet::new(),
+            current_client_field_id: entrypoint_id,
             path_to_current_client_field: vec![],
         }
     }
@@ -270,12 +266,15 @@ pub fn create_merged_selection_set(
     schema: &ValidatedSchema,
     parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
-    encountered_client_fields: &mut EncounteredClientFieldInfoMap,
-    // N.B. we call this for non-fetchable resolvers now, but that is a smell
     entrypoint: &ValidatedClientField,
-) -> (MergedSelectionSet, Vec<RootRefetchedPath>) {
-    let mut merge_traversal_state =
-        MergeTraversalState::new(encountered_client_fields, entrypoint.id);
+) -> (
+    MergedSelectionSet,
+    // TODO do not return
+    Vec<RootRefetchedPath>,
+    HashSet<ClientFieldId>,
+    HashMap<PathToRefetchField, PathToRefetchFieldInfo>,
+) {
+    let mut merge_traversal_state = MergeTraversalState::new(entrypoint.id);
     let full_merged_selection_set = create_merged_selection_set_with_merge_traversal_state(
         schema,
         parent_type,
@@ -283,6 +282,11 @@ pub fn create_merged_selection_set(
         &mut merge_traversal_state,
     );
 
+    // TODO don't clone
+    let encountered_client_fields = merge_traversal_state.encountered_client_fields.clone();
+    let paths_to_refetch_fields = merge_traversal_state.paths_to_refetch_fields.clone();
+
+    // TODO remove
     let root_refetched_paths = merge_traversal_state
         .sorted_paths_to_refetch_fields()
         .into_iter()
@@ -291,7 +295,12 @@ pub fn create_merged_selection_set(
         })
         .collect();
 
-    (full_merged_selection_set, root_refetched_paths)
+    (
+        full_merged_selection_set,
+        root_refetched_paths,
+        encountered_client_fields,
+        paths_to_refetch_fields,
+    )
 }
 
 pub fn get_root_refetched_path(
@@ -505,7 +514,7 @@ fn create_merged_selection_set_with_merge_traversal_state(
     schema: &ValidatedSchema,
     parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
-    merge_traversal_state: &mut MergeTraversalState<'_>,
+    merge_traversal_state: &mut MergeTraversalState,
 ) -> MergedSelectionSet {
     let mut merged_selection_map = HashMap::new();
 
@@ -533,7 +542,7 @@ fn merge_selections_into_set(
     merged_selection_map: &mut MergedSelectionMap,
     parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
-    merge_traversal_state: &mut MergeTraversalState<'_>,
+    merge_traversal_state: &mut MergeTraversalState,
 ) {
     for validated_selection in validated_selections.iter().filter(filter_id_fields) {
         let span = validated_selection.span;
@@ -546,11 +555,9 @@ fn merge_selections_into_set(
                         }
                         FieldDefinitionLocation::Client(client_field_id) => {
                             let client_field = schema.client_field(*client_field_id);
-                            note_encountered_client_field(
-                                client_field,
-                                parent_type,
-                                merge_traversal_state,
-                            );
+                            merge_traversal_state
+                                .encountered_client_fields
+                                .insert(client_field.id);
                             maybe_note_path_to_refetch_fields(
                                 client_field,
                                 merge_traversal_state,
@@ -606,54 +613,6 @@ fn merge_selections_into_set(
     }
 }
 
-fn note_encountered_client_field(
-    client_field: &ValidatedClientField,
-    parent_type: &SchemaObject,
-    merge_traversal_state: &mut MergeTraversalState,
-) {
-    let get_path_to_refetch_etc = |variant: ImperativelyLoadedFieldVariant| {
-        (
-            PathToRefetchField {
-                linked_fields: merge_traversal_state.current_path.clone(),
-                field_name: client_field.name,
-            },
-            PathToRefetchFieldInfo {
-                refetch_field_parent_id: parent_type.id,
-                imperatively_loaded_field_variant: variant,
-                extra_selections: HashMap::new(),
-            },
-            merge_traversal_state.parent_client_field_id,
-        )
-    };
-    match merge_traversal_state
-        .encountered_client_fields
-        .entry(client_field.id)
-    {
-        Entry::Occupied(mut occupied) => match &client_field.variant {
-            ClientFieldVariant::ImperativelyLoadedField(variant) => occupied
-                .get_mut()
-                .paths_to_refetch_fields
-                .push(get_path_to_refetch_etc(variant.clone())),
-            _ => {
-                // Since we have already encountered this client field, we do not need
-                // to do anything, as we are just re-encountering it.
-            }
-        },
-        Entry::Vacant(vacant) => {
-            vacant.insert(EncounteredClientFieldInfo {
-                paths_to_refetch_fields: match &client_field.variant {
-                    ClientFieldVariant::ImperativelyLoadedField(variant) => {
-                        vec![get_path_to_refetch_etc(variant.clone())]
-                    }
-                    _ => {
-                        vec![]
-                    }
-                },
-            });
-        }
-    }
-}
-
 // TODO remove
 fn maybe_note_path_to_refetch_fields(
     client_field: &ValidatedClientField,
@@ -700,7 +659,7 @@ fn merge_linked_field_into_vacant_entry(
     new_linked_field: &ValidatedLinkedFieldSelection,
     schema: &ValidatedSchema,
     span: Span,
-    merge_traversal_state: &mut MergeTraversalState<'_>,
+    merge_traversal_state: &mut MergeTraversalState,
 ) {
     vacant_entry.insert(WithSpan::new(
         MergedServerFieldSelection::LinkedField(MergedLinkedFieldSelection {
@@ -727,7 +686,7 @@ fn merge_linked_field_into_occupied_entry(
     mut occupied: OccupiedEntry<'_, NormalizationKey, WithSpan<MergedServerFieldSelection>>,
     new_linked_field: &ValidatedLinkedFieldSelection,
     schema: &ValidatedSchema,
-    merge_traversal_state: &mut MergeTraversalState<'_>,
+    merge_traversal_state: &mut MergeTraversalState,
 ) {
     let existing_selection = occupied.get_mut();
     match &mut existing_selection.item {
@@ -755,7 +714,7 @@ fn merge_scalar_client_field(
     parent_type: &SchemaObject,
     schema: &ValidatedSchema,
     merged_selection_map: &mut MergedSelectionMap,
-    merge_traversal_state: &mut MergeTraversalState<'_>,
+    merge_traversal_state: &mut MergeTraversalState,
     client_field: &ValidatedClientField,
 ) {
     if let Some((ref selection_set, _)) = client_field.selection_set_and_unwraps {
@@ -844,7 +803,7 @@ fn HACK__merge_linked_fields(
     existing_selection_set: &mut Vec<WithSpan<MergedServerFieldSelection>>,
     new_selection_set: &[WithSpan<ValidatedSelection>],
     linked_field_parent_type: &SchemaObject,
-    merge_traversal_state: &mut MergeTraversalState<'_>,
+    merge_traversal_state: &mut MergeTraversalState,
 ) {
     let mut merged_selection_set = HashMap::new();
     for item in existing_selection_set.iter() {
