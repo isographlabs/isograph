@@ -1,3 +1,1 @@
-# isograph-cli
-
-This crate ultimately exposes the `isograph` command.
+# isograph_compiler
