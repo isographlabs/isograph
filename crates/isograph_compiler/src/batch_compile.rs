@@ -36,12 +36,12 @@ use crate::{
     write_artifacts::{write_to_disk, GenerateArtifactsError},
 };
 
-pub(crate) struct CompilationStats {
+pub struct CompilationStats {
     pub client_field_count: usize,
     pub entrypoint_count: usize,
     pub total_artifacts_written: usize,
 }
-pub(crate) struct WithDuration<T> {
+pub struct WithDuration<T> {
     pub elapsed_time: Duration,
     pub item: T,
 }
@@ -57,9 +57,7 @@ impl<T> WithDuration<T> {
     }
 }
 
-pub(crate) fn compile_and_print(
-    config: &CompilerConfig,
-) -> Result<CompilationStats, BatchCompileError> {
+pub fn compile_and_print(config: &CompilerConfig) -> Result<CompilationStats, BatchCompileError> {
     eprintln!("{}", "Starting to compile.".cyan());
 
     let result = handle_compile_command(config);
@@ -374,7 +372,7 @@ fn process_iso_literal_extraction(
 }
 
 #[derive(Error, Debug)]
-pub(crate) enum BatchCompileError {
+pub enum BatchCompileError {
     #[error("Unable to load schema file at path {path:?}.\nReason: {message}")]
     UnableToLoadSchema {
         path: PathBuf,

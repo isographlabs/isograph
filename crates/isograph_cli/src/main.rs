@@ -1,18 +1,11 @@
-mod batch_compile;
-mod field_directives;
-mod isograph_literals;
 mod opt;
-mod refetch_fields;
-mod schema;
-mod watch;
-mod write_artifacts;
 
-use batch_compile::compile_and_print;
 use colored::Colorize;
+use isograph_compiler::compile_and_print;
+use isograph_compiler::handle_watch_command;
 use isograph_config::create_config;
 use opt::CliOptions;
 use structopt::StructOpt;
-use watch::handle_watch_command;
 
 #[tokio::main]
 async fn main() {
