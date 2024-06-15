@@ -1,10 +1,11 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use common_lang_types::{PathAndContent, QueryOperationName, VariableName};
 use isograph_lang_types::ClientFieldId;
 use isograph_schema::{
-    create_merged_selection_set, get_root_refetched_path, MergedSelectionSet, PathToRefetchField,
-    PathToRefetchFieldInfo, RootRefetchedPath, SchemaObject, ValidatedSchema,
+    create_merged_selection_set, get_root_refetched_path, ClientIdsToRefetchPathMap,
+    MergedSelectionSet, PathToRefetchField, PathToRefetchFieldInfo, RootRefetchedPath,
+    SchemaObject, ValidatedSchema,
 };
 
 use crate::{
@@ -32,7 +33,7 @@ pub(crate) fn generate_entrypoint_artifact(
     PathAndContent,
     MergedSelectionSet,
     // encountered client fields
-    HashSet<ClientFieldId>,
+    ClientIdsToRefetchPathMap,
     HashMap<PathToRefetchField, PathToRefetchFieldInfo>,
 ) {
     let entrypoint = schema.client_field(entrypoint_id);
@@ -42,7 +43,7 @@ pub(crate) fn generate_entrypoint_artifact(
         let (
             merged_selection_set,
             _root_refetched_paths,
-            encountered_client_fields,
+            mut client_ids_to_refetch_paths_map,
             paths_to_refetch_fields,
         ) = create_merged_selection_set(
             schema,
@@ -95,6 +96,8 @@ pub(crate) fn generate_entrypoint_artifact(
         let normalization_ast_text =
             generate_normalization_ast_text(schema, &merged_selection_set, 0);
 
+        client_ids_to_refetch_paths_map.insert(entrypoint_id, root_refetched_paths);
+
         let entrypoint_artifact_info = EntrypointArtifactInfo {
             query_text,
             query_name,
@@ -106,7 +109,7 @@ pub(crate) fn generate_entrypoint_artifact(
         (
             entrypoint_artifact_info.path_and_content(),
             merged_selection_set,
-            encountered_client_fields,
+            client_ids_to_refetch_paths_map,
             paths_to_refetch_fields,
         )
     } else {

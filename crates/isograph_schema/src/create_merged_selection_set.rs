@@ -22,6 +22,8 @@ use crate::{
     ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection,
 };
 
+// TODO this should also contain reachable variables
+pub type ClientIdsToRefetchPathMap = HashMap<ClientFieldId, Vec<RootRefetchedPath>>;
 type MergedSelectionMap = HashMap<NormalizationKey, WithSpan<MergedServerFieldSelection>>;
 
 lazy_static! {
@@ -30,7 +32,7 @@ lazy_static! {
     pub static ref TYPENAME_FIELD_NAME: ScalarFieldName = "__typename".intern().into();
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RootRefetchedPath {
     pub path: PathToRefetchField,
     // The variables that are reachable from the merged selection set
@@ -224,7 +226,7 @@ struct MergeTraversalState {
     // The (mutable) ids of all client fields we have encountered
     // (TODO: only collect those for which we need to generate a reader,
     // once fire-and-forget fields are possible.)
-    encountered_client_fields: HashSet<ClientFieldId>,
+    client_ids_to_refetch_paths: ClientIdsToRefetchPathMap,
 
     /// The (mutable) id of the current client field we are processing.
     /// TODO: make this &'a ValidatedClientField
@@ -238,7 +240,7 @@ impl MergeTraversalState {
         Self {
             paths_to_refetch_fields: Default::default(),
             current_path: vec![],
-            encountered_client_fields: HashSet::new(),
+            client_ids_to_refetch_paths: HashMap::new(),
             current_client_field_id: entrypoint_id,
             path_to_current_client_field: vec![],
         }
@@ -271,7 +273,7 @@ pub fn create_merged_selection_set(
     MergedSelectionSet,
     // TODO do not return
     Vec<RootRefetchedPath>,
-    HashSet<ClientFieldId>,
+    ClientIdsToRefetchPathMap,
     HashMap<PathToRefetchField, PathToRefetchFieldInfo>,
 ) {
     let mut merge_traversal_state = MergeTraversalState::new(entrypoint.id);
@@ -283,7 +285,8 @@ pub fn create_merged_selection_set(
     );
 
     // TODO don't clone
-    let encountered_client_fields = merge_traversal_state.encountered_client_fields.clone();
+    let client_field_to_refetched_paths_map =
+        merge_traversal_state.client_ids_to_refetch_paths.clone();
     let paths_to_refetch_fields = merge_traversal_state.paths_to_refetch_fields.clone();
 
     // TODO remove
@@ -298,7 +301,7 @@ pub fn create_merged_selection_set(
     (
         full_merged_selection_set,
         root_refetched_paths,
-        encountered_client_fields,
+        client_field_to_refetched_paths_map,
         paths_to_refetch_fields,
     )
 }
@@ -556,8 +559,9 @@ fn merge_selections_into_set(
                         FieldDefinitionLocation::Client(client_field_id) => {
                             let client_field = schema.client_field(*client_field_id);
                             merge_traversal_state
-                                .encountered_client_fields
-                                .insert(client_field.id);
+                                .client_ids_to_refetch_paths
+                                // TODO do not insert an empty here
+                                .insert(client_field.id, vec![]);
                             maybe_note_path_to_refetch_fields(
                                 client_field,
                                 merge_traversal_state,

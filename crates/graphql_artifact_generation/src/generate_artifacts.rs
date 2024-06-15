@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, HashMap, HashSet},
+    collections::{hash_map::Entry, HashMap},
     fmt::{self, Debug, Display},
     path::PathBuf,
 };
@@ -67,7 +67,7 @@ pub fn get_artifact_path_and_content<'schema>(
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
 ) -> Vec<PathAndContent> {
-    let mut encountered_client_fields = HashSet::new();
+    let mut client_field_to_refetched_paths_map = HashMap::new();
     let mut path_and_contents = vec![];
 
     // For each entrypoint, generate an entrypoint artifact and refetch artifacts
@@ -77,19 +77,15 @@ pub fn get_artifact_path_and_content<'schema>(
         let (
             entrypoint_artifact,
             merged_selection_set,
-            new_encountered_client_fields,
+            new_client_field_to_refetched_paths_map,
             paths_to_refetch_fields,
         ) = generate_entrypoint_artifact(schema, *entrypoint_id);
         path_and_contents.push(entrypoint_artifact);
 
         // Schedule the generation of all encountered client fields
-        for client_field in new_encountered_client_fields {
-            encountered_client_fields.insert(client_field);
+        for (client_field, root_refetched_paths) in new_client_field_to_refetched_paths_map {
+            client_field_to_refetched_paths_map.insert(client_field, root_refetched_paths);
         }
-        // Also, schedule the generation of a reader artifact for the entrypoint itself.
-        // TODO: We do not need to do this — some entrypoints can be "fire-and-forget" and
-        // never actually read.
-        encountered_client_fields.insert(*entrypoint_id);
 
         let mut sorted_paths = paths_to_refetch_fields.into_iter().collect::<Vec<_>>();
         sorted_paths.sort_by_cached_key(|(path, _)| path.clone());
@@ -115,7 +111,7 @@ pub fn get_artifact_path_and_content<'schema>(
     }
 
     // Generate reader ASTs for all encountered client fields
-    for encountered_client_field_id in &encountered_client_fields {
+    for (encountered_client_field_id, _root_refetched_paths) in &client_field_to_refetched_paths_map {
         let encountered_client_field = schema.client_field(*encountered_client_field_id);
         path_and_contents.extend(match &encountered_client_field.variant {
             ClientFieldVariant::UserWritten(info) => generate_eager_reader_artifact(
