@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet};
 use common_lang_types::{PathAndContent, QueryOperationName, VariableName};
 use isograph_lang_types::ClientFieldId;
 use isograph_schema::{
-    create_merged_selection_set, MergedSelectionSet, PathToRefetchField, PathToRefetchFieldInfo,
-    RootRefetchedPath, SchemaObject, ValidatedSchema,
+    create_merged_selection_set, get_root_refetched_path, MergedSelectionSet, PathToRefetchField,
+    PathToRefetchFieldInfo, RootRefetchedPath, SchemaObject, ValidatedSchema,
 };
 
 use crate::{
@@ -41,7 +41,7 @@ pub(crate) fn generate_entrypoint_artifact(
 
         let (
             merged_selection_set,
-            root_refetched_paths,
+            _root_refetched_paths,
             encountered_client_fields,
             paths_to_refetch_fields,
         ) = create_merged_selection_set(
@@ -50,6 +50,20 @@ pub(crate) fn generate_entrypoint_artifact(
             selection_set,
             &entrypoint,
         );
+
+        let mut paths = paths_to_refetch_fields
+            .clone()
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        paths.sort_by_cached_key(|(k, _)| k.clone());
+
+        let root_refetched_paths = paths
+            .into_iter()
+            .map(|(path_to_refetch_field, info)| {
+                get_root_refetched_path(info, &merged_selection_set, path_to_refetch_field)
+            })
+            .collect::<Vec<_>>();
 
         // TODO when we do not call generate_entrypoint_artifact extraneously,
         // we can panic instead of using a default entrypoint type
