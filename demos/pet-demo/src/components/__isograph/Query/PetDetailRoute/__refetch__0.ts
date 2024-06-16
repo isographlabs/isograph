@@ -2,6 +2,7 @@ import type {IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst,
 const queryText = 'query Pet__refetch ($id: ID!) {\
   node____id___v_id: node(id: $id) {\
     ... on Pet {\
+      __typename,\
       id,\
       age,\
       best_friend_relationship {\
@@ -33,7 +34,6 @@ const queryText = 'query Pet__refetch ($id: ID!) {\
         weight,\
       },\
       tagline,\
-      __typename,\
     },\
   },\
 }';
@@ -53,6 +53,11 @@ const normalizationAst: NormalizationAst = [
         kind: "InlineFragment",
         type: "Pet",
         selections: [
+          {
+            kind: "Scalar",
+            fieldName: "__typename",
+            arguments: null,
+          },
           {
             kind: "Scalar",
             fieldName: "id",
@@ -191,11 +196,6 @@ const normalizationAst: NormalizationAst = [
           {
             kind: "Scalar",
             fieldName: "tagline",
-            arguments: null,
-          },
-          {
-            kind: "Scalar",
-            fieldName: "__typename",
             arguments: null,
           },
         ],

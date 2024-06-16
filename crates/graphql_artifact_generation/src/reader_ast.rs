@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Entry, HashSet};
+use std::collections::{hash_map::Entry, BTreeMap, HashSet};
 
 use common_lang_types::{ArtifactFileType, JavascriptVariableName, SelectableFieldName, WithSpan};
 use intern::string_key::Intern;
@@ -20,7 +20,7 @@ fn generate_reader_ast_node(
     indentation_level: u8,
     nested_client_field_imports: &mut NestedClientFieldImports,
     // TODO use this to generate usedRefetchQueries
-    root_refetched_paths: &[RootRefetchedPath],
+    root_refetched_paths: &BTreeMap<PathToRefetchField, RootRefetchedPath>,
     path: &mut Vec<NameAndArguments>,
 ) -> String {
     match &selection.item {
@@ -35,7 +35,11 @@ fn generate_reader_ast_node(
                             .map(|x| format!("\"{}\"", x.item))
                             .unwrap_or("null".to_string());
                         let arguments = get_serialized_field_arguments(
-                            &scalar_field.arguments,
+                            &scalar_field
+                                .arguments
+                                .iter()
+                                .map(|x| x.item.clone())
+                                .collect::<Vec<_>>(),
                             indentation_level + 1,
                         );
 
@@ -57,7 +61,11 @@ fn generate_reader_ast_node(
                         let alias = scalar_field.name_or_alias().item;
                         let nested_client_field = schema.client_field(client_field_id);
                         let arguments = get_serialized_field_arguments(
-                            &scalar_field.arguments,
+                            &scalar_field
+                                .arguments
+                                .iter()
+                                .map(|x| x.item.clone())
+                                .collect::<Vec<_>>(),
                             indentation_level + 1,
                         );
                         let indent_1 = "  ".repeat(indentation_level as usize);
@@ -149,8 +157,14 @@ fn generate_reader_ast_node(
 
                 path.pop();
 
-                let arguments =
-                    get_serialized_field_arguments(&linked_field.arguments, indentation_level + 1);
+                let arguments = get_serialized_field_arguments(
+                    &linked_field
+                        .arguments
+                        .iter()
+                        .map(|x| x.item.clone())
+                        .collect::<Vec<_>>(),
+                    indentation_level + 1,
+                );
                 let indent_1 = "  ".repeat(indentation_level as usize);
                 let indent_2 = "  ".repeat((indentation_level + 1) as usize);
                 format!(
@@ -196,7 +210,7 @@ fn generate_reader_ast_with_path<'schema>(
     indentation_level: u8,
     nested_client_field_imports: &mut NestedClientFieldImports,
     // N.B. this is not root_refetched_paths when we're generating a non-fetchable client field :(
-    root_refetched_paths: &[RootRefetchedPath],
+    root_refetched_paths: &BTreeMap<PathToRefetchField, RootRefetchedPath>,
     path: &mut Vec<NameAndArguments>,
 ) -> ReaderAst {
     let mut reader_ast = "[\n".to_string();
@@ -216,17 +230,17 @@ fn generate_reader_ast_with_path<'schema>(
 }
 
 fn get_nested_refetch_query_text(
-    root_refetched_paths: &[RootRefetchedPath],
+    root_refetched_paths: &BTreeMap<PathToRefetchField, RootRefetchedPath>,
     paths_to_refetch_fields_in_client_field: &[PathToRefetchField],
 ) -> String {
     let mut s = "[".to_string();
     for nested_refetch_query in paths_to_refetch_fields_in_client_field.iter() {
         let mut found_at_least_one = false;
         for index in root_refetched_paths
-            .iter()
+            .keys()
             .enumerate()
-            .filter_map(|(index, root_path)| {
-                if root_path.path == *nested_refetch_query {
+            .filter_map(|(index, path)| {
+                if path == nested_refetch_query {
                     Some(index)
                 } else {
                     None
@@ -248,16 +262,16 @@ fn get_nested_refetch_query_text(
 }
 
 fn find_imperatively_fetchable_query_index(
-    paths: &[RootRefetchedPath],
-    path: &[NameAndArguments],
+    paths: &BTreeMap<PathToRefetchField, RootRefetchedPath>,
+    outer_path: &[NameAndArguments],
     imperatively_fetchable_field_name: SelectableFieldName,
 ) -> RefetchQueryIndex {
     paths
         .iter()
         .enumerate()
-        .find_map(|(index, path_to_field)| {
-            if &path_to_field.path.linked_fields == path
-                && path_to_field.field_name == imperatively_fetchable_field_name
+        .find_map(|(index, (path, root_refetch_path))| {
+            if &path.linked_fields == outer_path
+                && root_refetch_path.field_name == imperatively_fetchable_field_name
             {
                 Some(RefetchQueryIndex(index as u32))
             } else {
@@ -273,7 +287,7 @@ pub(crate) fn generate_reader_ast<'schema>(
     indentation_level: u8,
     nested_client_field_imports: &mut NestedClientFieldImports,
     // N.B. this is not root_refetched_paths when we're generating an entrypoint :(
-    root_refetched_paths: &[RootRefetchedPath],
+    root_refetched_paths: &BTreeMap<PathToRefetchField, RootRefetchedPath>,
 ) -> ReaderAst {
     generate_reader_ast_with_path(
         schema,

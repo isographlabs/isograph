@@ -1,11 +1,12 @@
-use std::collections::HashMap;
+use std::collections::BTreeSet;
 
 use common_lang_types::{PathAndContent, QueryOperationName, VariableName};
+use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::ClientFieldId;
 use isograph_schema::{
-    create_merged_selection_set, get_root_refetched_path, ClientIdsToRefetchPathMap,
-    MergedSelectionSet, PathToRefetchField, PathToRefetchFieldInfo, RootRefetchedPath,
-    SchemaObject, ValidatedSchema,
+    create_merged_selection_set_and_insert_into_global_map, current_target_merged_selections,
+    get_reachable_variables, ClientFieldToCompletedMergeTraversalStateMap, MergedSelectionMap,
+    RootRefetchedPath, SchemaObject, ValidatedSchema,
 };
 
 use crate::{
@@ -26,45 +27,31 @@ struct EntrypointArtifactInfo<'schema> {
     refetch_query_artifact_import: RefetchQueryArtifactImport,
 }
 
-pub(crate) fn generate_entrypoint_artifact(
+pub(crate) fn generate_entrypoint_artifact<'a>(
     schema: &ValidatedSchema,
     entrypoint_id: ClientFieldId,
+    global_client_field_map: &'a mut ClientFieldToCompletedMergeTraversalStateMap,
 ) -> (
     PathAndContent,
-    MergedSelectionSet,
-    // encountered client fields
-    ClientIdsToRefetchPathMap,
-    HashMap<PathToRefetchField, PathToRefetchFieldInfo>,
+    Vec<(
+        RootRefetchedPath,
+        MergedSelectionMap,
+        BTreeSet<VariableName>,
+    )>,
 ) {
     let entrypoint = schema.client_field(entrypoint_id);
+
     if let Some((ref selection_set, _)) = entrypoint.selection_set_and_unwraps {
         let query_name = entrypoint.name.into();
 
-        let (
-            merged_selection_set,
-            _root_refetched_paths,
-            mut client_ids_to_refetch_paths_map,
-            paths_to_refetch_fields,
-        ) = create_merged_selection_set(
-            schema,
-            schema.server_field_data.object(entrypoint.parent_object_id),
-            selection_set,
-            &entrypoint,
-        );
-
-        let mut paths = paths_to_refetch_fields
-            .clone()
-            .into_iter()
-            .collect::<Vec<_>>();
-
-        paths.sort_by_cached_key(|(k, _)| k.clone());
-
-        let root_refetched_paths = paths
-            .into_iter()
-            .map(|(path_to_refetch_field, info)| {
-                get_root_refetched_path(info, &merged_selection_set, path_to_refetch_field)
-            })
-            .collect::<Vec<_>>();
+        let (traversal_state, selection_map) =
+            create_merged_selection_set_and_insert_into_global_map(
+                schema,
+                schema.server_field_data.object(entrypoint.parent_object_id),
+                selection_set,
+                global_client_field_map,
+                entrypoint,
+            );
 
         // TODO when we do not call generate_entrypoint_artifact extraneously,
         // we can panic instead of using a default entrypoint type
@@ -86,17 +73,33 @@ pub(crate) fn generate_entrypoint_artifact(
         let query_text = generate_query_text(
             query_name,
             schema,
-            &merged_selection_set,
+            &selection_map,
             &entrypoint.variable_definitions,
             root_operation_name,
         );
+        let refetch_paths_with_variables = traversal_state
+            .refetch_paths
+            .iter()
+            .map(|(path, root_refetch_path)| {
+                // TODO don't clone
+                let current_target_merged_selections =
+                    current_target_merged_selections(path.linked_fields.iter(), &selection_map)
+                        .clone();
+                let reachable_variables =
+                    get_reachable_variables(&current_target_merged_selections);
+                (
+                    root_refetch_path.clone(),
+                    current_target_merged_selections,
+                    reachable_variables,
+                )
+            })
+            .collect::<Vec<_>>();
+
         let refetch_query_artifact_import =
-            generate_refetch_query_artifact_import(&root_refetched_paths);
+            generate_refetch_query_artifact_import(&refetch_paths_with_variables);
 
         let normalization_ast_text =
-            generate_normalization_ast_text(schema, &merged_selection_set, 0);
-
-        client_ids_to_refetch_paths_map.insert(entrypoint_id, root_refetched_paths);
+            generate_normalization_ast_text(schema, selection_map.values(), 0);
 
         let entrypoint_artifact_info = EntrypointArtifactInfo {
             query_text,
@@ -108,9 +111,7 @@ pub(crate) fn generate_entrypoint_artifact(
 
         (
             entrypoint_artifact_info.path_and_content(),
-            merged_selection_set,
-            client_ids_to_refetch_paths_map,
-            paths_to_refetch_fields,
+            refetch_paths_with_variables,
         )
     } else {
         // TODO convert to error
@@ -119,26 +120,34 @@ pub(crate) fn generate_entrypoint_artifact(
 }
 
 fn generate_refetch_query_artifact_import(
-    root_refetched_paths: &[RootRefetchedPath],
+    root_refetched_paths: &[(
+        RootRefetchedPath,
+        MergedSelectionMap,
+        BTreeSet<VariableName>,
+    )],
 ) -> RefetchQueryArtifactImport {
     // TODO name the refetch queries with the path, or something, instead of
     // with indexes.
     let mut output = String::new();
     let mut array_syntax = String::new();
-    for (
-        query_index,
-        RootRefetchedPath {
-            reachable_variables,
-            field_variables,
+    for (query_index, item) in root_refetched_paths.iter().enumerate() {
+        let RootRefetchedPath {
+            path_to_refetch_field_info,
             ..
-        },
-    ) in root_refetched_paths.iter().enumerate()
-    {
+        } = &item.0;
         output.push_str(&format!(
             "import refetchQuery{} from './__refetch__{}';\n",
             query_index, query_index,
         ));
-        let variable_names_str = variable_names_to_string(&reachable_variables, &field_variables);
+        let variable_names_str = variable_names_to_string(
+            &item.2,
+            // What are we doing here?
+            path_to_refetch_field_info
+                .imperatively_loaded_field_variant
+                .top_level_schema_field_arguments
+                .iter()
+                .map(|x| x.item.name.item.lookup().intern().into()),
+        );
         array_syntax.push_str(&format!(
             "  {{ artifact: refetchQuery{}, allowedVariables: {} }},\n",
             query_index, variable_names_str
@@ -214,8 +223,8 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
 }
 
 fn variable_names_to_string(
-    variable_names: &[VariableName],
-    field_variables: &[VariableName],
+    variable_names: &BTreeSet<VariableName>,
+    field_variables: impl Iterator<Item = VariableName>,
 ) -> String {
     let mut s = "[".to_string();
 

@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 use common_lang_types::{PathAndContent, SelectableFieldName};
 use isograph_schema::{
-    create_merged_selection_set, SchemaObject, UserWrittenClientFieldInfo,
+    ScalarClientFieldTraversalState, SchemaObject, UserWrittenClientFieldInfo,
     UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema,
 };
 
@@ -24,6 +24,7 @@ pub fn generate_eager_reader_artifact<'schema>(
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
     info: UserWrittenClientFieldInfo,
+    scalar_client_field_traversal_state: &ScalarClientFieldTraversalState,
 ) -> Vec<PathAndContent> {
     let user_written_component_variant = info.user_written_component_variant;
     if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
@@ -32,25 +33,12 @@ pub fn generate_eager_reader_artifact<'schema>(
             .object(client_field.parent_object_id);
         let mut nested_client_field_artifact_imports = HashMap::new();
 
-        // TODO do not call this here. We are calling this to get the root_refetched_paths,
-        let (_merged_selection_set, root_refetched_paths, _, _) = create_merged_selection_set(
-            schema,
-            // TODO here we are assuming that the client field is only on the Query type.
-            // That restriction should be loosened.
-            schema
-                .server_field_data
-                .object(client_field.parent_object_id)
-                .into(),
-            selection_set,
-            client_field,
-        );
-
         let reader_ast = generate_reader_ast(
             schema,
             selection_set,
             0,
             &mut nested_client_field_artifact_imports,
-            &root_refetched_paths,
+            &scalar_client_field_traversal_state.refetch_paths,
         );
 
         let client_field_parameter_type = generate_client_field_parameter_type(

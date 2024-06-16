@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use common_lang_types::{PathAndContent, SelectableFieldName};
 use intern::string_key::Intern;
 use isograph_schema::{
-    create_merged_selection_set, FieldMapItem, ImperativelyLoadedFieldVariant, SchemaObject,
+    FieldMapItem, ImperativelyLoadedFieldVariant, ScalarClientFieldTraversalState, SchemaObject,
     ValidatedClientField, ValidatedSchema,
 };
 
@@ -120,6 +120,7 @@ pub(crate) fn generate_refetch_reader_artifact(
     schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
     variant: &ImperativelyLoadedFieldVariant,
+    scalar_client_field_traversal_state: &ScalarClientFieldTraversalState,
 ) -> Vec<PathAndContent> {
     if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
         let function_import_statement = match &variant.primary_field_info {
@@ -133,23 +134,12 @@ pub(crate) fn generate_refetch_reader_artifact(
             .object(client_field.parent_object_id);
         let mut nested_client_field_artifact_imports = HashMap::new();
 
-        // TODO do not call create_merge_selection_set
-        let (_merged_selection_set, root_refetched_paths, _, _) = create_merged_selection_set(
-            schema,
-            schema
-                .server_field_data
-                .object(client_field.parent_object_id)
-                .into(),
-            selection_set,
-            client_field,
-        );
-
         let reader_ast = generate_reader_ast(
             schema,
             selection_set,
             0,
             &mut nested_client_field_artifact_imports,
-            &root_refetched_paths,
+            &scalar_client_field_traversal_state.refetch_paths,
         );
 
         let client_field_parameter_type = generate_client_field_parameter_type(

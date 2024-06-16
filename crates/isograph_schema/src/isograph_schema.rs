@@ -18,7 +18,7 @@ use isograph_lang_types::{
 };
 use lazy_static::lazy_static;
 
-use crate::ClientFieldVariant;
+use crate::{ClientFieldVariant, NormalizationKey};
 
 lazy_static! {
     pub static ref ID_GRAPHQL_TYPE: GraphQLScalarTypeName = "ID".intern().into();
@@ -489,6 +489,16 @@ pub struct PathToRefetchField {
 pub struct NameAndArguments {
     pub name: SelectableFieldName,
     pub arguments: Vec<ArgumentKeyAndValue>,
+}
+
+impl NameAndArguments {
+    pub fn normalization_key(&self) -> NormalizationKey {
+        if self.name == "id".intern().into() {
+            NormalizationKey::Id
+        } else {
+            NormalizationKey::ServerField(self.clone())
+        }
+    }
 }
 
 pub fn into_name_and_arguments<T, U>(field: &LinkedFieldSelection<T, U>) -> NameAndArguments {

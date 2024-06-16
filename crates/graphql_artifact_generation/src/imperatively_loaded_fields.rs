@@ -89,7 +89,8 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field<'schema>(
         &root_operation_name,
     );
 
-    let normalization_ast_text = generate_normalization_ast_text(schema, &merged_selection_set, 0);
+    let normalization_ast_text =
+        generate_normalization_ast_text(schema, merged_selection_set.values(), 0);
 
     ImperativelyLoadedEntrypointArtifactInfo {
         normalization_ast_text,

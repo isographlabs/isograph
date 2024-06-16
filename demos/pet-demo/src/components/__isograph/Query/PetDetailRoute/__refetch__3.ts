@@ -3,10 +3,10 @@ const queryText = 'mutation Query__make_super ($checkin_id: ID!) {\
   make_checkin_super____checkin_id___v_checkin_id: make_checkin_super(checkin_id: $checkin_id) {\
     checkin {\
       ... on Checkin {\
+        __typename,\
         id,\
         location,\
         time,\
-        __typename,\
       },\
     },\
   },\
@@ -34,6 +34,11 @@ const normalizationAst: NormalizationAst = [
             selections: [
               {
                 kind: "Scalar",
+                fieldName: "__typename",
+                arguments: null,
+              },
+              {
+                kind: "Scalar",
                 fieldName: "id",
                 arguments: null,
               },
@@ -45,11 +50,6 @@ const normalizationAst: NormalizationAst = [
               {
                 kind: "Scalar",
                 fieldName: "time",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "__typename",
                 arguments: null,
               },
             ],

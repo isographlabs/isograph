@@ -2,10 +2,11 @@ import type {IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst,
 const queryText = 'query User__refetch ($first: Int!, $id: ID!) {\
   node____id___v_id: node(id: $id) {\
     ... on User {\
-      login,\
-      avatarUrl,\
-      name,\
+      __typename,\
       id,\
+      avatarUrl,\
+      login,\
+      name,\
       repositories____last___l_10: repositories(last: 10) {\
         edges {\
           node {\
@@ -28,7 +29,6 @@ const queryText = 'query User__refetch ($first: Int!, $id: ID!) {\
           },\
         },\
       },\
-      __typename,\
     },\
   },\
 }';
@@ -50,7 +50,12 @@ const normalizationAst: NormalizationAst = [
         selections: [
           {
             kind: "Scalar",
-            fieldName: "login",
+            fieldName: "__typename",
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            fieldName: "id",
             arguments: null,
           },
           {
@@ -60,12 +65,12 @@ const normalizationAst: NormalizationAst = [
           },
           {
             kind: "Scalar",
-            fieldName: "name",
+            fieldName: "login",
             arguments: null,
           },
           {
             kind: "Scalar",
-            fieldName: "id",
+            fieldName: "name",
             arguments: null,
           },
           {
@@ -174,11 +179,6 @@ const normalizationAst: NormalizationAst = [
                 ],
               },
             ],
-          },
-          {
-            kind: "Scalar",
-            fieldName: "__typename",
-            arguments: null,
           },
         ],
       },

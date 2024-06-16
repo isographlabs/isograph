@@ -1,8 +1,8 @@
-use common_lang_types::{HasName, QueryOperationName, UnvalidatedTypeName, WithLocation, WithSpan};
+use common_lang_types::{HasName, QueryOperationName, UnvalidatedTypeName, WithSpan};
 use graphql_lang_types::GraphQLTypeAnnotation;
 use isograph_lang_types::{NonConstantValue, SelectionFieldArgument};
 use isograph_schema::{
-    MergedSelectionSet, MergedServerFieldSelection, RootOperationName, ValidatedSchema,
+    MergedSelectionMap, MergedServerSelection, RootOperationName, ValidatedSchema,
     ValidatedVariableDefinition,
 };
 
@@ -11,7 +11,7 @@ use crate::generate_artifacts::QueryText;
 pub(crate) fn generate_query_text(
     query_name: QueryOperationName,
     schema: &ValidatedSchema,
-    merged_selection_set: &MergedSelectionSet,
+    selection_map: &MergedSelectionMap,
     query_variables: &[WithSpan<ValidatedVariableDefinition>],
     root_operation_name: &RootOperationName,
 ) -> QueryText {
@@ -23,7 +23,7 @@ pub(crate) fn generate_query_text(
         "{} {} {} {{\\\n",
         root_operation_name.0, query_name, variable_text
     ));
-    write_selections_for_query_text(&mut query_text, schema, &merged_selection_set, 1);
+    write_selections_for_query_text(&mut query_text, schema, selection_map.values(), 1);
     query_text.push_str("}");
     QueryText(query_text)
 }
@@ -65,36 +65,36 @@ fn write_variables_to_string<'a>(
     }
 }
 
-fn write_selections_for_query_text(
+fn write_selections_for_query_text<'a>(
     query_text: &mut String,
     schema: &ValidatedSchema,
-    items: &[WithSpan<MergedServerFieldSelection>],
+    items: impl Iterator<Item = &'a MergedServerSelection> + 'a,
     indentation_level: u8,
 ) {
-    for item in items.iter() {
-        match &item.item {
-            MergedServerFieldSelection::ScalarField(scalar_field) => {
+    for item in items {
+        match &item {
+            MergedServerSelection::ScalarField(scalar_field) => {
                 query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
                 if let Some(alias) = scalar_field.normalization_alias {
                     query_text.push_str(&format!("{}: ", alias));
                 }
-                let name = scalar_field.name.item;
+                let name = scalar_field.name;
                 let arguments = get_serialized_arguments_for_query_text(&scalar_field.arguments);
                 query_text.push_str(&format!("{}{},\\\n", name, arguments));
             }
-            MergedServerFieldSelection::LinkedField(linked_field) => {
+            MergedServerSelection::LinkedField(linked_field) => {
                 query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
                 if let Some(alias) = linked_field.normalization_alias {
                     // This is bad, alias is WithLocation
-                    query_text.push_str(&format!("{}: ", alias.item));
+                    query_text.push_str(&format!("{}: ", alias));
                 }
-                let name = linked_field.name.item;
+                let name = linked_field.name;
                 let arguments = get_serialized_arguments_for_query_text(&linked_field.arguments);
                 query_text.push_str(&format!("{}{} {{\\\n", name, arguments));
                 write_selections_for_query_text(
                     query_text,
                     schema,
-                    &linked_field.selection_set,
+                    linked_field.selection_map.values(),
                     indentation_level + 1,
                 );
                 query_text.push_str(&format!(
@@ -102,7 +102,7 @@ fn write_selections_for_query_text(
                     "  ".repeat(indentation_level as usize)
                 ));
             }
-            MergedServerFieldSelection::InlineFragment(inline_fragment) => {
+            MergedServerSelection::InlineFragment(inline_fragment) => {
                 query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
                 query_text.push_str(&format!(
                     "... on {} {{\\\n",
@@ -111,7 +111,7 @@ fn write_selections_for_query_text(
                 write_selections_for_query_text(
                     query_text,
                     schema,
-                    &inline_fragment.selection_set,
+                    inline_fragment.selection_map.values(),
                     indentation_level + 1,
                 );
                 query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
@@ -121,9 +121,7 @@ fn write_selections_for_query_text(
     }
 }
 
-fn get_serialized_arguments_for_query_text(
-    arguments: &[WithLocation<SelectionFieldArgument>],
-) -> String {
+fn get_serialized_arguments_for_query_text(arguments: &[SelectionFieldArgument]) -> String {
     if arguments.is_empty() {
         return "".to_string();
     } else {
@@ -131,14 +129,14 @@ fn get_serialized_arguments_for_query_text(
         let first = arguments.next().unwrap();
         let mut s = format!(
             "({}: {}",
-            first.item.name.item,
-            serialize_non_constant_value_for_graphql(&first.item.value.item)
+            first.name.item,
+            serialize_non_constant_value_for_graphql(&first.value.item)
         );
         for argument in arguments {
             s.push_str(&format!(
                 ", {}: {}",
-                argument.item.name.item,
-                serialize_non_constant_value_for_graphql(&argument.item.value.item)
+                argument.name.item,
+                serialize_non_constant_value_for_graphql(&argument.value.item)
             ));
         }
         s.push_str(")");

@@ -1,12 +1,12 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{hash_map::Entry, BTreeMap, HashMap},
     fmt::{self, Debug, Display},
     path::PathBuf,
 };
 
 use common_lang_types::{
     ArtifactFileType, DescriptionValue, IsographObjectTypeName, JavascriptVariableName,
-    PathAndContent, SelectableFieldName, WithLocation, WithSpan,
+    PathAndContent, SelectableFieldName, WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, ListTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
@@ -67,39 +67,28 @@ pub fn get_artifact_path_and_content<'schema>(
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
 ) -> Vec<PathAndContent> {
-    let mut client_field_to_refetched_paths_map = HashMap::new();
+    let mut client_field_to_traversal_states = BTreeMap::new();
     let mut path_and_contents = vec![];
 
     // For each entrypoint, generate an entrypoint artifact and refetch artifacts
     for entrypoint_id in schema.entrypoints.iter() {
         let entrypoint = schema.client_field(*entrypoint_id);
+        let (entrypoint_path_and_content, root_refetch_paths) = generate_entrypoint_artifact(
+            schema,
+            *entrypoint_id,
+            &mut client_field_to_traversal_states,
+        );
+        path_and_contents.push(entrypoint_path_and_content);
 
-        let (
-            entrypoint_artifact,
-            merged_selection_set,
-            new_client_field_to_refetched_paths_map,
-            paths_to_refetch_fields,
-        ) = generate_entrypoint_artifact(schema, *entrypoint_id);
-        path_and_contents.push(entrypoint_artifact);
-
-        // Schedule the generation of all encountered client fields
-        for (client_field, root_refetched_paths) in new_client_field_to_refetched_paths_map {
-            client_field_to_refetched_paths_map.insert(client_field, root_refetched_paths);
-        }
-
-        let mut sorted_paths = paths_to_refetch_fields.into_iter().collect::<Vec<_>>();
-        sorted_paths.sort_by_cached_key(|(path, _)| path.clone());
-
-        for (index, (path_to_refetch_field, path_to_refetch_field_info)) in
-            sorted_paths.into_iter().enumerate()
+        for (index, (root_refetch_path, nested_selection_map, reachable_variables)) in
+            root_refetch_paths.into_iter().enumerate()
         {
-            // Generate refetch artifacts for this entrypoint, as well
             let artifact_info = get_imperatively_loaded_artifact_info(
-                path_to_refetch_field_info,
-                &merged_selection_set,
-                path_to_refetch_field,
                 schema,
                 entrypoint,
+                root_refetch_path,
+                &nested_selection_map,
+                &reachable_variables,
                 index,
             );
 
@@ -110,9 +99,12 @@ pub fn get_artifact_path_and_content<'schema>(
         }
     }
 
-    // Generate reader ASTs for all encountered client fields
-    for (encountered_client_field_id, _root_refetched_paths) in &client_field_to_refetched_paths_map {
+    for (encountered_client_field_id, (scalar_client_field_traversal_state, _selection_map)) in
+        &client_field_to_traversal_states
+    {
         let encountered_client_field = schema.client_field(*encountered_client_field_id);
+
+        // Generate reader ASTs for all encountered client fields, which may be reader or refetch reader
         path_and_contents.extend(match &encountered_client_field.variant {
             ClientFieldVariant::UserWritten(info) => generate_eager_reader_artifact(
                 schema,
@@ -120,9 +112,15 @@ pub fn get_artifact_path_and_content<'schema>(
                 project_root,
                 artifact_directory,
                 *info,
+                scalar_client_field_traversal_state,
             ),
             ClientFieldVariant::ImperativelyLoadedField(variant) => {
-                generate_refetch_reader_artifact(schema, encountered_client_field, variant)
+                generate_refetch_reader_artifact(
+                    schema,
+                    encountered_client_field,
+                    variant,
+                    scalar_client_field_traversal_state,
+                )
             }
         });
     }
@@ -148,7 +146,8 @@ pub struct NestedClientFieldImportKey {
 pub(crate) type NestedClientFieldImports = HashMap<NestedClientFieldImportKey, JavaScriptImports>;
 
 pub(crate) fn get_serialized_field_arguments(
-    arguments: &[WithLocation<SelectionFieldArgument>],
+    // TODO make this an iterator
+    arguments: &[SelectionFieldArgument],
     indentation_level: u8,
 ) -> String {
     if arguments.is_empty() {
@@ -160,8 +159,8 @@ pub(crate) fn get_serialized_field_arguments(
     let indent_2 = "  ".repeat((indentation_level + 2) as usize);
 
     for argument in arguments {
-        let argument_name = argument.item.name.item;
-        let arg_value = match argument.item.value.item {
+        let argument_name = argument.name.item;
+        let arg_value = match argument.value.item {
             NonConstantValue::Variable(variable_name) => {
                 format!(
                     "\n\

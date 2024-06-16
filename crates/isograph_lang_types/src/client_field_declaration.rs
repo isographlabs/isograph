@@ -143,6 +143,21 @@ impl<TScalarField, TLinkedField> ServerFieldSelection<TScalarField, TLinkedField
             ServerFieldSelection::LinkedField(linked_field) => linked_field.name_or_alias(),
         }
     }
+
+    pub fn variables<'a>(&'a self) -> impl Iterator<Item = VariableName> + 'a {
+        let get_variable = |x: &'a WithLocation<SelectionFieldArgument>| match x.item.value.item {
+            NonConstantValue::Variable(v) => Some(v),
+            _ => None,
+        };
+        match self {
+            ServerFieldSelection::ScalarField(scalar_field) => {
+                scalar_field.arguments.iter().flat_map(get_variable)
+            }
+            ServerFieldSelection::LinkedField(linked_field) => {
+                linked_field.arguments.iter().flat_map(get_variable)
+            }
+        }
+    }
 }
 
 impl<TScalarField, TLinkedField> HasName for ServerFieldSelection<TScalarField, TLinkedField> {
