@@ -80,7 +80,7 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
         >,
     >,
     // TODO consider whether this belongs here. It could just be a free variable.
-    pub entrypoints: Vec<TSchemaValidationState::Entrypoint>,
+    pub entrypoints: TSchemaValidationState::Entrypoint,
     pub server_field_data: ServerFieldData,
 
     // Well known types

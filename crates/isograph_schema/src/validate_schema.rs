@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use common_lang_types::{
     InputTypeName, InputValueName, IsographObjectTypeName, SelectableFieldName,
     UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
@@ -64,7 +66,7 @@ impl SchemaValidationState for ValidatedSchemaState {
     type ClientFieldSelectionScalarFieldAssociatedData = ValidatedScalarFieldAssociatedData;
     type ClientFieldSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
     type ClientFieldVariableDefinitionAssociatedData = SelectableServerFieldId;
-    type Entrypoint = ClientFieldId;
+    type Entrypoint = HashSet<ClientFieldId>;
 }
 
 pub type ValidatedSchema = Schema<ValidatedSchemaState>;
@@ -75,7 +77,7 @@ impl ValidatedSchema {
     ) -> Result<Self, Vec<WithLocation<ValidateSchemaError>>> {
         let mut errors = vec![];
 
-        let mut updated_entrypoints = vec![];
+        let mut updated_entrypoints = HashSet::new();
         for (text_source, entrypoint_type_and_field) in unvalidated_schema.entrypoints.iter() {
             match unvalidated_schema
                 .validate_entrypoint_type_and_field(*text_source, *entrypoint_type_and_field)
@@ -87,7 +89,9 @@ impl ValidatedSchema {
                         e.location,
                     )
                 }) {
-                Ok(client_field_id) => updated_entrypoints.push(client_field_id),
+                Ok(client_field_id) => {
+                    updated_entrypoints.insert(client_field_id);
+                }
                 Err(e) => errors.push(e),
             }
         }

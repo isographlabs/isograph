@@ -28,7 +28,7 @@ impl SchemaValidationState for UnvalidatedSchemaState {
     type ClientFieldSelectionScalarFieldAssociatedData = IsographSelectionVariant;
     type ClientFieldSelectionLinkedFieldAssociatedData = IsographSelectionVariant;
     type ClientFieldVariableDefinitionAssociatedData = UnvalidatedTypeName;
-    type Entrypoint = (TextSource, WithSpan<EntrypointTypeAndField>);
+    type Entrypoint = Vec<(TextSource, WithSpan<EntrypointTypeAndField>)>;
 }
 
 pub type UnvalidatedSchema = Schema<UnvalidatedSchemaState>;
