@@ -1,7 +1,7 @@
 import type {EagerReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { IssueComment__formattedCommentCreationDate__param } from './param_type';
 import { IssueComment__formattedCommentCreationDate__output_type } from './output_type';
-import { formattedCommentCreationDate as resolver } from '../../../CommentList.tsx';
+import { formattedCommentCreationDate as resolver } from '../../../CommentList';
 
 const readerAst: ReaderAst<IssueComment__formattedCommentCreationDate__param> = [
   {

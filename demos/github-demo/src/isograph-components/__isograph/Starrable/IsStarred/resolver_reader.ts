@@ -1,6 +1,6 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Starrable__IsStarred__param } from './param_type';
-import { IsStarred as resolver } from '../../../RepositoryDetail.tsx';
+import { IsStarred as resolver } from '../../../RepositoryDetail';
 
 const readerAst: ReaderAst<Starrable__IsStarred__param> = [
   {

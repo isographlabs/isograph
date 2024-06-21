@@ -1,6 +1,6 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Query__PullRequestDetail__param } from './param_type';
-import { PullRequestDetail as resolver } from '../../../PullRequestDetail.tsx';
+import { PullRequestDetail as resolver } from '../../../PullRequestDetail';
 import PullRequest__CommentList__resolver_reader from '../../PullRequest/CommentList/resolver_reader';
 
 const readerAst: ReaderAst<Query__PullRequestDetail__param> = [

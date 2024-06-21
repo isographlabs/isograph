@@ -1,6 +1,6 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Pet__PetBestFriendCard__param } from './param_type';
-import { PetBestFriendCard as resolver } from '../../../PetBestFriendCard.tsx';
+import { PetBestFriendCard as resolver } from '../../../PetBestFriendCard';
 import Pet__PetUpdater__resolver_reader from '../../Pet/PetUpdater/resolver_reader';
 
 const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [

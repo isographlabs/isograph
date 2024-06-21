@@ -1,7 +1,7 @@
 import type {EagerReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { PullRequest__createdAtFormatted__param } from './param_type';
 import { PullRequest__createdAtFormatted__output_type } from './output_type';
-import { createdAtFormatted as resolver } from '../../../PullRequestTable.tsx';
+import { createdAtFormatted as resolver } from '../../../PullRequestTable';
 
 const readerAst: ReaderAst<PullRequest__createdAtFormatted__param> = [
   {

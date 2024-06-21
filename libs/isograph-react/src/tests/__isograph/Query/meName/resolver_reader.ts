@@ -1,7 +1,7 @@
 import type {EagerReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Query__meName__param } from './param_type';
 import { Query__meName__output_type } from './output_type';
-import { meNameField as resolver } from '../../../garbageCollection.test.ts';
+import { meNameField as resolver } from '../../../garbageCollection.test';
 
 const readerAst: ReaderAst<Query__meName__param> = [
   {

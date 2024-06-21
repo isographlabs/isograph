@@ -1,6 +1,6 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Actor__UserLink__param } from './param_type';
-import { UserLink as resolver } from '../../../UserLink.tsx';
+import { UserLink as resolver } from '../../../UserLink';
 
 const readerAst: ReaderAst<Actor__UserLink__param> = [
   {

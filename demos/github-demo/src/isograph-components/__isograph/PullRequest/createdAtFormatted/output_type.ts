@@ -1,2 +1,2 @@
-import { createdAtFormatted as resolver } from '../../../PullRequestTable.tsx';
+import { createdAtFormatted as resolver } from '../../../PullRequestTable';
 export type PullRequest__createdAtFormatted__output_type = ReturnType<typeof resolver>;

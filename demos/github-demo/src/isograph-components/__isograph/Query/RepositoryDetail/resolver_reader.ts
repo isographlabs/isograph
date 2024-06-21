@@ -1,6 +1,6 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Query__RepositoryDetail__param } from './param_type';
-import { RepositoryDetail as resolver } from '../../../RepositoryDetail.tsx';
+import { RepositoryDetail as resolver } from '../../../RepositoryDetail';
 import PullRequestConnection__PullRequestTable__resolver_reader from '../../PullRequestConnection/PullRequestTable/resolver_reader';
 import Repository__RepositoryLink__resolver_reader from '../../Repository/RepositoryLink/resolver_reader';
 import Starrable__IsStarred__resolver_reader from '../../Starrable/IsStarred/resolver_reader';
