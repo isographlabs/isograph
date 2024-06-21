@@ -4,9 +4,10 @@ use common_lang_types::{PathAndContent, QueryOperationName, VariableName};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::ClientFieldId;
 use isograph_schema::{
-    create_merged_selection_set_and_insert_into_global_map, current_target_merged_selections,
-    get_reachable_variables, ClientFieldToCompletedMergeTraversalStateMap, MergedSelectionMap,
-    RootRefetchedPath, SchemaObject, ValidatedSchema,
+    create_merged_selection_map_and_insert_into_global_map, current_target_merged_selections,
+    get_imperatively_loaded_artifact_info, get_reachable_variables,
+    ClientFieldToCompletedMergeTraversalStateMap, MergedSelectionMap, RootRefetchedPath,
+    SchemaObject, ValidatedSchema,
 };
 
 use crate::{
@@ -14,6 +15,7 @@ use crate::{
         generate_path, NormalizationAstText, QueryText, RefetchQueryArtifactImport, ENTRYPOINT,
         RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
     },
+    imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
     normalization_ast_text::generate_normalization_ast_text,
     query_text::generate_query_text,
 };
@@ -27,102 +29,105 @@ struct EntrypointArtifactInfo<'schema> {
     refetch_query_artifact_import: RefetchQueryArtifactImport,
 }
 
-pub(crate) fn generate_entrypoint_artifact<'a>(
+pub(crate) fn generate_entrypoint_artifacts<'a>(
     schema: &ValidatedSchema,
     entrypoint_id: ClientFieldId,
     global_client_field_map: &'a mut ClientFieldToCompletedMergeTraversalStateMap,
-) -> (
-    PathAndContent,
-    Vec<(
-        RootRefetchedPath,
-        MergedSelectionMap,
-        BTreeSet<VariableName>,
-    )>,
-) {
+) -> Vec<PathAndContent> {
     let entrypoint = schema.client_field(entrypoint_id);
+    let (selection_set, _) = entrypoint
+        .selection_set_and_unwraps
+        .as_ref()
+        .expect("Unsupported: client fields on query with no selection set");
 
-    if let Some((ref selection_set, _)) = entrypoint.selection_set_and_unwraps {
-        let query_name = entrypoint.name.into();
+    let query_name = entrypoint.name.into();
 
-        let (traversal_state, selection_map) =
-            create_merged_selection_set_and_insert_into_global_map(
-                schema,
-                schema.server_field_data.object(entrypoint.parent_object_id),
-                selection_set,
-                global_client_field_map,
-                entrypoint,
-            );
+    let (traversal_state, selection_map) = create_merged_selection_map_and_insert_into_global_map(
+        schema,
+        schema.server_field_data.object(entrypoint.parent_object_id),
+        selection_set,
+        global_client_field_map,
+        entrypoint,
+    );
 
-        // TODO when we do not call generate_entrypoint_artifact extraneously,
-        // we can panic instead of using a default entrypoint type
-        // TODO model this better so that the RootOperationName is somehow a
-        // parameter
-        let root_operation_name = schema
-            .fetchable_types
-            .get(&entrypoint.parent_object_id)
-            .unwrap_or_else(|| {
-                schema
-                    .fetchable_types
-                    .iter()
-                    .next()
-                    .expect("Expected at least one fetchable type to exist")
-                    .1
-            });
+    // TODO when we do not call generate_entrypoint_artifact extraneously,
+    // we can panic instead of using a default entrypoint type
+    // TODO model this better so that the RootOperationName is somehow a
+    // parameter
+    let root_operation_name = schema
+        .fetchable_types
+        .get(&entrypoint.parent_object_id)
+        .unwrap_or_else(|| {
+            schema
+                .fetchable_types
+                .iter()
+                .next()
+                .expect("Expected at least one fetchable type to exist")
+                .1
+        });
 
-        let parent_object = schema.server_field_data.object(entrypoint.parent_object_id);
-        let query_text = generate_query_text(
-            query_name,
-            schema,
-            &selection_map,
-            &entrypoint.variable_definitions,
-            root_operation_name,
-        );
-        let refetch_paths_with_variables = traversal_state
-            .refetch_paths
-            .iter()
-            .map(|(path, root_refetch_path)| {
-                // TODO don't clone
-                let current_target_merged_selections =
-                    current_target_merged_selections(path.linked_fields.iter(), &selection_map)
-                        .clone();
-                let reachable_variables =
-                    get_reachable_variables(&current_target_merged_selections);
-                (
-                    root_refetch_path.clone(),
-                    current_target_merged_selections,
-                    reachable_variables,
-                )
-            })
-            .collect::<Vec<_>>();
+    let parent_object = schema.server_field_data.object(entrypoint.parent_object_id);
+    let query_text = generate_query_text(
+        query_name,
+        schema,
+        &selection_map,
+        &entrypoint.variable_definitions,
+        root_operation_name,
+    );
+    let refetch_paths_with_variables = traversal_state
+        .refetch_paths
+        .iter()
+        .map(|(path, root_refetch_path)| {
+            let current_target_merged_selections =
+                current_target_merged_selections(path.linked_fields.iter(), &selection_map);
+            let reachable_variables = get_reachable_variables(&current_target_merged_selections);
+            (
+                root_refetch_path.clone(),
+                current_target_merged_selections,
+                reachable_variables,
+            )
+        })
+        .collect::<Vec<_>>();
 
-        let refetch_query_artifact_import =
-            generate_refetch_query_artifact_import(&refetch_paths_with_variables);
+    let refetch_query_artifact_import =
+        generate_refetch_query_artifact_import(&refetch_paths_with_variables);
 
-        let normalization_ast_text =
-            generate_normalization_ast_text(schema, selection_map.values(), 0);
+    let normalization_ast_text = generate_normalization_ast_text(schema, selection_map.values(), 0);
 
-        let entrypoint_artifact_info = EntrypointArtifactInfo {
-            query_text,
-            query_name,
-            parent_type: parent_object.into(),
-            normalization_ast_text,
-            refetch_query_artifact_import,
-        };
-
-        (
-            entrypoint_artifact_info.path_and_content(),
-            refetch_paths_with_variables,
-        )
-    } else {
-        // TODO convert to error
-        todo!("Unsupported: client fields on query with no selection set")
+    let mut paths_and_contents = vec![EntrypointArtifactInfo {
+        query_text,
+        query_name,
+        parent_type: parent_object.into(),
+        normalization_ast_text,
+        refetch_query_artifact_import,
     }
+    .path_and_content()];
+
+    for (index, (root_refetch_path, nested_selection_map, reachable_variables)) in
+        refetch_paths_with_variables.into_iter().enumerate()
+    {
+        let artifact_info = get_imperatively_loaded_artifact_info(
+            schema,
+            entrypoint,
+            root_refetch_path,
+            &nested_selection_map,
+            &reachable_variables,
+            index,
+        );
+
+        paths_and_contents.push(get_artifact_for_imperatively_loaded_field(
+            schema,
+            artifact_info,
+        ))
+    }
+
+    paths_and_contents
 }
 
 fn generate_refetch_query_artifact_import(
     root_refetched_paths: &[(
         RootRefetchedPath,
-        MergedSelectionMap,
+        &MergedSelectionMap,
         BTreeSet<VariableName>,
     )],
 ) -> RefetchQueryArtifactImport {

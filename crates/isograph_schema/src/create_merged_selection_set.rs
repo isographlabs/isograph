@@ -269,7 +269,7 @@ fn merge_selections_into_selection_map(
     }
 }
 
-pub fn create_merged_selection_set_and_insert_into_global_map(
+pub fn create_merged_selection_map_and_insert_into_global_map(
     schema: &ValidatedSchema,
     parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
@@ -687,7 +687,7 @@ fn merge_scalar_client_field(
         newly_encountered_scalar_client_field.selection_set_and_unwraps
     {
         let (child_traversal_state, child_map) =
-            create_merged_selection_set_and_insert_into_global_map(
+            create_merged_selection_map_and_insert_into_global_map(
                 schema,
                 parent_type,
                 selection_set,

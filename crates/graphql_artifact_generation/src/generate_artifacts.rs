@@ -15,17 +15,14 @@ use isograph_lang_types::{
     ServerFieldSelection,
 };
 use isograph_schema::{
-    get_imperatively_loaded_artifact_info, ClientFieldVariant, FieldDefinitionLocation,
-    ObjectTypeAndFieldName, SchemaObject, UserWrittenComponentVariant, ValidatedClientField,
-    ValidatedSchema, ValidatedSelection,
+    ClientFieldVariant, FieldDefinitionLocation, ObjectTypeAndFieldName, SchemaObject,
+    UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema, ValidatedSelection,
 };
 use lazy_static::lazy_static;
 
 use crate::{
     eager_reader_artifact::generate_eager_reader_artifact,
-    entrypoint_artifact::generate_entrypoint_artifact,
-    imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
-    iso_overload_file::build_iso_overload,
+    entrypoint_artifact::generate_entrypoint_artifacts, iso_overload_file::build_iso_overload,
     refetch_reader_artifact::generate_refetch_reader_artifact,
 };
 
@@ -72,31 +69,12 @@ pub fn get_artifact_path_and_content<'schema>(
 
     // For each entrypoint, generate an entrypoint artifact and refetch artifacts
     for entrypoint_id in schema.entrypoints.iter() {
-        let entrypoint = schema.client_field(*entrypoint_id);
-        let (entrypoint_path_and_content, root_refetch_paths) = generate_entrypoint_artifact(
+        let entrypoint_path_and_content = generate_entrypoint_artifacts(
             schema,
             *entrypoint_id,
             &mut client_field_to_traversal_states,
         );
-        path_and_contents.push(entrypoint_path_and_content);
-
-        for (index, (root_refetch_path, nested_selection_map, reachable_variables)) in
-            root_refetch_paths.into_iter().enumerate()
-        {
-            let artifact_info = get_imperatively_loaded_artifact_info(
-                schema,
-                entrypoint,
-                root_refetch_path,
-                &nested_selection_map,
-                &reachable_variables,
-                index,
-            );
-
-            path_and_contents.push(get_artifact_for_imperatively_loaded_field(
-                schema,
-                artifact_info,
-            ))
-        }
+        path_and_contents.extend(entrypoint_path_and_content);
     }
 
     for (encountered_client_field_id, (scalar_client_field_traversal_state, _selection_map)) in
