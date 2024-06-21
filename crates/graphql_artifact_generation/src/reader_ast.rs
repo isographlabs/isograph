@@ -285,20 +285,22 @@ pub(crate) fn generate_reader_ast<'schema>(
     schema: &'schema ValidatedSchema,
     selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
     indentation_level: u8,
-    nested_client_field_imports: &mut NestedClientFieldImports,
     // N.B. this is not root_refetched_paths when we're generating an entrypoint :(
+    // ????
     root_refetched_paths: &BTreeMap<PathToRefetchField, RootRefetchedPath>,
-) -> ReaderAst {
-    generate_reader_ast_with_path(
+) -> (ReaderAst, NestedClientFieldImports) {
+    let mut client_field_imports = BTreeMap::new();
+    let reader_ast = generate_reader_ast_with_path(
         schema,
         selection_set,
         indentation_level,
-        nested_client_field_imports,
+        &mut client_field_imports,
         root_refetched_paths,
         // TODO we are not starting at the root when generating ASTs for reader artifacts
         // (and in theory some entrypoints).
         &mut vec![],
-    )
+    );
+    (reader_ast, client_field_imports)
 }
 
 fn refetched_paths_for_client_field(
