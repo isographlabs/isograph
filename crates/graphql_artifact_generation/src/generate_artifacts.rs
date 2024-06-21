@@ -421,13 +421,10 @@ fn write_query_types_from_selection(
                     .push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
                 let name_or_alias = linked_field.name_or_alias().item;
                 let type_annotation = field.associated_data.clone().map(|output_type_id| {
-                    // TODO Or interface or union type
-                    let object_id = if let SelectableServerFieldId::Object(object) = output_type_id
-                    {
-                        object
-                    } else {
-                        panic!("output_type_id should be a object");
-                    };
+                    let object_id = output_type_id.try_into().expect(
+                        "output_type_id should be an object. \
+                        This is indicative of a bug in Isograph.",
+                    );
                     let object = schema.server_field_data.object(object_id);
                     let inner = generate_client_field_parameter_type(
                         schema,

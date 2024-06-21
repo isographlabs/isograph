@@ -30,4 +30,15 @@ impl TryFrom<SelectableServerFieldId> for ServerScalarId {
     }
 }
 
+impl TryFrom<SelectableServerFieldId> for ServerObjectId {
+    type Error = ();
+
+    fn try_from(value: SelectableServerFieldId) -> Result<Self, Self::Error> {
+        match value {
+            SelectableServerFieldId::Object(object_id) => Ok(object_id),
+            SelectableServerFieldId::Scalar(_) => Err(()),
+        }
+    }
+}
+
 u32_newtype!(RefetchQueryIndex);
