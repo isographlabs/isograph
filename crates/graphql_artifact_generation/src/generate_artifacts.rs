@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, BTreeMap, HashMap},
+    collections::{btree_map::Entry, BTreeMap},
     fmt::{self, Debug, Display},
     path::PathBuf,
 };
@@ -118,7 +118,7 @@ pub struct NestedClientFieldImportKey {
     pub artifact_file_type: ArtifactFileType,
 }
 
-pub(crate) type NestedClientFieldImports = HashMap<NestedClientFieldImportKey, JavaScriptImports>;
+pub(crate) type NestedClientFieldImports = BTreeMap<NestedClientFieldImportKey, JavaScriptImports>;
 
 pub(crate) fn get_serialized_field_arguments(
     // TODO make this an iterator
@@ -207,10 +207,6 @@ pub(crate) fn nested_client_field_names_to_import_statement(
 ) -> (String, String) {
     let mut reader_import_statement = String::new();
     let mut param_type_import_statement = String::new();
-
-    // TODO we should always sort outputs. We should find a nice generic way to ensure that.
-    let mut nested_client_field_imports: Vec<_> = nested_client_field_imports.into_iter().collect();
-    nested_client_field_imports.sort_by(|(a, _), (b, _)| a.cmp(b));
 
     for (
         NestedClientFieldImportKey {

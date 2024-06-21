@@ -1,5 +1,5 @@
 use intern::Lookup;
-use std::{collections::HashMap, path::PathBuf, str::FromStr};
+use std::{collections::BTreeMap, path::PathBuf, str::FromStr};
 
 use common_lang_types::{ArtifactPathAndContent, SelectableFieldName};
 use isograph_schema::{
@@ -31,7 +31,7 @@ pub fn generate_eager_reader_artifact<'schema>(
         let parent_type = schema
             .server_field_data
             .object(client_field.parent_object_id);
-        let mut nested_client_field_artifact_imports = HashMap::new();
+        let mut nested_client_field_artifact_imports = BTreeMap::new();
 
         let reader_ast = generate_reader_ast(
             schema,

@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Entry, BTreeMap, HashSet};
+use std::collections::{btree_map::Entry, BTreeMap, HashSet};
 
 use common_lang_types::{ArtifactFileType, JavascriptVariableName, SelectableFieldName, WithSpan};
 use intern::string_key::Intern;

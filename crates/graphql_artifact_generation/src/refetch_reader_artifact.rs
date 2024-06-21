@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::BTreeMap, path::PathBuf};
 
 use common_lang_types::{ArtifactPathAndContent, SelectableFieldName};
 use intern::string_key::Intern;
@@ -132,7 +132,7 @@ pub(crate) fn generate_refetch_reader_artifact(
         let parent_type = schema
             .server_field_data
             .object(client_field.parent_object_id);
-        let mut nested_client_field_artifact_imports = HashMap::new();
+        let mut nested_client_field_artifact_imports = BTreeMap::new();
 
         let reader_ast = generate_reader_ast(
             schema,
