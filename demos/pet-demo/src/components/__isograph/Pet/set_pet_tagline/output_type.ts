@@ -16,4 +16,4 @@ const resolver = (
   makeNetworkRequest(environment, artifact, variables);
 };
 
-export type Pet__set_pet_tagline__outputType = (params: any) => void;
+export type Pet__set_pet_tagline__output_type = (params: any) => void;

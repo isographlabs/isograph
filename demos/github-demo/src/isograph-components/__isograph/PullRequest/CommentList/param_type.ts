@@ -1,4 +1,4 @@
-import {IssueComment__formattedCommentCreationDate__outputType} from '../../IssueComment/formattedCommentCreationDate/output_type';
+import { type IssueComment__formattedCommentCreationDate__output_type } from '../../IssueComment/formattedCommentCreationDate/output_type';
 
 export type PullRequest__CommentList__param = {
   /**
@@ -21,7 +21,7 @@ id: string,
 The body rendered to text.
         */
 bodyText: string,
-        formattedCommentCreationDate: IssueComment__formattedCommentCreationDate__outputType,
+        formattedCommentCreationDate: IssueComment__formattedCommentCreationDate__output_type,
         /**
 The actor who authored the comment.
         */

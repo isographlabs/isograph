@@ -1,7 +1,7 @@
-import {Query__Header__outputType} from '../Header/output_type';
-import {Query__HomePageList__outputType} from '../HomePageList/output_type';
+import { type Query__Header__output_type } from '../../Query/Header/output_type';
+import { type Query__HomePageList__output_type } from '../../Query/HomePageList/output_type';
 
 export type Query__HomePage__param = {
-  Header: Query__Header__outputType,
-  HomePageList: Query__HomePageList__outputType,
+  Header: Query__Header__output_type,
+  HomePageList: Query__HomePageList__output_type,
 };

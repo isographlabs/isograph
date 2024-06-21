@@ -1,6 +1,6 @@
 import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Query__PetFavoritePhrase__param} from './param_type';
-import {Query__PetFavoritePhrase__outputType} from './output_type';
+import {Query__PetFavoritePhrase__output_type} from './output_type';
 import readerResolver from './resolver_reader';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
@@ -43,7 +43,7 @@ const normalizationAst: NormalizationAst = [
 ];
 const artifact: IsographEntrypoint<
   Query__PetFavoritePhrase__param,
-  Query__PetFavoritePhrase__outputType
+  Query__PetFavoritePhrase__output_type
 > = {
   kind: "Entrypoint",
   queryText,

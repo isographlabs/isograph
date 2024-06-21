@@ -1,6 +1,6 @@
 import type {EagerReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Mutation__SetTagline__param } from './param_type';
-import { Mutation__SetTagline__outputType } from './output_type';
+import { Mutation__SetTagline__output_type } from './output_type';
 import { setTagline as resolver } from '../../../PetTaglineCard.tsx';
 
 const readerAst: ReaderAst<Mutation__SetTagline__param> = [
@@ -35,7 +35,7 @@ const readerAst: ReaderAst<Mutation__SetTagline__param> = [
 
 const artifact: EagerReaderArtifact<
   Mutation__SetTagline__param,
-  Mutation__SetTagline__outputType
+  Mutation__SetTagline__output_type
 > = {
   kind: "EagerReaderArtifact",
   resolver,

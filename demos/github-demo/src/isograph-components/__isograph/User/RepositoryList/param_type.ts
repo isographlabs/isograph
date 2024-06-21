@@ -1,4 +1,4 @@
-import {Repository__RepositoryLink__outputType} from '../../Repository/RepositoryLink/output_type';
+import { type Repository__RepositoryLink__output_type } from '../../Repository/RepositoryLink/output_type';
 
 export type User__RepositoryList__param = {
   /**
@@ -17,7 +17,7 @@ The item at the end of the edge.
 The Node ID of the Repository object
         */
 id: string,
-        RepositoryLink: Repository__RepositoryLink__outputType,
+        RepositoryLink: Repository__RepositoryLink__output_type,
                 /**
 The name of the repository.
         */

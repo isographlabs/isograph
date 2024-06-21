@@ -1,4 +1,4 @@
-import {User__RepositoryList__outputType} from '../../User/RepositoryList/output_type';
+import { type User__RepositoryList__output_type } from '../../User/RepositoryList/output_type';
 
 export type Query__UserDetail__param = {
   /**
@@ -9,6 +9,6 @@ Lookup a user by login.
 The user's public profile name.
     */
 name: (string | null),
-    RepositoryList: User__RepositoryList__outputType,
+    RepositoryList: User__RepositoryList__output_type,
   } | null),
 };

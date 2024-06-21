@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{collections::BTreeSet, path::PathBuf};
 
 use common_lang_types::{ArtifactPathAndContent, SelectableFieldName};
 use intern::string_key::Intern;
@@ -10,10 +10,10 @@ use isograph_schema::{
 use crate::{
     generate_artifacts::{
         generate_client_field_parameter_type, generate_output_type, generate_path,
-        get_output_type_text, nested_client_field_names_to_import_statement,
-        ClientFieldFunctionImportStatement, ClientFieldOutputType, ClientFieldParameterType,
-        NestedClientFieldImports, ReaderAst, REFETCH_READER, RESOLVER_OUTPUT_TYPE,
-        RESOLVER_PARAM_TYPE,
+        get_output_type_text, param_type_imports_to_import_statement,
+        reader_imports_to_import_statement, ClientFieldFunctionImportStatement,
+        ClientFieldOutputType, ClientFieldParameterType, ParamTypeImports, ReaderAst,
+        ReaderImports, REFETCH_READER, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE,
     },
     reader_ast::generate_reader_ast,
 };
@@ -22,7 +22,8 @@ use crate::{
 struct RefetchReaderArtifactInfo<'schema> {
     parent_type: &'schema SchemaObject,
     client_field_name: SelectableFieldName,
-    nested_client_field_artifact_imports: NestedClientFieldImports,
+    reader_imports: ReaderImports,
+    param_type_imports: ParamTypeImports,
     client_field_output_type: ClientFieldOutputType,
     reader_ast: ReaderAst,
     client_field_parameter_type: ClientFieldParameterType,
@@ -48,17 +49,16 @@ impl<'schema> RefetchReaderArtifactInfo<'schema> {
             client_field_parameter_type,
             client_field_output_type,
             reader_ast,
-            nested_client_field_artifact_imports,
+            reader_imports,
             parent_type,
             client_field_name,
+            param_type_imports,
             ..
         } = self;
 
-        let (client_field_import_statement, client_field_type_import_statement) =
-            nested_client_field_names_to_import_statement(
-                nested_client_field_artifact_imports,
-                parent_type.name,
-            );
+        let reader_import_statement = reader_imports_to_import_statement(&reader_imports);
+        let param_type_import_statement =
+            param_type_imports_to_import_statement(&param_type_imports);
 
         let output_type_text = get_output_type_text(
             &function_import_statement,
@@ -79,7 +79,7 @@ impl<'schema> RefetchReaderArtifactInfo<'schema> {
             "import type {{RefetchReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact}} from '@isograph/react';\n\
             import {{ {reader_param_type} }} from './{param_type_file_name}';\n\
             {function_import_statement}\n\
-            {client_field_import_statement}\n\
+            {reader_import_statement}\n\
             const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
             const artifact: RefetchReaderArtifact = {{\n\
             {}kind: \"RefetchReaderArtifact\",\n\
@@ -92,7 +92,7 @@ impl<'schema> RefetchReaderArtifactInfo<'schema> {
         );
 
         let param_type_content = format!(
-            "{client_field_type_import_statement}\n\
+            "{param_type_import_statement}\n\
             export type {reader_param_type} = {client_field_parameter_type};\n",
         );
 
@@ -133,18 +133,19 @@ pub(crate) fn generate_refetch_reader_artifact(
             .server_field_data
             .object(client_field.parent_object_id);
 
-        let (reader_ast, mut nested_client_field_artifact_imports) = generate_reader_ast(
+        let (reader_ast, reader_imports) = generate_reader_ast(
             schema,
             selection_set,
             0,
             &scalar_client_field_traversal_state.refetch_paths,
         );
 
+        let mut param_type_imports = BTreeSet::new();
         let client_field_parameter_type = generate_client_field_parameter_type(
             schema,
             &selection_set,
             parent_type.into(),
-            &mut nested_client_field_artifact_imports,
+            &mut param_type_imports,
             0,
         );
         let client_field_output_type = generate_output_type(client_field);
@@ -152,10 +153,11 @@ pub(crate) fn generate_refetch_reader_artifact(
             parent_type: parent_type.into(),
             client_field_name: client_field.name,
             reader_ast,
-            nested_client_field_artifact_imports,
+            reader_imports,
             function_import_statement,
             client_field_output_type,
             client_field_parameter_type,
+            param_type_imports,
         }
         .path_and_content()
     } else {

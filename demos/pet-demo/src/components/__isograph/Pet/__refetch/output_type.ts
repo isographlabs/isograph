@@ -15,4 +15,4 @@ const resolver = (
   return makeNetworkRequest(environment, artifact, variables);
 };
 
-export type Pet____refetch__outputType = () => void;
+export type Pet____refetch__output_type = () => void;

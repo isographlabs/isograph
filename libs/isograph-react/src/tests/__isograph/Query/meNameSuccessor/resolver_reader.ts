@@ -1,6 +1,6 @@
 import type {EagerReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Query__meNameSuccessor__param } from './param_type';
-import { Query__meNameSuccessor__outputType } from './output_type';
+import { Query__meNameSuccessor__output_type } from './output_type';
 import { meNameField as resolver } from '../../../meNameSuccessor.ts';
 
 const readerAst: ReaderAst<Query__meNameSuccessor__param> = [
@@ -44,7 +44,7 @@ const readerAst: ReaderAst<Query__meNameSuccessor__param> = [
 
 const artifact: EagerReaderArtifact<
   Query__meNameSuccessor__param,
-  Query__meNameSuccessor__outputType
+  Query__meNameSuccessor__output_type
 > = {
   kind: "EagerReaderArtifact",
   resolver,

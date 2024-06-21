@@ -1,8 +1,8 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Query__UserPage__param } from './param_type';
 import { UserPage as resolver } from '../../../UserRoute.tsx';
-import Query__Header__resolver_reader from '../Header/resolver_reader';
-import Query__UserDetail__resolver_reader from '../UserDetail/resolver_reader';
+import Query__Header__resolver_reader from '../../Query/Header/resolver_reader';
+import Query__UserDetail__resolver_reader from '../../Query/UserDetail/resolver_reader';
 
 const readerAst: ReaderAst<Query__UserPage__param> = [
   {

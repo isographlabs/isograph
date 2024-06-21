@@ -1,6 +1,6 @@
 import type {EagerReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { Query__nodeField__param } from './param_type';
-import { Query__nodeField__outputType } from './output_type';
+import { Query__nodeField__output_type } from './output_type';
 import { nodeField as resolver } from '../../../nodeQuery.ts';
 
 const readerAst: ReaderAst<Query__nodeField__param> = [
@@ -27,7 +27,7 @@ const readerAst: ReaderAst<Query__nodeField__param> = [
 
 const artifact: EagerReaderArtifact<
   Query__nodeField__param,
-  Query__nodeField__outputType
+  Query__nodeField__output_type
 > = {
   kind: "EagerReaderArtifact",
   resolver,

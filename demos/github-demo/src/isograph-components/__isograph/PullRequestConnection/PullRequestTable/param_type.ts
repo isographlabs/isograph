@@ -1,6 +1,6 @@
-import {Actor__UserLink__outputType} from '../../Actor/UserLink/output_type';
-import {PullRequest__PullRequestLink__outputType} from '../../PullRequest/PullRequestLink/output_type';
-import {PullRequest__createdAtFormatted__outputType} from '../../PullRequest/createdAtFormatted/output_type';
+import { type Actor__UserLink__output_type } from '../../Actor/UserLink/output_type';
+import { type PullRequest__PullRequestLink__output_type } from '../../PullRequest/PullRequestLink/output_type';
+import { type PullRequest__createdAtFormatted__output_type } from '../../PullRequest/createdAtFormatted/output_type';
 
 export type PullRequestConnection__PullRequestTable__param = {
   /**
@@ -15,7 +15,7 @@ The item at the end of the edge.
 The Node ID of the PullRequest object
       */
 id: string,
-      PullRequestLink: PullRequest__PullRequestLink__outputType,
+      PullRequestLink: PullRequest__PullRequestLink__output_type,
             /**
 Identifies the pull request number.
       */
@@ -28,7 +28,7 @@ title: string,
 The actor who authored the comment.
       */
       author: ({
-        UserLink: Actor__UserLink__outputType,
+        UserLink: Actor__UserLink__output_type,
                 /**
 The username of the actor.
         */
@@ -42,7 +42,7 @@ closed: boolean,
 Returns a count of how many comments this pull request has received.
       */
 totalCommentsCount: (number | null),
-      createdAtFormatted: PullRequest__createdAtFormatted__outputType,
+      createdAtFormatted: PullRequest__createdAtFormatted__output_type,
     } | null),
   } | null))[],
 };

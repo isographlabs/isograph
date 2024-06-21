@@ -1,5 +1,5 @@
-import {User__RepositoryList__outputType} from '../../User/RepositoryList/output_type';
-import {User____refetch__outputType} from '../../User/__refetch/output_type';
+import { type User__RepositoryList__output_type } from '../../User/RepositoryList/output_type';
+import { type User____refetch__output_type } from '../../User/__refetch/output_type';
 
 export type Query__HomePageList__param = {
   /**
@@ -14,10 +14,10 @@ login: string,
 The user's public profile name.
     */
 name: (string | null),
-    RepositoryList: User__RepositoryList__outputType,
+    RepositoryList: User__RepositoryList__output_type,
     /**
 A refetch field for the User type.
     */
-    __refetch: User____refetch__outputType,
+    __refetch: User____refetch__output_type,
   },
 };

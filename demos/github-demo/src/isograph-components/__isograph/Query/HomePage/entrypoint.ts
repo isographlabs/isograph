@@ -1,6 +1,6 @@
 import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Query__HomePage__param} from './param_type';
-import {Query__HomePage__outputType} from './output_type';
+import {Query__HomePage__output_type} from './output_type';
 import readerResolver from './resolver_reader';
 import refetchQuery0 from './__refetch__0';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [
@@ -176,7 +176,7 @@ const normalizationAst: NormalizationAst = [
 ];
 const artifact: IsographEntrypoint<
   Query__HomePage__param,
-  Query__HomePage__outputType
+  Query__HomePage__output_type
 > = {
   kind: "Entrypoint",
   queryText,

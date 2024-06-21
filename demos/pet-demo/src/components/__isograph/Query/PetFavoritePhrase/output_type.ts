@@ -1,3 +1,3 @@
 import type {ExtractSecondParam, RefetchQueryNormalizationArtifact} from '@isograph/react';
 import { PetFavoritePhrase as resolver } from '../../../FavoritePhrase.tsx';
-export type Query__PetFavoritePhrase__outputType = (React.FC<ExtractSecondParam<typeof resolver>>);
+export type Query__PetFavoritePhrase__output_type = (React.FC<ExtractSecondParam<typeof resolver>>);

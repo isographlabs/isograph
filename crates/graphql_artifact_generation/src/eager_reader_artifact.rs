@@ -1,5 +1,5 @@
 use intern::Lookup;
-use std::{path::PathBuf, str::FromStr};
+use std::{collections::BTreeSet, path::PathBuf, str::FromStr};
 
 use common_lang_types::{ArtifactPathAndContent, SelectableFieldName};
 use isograph_schema::{
@@ -10,10 +10,10 @@ use isograph_schema::{
 use crate::{
     generate_artifacts::{
         generate_client_field_parameter_type, generate_output_type, generate_path,
-        get_output_type_text, nested_client_field_names_to_import_statement,
-        ClientFieldFunctionImportStatement, ClientFieldOutputType, ClientFieldParameterType,
-        NestedClientFieldImports, ReaderAst, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE,
-        RESOLVER_READER,
+        get_output_type_text, param_type_imports_to_import_statement,
+        reader_imports_to_import_statement, ClientFieldFunctionImportStatement,
+        ClientFieldOutputType, ClientFieldParameterType, ParamTypeImports, ReaderAst,
+        ReaderImports, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
     },
     reader_ast::generate_reader_ast,
 };
@@ -32,18 +32,19 @@ pub fn generate_eager_reader_artifact<'schema>(
             .server_field_data
             .object(client_field.parent_object_id);
 
-        let (reader_ast, mut nested_client_field_artifact_imports) = generate_reader_ast(
+        let (reader_ast, nested_client_field_artifact_imports) = generate_reader_ast(
             schema,
             selection_set,
             0,
             &scalar_client_field_traversal_state.refetch_paths,
         );
 
+        let mut param_type_imports = BTreeSet::new();
         let client_field_parameter_type = generate_client_field_parameter_type(
             schema,
             &selection_set,
             parent_type.into(),
-            &mut nested_client_field_artifact_imports,
+            &mut param_type_imports,
             0,
         );
         let client_field_output_type = generate_output_type(client_field);
@@ -53,11 +54,12 @@ pub fn generate_eager_reader_artifact<'schema>(
             parent_type: parent_type.into(),
             client_field_name: client_field.name,
             reader_ast,
-            nested_client_field_artifact_imports,
+            reader_imports: nested_client_field_artifact_imports,
             function_import_statement,
             client_field_output_type,
             client_field_parameter_type,
             user_written_component_variant,
+            param_type_imports,
         }
         .path_and_content()
     } else {
@@ -69,7 +71,8 @@ pub fn generate_eager_reader_artifact<'schema>(
 struct EagerReaderArtifactInfo<'schema> {
     parent_type: &'schema SchemaObject,
     client_field_name: SelectableFieldName,
-    nested_client_field_artifact_imports: NestedClientFieldImports,
+    reader_imports: ReaderImports,
+    param_type_imports: ParamTypeImports,
     client_field_output_type: ClientFieldOutputType,
     reader_ast: ReaderAst,
     client_field_parameter_type: ClientFieldParameterType,
@@ -97,18 +100,17 @@ impl<'schema> EagerReaderArtifactInfo<'schema> {
             client_field_parameter_type,
             client_field_output_type,
             reader_ast,
-            nested_client_field_artifact_imports,
+            reader_imports,
             parent_type,
             client_field_name,
             user_written_component_variant,
+            param_type_imports,
             ..
         } = self;
 
-        let (reader_import_statement, param_type_import_statement) =
-            nested_client_field_names_to_import_statement(
-                nested_client_field_artifact_imports,
-                parent_type.name,
-            );
+        let reader_import_statement = reader_imports_to_import_statement(&reader_imports);
+        let param_type_import_statement =
+            param_type_imports_to_import_statement(&param_type_imports);
 
         let parent_name = parent_type.name;
         let reader_param_type = format!("{parent_name}__{client_field_name}__param");
@@ -121,7 +123,7 @@ impl<'schema> EagerReaderArtifactInfo<'schema> {
 
         let (reader_content, final_output_type_text) =
             if let UserWrittenComponentVariant::Eager = user_written_component_variant {
-                let reader_output_type = format!("{parent_name}__{client_field_name}__outputType");
+                let reader_output_type = format!("{parent_name}__{client_field_name}__output_type");
                 let param_type_file_name = *RESOLVER_PARAM_TYPE;
                 let output_type_file_name = *RESOLVER_OUTPUT_TYPE;
                 (

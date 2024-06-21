@@ -1,7 +1,7 @@
-import {Query__Header__outputType} from '../Header/output_type';
-import {Query__RepositoryDetail__outputType} from '../RepositoryDetail/output_type';
+import { type Query__Header__output_type } from '../../Query/Header/output_type';
+import { type Query__RepositoryDetail__output_type } from '../../Query/RepositoryDetail/output_type';
 
 export type Query__RepositoryPage__param = {
-  Header: Query__Header__outputType,
-  RepositoryDetail: Query__RepositoryDetail__outputType,
+  Header: Query__Header__output_type,
+  RepositoryDetail: Query__RepositoryDetail__output_type,
 };

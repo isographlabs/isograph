@@ -1,4 +1,4 @@
-import {PetStats__refetch_pet_stats__outputType} from '../../PetStats/refetch_pet_stats/output_type';
+import { type PetStats__refetch_pet_stats__output_type } from '../../PetStats/refetch_pet_stats/output_type';
 
 export type Pet__PetStatsCard__param = {
   id: string,
@@ -11,6 +11,6 @@ export type Pet__PetStatsCard__param = {
     hunger: (number | null),
     sociability: (number | null),
     energy: (number | null),
-    refetch_pet_stats: PetStats__refetch_pet_stats__outputType,
+    refetch_pet_stats: PetStats__refetch_pet_stats__output_type,
   } | null),
 };

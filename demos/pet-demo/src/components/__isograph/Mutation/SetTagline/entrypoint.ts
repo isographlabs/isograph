@@ -1,6 +1,6 @@
 import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Mutation__SetTagline__param} from './param_type';
-import {Mutation__SetTagline__outputType} from './output_type';
+import {Mutation__SetTagline__output_type} from './output_type';
 import readerResolver from './resolver_reader';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
@@ -46,7 +46,7 @@ const normalizationAst: NormalizationAst = [
 ];
 const artifact: IsographEntrypoint<
   Mutation__SetTagline__param,
-  Mutation__SetTagline__outputType
+  Mutation__SetTagline__output_type
 > = {
   kind: "Entrypoint",
   queryText,

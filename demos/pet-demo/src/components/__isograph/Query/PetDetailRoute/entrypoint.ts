@@ -1,6 +1,6 @@
 import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Query__PetDetailRoute__param} from './param_type';
-import {Query__PetDetailRoute__outputType} from './output_type';
+import {Query__PetDetailRoute__output_type} from './output_type';
 import readerResolver from './resolver_reader';
 import refetchQuery0 from './__refetch__0';
 import refetchQuery1 from './__refetch__1';
@@ -207,7 +207,7 @@ const normalizationAst: NormalizationAst = [
 ];
 const artifact: IsographEntrypoint<
   Query__PetDetailRoute__param,
-  Query__PetDetailRoute__outputType
+  Query__PetDetailRoute__output_type
 > = {
   kind: "Entrypoint",
   queryText,

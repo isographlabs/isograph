@@ -15,4 +15,4 @@ const resolver = (
   makeNetworkRequest(environment, artifact, variables);
 };
 
-export type Pet__set_best_friend__outputType = (params: any) => void;
+export type Pet__set_best_friend__output_type = (params: any) => void;

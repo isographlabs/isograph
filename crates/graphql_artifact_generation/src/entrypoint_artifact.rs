@@ -197,7 +197,7 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
         } = self;
         let entrypoint_params_typename = format!("{}__{}__param", parent_type.name, query_name);
         let entrypoint_output_type_name =
-            format!("{}__{}__outputType", parent_type.name, query_name);
+            format!("{}__{}__output_type", parent_type.name, query_name);
 
         let resolver_reader_file_name = *RESOLVER_READER;
         let param_type_file_name = *RESOLVER_PARAM_TYPE;

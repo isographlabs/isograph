@@ -1,4 +1,4 @@
-import {PullRequest__CommentList__outputType} from '../../PullRequest/CommentList/output_type';
+import { type PullRequest__CommentList__output_type } from '../../PullRequest/CommentList/output_type';
 
 export type Query__PullRequestDetail__param = {
   /**
@@ -17,7 +17,7 @@ title: string,
 The body rendered to HTML.
       */
 bodyHTML: string,
-      CommentList: PullRequest__CommentList__outputType,
+      CommentList: PullRequest__CommentList__output_type,
     } | null),
   } | null),
 };

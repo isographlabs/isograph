@@ -1,7 +1,6 @@
-use std::collections::{btree_map::Entry, BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 
-use common_lang_types::{ArtifactFileType, JavascriptVariableName, SelectableFieldName, WithSpan};
-use intern::string_key::Intern;
+use common_lang_types::{SelectableFieldName, WithSpan};
 use isograph_lang_types::{RefetchQueryIndex, Selection, ServerFieldSelection};
 use isograph_schema::{
     into_name_and_arguments, ArgumentKeyAndValue, ClientFieldVariant, FieldDefinitionLocation,
@@ -10,15 +9,14 @@ use isograph_schema::{
 };
 
 use crate::generate_artifacts::{
-    get_serialized_field_arguments, JavaScriptImports, NestedClientFieldImportKey,
-    NestedClientFieldImports, ReaderAst, SourceArtifact, REFETCH_READER, RESOLVER_READER,
+    get_serialized_field_arguments, ReaderAst, ReaderImports, ResolverReaderOrRefetchResolver,
 };
 
 fn generate_reader_ast_node(
     selection: &WithSpan<ValidatedSelection>,
     schema: &ValidatedSchema,
     indentation_level: u8,
-    nested_client_field_imports: &mut NestedClientFieldImports,
+    nested_client_field_imports: &mut ReaderImports,
     // TODO use this to generate usedRefetchQueries
     root_refetched_paths: &BTreeMap<PathToRefetchField, RootRefetchedPath>,
     path: &mut Vec<NameAndArguments>,
@@ -85,15 +83,16 @@ fn generate_reader_ast_node(
                                 let reader_artifact_import_name = format!(
                                     "{}__refetch_reader",
                                     nested_client_field.type_and_field.underscore_separated()
-                                )
-                                .intern()
-                                .into();
-                                insert_default_import_into_nested_client_field_imports(
-                                    nested_client_field_imports,
-                                    nested_client_field,
-                                    *REFETCH_READER,
-                                    reader_artifact_import_name,
                                 );
+
+                                {
+                                    let artifact_file_type =
+                                        ResolverReaderOrRefetchResolver::RefetchReader;
+                                    nested_client_field_imports.insert(
+                                        nested_client_field.type_and_field,
+                                        artifact_file_type,
+                                    );
+                                };
                                 let refetch_query_index = find_imperatively_fetchable_query_index(
                                     root_refetched_paths,
                                     path,
@@ -114,15 +113,13 @@ fn generate_reader_ast_node(
                                 let reader_artifact_import_name = format!(
                                     "{}__resolver_reader",
                                     nested_client_field.type_and_field.underscore_separated()
-                                )
-                                .intern()
-                                .into();
-                                insert_default_import_into_nested_client_field_imports(
-                                    nested_client_field_imports,
-                                    nested_client_field,
-                                    *RESOLVER_READER,
-                                    reader_artifact_import_name,
                                 );
+
+                                nested_client_field_imports.insert(
+                                    nested_client_field.type_and_field,
+                                    ResolverReaderOrRefetchResolver::ResolverReader,
+                                );
+
                                 format!(
                                     "{indent_1}{{\n\
                                     {indent_2}kind: \"Resolver\",\n\
@@ -181,34 +178,11 @@ fn generate_reader_ast_node(
     }
 }
 
-fn insert_default_import_into_nested_client_field_imports(
-    nested_client_field_imports: &mut NestedClientFieldImports,
-    client_field: &ValidatedClientField,
-    artifact_file_type: ArtifactFileType,
-    reader_artifact_import_name: JavascriptVariableName,
-) {
-    match nested_client_field_imports.entry(NestedClientFieldImportKey {
-        object_type_and_field: client_field.type_and_field,
-        source_artifact: SourceArtifact::ResolverOrRefetchReader,
-        artifact_file_type,
-    }) {
-        Entry::Occupied(mut occupied) => {
-            occupied.get_mut().default_import = Some(reader_artifact_import_name);
-        }
-        Entry::Vacant(vacant) => {
-            vacant.insert(JavaScriptImports {
-                default_import: Some(reader_artifact_import_name),
-                types: vec![],
-            });
-        }
-    }
-}
-
 fn generate_reader_ast_with_path<'schema>(
     schema: &'schema ValidatedSchema,
     selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
     indentation_level: u8,
-    nested_client_field_imports: &mut NestedClientFieldImports,
+    nested_client_field_imports: &mut ReaderImports,
     // N.B. this is not root_refetched_paths when we're generating a non-fetchable client field :(
     root_refetched_paths: &BTreeMap<PathToRefetchField, RootRefetchedPath>,
     path: &mut Vec<NameAndArguments>,
@@ -288,7 +262,7 @@ pub(crate) fn generate_reader_ast<'schema>(
     // N.B. this is not root_refetched_paths when we're generating an entrypoint :(
     // ????
     root_refetched_paths: &BTreeMap<PathToRefetchField, RootRefetchedPath>,
-) -> (ReaderAst, NestedClientFieldImports) {
+) -> (ReaderAst, ReaderImports) {
     let mut client_field_imports = BTreeMap::new();
     let reader_ast = generate_reader_ast_with_path(
         schema,
