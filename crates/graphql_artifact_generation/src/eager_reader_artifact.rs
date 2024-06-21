@@ -1,7 +1,7 @@
 use intern::Lookup;
 use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
-use common_lang_types::{PathAndContent, SelectableFieldName};
+use common_lang_types::{ArtifactPathAndContent, SelectableFieldName};
 use isograph_schema::{
     ScalarClientFieldTraversalState, SchemaObject, UserWrittenClientFieldInfo,
     UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema,
@@ -25,7 +25,7 @@ pub fn generate_eager_reader_artifact<'schema>(
     artifact_directory: &PathBuf,
     info: UserWrittenClientFieldInfo,
     scalar_client_field_traversal_state: &ScalarClientFieldTraversalState,
-) -> Vec<PathAndContent> {
+) -> Vec<ArtifactPathAndContent> {
     let user_written_component_variant = info.user_written_component_variant;
     if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
         let parent_type = schema
@@ -81,7 +81,7 @@ struct EagerReaderArtifactInfo<'schema> {
 }
 
 impl<'schema> EagerReaderArtifactInfo<'schema> {
-    fn path_and_content(self) -> Vec<PathAndContent> {
+    fn path_and_content(self) -> Vec<ArtifactPathAndContent> {
         let EagerReaderArtifactInfo {
             parent_type,
             client_field_name,
@@ -93,7 +93,7 @@ impl<'schema> EagerReaderArtifactInfo<'schema> {
         self.file_contents(&relative_directory)
     }
 
-    fn file_contents(self, relative_directory: &PathBuf) -> Vec<PathAndContent> {
+    fn file_contents(self, relative_directory: &PathBuf) -> Vec<ArtifactPathAndContent> {
         let EagerReaderArtifactInfo {
             function_import_statement,
             client_field_parameter_type,
@@ -185,17 +185,17 @@ impl<'schema> EagerReaderArtifactInfo<'schema> {
         );
 
         vec![
-            PathAndContent {
+            ArtifactPathAndContent {
                 relative_directory: relative_directory.clone(),
                 file_name_prefix: *RESOLVER_READER,
                 file_content: reader_content,
             },
-            PathAndContent {
+            ArtifactPathAndContent {
                 relative_directory: relative_directory.clone(),
                 file_name_prefix: *RESOLVER_PARAM_TYPE,
                 file_content: param_type_content,
             },
-            PathAndContent {
+            ArtifactPathAndContent {
                 relative_directory: relative_directory.clone(),
                 file_name_prefix: *RESOLVER_OUTPUT_TYPE,
                 file_content: final_output_type_text,

@@ -1,4 +1,4 @@
-use common_lang_types::{IsographObjectTypeName, PathAndContent, SelectableFieldName};
+use common_lang_types::{ArtifactPathAndContent, IsographObjectTypeName, SelectableFieldName};
 use intern::string_key::Intern;
 use isograph_lang_types::RefetchQueryIndex;
 use isograph_schema::{ImperativelyLoadedFieldArtifactInfo, ValidatedSchema, REFETCH_FIELD_NAME};
@@ -19,7 +19,7 @@ pub(crate) struct ImperativelyLoadedEntrypointArtifactInfo {
 }
 
 impl ImperativelyLoadedEntrypointArtifactInfo {
-    pub fn path_and_content(self) -> PathAndContent {
+    pub fn path_and_content(self) -> ArtifactPathAndContent {
         let ImperativelyLoadedEntrypointArtifactInfo {
             root_fetchable_field,
             root_fetchable_field_parent_object,
@@ -33,7 +33,7 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
             .intern()
             .into();
 
-        PathAndContent {
+        ArtifactPathAndContent {
             file_content: self.file_contents(),
             relative_directory,
             file_name_prefix,
@@ -70,7 +70,7 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
 pub(crate) fn get_artifact_for_imperatively_loaded_field<'schema>(
     schema: &'schema ValidatedSchema,
     imperatively_loaded_field_artifact_info: ImperativelyLoadedFieldArtifactInfo,
-) -> PathAndContent {
+) -> ArtifactPathAndContent {
     let ImperativelyLoadedFieldArtifactInfo {
         merged_selection_set,
         root_fetchable_field,

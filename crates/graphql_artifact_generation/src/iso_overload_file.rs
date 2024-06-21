@@ -1,7 +1,7 @@
 use intern::Lookup;
 use std::{cmp::Ordering, path::PathBuf};
 
-use common_lang_types::{PathAndContent, SelectableFieldName};
+use common_lang_types::{ArtifactPathAndContent, SelectableFieldName};
 use isograph_schema::{
     ClientFieldVariant, UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema,
 };
@@ -71,7 +71,7 @@ export function iso<T>(
     (import, s)
 }
 
-pub(crate) fn build_iso_overload<'schema>(schema: &'schema ValidatedSchema) -> PathAndContent {
+pub(crate) fn build_iso_overload<'schema>(schema: &'schema ValidatedSchema) -> ArtifactPathAndContent {
     let mut imports = "import type {IsographEntrypoint} from '@isograph/react';\n".to_string();
     let mut content = String::from(
         "
@@ -152,7 +152,7 @@ export function iso(_isographLiteralText: string):
 }",
     );
     imports.push_str(&content);
-    PathAndContent {
+    ArtifactPathAndContent {
         file_content: imports,
         relative_directory: PathBuf::new(),
         file_name_prefix: *ISO_TS,

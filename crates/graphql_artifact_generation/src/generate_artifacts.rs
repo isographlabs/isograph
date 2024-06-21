@@ -5,8 +5,8 @@ use std::{
 };
 
 use common_lang_types::{
-    ArtifactFileType, DescriptionValue, IsographObjectTypeName, JavascriptVariableName,
-    PathAndContent, SelectableFieldName, WithSpan,
+    ArtifactFileType, ArtifactPathAndContent, DescriptionValue, IsographObjectTypeName,
+    JavascriptVariableName, SelectableFieldName, WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, ListTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
@@ -63,22 +63,19 @@ pub fn get_artifact_path_and_content<'schema>(
     schema: &'schema ValidatedSchema,
     project_root: &PathBuf,
     artifact_directory: &PathBuf,
-) -> Vec<PathAndContent> {
-    let mut client_field_to_traversal_states = BTreeMap::new();
+) -> Vec<ArtifactPathAndContent> {
+    let mut global_client_field_map = BTreeMap::new();
     let mut path_and_contents = vec![];
 
     // For each entrypoint, generate an entrypoint artifact and refetch artifacts
     for entrypoint_id in schema.entrypoints.iter() {
-        let entrypoint_path_and_content = generate_entrypoint_artifacts(
-            schema,
-            *entrypoint_id,
-            &mut client_field_to_traversal_states,
-        );
+        let entrypoint_path_and_content =
+            generate_entrypoint_artifacts(schema, *entrypoint_id, &mut global_client_field_map);
         path_and_contents.extend(entrypoint_path_and_content);
     }
 
     for (encountered_client_field_id, (scalar_client_field_traversal_state, _selection_map)) in
-        &client_field_to_traversal_states
+        &global_client_field_map
     {
         let encountered_client_field = schema.client_field(*encountered_client_field_id);
 

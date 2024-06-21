@@ -4,11 +4,11 @@ use std::{
     path::PathBuf,
 };
 
-use common_lang_types::PathAndContent;
+use common_lang_types::ArtifactPathAndContent;
 use thiserror::Error;
 
 pub(crate) fn write_to_disk<'schema>(
-    paths_and_contents: impl Iterator<Item = PathAndContent>,
+    paths_and_contents: impl Iterator<Item = ArtifactPathAndContent>,
     artifact_directory: &PathBuf,
 ) -> Result<usize, GenerateArtifactsError> {
     if artifact_directory.exists() {

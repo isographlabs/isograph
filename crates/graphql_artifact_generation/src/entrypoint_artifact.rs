@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use common_lang_types::{PathAndContent, QueryOperationName, VariableName};
+use common_lang_types::{ArtifactPathAndContent, QueryOperationName, VariableName};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::ClientFieldId;
 use isograph_schema::{
@@ -33,7 +33,7 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
     schema: &ValidatedSchema,
     entrypoint_id: ClientFieldId,
     global_client_field_map: &'a mut ClientFieldToCompletedMergeTraversalStateMap,
-) -> Vec<PathAndContent> {
+) -> Vec<ArtifactPathAndContent> {
     let entrypoint = schema.client_field(entrypoint_id);
     let (selection_set, _) = entrypoint
         .selection_set_and_unwraps
@@ -171,7 +171,7 @@ fn generate_refetch_query_artifact_import(
 }
 
 impl<'schema> EntrypointArtifactInfo<'schema> {
-    fn path_and_content(self) -> PathAndContent {
+    fn path_and_content(self) -> ArtifactPathAndContent {
         let EntrypointArtifactInfo {
             query_name,
             parent_type,
@@ -180,7 +180,7 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
 
         let directory = generate_path(parent_type.name, (*query_name).into());
 
-        PathAndContent {
+        ArtifactPathAndContent {
             relative_directory: directory,
             file_content: self.file_contents(),
             file_name_prefix: *ENTRYPOINT,

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use common_lang_types::{PathAndContent, SelectableFieldName};
+use common_lang_types::{ArtifactPathAndContent, SelectableFieldName};
 use intern::string_key::Intern;
 use isograph_schema::{
     FieldMapItem, ImperativelyLoadedFieldVariant, ScalarClientFieldTraversalState, SchemaObject,
@@ -30,7 +30,7 @@ struct RefetchReaderArtifactInfo<'schema> {
 }
 
 impl<'schema> RefetchReaderArtifactInfo<'schema> {
-    fn path_and_content(self) -> Vec<PathAndContent> {
+    fn path_and_content(self) -> Vec<ArtifactPathAndContent> {
         let RefetchReaderArtifactInfo {
             parent_type,
             client_field_name,
@@ -42,7 +42,7 @@ impl<'schema> RefetchReaderArtifactInfo<'schema> {
         self.file_contents(&relative_directory)
     }
 
-    fn file_contents(self, relative_directory: &PathBuf) -> Vec<PathAndContent> {
+    fn file_contents(self, relative_directory: &PathBuf) -> Vec<ArtifactPathAndContent> {
         let RefetchReaderArtifactInfo {
             function_import_statement,
             client_field_parameter_type,
@@ -97,17 +97,17 @@ impl<'schema> RefetchReaderArtifactInfo<'schema> {
         );
 
         vec![
-            PathAndContent {
+            ArtifactPathAndContent {
                 relative_directory: relative_directory.clone(),
                 file_name_prefix: *REFETCH_READER,
                 file_content: reader_content,
             },
-            PathAndContent {
+            ArtifactPathAndContent {
                 relative_directory: relative_directory.clone(),
                 file_name_prefix: *RESOLVER_PARAM_TYPE,
                 file_content: param_type_content,
             },
-            PathAndContent {
+            ArtifactPathAndContent {
                 relative_directory: relative_directory.clone(),
                 file_name_prefix: *RESOLVER_OUTPUT_TYPE,
                 file_content: output_type_text,
@@ -121,7 +121,7 @@ pub(crate) fn generate_refetch_reader_artifact(
     client_field: &ValidatedClientField,
     variant: &ImperativelyLoadedFieldVariant,
     scalar_client_field_traversal_state: &ScalarClientFieldTraversalState,
-) -> Vec<PathAndContent> {
+) -> Vec<ArtifactPathAndContent> {
     if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
         let function_import_statement = match &variant.primary_field_info {
             Some(info) => generate_function_import_statement_for_mutation_reader(
