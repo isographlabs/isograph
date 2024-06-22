@@ -108,21 +108,22 @@ pub fn get_artifact_path_and_content<'schema>(
         });
     }
 
-    for client_field in schema
-        .client_fields
-        .iter()
-        .filter(|field| match field.variant {
-            ClientFieldVariant::UserWritten(_) => true,
-            ClientFieldVariant::ImperativelyLoadedField(_) => false,
-        })
+    for user_written_client_field in
+        schema
+            .client_fields
+            .iter()
+            .filter(|field| match field.variant {
+                ClientFieldVariant::UserWritten(_) => true,
+                ClientFieldVariant::ImperativelyLoadedField(_) => false,
+            })
     {
         // For each user-written client field, generate a param type artifact
         path_and_contents.push(generate_eager_reader_param_type_artifact(
             schema,
-            client_field,
+            user_written_client_field,
         ));
 
-        match global_client_field_map.get(&client_field.id) {
+        match global_client_field_map.get(&user_written_client_field.id) {
             Some((traversal_state, _)) => {
                 // If this user-written client field is reachable from an entrypoint,
                 // we've already noted the accessible client fields
@@ -131,7 +132,9 @@ pub fn get_artifact_path_and_content<'schema>(
             None => {
                 // If this field is not reachable from an entrypoint, we need to
                 // encounter all the client fields
-                for nested_client_field in client_field.accessible_client_fields(schema) {
+                for nested_client_field in
+                    user_written_client_field.accessible_client_fields(schema)
+                {
                     encountered_output_types.insert(nested_client_field.id);
                 }
             }
