@@ -9,6 +9,8 @@ import { Pet__PetStatsCard__param } from './Pet/PetStatsCard/param_type';
 import { Pet__PetSummaryCard__param } from './Pet/PetSummaryCard/param_type';
 import { Pet__PetTaglineCard__param } from './Pet/PetTaglineCard/param_type';
 import { Pet__PetUpdater__param } from './Pet/PetUpdater/param_type';
+import { Pet__Unreachable2__param } from './Pet/Unreachable2/param_type';
+import { Pet__UnreachableFromEntrypoint__param } from './Pet/UnreachableFromEntrypoint/param_type';
 import { Query__HomeRoute__param } from './Query/HomeRoute/param_type';
 import { Query__PetDetailRoute__param } from './Query/PetDetailRoute/param_type';
 import { Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/param_type';
@@ -101,6 +103,14 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.PetUpdater', T>
 ): IdentityWithParamComponent<Pet__PetUpdater__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Pet.Unreachable2', T>
+): IdentityWithParam<Pet__Unreachable2__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Pet.UnreachableFromEntrypoint', T>
+): IdentityWithParam<Pet__UnreachableFromEntrypoint__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.HomeRoute', T>

@@ -16,6 +16,18 @@ extend type Mutation
     path: "checkin"
     fieldMap: [{ from: "id", to: "checkin_id" }]
   )
+  # this field should only be accessed in UnreachableFromEntrypoint.tsx
+  @exposeField(
+    field: "set_pet_best_friend"
+    as: "set_best_friend_do_not_use"
+    path: "pet"
+  )
+  # this field should not be accessed
+  @exposeField(
+    field: "set_pet_best_friend"
+    as: "set_best_friend_do_not_use_2"
+    path: "pet"
+  )
 
 extend type Query
   @exposeField(field: "pet", path: "stats", as: "refetch_pet_stats")
