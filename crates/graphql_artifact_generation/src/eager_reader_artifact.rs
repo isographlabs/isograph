@@ -1,21 +1,20 @@
 use intern::Lookup;
 use std::{collections::BTreeSet, path::PathBuf, str::FromStr};
 
-use common_lang_types::{ArtifactPathAndContent, SelectableFieldName};
+use common_lang_types::ArtifactPathAndContent;
 use isograph_schema::{
-    ScalarClientFieldTraversalState, SchemaObject, UserWrittenClientFieldInfo,
-    UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema,
+    ScalarClientFieldTraversalState, UserWrittenClientFieldInfo, UserWrittenComponentVariant,
+    ValidatedClientField, ValidatedSchema,
 };
 
 use crate::{
     generate_artifacts::{
         generate_client_field_parameter_type, generate_output_type, generate_path,
-        ClientFieldFunctionImportStatement, ClientFieldOutputType, ClientFieldParameterType,
-        ReaderAst, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
+        ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE,
+        RESOLVER_READER,
     },
     import_statements::{
         param_type_imports_to_import_statement, reader_imports_to_import_statement,
-        ParamTypeImports, ReaderImports,
     },
     reader_ast::generate_reader_ast,
 };
@@ -38,7 +37,7 @@ pub fn generate_eager_reader_artifact<'schema>(
         .server_field_data
         .object(client_field.parent_object_id);
 
-    let (reader_ast, nested_client_field_artifact_imports) = generate_reader_ast(
+    let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
         selection_set,
         0,
@@ -56,87 +55,35 @@ pub fn generate_eager_reader_artifact<'schema>(
     let client_field_output_type = generate_output_type(client_field);
     let function_import_statement =
         generate_function_import_statement(project_root, artifact_directory, info);
-    EagerReaderArtifactInfo {
-        parent_type: parent_type.into(),
-        client_field_name: client_field.name,
-        reader_ast,
-        reader_imports: nested_client_field_artifact_imports,
-        function_import_statement,
-        client_field_output_type,
-        client_field_parameter_type,
-        user_written_component_variant,
-        param_type_imports,
-    }
-    .path_and_content()
-}
 
-#[derive(Debug)]
-struct EagerReaderArtifactInfo<'schema> {
-    parent_type: &'schema SchemaObject,
-    client_field_name: SelectableFieldName,
-    reader_imports: ReaderImports,
-    param_type_imports: ParamTypeImports,
-    client_field_output_type: ClientFieldOutputType,
-    reader_ast: ReaderAst,
-    client_field_parameter_type: ClientFieldParameterType,
-    function_import_statement: ClientFieldFunctionImportStatement,
-    // TODO be generic over this type, since it is a GraphQL-ism?
-    user_written_component_variant: UserWrittenComponentVariant,
-}
+    let client_field_name = client_field.name;
+    let relative_directory = generate_path(parent_type.name, client_field_name);
 
-impl<'schema> EagerReaderArtifactInfo<'schema> {
-    fn path_and_content(self) -> Vec<ArtifactPathAndContent> {
-        let EagerReaderArtifactInfo {
-            parent_type,
-            client_field_name,
-            ..
-        } = &self;
+    let reader_import_statement = reader_imports_to_import_statement(&reader_imports);
+    let param_type_import_statement = param_type_imports_to_import_statement(&param_type_imports);
 
-        let relative_directory = generate_path(parent_type.name, *client_field_name);
-
-        self.file_contents(&relative_directory)
-    }
-
-    fn file_contents(self, relative_directory: &PathBuf) -> Vec<ArtifactPathAndContent> {
-        let EagerReaderArtifactInfo {
-            function_import_statement,
-            client_field_parameter_type,
-            client_field_output_type,
-            reader_ast,
-            reader_imports,
-            parent_type,
-            client_field_name,
-            user_written_component_variant,
-            param_type_imports,
-            ..
-        } = self;
-
-        let reader_import_statement = reader_imports_to_import_statement(&reader_imports);
-        let param_type_import_statement =
-            param_type_imports_to_import_statement(&param_type_imports);
-
-        let parent_name = parent_type.name;
-        let reader_param_type = format!("{parent_name}__{client_field_name}__param");
-        let output_type_text = {
-            let function_import_statement = &function_import_statement;
-            let parent_type_name = parent_type.name;
-            let field_name = client_field_name;
-            let output_type = client_field_output_type;
-            format!(
-                "{function_import_statement}\n\
+    let parent_name = parent_type.name;
+    let reader_param_type = format!("{parent_name}__{client_field_name}__param");
+    let output_type_text = {
+        let function_import_statement = &function_import_statement;
+        let parent_type_name = parent_type.name;
+        let field_name = client_field_name;
+        let output_type = client_field_output_type;
+        format!(
+            "{function_import_statement}\n\
                 export type {}__{}__output_type = {};",
-                parent_type_name, field_name, output_type
-            )
-        };
+            parent_type_name, field_name, output_type
+        )
+    };
 
-        let (reader_content, final_output_type_text) =
-            if let UserWrittenComponentVariant::Eager = user_written_component_variant {
-                let reader_output_type = format!("{parent_name}__{client_field_name}__output_type");
-                let param_type_file_name = *RESOLVER_PARAM_TYPE;
-                let output_type_file_name = *RESOLVER_OUTPUT_TYPE;
-                (
-                    format!(
-                        "import type {{EagerReaderArtifact, ReaderAst, \
+    let (reader_content, final_output_type_text) =
+        if let UserWrittenComponentVariant::Eager = user_written_component_variant {
+            let reader_output_type = format!("{parent_name}__{client_field_name}__output_type");
+            let param_type_file_name = *RESOLVER_PARAM_TYPE;
+            let output_type_file_name = *RESOLVER_OUTPUT_TYPE;
+            (
+                format!(
+                    "import type {{EagerReaderArtifact, ReaderAst, \
                         RefetchQueryNormalizationArtifact}} from '@isograph/react';\n\
                         import {{ {reader_param_type} }} from './{param_type_file_name}';\n\
                         import {{ {reader_output_type} }} from './{output_type_file_name}';\n\
@@ -152,16 +99,16 @@ impl<'schema> EagerReaderArtifactInfo<'schema> {
                         {}readerAst,\n\
                         }};\n\n\
                         export default artifact;\n",
-                        "  ", "  ", "  ", "  ", "  ",
-                    ),
-                    output_type_text,
-                )
-            } else {
-                let component_name = format!("{}.{}", parent_name, client_field_name);
-                let param_type_file_name = *RESOLVER_PARAM_TYPE;
-                (
-                    format!(
-                        "import type {{ComponentReaderArtifact, ExtractSecondParam, \
+                    "  ", "  ", "  ", "  ", "  ",
+                ),
+                output_type_text,
+            )
+        } else {
+            let component_name = format!("{}.{}", parent_name, client_field_name);
+            let param_type_file_name = *RESOLVER_PARAM_TYPE;
+            (
+                format!(
+                    "import type {{ComponentReaderArtifact, ExtractSecondParam, \
                         ReaderAst, RefetchQueryNormalizationArtifact}} from '@isograph/react';\n\
                         import {{ {reader_param_type} }} from './{param_type_file_name}';\n\
                         {function_import_statement}\n\
@@ -177,39 +124,38 @@ impl<'schema> EagerReaderArtifactInfo<'schema> {
                         {}readerAst,\n\
                         }};\n\n\
                         export default artifact;\n",
-                        "  ", "  ", "  ", "  ", "  ", "  ",
-                    ),
-                    format!(
-                        "import type {{ExtractSecondParam, RefetchQueryNormalizationArtifact}} \
+                    "  ", "  ", "  ", "  ", "  ", "  ",
+                ),
+                format!(
+                    "import type {{ExtractSecondParam, RefetchQueryNormalizationArtifact}} \
                         from '@isograph/react';\n\
                         {output_type_text}\n",
-                    ),
-                )
-            };
+                ),
+            )
+        };
 
-        let param_type_content = format!(
-            "{param_type_import_statement}\n\
+    let param_type_content = format!(
+        "{param_type_import_statement}\n\
             export type {reader_param_type} = {client_field_parameter_type};\n",
-        );
+    );
 
-        vec![
-            ArtifactPathAndContent {
-                relative_directory: relative_directory.clone(),
-                file_name_prefix: *RESOLVER_READER,
-                file_content: reader_content,
-            },
-            ArtifactPathAndContent {
-                relative_directory: relative_directory.clone(),
-                file_name_prefix: *RESOLVER_PARAM_TYPE,
-                file_content: param_type_content,
-            },
-            ArtifactPathAndContent {
-                relative_directory: relative_directory.clone(),
-                file_name_prefix: *RESOLVER_OUTPUT_TYPE,
-                file_content: final_output_type_text,
-            },
-        ]
-    }
+    vec![
+        ArtifactPathAndContent {
+            relative_directory: relative_directory.clone(),
+            file_name_prefix: *RESOLVER_READER,
+            file_content: reader_content,
+        },
+        ArtifactPathAndContent {
+            relative_directory: relative_directory.clone(),
+            file_name_prefix: *RESOLVER_PARAM_TYPE,
+            file_content: param_type_content,
+        },
+        ArtifactPathAndContent {
+            relative_directory: relative_directory.clone(),
+            file_name_prefix: *RESOLVER_OUTPUT_TYPE,
+            file_content: final_output_type_text,
+        },
+    ]
 }
 
 fn generate_function_import_statement(
