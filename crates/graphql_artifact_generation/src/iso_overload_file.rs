@@ -71,7 +71,9 @@ export function iso<T>(
     (import, s)
 }
 
-pub(crate) fn build_iso_overload<'schema>(schema: &'schema ValidatedSchema) -> ArtifactPathAndContent {
+pub(crate) fn build_iso_overload<'schema>(
+    schema: &'schema ValidatedSchema,
+) -> ArtifactPathAndContent {
     let mut imports = "import type {IsographEntrypoint} from '@isograph/react';\n".to_string();
     let mut content = String::from(
         "
