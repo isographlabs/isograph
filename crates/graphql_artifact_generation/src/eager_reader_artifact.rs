@@ -19,35 +19,7 @@ use crate::{
     reader_ast::generate_reader_ast,
 };
 
-pub(crate) fn generate_eager_reader_artifacts(
-    schema: &ValidatedSchema,
-    client_field: &ValidatedClientField,
-    project_root: &PathBuf,
-    artifact_directory: &PathBuf,
-    info: UserWrittenClientFieldInfo,
-    scalar_client_field_traversal_state: &ScalarClientFieldTraversalState,
-) -> Vec<ArtifactPathAndContent> {
-    vec![
-        generate_eager_reader_artifact(
-            schema,
-            client_field,
-            project_root,
-            artifact_directory,
-            info,
-            scalar_client_field_traversal_state,
-        ),
-        generate_eager_reader_output_type_artifact(
-            schema,
-            client_field,
-            project_root,
-            artifact_directory,
-            info,
-        ),
-        generate_eager_reader_param_type_artifact(schema, client_field),
-    ]
-}
-
-fn generate_eager_reader_artifact(
+pub(crate) fn generate_eager_reader_artifact(
     schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
     project_root: &PathBuf,
@@ -136,7 +108,7 @@ fn generate_eager_reader_artifact(
     }
 }
 
-fn generate_eager_reader_param_type_artifact(
+pub(crate) fn generate_eager_reader_param_type_artifact(
     schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
 ) -> ArtifactPathAndContent {
@@ -173,7 +145,7 @@ fn generate_eager_reader_param_type_artifact(
     }
 }
 
-fn generate_eager_reader_output_type_artifact(
+pub(crate) fn generate_eager_reader_output_type_artifact(
     schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
     project_root: &PathBuf,

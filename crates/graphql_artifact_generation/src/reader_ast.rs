@@ -13,6 +13,7 @@ use crate::{
     import_statements::{ReaderImports, ResolverReaderOrRefetchResolver},
 };
 
+// Can we do this when visiting the client field in when generating entrypoints?
 fn generate_reader_ast_node(
     selection: &WithSpan<ValidatedSelection>,
     schema: &ValidatedSchema,

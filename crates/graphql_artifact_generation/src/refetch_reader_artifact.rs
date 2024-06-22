@@ -14,24 +14,7 @@ use crate::{
     reader_ast::generate_reader_ast,
 };
 
-pub(crate) fn generate_refetch_reader_artifacts(
-    schema: &ValidatedSchema,
-    client_field: &ValidatedClientField,
-    variant: &ImperativelyLoadedFieldVariant,
-    scalar_client_field_traversal_state: &ScalarClientFieldTraversalState,
-) -> Vec<ArtifactPathAndContent> {
-    vec![
-        generate_refetch_reader_artifact(
-            schema,
-            client_field,
-            variant,
-            scalar_client_field_traversal_state,
-        ),
-        generate_refetch_output_type_artifact(schema, client_field),
-    ]
-}
-
-fn generate_refetch_reader_artifact(
+pub(crate) fn generate_refetch_reader_artifact(
     schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
     variant: &ImperativelyLoadedFieldVariant,
@@ -84,7 +67,7 @@ fn generate_refetch_reader_artifact(
     }
 }
 
-fn generate_refetch_output_type_artifact(
+pub(crate) fn generate_refetch_output_type_artifact(
     schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
 ) -> ArtifactPathAndContent {

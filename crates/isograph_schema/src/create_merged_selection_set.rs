@@ -147,6 +147,9 @@ pub struct ScalarClientFieldTraversalState {
 
     /// The (mutable) path from the current client field to wherever we are iterating
     traversal_path: Vec<NameAndArguments>,
+
+    /// Client fields that are directly accessed by this client field
+    pub accessible_client_fields: HashSet<ClientFieldId>,
 }
 
 impl ScalarClientFieldTraversalState {
@@ -155,6 +158,7 @@ impl ScalarClientFieldTraversalState {
             refetch_paths: BTreeMap::new(),
             reachable_variables: HashSet::new(),
             traversal_path: vec![],
+            accessible_client_fields: HashSet::new(),
         }
     }
 
@@ -546,6 +550,11 @@ fn merge_validated_selections_into_selection_map(
                                         },
                                     );
                                 }
+
+                                merge_traversal_state
+                                    .accessible_client_fields
+                                    .insert(*client_field_id);
+
                                 merge_scalar_client_field(
                                     parent_type,
                                     schema,

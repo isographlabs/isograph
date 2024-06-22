@@ -1,5 +1,5 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     fmt::{self, Debug, Display},
     path::PathBuf,
 };
@@ -11,7 +11,7 @@ use common_lang_types::{
 use graphql_lang_types::{GraphQLTypeAnnotation, ListTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    NonConstantValue, SelectableServerFieldId, Selection, SelectionFieldArgument,
+    ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection, SelectionFieldArgument,
     ServerFieldSelection,
 };
 use isograph_schema::{
@@ -21,10 +21,16 @@ use isograph_schema::{
 use lazy_static::lazy_static;
 
 use crate::{
-    eager_reader_artifact::generate_eager_reader_artifacts,
-    entrypoint_artifact::generate_entrypoint_artifacts, import_statements::ParamTypeImports,
+    eager_reader_artifact::{
+        generate_eager_reader_artifact, generate_eager_reader_output_type_artifact,
+        generate_eager_reader_param_type_artifact,
+    },
+    entrypoint_artifact::generate_entrypoint_artifacts,
+    import_statements::ParamTypeImports,
     iso_overload_file::build_iso_overload,
-    refetch_reader_artifact::generate_refetch_reader_artifacts,
+    refetch_reader_artifact::{
+        generate_refetch_output_type_artifact, generate_refetch_reader_artifact,
+    },
 };
 
 lazy_static! {
@@ -64,12 +70,16 @@ pub fn get_artifact_path_and_content<'schema>(
 ) -> Vec<ArtifactPathAndContent> {
     let mut global_client_field_map = BTreeMap::new();
     let mut path_and_contents = vec![];
+    let mut encountered_output_types = HashSet::<ClientFieldId>::new();
 
     // For each entrypoint, generate an entrypoint artifact and refetch artifacts
     for entrypoint_id in schema.entrypoints.iter() {
         let entrypoint_path_and_content =
             generate_entrypoint_artifacts(schema, *entrypoint_id, &mut global_client_field_map);
         path_and_contents.extend(entrypoint_path_and_content);
+
+        // We also need to generate output types for entrypoints
+        encountered_output_types.insert(*entrypoint_id);
     }
 
     for (encountered_client_field_id, (scalar_client_field_traversal_state, _selection_map)) in
@@ -78,8 +88,8 @@ pub fn get_artifact_path_and_content<'schema>(
         let encountered_client_field = schema.client_field(*encountered_client_field_id);
 
         // Generate reader ASTs for all encountered client fields, which may be reader or refetch reader
-        path_and_contents.extend(match &encountered_client_field.variant {
-            ClientFieldVariant::UserWritten(info) => generate_eager_reader_artifacts(
+        path_and_contents.push(match &encountered_client_field.variant {
+            ClientFieldVariant::UserWritten(info) => generate_eager_reader_artifact(
                 schema,
                 encountered_client_field,
                 project_root,
@@ -88,7 +98,7 @@ pub fn get_artifact_path_and_content<'schema>(
                 scalar_client_field_traversal_state,
             ),
             ClientFieldVariant::ImperativelyLoadedField(variant) => {
-                generate_refetch_reader_artifacts(
+                generate_refetch_reader_artifact(
                     schema,
                     encountered_client_field,
                     variant,
@@ -96,6 +106,53 @@ pub fn get_artifact_path_and_content<'schema>(
                 )
             }
         });
+    }
+
+    for client_field in schema
+        .client_fields
+        .iter()
+        .filter(|field| match field.variant {
+            ClientFieldVariant::UserWritten(_) => true,
+            ClientFieldVariant::ImperativelyLoadedField(_) => false,
+        })
+    {
+        // For each user-written client field, generate a param type artifact
+        path_and_contents.push(generate_eager_reader_param_type_artifact(
+            schema,
+            client_field,
+        ));
+
+        match global_client_field_map.get(&client_field.id) {
+            Some((traversal_state, _)) => {
+                // If this user-written client field is reachable from an entrypoint,
+                // we've already noted the accessible client fields
+                encountered_output_types.extend(traversal_state.accessible_client_fields.iter())
+            }
+            None => {
+                // If this field is not reachable from an entrypoint, we need to
+                // encounter all the client fields
+                for nested_client_field in client_field.accessible_client_fields(schema) {
+                    encountered_output_types.insert(nested_client_field.id);
+                }
+            }
+        }
+    }
+
+    for output_type_id in encountered_output_types {
+        let client_field = schema.client_field(output_type_id);
+        let path_and_content = match client_field.variant {
+            ClientFieldVariant::UserWritten(info) => generate_eager_reader_output_type_artifact(
+                schema,
+                client_field,
+                project_root,
+                artifact_directory,
+                info,
+            ),
+            ClientFieldVariant::ImperativelyLoadedField(_) => {
+                generate_refetch_output_type_artifact(schema, client_field)
+            }
+        };
+        path_and_contents.push(path_and_content);
     }
 
     path_and_contents.push(build_iso_overload(schema));

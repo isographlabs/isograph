@@ -1,3 +1,4 @@
+mod accessible_client_fields_iterator;
 mod add_fields_to_subtypes;
 mod argument_map;
 mod create_merged_selection_set;
