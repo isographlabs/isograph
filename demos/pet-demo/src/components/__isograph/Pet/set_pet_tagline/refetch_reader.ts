@@ -1,5 +1,4 @@
 import type {RefetchReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
-import { Pet__set_pet_tagline__param } from './param_type';
 const includeReadOutData = (variables: any, readOutData: any) => {
   variables.input = variables.input ?? {};
   variables.input.id = readOutData.id;
@@ -18,7 +17,7 @@ const resolver = (
 };
 
 
-const readerAst: ReaderAst<Pet__set_pet_tagline__param> = [
+const readerAst: ReaderAst<unknown> = [
   {
     kind: "Scalar",
     fieldName: "id",

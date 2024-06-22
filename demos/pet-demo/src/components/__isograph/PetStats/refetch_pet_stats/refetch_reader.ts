@@ -1,5 +1,4 @@
 import type {RefetchReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
-import { PetStats__refetch_pet_stats__param } from './param_type';
 const includeReadOutData = (variables: any, readOutData: any) => {
   return variables;
 };
@@ -16,7 +15,7 @@ const resolver = (
 };
 
 
-const readerAst: ReaderAst<PetStats__refetch_pet_stats__param> = [
+const readerAst: ReaderAst<unknown> = [
 ];
 
 const artifact: RefetchReaderArtifact = {
