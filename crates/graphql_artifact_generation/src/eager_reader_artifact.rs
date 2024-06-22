@@ -29,44 +29,45 @@ pub fn generate_eager_reader_artifact<'schema>(
     scalar_client_field_traversal_state: &ScalarClientFieldTraversalState,
 ) -> Vec<ArtifactPathAndContent> {
     let user_written_component_variant = info.user_written_component_variant;
-    if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
-        let parent_type = schema
-            .server_field_data
-            .object(client_field.parent_object_id);
+    let (selection_set, _) = client_field
+        .selection_set_and_unwraps
+        .as_ref()
+        .expect("Unsupported: client fields not on query with no selection set");
 
-        let (reader_ast, nested_client_field_artifact_imports) = generate_reader_ast(
-            schema,
-            selection_set,
-            0,
-            &scalar_client_field_traversal_state.refetch_paths,
-        );
+    let parent_type = schema
+        .server_field_data
+        .object(client_field.parent_object_id);
 
-        let mut param_type_imports = BTreeSet::new();
-        let client_field_parameter_type = generate_client_field_parameter_type(
-            schema,
-            &selection_set,
-            parent_type.into(),
-            &mut param_type_imports,
-            0,
-        );
-        let client_field_output_type = generate_output_type(client_field);
-        let function_import_statement =
-            generate_function_import_statement(project_root, artifact_directory, info);
-        EagerReaderArtifactInfo {
-            parent_type: parent_type.into(),
-            client_field_name: client_field.name,
-            reader_ast,
-            reader_imports: nested_client_field_artifact_imports,
-            function_import_statement,
-            client_field_output_type,
-            client_field_parameter_type,
-            user_written_component_variant,
-            param_type_imports,
-        }
-        .path_and_content()
-    } else {
-        panic!("Unsupported: client fields not on query with no selection set")
+    let (reader_ast, nested_client_field_artifact_imports) = generate_reader_ast(
+        schema,
+        selection_set,
+        0,
+        &scalar_client_field_traversal_state.refetch_paths,
+    );
+
+    let mut param_type_imports = BTreeSet::new();
+    let client_field_parameter_type = generate_client_field_parameter_type(
+        schema,
+        &selection_set,
+        parent_type.into(),
+        &mut param_type_imports,
+        0,
+    );
+    let client_field_output_type = generate_output_type(client_field);
+    let function_import_statement =
+        generate_function_import_statement(project_root, artifact_directory, info);
+    EagerReaderArtifactInfo {
+        parent_type: parent_type.into(),
+        client_field_name: client_field.name,
+        reader_ast,
+        reader_imports: nested_client_field_artifact_imports,
+        function_import_statement,
+        client_field_output_type,
+        client_field_parameter_type,
+        user_written_component_variant,
+        param_type_imports,
     }
+    .path_and_content()
 }
 
 #[derive(Debug)]

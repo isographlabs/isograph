@@ -283,15 +283,16 @@ fn refetched_paths_for_client_field(
     schema: &ValidatedSchema,
     path: &mut Vec<NameAndArguments>,
 ) -> Vec<PathToRefetchField> {
-    let path_set = match &nested_client_field.selection_set_and_unwraps {
-        Some((selection_set, _)) => {
-            // Here, path is acting as a prefix. We will recieve (for example) foo.bar, and
-            // the client field may have a refetch query at baz.__refetch. In this case,
-            // this method would return something containing foo.bar.baz.__refetch
-            refetched_paths_with_path(&selection_set, schema, path)
-        }
-        None => panic!("unexpected non-existent selection set on client field"),
-    };
+    let (selection_set, _) = nested_client_field
+        .selection_set_and_unwraps
+        .as_ref()
+        .expect("Expected selection set");
+
+    // Here, path is acting as a prefix. We will receive (for example) foo.bar, and
+    // the client field may have a refetch query at baz.__refetch. In this case,
+    // this method would return something containing foo.bar.baz.__refetch
+    let path_set = refetched_paths_with_path(&selection_set, schema, path);
+
     let mut paths: Vec<_> = path_set.into_iter().collect();
     paths.sort();
     paths
@@ -324,18 +325,15 @@ fn refetched_paths_with_path(
                                 _ => {
                                     // For non-refetch fields, we need to recurse into the selection set
                                     // (if there is one)
-                                    match &client_field.selection_set_and_unwraps {
-                                        Some((selection_set, _unwraps)) => {
-                                            let new_paths = refetched_paths_with_path(
-                                                selection_set,
-                                                schema,
-                                                path,
-                                            );
+                                    let (selection_set, _) = client_field
+                                        .selection_set_and_unwraps
+                                        .as_ref()
+                                        .expect("Expected selection set");
 
-                                            paths.extend(new_paths.into_iter());
-                                        }
-                                        None => panic!("Client field has no selection set"),
-                                    };
+                                    let new_paths =
+                                        refetched_paths_with_path(selection_set, schema, path);
+
+                                    paths.extend(new_paths.into_iter());
                                 }
                             }
                         }

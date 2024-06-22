@@ -127,47 +127,47 @@ pub(crate) fn generate_refetch_reader_artifact(
     variant: &ImperativelyLoadedFieldVariant,
     scalar_client_field_traversal_state: &ScalarClientFieldTraversalState,
 ) -> Vec<ArtifactPathAndContent> {
-    if let Some((selection_set, _)) = &client_field.selection_set_and_unwraps {
-        let function_import_statement = match &variant.primary_field_info {
-            Some(info) => generate_function_import_statement_for_mutation_reader(
-                &info.primary_field_field_map,
-            ),
-            None => generate_function_import_statement_for_refetch_reader(),
-        };
-        let parent_type = schema
-            .server_field_data
-            .object(client_field.parent_object_id);
-
-        let (reader_ast, reader_imports) = generate_reader_ast(
-            schema,
-            selection_set,
-            0,
-            &scalar_client_field_traversal_state.refetch_paths,
-        );
-
-        let mut param_type_imports = BTreeSet::new();
-        let client_field_parameter_type = generate_client_field_parameter_type(
-            schema,
-            &selection_set,
-            parent_type.into(),
-            &mut param_type_imports,
-            0,
-        );
-        let client_field_output_type = generate_output_type(client_field);
-        RefetchReaderArtifactInfo {
-            parent_type: parent_type.into(),
-            client_field_name: client_field.name,
-            reader_ast,
-            reader_imports,
-            function_import_statement,
-            client_field_output_type,
-            client_field_parameter_type,
-            param_type_imports,
+    let (selection_set, _) = client_field
+        .selection_set_and_unwraps
+        .as_ref()
+        .expect("Expected selection set");
+    let function_import_statement = match &variant.primary_field_info {
+        Some(info) => {
+            generate_function_import_statement_for_mutation_reader(&info.primary_field_field_map)
         }
-        .path_and_content()
-    } else {
-        panic!("Unsupported: client fields not on query with no selection set")
+        None => generate_function_import_statement_for_refetch_reader(),
+    };
+    let parent_type = schema
+        .server_field_data
+        .object(client_field.parent_object_id);
+
+    let (reader_ast, reader_imports) = generate_reader_ast(
+        schema,
+        selection_set,
+        0,
+        &scalar_client_field_traversal_state.refetch_paths,
+    );
+
+    let mut param_type_imports = BTreeSet::new();
+    let client_field_parameter_type = generate_client_field_parameter_type(
+        schema,
+        &selection_set,
+        parent_type.into(),
+        &mut param_type_imports,
+        0,
+    );
+    let client_field_output_type = generate_output_type(client_field);
+    RefetchReaderArtifactInfo {
+        parent_type: parent_type.into(),
+        client_field_name: client_field.name,
+        reader_ast,
+        reader_imports,
+        function_import_statement,
+        client_field_output_type,
+        client_field_parameter_type,
+        param_type_imports,
     }
+    .path_and_content()
 }
 
 fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctionImportStatement {
