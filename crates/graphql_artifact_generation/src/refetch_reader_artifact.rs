@@ -19,12 +19,30 @@ use crate::{
     reader_ast::generate_reader_ast,
 };
 
-pub(crate) fn generate_refetch_reader_artifact(
+pub(crate) fn generate_refetch_reader_artifacts(
     schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
     variant: &ImperativelyLoadedFieldVariant,
     scalar_client_field_traversal_state: &ScalarClientFieldTraversalState,
 ) -> Vec<ArtifactPathAndContent> {
+    vec![
+        generate_refetch_reader_artifact(
+            schema,
+            client_field,
+            variant,
+            scalar_client_field_traversal_state,
+        ),
+        generate_refetch_param_type_artifact(schema, client_field),
+        generate_refetch_output_type_artifact(schema, client_field),
+    ]
+}
+
+fn generate_refetch_reader_artifact(
+    schema: &ValidatedSchema,
+    client_field: &ValidatedClientField,
+    variant: &ImperativelyLoadedFieldVariant,
+    scalar_client_field_traversal_state: &ScalarClientFieldTraversalState,
+) -> ArtifactPathAndContent {
     let (selection_set, _) = client_field
         .selection_set_and_unwraps
         .as_ref()
@@ -46,41 +64,13 @@ pub(crate) fn generate_refetch_reader_artifact(
         &scalar_client_field_traversal_state.refetch_paths,
     );
 
-    let mut param_type_imports = BTreeSet::new();
-    let client_field_parameter_type = generate_client_field_parameter_type(
-        schema,
-        &selection_set,
-        parent_type.into(),
-        &mut param_type_imports,
-        0,
-    );
-    let client_field_output_type = generate_output_type(client_field);
-
     let relative_directory = generate_path(parent_type.name, client_field.name);
 
-    let relative_directory = &relative_directory;
-
     let reader_import_statement = reader_imports_to_import_statement(&reader_imports);
-    let param_type_import_statement = param_type_imports_to_import_statement(&param_type_imports);
 
-    let client_field_name = client_field.name;
-    let output_type_text = {
-        let parent_type_name = parent_type.name;
-        let output_type = client_field_output_type;
-        format!(
-            "export type {}__{}__output_type = {};",
-            parent_type_name, client_field_name, output_type
-        )
-    };
-    let output_type_text = format!(
-        "import {{ RefetchQueryNormalizationArtifact }} from '@isograph/react';\n\
-            {output_type_text}"
-    );
+    let reader_param_type = format!("{}__{}__param", parent_type.name, client_field.name);
 
-    let parent_name = parent_type.name;
-    let reader_param_type = format!("{parent_name}__{client_field_name}__param");
     let param_type_file_name = *RESOLVER_PARAM_TYPE;
-
     let reader_content = format!(
             "import type {{RefetchReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact}} from '@isograph/react';\n\
             import {{ {reader_param_type} }} from './{param_type_file_name}';\n\
@@ -97,28 +87,76 @@ pub(crate) fn generate_refetch_reader_artifact(
             "  ", "  ", "  ", "  "
         );
 
+    ArtifactPathAndContent {
+        relative_directory: relative_directory.clone(),
+        file_name_prefix: *REFETCH_READER,
+        file_content: reader_content,
+    }
+}
+
+fn generate_refetch_output_type_artifact(
+    schema: &ValidatedSchema,
+    client_field: &ValidatedClientField,
+) -> ArtifactPathAndContent {
+    let parent_type = schema
+        .server_field_data
+        .object(client_field.parent_object_id);
+    let relative_directory = generate_path(parent_type.name, client_field.name);
+
+    let client_field_output_type = generate_output_type(client_field);
+
+    let output_type_text = {
+        let parent_type_name = parent_type.name;
+        let output_type = client_field_output_type;
+        format!(
+            "export type {}__{}__output_type = {};",
+            parent_type_name, client_field.name, output_type
+        )
+    };
+    let output_type_text = format!(
+        "import {{ RefetchQueryNormalizationArtifact }} from '@isograph/react';\n\
+            {output_type_text}"
+    );
+    ArtifactPathAndContent {
+        relative_directory: relative_directory.clone(),
+        file_name_prefix: *RESOLVER_OUTPUT_TYPE,
+        file_content: output_type_text,
+    }
+}
+
+fn generate_refetch_param_type_artifact(
+    schema: &ValidatedSchema,
+    client_field: &ValidatedClientField,
+) -> ArtifactPathAndContent {
+    let (selection_set, _) = client_field
+        .selection_set_and_unwraps
+        .as_ref()
+        .expect("Expected selection set");
+    let parent_type = schema
+        .server_field_data
+        .object(client_field.parent_object_id);
+    let relative_directory = generate_path(parent_type.name, client_field.name);
+
+    let mut param_type_imports = BTreeSet::new();
+    let client_field_parameter_type = generate_client_field_parameter_type(
+        schema,
+        &selection_set,
+        parent_type.into(),
+        &mut param_type_imports,
+        0,
+    );
+    let param_type_import_statement = param_type_imports_to_import_statement(&param_type_imports);
+    let reader_param_type = format!("{}__{}__param", parent_type.name, client_field.name);
     let param_type_content = format!(
         "{param_type_import_statement}\n\
-            export type {reader_param_type} = {client_field_parameter_type};\n",
+        export type {reader_param_type} = {client_field_parameter_type};\n",
     );
 
-    vec![
-        ArtifactPathAndContent {
-            relative_directory: relative_directory.clone(),
-            file_name_prefix: *REFETCH_READER,
-            file_content: reader_content,
-        },
-        ArtifactPathAndContent {
-            relative_directory: relative_directory.clone(),
-            file_name_prefix: *RESOLVER_PARAM_TYPE,
-            file_content: param_type_content,
-        },
-        ArtifactPathAndContent {
-            relative_directory: relative_directory.clone(),
-            file_name_prefix: *RESOLVER_OUTPUT_TYPE,
-            file_content: output_type_text,
-        },
-    ]
+    ArtifactPathAndContent {
+        relative_directory: relative_directory.clone(),
+        file_name_prefix: *RESOLVER_PARAM_TYPE,
+        file_content: param_type_content,
+    }
 }
 
 fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctionImportStatement {

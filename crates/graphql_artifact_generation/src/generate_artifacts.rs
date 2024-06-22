@@ -24,7 +24,7 @@ use crate::{
     eager_reader_artifact::generate_eager_reader_artifacts,
     entrypoint_artifact::generate_entrypoint_artifacts, import_statements::ParamTypeImports,
     iso_overload_file::build_iso_overload,
-    refetch_reader_artifact::generate_refetch_reader_artifact,
+    refetch_reader_artifact::generate_refetch_reader_artifacts,
 };
 
 lazy_static! {
@@ -88,7 +88,7 @@ pub fn get_artifact_path_and_content<'schema>(
                 scalar_client_field_traversal_state,
             ),
             ClientFieldVariant::ImperativelyLoadedField(variant) => {
-                generate_refetch_reader_artifact(
+                generate_refetch_reader_artifacts(
                     schema,
                     encountered_client_field,
                     variant,
