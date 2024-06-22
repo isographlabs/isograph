@@ -10,10 +10,13 @@ use isograph_schema::{
 use crate::{
     generate_artifacts::{
         generate_client_field_parameter_type, generate_output_type, generate_path,
-        get_output_type_text, param_type_imports_to_import_statement,
-        reader_imports_to_import_statement, ClientFieldFunctionImportStatement,
-        ClientFieldOutputType, ClientFieldParameterType, ParamTypeImports, ReaderAst,
-        ReaderImports, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
+        get_output_type_text, ClientFieldFunctionImportStatement, ClientFieldOutputType,
+        ClientFieldParameterType, ReaderAst, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE,
+        RESOLVER_READER,
+    },
+    import_statements::{
+        param_type_imports_to_import_statement, reader_imports_to_import_statement,
+        ParamTypeImports, ReaderImports,
     },
     reader_ast::generate_reader_ast,
 };

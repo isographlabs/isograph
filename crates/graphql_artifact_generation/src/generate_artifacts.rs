@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     fmt::{self, Debug, Display},
     path::PathBuf,
 };
@@ -15,14 +15,15 @@ use isograph_lang_types::{
     ServerFieldSelection,
 };
 use isograph_schema::{
-    ClientFieldVariant, FieldDefinitionLocation, ObjectTypeAndFieldName, SchemaObject,
-    UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema, ValidatedSelection,
+    ClientFieldVariant, FieldDefinitionLocation, SchemaObject, UserWrittenComponentVariant,
+    ValidatedClientField, ValidatedSchema, ValidatedSelection,
 };
 use lazy_static::lazy_static;
 
 use crate::{
     eager_reader_artifact::generate_eager_reader_artifact,
-    entrypoint_artifact::generate_entrypoint_artifacts, iso_overload_file::build_iso_overload,
+    entrypoint_artifact::generate_entrypoint_artifacts, import_statements::ParamTypeImports,
+    iso_overload_file::build_iso_overload,
     refetch_reader_artifact::generate_refetch_reader_artifact,
 };
 
@@ -103,54 +104,6 @@ pub fn get_artifact_path_and_content<'schema>(
     path_and_contents.push(build_iso_overload(schema));
 
     path_and_contents
-}
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) enum ResolverReaderOrRefetchResolver {
-    ResolverReader,
-    RefetchReader,
-}
-
-impl ResolverReaderOrRefetchResolver {
-    pub fn filename(&self) -> &'static str {
-        match self {
-            ResolverReaderOrRefetchResolver::ResolverReader => "resolver_reader",
-            ResolverReaderOrRefetchResolver::RefetchReader => "refetch_reader",
-        }
-    }
-}
-
-pub(crate) type ReaderImports = BTreeMap<ObjectTypeAndFieldName, ResolverReaderOrRefetchResolver>;
-pub(crate) type ParamTypeImports = BTreeSet<ObjectTypeAndFieldName>;
-
-pub(crate) fn reader_imports_to_import_statement(reader_imports: &ReaderImports) -> String {
-    let mut output = String::new();
-    for (type_and_field, artifact_type) in reader_imports.iter() {
-        output.push_str(&format!(
-            "import {}__{} from '../../{}/{}/{}';\n",
-            type_and_field.underscore_separated(),
-            artifact_type.filename(),
-            type_and_field.type_name,
-            type_and_field.field_name,
-            artifact_type.filename()
-        ));
-    }
-    output
-}
-
-pub(crate) fn param_type_imports_to_import_statement(
-    param_type_imports: &ParamTypeImports,
-) -> String {
-    let mut output = String::new();
-    for type_and_field in param_type_imports.iter() {
-        output.push_str(&format!(
-            "import {{ type {}__output_type }} from '../../{}/{}/output_type';\n",
-            type_and_field.underscore_separated(),
-            type_and_field.type_name,
-            type_and_field.field_name,
-        ));
-    }
-    output
 }
 
 pub(crate) fn get_serialized_field_arguments(

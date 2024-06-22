@@ -8,8 +8,9 @@ use isograph_schema::{
     ValidatedSelection,
 };
 
-use crate::generate_artifacts::{
-    get_serialized_field_arguments, ReaderAst, ReaderImports, ResolverReaderOrRefetchResolver,
+use crate::{
+    generate_artifacts::{get_serialized_field_arguments, ReaderAst},
+    import_statements::{ReaderImports, ResolverReaderOrRefetchResolver},
 };
 
 fn generate_reader_ast_node(

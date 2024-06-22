@@ -2,6 +2,7 @@ mod eager_reader_artifact;
 mod entrypoint_artifact;
 mod generate_artifacts;
 mod imperatively_loaded_fields;
+mod import_statements;
 mod iso_overload_file;
 mod normalization_ast_text;
 mod query_text;
