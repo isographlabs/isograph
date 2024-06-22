@@ -21,7 +21,7 @@ use isograph_schema::{
 use lazy_static::lazy_static;
 
 use crate::{
-    eager_reader_artifact::generate_eager_reader_artifact,
+    eager_reader_artifact::generate_eager_reader_artifacts,
     entrypoint_artifact::generate_entrypoint_artifacts, import_statements::ParamTypeImports,
     iso_overload_file::build_iso_overload,
     refetch_reader_artifact::generate_refetch_reader_artifact,
@@ -79,7 +79,7 @@ pub fn get_artifact_path_and_content<'schema>(
 
         // Generate reader ASTs for all encountered client fields, which may be reader or refetch reader
         path_and_contents.extend(match &encountered_client_field.variant {
-            ClientFieldVariant::UserWritten(info) => generate_eager_reader_artifact(
+            ClientFieldVariant::UserWritten(info) => generate_eager_reader_artifacts(
                 schema,
                 encountered_client_field,
                 project_root,
