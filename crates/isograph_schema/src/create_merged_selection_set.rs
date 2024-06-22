@@ -143,7 +143,6 @@ pub struct ScalarClientFieldTraversalState {
     pub refetch_paths: BTreeMap<PathToRefetchField, RootRefetchedPath>,
 
     /// Likewise for reachable variables
-    /// TODO: write to this
     pub reachable_variables: HashSet<VariableName>,
 
     /// The (mutable) path from the current client field to wherever we are iterating
