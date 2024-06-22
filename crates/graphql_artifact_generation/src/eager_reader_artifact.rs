@@ -10,9 +10,8 @@ use isograph_schema::{
 use crate::{
     generate_artifacts::{
         generate_client_field_parameter_type, generate_output_type, generate_path,
-        get_output_type_text, ClientFieldFunctionImportStatement, ClientFieldOutputType,
-        ClientFieldParameterType, ReaderAst, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE,
-        RESOLVER_READER,
+        ClientFieldFunctionImportStatement, ClientFieldOutputType, ClientFieldParameterType,
+        ReaderAst, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
     },
     import_statements::{
         param_type_imports_to_import_statement, reader_imports_to_import_statement,
@@ -117,12 +116,17 @@ impl<'schema> EagerReaderArtifactInfo<'schema> {
 
         let parent_name = parent_type.name;
         let reader_param_type = format!("{parent_name}__{client_field_name}__param");
-        let output_type_text = get_output_type_text(
-            &function_import_statement,
-            parent_type.name,
-            client_field_name,
-            client_field_output_type,
-        );
+        let output_type_text = {
+            let function_import_statement = &function_import_statement;
+            let parent_type_name = parent_type.name;
+            let field_name = client_field_name;
+            let output_type = client_field_output_type;
+            format!(
+                "{function_import_statement}\n\
+                export type {}__{}__output_type = {};",
+                parent_type_name, field_name, output_type
+            )
+        };
 
         let (reader_content, final_output_type_text) =
             if let UserWrittenComponentVariant::Eager = user_written_component_variant {

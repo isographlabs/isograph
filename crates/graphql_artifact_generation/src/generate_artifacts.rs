@@ -187,20 +187,6 @@ pub fn generate_path(
     PathBuf::from(object_name.lookup()).join(field_name.lookup())
 }
 
-pub(crate) fn get_output_type_text(
-    function_import_statement: &ClientFieldFunctionImportStatement,
-    parent_type_name: IsographObjectTypeName,
-    field_name: SelectableFieldName,
-    output_type: ClientFieldOutputType,
-) -> String {
-    let function_import_statement = &function_import_statement.0;
-    format!(
-        "{function_import_statement}\n\
-        export type {}__{}__output_type = {};",
-        parent_type_name, field_name, output_type
-    )
-}
-
 pub(crate) fn generate_client_field_parameter_type(
     schema: &ValidatedSchema,
     selection_set: &[WithSpan<ValidatedSelection>],

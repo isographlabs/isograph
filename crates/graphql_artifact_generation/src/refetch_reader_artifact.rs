@@ -10,9 +10,8 @@ use isograph_schema::{
 use crate::{
     generate_artifacts::{
         generate_client_field_parameter_type, generate_output_type, generate_path,
-        get_output_type_text, ClientFieldFunctionImportStatement, ClientFieldOutputType,
-        ClientFieldParameterType, ReaderAst, REFETCH_READER, RESOLVER_OUTPUT_TYPE,
-        RESOLVER_PARAM_TYPE,
+        ClientFieldFunctionImportStatement, ClientFieldOutputType, ClientFieldParameterType,
+        ReaderAst, REFETCH_READER, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE,
     },
     import_statements::{
         param_type_imports_to_import_statement, reader_imports_to_import_statement,
@@ -63,12 +62,15 @@ impl<'schema> RefetchReaderArtifactInfo<'schema> {
         let param_type_import_statement =
             param_type_imports_to_import_statement(&param_type_imports);
 
-        let output_type_text = get_output_type_text(
-            &function_import_statement,
-            parent_type.name,
-            client_field_name,
-            client_field_output_type,
-        );
+        let output_type_text = {
+            let parent_type_name = parent_type.name;
+            let field_name = client_field_name;
+            let output_type = client_field_output_type;
+            format!(
+                "export type {}__{}__output_type = {};",
+                parent_type_name, field_name, output_type
+            )
+        };
         let output_type_text = format!(
             "import {{ RefetchQueryNormalizationArtifact }} from '@isograph/react';\n\
             {output_type_text}"
