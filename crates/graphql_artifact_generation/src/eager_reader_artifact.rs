@@ -53,6 +53,7 @@ pub fn generate_eager_reader_artifact<'schema>(
         0,
     );
     let client_field_output_type = generate_output_type(client_field);
+
     let function_import_statement =
         generate_function_import_statement(project_root, artifact_directory, info);
 
