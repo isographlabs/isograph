@@ -38,28 +38,25 @@ lazy_static! {
 
 /// Get all artifacts according to the following scheme:
 ///
-/// For each entrypoint, generate an entrypoint artifact.
-/// - While creating the artifact's merged selection set:
-///   - note imperative client fields (e.g. __refetch, exposeAs and
-///     @loadable fields.) and their path, and queue up imperative
-///     field artifacts
+/// For each entrypoint, generate an entrypoint artifact. This involves
+/// generating the merged selection map.
 ///
-/// For each hand-written client field, generate
-/// - parameter in type/field/parameter_type.ts
-/// - output type artifacts
-///   - note that we only really need to do this for client fields
-///     reachable from other client fields and those that serve
-///     as entrypoints
-/// - reader artifacts in type/field/reader.ts
-///   - note that we only need readers if an entrypoint shows up as part
-///     of an entrypoint, but it doesn't seem to hurt to have readers for
-///     all hand-written fields, since one may want to debug a reader.
+/// - While creating a client field's merged selection map, whenever we enter
+///   a client field, we check a cache (`global_client_field_map`). If that
+///   cache is empty, we populate it with the client field's merged selection
+///   map, reachable variables, and paths to refetch fields.
+/// - If that cache is full, we reuse the values in the cache.
+/// - Using that value, we merge it the child field's selection map into the
+///   parent's selection map, merge variables, etc.
 ///
-/// For each imperative field artifact, generate:
-/// - reader (i.e. to select id field), in type/field/imperative_reader.ts
-/// - entrypoint + output type in root_type/field/imperative_field_N.ts (if slim)
-/// - entrypoint + output type in type/field/entrypoint.ts (if not slim)
-/// - if readable, reader in type/field/reader.ts
+/// For each field that we encounter in this way (including the entrypoint
+/// itself), we must generate a resolver or refetch reader artifact. (Currently,
+/// each field will have only one or the other; but once we have loadable fields,
+/// the loadable field will have both a refetch and resolver reader artifact.)
+///
+/// Also, for each user-written resolver, we must generate a param_type artifact.
+/// For each resolver that is reachable from a reader, we must also generate an
+/// output_type artifact.
 pub fn get_artifact_path_and_content<'schema>(
     schema: &'schema ValidatedSchema,
     project_root: &PathBuf,
@@ -189,14 +186,14 @@ pub fn generate_path(
 
 pub(crate) fn generate_client_field_parameter_type(
     schema: &ValidatedSchema,
-    selection_set: &[WithSpan<ValidatedSelection>],
+    selection_map: &[WithSpan<ValidatedSelection>],
     parent_type: &SchemaObject,
     nested_client_field_imports: &mut ParamTypeImports,
     indentation_level: u8,
 ) -> ClientFieldParameterType {
     // TODO use unwraps
     let mut client_field_parameter_type = "{\n".to_string();
-    for selection in selection_set.iter() {
+    for selection in selection_map.iter() {
         write_query_types_from_selection(
             schema,
             &mut client_field_parameter_type,
