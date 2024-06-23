@@ -10,8 +10,9 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ClientFieldId, NonConstantValue, RefetchQueryIndex, SelectableServerFieldId, Selection,
-    SelectionFieldArgument, ServerFieldSelection, ServerObjectId, VariableDefinition,
+    ClientFieldId, IsographSelectionVariant, NonConstantValue, RefetchQueryIndex,
+    SelectableServerFieldId, Selection, SelectionFieldArgument, ServerFieldSelection,
+    ServerObjectId, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -32,6 +33,7 @@ pub type ClientFieldToCompletedMergeTraversalStateMap =
 pub struct ClientFieldTraversalResult {
     pub traversal_state: ScalarClientFieldTraversalState,
     pub merged_selection_map: MergedSelectionMap,
+    pub was_selected_loadably: bool,
 }
 
 lazy_static! {
@@ -287,10 +289,15 @@ pub fn create_merged_selection_map_and_insert_into_global_map(
     validated_selections: &[WithSpan<ValidatedSelection>],
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
     root_object: &ValidatedClientField,
+    was_selected_loadably: bool,
 ) -> ClientFieldTraversalResult {
     // TODO move this check outside of this function
-    match global_client_field_map.get(&root_object.id) {
-        Some(traversal_result) => traversal_result.clone(),
+    match global_client_field_map.get_mut(&root_object.id) {
+        Some(traversal_result) => {
+            traversal_result.was_selected_loadably =
+                traversal_result.was_selected_loadably || was_selected_loadably;
+            traversal_result.clone()
+        }
         None => {
             let mut merge_traversal_state = ScalarClientFieldTraversalState::new();
             let selection_map = create_selection_map_with_merge_traversal_state(
@@ -308,6 +315,7 @@ pub fn create_merged_selection_map_and_insert_into_global_map(
                 ClientFieldTraversalResult {
                     traversal_state: merge_traversal_state.clone(),
                     merged_selection_map: selection_map.clone(),
+                    was_selected_loadably,
                 },
             );
 
@@ -315,6 +323,7 @@ pub fn create_merged_selection_map_and_insert_into_global_map(
             ClientFieldTraversalResult {
                 traversal_state: merge_traversal_state,
                 merged_selection_map: selection_map,
+                was_selected_loadably,
             }
         }
     }
@@ -542,10 +551,10 @@ fn merge_validated_selections_into_selection_map(
                     .extend(variables.into_iter());
 
                 match validated_server_field {
-                    ServerFieldSelection::ScalarField(scalar_field) => {
-                        match &scalar_field.associated_data.location {
+                    ServerFieldSelection::ScalarField(scalar_field_selection) => {
+                        match &scalar_field_selection.associated_data.location {
                             FieldDefinitionLocation::Server(_) => {
-                                merge_scalar_server_field(scalar_field, parent_map);
+                                merge_scalar_server_field(scalar_field_selection, parent_map);
                             }
                             FieldDefinitionLocation::Client(client_field_id) => {
                                 let newly_encountered_scalar_client_field =
@@ -575,6 +584,7 @@ fn merge_validated_selections_into_selection_map(
                                     merge_traversal_state,
                                     newly_encountered_scalar_client_field,
                                     global_client_field_map,
+                                    &scalar_field_selection.associated_data.selection_variant,
                                 )
                             }
                         };
@@ -703,16 +713,19 @@ fn merge_scalar_client_field(
     parent_merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_scalar_client_field: &ValidatedClientField,
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
+    selection_variant: &IsographSelectionVariant,
 ) {
     let ClientFieldTraversalResult {
         traversal_state,
         merged_selection_map,
+        ..
     } = create_merged_selection_map_and_insert_into_global_map(
         schema,
         parent_type,
         &newly_encountered_scalar_client_field.selection_set,
         global_client_field_map,
         newly_encountered_scalar_client_field,
+        matches!(selection_variant, &IsographSelectionVariant::Loadable(_)),
     );
 
     parent_merge_traversal_state.incorporate_results_of_iterating_into_child(&traversal_state);

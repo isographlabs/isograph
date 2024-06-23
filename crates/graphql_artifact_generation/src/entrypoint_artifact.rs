@@ -41,12 +41,14 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
     let ClientFieldTraversalResult {
         traversal_state,
         merged_selection_map,
+        ..
     } = create_merged_selection_map_and_insert_into_global_map(
         schema,
         schema.server_field_data.object(entrypoint.parent_object_id),
         &entrypoint.selection_set,
         global_client_field_map,
         entrypoint,
+        false,
     );
 
     // TODO when we do not call generate_entrypoint_artifact extraneously,
