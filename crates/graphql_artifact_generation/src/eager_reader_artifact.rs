@@ -28,15 +28,13 @@ pub(crate) fn generate_eager_reader_artifact(
     scalar_client_field_traversal_state: &ScalarClientFieldTraversalState,
 ) -> ArtifactPathAndContent {
     let user_written_component_variant = info.user_written_component_variant;
-    let (ref selection_set, _) = client_field.selection_set_and_unwraps;
-
     let parent_type = schema
         .server_field_data
         .object(client_field.parent_object_id);
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
-        selection_set,
+        &client_field.selection_set,
         0,
         &scalar_client_field_traversal_state.refetch_paths,
     );
@@ -109,8 +107,6 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
     schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
 ) -> ArtifactPathAndContent {
-    let (ref selection_set, _) = client_field.selection_set_and_unwraps;
-
     let parent_type = schema
         .server_field_data
         .object(client_field.parent_object_id);
@@ -119,7 +115,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
     let mut param_type_imports = BTreeSet::new();
     let client_field_parameter_type = generate_client_field_parameter_type(
         schema,
-        &selection_set,
+        &client_field.selection_set,
         parent_type.into(),
         &mut param_type_imports,
         0,

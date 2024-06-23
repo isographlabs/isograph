@@ -447,17 +447,15 @@ pub struct ClientField<
     // TODO make this a ClientFieldName that can be converted into a SelectableFieldName
     pub name: SelectableFieldName,
     pub id: ClientFieldId,
-    pub selection_set_and_unwraps: (
-        Vec<
-            WithSpan<
-                Selection<
-                    TClientFieldSelectionScalarFieldAssociatedData,
-                    TClientFieldSelectionLinkedFieldAssociatedData,
-                >,
+    pub selection_set: Vec<
+        WithSpan<
+            Selection<
+                TClientFieldSelectionScalarFieldAssociatedData,
+                TClientFieldSelectionLinkedFieldAssociatedData,
             >,
         >,
-        Vec<WithSpan<Unwrap>>,
-    ),
+    >,
+    pub unwraps: Vec<WithSpan<Unwrap>>,
 
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,

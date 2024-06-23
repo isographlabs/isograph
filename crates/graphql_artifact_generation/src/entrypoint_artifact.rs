@@ -35,14 +35,13 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
     global_client_field_map: &'a mut ClientFieldToCompletedMergeTraversalStateMap,
 ) -> Vec<ArtifactPathAndContent> {
     let entrypoint = schema.client_field(entrypoint_id);
-    let (ref selection_set, _) = entrypoint.selection_set_and_unwraps;
 
     let query_name = entrypoint.name.into();
 
     let (traversal_state, selection_map) = create_merged_selection_map_and_insert_into_global_map(
         schema,
         schema.server_field_data.object(entrypoint.parent_object_id),
-        selection_set,
+        &entrypoint.selection_set,
         global_client_field_map,
         entrypoint,
     );

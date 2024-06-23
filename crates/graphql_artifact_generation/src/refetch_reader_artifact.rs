@@ -20,7 +20,6 @@ pub(crate) fn generate_refetch_reader_artifact(
     variant: &ImperativelyLoadedFieldVariant,
     scalar_client_field_traversal_state: &ScalarClientFieldTraversalState,
 ) -> ArtifactPathAndContent {
-    let (selection_set, _) = &client_field.selection_set_and_unwraps;
     let function_import_statement = match &variant.primary_field_info {
         Some(info) => {
             generate_function_import_statement_for_mutation_reader(&info.primary_field_field_map)
@@ -33,7 +32,7 @@ pub(crate) fn generate_refetch_reader_artifact(
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
-        selection_set,
+        &client_field.selection_set,
         0,
         &scalar_client_field_traversal_state.refetch_paths,
     );

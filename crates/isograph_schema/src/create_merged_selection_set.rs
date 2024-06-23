@@ -694,9 +694,7 @@ fn merge_scalar_client_field(
     let (child_traversal_state, child_map) = create_merged_selection_map_and_insert_into_global_map(
         schema,
         parent_type,
-        &newly_encountered_scalar_client_field
-            .selection_set_and_unwraps
-            .0,
+        &newly_encountered_scalar_client_field.selection_set,
         global_client_field_map,
         newly_encountered_scalar_client_field,
     );

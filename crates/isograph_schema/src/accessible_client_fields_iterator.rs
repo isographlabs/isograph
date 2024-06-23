@@ -9,10 +9,8 @@ impl ValidatedClientField {
         &'a self,
         schema: &'a ValidatedSchema,
     ) -> impl Iterator<Item = &'a ValidatedClientField> + 'a {
-        let (ref selection_set, _) = self.selection_set_and_unwraps;
-
         AccessibleClientFieldIterator {
-            selection_set,
+            selection_set: &self.selection_set,
             index: 0,
             schema,
             sub_iterator: None,

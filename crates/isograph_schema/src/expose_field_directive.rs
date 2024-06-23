@@ -221,7 +221,8 @@ impl UnvalidatedSchema {
                 // set_pet_best_friend
                 name: client_field_scalar_selection_name,
                 id: mutation_field_client_field_id,
-                selection_set_and_unwraps: (fields.to_vec(), vec![]),
+                selection_set: fields.to_vec(),
+                unwraps: vec![],
                 variant: ClientFieldVariant::ImperativelyLoadedField(
                     ImperativelyLoadedFieldVariant {
                         client_field_scalar_selection_name: client_field_scalar_selection_name
