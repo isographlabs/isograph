@@ -147,7 +147,7 @@ fn generate_refetch_query_artifact_import(
                 .imperatively_loaded_field_variant
                 .top_level_schema_field_arguments
                 .iter()
-                .map(|x| x.item.name.item.lookup().intern().into()),
+                .map(|x| x.name.item.lookup().intern().into()),
         );
         array_syntax.push_str(&format!(
             "  {{ artifact: refetchQuery{}, allowedVariables: {} }},\n",

@@ -146,10 +146,14 @@ pub struct PrimaryFieldInfo {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ImperativelyLoadedFieldVariant {
     pub client_field_scalar_selection_name: ScalarFieldName,
+    /// What field should we select when generating the refetch query?
     pub top_level_schema_field_name: LinkedFieldName,
-    pub top_level_schema_field_arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+    /// The arguments we must pass to the top level schema field, e.g. id: ID!
+    /// for node(id: $id)
+    pub top_level_schema_field_arguments: Vec<GraphQLInputValueDefinition>,
 
-    // Note: if this is missing, this is a refetch field
+    /// If we need to select a sub-field, this is Some(...). We should model
+    /// this differently, this is very awkward!
     pub primary_field_info: Option<PrimaryFieldInfo>,
 
     pub root_object_id: ServerObjectId,

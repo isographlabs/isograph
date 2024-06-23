@@ -388,11 +388,11 @@ fn process_imperatively_loaded_field(
             // TODO don't clone
             .cloned()
             .map(|x| {
-                let variable_name = x.item.name.map(|value_name| value_name.into());
+                let variable_name = x.name.map(|value_name| value_name.into());
                 definitions_of_used_variables.push(WithSpan {
                     item: VariableDefinition {
                         name: variable_name,
-                        type_: x.item.type_.clone().map(|type_name| {
+                        type_: x.type_.clone().map(|type_name| {
                             *schema
                                 .server_field_data
                                 .defined_types
@@ -408,11 +408,11 @@ fn process_imperatively_loaded_field(
 
                 SelectionFieldArgument {
                     name: WithSpan::new(
-                        x.item.name.item.lookup().intern().into(),
+                        x.name.item.lookup().intern().into(),
                         Span::todo_generated(),
                     ),
                     value: WithSpan::new(
-                        NonConstantValue::Variable(x.item.name.item.into()),
+                        NonConstantValue::Variable(x.name.item.into()),
                         Span::todo_generated(),
                     ),
                 }

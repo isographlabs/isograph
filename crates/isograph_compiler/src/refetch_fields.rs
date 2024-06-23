@@ -67,21 +67,18 @@ fn add_refetch_field_to_object(
                 Span::todo_generated(),
             );
 
-            let id_arguments = vec![WithLocation::new(
-                GraphQLInputValueDefinition {
-                    description: None,
-                    name: WithLocation::new("id".intern().into(), Location::generated()),
-                    type_: GraphQLTypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
-                        NamedTypeAnnotation(WithSpan::new(
-                            "ID".intern().into(),
-                            Span::todo_generated(),
-                        )),
-                    ))),
-                    default_value: None,
-                    directives: vec![],
-                },
-                Location::generated(),
-            )];
+            let id_arguments = vec![GraphQLInputValueDefinition {
+                description: None,
+                name: WithLocation::new("id".intern().into(), Location::generated()),
+                type_: GraphQLTypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
+                    NamedTypeAnnotation(WithSpan::new(
+                        "ID".intern().into(),
+                        Span::todo_generated(),
+                    )),
+                ))),
+                default_value: None,
+                directives: vec![],
+            }];
 
             client_fields.push(ClientField {
                 description: Some(

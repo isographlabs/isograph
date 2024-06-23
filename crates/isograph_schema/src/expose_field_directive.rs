@@ -230,7 +230,10 @@ impl UnvalidatedSchema {
                             .intern()
                             .into(),
                         top_level_schema_field_name,
-                        top_level_schema_field_arguments: mutation_field_arguments.to_vec(),
+                        top_level_schema_field_arguments: mutation_field_arguments
+                            .into_iter()
+                            .map(|x| x.item)
+                            .collect::<Vec<_>>(),
 
                         primary_field_info: Some(PrimaryFieldInfo {
                             primary_field_name,
