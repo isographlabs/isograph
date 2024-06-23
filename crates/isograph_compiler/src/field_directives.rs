@@ -35,12 +35,12 @@ pub fn validate_isograph_field_directives(
             parent_type,
             client_field_name,
             description,
-            selection_set_and_unwraps,
+            selection_set,
+            unwraps,
             directives,
             variable_definitions,
             definition_path,
         } = with_span.item;
-        let (selection_set, unwraps) = selection_set_and_unwraps;
         let selecton_set_or_errors = and_then_selection_set_and_collect_errors(
             selection_set,
             &|scalar_field_selection| {
@@ -74,7 +74,8 @@ pub fn validate_isograph_field_directives(
                                 parent_type,
                                 client_field_name,
                                 description,
-                                selection_set_and_unwraps: (new_selection_set, unwraps),
+                                selection_set: new_selection_set,
+                                unwraps,
                                 directives,
                                 variable_definitions,
                                 definition_path,

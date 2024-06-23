@@ -139,7 +139,7 @@ fn parse_client_field_declaration_inner<'a>(
 
             let description = parse_optional_description(tokens);
 
-            let selection_set_and_unwraps = parse_selection_set_and_unwraps(tokens, text_source)?;
+            let (selection_set, unwraps) = parse_selection_set_and_unwraps(tokens, text_source)?;
 
             let const_export_name = const_export_name.ok_or_else(|| {
                 WithSpan::new(
@@ -160,7 +160,8 @@ fn parse_client_field_declaration_inner<'a>(
                 parent_type,
                 client_field_name,
                 description,
-                selection_set_and_unwraps,
+                selection_set,
+                unwraps,
                 definition_path: definition_file_path,
                 directives,
                 const_export_name: const_export_name.intern().into(),
