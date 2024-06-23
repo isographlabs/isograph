@@ -1,7 +1,9 @@
 use std::collections::{BTreeMap, HashSet};
 
 use common_lang_types::{SelectableFieldName, WithSpan};
-use isograph_lang_types::{ClientFieldId, RefetchQueryIndex, Selection, ServerFieldSelection};
+use isograph_lang_types::{
+    ClientFieldId, IsographSelectionVariant, RefetchQueryIndex, Selection, ServerFieldSelection,
+};
 use isograph_schema::{
     into_name_and_arguments, ArgumentKeyAndValue, ClientFieldVariant, FieldDefinitionLocation,
     NameAndArguments, PathToRefetchField, RootRefetchedPath, ValidatedClientField,
@@ -119,15 +121,31 @@ fn scalar_client_defined_field_ast_node(
             indentation_level,
             scalar_field_selection,
         ),
-        ClientFieldVariant::UserWritten(_) => user_written_variant_ast_node(
-            scalar_field_selection,
-            indentation_level,
-            nested_client_field,
-            schema,
-            path,
-            root_refetched_paths,
-            reader_imports,
-        ),
+        ClientFieldVariant::UserWritten(_) => {
+            if matches!(
+                scalar_field_selection.associated_data.selection_variant,
+                IsographSelectionVariant::Loadable(_)
+            ) {
+                imperatively_loaded_variant_ast_node(
+                    nested_client_field,
+                    reader_imports,
+                    root_refetched_paths,
+                    path,
+                    indentation_level,
+                    scalar_field_selection,
+                )
+            } else {
+                user_written_variant_ast_node(
+                    scalar_field_selection,
+                    indentation_level,
+                    nested_client_field,
+                    schema,
+                    path,
+                    root_refetched_paths,
+                    reader_imports,
+                )
+            }
+        }
     }
 }
 

@@ -559,6 +559,41 @@ fn merge_validated_selections_into_selection_map(
                             FieldDefinitionLocation::Client(client_field_id) => {
                                 let newly_encountered_scalar_client_field =
                                     schema.client_field(*client_field_id);
+
+                                let is_selected_loadably = matches!(
+                                    scalar_field_selection.associated_data.selection_variant,
+                                    IsographSelectionVariant::Loadable(_)
+                                );
+
+                                if is_selected_loadably {
+                                    merge_traversal_state.refetch_paths.insert(
+                                        PathToRefetchField {
+                                            linked_fields: merge_traversal_state
+                                                .traversal_path
+                                                .clone(),
+                                            field_name: newly_encountered_scalar_client_field.name,
+                                        },
+                                        RootRefetchedPath {
+                                            field_name: newly_encountered_scalar_client_field.name,
+                                            path_to_refetch_field_info: PathToRefetchFieldInfo {
+                                                refetch_field_parent_id: parent_type.id,
+                                                imperatively_loaded_field_variant:
+                                                    ImperativelyLoadedFieldVariant {
+                                                        client_field_scalar_selection_name:
+                                                            scalar_field_selection.name.item,
+                                                        top_level_schema_field_name:
+                                                            *NODE_FIELD_NAME,
+                                                        top_level_schema_field_arguments:
+                                                            id_arguments(),
+                                                        primary_field_info: None,
+                                                        root_object_id: schema.query_id(),
+                                                    },
+                                                extra_selections: BTreeMap::new(),
+                                            },
+                                        },
+                                    );
+                                }
+
                                 if let Some((path, info)) = optional_field_refetch_info(
                                     newly_encountered_scalar_client_field,
                                     merge_traversal_state,

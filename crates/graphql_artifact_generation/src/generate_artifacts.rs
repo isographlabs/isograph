@@ -85,31 +85,76 @@ pub fn get_artifact_path_and_content<'schema>(
     for (
         encountered_client_field_id,
         ClientFieldTraversalResult {
-            traversal_state, ..
+            traversal_state,
+            was_selected_loadably,
+            ..
         },
     ) in &global_client_field_map
     {
         let encountered_client_field = schema.client_field(*encountered_client_field_id);
 
         // Generate reader ASTs for all encountered client fields, which may be reader or refetch reader
-        path_and_contents.push(match &encountered_client_field.variant {
-            ClientFieldVariant::UserWritten(info) => generate_eager_reader_artifact(
-                schema,
-                encountered_client_field,
-                project_root,
-                artifact_directory,
-                *info,
-                traversal_state,
-            ),
+        match &encountered_client_field.variant {
+            ClientFieldVariant::UserWritten(info) => {
+                path_and_contents.push(generate_eager_reader_artifact(
+                    schema,
+                    encountered_client_field,
+                    project_root,
+                    artifact_directory,
+                    *info,
+                    traversal_state,
+                ));
+
+                if *was_selected_loadably {
+                    #[allow(unused_doc_comments)]
+                    /**
+                     * This is incorrect. We currently generate a refetch reader artifact
+                     * that uses the selection set of the loadable field for its refetch
+                     * reader AST.
+                     *
+                     * Explanation of how it is and how it should be:
+                     * - Currently, client fields have only a single selection set.
+                     * - It is used for generating the resolver reader and refetch reader
+                     *   artifacts. Previously, no client field had both, so one selection set
+                     *   could play both roles.
+                     * - Instead, client fields should have:
+                     *   - reader_selection_set: SelectionSet | RefetchSelectionSet
+                     *   - variable_selection_set: SelectionSet
+                     *   - fetch_strategy: FetchStrategy (e.g. use a specific field (Node,
+                     *     Mutation, etc), or generate a path from Query, etc.)
+                     * - Both selection sets above can be empty (i.e. can be used to read out
+                     *   an empty object.)
+                     *
+                     * For fields that are fetched as part of the parent query (i.e. regular
+                     * client fields that are not fetched loadably), the reader_selection_set
+                     * is merged into the parent merged selection set.
+                     *
+                     * For fields that are imperatively fetched (e.g. __refetch, magic mutation
+                     * fields, @loadable fields, etc.), the variable selection set is merged
+                     * into the parent, and the FetchStategy is used to generate the actual
+                     * network request.
+                     *
+                     * TODO:
+                     * - not all fields (e.g. __refetch, magic mutation fields) can be fetched
+                     *   as part of the parent, we should model that.
+                     */
+                    path_and_contents.push(generate_refetch_reader_artifact(
+                        schema,
+                        encountered_client_field,
+                        None,
+                        traversal_state,
+                    ))
+                }
+            }
             ClientFieldVariant::ImperativelyLoadedField(variant) => {
-                generate_refetch_reader_artifact(
+                path_and_contents.push(generate_refetch_reader_artifact(
                     schema,
                     encountered_client_field,
                     variant.primary_field_info.as_ref(),
                     traversal_state,
-                )
+                ))
             }
-        });
+        };
     }
 
     for user_written_client_field in

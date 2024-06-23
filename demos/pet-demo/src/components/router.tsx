@@ -6,7 +6,7 @@ import { useRouter } from 'next/router';
 
 export type PetId = string;
 
-export type Route = HomeRoute | PetDetailRoute;
+export type Route = HomeRoute | PetDetailRoute | LoadableRoute;
 
 export type HomeRoute = {
   kind: 'Home';
@@ -17,6 +17,10 @@ export type PetDetailRoute = {
   id: PetId;
 };
 
+export type LoadableRoute = {
+  kind: 'Loadable';
+};
+
 function toRoute(route: Route): string {
   switch (route.kind) {
     case 'Home': {
@@ -24,6 +28,9 @@ function toRoute(route: Route): string {
     }
     case 'PetDetail': {
       return `/pet/${route.id}`;
+    }
+    case 'Loadable': {
+      return '/loadable';
     }
   }
 }
@@ -64,6 +71,8 @@ function Router({
       return <HomeRouteLoader navigateTo={setRoute} />;
     case 'PetDetail':
       return <PetDetailRouteLoader navigateTo={setRoute} route={route} />;
+    case 'Loadable':
+      return <LoadableDemo />;
     default:
       const exhaustiveCheck: never = route;
   }
@@ -106,4 +115,19 @@ function PetDetailRouteLoader({
 // If window.__LOG is true, Isograph will log a bunch of diagnostics.
 if (typeof window !== 'undefined') {
   window.__LOG = true;
+}
+
+function LoadableDemo() {
+  const { queryReference } = useLazyReference(
+    iso(`entrypoint Query.LoadableDemo`),
+    {},
+  );
+
+  const data = useResult(queryReference);
+  console.log('loadable', data);
+  if (typeof window !== 'undefined') {
+    // @ts-expect-error
+    window.data = data;
+  }
+  return <>loadable demo</>;
 }
