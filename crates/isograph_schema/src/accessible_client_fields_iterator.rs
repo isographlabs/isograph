@@ -9,10 +9,7 @@ impl ValidatedClientField {
         &'a self,
         schema: &'a ValidatedSchema,
     ) -> impl Iterator<Item = &'a ValidatedClientField> + 'a {
-        let (selection_set, _) = self
-            .selection_set_and_unwraps
-            .as_ref()
-            .expect("selection set must exist");
+        let (ref selection_set, _) = self.selection_set_and_unwraps;
 
         AccessibleClientFieldIterator {
             selection_set,

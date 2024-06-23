@@ -40,34 +40,33 @@ pub fn validate_isograph_field_directives(
             variable_definitions,
             definition_path,
         } = with_span.item;
-        match selection_set_and_unwraps {
-            Some((selection_set, unwraps)) => {
-                let selecton_set_or_errors = and_then_selection_set_and_collect_errors(
-                    selection_set,
-                    &|scalar_field_selection| {
-                        if let Some(directive) = scalar_field_selection
-                            .directives
-                            .iter()
-                            .find(|directive| directive.item.name.item == *LOADABLE_DIRECTIVE_NAME)
-                        {
-                            let loadable_variant = from_isograph_field_directive(&directive.item)
-                                .map_err(|message| {
-                                WithLocation::new(
-                                    ProcessClientFieldDeclarationError::UnableToDeserialize {
-                                        directive_name: *LOADABLE_DIRECTIVE_NAME,
-                                        message,
-                                    },
-                                    Location::generated(),
-                                )
-                            })?;
-                            Ok(IsographSelectionVariant::Loadable(loadable_variant))
-                        } else {
-                            Ok(IsographSelectionVariant::Regular)
-                        }
-                    },
-                    &|_linked_field_selection| Ok(IsographSelectionVariant::Regular),
-                );
-                match selecton_set_or_errors {
+        let (selection_set, unwraps) = selection_set_and_unwraps;
+        let selecton_set_or_errors = and_then_selection_set_and_collect_errors(
+            selection_set,
+            &|scalar_field_selection| {
+                if let Some(directive) = scalar_field_selection
+                    .directives
+                    .iter()
+                    .find(|directive| directive.item.name.item == *LOADABLE_DIRECTIVE_NAME)
+                {
+                    let loadable_variant =
+                        from_isograph_field_directive(&directive.item).map_err(|message| {
+                            WithLocation::new(
+                                ProcessClientFieldDeclarationError::UnableToDeserialize {
+                                    directive_name: *LOADABLE_DIRECTIVE_NAME,
+                                    message,
+                                },
+                                Location::generated(),
+                            )
+                        })?;
+                    Ok(IsographSelectionVariant::Loadable(loadable_variant))
+                } else {
+                    Ok(IsographSelectionVariant::Regular)
+                }
+            },
+            &|_linked_field_selection| Ok(IsographSelectionVariant::Regular),
+        );
+        match selecton_set_or_errors {
                     Ok(new_selection_set) => transformed_client_fields.push(
                         (WithSpan::new(
                             ClientFieldDeclarationWithValidatedDirectives {
@@ -75,7 +74,7 @@ pub fn validate_isograph_field_directives(
                                 parent_type,
                                 client_field_name,
                                 description,
-                                selection_set_and_unwraps: Some((new_selection_set, unwraps)),
+                                selection_set_and_unwraps: (new_selection_set, unwraps),
                                 directives,
                                 variable_definitions,
                                 definition_path,
@@ -85,24 +84,6 @@ pub fn validate_isograph_field_directives(
                     ),
                     Err(e) => errors.try_borrow_mut().expect("Expected Rc to yield mutable reference. This is indicative of a bug in Isograph.").extend(e),
                 }
-            }
-            None => transformed_client_fields.push((
-                WithSpan::new(
-                    ClientFieldDeclarationWithValidatedDirectives {
-                        const_export_name,
-                        parent_type,
-                        client_field_name,
-                        description,
-                        selection_set_and_unwraps: None,
-                        directives,
-                        variable_definitions,
-                        definition_path,
-                    },
-                    with_span.span,
-                ),
-                text_source,
-            )),
-        };
     }
 
     let errors = Rc::into_inner(errors)

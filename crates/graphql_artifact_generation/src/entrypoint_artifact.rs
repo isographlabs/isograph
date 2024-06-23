@@ -35,10 +35,7 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
     global_client_field_map: &'a mut ClientFieldToCompletedMergeTraversalStateMap,
 ) -> Vec<ArtifactPathAndContent> {
     let entrypoint = schema.client_field(entrypoint_id);
-    let (selection_set, _) = entrypoint
-        .selection_set_and_unwraps
-        .as_ref()
-        .expect("Unsupported: client fields on query with no selection set");
+    let (ref selection_set, _) = entrypoint.selection_set_and_unwraps;
 
     let query_name = entrypoint.name.into();
 

@@ -366,45 +366,32 @@ fn validate_client_field_selection_set(
 ) -> ValidateSchemaResult<ValidatedClientField> {
     let variable_definitions =
         validate_variable_definitions(schema_data, unvalidated_client_field.variable_definitions)?;
+    let (selection_set, unwraps) = unvalidated_client_field.selection_set_and_unwraps;
 
-    match unvalidated_client_field.selection_set_and_unwraps {
-        Some((selection_set, unwraps)) => {
-            let parent_object = schema_data.object(unvalidated_client_field.parent_object_id);
-            let selection_set = validate_client_field_definition_selections_exist_and_types_match(
-                schema_data,
-                selection_set,
-                parent_object,
-                server_fields,
-            )
-            .map_err(|err| {
-                validate_selections_error_to_validate_schema_error(
-                    err,
-                    parent_object,
-                    unvalidated_client_field.name,
-                )
-            })?;
-            Ok(ClientField {
-                description: unvalidated_client_field.description,
-                name: unvalidated_client_field.name,
-                id: unvalidated_client_field.id,
-                selection_set_and_unwraps: Some((selection_set, unwraps)),
-                variant: unvalidated_client_field.variant,
-                variable_definitions,
-                type_and_field: unvalidated_client_field.type_and_field,
-                parent_object_id: unvalidated_client_field.parent_object_id,
-            })
-        }
-        None => Ok(ClientField {
-            description: unvalidated_client_field.description,
-            name: unvalidated_client_field.name,
-            id: unvalidated_client_field.id,
-            selection_set_and_unwraps: None,
-            variant: unvalidated_client_field.variant,
-            variable_definitions,
-            type_and_field: unvalidated_client_field.type_and_field,
-            parent_object_id: unvalidated_client_field.parent_object_id,
-        }),
-    }
+    let parent_object = schema_data.object(unvalidated_client_field.parent_object_id);
+    let selection_set = validate_client_field_definition_selections_exist_and_types_match(
+        schema_data,
+        selection_set,
+        parent_object,
+        server_fields,
+    )
+    .map_err(|err| {
+        validate_selections_error_to_validate_schema_error(
+            err,
+            parent_object,
+            unvalidated_client_field.name,
+        )
+    })?;
+    Ok(ClientField {
+        description: unvalidated_client_field.description,
+        name: unvalidated_client_field.name,
+        id: unvalidated_client_field.id,
+        selection_set_and_unwraps: (selection_set, unwraps),
+        variant: unvalidated_client_field.variant,
+        variable_definitions,
+        type_and_field: unvalidated_client_field.type_and_field,
+        parent_object_id: unvalidated_client_field.parent_object_id,
+    })
 }
 
 fn validate_variable_definitions(

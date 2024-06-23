@@ -691,24 +691,19 @@ fn merge_scalar_client_field(
     newly_encountered_scalar_client_field: &ValidatedClientField,
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
 ) {
-    if let Some((ref selection_set, _)) =
-        newly_encountered_scalar_client_field.selection_set_and_unwraps
-    {
-        let (child_traversal_state, child_map) =
-            create_merged_selection_map_and_insert_into_global_map(
-                schema,
-                parent_type,
-                selection_set,
-                global_client_field_map,
-                newly_encountered_scalar_client_field,
-            );
+    let (child_traversal_state, child_map) = create_merged_selection_map_and_insert_into_global_map(
+        schema,
+        parent_type,
+        &newly_encountered_scalar_client_field
+            .selection_set_and_unwraps
+            .0,
+        global_client_field_map,
+        newly_encountered_scalar_client_field,
+    );
 
-        parent_merge_traversal_state
-            .incorporate_results_of_iterating_into_child(&child_traversal_state);
-        merge_selections_into_selection_map(parent_map, &child_map);
-    } else {
-        panic!("unsupported client field without selection set");
-    }
+    parent_merge_traversal_state
+        .incorporate_results_of_iterating_into_child(&child_traversal_state);
+    merge_selections_into_selection_map(parent_map, &child_map);
 }
 
 fn merge_scalar_server_field(

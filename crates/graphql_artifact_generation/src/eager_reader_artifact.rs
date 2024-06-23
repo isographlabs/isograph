@@ -28,10 +28,7 @@ pub(crate) fn generate_eager_reader_artifact(
     scalar_client_field_traversal_state: &ScalarClientFieldTraversalState,
 ) -> ArtifactPathAndContent {
     let user_written_component_variant = info.user_written_component_variant;
-    let (selection_set, _) = client_field
-        .selection_set_and_unwraps
-        .as_ref()
-        .expect("Unsupported: client fields not on query with no selection set");
+    let (ref selection_set, _) = client_field.selection_set_and_unwraps;
 
     let parent_type = schema
         .server_field_data
@@ -112,10 +109,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
     schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
 ) -> ArtifactPathAndContent {
-    let (selection_set, _) = client_field
-        .selection_set_and_unwraps
-        .as_ref()
-        .expect("Unsupported: client fields not on query with no selection set");
+    let (ref selection_set, _) = client_field.selection_set_and_unwraps;
 
     let parent_type = schema
         .server_field_data

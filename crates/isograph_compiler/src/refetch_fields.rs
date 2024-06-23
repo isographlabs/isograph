@@ -91,7 +91,7 @@ fn add_refetch_field_to_object(
                 ),
                 name: (*REFETCH_FIELD_NAME).into(),
                 id: next_client_field_id,
-                selection_set_and_unwraps: Some((vec![id_field_selection], vec![])),
+                selection_set_and_unwraps: (vec![id_field_selection], vec![]),
                 variant: ClientFieldVariant::ImperativelyLoadedField(
                     ImperativelyLoadedFieldVariant {
                         client_field_scalar_selection_name: *REFETCH_FIELD_NAME,

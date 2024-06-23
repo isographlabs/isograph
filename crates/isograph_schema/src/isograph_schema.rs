@@ -447,12 +447,7 @@ pub struct ClientField<
     // TODO make this a ClientFieldName that can be converted into a SelectableFieldName
     pub name: SelectableFieldName,
     pub id: ClientFieldId,
-    // TODO it makes no sense for a client field to not select fields!
-    // Why not just make it a global function at that point? Who knows.
-    // Unless you'll eventually select fields?
-    // Perhaps refetch fields for viewer (or other fields that have a known path
-    // that don't require id) will have no selection set.
-    pub selection_set_and_unwraps: Option<(
+    pub selection_set_and_unwraps: (
         Vec<
             WithSpan<
                 Selection<
@@ -462,7 +457,7 @@ pub struct ClientField<
             >,
         >,
         Vec<WithSpan<Unwrap>>,
-    )>,
+    ),
 
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,

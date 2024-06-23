@@ -176,17 +176,15 @@ fn parse_client_field_declaration_inner<'a>(
 fn parse_selection_set_and_unwraps<'a>(
     tokens: &mut PeekableLexer<'a>,
     text_source: TextSource,
-) -> ParseResultWithSpan<
-    Option<(
-        Vec<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>>,
-        Vec<WithSpan<Unwrap>>,
-    )>,
-> {
+) -> ParseResultWithSpan<(
+    Vec<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>>,
+    Vec<WithSpan<Unwrap>>,
+)> {
     let selection_set = parse_optional_selection_set(tokens, text_source)?;
     match selection_set {
         Some(selection_set) => {
             let unwraps = parse_unwraps(tokens);
-            Ok(Some((selection_set, unwraps)))
+            Ok((selection_set, unwraps))
         }
         None => Err(WithSpan::new(
             IsographLiteralParseError::ExpectedSelectionSet,
@@ -195,6 +193,7 @@ fn parse_selection_set_and_unwraps<'a>(
     }
 }
 
+// TODO this should not parse an optional selection set, but a required one
 fn parse_optional_selection_set<'a>(
     tokens: &mut PeekableLexer<'a>,
     text_source: TextSource,

@@ -284,10 +284,7 @@ fn refetched_paths_for_client_field(
     schema: &ValidatedSchema,
     path: &mut Vec<NameAndArguments>,
 ) -> Vec<PathToRefetchField> {
-    let (selection_set, _) = nested_client_field
-        .selection_set_and_unwraps
-        .as_ref()
-        .expect("Expected selection set");
+    let (ref selection_set, _) = nested_client_field.selection_set_and_unwraps;
 
     // Here, path is acting as a prefix. We will receive (for example) foo.bar, and
     // the client field may have a refetch query at baz.__refetch. In this case,
@@ -326,10 +323,8 @@ fn refetched_paths_with_path(
                                 _ => {
                                     // For non-refetch fields, we need to recurse into the selection set
                                     // (if there is one)
-                                    let (selection_set, _) = client_field
-                                        .selection_set_and_unwraps
-                                        .as_ref()
-                                        .expect("Expected selection set");
+                                    let (ref selection_set, _) =
+                                        client_field.selection_set_and_unwraps;
 
                                     let new_paths =
                                         refetched_paths_with_path(selection_set, schema, path);

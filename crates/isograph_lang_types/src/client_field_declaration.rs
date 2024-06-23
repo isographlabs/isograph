@@ -27,10 +27,10 @@ pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub client_field_name: WithSpan<ScalarFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub selection_set_and_unwraps: Option<(
+    pub selection_set_and_unwraps: (
         Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
         Vec<WithSpan<Unwrap>>,
-    )>,
+    ),
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: FilePath,
