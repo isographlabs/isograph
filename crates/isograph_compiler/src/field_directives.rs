@@ -67,24 +67,31 @@ pub fn validate_isograph_field_directives(
             &|_linked_field_selection| Ok(IsographSelectionVariant::Regular),
         );
         match selecton_set_or_errors {
-                    Ok(new_selection_set) => transformed_client_fields.push(
-                        (WithSpan::new(
-                            ClientFieldDeclarationWithValidatedDirectives {
-                                const_export_name,
-                                parent_type,
-                                client_field_name,
-                                description,
-                                selection_set: new_selection_set,
-                                unwraps,
-                                directives,
-                                variable_definitions,
-                                definition_path,
-                            },
-                            with_span.span,
-                        ), text_source),
-                    ),
-                    Err(e) => errors.try_borrow_mut().expect("Expected Rc to yield mutable reference. This is indicative of a bug in Isograph.").extend(e),
-                }
+            Ok(new_selection_set) => transformed_client_fields.push((
+                WithSpan::new(
+                    ClientFieldDeclarationWithValidatedDirectives {
+                        const_export_name,
+                        parent_type,
+                        client_field_name,
+                        description,
+                        selection_set: new_selection_set,
+                        unwraps,
+                        directives,
+                        variable_definitions,
+                        definition_path,
+                    },
+                    with_span.span,
+                ),
+                text_source,
+            )),
+            Err(e) => errors
+                .try_borrow_mut()
+                .expect(
+                    "Expected Rc to yield mutable reference. \
+                        This is indicative of a bug in Isograph.",
+                )
+                .extend(e),
+        }
     }
 
     let errors = Rc::into_inner(errors)
