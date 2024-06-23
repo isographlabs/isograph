@@ -1,17 +1,14 @@
 use std::collections::hash_map::Entry;
 
 use common_lang_types::{Location, Span, WithLocation, WithSpan};
-use graphql_lang_types::{
-    GraphQLInputValueDefinition, GraphQLTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
-};
 use intern::string_key::Intern;
 use isograph_lang_types::{
     IsographSelectionVariant, ScalarFieldSelection, Selection, ServerFieldSelection, ServerObjectId,
 };
 use isograph_schema::{
-    ClientField, ClientFieldVariant, FieldDefinitionLocation, ImperativelyLoadedFieldVariant,
-    ObjectTypeAndFieldName, SchemaObject, UnvalidatedClientField, UnvalidatedSchema,
-    NODE_FIELD_NAME, REFETCH_FIELD_NAME,
+    id_arguments, ClientField, ClientFieldVariant, FieldDefinitionLocation,
+    ImperativelyLoadedFieldVariant, ObjectTypeAndFieldName, SchemaObject, UnvalidatedClientField,
+    UnvalidatedSchema, NODE_FIELD_NAME, REFETCH_FIELD_NAME,
 };
 
 use crate::batch_compile::BatchCompileError;
@@ -19,11 +16,7 @@ use crate::batch_compile::BatchCompileError;
 pub fn add_refetch_fields_to_objects(
     schema: &mut UnvalidatedSchema,
 ) -> Result<(), BatchCompileError> {
-    let query_id = schema
-        .fetchable_types
-        .iter()
-        .find_map(|x| if x.1 .0 == "query" { Some(*x.0) } else { None })
-        .expect("Expected query to be defined");
+    let query_id = schema.query_id();
 
     'objects: for object in schema.server_field_data.server_objects.iter_mut() {
         if object.id_field.is_none() {
@@ -67,19 +60,6 @@ fn add_refetch_field_to_object(
                 Span::todo_generated(),
             );
 
-            let id_arguments = vec![GraphQLInputValueDefinition {
-                description: None,
-                name: WithLocation::new("id".intern().into(), Location::generated()),
-                type_: GraphQLTypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
-                    NamedTypeAnnotation(WithSpan::new(
-                        "ID".intern().into(),
-                        Span::todo_generated(),
-                    )),
-                ))),
-                default_value: None,
-                directives: vec![],
-            }];
-
             client_fields.push(ClientField {
                 description: Some(
                     format!("A refetch field for the {} type.", object.name)
@@ -94,7 +74,7 @@ fn add_refetch_field_to_object(
                     ImperativelyLoadedFieldVariant {
                         client_field_scalar_selection_name: *REFETCH_FIELD_NAME,
                         top_level_schema_field_name: *NODE_FIELD_NAME,
-                        top_level_schema_field_arguments: id_arguments,
+                        top_level_schema_field_arguments: id_arguments(),
 
                         primary_field_info: None,
 

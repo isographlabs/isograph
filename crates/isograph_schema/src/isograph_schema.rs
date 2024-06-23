@@ -93,6 +93,19 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
     pub fetchable_types: HashMap<ServerObjectId, RootOperationName>,
 }
 
+impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationState> {
+    /// This is a smell, and we should refactor away from it, or all schema's
+    /// should have a root type.
+    pub fn query_id(&self) -> ServerObjectId {
+        *self
+            .fetchable_types
+            .iter()
+            .find(|(_, root_operation_name)| root_operation_name.0 == "query")
+            .expect("Expected query to be found")
+            .0
+    }
+}
+
 /// Distinguishes between server-defined fields and locally-defined fields.
 /// TFieldAssociatedData can be a ScalarFieldName in an unvalidated schema, or a
 /// ScalarId, in a validated schema.

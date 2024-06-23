@@ -1,9 +1,12 @@
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, HashSet};
 
 use common_lang_types::{
-    IsographObjectTypeName, LinkedFieldAlias, LinkedFieldName, QueryOperationName,
+    IsographObjectTypeName, LinkedFieldAlias, LinkedFieldName, Location, QueryOperationName,
     ScalarFieldAlias, ScalarFieldName, SelectableFieldName, Span, VariableName, WithLocation,
     WithSpan,
+};
+use graphql_lang_types::{
+    GraphQLInputValueDefinition, GraphQLTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -980,4 +983,17 @@ fn get_aliased_mutation_field_name(
         s.push_str(&param.to_alias_str_chunk());
     }
     s
+}
+
+pub fn id_arguments() -> Vec<GraphQLInputValueDefinition> {
+    let id_arguments = vec![GraphQLInputValueDefinition {
+        description: None,
+        name: WithLocation::new("id".intern().into(), Location::generated()),
+        type_: GraphQLTypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
+            NamedTypeAnnotation(WithSpan::new("ID".intern().into(), Span::todo_generated())),
+        ))),
+        default_value: None,
+        directives: vec![],
+    }];
+    id_arguments
 }
