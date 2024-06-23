@@ -6,8 +6,8 @@ use isograph_lang_types::ClientFieldId;
 use isograph_schema::{
     create_merged_selection_map_and_insert_into_global_map, current_target_merged_selections,
     get_imperatively_loaded_artifact_info, get_reachable_variables,
-    ClientFieldToCompletedMergeTraversalStateMap, MergedSelectionMap, RootRefetchedPath,
-    SchemaObject, ValidatedSchema,
+    ClientFieldToCompletedMergeTraversalStateMap, ClientFieldTraversalResult, MergedSelectionMap,
+    RootRefetchedPath, SchemaObject, ValidatedSchema,
 };
 
 use crate::{
@@ -38,7 +38,10 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
 
     let query_name = entrypoint.name.into();
 
-    let (traversal_state, selection_map) = create_merged_selection_map_and_insert_into_global_map(
+    let ClientFieldTraversalResult {
+        traversal_state,
+        merged_selection_map,
+    } = create_merged_selection_map_and_insert_into_global_map(
         schema,
         schema.server_field_data.object(entrypoint.parent_object_id),
         &entrypoint.selection_set,
@@ -66,7 +69,7 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
     let query_text = generate_query_text(
         query_name,
         schema,
-        &selection_map,
+        &merged_selection_map,
         &entrypoint.variable_definitions,
         root_operation_name,
     );
@@ -75,7 +78,7 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
         .iter()
         .map(|(path, root_refetch_path)| {
             let current_target_merged_selections =
-                current_target_merged_selections(path.linked_fields.iter(), &selection_map);
+                current_target_merged_selections(path.linked_fields.iter(), &merged_selection_map);
             let reachable_variables = get_reachable_variables(&current_target_merged_selections);
             (
                 root_refetch_path.clone(),
@@ -88,7 +91,8 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
     let refetch_query_artifact_import =
         generate_refetch_query_artifact_import(&refetch_paths_with_variables);
 
-    let normalization_ast_text = generate_normalization_ast_text(schema, selection_map.values(), 0);
+    let normalization_ast_text =
+        generate_normalization_ast_text(schema, merged_selection_map.values(), 0);
 
     let mut paths_and_contents = vec![EntrypointArtifactInfo {
         query_text,

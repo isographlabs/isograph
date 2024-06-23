@@ -15,8 +15,8 @@ use isograph_lang_types::{
     ServerFieldSelection,
 };
 use isograph_schema::{
-    ClientFieldVariant, FieldDefinitionLocation, SchemaObject, UserWrittenComponentVariant,
-    ValidatedClientField, ValidatedSchema, ValidatedSelection,
+    ClientFieldTraversalResult, ClientFieldVariant, FieldDefinitionLocation, SchemaObject,
+    UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema, ValidatedSelection,
 };
 use lazy_static::lazy_static;
 
@@ -82,8 +82,12 @@ pub fn get_artifact_path_and_content<'schema>(
         encountered_output_types.insert(*entrypoint_id);
     }
 
-    for (encountered_client_field_id, (scalar_client_field_traversal_state, _selection_map)) in
-        &global_client_field_map
+    for (
+        encountered_client_field_id,
+        ClientFieldTraversalResult {
+            traversal_state, ..
+        },
+    ) in &global_client_field_map
     {
         let encountered_client_field = schema.client_field(*encountered_client_field_id);
 
@@ -95,14 +99,14 @@ pub fn get_artifact_path_and_content<'schema>(
                 project_root,
                 artifact_directory,
                 *info,
-                scalar_client_field_traversal_state,
+                traversal_state,
             ),
             ClientFieldVariant::ImperativelyLoadedField(variant) => {
                 generate_refetch_reader_artifact(
                     schema,
                     encountered_client_field,
                     variant,
-                    scalar_client_field_traversal_state,
+                    traversal_state,
                 )
             }
         });
@@ -124,7 +128,9 @@ pub fn get_artifact_path_and_content<'schema>(
         ));
 
         match global_client_field_map.get(&user_written_client_field.id) {
-            Some((traversal_state, _)) => {
+            Some(ClientFieldTraversalResult {
+                traversal_state, ..
+            }) => {
                 // If this user-written client field is reachable from an entrypoint,
                 // we've already noted the accessible client fields
                 encountered_output_types.extend(traversal_state.accessible_client_fields.iter())

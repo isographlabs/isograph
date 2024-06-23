@@ -26,7 +26,13 @@ pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
 
 // Maybe this should be FNVHashMap? We don't really need stable iteration order
 pub type ClientFieldToCompletedMergeTraversalStateMap =
-    BTreeMap<ClientFieldId, (ScalarClientFieldTraversalState, MergedSelectionMap)>;
+    BTreeMap<ClientFieldId, ClientFieldTraversalResult>;
+
+#[derive(Clone, Debug)]
+pub struct ClientFieldTraversalResult {
+    pub traversal_state: ScalarClientFieldTraversalState,
+    pub merged_selection_map: MergedSelectionMap,
+}
 
 lazy_static! {
     pub static ref REFETCH_FIELD_NAME: ScalarFieldName = "__refetch".intern().into();
@@ -281,12 +287,10 @@ pub fn create_merged_selection_map_and_insert_into_global_map(
     validated_selections: &[WithSpan<ValidatedSelection>],
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
     root_object: &ValidatedClientField,
-) -> (ScalarClientFieldTraversalState, MergedSelectionMap) {
+) -> ClientFieldTraversalResult {
     // TODO move this check outside of this function
     match global_client_field_map.get(&root_object.id) {
-        Some(merge_traversal_state_and_selection_map) => {
-            merge_traversal_state_and_selection_map.clone()
-        }
+        Some(traversal_result) => traversal_result.clone(),
         None => {
             let mut merge_traversal_state = ScalarClientFieldTraversalState::new();
             let selection_map = create_selection_map_with_merge_traversal_state(
@@ -301,11 +305,17 @@ pub fn create_merged_selection_map_and_insert_into_global_map(
             // if we have some sort of recursion. That probably stack overflows right now.
             global_client_field_map.insert(
                 root_object.id,
-                (merge_traversal_state.clone(), selection_map.clone()),
+                ClientFieldTraversalResult {
+                    traversal_state: merge_traversal_state.clone(),
+                    merged_selection_map: selection_map.clone(),
+                },
             );
 
             // TODO we don't always use this return value, so we shouldn't always clone above
-            (merge_traversal_state, selection_map)
+            ClientFieldTraversalResult {
+                traversal_state: merge_traversal_state,
+                merged_selection_map: selection_map,
+            }
         }
     }
 }
@@ -694,7 +704,10 @@ fn merge_scalar_client_field(
     newly_encountered_scalar_client_field: &ValidatedClientField,
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
 ) {
-    let (child_traversal_state, child_map) = create_merged_selection_map_and_insert_into_global_map(
+    let ClientFieldTraversalResult {
+        traversal_state,
+        merged_selection_map,
+    } = create_merged_selection_map_and_insert_into_global_map(
         schema,
         parent_type,
         &newly_encountered_scalar_client_field.selection_set,
@@ -702,9 +715,8 @@ fn merge_scalar_client_field(
         newly_encountered_scalar_client_field,
     );
 
-    parent_merge_traversal_state
-        .incorporate_results_of_iterating_into_child(&child_traversal_state);
-    merge_selections_into_selection_map(parent_map, &child_map);
+    parent_merge_traversal_state.incorporate_results_of_iterating_into_child(&traversal_state);
+    merge_selections_into_selection_map(parent_map, &merged_selection_map);
 }
 
 fn merge_scalar_server_field(
