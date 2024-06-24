@@ -565,7 +565,7 @@ fn merge_validated_selections_into_selection_map(
                                     parent_type,
                                 ) {
                                     merge_traversal_state.refetch_paths.insert(
-                                        path.clone(),
+                                        path,
                                         RootRefetchedPath {
                                             field_name: newly_encountered_scalar_client_field.name,
                                             path_to_refetch_field_info: info,
@@ -589,15 +589,15 @@ fn merge_validated_selections_into_selection_map(
                             }
                         };
                     }
-                    ServerFieldSelection::LinkedField(new_linked_field) => {
+                    ServerFieldSelection::LinkedField(linked_field_selection) => {
                         let normalization_key = name_and_arguments(
-                            new_linked_field.name.item.into(),
-                            &new_linked_field.arguments,
+                            linked_field_selection.name.item.into(),
+                            &linked_field_selection.arguments,
                         )
                         .normalization_key();
                         merge_traversal_state.traversal_path.push(NameAndArguments {
-                            name: new_linked_field.name.item.into(),
-                            arguments: new_linked_field
+                            name: linked_field_selection.name.item.into(),
+                            arguments: linked_field_selection
                                 .arguments
                                 .iter()
                                 .map(|argument| ArgumentKeyAndValue {
@@ -616,12 +616,12 @@ fn merge_validated_selections_into_selection_map(
                         let linked_field =
                             parent_map.entry(normalization_key).or_insert_with(|| {
                                 MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
-                                    name: new_linked_field.name.item,
-                                    normalization_alias: new_linked_field
+                                    name: linked_field_selection.name.item,
+                                    normalization_alias: linked_field_selection
                                         .normalization_alias
                                         .map(|x| x.item),
                                     selection_map: BTreeMap::new(),
-                                    arguments: new_linked_field
+                                    arguments: linked_field_selection
                                         .arguments
                                         .iter()
                                         .map(|x| x.item.clone())
@@ -636,7 +636,8 @@ fn merge_validated_selections_into_selection_map(
                                 )
                             }
                             MergedServerSelection::LinkedField(existing_linked_field) => {
-                                let type_id = new_linked_field.associated_data.parent_object_id;
+                                let type_id =
+                                    linked_field_selection.associated_data.parent_object_id;
                                 let linked_field_parent_type =
                                     schema.server_field_data.object(type_id);
 
@@ -644,7 +645,7 @@ fn merge_validated_selections_into_selection_map(
                                     schema,
                                     &mut existing_linked_field.selection_map,
                                     linked_field_parent_type,
-                                    &new_linked_field.selection_set,
+                                    &linked_field_selection.selection_set,
                                     merge_traversal_state,
                                     global_client_field_map,
                                 );

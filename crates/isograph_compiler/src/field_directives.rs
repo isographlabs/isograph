@@ -59,6 +59,8 @@ pub fn validate_isograph_field_directives(
                                 Location::generated(),
                             )
                         })?;
+                    // TODO validate that the field is actually loadable (i.e. implements Node or
+                    // whatnot)
                     Ok(IsographSelectionVariant::Loadable(loadable_variant))
                 } else {
                     Ok(IsographSelectionVariant::Regular)
