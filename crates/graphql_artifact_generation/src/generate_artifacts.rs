@@ -105,7 +105,7 @@ pub fn get_artifact_path_and_content<'schema>(
                 generate_refetch_reader_artifact(
                     schema,
                     encountered_client_field,
-                    variant,
+                    variant.primary_field_info.as_ref(),
                     traversal_state,
                 )
             }
