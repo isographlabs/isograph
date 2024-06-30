@@ -10,12 +10,6 @@ const readerAst: ReaderAst<Pet__Foo__param> = [
     alias: null,
     arguments: null,
   },
-  {
-    kind: "Scalar",
-    fieldName: "name",
-    alias: null,
-    arguments: null,
-  },
 ];
 
 const artifact: EagerReaderArtifact<

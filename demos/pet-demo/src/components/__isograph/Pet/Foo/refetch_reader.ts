@@ -23,12 +23,6 @@ const readerAst: ReaderAst<unknown> = [
     alias: null,
     arguments: null,
   },
-  {
-    kind: "Scalar",
-    fieldName: "name",
-    alias: null,
-    arguments: null,
-  },
 ];
 
 const artifact: RefetchReaderArtifact = {
