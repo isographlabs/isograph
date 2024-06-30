@@ -8,16 +8,17 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ClientFieldId, IsographSelectionVariant, ScalarFieldSelection, SelectableServerFieldId,
-    Selection, ServerFieldId, ServerFieldSelection, ServerObjectId,
+    ClientFieldId, IsographSelectionVariant, NonConstantValue, ScalarFieldSelection,
+    SelectableServerFieldId, Selection, SelectionFieldArgument, ServerFieldId,
+    ServerFieldSelection, ServerObjectId,
 };
 use serde::Deserialize;
 
 use crate::{
-    ArgumentMap, ClientField, ClientFieldVariant, FieldDefinitionLocation, FieldMapItem,
-    ImperativelyLoadedFieldVariant, ObjectTypeAndFieldName, PrimaryFieldInfo,
-    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
-    UnvalidatedSchema,
+    generate_refetch_field_strategy, ArgumentMap, ClientField, ClientFieldVariant,
+    FieldDefinitionLocation, FieldMapItem, ImperativelyLoadedFieldVariant, ObjectTypeAndFieldName,
+    PrimaryFieldInfo, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
+    ProcessedFieldMapItem, UnvalidatedSchema,
 };
 use lazy_static::lazy_static;
 
@@ -216,12 +217,26 @@ impl UnvalidatedSchema {
                 .collect::<Vec<_>>();
 
             let mutation_field_client_field_id = self.client_fields.len().into();
+            let top_level_arguments = mutation_field_arguments
+                .iter()
+                .map(|input_value_def| {
+                    let arg_name = input_value_def.item.name.item.lookup().intern();
+                    SelectionFieldArgument {
+                        name: WithSpan::new(arg_name.into(), Span::todo_generated()),
+                        value: WithSpan::new(
+                            NonConstantValue::Variable(arg_name.into()),
+                            Span::todo_generated(),
+                        ),
+                    }
+                })
+                .collect();
             let mutation_client_field = ClientField {
                 description,
                 // set_pet_best_friend
                 name: client_field_scalar_selection_name,
                 id: mutation_field_client_field_id,
                 reader_selection_set: fields.to_vec(),
+
                 unwraps: vec![],
                 variant: ClientFieldVariant::ImperativelyLoadedField(
                     ImperativelyLoadedFieldVariant {
@@ -251,6 +266,23 @@ impl UnvalidatedSchema {
                     field_name: client_field_scalar_selection_name, // set_pet_best_friend
                 },
                 parent_object_id: maybe_abstract_parent_object_id,
+                refetch_strategy: Some(crate::RefetchStrategy::UseRefetchField(
+                    generate_refetch_field_strategy(
+                        fields.to_vec(),
+                        // NOTE: this will probably panic if we're not exposing fields which are
+                        // originally on Mutation
+                        parent_object_id,
+                        format!("Mutation__{}", primary_field_name).intern().into(),
+                        top_level_schema_field_name,
+                        top_level_arguments,
+                        // This is blatantly incorrect - at this point, we don't know whether
+                        // we require refinement, since the same field is copied from the abstract
+                        // type to the concrete type. So, when we do that, we need to account
+                        // for this.
+                        RequiresRefinement::No,
+                        Some(primary_field_name),
+                    ),
+                )),
             };
             self.client_fields.push(mutation_client_field);
 

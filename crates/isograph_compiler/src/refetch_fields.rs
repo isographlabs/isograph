@@ -1,14 +1,12 @@
 use std::collections::hash_map::Entry;
 
-use common_lang_types::{Location, Span, WithLocation, WithSpan};
 use intern::string_key::Intern;
-use isograph_lang_types::{
-    IsographSelectionVariant, ScalarFieldSelection, Selection, ServerFieldSelection, ServerObjectId,
-};
+use isograph_lang_types::ServerObjectId;
 use isograph_schema::{
-    id_arguments, ClientField, ClientFieldVariant, FieldDefinitionLocation,
-    ImperativelyLoadedFieldVariant, ObjectTypeAndFieldName, SchemaObject, UnvalidatedClientField,
-    UnvalidatedSchema, NODE_FIELD_NAME, REFETCH_FIELD_NAME,
+    generate_refetch_field_strategy, id_arguments, id_selection, id_top_level_arguments,
+    ClientField, ClientFieldVariant, FieldDefinitionLocation, ImperativelyLoadedFieldVariant,
+    ObjectTypeAndFieldName, RefetchStrategy, RequiresRefinement, SchemaObject,
+    UnvalidatedClientField, UnvalidatedSchema, NODE_FIELD_NAME, REFETCH_FIELD_NAME,
 };
 
 use crate::batch_compile::BatchCompileError;
@@ -47,18 +45,7 @@ fn add_refetch_field_to_object(
 
             vacant_entry.insert(FieldDefinitionLocation::Client(next_client_field_id));
 
-            let id_field_selection = WithSpan::new(
-                Selection::ServerField(ServerFieldSelection::ScalarField(ScalarFieldSelection {
-                    name: WithLocation::new("id".intern().into(), Location::generated()),
-                    reader_alias: None,
-                    normalization_alias: None,
-                    associated_data: IsographSelectionVariant::Regular,
-                    unwraps: vec![],
-                    arguments: vec![],
-                    directives: vec![],
-                })),
-                Span::todo_generated(),
-            );
+            let id_field_selection = id_selection();
 
             client_fields.push(ClientField {
                 description: Some(
@@ -87,6 +74,18 @@ fn add_refetch_field_to_object(
                     field_name: "__refetch".intern().into(),
                 },
                 parent_object_id: object.id,
+                refetch_strategy: object.id_field.map(|_| {
+                    // Assume that if we have an id field, this implements Node
+                    RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
+                        vec![id_selection()],
+                        query_id,
+                        format!("refetch__{}", object.name).intern().into(),
+                        *NODE_FIELD_NAME,
+                        id_top_level_arguments(),
+                        RequiresRefinement::Yes(object.name),
+                        None,
+                    ))
+                }),
             });
         }
     }

@@ -113,6 +113,7 @@ pub struct MergedInlineFragmentSelection {
 pub enum NormalizationKey {
     Discriminator, // AKA typename
     Id,
+    // TODO this should not have NameAndArguments, but LinkedFieldNameAndArguments
     ServerField(NameAndArguments),
     InlineFragment(IsographObjectTypeName),
 }
@@ -401,7 +402,7 @@ fn process_imperatively_loaded_field(
     };
 
     // TODO consider wrapping this when we first create the RootRefetchedPath?
-    let wrapped_selection_map = selection_set_wrapped(
+    let wrapped_selection_map = selection_map_wrapped(
         selection_map.clone(),
         // TODO why are these types different
         top_level_schema_field_name.lookup().intern().into(),
@@ -934,8 +935,8 @@ fn select_typename_and_id_fields_in_merged_selection(
     }
 }
 
-pub fn selection_set_wrapped(
-    mut merged_selection_set: MergedSelectionMap,
+pub fn selection_map_wrapped(
+    mut inner_selection_map: MergedSelectionMap,
     top_level_field: LinkedFieldName,
     top_level_field_arguments: Vec<SelectionFieldArgument>,
     // TODO support arguments and vectors of subfields
@@ -949,18 +950,18 @@ pub fn selection_set_wrapped(
     // Should we wrap the selection set in a type to refine to?
     let selection_set_with_inline_fragment = match type_to_refine_to {
         RequiresRefinement::Yes(type_to_refine_to) => {
-            maybe_add_typename_selection(&mut merged_selection_set);
+            maybe_add_typename_selection(&mut inner_selection_map);
             let mut map = BTreeMap::new();
             map.insert(
                 NormalizationKey::InlineFragment(type_to_refine_to),
                 MergedServerSelection::InlineFragment(MergedInlineFragmentSelection {
                     type_to_refine_to,
-                    selection_map: merged_selection_set,
+                    selection_map: inner_selection_map,
                 }),
             );
             map
         }
-        RequiresRefinement::No => merged_selection_set,
+        RequiresRefinement::No => inner_selection_map,
     };
 
     let selection_set_with_subfield = match subfield {
@@ -1047,7 +1048,7 @@ fn get_aliased_mutation_field_name(
 }
 
 pub fn id_arguments() -> Vec<GraphQLInputValueDefinition> {
-    let id_arguments = vec![GraphQLInputValueDefinition {
+    vec![GraphQLInputValueDefinition {
         description: None,
         name: WithLocation::new("id".intern().into(), Location::generated()),
         type_: GraphQLTypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
@@ -1055,6 +1056,5 @@ pub fn id_arguments() -> Vec<GraphQLInputValueDefinition> {
         ))),
         default_value: None,
         directives: vec![],
-    }];
-    id_arguments
+    }]
 }

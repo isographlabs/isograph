@@ -13,10 +13,11 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    ClientField, FieldDefinitionLocation, Schema, SchemaIdField, SchemaObject, SchemaServerField,
-    SchemaValidationState, ServerFieldData, UnvalidatedClientField,
-    UnvalidatedLinkedFieldSelection, UnvalidatedSchema, UnvalidatedSchemaField,
-    UnvalidatedSchemaServerField, ValidateEntrypointDeclarationError,
+    ClientField, FieldDefinitionLocation, RefetchStrategy, Schema, SchemaIdField, SchemaObject,
+    SchemaServerField, SchemaValidationState, ServerFieldData, UnvalidatedClientField,
+    UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy, UnvalidatedSchema,
+    UnvalidatedSchemaField, UnvalidatedSchemaServerField, UseRefetchFieldRefetchStrategy,
+    ValidateEntrypointDeclarationError,
 };
 
 pub type ValidatedSchemaServerField =
@@ -40,6 +41,11 @@ pub type ValidatedClientField = ClientField<
     <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::ClientFieldVariableDefinitionAssociatedData,
+>;
+
+pub type ValidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
+    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
 >;
 
 /// The validated defined field that shows up in the TScalarField generic.
@@ -381,6 +387,7 @@ fn validate_client_field_selection_set(
             unvalidated_client_field.name,
         )
     })?;
+
     Ok(ClientField {
         description: unvalidated_client_field.description,
         name: unvalidated_client_field.name,
@@ -391,6 +398,49 @@ fn validate_client_field_selection_set(
         variable_definitions,
         type_and_field: unvalidated_client_field.type_and_field,
         parent_object_id: unvalidated_client_field.parent_object_id,
+        refetch_strategy: unvalidated_client_field
+            .refetch_strategy
+            .map(|refetch_strategy| match refetch_strategy {
+                RefetchStrategy::UseRefetchField(use_refetch_field_strategy) => {
+                    Ok::<_, WithLocation<ValidateSchemaError>>(RefetchStrategy::UseRefetchField(
+                        validate_use_refetch_field_strategy(
+                            schema_data,
+                            use_refetch_field_strategy,
+                            server_fields,
+                            parent_object,
+                            unvalidated_client_field.name,
+                        )?,
+                    ))
+                }
+            })
+            .transpose()?,
+    })
+}
+
+/// Validate the selection set on the RefetchFieldStrategy, in particular, associate
+/// id's with each selection in the refetch_selection_set
+fn validate_use_refetch_field_strategy(
+    schema_data: &ServerFieldData,
+    use_refetch_field_strategy: UnvalidatedRefetchFieldStrategy,
+    server_fields: &[UnvalidatedSchemaServerField],
+    parent_object: &SchemaObject,
+    client_field_name: SelectableFieldName,
+) -> ValidateSchemaResult<ValidatedRefetchFieldStrategy> {
+    let refetch_selection_set = validate_client_field_definition_selections_exist_and_types_match(
+        schema_data,
+        use_refetch_field_strategy.refetch_selection_set,
+        parent_object,
+        server_fields,
+    )
+    .map_err(|err| {
+        validate_selections_error_to_validate_schema_error(err, parent_object, client_field_name)
+    })?;
+
+    Ok(ValidatedRefetchFieldStrategy {
+        refetch_selection_set,
+        root_fetchable_type: use_refetch_field_strategy.root_fetchable_type,
+        generate_refetch_query: use_refetch_field_strategy.generate_refetch_query,
+        refetch_query_name: use_refetch_field_strategy.refetch_query_name,
     })
 }
 

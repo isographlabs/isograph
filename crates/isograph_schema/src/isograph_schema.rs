@@ -18,7 +18,7 @@ use isograph_lang_types::{
 };
 use lazy_static::lazy_static;
 
-use crate::{ClientFieldVariant, NormalizationKey};
+use crate::{refetch_strategy::RefetchStrategy, ClientFieldVariant, NormalizationKey};
 
 lazy_static! {
     pub static ref ID_GRAPHQL_TYPE: GraphQLScalarTypeName = "ID".intern().into();
@@ -466,6 +466,14 @@ pub struct ClientField<
                 TClientFieldSelectionScalarFieldAssociatedData,
                 TClientFieldSelectionLinkedFieldAssociatedData,
             >,
+        >,
+    >,
+
+    // None -> not refetchable
+    pub refetch_strategy: Option<
+        RefetchStrategy<
+            TClientFieldSelectionScalarFieldAssociatedData,
+            TClientFieldSelectionLinkedFieldAssociatedData,
         >,
     >,
     pub unwraps: Vec<WithSpan<Unwrap>>,

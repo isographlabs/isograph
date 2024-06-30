@@ -1,19 +1,21 @@
 use common_lang_types::{
     ConstExportName, FilePath, IsographDirectiveName, IsographObjectTypeName, LinkedFieldName,
-    Location, ScalarFieldName, SelectableFieldName, TextSource, UnvalidatedTypeName, WithLocation,
-    WithSpan,
+    Location, ScalarFieldName, SelectableFieldName, Span, TextSource, UnvalidatedTypeName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ClientFieldDeclaration, ClientFieldDeclarationWithValidatedDirectives, DeserializationError,
-    SelectableServerFieldId, ServerObjectId,
+    NonConstantValue, SelectableServerFieldId, SelectionFieldArgument, ServerObjectId,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    ClientField, FieldDefinitionLocation, FieldMapItem, ObjectTypeAndFieldName, UnvalidatedSchema,
+    refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
+    ClientField, FieldDefinitionLocation, FieldMapItem, ObjectTypeAndFieldName, RequiresRefinement,
+    UnvalidatedSchema, NODE_FIELD_NAME,
 };
 
 impl UnvalidatedSchema {
@@ -57,6 +59,7 @@ impl UnvalidatedSchema {
         parent_object_id: ServerObjectId,
         client_field_declaration: WithSpan<ClientFieldDeclarationWithValidatedDirectives>,
     ) -> ProcessClientFieldDeclarationResult<()> {
+        let query_id = self.query_id();
         let object = &mut self.server_field_data.server_objects[parent_object_id.as_usize()];
         let client_field_field_name_ws = client_field_declaration.item.client_field_name;
         let client_field_name = client_field_field_name_ws.item;
@@ -99,6 +102,18 @@ impl UnvalidatedSchema {
             },
 
             parent_object_id,
+            refetch_strategy: object.id_field.map(|_| {
+                // Assume that if we have an id field, this implements Node
+                RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
+                    vec![id_selection()],
+                    query_id,
+                    format!("refetch__{}", object.name).intern().into(),
+                    *NODE_FIELD_NAME,
+                    id_top_level_arguments(),
+                    RequiresRefinement::Yes(object.name),
+                    None,
+                ))
+            }),
         });
         Ok(())
     }
@@ -201,4 +216,14 @@ fn get_client_variant<TScalarField, TLinkedField>(
         file_path: client_field_declaration.definition_path,
         user_written_component_variant: UserWrittenComponentVariant::Eager,
     });
+}
+
+pub fn id_top_level_arguments() -> Vec<SelectionFieldArgument> {
+    vec![SelectionFieldArgument {
+        name: WithSpan::new("id".intern().into(), Span::todo_generated()),
+        value: WithSpan::new(
+            NonConstantValue::Variable("id".intern().into()),
+            Span::todo_generated(),
+        ),
+    }]
 }

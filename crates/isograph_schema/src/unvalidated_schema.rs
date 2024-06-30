@@ -12,7 +12,7 @@ use isograph_lang_types::{
 
 use crate::{
     ClientField, FieldDefinitionLocation, Schema, SchemaScalar, SchemaServerField,
-    SchemaValidationState, ServerFieldData,
+    SchemaValidationState, ServerFieldData, UseRefetchFieldRefetchStrategy,
 };
 use lazy_static::lazy_static;
 
@@ -48,6 +48,11 @@ pub type UnvalidatedClientField = ClientField<
 >;
 
 pub type UnvalidatedLinkedFieldSelection = LinkedFieldSelection<
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
+>;
+
+pub type UnvalidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
     <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
 >;

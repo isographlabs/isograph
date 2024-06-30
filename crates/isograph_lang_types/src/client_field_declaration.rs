@@ -180,7 +180,7 @@ pub struct ScalarFieldSelection<TScalarField> {
 }
 
 impl<TScalarField> ScalarFieldSelection<TScalarField> {
-    pub fn map<U>(self, mut map: impl FnMut(TScalarField) -> U) -> ScalarFieldSelection<U> {
+    pub fn map<U>(self, map: &impl Fn(TScalarField) -> U) -> ScalarFieldSelection<U> {
         ScalarFieldSelection {
             name: self.name,
             reader_alias: self.reader_alias,
@@ -194,7 +194,7 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
 
     pub fn and_then<U, E>(
         self,
-        mut map: impl FnMut(TScalarField) -> Result<U, E>,
+        map: &impl Fn(TScalarField) -> Result<U, E>,
     ) -> Result<ScalarFieldSelection<U>, E> {
         Ok(ScalarFieldSelection {
             name: self.name,
@@ -227,6 +227,40 @@ pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
 }
 
 impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField> {
+    pub fn map<U, V>(
+        self,
+        map_scalar: &impl Fn(TScalarField) -> U,
+        map_linked: &impl Fn(TLinkedField) -> V,
+    ) -> LinkedFieldSelection<U, V> {
+        LinkedFieldSelection {
+            name: self.name,
+            reader_alias: self.reader_alias,
+            normalization_alias: self.normalization_alias,
+            associated_data: map_linked(self.associated_data),
+            selection_set: self
+                .selection_set
+                .into_iter()
+                .map(|with_span| {
+                    with_span.map(|selection| {
+                        selection.map(&mut |server_field_selection| {
+                            server_field_selection.map(
+                                &mut |scalar_field_selection| {
+                                    scalar_field_selection.map(map_scalar)
+                                },
+                                &mut |linked_field_selection| {
+                                    linked_field_selection.map(map_scalar, map_linked)
+                                },
+                            )
+                        })
+                    })
+                })
+                .collect(),
+            unwraps: self.unwraps,
+            arguments: self.arguments,
+            directives: self.directives,
+        }
+    }
+
     pub fn name_or_alias(&self) -> WithLocation<FieldNameOrAlias> {
         self.reader_alias
             .map(|item| item.map(FieldNameOrAlias::from))
