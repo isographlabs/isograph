@@ -45,7 +45,7 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
     } = create_merged_selection_map_and_insert_into_global_map(
         schema,
         schema.server_field_data.object(entrypoint.parent_object_id),
-        &entrypoint.selection_set,
+        &entrypoint.reader_selection_set,
         global_client_field_map,
         entrypoint,
         false,

@@ -89,7 +89,7 @@ impl UnvalidatedSchema {
             description: client_field_declaration.item.description.map(|x| x.item),
             name,
             id: next_client_field_id,
-            selection_set: client_field_declaration.item.selection_set,
+            reader_selection_set: client_field_declaration.item.selection_set,
             unwraps: client_field_declaration.item.unwraps,
             variant,
             variable_definitions: client_field_declaration.item.variable_definitions,

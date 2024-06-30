@@ -32,7 +32,7 @@ pub(crate) fn generate_refetch_reader_artifact(
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
-        &client_field.selection_set,
+        &client_field.reader_selection_set,
         0,
         &scalar_client_field_traversal_state.refetch_paths,
     );

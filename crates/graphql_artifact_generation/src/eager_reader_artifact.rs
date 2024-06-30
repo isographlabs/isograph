@@ -34,7 +34,7 @@ pub(crate) fn generate_eager_reader_artifact(
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
-        &client_field.selection_set,
+        &client_field.reader_selection_set,
         0,
         &scalar_client_field_traversal_state.refetch_paths,
     );
@@ -115,7 +115,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
     let mut param_type_imports = BTreeSet::new();
     let client_field_parameter_type = generate_client_field_parameter_type(
         schema,
-        &client_field.selection_set,
+        &client_field.reader_selection_set,
         parent_type.into(),
         &mut param_type_imports,
         0,

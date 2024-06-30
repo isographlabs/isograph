@@ -376,7 +376,8 @@ fn refetched_paths_for_client_field(
     // Here, path is acting as a prefix. We will receive (for example) foo.bar, and
     // the client field may have a refetch query at baz.__refetch. In this case,
     // this method would return something containing foo.bar.baz.__refetch
-    let path_set = refetched_paths_with_path(&nested_client_field.selection_set, schema, path);
+    let path_set =
+        refetched_paths_with_path(&nested_client_field.reader_selection_set, schema, path);
 
     let mut paths: Vec<_> = path_set.into_iter().collect();
     paths.sort();
@@ -411,7 +412,7 @@ fn refetched_paths_with_path(
                                     // For non-refetch fields, we need to recurse into the selection set
                                     // (if there is one)
                                     let new_paths = refetched_paths_with_path(
-                                        &client_field.selection_set,
+                                        &client_field.reader_selection_set,
                                         schema,
                                         path,
                                     );

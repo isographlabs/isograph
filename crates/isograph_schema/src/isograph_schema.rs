@@ -460,7 +460,7 @@ pub struct ClientField<
     // TODO make this a ClientFieldName that can be converted into a SelectableFieldName
     pub name: SelectableFieldName,
     pub id: ClientFieldId,
-    pub selection_set: Vec<
+    pub reader_selection_set: Vec<
         WithSpan<
             Selection<
                 TClientFieldSelectionScalarFieldAssociatedData,

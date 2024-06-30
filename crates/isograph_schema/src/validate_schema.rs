@@ -370,7 +370,7 @@ fn validate_client_field_selection_set(
     let parent_object = schema_data.object(unvalidated_client_field.parent_object_id);
     let selection_set = validate_client_field_definition_selections_exist_and_types_match(
         schema_data,
-        unvalidated_client_field.selection_set,
+        unvalidated_client_field.reader_selection_set,
         parent_object,
         server_fields,
     )
@@ -385,7 +385,7 @@ fn validate_client_field_selection_set(
         description: unvalidated_client_field.description,
         name: unvalidated_client_field.name,
         id: unvalidated_client_field.id,
-        selection_set,
+        reader_selection_set: selection_set,
         unwraps: unvalidated_client_field.unwraps,
         variant: unvalidated_client_field.variant,
         variable_definitions,
