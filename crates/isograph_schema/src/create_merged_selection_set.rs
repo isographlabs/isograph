@@ -759,7 +759,7 @@ fn merge_scalar_client_field(
     } = create_merged_selection_map_and_insert_into_global_map(
         schema,
         parent_type,
-        &newly_encountered_scalar_client_field.reader_selection_set,
+        &*newly_encountered_scalar_client_field.selection_set_for_parent_query(),
         global_client_field_map,
         newly_encountered_scalar_client_field,
         matches!(selection_variant, &IsographSelectionVariant::Loadable(_)),

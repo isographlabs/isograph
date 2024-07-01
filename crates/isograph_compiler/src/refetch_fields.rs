@@ -45,8 +45,6 @@ fn add_refetch_field_to_object(
 
             vacant_entry.insert(FieldDefinitionLocation::Client(next_client_field_id));
 
-            let id_field_selection = id_selection();
-
             client_fields.push(ClientField {
                 description: Some(
                     format!("A refetch field for the {} type.", object.name)
@@ -55,7 +53,7 @@ fn add_refetch_field_to_object(
                 ),
                 name: (*REFETCH_FIELD_NAME).into(),
                 id: next_client_field_id,
-                reader_selection_set: vec![id_field_selection],
+                reader_selection_set: None,
                 unwraps: vec![],
                 variant: ClientFieldVariant::ImperativelyLoadedField(
                     ImperativelyLoadedFieldVariant {

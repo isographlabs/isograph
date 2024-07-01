@@ -460,11 +460,13 @@ pub struct ClientField<
     // TODO make this a ClientFieldName that can be converted into a SelectableFieldName
     pub name: SelectableFieldName,
     pub id: ClientFieldId,
-    pub reader_selection_set: Vec<
-        WithSpan<
-            Selection<
-                TClientFieldSelectionScalarFieldAssociatedData,
-                TClientFieldSelectionLinkedFieldAssociatedData,
+    pub reader_selection_set: Option<
+        Vec<
+            WithSpan<
+                Selection<
+                    TClientFieldSelectionScalarFieldAssociatedData,
+                    TClientFieldSelectionLinkedFieldAssociatedData,
+                >,
             >,
         >,
     >,
@@ -491,6 +493,42 @@ pub struct ClientField<
 
     // TODO should this be TypeWithFieldsId???
     pub parent_object_id: ServerObjectId,
+}
+
+impl<
+        TClientFieldSelectionScalarFieldAssociatedData,
+        TClientFieldSelectionLinkedFieldAssociatedData,
+        TClientFieldVariableDefinitionAssociatedData,
+    >
+    ClientField<
+        TClientFieldSelectionScalarFieldAssociatedData,
+        TClientFieldSelectionLinkedFieldAssociatedData,
+        TClientFieldVariableDefinitionAssociatedData,
+    >
+{
+    pub fn selection_set_for_parent_query(
+        &self,
+    ) -> &Vec<
+        WithSpan<
+            Selection<
+                TClientFieldSelectionScalarFieldAssociatedData,
+                TClientFieldSelectionLinkedFieldAssociatedData,
+            >,
+        >,
+    > {
+        if let Some(s) = self.reader_selection_set.as_ref() {
+            s
+        } else {
+            self.refetch_strategy
+                .as_ref()
+                .map(|strategy| strategy.refetch_selection_set())
+                .expect(
+                    "Expected client field to have \
+                    either a reader_selection_set or a refetch_selection_set.\
+                    This is indicative of a bug in Isograph.",
+                )
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]

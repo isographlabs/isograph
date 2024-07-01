@@ -374,19 +374,26 @@ fn validate_client_field_selection_set(
         validate_variable_definitions(schema_data, unvalidated_client_field.variable_definitions)?;
 
     let parent_object = schema_data.object(unvalidated_client_field.parent_object_id);
-    let selection_set = validate_client_field_definition_selections_exist_and_types_match(
-        schema_data,
-        unvalidated_client_field.reader_selection_set,
-        parent_object,
-        server_fields,
-    )
-    .map_err(|err| {
-        validate_selections_error_to_validate_schema_error(
-            err,
-            parent_object,
-            unvalidated_client_field.name,
-        )
-    })?;
+    let selection_set = unvalidated_client_field
+        .reader_selection_set
+        .map(|selection_set| {
+            Ok::<_, WithLocation<ValidateSchemaError>>(
+                validate_client_field_definition_selections_exist_and_types_match(
+                    schema_data,
+                    selection_set,
+                    parent_object,
+                    server_fields,
+                )
+                .map_err(|err| {
+                    validate_selections_error_to_validate_schema_error(
+                        err,
+                        parent_object,
+                        unvalidated_client_field.name,
+                    )
+                })?,
+            )
+        })
+        .transpose()?;
 
     Ok(ClientField {
         description: unvalidated_client_field.description,

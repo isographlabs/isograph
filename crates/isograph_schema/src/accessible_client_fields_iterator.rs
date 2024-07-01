@@ -10,7 +10,7 @@ impl ValidatedClientField {
         schema: &'a ValidatedSchema,
     ) -> impl Iterator<Item = &'a ValidatedClientField> + 'a {
         AccessibleClientFieldIterator {
-            selection_set: &self.reader_selection_set,
+            selection_set: &self.selection_set_for_parent_query(),
             index: 0,
             schema,
             sub_iterator: None,
