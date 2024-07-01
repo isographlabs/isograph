@@ -19,6 +19,7 @@ pub(crate) fn generate_refetch_reader_artifact(
     client_field: &ValidatedClientField,
     primary_field_info: Option<&PrimaryFieldInfo>,
     scalar_client_field_traversal_state: &ScalarClientFieldTraversalState,
+    was_selected_loadably: bool,
 ) -> ArtifactPathAndContent {
     let function_import_statement = match primary_field_info {
         Some(info) => {
@@ -32,7 +33,19 @@ pub(crate) fn generate_refetch_reader_artifact(
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
-        &*client_field.selection_set_for_parent_query(),
+        if was_selected_loadably {
+            // TODO model this better
+            client_field
+                .refetch_strategy
+                .as_ref()
+                .expect(
+                    "Expected refetch strategy. \
+                This is indicative of a bug in Isograph.",
+                )
+                .refetch_selection_set()
+        } else {
+            &*client_field.selection_set_for_parent_query()
+        },
         0,
         &scalar_client_field_traversal_state.refetch_paths,
     );

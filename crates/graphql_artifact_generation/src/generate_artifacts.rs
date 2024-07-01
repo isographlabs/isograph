@@ -163,6 +163,7 @@ pub fn get_artifact_path_and_content<'schema>(
                         encountered_client_field,
                         None,
                         traversal_state,
+                        true,
                     ))
                 }
             }
@@ -172,6 +173,7 @@ pub fn get_artifact_path_and_content<'schema>(
                     encountered_client_field,
                     variant.primary_field_info.as_ref(),
                     traversal_state,
+                    false,
                 ))
             }
         };

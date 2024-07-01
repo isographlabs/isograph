@@ -6,7 +6,7 @@ import { Foo as resolver } from '../../../Loadable';
 const readerAst: ReaderAst<Pet__Foo__param> = [
   {
     kind: "Scalar",
-    fieldName: "id",
+    fieldName: "name",
     alias: null,
     arguments: null,
   },

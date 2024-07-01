@@ -33,6 +33,7 @@ pub type ClientFieldToCompletedMergeTraversalStateMap =
 pub struct ClientFieldTraversalResult {
     pub traversal_state: ScalarClientFieldTraversalState,
     pub merged_selection_map: MergedSelectionMap,
+    // TODO change this to Option<SelectionSet>?
     pub was_selected_loadably: bool,
 }
 

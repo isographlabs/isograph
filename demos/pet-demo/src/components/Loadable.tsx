@@ -2,7 +2,7 @@ import { iso } from '@iso';
 
 export const Foo = iso(`
   field Pet.Foo {
-    id
+    name
   }
 `)((data) => {
   return data;
