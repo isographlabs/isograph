@@ -622,6 +622,7 @@ fn merge_validated_selections_into_selection_map(
                                     newly_encountered_scalar_client_field,
                                     global_client_field_map,
                                     &scalar_field_selection.associated_data.selection_variant,
+                                    is_selected_loadably,
                                 )
                             }
                         };
@@ -752,6 +753,7 @@ fn merge_scalar_client_field(
     newly_encountered_scalar_client_field: &ValidatedClientField,
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
     selection_variant: &IsographSelectionVariant,
+    is_selected_loadably: bool,
 ) {
     let ClientFieldTraversalResult {
         traversal_state,
@@ -766,8 +768,45 @@ fn merge_scalar_client_field(
         matches!(selection_variant, &IsographSelectionVariant::Loadable(_)),
     );
 
-    parent_merge_traversal_state.incorporate_results_of_iterating_into_child(&traversal_state);
-    merge_selections_into_selection_map(parent_map, &merged_selection_map);
+    if is_selected_loadably {
+        // since the field has been selected loadably, we need to actually generate a different
+        // merged selection map (one from the refetch_selection_set instead of from the
+        // reader_selection_map).
+        //
+        // The way we're doing this now is awkward. This should probably be done as part of
+        // create_merged_selection_map_and_insert_into_global_map.
+        //
+        // Note that we do not need to call incorporate_results_of_iterating_into_child, since
+        // that is a no-op. We only need to call merge_selections_into_selection_map to ensure
+        // that whatever fields are mapped are selected.
+        //
+        // (For now, we only select the id field, so... this is also a no-op.)
+        // Anyway, we should model this better.
+        let merged_selection_map_from_refetch_selection_set = {
+            let mut merge_traversal_state = ScalarClientFieldTraversalState::new();
+            &create_selection_map_with_merge_traversal_state(
+                schema,
+                parent_type,
+                newly_encountered_scalar_client_field
+                    .refetch_strategy
+                    .as_ref()
+                    .expect(
+                        "Expected refetch_strategy to exist. \
+                        This is indicative of a bug in Isograph.",
+                    )
+                    .refetch_selection_set(),
+                &mut merge_traversal_state,
+                &mut Default::default(),
+            )
+        };
+        merge_selections_into_selection_map(
+            parent_map,
+            merged_selection_map_from_refetch_selection_set,
+        )
+    } else {
+        parent_merge_traversal_state.incorporate_results_of_iterating_into_child(&traversal_state);
+        merge_selections_into_selection_map(parent_map, &merged_selection_map);
+    }
 }
 
 fn merge_scalar_server_field(

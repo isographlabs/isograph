@@ -10,7 +10,7 @@ const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [
 const queryText = 'query LoadableDemo  {\
   pet____id___l_0: pet(id: 0) {\
     id,\
-    name,\
+    tagline,\
   },\
 }';
 
@@ -32,7 +32,7 @@ const normalizationAst: NormalizationAst = [
       },
       {
         kind: "Scalar",
-        fieldName: "name",
+        fieldName: "tagline",
         arguments: null,
       },
     ],

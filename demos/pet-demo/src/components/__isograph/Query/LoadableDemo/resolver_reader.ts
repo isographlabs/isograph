@@ -18,7 +18,7 @@ const readerAst: ReaderAst<Query__LoadableDemo__param> = [
     selections: [
       {
         kind: "Scalar",
-        fieldName: "name",
+        fieldName: "tagline",
         alias: null,
         arguments: null,
       },
