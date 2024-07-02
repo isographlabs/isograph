@@ -2,7 +2,7 @@ import type {EagerReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact} 
 import { Query__LoadableDemo__param } from './param_type';
 import { Query__LoadableDemo__output_type } from './output_type';
 import { Bar as resolver } from '../../../Loadable';
-import Pet__Foo__refetch_reader from '../../Pet/Foo/refetch_reader';
+import Pet__LoadableField__refetch_reader from '../../Pet/LoadableField/refetch_reader';
 
 const readerAst: ReaderAst<Query__LoadableDemo__param> = [
   {
@@ -24,8 +24,8 @@ const readerAst: ReaderAst<Query__LoadableDemo__param> = [
       },
       {
         kind: "ImperativelyLoadedField",
-        alias: "Foo",
-        readerArtifact: Pet__Foo__refetch_reader,
+        alias: "LoadableField",
+        readerArtifact: Pet__LoadableField__refetch_reader,
         refetchQuery: 0,
       },
     ],

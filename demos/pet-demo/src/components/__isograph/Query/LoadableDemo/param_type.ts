@@ -1,8 +1,8 @@
-import { type Pet__Foo__output_type } from '../../Pet/Foo/output_type';
+import { type Pet__LoadableField__output_type } from '../../Pet/LoadableField/output_type';
 
 export type Query__LoadableDemo__param = {
   pet: ({
     tagline: string,
-    Foo: Pet__Foo__output_type,
+    LoadableField: Pet__LoadableField__output_type,
   } | null),
 };

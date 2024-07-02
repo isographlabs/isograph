@@ -2,7 +2,7 @@ import type {IsographEntrypoint} from '@isograph/react';
 import { Checkin__CheckinDisplay__param } from './Checkin/CheckinDisplay/param_type';
 import { Mutation__SetTagline__param } from './Mutation/SetTagline/param_type';
 import { Pet__FavoritePhraseLoader__param } from './Pet/FavoritePhraseLoader/param_type';
-import { Pet__Foo__param } from './Pet/Foo/param_type';
+import { Pet__LoadableField__param } from './Pet/LoadableField/param_type';
 import { Pet__PetBestFriendCard__param } from './Pet/PetBestFriendCard/param_type';
 import { Pet__PetCheckinsCard__param } from './Pet/PetCheckinsCard/param_type';
 import { Pet__PetPhraseCard__param } from './Pet/PetPhraseCard/param_type';
@@ -80,8 +80,8 @@ export function iso<T>(
 ): IdentityWithParamComponent<Pet__FavoritePhraseLoader__param>;
 
 export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'field Pet.Foo', T>
-): IdentityWithParam<Pet__Foo__param>;
+  param: T & MatchesWhitespaceAndString<'field Pet.LoadableField', T>
+): IdentityWithParam<Pet__LoadableField__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.PetBestFriendCard', T>
