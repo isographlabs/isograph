@@ -3,7 +3,6 @@ import { iso } from '@iso';
 import { MenuItem, Select, Button, Input, Box } from '@mui/material';
 
 import { PetId } from './router';
-import { useLazyReference, useResult } from '@isograph/react';
 
 export const PetUpdater = iso(`
   field Pet.PetUpdater @component

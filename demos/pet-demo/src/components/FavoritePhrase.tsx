@@ -1,5 +1,5 @@
 import { iso } from '@iso';
-import * as React from 'react';
+import React from 'react';
 import { UNASSIGNED_STATE } from '@isograph/react-disposable-state';
 import { EntrypointReader, useImperativeReference } from '@isograph/react';
 
