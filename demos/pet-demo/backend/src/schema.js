@@ -162,6 +162,7 @@ const pets = [
     },
     age: 16,
     tagline: 'The OG',
+    alt_tagline: 'The cute one',
     favorite_phrase: "Don't bother me!",
     stats: {
       weight: 18,

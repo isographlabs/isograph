@@ -42,6 +42,7 @@ type Pet implements Node {
   age: Int!
   stats: PetStats
   tagline: String!
+  alt_tagline: String!
   potential_new_best_friends: [Pet!]!
 
   checkins: [Checkin!]!

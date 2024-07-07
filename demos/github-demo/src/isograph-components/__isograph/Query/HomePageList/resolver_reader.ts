@@ -33,7 +33,8 @@ const readerAst: ReaderAst<Query__HomePageList__param> = [
       {
         kind: "ImperativelyLoadedField",
         alias: "__refetch",
-        readerArtifact: User____refetch__refetch_reader,
+        refetchReaderArtifact: User____refetch__refetch_reader,
+        resolverReaderArtifact: null,
         refetchQuery: 0,
       },
     ],

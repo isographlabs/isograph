@@ -81,7 +81,7 @@ export function iso<T>(
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.LoadableField', T>
-): IdentityWithParam<Pet__LoadableField__param>;
+): IdentityWithParamComponent<Pet__LoadableField__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.PetBestFriendCard', T>
@@ -125,7 +125,7 @@ export function iso<T>(
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.LoadableDemo', T>
-): IdentityWithParam<Query__LoadableDemo__param>;
+): IdentityWithParamComponent<Query__LoadableDemo__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.PetDetailRoute', T>

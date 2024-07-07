@@ -40,7 +40,7 @@ pub(crate) fn generate_refetch_reader_artifact(
                 .as_ref()
                 .expect(
                     "Expected refetch strategy. \
-                This is indicative of a bug in Isograph.",
+                    This is indicative of a bug in Isograph.",
                 )
                 .refetch_selection_set()
         } else {
@@ -112,18 +112,34 @@ fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctio
         to: "id".intern().into(),
     }]);
     let indent = "  ";
+    // TODO we need to generate nested refetch queries, which may either be
+    // passed from the original entrypoint or specific to the loadable field.
+    //
+    // It should probably be passed from the original entrypoint.
     let content = format!(
         "{include_read_out_data}\n\
-        import {{ makeNetworkRequest, type IsographEnvironment }} \
+        import {{ makeNetworkRequest, type IsographEnvironment, type DataId, type TopLevelReaderArtifact }} \
         from '@isograph/react';\n\
         const resolver = (\n\
         {indent}environment: IsographEnvironment,\n\
         {indent}artifact: RefetchQueryNormalizationArtifact,\n\
         {indent}readOutData: any,\n\
-        {indent}filteredVariables: any\n\
+        {indent}filteredVariables: any,\n\
+        {indent}rootId: DataId,\n\
+        {indent}// TODO type this\n\
+        {indent}readerArtifact: TopLevelReaderArtifact<any, any, any> | null,\n\
         ) => () => {{\n\
         {indent}const variables = includeReadOutData(filteredVariables, readOutData);\n\
-        {indent}return makeNetworkRequest(environment, artifact, variables);\n\
+        {indent}const [_networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables);\n\
+        {indent}if (readerArtifact == null) return;\n\
+        {indent}const fragmentReference = {{\n\
+        {indent}  kind: 'FragmentReference',\n\
+        {indent}  readerArtifact,\n\
+        {indent}  root: rootId,\n\
+        {indent}  variables,\n\
+        {indent}  nestedRefetchQueries: [],\n\
+        {indent}}};\n\
+        {indent}return [fragmentReference, disposeNetworkRequest];\n\
         }};\n"
     );
     ClientFieldFunctionImportStatement(content)
@@ -133,21 +149,32 @@ fn generate_function_import_statement_for_mutation_reader(
     field_map: &[FieldMapItem],
 ) -> ClientFieldFunctionImportStatement {
     let include_read_out_data = get_read_out_data(&field_map);
+    let indent = "  ";
     ClientFieldFunctionImportStatement(format!(
         "{include_read_out_data}\n\
-        import {{ makeNetworkRequest, type IsographEnvironment }} from '@isograph/react';\n\
+        import {{ makeNetworkRequest, type IsographEnvironment, type DataId, type TopLevelReaderArtifact }} from '@isograph/react';\n\
         const resolver = (\n\
-        {}environment: IsographEnvironment,\n\
-        {}artifact: RefetchQueryNormalizationArtifact,\n\
-        {}readOutData: any,\n\
-        {}filteredVariables: any\n\
+        {indent}environment: IsographEnvironment,\n\
+        {indent}artifact: RefetchQueryNormalizationArtifact,\n\
+        {indent}readOutData: any,\n\
+        {indent}filteredVariables: any,\n\
+        {indent}rootId: DataId,\n\
+        {indent}// TODO type this\n\
+        {indent}readerArtifact: TopLevelReaderArtifact<any, any, any>,\n\
         ) => (mutationParams: any) => {{\n\
-        {}const variables = includeReadOutData({{...filteredVariables, \
-        ...mutationParams}}, readOutData);\n\
-        {}makeNetworkRequest(environment, artifact, variables);\n\
+        {indent}const variables = includeReadOutData({{...filteredVariables, ...mutationParams}}, readOutData);\n\
+        {indent}const [_networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables);\n\
+        {indent}if (readerArtifact == null) return;\n\
+        {indent}const fragmentReference = {{\n\
+        {indent}  kind: 'FragmentReference',\n\
+        {indent}  readerArtifact,\n\
+        {indent}  root: rootId,\n\
+        {indent}  variables,\n\
+        {indent}  nestedRefetchQueries: [],\n\
+        {indent}}};\n\
+        {indent}return [fragmentReference, disposeNetworkRequest];\n\
         }};\n\
         ",
-        "  ", "  ", "  ", "  ", "  ", "  "
     ))
 }
 

@@ -2,7 +2,7 @@ import { type Pet__LoadableField__output_type } from '../../Pet/LoadableField/ou
 
 export type Query__LoadableDemo__param = {
   pet: ({
-    tagline: string,
+    name: string,
     LoadableField: Pet__LoadableField__output_type,
   } | null),
 };

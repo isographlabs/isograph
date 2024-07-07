@@ -4,15 +4,27 @@ const includeReadOutData = (variables: any, readOutData: any) => {
   return variables;
 };
 
-import { makeNetworkRequest, type IsographEnvironment } from '@isograph/react';
+import { makeNetworkRequest, type IsographEnvironment, type DataId, type TopLevelReaderArtifact } from '@isograph/react';
 const resolver = (
   environment: IsographEnvironment,
   artifact: RefetchQueryNormalizationArtifact,
   readOutData: any,
-  filteredVariables: any
+  filteredVariables: any,
+  rootId: DataId,
+  // TODO type this
+  readerArtifact: TopLevelReaderArtifact<any, any, any> | null,
 ) => () => {
   const variables = includeReadOutData(filteredVariables, readOutData);
-  return makeNetworkRequest(environment, artifact, variables);
+  const [_networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables);
+  if (readerArtifact == null) return;
+  const fragmentReference = {
+    kind: 'FragmentReference',
+    readerArtifact,
+    root: rootId,
+    variables,
+    nestedRefetchQueries: [],
+  };
+  return [fragmentReference, disposeNetworkRequest];
 };
 
 

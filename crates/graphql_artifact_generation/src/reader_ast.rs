@@ -120,6 +120,7 @@ fn scalar_client_defined_field_ast_node(
             path,
             indentation_level,
             scalar_field_selection,
+            false,
         ),
         ClientFieldVariant::UserWritten(_) => {
             if matches!(
@@ -133,6 +134,7 @@ fn scalar_client_defined_field_ast_node(
                     path,
                     indentation_level,
                     scalar_field_selection,
+                    true,
                 )
             } else {
                 user_written_variant_ast_node(
@@ -207,20 +209,36 @@ fn imperatively_loaded_variant_ast_node(
     path: &mut Vec<NameAndArguments>,
     indentation_level: u8,
     scalar_field_selection: &ValidatedScalarFieldSelection,
+    // This is indicative of poor modeling
+    selected_loadably: bool,
 ) -> String {
     let alias = scalar_field_selection.name_or_alias().item;
     let indent_1 = "  ".repeat(indentation_level as usize);
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
-    let reader_artifact_import_name = format!(
+    let refetch_reader_artifact_import_name = format!(
         "{}__refetch_reader",
         nested_client_field.type_and_field.underscore_separated()
     );
 
-    {
-        let artifact_file_type = ResolverReaderOrRefetchResolver::RefetchReader;
-        reader_imports.insert((nested_client_field.type_and_field, artifact_file_type));
+    let resolver_reader_artifact_import_name = if selected_loadably {
+        reader_imports.insert((
+            nested_client_field.type_and_field,
+            ResolverReaderOrRefetchResolver::ResolverReader,
+        ));
+        format!(
+            "{}__resolver_reader",
+            nested_client_field.type_and_field.underscore_separated()
+        )
+    } else {
+        "null".to_string()
     };
+
+    reader_imports.insert((
+        nested_client_field.type_and_field,
+        ResolverReaderOrRefetchResolver::RefetchReader,
+    ));
+
     let refetch_query_index = find_imperatively_fetchable_query_index(
         root_refetched_paths,
         path,
@@ -232,7 +250,8 @@ fn imperatively_loaded_variant_ast_node(
         "{indent_1}{{\n\
         {indent_2}kind: \"ImperativelyLoadedField\",\n\
         {indent_2}alias: \"{alias}\",\n\
-        {indent_2}readerArtifact: {reader_artifact_import_name},\n\
+        {indent_2}refetchReaderArtifact: {refetch_reader_artifact_import_name},\n\
+        {indent_2}resolverReaderArtifact: {resolver_reader_artifact_import_name},\n\
         {indent_2}refetchQuery: {refetch_query_index},\n\
         {indent_1}}},\n",
     )

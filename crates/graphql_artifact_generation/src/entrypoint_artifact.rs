@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use common_lang_types::{ArtifactPathAndContent, QueryOperationName, VariableName};
 use intern::{string_key::Intern, Lookup};
-use isograph_lang_types::ClientFieldId;
+use isograph_lang_types::{ClientFieldId, IsographSelectionVariant};
 use isograph_schema::{
     create_merged_selection_map_and_insert_into_global_map, current_target_merged_selections,
     get_imperatively_loaded_artifact_info, get_reachable_variables,
@@ -78,9 +78,25 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
     let refetch_paths_with_variables = traversal_state
         .refetch_paths
         .iter()
-        .map(|((path, _), root_refetch_path)| {
-            let current_target_merged_selections =
-                current_target_merged_selections(path.linked_fields.iter(), &merged_selection_map);
+        .map(|((path, selection_variant), root_refetch_path)| {
+            let current_target_merged_selections = match selection_variant {
+                IsographSelectionVariant::Regular => current_target_merged_selections(
+                    path.linked_fields.iter(),
+                    &merged_selection_map,
+                ),
+                IsographSelectionVariant::Loadable(_) => {
+                    // Note: it would be cleaner to include a reference to the merged selection set here via
+                    // the selection_variant variable, instead of by looking it up like this.
+                    &global_client_field_map
+                        .get(&root_refetch_path.path_to_refetch_field_info.client_field_id)
+                        .expect(
+                            "Expected field to have been encountered, \
+                                since it is being used as a refetch field.",
+                        )
+                        .merged_selection_map
+                }
+            };
+
             let reachable_variables = get_reachable_variables(&current_target_merged_selections);
             (
                 root_refetch_path.clone(),

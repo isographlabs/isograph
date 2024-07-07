@@ -34,7 +34,7 @@ pub struct ClientFieldTraversalResult {
     pub traversal_state: ScalarClientFieldTraversalState,
     pub merged_selection_map: MergedSelectionMap,
     // TODO change this to Option<SelectionSet>?
-    pub was_selected_loadably: bool,
+    pub was_ever_selected_loadably: bool,
 }
 
 lazy_static! {
@@ -300,8 +300,11 @@ pub fn create_merged_selection_map_and_insert_into_global_map(
     // TODO move this check outside of this function
     match global_client_field_map.get_mut(&root_object.id) {
         Some(traversal_result) => {
-            traversal_result.was_selected_loadably =
-                traversal_result.was_selected_loadably || was_selected_loadably;
+            // What are we doing here? We are noting whether we ever encountered this field
+            // loadably. If we never encounter it loadably, we generate some files. If it was
+            // ever encountered loadably, we also generate additional files.
+            traversal_result.was_ever_selected_loadably =
+                traversal_result.was_ever_selected_loadably || was_selected_loadably;
             traversal_result.clone()
         }
         None => {
@@ -321,7 +324,7 @@ pub fn create_merged_selection_map_and_insert_into_global_map(
                 ClientFieldTraversalResult {
                     traversal_state: merge_traversal_state.clone(),
                     merged_selection_map: selection_map.clone(),
-                    was_selected_loadably,
+                    was_ever_selected_loadably: was_selected_loadably,
                 },
             );
 
@@ -329,7 +332,7 @@ pub fn create_merged_selection_map_and_insert_into_global_map(
             ClientFieldTraversalResult {
                 traversal_state: merge_traversal_state,
                 merged_selection_map: selection_map,
-                was_selected_loadably,
+                was_ever_selected_loadably: was_selected_loadably,
             }
         }
     }
@@ -764,6 +767,7 @@ fn merge_scalar_client_field(
     newly_encountered_scalar_client_field: &ValidatedClientField,
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
     selection_variant: &IsographSelectionVariant,
+    // TODO pass Option<LoadableVariant
     is_selected_loadably: bool,
 ) {
     let ClientFieldTraversalResult {

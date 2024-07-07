@@ -60,3 +60,4 @@ export {
   Arguments,
 } from './util';
 export { useRerenderOnChange } from './useRerenderOnChange';
+export { useClientSideDefer } from './loadable-hooks/useClientSideDefer';

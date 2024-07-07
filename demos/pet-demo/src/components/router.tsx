@@ -123,11 +123,10 @@ function LoadableDemo() {
     {},
   );
 
-  const data = useResult(queryReference);
-  console.log('loadable', data);
+  const Component = useResult(queryReference);
   if (typeof window !== 'undefined') {
     // @ts-expect-error
-    window.data = data;
+    window.data = Component;
   }
-  return <>loadable demo</>;
+  return <Component />;
 }

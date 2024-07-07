@@ -196,7 +196,7 @@ function readData<TReadFromStore>(
       case 'ImperativelyLoadedField': {
         const data = readData(
           environment,
-          field.readerArtifact.readerAst,
+          field.refetchReaderArtifact.readerAst,
           root,
           variables,
           // Refetch fields just read the id, and don't need refetch query artifacts
@@ -218,12 +218,19 @@ function readData<TReadFromStore>(
           const refetchQueryArtifact = refetchQuery.artifact;
           const allowedVariables = refetchQuery.allowedVariables;
 
-          target[field.alias] = field.readerArtifact.resolver(
-            environment,
-            refetchQueryArtifact,
-            data.data,
-            filterVariables(variables, allowedVariables),
-          );
+          target[field.alias] = [
+            // DataId
+            root,
+            // Fetcher
+            field.refetchReaderArtifact.resolver(
+              environment,
+              refetchQueryArtifact,
+              data.data,
+              filterVariables(variables, allowedVariables),
+              root,
+              field.resolverReaderArtifact,
+            ),
+          ];
         }
         break;
       }

@@ -86,7 +86,7 @@ pub fn get_artifact_path_and_content<'schema>(
         encountered_client_field_id,
         ClientFieldTraversalResult {
             traversal_state,
-            was_selected_loadably,
+            was_ever_selected_loadably: was_selected_loadably,
             ..
         },
     ) in &global_client_field_map
@@ -106,58 +106,6 @@ pub fn get_artifact_path_and_content<'schema>(
                 ));
 
                 if *was_selected_loadably {
-                    #[allow(unused_doc_comments)]
-                    /**
-                     * This is incorrect. We currently generate a refetch reader artifact
-                     * that uses the selection set of the loadable field for its refetch
-                     * reader AST.
-                     *
-                     * # Explanation of how it is:
-                     *
-                     * Currently, client fields have only a single selection set.
-                     *
-                     * It is used for generating the resolver reader and refetch reader
-                     * artifacts. Previously, no client field had both, so one selection set
-                     * could play both roles.
-                     *
-                     * # Explanation of how it should be:
-                     *
-                     * Instead, client fields should optionally be imperatively fetchable,
-                     * and optionally fetchable as part of the parent query. (e.g. in
-                     * GraphQL, some fields can be only accessible on the Mutation object
-                     * and not off of the query.)
-                     *
-                     * Fields which are neither fetchable imperatively nor fetchable as
-                     * part of the parent are unusable. Maybe we should make that state
-                     * unrepresentable.
-                     *
-                     * So, client fields should have:
-                     * - reader_selection_set: Option<SelectionSet>
-                     *   - this selection set is rooted at the field's parent type
-                     * - fetch_strategy: Option<FetchStrategy>
-                     *   - a FetchStrategy contains a SelectionSet, also rooted on the
-                     *     field's parent type, which selects the fields needed (e.g. `id`)
-                     *   - it also contains info about how to construct the imperatively
-                     *     fetched query (e.g. "use node", "reconstruct the query from root",
-                     *     etc.)
-                     *
-                     * For the generated refetch query, what fields do we refetch? I don't think
-                     * this is the final answer, but as a first pass:
-                     * - If the field has a reader_selection_set, we can use that.
-                     *   - In the future, you would probably want to be able to fetch either
-                     *     the complete selection set, or whatever is not included as part of the
-                     *     parent.
-                     * - If the field doesn't have a reader_selection_set, we can use part of
-                     *   the parent's normalization AST for the refetch.
-                     *   - Eventually we want to filter this, e.g. User.set_best_friend should
-                     *     only refetch all the selections off of the best_friend field.
-                     *
-                     * The implicit assumption in the above is that if you don't have a
-                     * reader_selection_set, it's being fetched for side effects, and if you do,
-                     * it's being fetched for the data. But that's not always true! You could
-                     * have both a result (e.g. did we succeed in setting the best friend?) and
-                     * a side effect (setting the best friend.)
-                     */
                     path_and_contents.push(generate_refetch_reader_artifact(
                         schema,
                         encountered_client_field,

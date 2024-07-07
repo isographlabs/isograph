@@ -42,7 +42,7 @@ declare global {
   }
 }
 
-function getOrCreateCache<T>(
+export function getOrCreateCache<T>(
   environment: IsographEnvironment,
   index: string,
   factory: Factory<T>,

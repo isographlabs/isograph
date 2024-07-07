@@ -9,7 +9,8 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
   {
     kind: "ImperativelyLoadedField",
     alias: "set_best_friend",
-    readerArtifact: Pet__set_best_friend__refetch_reader,
+    refetchReaderArtifact: Pet__set_best_friend__refetch_reader,
+    resolverReaderArtifact: null,
     refetchQuery: 1,
   },
   {
@@ -35,7 +36,8 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
   {
     kind: "ImperativelyLoadedField",
     alias: "set_pet_tagline",
-    readerArtifact: Pet__set_pet_tagline__refetch_reader,
+    refetchReaderArtifact: Pet__set_pet_tagline__refetch_reader,
+    resolverReaderArtifact: null,
     refetchQuery: 2,
   },
   {
@@ -47,7 +49,8 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
   {
     kind: "ImperativelyLoadedField",
     alias: "__refetch",
-    readerArtifact: Pet____refetch__refetch_reader,
+    refetchReaderArtifact: Pet____refetch__refetch_reader,
+    resolverReaderArtifact: null,
     refetchQuery: 0,
   },
 ];

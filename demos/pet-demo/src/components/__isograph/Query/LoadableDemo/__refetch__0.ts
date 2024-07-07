@@ -4,6 +4,7 @@ const queryText = 'query Pet__refetch ($id: ID!) {\
     ... on Pet {\
       __typename,\
       id,\
+      alt_tagline,\
       tagline,\
     },\
   },\
@@ -32,6 +33,11 @@ const normalizationAst: NormalizationAst = [
           {
             kind: "Scalar",
             fieldName: "id",
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            fieldName: "alt_tagline",
             arguments: null,
           },
           {

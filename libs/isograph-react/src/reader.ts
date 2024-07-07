@@ -1,5 +1,6 @@
 import {
   ComponentOrFieldName,
+  DataId,
   IsographEnvironment,
 } from './IsographEnvironment';
 import { RefetchQueryNormalizationArtifact } from './entrypoint';
@@ -43,6 +44,11 @@ export type RefetchReaderArtifact = {
     artifact: RefetchQueryNormalizationArtifact,
     // TODO type this better
     variables: any,
+    // TODO type this better
+    filteredVariables: any,
+    rootId: DataId,
+    readerArtifact: TopLevelReaderArtifact<any, any, any> | null,
+    // TODO type this better
   ) => () => void;
 };
 
@@ -56,6 +62,8 @@ export type MutationReaderArtifact<TReadFromStore extends Object> = {
     readOutData: TReadFromStore,
     // TODO type this better
     filteredVariables: any,
+    rootId: DataId,
+    readerArtifact: TopLevelReaderArtifact<any, any, any> | null,
     // TODO type this better
   ) => (mutationParams: any) => void;
 };
@@ -100,6 +108,9 @@ export type ReaderResolverField = {
 export type ReaderImperativelyLoadedField = {
   readonly kind: 'ImperativelyLoadedField';
   readonly alias: string;
-  readonly readerArtifact: MutationReaderArtifact<any> | RefetchReaderArtifact;
+  readonly refetchReaderArtifact:
+    | MutationReaderArtifact<any>
+    | RefetchReaderArtifact;
+  readonly resolverReaderArtifact: TopLevelReaderArtifact<any, any, any> | null;
   readonly refetchQuery: number;
 };
