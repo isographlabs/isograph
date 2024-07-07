@@ -138,6 +138,7 @@ pub struct PathToRefetchFieldInfo {
     refetch_field_parent_id: ServerObjectId,
     pub imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant,
     extra_selections: MergedSelectionMap,
+    pub client_field_id: ClientFieldId,
 }
 
 pub type RefetchedPathsMap =
@@ -350,6 +351,7 @@ pub fn get_imperatively_loaded_artifact_info(
         refetch_field_parent_id,
         imperatively_loaded_field_variant,
         extra_selections: _,
+        client_field_id: _,
     } = path_to_refetch_field_info;
 
     let artifact_info = process_imperatively_loaded_field(
@@ -595,6 +597,7 @@ fn merge_validated_selections_into_selection_map(
                                                         root_object_id: schema.query_id(),
                                                     },
                                                 extra_selections: BTreeMap::new(),
+                                                client_field_id: *client_field_id,
                                             },
                                         },
                                     );
@@ -729,6 +732,7 @@ fn optional_field_refetch_info(
                 refetch_field_parent_id: parent_type.id,
                 imperatively_loaded_field_variant: variant.clone(),
                 extra_selections: BTreeMap::new(),
+                client_field_id: client_field.id,
             },
         )),
         _ => None,
