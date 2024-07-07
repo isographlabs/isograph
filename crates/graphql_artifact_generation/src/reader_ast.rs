@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use common_lang_types::{SelectableFieldName, WithSpan};
 use isograph_lang_types::{
@@ -184,10 +184,10 @@ fn user_written_variant_ast_node(
         nested_client_field.type_and_field.underscore_separated()
     );
 
-    reader_imports.insert(
+    reader_imports.insert((
         nested_client_field.type_and_field,
         ResolverReaderOrRefetchResolver::ResolverReader,
-    );
+    ));
 
     format!(
         "{indent_1}{{\n\
@@ -219,7 +219,7 @@ fn imperatively_loaded_variant_ast_node(
 
     {
         let artifact_file_type = ResolverReaderOrRefetchResolver::RefetchReader;
-        reader_imports.insert(nested_client_field.type_and_field, artifact_file_type);
+        reader_imports.insert((nested_client_field.type_and_field, artifact_file_type));
     };
     let refetch_query_index = find_imperatively_fetchable_query_index(
         root_refetched_paths,
@@ -354,7 +354,7 @@ pub(crate) fn generate_reader_ast<'schema>(
     // ????
     root_refetched_paths: &BTreeMap<PathToRefetchField, RootRefetchedPath>,
 ) -> (ReaderAst, ReaderImports) {
-    let mut client_field_imports = BTreeMap::new();
+    let mut client_field_imports = BTreeSet::new();
     let reader_ast = generate_reader_ast_with_path(
         schema,
         selection_set,

@@ -1,8 +1,8 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use isograph_schema::ObjectTypeAndFieldName;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum ResolverReaderOrRefetchResolver {
     ResolverReader,
     RefetchReader,
@@ -17,7 +17,7 @@ impl ResolverReaderOrRefetchResolver {
     }
 }
 
-pub(crate) type ReaderImports = BTreeMap<ObjectTypeAndFieldName, ResolverReaderOrRefetchResolver>;
+pub(crate) type ReaderImports = BTreeSet<(ObjectTypeAndFieldName, ResolverReaderOrRefetchResolver)>;
 pub(crate) type ParamTypeImports = BTreeSet<ObjectTypeAndFieldName>;
 
 pub(crate) fn reader_imports_to_import_statement(reader_imports: &ReaderImports) -> String {
