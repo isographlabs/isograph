@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashSet};
 
 use common_lang_types::{SelectableFieldName, WithSpan};
 use isograph_lang_types::{
@@ -6,7 +6,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     into_name_and_arguments, ArgumentKeyAndValue, ClientFieldVariant, FieldDefinitionLocation,
-    NameAndArguments, PathToRefetchField, RootRefetchedPath, ValidatedClientField,
+    NameAndArguments, PathToRefetchField, RefetchedPathsMap, ValidatedClientField,
     ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection, ValidatedSchema,
     ValidatedSelection,
 };
@@ -23,7 +23,7 @@ fn generate_reader_ast_node(
     indentation_level: u8,
     reader_imports: &mut ReaderImports,
     // TODO use this to generate usedRefetchQueries
-    root_refetched_paths: &BTreeMap<PathToRefetchField, RootRefetchedPath>,
+    root_refetched_paths: &RefetchedPathsMap,
     path: &mut Vec<NameAndArguments>,
 ) -> String {
     match &selection.item {
@@ -104,7 +104,7 @@ fn scalar_client_defined_field_ast_node(
     client_field_id: ClientFieldId,
     indentation_level: u8,
     path: &mut Vec<NameAndArguments>,
-    root_refetched_paths: &BTreeMap<PathToRefetchField, RootRefetchedPath>,
+    root_refetched_paths: &RefetchedPathsMap,
     reader_imports: &mut ReaderImports,
 ) -> String {
     // This field is a client field, so we need to look up the field in the
@@ -155,7 +155,7 @@ fn user_written_variant_ast_node(
     nested_client_field: &ValidatedClientField,
     schema: &ValidatedSchema,
     path: &mut Vec<NameAndArguments>,
-    root_refetched_paths: &BTreeMap<PathToRefetchField, RootRefetchedPath>,
+    root_refetched_paths: &RefetchedPathsMap,
     reader_imports: &mut ReaderImports,
 ) -> String {
     let alias = scalar_field_selection.name_or_alias().item;
@@ -203,7 +203,7 @@ fn user_written_variant_ast_node(
 fn imperatively_loaded_variant_ast_node(
     nested_client_field: &ValidatedClientField,
     reader_imports: &mut ReaderImports,
-    root_refetched_paths: &BTreeMap<PathToRefetchField, RootRefetchedPath>,
+    root_refetched_paths: &RefetchedPathsMap,
     path: &mut Vec<NameAndArguments>,
     indentation_level: u8,
     scalar_field_selection: &ValidatedScalarFieldSelection,
@@ -275,7 +275,7 @@ fn generate_reader_ast_with_path<'schema>(
     indentation_level: u8,
     nested_client_field_imports: &mut ReaderImports,
     // N.B. this is not root_refetched_paths when we're generating a non-fetchable client field :(
-    root_refetched_paths: &BTreeMap<PathToRefetchField, RootRefetchedPath>,
+    root_refetched_paths: &RefetchedPathsMap,
     path: &mut Vec<NameAndArguments>,
 ) -> ReaderAst {
     let mut reader_ast = "[\n".to_string();
@@ -295,7 +295,7 @@ fn generate_reader_ast_with_path<'schema>(
 }
 
 fn get_nested_refetch_query_text(
-    root_refetched_paths: &BTreeMap<PathToRefetchField, RootRefetchedPath>,
+    root_refetched_paths: &RefetchedPathsMap,
     paths_to_refetch_fields_in_client_field: &[PathToRefetchField],
 ) -> String {
     let mut s = "[".to_string();
@@ -304,7 +304,7 @@ fn get_nested_refetch_query_text(
         for index in root_refetched_paths
             .keys()
             .enumerate()
-            .filter_map(|(index, path)| {
+            .filter_map(|(index, (path, _))| {
                 if path == nested_refetch_query {
                     Some(index)
                 } else {
@@ -327,14 +327,14 @@ fn get_nested_refetch_query_text(
 }
 
 fn find_imperatively_fetchable_query_index(
-    paths: &BTreeMap<PathToRefetchField, RootRefetchedPath>,
+    paths: &RefetchedPathsMap,
     outer_path: &[NameAndArguments],
     imperatively_fetchable_field_name: SelectableFieldName,
 ) -> RefetchQueryIndex {
     paths
         .iter()
         .enumerate()
-        .find_map(|(index, (path, root_refetch_path))| {
+        .find_map(|(index, ((path, _), root_refetch_path))| {
             if &path.linked_fields == outer_path
                 && root_refetch_path.field_name == imperatively_fetchable_field_name
             {
@@ -352,7 +352,7 @@ pub(crate) fn generate_reader_ast<'schema>(
     indentation_level: u8,
     // N.B. this is not root_refetched_paths when we're generating an entrypoint :(
     // ????
-    root_refetched_paths: &BTreeMap<PathToRefetchField, RootRefetchedPath>,
+    root_refetched_paths: &RefetchedPathsMap,
 ) -> (ReaderAst, ReaderImports) {
     let mut client_field_imports = BTreeSet::new();
     let reader_ast = generate_reader_ast_with_path(

@@ -78,7 +78,7 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
     let refetch_paths_with_variables = traversal_state
         .refetch_paths
         .iter()
-        .map(|(path, root_refetch_path)| {
+        .map(|((path, _), root_refetch_path)| {
             let current_target_merged_selections =
                 current_target_merged_selections(path.linked_fields.iter(), &merged_selection_map);
             let reachable_variables = get_reachable_variables(&current_target_merged_selections);

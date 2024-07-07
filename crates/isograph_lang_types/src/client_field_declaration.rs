@@ -38,13 +38,13 @@ pub type ClientFieldDeclarationWithUnvalidatedDirectives = ClientFieldDeclaratio
 pub type ClientFieldDeclarationWithValidatedDirectives =
     ClientFieldDeclaration<IsographSelectionVariant, IsographSelectionVariant>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum IsographSelectionVariant {
     Regular,
     Loadable(LoadableVariant),
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LoadableVariant {
     #[allow(dead_code)]

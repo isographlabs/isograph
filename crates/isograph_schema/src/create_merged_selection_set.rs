@@ -140,6 +140,9 @@ pub struct PathToRefetchFieldInfo {
     extra_selections: MergedSelectionMap,
 }
 
+pub type RefetchedPathsMap =
+    BTreeMap<(PathToRefetchField, IsographSelectionVariant), RootRefetchedPath>;
+
 /// As we traverse, whenever we enter a new scalar client field (including at the
 /// root, with the entrypoint), we create a new one of these and pass it down.
 ///
@@ -153,7 +156,7 @@ pub struct PathToRefetchFieldInfo {
 #[derive(Debug, Clone)]
 pub struct ScalarClientFieldTraversalState {
     /// As we traverse, if we encounter a refetch path, we note it here
-    pub refetch_paths: BTreeMap<PathToRefetchField, RootRefetchedPath>,
+    pub refetch_paths: RefetchedPathsMap,
 
     /// Likewise for reachable variables
     pub reachable_variables: HashSet<VariableName>,
@@ -186,14 +189,14 @@ impl ScalarClientFieldTraversalState {
         // TODO self.path_since_client_field should be a parameter to this function
         self.refetch_paths
             .extend(child_traversal_state.refetch_paths.iter().map(
-                |(path, root_refetched_path)| {
+                |((path, selection_variant), root_refetched_path)| {
                     // TODO don't clone
                     let mut path = path.clone();
                     let mut complete_path = self.traversal_path.clone();
                     complete_path.extend(path.linked_fields);
                     path.linked_fields = complete_path;
 
-                    (path, root_refetched_path.clone())
+                    ((path, *selection_variant), root_refetched_path.clone())
                 },
             ));
     }
@@ -569,12 +572,16 @@ fn merge_validated_selections_into_selection_map(
 
                                 if is_selected_loadably {
                                     merge_traversal_state.refetch_paths.insert(
-                                        PathToRefetchField {
-                                            linked_fields: merge_traversal_state
-                                                .traversal_path
-                                                .clone(),
-                                            field_name: newly_encountered_scalar_client_field.name,
-                                        },
+                                        (
+                                            PathToRefetchField {
+                                                linked_fields: merge_traversal_state
+                                                    .traversal_path
+                                                    .clone(),
+                                                field_name: newly_encountered_scalar_client_field
+                                                    .name,
+                                            },
+                                            IsographSelectionVariant::Regular,
+                                        ),
                                         RootRefetchedPath {
                                             field_name: newly_encountered_scalar_client_field.name,
                                             path_to_refetch_field_info: PathToRefetchFieldInfo {
@@ -602,7 +609,7 @@ fn merge_validated_selections_into_selection_map(
                                     parent_type,
                                 ) {
                                     merge_traversal_state.refetch_paths.insert(
-                                        path,
+                                        (path, IsographSelectionVariant::Regular),
                                         RootRefetchedPath {
                                             field_name: newly_encountered_scalar_client_field.name,
                                             path_to_refetch_field_info: info,
