@@ -565,12 +565,9 @@ fn merge_validated_selections_into_selection_map(
                                 let newly_encountered_scalar_client_field =
                                     schema.client_field(*client_field_id);
 
-                                let is_selected_loadably = matches!(
-                                    scalar_field_selection.associated_data.selection_variant,
-                                    IsographSelectionVariant::Loadable(_)
-                                );
-
-                                if is_selected_loadably {
+                                if let IsographSelectionVariant::Loadable(l) =
+                                    scalar_field_selection.associated_data.selection_variant
+                                {
                                     merge_traversal_state.refetch_paths.insert(
                                         (
                                             PathToRefetchField {
@@ -580,7 +577,7 @@ fn merge_validated_selections_into_selection_map(
                                                 field_name: newly_encountered_scalar_client_field
                                                     .name,
                                             },
-                                            IsographSelectionVariant::Regular,
+                                            IsographSelectionVariant::Loadable(l),
                                         ),
                                         RootRefetchedPath {
                                             field_name: newly_encountered_scalar_client_field.name,
@@ -629,7 +626,10 @@ fn merge_validated_selections_into_selection_map(
                                     newly_encountered_scalar_client_field,
                                     global_client_field_map,
                                     &scalar_field_selection.associated_data.selection_variant,
-                                    is_selected_loadably,
+                                    matches!(
+                                        scalar_field_selection.associated_data.selection_variant,
+                                        IsographSelectionVariant::Loadable(_)
+                                    ),
                                 )
                             }
                         };
