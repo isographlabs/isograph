@@ -254,3 +254,26 @@ type MutationConfig<TVariables> = {
 - Where can we store this? Clearly, since we can load during normalization time, it can't be in component state.
   - So, does that mean that we suffer from the situation where multiple identical components share the same loaded queries, pagination state, etc.?
   - Or, are fields that are loaded during normalization different than those loaded post-render?
+
+## Unifying loadable fields
+
+- There are at least three ways to load fields imperatively:
+  - `__refetch`
+  - exposed fields (i.e. magic mutation fields)
+  - @loadable fields
+- Exposed fields
+  - Exposed fields must be fetched in a follow-up request, since: we need data from the original request (i.e. what we read with the refetch reader) and we need to make a separate request (due to limitations of GraphQL). This is true whether they have different root objects or not.
+    - Exposed fields which have an empty refetch reader selection set (not supported?) could be auto-hoisted iff the path from the root to the field contains only non-null fields. But fields with no reader selection set are a perfect use case for `root`, so we should probably not have different behavior here.
+    - Fields re-exposed on themselves are a weird edge case, and should probably behave identically to regular ol' exposed fields.
+  - However, we can hide this from the user and execute them as an immediate follow up.
+- `__refetch` fields can always be merged into the parent, and fetched along with it.
+- So, we can make the behavior of fields as follows:
+  - regular field: imperative iff selected with @loadable, selected along with parent otherwise
+  - exposed: imperative iff selected with @loadable, selected as an immediate follow-up otherwise
+  - `__refetch`: imperative iff selected with @loadable, merged into parent otherwise (which is a no-op)
+- So, this is a bit awkward for `__refetch` fields. So, it might be better to have special fields `self`, `parent` and `root`, which behave as follows:
+  - If selected as a scalar, do **not** have a resolver reader. Instead, refetch all fields selected at that location. Maybe this only makes sense for `self`?
+  - If selected as a linked field, that becomes the selection set.
+  - If selected non-loadably, fetch as immediate follow-ups (for `root`, or `parent` if the current field is nullable) or are merged into parent (for `self` or `parent` if the current field not nullable).
+  - And maybe one should allow users to choose to make the `root` field always be fetched along with the parent (i.e. merged) if the root type is the same, otherwise as a simultaneous request?
+- But in any case, that allows us to make `@loadable` the only way to fetch this, and otherwise all fields can have type `MaybeLoaded<OutputType>`, which can then be unwrapped.
