@@ -28,7 +28,7 @@ export const HomePageList = iso(`
       <h1>
         {data.viewer.name}&apos;s ({data.viewer.login}) repository stats
       </h1>
-      <Button onClick={() => data.viewer.__refetch()} variant="contained">
+      <Button onClick={() => data.viewer.__refetch[1]()} variant="contained">
         Refetch viewer
       </Button>
       <data.viewer.RepositoryList setRoute={setRoute} />

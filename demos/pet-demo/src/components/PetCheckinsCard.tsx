@@ -39,7 +39,7 @@ export const CheckinDisplay = iso(`
 `)((checkin) => (
   <b>
     {checkin.location} at {checkin.time}&nbsp;
-    <Button onClick={() => checkin.make_super({})} variant="text">
+    <Button onClick={() => checkin.make_super[1]({})} variant="text">
       🎉
     </Button>
   </b>

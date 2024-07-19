@@ -41,15 +41,19 @@ export const Bar = iso(`
   }
 
   console.log('pet', pet);
+  // @ts-expect-error
   const data = useClientSideDefer(pet.LoadableField);
+  // @ts-expect-error
   const data2 = useClientSideDefer(pet.LoadableField2);
   console.log('deferred data', data);
   return (
     <>
       <h1>Name: {pet.name}</h1>
       <Suspense fallback="loading">
+        {/* @ts-expect-error */}
         <EntrypointReader queryReference={data} />
         <br />
+        {/* @ts-expect-error */}
         <EntrypointReader queryReference={data2} />
       </Suspense>
     </>

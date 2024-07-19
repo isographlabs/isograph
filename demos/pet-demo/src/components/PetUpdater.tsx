@@ -29,7 +29,7 @@ export const PetUpdater = iso(`
   // TODO the tagline can change. But we're storing a stale one in state.
   // We should find a way to work around this.
 
-  const updateTagline = () => pet.set_pet_tagline({ input: { tagline } });
+  const updateTagline = () => pet.set_pet_tagline[1]({ input: { tagline } });
 
   return (
     <>
@@ -42,7 +42,7 @@ export const PetUpdater = iso(`
             if (value === 'NONE') {
               return;
             }
-            pet.set_best_friend({
+            pet.set_best_friend[1]({
               new_best_friend_id: value,
             });
           }
@@ -72,7 +72,7 @@ export const PetUpdater = iso(`
         <Button variant="contained" onClick={updateTagline}>
           Set tagline
         </Button>
-        <Button variant="contained" onClick={() => pet.__refetch()}>
+        <Button variant="contained" onClick={() => pet.__refetch[1]()}>
           Refetch pet
         </Button>
       </Box>

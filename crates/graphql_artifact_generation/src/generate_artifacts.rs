@@ -249,9 +249,10 @@ pub(crate) fn generate_output_type(client_field: &ValidatedClientField) -> Clien
                 ),
             },
             ClientFieldVariant::ImperativelyLoadedField(params) => {
+                // N.B. the string is a stable id for deduplicating
                 match params.primary_field_info {
-                    Some(_) => ClientFieldOutputType("(params: any) => void".to_string()),
-                    None => ClientFieldOutputType("() => void".to_string()),
+                    Some(_) => ClientFieldOutputType("[string, (params: any) => void]".to_string()),
+                    None => ClientFieldOutputType("[string, () => void]".to_string()),
                 }
             }
         },
