@@ -1,4 +1,4 @@
-import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Pet__PetTaglineCard__param } from './param_type';
 import { PetTaglineCard as resolver } from '../../../PetTaglineCard';
 

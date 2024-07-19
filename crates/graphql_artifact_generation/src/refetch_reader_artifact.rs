@@ -55,7 +55,7 @@ pub(crate) fn generate_refetch_reader_artifact(
     let reader_import_statement = reader_imports_to_import_statement(&reader_imports);
 
     let reader_content = format!(
-            "import type {{RefetchReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact}} from '@isograph/react';\n\
+            "import type {{ RefetchReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact }} from '@isograph/react';\n\
             {function_import_statement}\n\
             {reader_import_statement}\n\
             const readerAst: ReaderAst<unknown> = {reader_ast};\n\n\

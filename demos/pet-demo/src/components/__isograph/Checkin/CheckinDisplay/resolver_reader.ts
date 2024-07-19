@@ -1,4 +1,4 @@
-import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Checkin__CheckinDisplay__param } from './param_type';
 import { CheckinDisplay as resolver } from '../../../PetCheckinsCard';
 import ICheckin__make_super__refetch_reader from '../../ICheckin/make_super/refetch_reader';

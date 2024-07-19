@@ -1,4 +1,4 @@
-import type {RefetchReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import type { RefetchReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact } from '@isograph/react';
 const includeReadOutData = (variables: any, readOutData: any) => {
   variables.input = variables.input ?? {};
   variables.input.id = readOutData.id;

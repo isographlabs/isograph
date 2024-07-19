@@ -1,3 +1,3 @@
-import type {ExtractSecondParam, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import type { ExtractSecondParam } from '@isograph/react';
 import { PetTaglineCard as resolver } from '../../../PetTaglineCard';
 export type Pet__PetTaglineCard__output_type = (React.FC<ExtractSecondParam<typeof resolver>>);

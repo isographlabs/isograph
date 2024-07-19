@@ -1,4 +1,4 @@
-import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Query__LoadableDemo__param } from './param_type';
 import { Bar as resolver } from '../../../LoadableDemo';
 import Pet__LoadableField__resolver_reader from '../../Pet/LoadableField/resolver_reader';

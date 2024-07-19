@@ -1,4 +1,4 @@
-import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Pet__PetUpdater__param } from './param_type';
 import { PetUpdater as resolver } from '../../../PetUpdater';
 import Pet____refetch__refetch_reader from '../../Pet/__refetch/refetch_reader';

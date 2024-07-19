@@ -1,4 +1,4 @@
-import type {IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import type { IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst } from '@isograph/react';
 const queryText = 'query Pet__refetch ($id: ID!) {\
   node____id___v_id: node(id: $id) {\
     ... on Pet {\

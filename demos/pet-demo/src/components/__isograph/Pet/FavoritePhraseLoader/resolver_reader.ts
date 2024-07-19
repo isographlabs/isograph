@@ -1,4 +1,4 @@
-import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Pet__FavoritePhraseLoader__param } from './param_type';
 import { FavoritePhraseLoader as resolver } from '../../../FavoritePhrase';
 

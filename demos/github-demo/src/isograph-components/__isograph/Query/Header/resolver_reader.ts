@@ -1,4 +1,4 @@
-import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Query__Header__param } from './param_type';
 import { Header as resolver } from '../../../header';
 import User__Avatar__resolver_reader from '../../User/Avatar/resolver_reader';

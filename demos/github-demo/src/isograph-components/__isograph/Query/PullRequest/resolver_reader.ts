@@ -1,4 +1,4 @@
-import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst, RefetchQueryNormalizationArtifact} from '@isograph/react';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Query__PullRequest__param } from './param_type';
 import { PullRequest as resolver } from '../../../PullRequestRoute';
 import Query__Header__resolver_reader from '../../Query/Header/resolver_reader';

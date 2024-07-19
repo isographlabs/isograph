@@ -54,8 +54,7 @@ pub(crate) fn generate_eager_reader_artifact(
         let param_type_file_name = *RESOLVER_PARAM_TYPE;
         let output_type_file_name = *RESOLVER_OUTPUT_TYPE;
         format!(
-            "import type {{EagerReaderArtifact, ReaderAst, \
-            RefetchQueryNormalizationArtifact}} from '@isograph/react';\n\
+            "import type {{ EagerReaderArtifact, ReaderAst }} from '@isograph/react';\n\
             import {{ {reader_param_type} }} from './{param_type_file_name}';\n\
             import {{ {reader_output_type} }} from './{output_type_file_name}';\n\
             {function_import_statement}\n\
@@ -77,7 +76,7 @@ pub(crate) fn generate_eager_reader_artifact(
         let param_type_file_name = *RESOLVER_PARAM_TYPE;
         format!(
             "import type {{ComponentReaderArtifact, ExtractSecondParam, \
-            ReaderAst, RefetchQueryNormalizationArtifact}} from '@isograph/react';\n\
+            ReaderAst }} from '@isograph/react';\n\
             import {{ {reader_param_type} }} from './{param_type_file_name}';\n\
             {function_import_statement}\n\
             {reader_import_statement}\n\
@@ -163,7 +162,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact(
             output_type_text
         } else {
             format!(
-                "import type {{ExtractSecondParam, RefetchQueryNormalizationArtifact}} \
+                "import type {{ ExtractSecondParam }} \
                 from '@isograph/react';\n\
                 {output_type_text}\n",
             )
