@@ -41,9 +41,7 @@ export const Bar = iso(`
   }
 
   console.log('pet', pet);
-  // @ts-expect-error
   const data = useClientSideDefer(pet.LoadableField);
-  // @ts-expect-error
   const data2 = useClientSideDefer(pet.LoadableField2);
   console.log('deferred data', data);
   return (

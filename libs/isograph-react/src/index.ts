@@ -37,6 +37,7 @@ export {
   ReaderResolverField,
   ReaderScalarField,
   TopLevelReaderArtifact,
+  LoadableField,
 } from './reader';
 export {
   NormalizationAst,

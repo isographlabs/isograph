@@ -1,3 +1,4 @@
+import { FragmentReference } from './FragmentReference';
 import {
   ComponentOrFieldName,
   DataId,
@@ -110,3 +111,5 @@ export type ReaderImperativelyLoadedField = {
   readonly refetchQuery: number;
   readonly name: string;
 };
+
+export type LoadableField<T> = [string, () => FragmentReference<any, T>];

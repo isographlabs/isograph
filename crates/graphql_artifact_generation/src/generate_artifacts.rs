@@ -11,8 +11,8 @@ use common_lang_types::{
 use graphql_lang_types::{GraphQLTypeAnnotation, ListTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection, SelectionFieldArgument,
-    ServerFieldSelection,
+    ClientFieldId, IsographSelectionVariant, NonConstantValue, SelectableServerFieldId, Selection,
+    SelectionFieldArgument, ServerFieldSelection,
 };
 use isograph_schema::{
     ClientFieldTraversalResult, ClientFieldVariant, FieldDefinitionLocation, SchemaObject,
@@ -272,6 +272,7 @@ pub(crate) fn generate_client_field_parameter_type(
     parent_type: &SchemaObject,
     nested_client_field_imports: &mut ParamTypeImports,
     indentation_level: u8,
+    loadable_field_encountered: &mut bool,
 ) -> ClientFieldParameterType {
     // TODO use unwraps
     let mut client_field_parameter_type = "{\n".to_string();
@@ -283,6 +284,7 @@ pub(crate) fn generate_client_field_parameter_type(
             parent_type,
             nested_client_field_imports,
             indentation_level + 1,
+            loadable_field_encountered,
         );
     }
     client_field_parameter_type.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
@@ -297,6 +299,7 @@ fn write_query_types_from_selection(
     parent_type: &SchemaObject,
     nested_client_field_imports: &mut ParamTypeImports,
     indentation_level: u8,
+    loadable_field_encountered: &mut bool,
 ) {
     match &selection.item {
         Selection::ServerField(field) => match field {
@@ -349,11 +352,21 @@ fn write_query_types_from_selection(
                             .push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
 
                         nested_client_field_imports.insert(client_field.type_and_field);
-                        query_type_declaration.push_str(&format!(
-                            "{}: {}__output_type,\n",
-                            scalar_field.name_or_alias().item,
+                        let inner_output_type = format!(
+                            "{}__output_type",
                             client_field.type_and_field.underscore_separated()
-                        ));
+                        );
+                        let output_type = match scalar_field.associated_data.selection_variant {
+                            IsographSelectionVariant::Regular => inner_output_type,
+                            IsographSelectionVariant::Loadable(_) => {
+                                *loadable_field_encountered = true;
+                                format!("LoadableField<{inner_output_type}>")
+                            }
+                        };
+
+                        query_type_declaration.push_str(
+                            &(format!("{}: {},\n", scalar_field.name_or_alias().item, output_type)),
+                        );
                     }
                 }
             }
@@ -385,6 +398,7 @@ fn write_query_types_from_selection(
                         object.into(),
                         nested_client_field_imports,
                         indentation_level,
+                        loadable_field_encountered,
                     );
                     inner
                 });
