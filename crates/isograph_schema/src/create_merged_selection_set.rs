@@ -632,10 +632,6 @@ fn merge_validated_selections_into_selection_map(
                                     newly_encountered_scalar_client_field,
                                     global_client_field_map,
                                     &scalar_field_selection.associated_data.selection_variant,
-                                    matches!(
-                                        scalar_field_selection.associated_data.selection_variant,
-                                        IsographSelectionVariant::Loadable(_)
-                                    ),
                                 )
                             }
                         };
@@ -767,9 +763,8 @@ fn merge_scalar_client_field(
     newly_encountered_scalar_client_field: &ValidatedClientField,
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
     selection_variant: &IsographSelectionVariant,
-    // TODO pass Option<LoadableVariant
-    is_selected_loadably: bool,
 ) {
+    let was_selected_loadably = matches!(selection_variant, &IsographSelectionVariant::Loadable(_));
     let ClientFieldTraversalResult {
         traversal_state,
         merged_selection_map,
@@ -780,10 +775,10 @@ fn merge_scalar_client_field(
         &*newly_encountered_scalar_client_field.selection_set_for_parent_query(),
         global_client_field_map,
         newly_encountered_scalar_client_field,
-        matches!(selection_variant, &IsographSelectionVariant::Loadable(_)),
+        was_selected_loadably,
     );
 
-    if is_selected_loadably {
+    if was_selected_loadably {
         // since the field has been selected loadably, we need to actually generate a different
         // merged selection map (one from the refetch_selection_set instead of from the
         // reader_selection_map).
