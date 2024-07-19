@@ -1,4 +1,4 @@
-import type { IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst } from '@isograph/react';
+import type { IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact } from '@isograph/react';
 const queryText = 'query Query__refetch_pet_stats ($id: ID!) {\
   pet____id___v_id: pet(id: $id) {\
     stats {\
@@ -63,7 +63,7 @@ const normalizationAst: NormalizationAst = [
     ],
   },
 ];
-const artifact: any = {
+const artifact: RefetchQueryNormalizationArtifact = {
   kind: "RefetchQuery",
   queryText,
   normalizationAst,

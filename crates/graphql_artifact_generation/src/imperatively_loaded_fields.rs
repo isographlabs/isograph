@@ -50,10 +50,10 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
         } = self;
 
         format!(
-            "import type {{ IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst }} from '@isograph/react';\n\
+            "import type {{ IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact }} from '@isograph/react';\n\
             const queryText = '{query_text}';\n\n\
             const normalizationAst: NormalizationAst = {normalization_ast};\n\
-            const artifact: any = {{\n\
+            const artifact: RefetchQueryNormalizationArtifact = {{\n\
             {}kind: \"RefetchQuery\",\n\
             {}queryText,\n\
             {}normalizationAst,\n\

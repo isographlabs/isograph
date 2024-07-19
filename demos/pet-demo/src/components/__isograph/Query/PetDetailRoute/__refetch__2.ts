@@ -1,4 +1,4 @@
-import type { IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst } from '@isograph/react';
+import type { IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact } from '@isograph/react';
 const queryText = 'mutation Query__set_pet_tagline ($input: SetPetTaglineParams!) {\
   set_pet_tagline____input___v_input: set_pet_tagline(input: $input) {\
     pet {\
@@ -198,7 +198,7 @@ const normalizationAst: NormalizationAst = [
     ],
   },
 ];
-const artifact: any = {
+const artifact: RefetchQueryNormalizationArtifact = {
   kind: "RefetchQuery",
   queryText,
   normalizationAst,
