@@ -15,11 +15,13 @@ import { Pet__Unreachable2__param } from './Pet/Unreachable2/param_type';
 import { Pet__UnreachableFromEntrypoint__param } from './Pet/UnreachableFromEntrypoint/param_type';
 import { Query__HomeRoute__param } from './Query/HomeRoute/param_type';
 import { Query__LoadableDemo__param } from './Query/LoadableDemo/param_type';
+import { Query__PetDetailDeferredRoute__param } from './Query/PetDetailDeferredRoute/param_type';
 import { Query__PetDetailRoute__param } from './Query/PetDetailRoute/param_type';
 import { Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/param_type';
 import entrypoint_Mutation__SetTagline from '../__isograph/Mutation/SetTagline/entrypoint';
 import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint';
 import entrypoint_Query__LoadableDemo from '../__isograph/Query/LoadableDemo/entrypoint';
+import entrypoint_Query__PetDetailDeferredRoute from '../__isograph/Query/PetDetailDeferredRoute/entrypoint';
 import entrypoint_Query__PetDetailRoute from '../__isograph/Query/PetDetailRoute/entrypoint';
 import entrypoint_Query__PetFavoritePhrase from '../__isograph/Query/PetFavoritePhrase/entrypoint';
 
@@ -133,6 +135,10 @@ export function iso<T>(
 ): IdentityWithParamComponent<Query__LoadableDemo__param>;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.PetDetailDeferredRoute', T>
+): IdentityWithParamComponent<Query__PetDetailDeferredRoute__param>;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.PetDetailRoute', T>
 ): IdentityWithParamComponent<Query__PetDetailRoute__param>;
 
@@ -151,6 +157,10 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.LoadableDemo', T>
 ): typeof entrypoint_Query__LoadableDemo;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.PetDetailDeferredRoute', T>
+): typeof entrypoint_Query__PetDetailDeferredRoute;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.PetDetailRoute', T>

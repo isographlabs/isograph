@@ -6,7 +6,11 @@ import { useRouter } from 'next/router';
 
 export type PetId = string;
 
-export type Route = HomeRoute | PetDetailRoute | LoadableRoute;
+export type Route =
+  | HomeRoute
+  | PetDetailRoute
+  | PetDetailDeferredRoute
+  | LoadableRoute;
 
 export type HomeRoute = {
   kind: 'Home';
@@ -14,6 +18,11 @@ export type HomeRoute = {
 
 export type PetDetailRoute = {
   kind: 'PetDetail';
+  id: PetId;
+};
+
+export type PetDetailDeferredRoute = {
+  kind: 'PetDetailDeferred';
   id: PetId;
 };
 
@@ -28,6 +37,9 @@ function toRoute(route: Route): string {
     }
     case 'PetDetail': {
       return `/pet/${route.id}`;
+    }
+    case 'PetDetailDeferred': {
+      return `/pet/with-defer/${route.id}`;
     }
     case 'Loadable': {
       return '/loadable';
@@ -71,6 +83,10 @@ function Router({
       return <HomeRouteLoader navigateTo={setRoute} />;
     case 'PetDetail':
       return <PetDetailRouteLoader navigateTo={setRoute} route={route} />;
+    case 'PetDetailDeferred':
+      return (
+        <PetDetailDeferredRouteLoader navigateTo={setRoute} route={route} />
+      );
     case 'Loadable':
       return <LoadableDemo />;
     default:
@@ -105,6 +121,22 @@ function PetDetailRouteLoader({
 }) {
   const { queryReference } = useLazyReference(
     iso(`entrypoint Query.PetDetailRoute`),
+    { id: route.id },
+  );
+
+  const Component = useResult(queryReference);
+  return <Component navigateTo={navigateTo} />;
+}
+
+function PetDetailDeferredRouteLoader({
+  navigateTo,
+  route,
+}: {
+  navigateTo: (path: Route) => void;
+  route: PetDetailDeferredRoute;
+}) {
+  const { queryReference } = useLazyReference(
+    iso(`entrypoint Query.PetDetailDeferredRoute`),
     { id: route.id },
   );
 
