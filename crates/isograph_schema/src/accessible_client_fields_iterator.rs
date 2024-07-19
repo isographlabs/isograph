@@ -67,6 +67,9 @@ impl<'a> Iterator for AccessibleClientFieldIterator<'a> {
                             let next = iterator.next();
                             if next.is_some() {
                                 self.sub_iterator = Some(Box::new(iterator));
+                                // When we exhaust the iterator, we don't want to re-create and
+                                // re-iterate sub_iterator, so we also advance the index.
+                                self.index += 1;
                                 return next;
                             }
                             self.index += 1;
