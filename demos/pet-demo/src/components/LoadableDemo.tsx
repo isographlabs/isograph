@@ -48,10 +48,8 @@ export const Bar = iso(`
     <>
       <h1>Name: {pet.name}</h1>
       <Suspense fallback="loading">
-        {/* @ts-expect-error */}
         <EntrypointReader queryReference={data} />
         <br />
-        {/* @ts-expect-error */}
         <EntrypointReader queryReference={data2} />
       </Suspense>
     </>

@@ -1,3 +1,4 @@
+import { ItemCleanupPair } from '@isograph/disposable-types';
 import { FragmentReference } from './FragmentReference';
 import {
   ComponentOrFieldName,
@@ -112,4 +113,7 @@ export type ReaderImperativelyLoadedField = {
   readonly name: string;
 };
 
-export type LoadableField<T> = [string, () => FragmentReference<any, T>];
+export type LoadableField<T> = [
+  string,
+  () => ItemCleanupPair<FragmentReference<any, T>>,
+];

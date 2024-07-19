@@ -1,4 +1,4 @@
-import { ItemCleanupPair } from '@isograph/isograph-disposable-types';
+import { ItemCleanupPair } from '@isograph/disposable-types';
 import { FragmentReference } from '../FragmentReference';
 import { useIsographEnvironment } from '../IsographEnvironmentProvider';
 import { getOrCreateCache } from '../cache';
@@ -9,7 +9,7 @@ import { DataId } from '../IsographEnvironment';
 export function useClientSideDefer<TValue>([id, loader]: [
   DataId,
   () => ItemCleanupPair<FragmentReference<any, TValue>>,
-]) {
+]): FragmentReference<any, TValue> {
   const environment = useIsographEnvironment();
   const cache = getOrCreateCache(environment, id, loader);
 
