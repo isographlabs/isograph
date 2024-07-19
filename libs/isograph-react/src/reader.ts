@@ -91,11 +91,6 @@ export type ReaderLinkedField = {
   readonly arguments: Arguments | null;
 };
 
-export type ReaderResolverVariant =
-  | { readonly kind: 'Eager' }
-  // componentName is type + field concatenated
-  | { readonly kind: 'Component'; readonly componentName: string };
-
 export type ReaderResolverField = {
   readonly kind: 'Resolver';
   readonly alias: string;

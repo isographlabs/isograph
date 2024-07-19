@@ -35,7 +35,6 @@ export {
   ReaderAstNode,
   ReaderLinkedField,
   ReaderResolverField,
-  ReaderResolverVariant,
   ReaderScalarField,
 } from './reader';
 export {
