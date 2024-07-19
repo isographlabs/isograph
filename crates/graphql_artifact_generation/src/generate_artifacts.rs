@@ -86,7 +86,7 @@ pub fn get_artifact_path_and_content<'schema>(
         encountered_client_field_id,
         ClientFieldTraversalResult {
             traversal_state,
-            was_ever_selected_loadably: was_selected_loadably,
+            was_ever_selected_loadably,
             ..
         },
     ) in &global_client_field_map
@@ -105,7 +105,7 @@ pub fn get_artifact_path_and_content<'schema>(
                     traversal_state,
                 ));
 
-                if *was_selected_loadably {
+                if *was_ever_selected_loadably {
                     path_and_contents.push(generate_refetch_reader_artifact(
                         schema,
                         encountered_client_field,
