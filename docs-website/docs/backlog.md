@@ -6,11 +6,17 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 
 ## Top mid-term runtime priorities
 
-- preloaded queries w/dispose
 - garbage collection & retention
-- subscriptions & granular rerendering
-  - change how top-level fields are normalized (i.e. into their own object, without going through ROOT)
-- connections and pagination
+- change how top-level fields are normalized (i.e. into their own object, without going through ROOT)
+- complete work on loadable fields
+  - unification
+  - filters
+  - normalization-time operations
+- granular re-renders: use reader AST for comparison, and skip comparing stuff like imperatively loaded fields
+- userland impl of:
+  - pagination, etc.
+  - live queries
+  - useQueryLoader and variants
 
 ## Top mid-term compiler/syntax priorities
 
@@ -20,10 +26,6 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
   - Or syntax: bar: `as Foo { ... }`? This can always be added on afterward after some thought.
 - connections and pagination
 - client links/pointers
-
-## Top implementation detail priorities
-
-- enable unit tests for react-disposable-state
 
 ## Top cleanup priorities
 
@@ -43,9 +45,9 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 
 ## Feature backlog
 
-- garbage collection
-- granular re-rendering
-  - Refetch on missing data
+- Ability to execute code at normalization time, e.g. for `| normalizationTimeDefer`
+- Ability to define filters
+- Refetch on missing data
 - fetch policies
 - Unwraps (i.e. `!`) exist in the syntax, but are unused
   - consider whether it is truly the case that there always is a linear way to unwrap a given field, or whether we should unify this with "execute this on the server" etc.
@@ -54,8 +56,6 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 - Stateful resolvers?
   - This could be thought of as "realized" resolvers, which is to say there is overlap with better DevEx for components
 - Subscriptions are not supported
-- Defer, etc.
-- Pagination.
 - Types for variables
 - typed IDs
 - consider resolvers that return functions only read data when called, i.e. do not eagerly read. Consider whether this can be achieved with omitting a !, i.e. foo_resolver! returns TReadFromStore, foo_resolver returns a `ReadDataResult TReadFromStore`
@@ -66,12 +66,11 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 
 - Typegen code is a mess
 - JS code needs structure, etc.
-- `HACK__merge_linked_fields` is indicative of the fact that merged linked fields should contain hashmaps of key => merged item, instead of vectors of merged items.
 - Objects which do not have IDs should be merged into their parent object in the store.
   - or weak types are scalars
 - IsographSchemaObject, etc. should not contain name: `WithLocation<...>`, but instead, be stored `WithLocation T`, and WithLocation should **not** have a span.
 - There should be a cleaner separation between GraphQL and Isograph. In particular, we should load the GraphQL schema, but turn it into Isograph concepts, and only deal with Isograph concepts.
-- CLI should be separate crate than batch-compile; so should watch mode utils, so as to increase the speed of iteration if the dev is running builds.
+- CLI should be in a separate crate from batch-compile; so should watch mode utils, so as to increase the speed of iteration if the dev is running builds.
 - CLI command to create missing directories (e.g. project_root).
 - do not panic when an unknown token is encountered
 
@@ -88,7 +87,6 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 - Garbage collection
 - Preloaded queries
 - Fetch/cache policies
-- Granular re-renders
 - Ability to select fewer or extra fields on mutation and refetch fields, e.g.
 
 ```
@@ -112,12 +110,10 @@ set_foo {
 
 - Maybe some way to specify on the directive what fields you want to always select, since it might be annoying to do this on every selection. Though maybe you can go through another client field?
 - Ability to pass as arguments such selections?
-- Defer/stream
 - Subscriptions
 - Interfaces/unions
 - Entrypoints
 - Field unwrapping syntax
-- Pagination
 - Compile to non-GraphQL
 - Actually validate variables
 - Typegen for types of component's other props, somehow. Maybe have a second param that is typed.
@@ -163,7 +159,7 @@ set_foo {
 - Compile compiler to Wasm
 - IR explorer
 - Code sandbox example
-- Topological sort in compiler
+- Topological sort in compiler? (Is this still needed?)
 - Validate no infinite recursion
 - Statically prune inaccessible branches
 - TypeScript errors in emitted artifacts
@@ -176,14 +172,13 @@ set_foo {
 - plugin options to point to config
 - Namespaces and components installable from external libraries
 - npx way to install Isograph in an existing library
-- periodic refetch (live queries)
 - router example and integration
 - directive on scalar that affects the JS representation of scalars
 - ability to pass a parameter down to the child, e.g. an abstract component can read from its concrete parent an object that implements a given interface. e.g. in order to implement Node, you must implement an id field.
 - exposeField errors are pretty bad right now
 - date transformations and other types
 - client links that return an ID from the original data
-  - use generics to enforce this e.g. require a function of `(data: Data<TIDType>) => TIDType`. So you can't return shit from anywhere else.
+  - use generics to enforce this e.g. require a function of `(data: Data<TIDType>) => TIDType`. So you can't return any other value.
   - opt into non-waterfall behavior for these
   - just for fun, in unit tests, we can make the id type an object instead of a string.
 
