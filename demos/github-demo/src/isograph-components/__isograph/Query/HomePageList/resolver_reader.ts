@@ -36,6 +36,7 @@ const readerAst: ReaderAst<Query__HomePageList__param> = [
         refetchReaderArtifact: User____refetch__refetch_reader,
         resolverReaderArtifact: null,
         refetchQuery: 0,
+        name: "__refetch",
       },
     ],
   },

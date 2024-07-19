@@ -3,6 +3,8 @@ import { Query__LoadableDemo__param } from './param_type';
 import { Bar as resolver } from '../../../LoadableDemo';
 import Pet__LoadableField__resolver_reader from '../../Pet/LoadableField/resolver_reader';
 import Pet__LoadableField__refetch_reader from '../../Pet/LoadableField/refetch_reader';
+import Pet__LoadableField2__resolver_reader from '../../Pet/LoadableField2/resolver_reader';
+import Pet__LoadableField2__refetch_reader from '../../Pet/LoadableField2/refetch_reader';
 
 const readerAst: ReaderAst<Query__LoadableDemo__param> = [
   {
@@ -28,6 +30,15 @@ const readerAst: ReaderAst<Query__LoadableDemo__param> = [
         refetchReaderArtifact: Pet__LoadableField__refetch_reader,
         resolverReaderArtifact: Pet__LoadableField__resolver_reader,
         refetchQuery: 0,
+        name: "LoadableField",
+      },
+      {
+        kind: "ImperativelyLoadedField",
+        alias: "LoadableField2",
+        refetchReaderArtifact: Pet__LoadableField2__refetch_reader,
+        resolverReaderArtifact: Pet__LoadableField2__resolver_reader,
+        refetchQuery: 1,
+        name: "LoadableField2",
       },
     ],
   },

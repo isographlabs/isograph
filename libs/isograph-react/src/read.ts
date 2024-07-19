@@ -220,7 +220,7 @@ function readData<TReadFromStore>(
 
           target[field.alias] = [
             // DataId
-            root,
+            root + '__' + field.name,
             // Fetcher
             field.refetchReaderArtifact.resolver(
               environment,

@@ -108,4 +108,5 @@ export type ReaderImperativelyLoadedField = {
     | RefetchReaderArtifact;
   readonly resolverReaderArtifact: TopLevelReaderArtifact<any, any, any> | null;
   readonly refetchQuery: number;
+  readonly name: string;
 };

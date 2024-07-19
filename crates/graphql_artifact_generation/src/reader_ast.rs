@@ -246,6 +246,11 @@ fn imperatively_loaded_variant_ast_node(
     )
     .0;
 
+    // TODO we also need to account for arguments here.
+    // Note that scalar_field_selection.arguments includes an id argument, which
+    // may or may not be what we want here.
+    let name = scalar_field_selection.name.item;
+
     format!(
         "{indent_1}{{\n\
         {indent_2}kind: \"ImperativelyLoadedField\",\n\
@@ -253,6 +258,7 @@ fn imperatively_loaded_variant_ast_node(
         {indent_2}refetchReaderArtifact: {refetch_reader_artifact_import_name},\n\
         {indent_2}resolverReaderArtifact: {resolver_reader_artifact_import_name},\n\
         {indent_2}refetchQuery: {refetch_query_index},\n\
+        {indent_2}name: \"{name}\",\n\
         {indent_1}}},\n",
     )
 }
