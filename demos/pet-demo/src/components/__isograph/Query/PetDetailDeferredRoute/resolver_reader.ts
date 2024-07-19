@@ -2,6 +2,7 @@ import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@iso
 import { Query__PetDetailDeferredRoute__param } from './param_type';
 import { PetDetailDeferredRoute as resolver } from '../../../PetDetailDeferredRoute';
 import Pet__PetCheckinsCard__resolver_reader from '../../Pet/PetCheckinsCard/resolver_reader';
+import Pet__PetCheckinsCard__refetch_reader from '../../Pet/PetCheckinsCard/refetch_reader';
 
 const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
   {
@@ -22,11 +23,12 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
         arguments: null,
       },
       {
-        kind: "Resolver",
+        kind: "ImperativelyLoadedField",
         alias: "PetCheckinsCard",
-        arguments: null,
-        readerArtifact: Pet__PetCheckinsCard__resolver_reader,
-        usedRefetchQueries: [0, ],
+        refetchReaderArtifact: Pet__PetCheckinsCard__refetch_reader,
+        resolverReaderArtifact: Pet__PetCheckinsCard__resolver_reader,
+        refetchQuery: 0,
+        name: "PetCheckinsCard",
       },
     ],
   },

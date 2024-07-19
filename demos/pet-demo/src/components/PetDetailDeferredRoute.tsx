@@ -2,12 +2,13 @@ import React from 'react';
 import { iso } from '@iso';
 import { Container, Stack } from '@mui/material';
 import { Route } from './router';
+import { EntrypointReader, useClientSideDefer } from '@isograph/react';
 
 export const PetDetailDeferredRoute = iso(`
   field Query.PetDetailDeferredRoute($id: ID!) @component {
     pet(id: $id) {
       name
-      PetCheckinsCard
+      PetCheckinsCard @loadable
     }
   }
 `)(function PetDetailRouteComponent(
@@ -18,6 +19,10 @@ export const PetDetailDeferredRoute = iso(`
   if (pet == null) {
     return <h1>Pet not found.</h1>;
   }
+
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const petCheckinsCard = useClientSideDefer(pet.PetCheckinsCard);
+
   return (
     <Container maxWidth="md">
       <h1>Pet Detail for {pet.name}</h1>
@@ -30,7 +35,7 @@ export const PetDetailDeferredRoute = iso(`
       <React.Suspense fallback={<h2>Loading pet details...</h2>}>
         <Stack direction="row" spacing={4}>
           <Stack direction="column" spacing={4}>
-            <pet.PetCheckinsCard />
+            <EntrypointReader queryReference={petCheckinsCard} />
           </Stack>
         </Stack>
       </React.Suspense>
