@@ -32,7 +32,10 @@ pub type ClientFieldToCompletedMergeTraversalStateMap =
 #[derive(Clone, Debug)]
 pub struct ClientFieldTraversalResult {
     pub traversal_state: ScalarClientFieldTraversalState,
-    pub merged_selection_map: MergedSelectionMap,
+    /// This is used to generate the normalization AST and query text
+    pub outer_merged_selection_map: MergedSelectionMap,
+    /// This is used to generate refetch queries
+    pub complete_merged_selection_map: MergedSelectionMap,
     // TODO change this to Option<SelectionSet>?
     pub was_ever_selected_loadably: bool,
 }
@@ -309,13 +312,14 @@ pub fn create_merged_selection_map_and_insert_into_global_map(
         }
         None => {
             let mut merge_traversal_state = ScalarClientFieldTraversalState::new();
-            let selection_map = create_selection_map_with_merge_traversal_state(
-                schema,
-                parent_type,
-                validated_selections,
-                &mut merge_traversal_state,
-                global_client_field_map,
-            );
+            let (outer_merged_selection_map, complete_merged_selection_map) =
+                create_selection_map_with_merge_traversal_state(
+                    schema,
+                    parent_type,
+                    validated_selections,
+                    &mut merge_traversal_state,
+                    global_client_field_map,
+                );
 
             // N.B. global_client_field_map might actually have an item stored in root_object.id,
             // if we have some sort of recursion. That probably stack overflows right now.
@@ -323,7 +327,8 @@ pub fn create_merged_selection_map_and_insert_into_global_map(
                 root_object.id,
                 ClientFieldTraversalResult {
                     traversal_state: merge_traversal_state.clone(),
-                    merged_selection_map: selection_map.clone(),
+                    outer_merged_selection_map: outer_merged_selection_map.clone(),
+                    complete_merged_selection_map: complete_merged_selection_map.clone(),
                     was_ever_selected_loadably: was_selected_loadably,
                 },
             );
@@ -331,7 +336,8 @@ pub fn create_merged_selection_map_and_insert_into_global_map(
             // TODO we don't always use this return value, so we shouldn't always clone above
             ClientFieldTraversalResult {
                 traversal_state: merge_traversal_state,
-                merged_selection_map: selection_map,
+                outer_merged_selection_map,
+                complete_merged_selection_map,
                 was_ever_selected_loadably: was_selected_loadably,
             }
         }
@@ -530,18 +536,32 @@ fn create_selection_map_with_merge_traversal_state(
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
-) -> MergedSelectionMap {
-    let mut merged_selection_map = BTreeMap::new();
+) -> (MergedSelectionMap, MergedSelectionMap) {
+    // TODO do these in one iteration
+
+    let mut outer_merged_selection_map = BTreeMap::new();
     merge_validated_selections_into_selection_map(
         schema,
-        &mut merged_selection_map,
+        &mut outer_merged_selection_map,
         parent_type,
         validated_selections,
         merge_traversal_state,
         global_client_field_map,
+        false,
     );
 
-    merged_selection_map
+    let mut complete_merged_selection_map = BTreeMap::new();
+    merge_validated_selections_into_selection_map(
+        schema,
+        &mut complete_merged_selection_map,
+        parent_type,
+        validated_selections,
+        merge_traversal_state,
+        global_client_field_map,
+        true,
+    );
+
+    (outer_merged_selection_map, complete_merged_selection_map)
 }
 
 fn merge_validated_selections_into_selection_map(
@@ -551,6 +571,8 @@ fn merge_validated_selections_into_selection_map(
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
+    // TODO use an enum
+    recurse_into_loadable_fields: bool,
 ) {
     for validated_selection in validated_selections.iter().filter(filter_id_fields) {
         match &validated_selection.item {
@@ -632,6 +654,7 @@ fn merge_validated_selections_into_selection_map(
                                     newly_encountered_scalar_client_field,
                                     global_client_field_map,
                                     &scalar_field_selection.associated_data.selection_variant,
+                                    recurse_into_loadable_fields,
                                 )
                             }
                         };
@@ -695,6 +718,7 @@ fn merge_validated_selections_into_selection_map(
                                     &linked_field_selection.selection_set,
                                     merge_traversal_state,
                                     global_client_field_map,
+                                    recurse_into_loadable_fields,
                                 );
                             }
                             MergedServerSelection::InlineFragment(_) => {
@@ -763,11 +787,12 @@ fn merge_scalar_client_field(
     newly_encountered_scalar_client_field: &ValidatedClientField,
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
     selection_variant: &IsographSelectionVariant,
+    recurse_into_loadable_fields: bool,
 ) {
     let was_selected_loadably = matches!(selection_variant, &IsographSelectionVariant::Loadable(_));
     let ClientFieldTraversalResult {
         traversal_state,
-        merged_selection_map,
+        outer_merged_selection_map: merged_selection_map,
         ..
     } = create_merged_selection_map_and_insert_into_global_map(
         schema,
@@ -792,7 +817,7 @@ fn merge_scalar_client_field(
         //
         // (For now, we only select the id field, so... this is also a no-op.)
         // Anyway, we should model this better.
-        let merged_selection_map_from_refetch_selection_set = {
+        let (outer_merged_selection_map_from_refetch_selection_set, _) = {
             let mut merge_traversal_state = ScalarClientFieldTraversalState::new();
             &create_selection_map_with_merge_traversal_state(
                 schema,
@@ -811,9 +836,11 @@ fn merge_scalar_client_field(
         };
         merge_selections_into_selection_map(
             parent_map,
-            merged_selection_map_from_refetch_selection_set,
+            outer_merged_selection_map_from_refetch_selection_set,
         )
-    } else {
+    }
+
+    if !was_selected_loadably || recurse_into_loadable_fields {
         parent_merge_traversal_state.incorporate_results_of_iterating_into_child(&traversal_state);
         merge_selections_into_selection_map(parent_map, &merged_selection_map);
     }

@@ -40,7 +40,8 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
 
     let ClientFieldTraversalResult {
         traversal_state,
-        merged_selection_map,
+        outer_merged_selection_map,
+        complete_merged_selection_map,
         ..
     } = create_merged_selection_map_and_insert_into_global_map(
         schema,
@@ -71,7 +72,7 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
     let query_text = generate_query_text(
         query_name,
         schema,
-        &merged_selection_map,
+        &outer_merged_selection_map,
         &entrypoint.variable_definitions,
         root_operation_name,
     );
@@ -82,7 +83,7 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
             let current_target_merged_selections = match selection_variant {
                 IsographSelectionVariant::Regular => current_target_merged_selections(
                     path.linked_fields.iter(),
-                    &merged_selection_map,
+                    &complete_merged_selection_map,
                 ),
                 IsographSelectionVariant::Loadable(_) => {
                     // Note: it would be cleaner to include a reference to the merged selection set here via
@@ -93,7 +94,7 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
                             "Expected field to have been encountered, \
                                 since it is being used as a refetch field.",
                         )
-                        .merged_selection_map
+                        .outer_merged_selection_map
                 }
             };
 
@@ -110,7 +111,7 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
         generate_refetch_query_artifact_import(&refetch_paths_with_variables);
 
     let normalization_ast_text =
-        generate_normalization_ast_text(schema, merged_selection_map.values(), 0);
+        generate_normalization_ast_text(schema, outer_merged_selection_map.values(), 0);
 
     let mut paths_and_contents = vec![EntrypointArtifactInfo {
         query_text,
