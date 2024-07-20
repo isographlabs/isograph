@@ -26,11 +26,24 @@ export const PetSummaryCard = iso(`
             sx={{ height: 100, width: 100, cursor: 'pointer' }}
             src={data.picture}
             onClick={() =>
-              runtimeProps.navigateTo({ kind: 'PetDetail', id: data.id })
+              runtimeProps.navigateTo({
+                kind: 'PetDetail',
+                id: data.id,
+              })
             }
           />
           <div style={{ width: 300 }}>
-            <h2>{data.name}</h2>
+            <h2
+              onClick={() =>
+                runtimeProps.navigateTo({
+                  kind: 'PetDetailDeferred',
+                  id: data.id,
+                })
+              }
+              style={{ cursor: 'pointer' }}
+            >
+              {data.name}
+            </h2>
             <div>
               <i>{data.tagline}</i>
             </div>

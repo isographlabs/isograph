@@ -114,6 +114,7 @@ fn scalar_client_defined_field_ast_node(
     // This is indicative of poor data modeling.
     match nested_client_field.variant {
         ClientFieldVariant::ImperativelyLoadedField(_) => imperatively_loaded_variant_ast_node(
+            schema,
             nested_client_field,
             reader_imports,
             root_refetched_paths,
@@ -128,6 +129,7 @@ fn scalar_client_defined_field_ast_node(
                 IsographSelectionVariant::Loadable(_)
             ) {
                 imperatively_loaded_variant_ast_node(
+                    schema,
                     nested_client_field,
                     reader_imports,
                     root_refetched_paths,
@@ -203,6 +205,7 @@ fn user_written_variant_ast_node(
 }
 
 fn imperatively_loaded_variant_ast_node(
+    schema: &ValidatedSchema,
     nested_client_field: &ValidatedClientField,
     reader_imports: &mut ReaderImports,
     root_refetched_paths: &RefetchedPathsMap,
@@ -251,6 +254,13 @@ fn imperatively_loaded_variant_ast_node(
     // may or may not be what we want here.
     let name = scalar_field_selection.name.item;
 
+    let paths_to_refetch_field_in_client_field =
+        refetched_paths_for_client_field(nested_client_field, schema, path);
+    let nested_refetch_queries = get_nested_refetch_query_text(
+        &root_refetched_paths,
+        &paths_to_refetch_field_in_client_field,
+    );
+
     format!(
         "{indent_1}{{\n\
         {indent_2}kind: \"ImperativelyLoadedField\",\n\
@@ -259,6 +269,7 @@ fn imperatively_loaded_variant_ast_node(
         {indent_2}resolverReaderArtifact: {resolver_reader_artifact_import_name},\n\
         {indent_2}refetchQuery: {refetch_query_index},\n\
         {indent_2}name: \"{name}\",\n\
+        {indent_2}usedRefetchQueries: {nested_refetch_queries},\n\
         {indent_1}}},\n",
     )
 }

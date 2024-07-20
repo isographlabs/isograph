@@ -29,6 +29,7 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
         resolverReaderArtifact: Pet__PetCheckinsCard__resolver_reader,
         refetchQuery: 0,
         name: "PetCheckinsCard",
+        usedRefetchQueries: [1, ],
       },
     ],
   },

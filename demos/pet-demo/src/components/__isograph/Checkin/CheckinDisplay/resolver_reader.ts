@@ -23,6 +23,7 @@ const readerAst: ReaderAst<Checkin__CheckinDisplay__param> = [
     resolverReaderArtifact: null,
     refetchQuery: 0,
     name: "make_super",
+    usedRefetchQueries: [],
   },
 ];
 

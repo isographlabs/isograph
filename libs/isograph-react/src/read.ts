@@ -194,6 +194,8 @@ function readData<TReadFromStore>(
         break;
       }
       case 'ImperativelyLoadedField': {
+        // First, we read the data using the refetch reader AST (i.e. read out the
+        // id field).
         const data = readData(
           environment,
           field.refetchReaderArtifact.readerAst,
@@ -218,6 +220,8 @@ function readData<TReadFromStore>(
           const refetchQueryArtifact = refetchQuery.artifact;
           const allowedVariables = refetchQuery.allowedVariables;
 
+          // Second, we allow the user to call the resolver, which will ultimately
+          // use the resolver reader AST to get the resolver parameters.
           target[field.alias] = [
             // DataId
             root + '__' + field.name,
@@ -229,6 +233,7 @@ function readData<TReadFromStore>(
               filterVariables(variables, allowedVariables),
               root,
               field.resolverReaderArtifact,
+              field.usedRefetchQueries.map((id) => nestedRefetchQueries[id]),
             ),
           ];
         }

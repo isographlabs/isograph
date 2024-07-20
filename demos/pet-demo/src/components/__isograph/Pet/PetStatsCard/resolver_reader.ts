@@ -71,6 +71,7 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
         resolverReaderArtifact: null,
         refetchQuery: 0,
         name: "refetch_pet_stats",
+        usedRefetchQueries: [],
       },
     ],
   },

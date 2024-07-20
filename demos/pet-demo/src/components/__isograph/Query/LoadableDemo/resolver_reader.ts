@@ -31,6 +31,7 @@ const readerAst: ReaderAst<Query__LoadableDemo__param> = [
         resolverReaderArtifact: Pet__LoadableField__resolver_reader,
         refetchQuery: 0,
         name: "LoadableField",
+        usedRefetchQueries: [],
       },
       {
         kind: "ImperativelyLoadedField",
@@ -39,6 +40,7 @@ const readerAst: ReaderAst<Query__LoadableDemo__param> = [
         resolverReaderArtifact: Pet__LoadableField2__resolver_reader,
         refetchQuery: 1,
         name: "LoadableField2",
+        usedRefetchQueries: [],
       },
     ],
   },

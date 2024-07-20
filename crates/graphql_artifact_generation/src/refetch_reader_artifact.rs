@@ -118,8 +118,11 @@ fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctio
     // It should probably be passed from the original entrypoint.
     let content = format!(
         "{include_read_out_data}\n\
-        import {{ makeNetworkRequest, type IsographEnvironment, type DataId, type TopLevelReaderArtifact }} \
+        import {{ makeNetworkRequest, type IsographEnvironment, \
+        type FragmentReference, type RefetchQueryNormalizationArtifactWrapper, \
+        type DataId, type TopLevelReaderArtifact }} \
         from '@isograph/react';\n\
+        import {{ type ItemCleanupPair }} from '@isograph/react-disposable-state';\n\
         const resolver = (\n\
         {indent}environment: IsographEnvironment,\n\
         {indent}artifact: RefetchQueryNormalizationArtifact,\n\
@@ -128,7 +131,8 @@ fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctio
         {indent}rootId: DataId,\n\
         {indent}// TODO type this\n\
         {indent}readerArtifact: TopLevelReaderArtifact<any, any, any> | null,\n\
-        ) => () => {{\n\
+        {indent}nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],\n\
+        ) => (): ItemCleanupPair<FragmentReference<any, any>> | undefined => {{\n\
         {indent}const variables = includeReadOutData(filteredVariables, readOutData);\n\
         {indent}const [_networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables);\n\
         {indent}if (readerArtifact == null) return;\n\
@@ -137,8 +141,8 @@ fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctio
         {indent}  readerArtifact,\n\
         {indent}  root: rootId,\n\
         {indent}  variables,\n\
-        {indent}  nestedRefetchQueries: [],\n\
-        {indent}}};\n\
+        {indent}  nestedRefetchQueries,\n\
+        {indent}}} as const;\n\
         {indent}return [fragmentReference, disposeNetworkRequest];\n\
         }};\n"
     );
@@ -152,7 +156,12 @@ fn generate_function_import_statement_for_mutation_reader(
     let indent = "  ";
     ClientFieldFunctionImportStatement(format!(
         "{include_read_out_data}\n\
-        import {{ makeNetworkRequest, type IsographEnvironment, type DataId, type TopLevelReaderArtifact }} from '@isograph/react';\n\
+        import {{ makeNetworkRequest, type IsographEnvironment, \
+        type DataId, type TopLevelReaderArtifact, \
+        type FragmentReference, \
+        type RefetchQueryNormalizationArtifactWrapper \
+        }} from '@isograph/react';\n\
+        import {{ type ItemCleanupPair }} from '@isograph/react-disposable-state';\n\
         const resolver = (\n\
         {indent}environment: IsographEnvironment,\n\
         {indent}artifact: RefetchQueryNormalizationArtifact,\n\
@@ -161,7 +170,8 @@ fn generate_function_import_statement_for_mutation_reader(
         {indent}rootId: DataId,\n\
         {indent}// TODO type this\n\
         {indent}readerArtifact: TopLevelReaderArtifact<any, any, any>,\n\
-        ) => (mutationParams: any) => {{\n\
+        {indent}nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],\n\
+        ) => (mutationParams: any): ItemCleanupPair<FragmentReference<any, any>> | undefined => {{\n\
         {indent}const variables = includeReadOutData({{...filteredVariables, ...mutationParams}}, readOutData);\n\
         {indent}const [_networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables);\n\
         {indent}if (readerArtifact == null) return;\n\
@@ -170,8 +180,8 @@ fn generate_function_import_statement_for_mutation_reader(
         {indent}  readerArtifact,\n\
         {indent}  root: rootId,\n\
         {indent}  variables,\n\
-        {indent}  nestedRefetchQueries: [],\n\
-        {indent}}};\n\
+        {indent}  nestedRefetchQueries,\n\
+        {indent}}} as const;\n\
         {indent}return [fragmentReference, disposeNetworkRequest];\n\
         }};\n\
         ",
