@@ -6,7 +6,7 @@ license = "MIT"
 
 [dependencies]
 graphql-syntax = { git = "https://github.com/facebook/relay.git", tag = "v16.2.0" }
-intern = { git = "https://github.com/facebook/relay.git", tag = "v16.2.0" }
+intern = { path = "../../relay-crates/intern" }
 graphql_lang_types = { path = "../graphql_lang_types" }
 common_lang_types = { path = "../common_lang_types" }
 logos = "0.12"

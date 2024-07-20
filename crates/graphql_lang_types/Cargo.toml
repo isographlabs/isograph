@@ -5,7 +5,7 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
-intern = { git = "https://github.com/facebook/relay.git", tag = "v16.2.0" }
+intern = { path = "../../relay-crates/intern" }
 common_lang_types = { path = "../common_lang_types" }
 strum = { version="0.25.0", features=["derive"] }
 serde = "1.0.197"

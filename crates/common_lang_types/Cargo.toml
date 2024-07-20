@@ -6,6 +6,6 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-intern = { git = "https://github.com/facebook/relay.git", tag = "v16.2.0" }
+intern = { path = "../../relay-crates/intern" }
 string_key_newtype = { path = "../string_key_newtype" }
 serde = "1.0.197"

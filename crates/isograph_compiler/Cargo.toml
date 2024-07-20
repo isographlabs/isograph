@@ -6,7 +6,7 @@ license = "MIT"
 
 [dependencies]
 thiserror = "1.0.40"
-intern = { git = "https://github.com/facebook/relay.git", tag = "v16.2.0" }
+intern = { path = "../../relay-crates/intern" }
 graphql_schema_parser = { path = "../graphql_schema_parser" }
 graphql_lang_types = { path = "../graphql_lang_types" }
 isograph_config = { path = "../isograph_config" }
