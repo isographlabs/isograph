@@ -12,6 +12,7 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
   - unification
   - filters
   - normalization-time operations
+  - parameters
 - granular re-renders: use reader AST for comparison, and skip comparing stuff like imperatively loaded fields
 - userland impl of:
   - pagination, etc.
