@@ -150,10 +150,52 @@ dependencies = [
  "ansi_term",
  "atty",
  "bitflags 1.3.2",
- "strsim",
- "textwrap",
+ "strsim 0.8.0",
+ "textwrap 0.11.0",
  "unicode-width",
  "vec_map",
+]
+
+[[package]]
+name = "clap"
+version = "3.2.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ea181bf566f71cb9a5d17a59e1871af638180a18fb0035c92ae62b705207123"
+dependencies = [
+ "atty",
+ "bitflags 1.3.2",
+ "clap_derive",
+ "clap_lex",
+ "indexmap 1.9.3",
+ "once_cell",
+ "regex",
+ "strsim 0.10.0",
+ "termcolor",
+ "terminal_size",
+ "textwrap 0.16.1",
+ "unicase",
+]
+
+[[package]]
+name = "clap_derive"
+version = "3.2.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae6371b8bdc8b7d3959e9cf7b22d4435ef3e79e138688421ec654acf8c81b008"
+dependencies = [
+ "heck 0.4.1",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "clap_lex"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2850f2f5a82cbf437dd5af4d49848fbdfc27c157c3d010345776f952765261c5"
+dependencies = [
+ "os_str_bytes",
 ]
 
 [[package]]
@@ -175,11 +217,10 @@ checksum = "dc17e449bc7854c50b943d113a98bc0e01dc6585d2c66eaa09ca645ebd8a7e62"
 [[package]]
 name = "common"
 version = "0.0.0"
-source = "git+https://github.com/facebook/relay.git?tag=v16.2.0#014af4fd657fff32575c363e8e392d99759d130b"
 dependencies = [
  "colored",
- "indexmap",
- "intern 0.1.0",
+ "indexmap 2.2.1",
+ "intern",
  "log",
  "lsp-types",
  "md-5",
@@ -193,7 +234,7 @@ dependencies = [
 name = "common_lang_types"
 version = "0.0.4"
 dependencies = [
- "intern 0.0.4",
+ "intern",
  "serde",
  "string_key_newtype",
 ]
@@ -243,6 +284,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "diff"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -274,6 +321,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "errno"
+version = "0.3.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "534c5cf6194dfab3db3242765c03bbe257cf92f22b38f6bc0c58d59108a820ba"
+dependencies = [
+ "libc",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "file-id"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -292,6 +349,18 @@ dependencies = [
  "libc",
  "redox_syscall",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "fixture-tests"
+version = "0.0.0"
+dependencies = [
+ "clap 3.2.25",
+ "colored",
+ "diff",
+ "lazy_static",
+ "signedsource",
+ "tokio",
 ]
 
 [[package]]
@@ -346,15 +415,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4271d37baee1b8c7e4b708028c57d816cf9d2434acb33a549475f78c181f6253"
 
 [[package]]
+name = "graphql-cli"
+version = "0.0.0"
+dependencies = [
+ "colored",
+ "common",
+]
+
+[[package]]
 name = "graphql-syntax"
 version = "0.0.0"
-source = "git+https://github.com/facebook/relay.git?tag=v16.2.0#014af4fd657fff32575c363e8e392d99759d130b"
 dependencies = [
  "common",
- "intern 0.1.0",
+ "fixture-tests",
+ "graphql-cli",
+ "intern",
  "logos",
  "serde",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -363,7 +442,7 @@ version = "0.0.4"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
- "intern 0.0.4",
+ "intern",
  "isograph_lang_types",
  "isograph_schema",
  "lazy_static",
@@ -375,7 +454,7 @@ name = "graphql_lang_types"
 version = "0.0.4"
 dependencies = [
  "common_lang_types",
- "intern 0.0.4",
+ "intern",
  "serde",
  "strum",
  "thiserror",
@@ -388,7 +467,7 @@ dependencies = [
  "common_lang_types",
  "graphql-syntax",
  "graphql_lang_types",
- "intern 0.0.4",
+ "intern",
  "logos",
  "thiserror",
 ]
@@ -440,6 +519,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d3d0e0f38255e7fa3cf31335b3a56f05febd18025f4db5ef7a0cfb4f8da651f"
 
 [[package]]
+name = "hex"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
 name = "idna"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -447,6 +532,16 @@ checksum = "634d9b1461af396cad843f47fdba5597a4f9e6ddd4bfb6ff5d85028c25cb12f6"
 dependencies = [
  "unicode-bidi",
  "unicode-normalization",
+]
+
+[[package]]
+name = "indexmap"
+version = "1.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd070e393353796e801d209ad339e89596eb4c8d430d18ede6a1cced8fafbd99"
+dependencies = [
+ "autocfg",
+ "hashbrown 0.12.3",
 ]
 
 [[package]]
@@ -489,7 +584,7 @@ dependencies = [
  "bincode",
  "fnv",
  "hashbrown 0.12.3",
- "indexmap",
+ "indexmap 2.2.1",
  "once_cell",
  "parking_lot",
  "rand",
@@ -501,26 +596,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "intern"
-version = "0.1.0"
-source = "git+https://github.com/facebook/relay.git?tag=v16.2.0#014af4fd657fff32575c363e8e392d99759d130b"
-dependencies = [
- "fnv",
- "hashbrown 0.12.3",
- "indexmap",
- "once_cell",
- "parking_lot",
- "serde",
- "serde_bytes",
- "serde_derive",
- "smallvec",
-]
-
-[[package]]
 name = "inventory"
 version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f958d3d68f4167080a18141e10381e7634563984a537f2a49a30fd8e53ac5767"
+
+[[package]]
+name = "io-lifetimes"
+version = "1.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eae7b9aee968036d54dce06cebaefd919e4472e753296daccd6d344e3e2df0c2"
+dependencies = [
+ "hermit-abi 0.3.4",
+ "libc",
+ "windows-sys 0.48.0",
+]
 
 [[package]]
 name = "isograph_cli"
@@ -548,7 +638,7 @@ dependencies = [
  "graphql_artifact_generation",
  "graphql_lang_types",
  "graphql_schema_parser",
- "intern 0.0.4",
+ "intern",
  "isograph_config",
  "isograph_lang_parser",
  "isograph_lang_types",
@@ -578,7 +668,7 @@ version = "0.0.4"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
- "intern 0.0.4",
+ "intern",
  "isograph_lang_types",
  "logos",
  "thiserror",
@@ -590,7 +680,7 @@ version = "0.0.4"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
- "intern 0.0.4",
+ "intern",
  "serde",
  "thiserror",
  "u32_newtypes",
@@ -603,7 +693,7 @@ dependencies = [
  "colorize",
  "common_lang_types",
  "graphql_lang_types",
- "intern 0.0.4",
+ "intern",
  "isograph_config",
  "isograph_lang_types",
  "lazy_static",
@@ -648,6 +738,12 @@ name = "libc"
 version = "0.2.152"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13e3bf6590cbc649f4d1a3eefc9d5d6eb746f5200ffb04e5e142700b8faa56e7"
+
+[[package]]
+name = "linux-raw-sys"
+version = "0.3.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef53942eb7bf7ff43a617b3e2c1c4a5ecf5944a7c1bc12d7ee39bbb15e5c1519"
 
 [[package]]
 name = "lock_api"
@@ -798,6 +894,12 @@ name = "once_cell"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fdb12b2476b595f9358c5161aa467c2438859caa136dec86c26fdd2efe17b92"
+
+[[package]]
+name = "os_str_bytes"
+version = "6.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2355d85b9a3786f481747ced0e0ff2ba35213a1f9bd406ed906554d7af805a1"
 
 [[package]]
 name = "parking_lot"
@@ -995,6 +1097,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d626bb9dae77e28219937af045c257c28bfd3f69333c512553507f5f9798cb76"
 
 [[package]]
+name = "rustix"
+version = "0.37.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fea8ca367a3a01fe35e6943c400addf443c0f57670e6ec51196f71a4b8762dd2"
+dependencies = [
+ "bitflags 1.3.2",
+ "errno",
+ "io-lifetimes",
+ "libc",
+ "linux-raw-sys",
+ "windows-sys 0.48.0",
+]
+
+[[package]]
 name = "rustversion"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1091,6 +1207,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "signedsource"
+version = "0.0.0"
+dependencies = [
+ "hex",
+ "lazy_static",
+ "md-5",
+ "regex",
+]
+
+[[package]]
 name = "smallvec"
 version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1113,7 +1239,7 @@ dependencies = [
 name = "string_key_newtype"
 version = "0.0.4"
 dependencies = [
- "intern 0.0.4",
+ "intern",
 ]
 
 [[package]]
@@ -1123,12 +1249,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ea5119cdb4c55b55d432abb513a0429384878c15dde60cc77b1c99de1a95a6a"
 
 [[package]]
+name = "strsim"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
+
+[[package]]
 name = "structopt"
 version = "0.3.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c6b5c64445ba8094a6ab0c3cd2ad323e07171012d9c98b0b15651daf1787a10"
 dependencies = [
- "clap",
+ "clap 2.34.0",
  "lazy_static",
  "structopt-derive",
 ]
@@ -1269,6 +1401,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "termcolor"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
+dependencies = [
+ "winapi-util",
+]
+
+[[package]]
+name = "terminal_size"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e6bf6f19e9f8ed8d4048dc22981458ebcf406d67e94cd422e5ecd73d63b3237"
+dependencies = [
+ "rustix",
+ "windows-sys 0.48.0",
+]
+
+[[package]]
 name = "tests"
 version = "0.1.0"
 dependencies = [
@@ -1276,7 +1427,7 @@ dependencies = [
  "common_lang_types",
  "graphql_lang_types",
  "graphql_schema_parser",
- "intern 0.0.4",
+ "intern",
  "isograph_config",
  "isograph_lang_types",
  "isograph_schema",
@@ -1291,6 +1442,16 @@ version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
 dependencies = [
+ "unicode-width",
+]
+
+[[package]]
+name = "textwrap"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23d434d3f8967a09480fb04132ebe0a3e088c173e6d0ee7897abbdf4eab0f8b9"
+dependencies = [
+ "terminal_size",
  "unicode-width",
 ]
 
@@ -1345,6 +1506,7 @@ dependencies = [
  "signal-hook-registry",
  "socket2",
  "tokio-macros",
+ "tracing",
  "windows-sys 0.48.0",
 ]
 
@@ -1357,6 +1519,25 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.48",
+]
+
+[[package]]
+name = "tracing"
+version = "0.1.40"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3523ab5a71916ccf420eebdf5521fcef02141234bbc0b8a49f2fdc4544364ef"
+dependencies = [
+ "pin-project-lite",
+ "tracing-core",
+]
+
+[[package]]
+name = "tracing-core"
+version = "0.1.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c06d3da6113f116aaee68e4d601191614c9053067f9ab7f6edbcb161237daa54"
+dependencies = [
+ "once_cell",
 ]
 
 [[package]]
@@ -1392,6 +1573,15 @@ dependencies = [
 [[package]]
 name = "u32_newtypes"
 version = "0.0.4"
+
+[[package]]
+name = "unicase"
+version = "2.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7d2d4dafb69621809a81864c9c1b864479e1235c0dd4e199924b9742439ed89"
+dependencies = [
+ "version_check",
+]
 
 [[package]]
 name = "unicode-bidi"
