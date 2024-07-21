@@ -9,7 +9,7 @@ export default function Home() {
         <title>Robert&apos;s Pet List 3000</title>
       </Head>
       <ThemeProvider>
-        <GraphQLConfDemo initialState={{ kind: 'Loadable' }} />
+        <GraphQLConfDemo route={{ kind: 'Loadable' }} />
       </ThemeProvider>
     </>
   );

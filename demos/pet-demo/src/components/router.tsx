@@ -47,15 +47,11 @@ function toRoute(route: Route): string {
   }
 }
 
-export function GraphQLConfDemo(props: { initialState: Route }) {
+export function GraphQLConfDemo({ route }: { route: Route }) {
   const router = useRouter();
-  const [currentRoute, setCurrentRoute] = React.useState<Route>(
-    props.initialState,
-  );
 
-  const updateRoute = (route: Route) => {
-    setCurrentRoute(route);
-    router.push(toRoute(route));
+  const updateRoute = (newRoute: Route) => {
+    router.push(toRoute(newRoute));
   };
 
   return (
@@ -66,7 +62,7 @@ export function GraphQLConfDemo(props: { initialState: Route }) {
         </Container>
       }
     >
-      <Router route={currentRoute} setRoute={updateRoute} />
+      <Router route={route} setRoute={updateRoute} />
     </React.Suspense>
   );
 }

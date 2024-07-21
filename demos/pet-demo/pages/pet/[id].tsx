@@ -18,7 +18,7 @@ export default function PetDetail() {
       <ThemeProvider>
         {id && (
           <GraphQLConfDemo
-            initialState={{
+            route={{
               kind: 'PetDetail',
               // @ts-expect-error
               id: router.query.id,
