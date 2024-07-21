@@ -33,8 +33,10 @@ pub type ClientFieldToCompletedMergeTraversalStateMap =
 pub struct ClientFieldTraversalResult {
     pub traversal_state: ScalarClientFieldTraversalState,
     /// This is used to generate the normalization AST and query text
+    /// TODO: make this a newtype
     pub outer_merged_selection_map: MergedSelectionMap,
     /// This is used to generate refetch queries
+    /// TODO: make this a newtype
     pub complete_merged_selection_map: MergedSelectionMap,
     // TODO change this to Option<SelectionSet>?
     pub was_ever_selected_loadably: bool,
@@ -792,7 +794,7 @@ fn merge_scalar_client_field(
     let was_selected_loadably = matches!(selection_variant, &IsographSelectionVariant::Loadable(_));
     let ClientFieldTraversalResult {
         traversal_state,
-        outer_merged_selection_map: merged_selection_map,
+        complete_merged_selection_map,
         ..
     } = create_merged_selection_map_and_insert_into_global_map(
         schema,
@@ -842,7 +844,7 @@ fn merge_scalar_client_field(
 
     if !was_selected_loadably || recurse_into_loadable_fields {
         parent_merge_traversal_state.incorporate_results_of_iterating_into_child(&traversal_state);
-        merge_selections_into_selection_map(parent_map, &merged_selection_map);
+        merge_selections_into_selection_map(parent_map, &complete_merged_selection_map);
     }
 }
 
