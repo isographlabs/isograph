@@ -7,7 +7,7 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 ## GraphQL conf 2024 priorities
 
 - VSCode extension: syntax highlighting
-- Loadable fields: arguments
+- Loadable fields: id from args, (args) => [id, foo]
 - Network errors
 - Userland impl of pagination, live queries, useQueryLoader (w/ intersection observer)
 - Load normalization ASTs (etc) when a non-null network response is received. Does this require `as Foo`?
