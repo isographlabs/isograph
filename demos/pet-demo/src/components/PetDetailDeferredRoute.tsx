@@ -1,20 +1,24 @@
 import React from 'react';
 import { iso } from '@iso';
 import { Container, Stack } from '@mui/material';
-import { Route } from './router';
-import { EntrypointReader, useClientSideDefer } from '@isograph/react';
+import {
+  EntrypointReader,
+  useClientSideDefer,
+  useLazyReference,
+  useResult,
+} from '@isograph/react';
+import { PetDetailDeferredRoute, Route, useNavigateTo } from './routes';
 
-export const PetDetailDeferredRoute = iso(`
+export const PetDetailDeferredRouteComponent = iso(`
   field Query.PetDetailDeferredRoute($id: ID!) @component {
     pet(id: $id) {
       name
       PetCheckinsCard @loadable
     }
   }
-`)(function PetDetailRouteComponent(
-  data,
-  { navigateTo }: { navigateTo: (nextRoute: Route) => void },
-) {
+`)(function PetDetailRouteComponent(data) {
+  const navigateTo = useNavigateTo();
+
   const { pet } = data;
   if (pet == null) {
     return <h1>Pet not found.</h1>;
@@ -42,3 +46,17 @@ export const PetDetailDeferredRoute = iso(`
     </Container>
   );
 });
+
+export function PetDetailDeferredRouteLoader({
+  route,
+}: {
+  route: PetDetailDeferredRoute;
+}) {
+  const { queryReference } = useLazyReference(
+    iso(`entrypoint Query.PetDetailDeferredRoute`),
+    { id: route.id },
+  );
+
+  const Component = useResult(queryReference);
+  return <Component />;
+}

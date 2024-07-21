@@ -1,6 +1,8 @@
 import Head from 'next/head';
-import { GraphQLConfDemo } from '@/src/components/router';
 import ThemeProvider from '@/src/theme';
+import { HomeRouteLoader } from '@/src/components/HomeRoute';
+import { Suspense } from 'react';
+import { FullPageLoading } from '@/src/components/routes';
 
 export default function Home() {
   return (
@@ -9,7 +11,9 @@ export default function Home() {
         <title>Robert&apos;s Pet List 3000</title>
       </Head>
       <ThemeProvider>
-        <GraphQLConfDemo route={{ kind: 'Home' }} />
+        <Suspense fallback={<FullPageLoading />}>
+          <HomeRouteLoader />
+        </Suspense>
       </ThemeProvider>
     </>
   );

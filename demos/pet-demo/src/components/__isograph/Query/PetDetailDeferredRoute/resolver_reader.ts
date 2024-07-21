@@ -1,6 +1,6 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Query__PetDetailDeferredRoute__param } from './param_type';
-import { PetDetailDeferredRoute as resolver } from '../../../PetDetailDeferredRoute';
+import { PetDetailDeferredRouteComponent as resolver } from '../../../PetDetailDeferredRoute';
 import Pet__PetCheckinsCard__resolver_reader from '../../Pet/PetCheckinsCard/resolver_reader';
 import Pet__PetCheckinsCard__refetch_reader from '../../Pet/PetCheckinsCard/refetch_reader';
 

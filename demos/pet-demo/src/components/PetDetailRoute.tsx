@@ -1,9 +1,10 @@
 import React from 'react';
 import { iso } from '@iso';
 import { Container, Stack } from '@mui/material';
-import { Route } from './router';
+import { useLazyReference, useResult } from '@isograph/react';
+import { Route, PetDetailRoute, useNavigateTo } from './routes';
 
-export const PetDetailRoute = iso(`
+export const PetDetailRouteComponent = iso(`
   field Query.PetDetailRoute($id: ID!) @component {
     pet(id: $id) {
       name
@@ -14,10 +15,8 @@ export const PetDetailRoute = iso(`
       PetStatsCard
     }
   }
-`)(function PetDetailRouteComponent(
-  data,
-  { navigateTo }: { navigateTo: (nextRoute: Route) => void },
-) {
+`)(function PetDetailRouteComponent(data) {
+  const navigateTo = useNavigateTo();
   const { pet } = data;
   if (pet == null) {
     return <h1>Pet not found.</h1>;
@@ -48,3 +47,13 @@ export const PetDetailRoute = iso(`
     </Container>
   );
 });
+
+export function PetDetailRouteLoader({ route }: { route: PetDetailRoute }) {
+  const { queryReference } = useLazyReference(
+    iso(`entrypoint Query.PetDetailRoute`),
+    { id: route.id },
+  );
+
+  const Component = useResult(queryReference);
+  return <Component />;
+}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { iso } from '@iso';
 import { Avatar, Card, CardContent, Stack } from '@mui/material';
-import { Route } from './router';
+import { useNavigateTo } from './routes';
 
 export const PetSummaryCard = iso(`
   field Pet.PetSummaryCard @component {
@@ -11,10 +11,8 @@ export const PetSummaryCard = iso(`
     tagline
     FavoritePhraseLoader
   }
-`)(function PetSummaryCardComponent(
-  data,
-  runtimeProps: { navigateTo: (newRoute: Route) => void },
-) {
+`)(function PetSummaryCardComponent(data) {
+  const navigateTo = useNavigateTo();
   return (
     <Card
       variant="outlined"
@@ -26,7 +24,7 @@ export const PetSummaryCard = iso(`
             sx={{ height: 100, width: 100, cursor: 'pointer' }}
             src={data.picture}
             onClick={() =>
-              runtimeProps.navigateTo({
+              navigateTo({
                 kind: 'PetDetail',
                 id: data.id,
               })
@@ -35,7 +33,7 @@ export const PetSummaryCard = iso(`
           <div style={{ width: 300 }}>
             <h2
               onClick={() =>
-                runtimeProps.navigateTo({
+                navigateTo({
                   kind: 'PetDetailDeferred',
                   id: data.id,
                 })
