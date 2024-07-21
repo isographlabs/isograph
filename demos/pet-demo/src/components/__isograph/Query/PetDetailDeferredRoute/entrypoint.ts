@@ -12,6 +12,11 @@ const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [
 const queryText = 'query PetDetailDeferredRoute ($id: ID!) {\
   pet____id___v_id: pet(id: $id) {\
     id,\
+    checkins {\
+      id,\
+      location,\
+      time,\
+    },\
     name,\
   },\
 }';
@@ -31,6 +36,28 @@ const normalizationAst: NormalizationAst = [
         kind: "Scalar",
         fieldName: "id",
         arguments: null,
+      },
+      {
+        kind: "Linked",
+        fieldName: "checkins",
+        arguments: null,
+        selections: [
+          {
+            kind: "Scalar",
+            fieldName: "id",
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            fieldName: "location",
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            fieldName: "time",
+            arguments: null,
+          },
+        ],
       },
       {
         kind: "Scalar",

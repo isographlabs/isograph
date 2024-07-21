@@ -1,8 +1,7 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Query__PetDetailDeferredRoute__param } from './param_type';
 import { PetDetailDeferredRouteComponent as resolver } from '../../../PetDetailDeferredRoute';
-import Pet__PetCheckinsCard__resolver_reader from '../../Pet/PetCheckinsCard/resolver_reader';
-import Pet__PetCheckinsCard__refetch_reader from '../../Pet/PetCheckinsCard/refetch_reader';
+import Pet__PetDetailDeferredRouteInnerComponent__resolver_reader from '../../Pet/PetDetailDeferredRouteInnerComponent/resolver_reader';
 
 const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
   {
@@ -17,19 +16,11 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
     ],
     selections: [
       {
-        kind: "Scalar",
-        fieldName: "name",
-        alias: null,
+        kind: "Resolver",
+        alias: "PetDetailDeferredRouteInnerComponent",
         arguments: null,
-      },
-      {
-        kind: "ImperativelyLoadedField",
-        alias: "PetCheckinsCard",
-        refetchReaderArtifact: Pet__PetCheckinsCard__refetch_reader,
-        resolverReaderArtifact: Pet__PetCheckinsCard__resolver_reader,
-        refetchQuery: 0,
-        name: "PetCheckinsCard",
-        usedRefetchQueries: [1, ],
+        readerArtifact: Pet__PetDetailDeferredRouteInnerComponent__resolver_reader,
+        usedRefetchQueries: [0, 1, ],
       },
     ],
   },

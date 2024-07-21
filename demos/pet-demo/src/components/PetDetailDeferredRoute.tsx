@@ -12,19 +12,25 @@ import { PetDetailDeferredRoute, Route, useNavigateTo } from './routes';
 export const PetDetailDeferredRouteComponent = iso(`
   field Query.PetDetailDeferredRoute($id: ID!) @component {
     pet(id: $id) {
-      name
-      PetCheckinsCard @loadable
+      PetDetailDeferredRouteInnerComponent
     }
   }
 `)(function PetDetailRouteComponent(data) {
-  const navigateTo = useNavigateTo();
-
   const { pet } = data;
   if (pet == null) {
     return <h1>Pet not found.</h1>;
   }
 
-  // eslint-disable-next-line react-hooks/rules-of-hooks
+  return <pet.PetDetailDeferredRouteInnerComponent />;
+});
+
+export const PetDetailDeferredRouteInnerComponent = iso(`
+  field Pet.PetDetailDeferredRouteInnerComponent @component {
+    name
+    PetCheckinsCard @loadable
+  }
+`)((pet) => {
+  const navigateTo = useNavigateTo();
   const petCheckinsCard = useClientSideDefer(pet.PetCheckinsCard);
 
   return (
