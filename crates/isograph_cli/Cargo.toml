@@ -9,6 +9,7 @@ structopt = "0.3.26"
 thiserror = "1.0.40"
 isograph_compiler = { path = "../isograph_compiler" }
 isograph_config = { path = "../isograph_config" }
+isograph_lsp= { path = "../isograph_lsp"}
 colored = "2.0.4"
 lazy_static = "1.4"
 regex = "1.6.0"
@@ -16,4 +17,3 @@ notify = "6.1.1"
 tokio = { version="1.35.0", features=["full"] }
 notify-debouncer-full = "0.3.1"
 pretty-duration = "0.1.1"
-
