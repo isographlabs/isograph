@@ -4,6 +4,20 @@
 See the [open issues](https://github.com/isographlabs/isograph/issues).
 :::
 
+## GraphQL conf 2024 priorities
+
+- VSCode extension: syntax highlighting
+- Loadable fields: arguments
+- Network errors
+- Userland impl of pagination, live queries, useQueryLoader (w/ intersection observer)
+- Load normalization ASTs (etc) when a non-null network response is received. Does this require `as Foo`?
+
+## GraphQL conf 2024 nice-to-haves
+
+- Fix granular re-renders with AST
+- Proper selection sets (i.e. rooted at the closest loadable field?)
+- Limit exposed fields to specific selections
+
 ## Top mid-term runtime priorities
 
 - garbage collection & retention
@@ -85,7 +99,6 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 - Docs
 - VSCode extension
 - Fetch policies
-- Garbage collection
 - Preloaded queries
 - Fetch/cache policies
 - Ability to select fewer or extra fields on mutation and refetch fields, e.g.
