@@ -17,9 +17,6 @@ export const HomeRoute = iso(`
   return (
     <Container maxWidth="md">
       <h1>Robert&apos;s Pet List 3000</h1>
-      <small onClick={() => secondParam.navigateTo({ kind: 'Loadable' })}>
-        View loadable demo
-      </small>
       <Stack direction="column" spacing={4}>
         {data.pets.map((pet) => (
           <pet.PetSummaryCard

@@ -6,11 +6,7 @@ import { useRouter } from 'next/router';
 
 export type PetId = string;
 
-export type Route =
-  | HomeRoute
-  | PetDetailRoute
-  | PetDetailDeferredRoute
-  | LoadableRoute;
+export type Route = HomeRoute | PetDetailRoute | PetDetailDeferredRoute;
 
 export type HomeRoute = {
   kind: 'Home';
@@ -26,10 +22,6 @@ export type PetDetailDeferredRoute = {
   id: PetId;
 };
 
-export type LoadableRoute = {
-  kind: 'Loadable';
-};
-
 function toRoute(route: Route): string {
   switch (route.kind) {
     case 'Home': {
@@ -40,9 +32,6 @@ function toRoute(route: Route): string {
     }
     case 'PetDetailDeferred': {
       return `/pet/with-defer/${route.id}`;
-    }
-    case 'Loadable': {
-      return '/loadable';
     }
   }
 }
@@ -83,8 +72,6 @@ function Router({
       return (
         <PetDetailDeferredRouteLoader navigateTo={setRoute} route={route} />
       );
-    case 'Loadable':
-      return <LoadableDemo />;
     default:
       const exhaustiveCheck: never = route;
   }
@@ -143,18 +130,4 @@ function PetDetailDeferredRouteLoader({
 // If window.__LOG is true, Isograph will log a bunch of diagnostics.
 if (typeof window !== 'undefined') {
   window.__LOG = true;
-}
-
-function LoadableDemo() {
-  const { queryReference } = useLazyReference(
-    iso(`entrypoint Query.LoadableDemo`),
-    {},
-  );
-
-  const Component = useResult(queryReference);
-  if (typeof window !== 'undefined') {
-    // @ts-expect-error
-    window.data = Component;
-  }
-  return <Component />;
 }

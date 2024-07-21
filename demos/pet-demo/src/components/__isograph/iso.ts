@@ -2,8 +2,6 @@ import type {IsographEntrypoint} from '@isograph/react';
 import { Checkin__CheckinDisplay__param } from './Checkin/CheckinDisplay/param_type';
 import { Mutation__SetTagline__param } from './Mutation/SetTagline/param_type';
 import { Pet__FavoritePhraseLoader__param } from './Pet/FavoritePhraseLoader/param_type';
-import { Pet__LoadableField2__param } from './Pet/LoadableField2/param_type';
-import { Pet__LoadableField__param } from './Pet/LoadableField/param_type';
 import { Pet__PetBestFriendCard__param } from './Pet/PetBestFriendCard/param_type';
 import { Pet__PetCheckinsCard__param } from './Pet/PetCheckinsCard/param_type';
 import { Pet__PetPhraseCard__param } from './Pet/PetPhraseCard/param_type';
@@ -14,13 +12,11 @@ import { Pet__PetUpdater__param } from './Pet/PetUpdater/param_type';
 import { Pet__Unreachable2__param } from './Pet/Unreachable2/param_type';
 import { Pet__UnreachableFromEntrypoint__param } from './Pet/UnreachableFromEntrypoint/param_type';
 import { Query__HomeRoute__param } from './Query/HomeRoute/param_type';
-import { Query__LoadableDemo__param } from './Query/LoadableDemo/param_type';
 import { Query__PetDetailDeferredRoute__param } from './Query/PetDetailDeferredRoute/param_type';
 import { Query__PetDetailRoute__param } from './Query/PetDetailRoute/param_type';
 import { Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/param_type';
 import entrypoint_Mutation__SetTagline from '../__isograph/Mutation/SetTagline/entrypoint';
 import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint';
-import entrypoint_Query__LoadableDemo from '../__isograph/Query/LoadableDemo/entrypoint';
 import entrypoint_Query__PetDetailDeferredRoute from '../__isograph/Query/PetDetailDeferredRoute/entrypoint';
 import entrypoint_Query__PetDetailRoute from '../__isograph/Query/PetDetailRoute/entrypoint';
 import entrypoint_Query__PetFavoritePhrase from '../__isograph/Query/PetFavoritePhrase/entrypoint';
@@ -83,14 +79,6 @@ export function iso<T>(
 ): IdentityWithParamComponent<Pet__FavoritePhraseLoader__param>;
 
 export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'field Pet.LoadableField2', T>
-): IdentityWithParamComponent<Pet__LoadableField2__param>;
-
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'field Pet.LoadableField', T>
-): IdentityWithParamComponent<Pet__LoadableField__param>;
-
-export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.PetBestFriendCard', T>
 ): IdentityWithParamComponent<Pet__PetBestFriendCard__param>;
 
@@ -131,10 +119,6 @@ export function iso<T>(
 ): IdentityWithParamComponent<Query__HomeRoute__param>;
 
 export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'field Query.LoadableDemo', T>
-): IdentityWithParamComponent<Query__LoadableDemo__param>;
-
-export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.PetDetailDeferredRoute', T>
 ): IdentityWithParamComponent<Query__PetDetailDeferredRoute__param>;
 
@@ -153,10 +137,6 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.HomeRoute', T>
 ): typeof entrypoint_Query__HomeRoute;
-
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'entrypoint Query.LoadableDemo', T>
-): typeof entrypoint_Query__LoadableDemo;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.PetDetailDeferredRoute', T>
