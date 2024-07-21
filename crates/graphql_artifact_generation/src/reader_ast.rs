@@ -433,8 +433,8 @@ fn refetched_paths_with_path(
     for selection in selection_set {
         match &selection.item {
             Selection::ServerField(field) => match field {
-                ServerFieldSelection::ScalarField(scalar) => {
-                    match scalar.associated_data.location {
+                ServerFieldSelection::ScalarField(scalar_field_selection) => {
+                    match scalar_field_selection.associated_data.location {
                         FieldDefinitionLocation::Server(_) => {
                             // Do nothing, we encountered a server field
                         }
@@ -448,6 +448,16 @@ fn refetched_paths_with_path(
                                     });
                                 }
                                 _ => {
+                                    if matches!(
+                                        scalar_field_selection.associated_data.selection_variant,
+                                        IsographSelectionVariant::Loadable(_)
+                                    ) {
+                                        paths.insert(PathToRefetchField {
+                                            linked_fields: path.clone(),
+                                            field_name: client_field.name,
+                                        });
+                                    }
+
                                     // For non-refetch fields, we need to recurse into the selection set
                                     // (if there is one)
                                     let new_paths = refetched_paths_with_path(
