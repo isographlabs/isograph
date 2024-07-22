@@ -71,6 +71,12 @@ impl Default for UnvalidatedSchema {
     }
 }
 
+impl Default for UnvalidatedSchema {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UnvalidatedSchema {
     pub fn new() -> Self {
         // TODO add __typename
