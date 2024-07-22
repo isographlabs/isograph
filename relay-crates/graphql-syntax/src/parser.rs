@@ -1445,7 +1445,7 @@ impl<'a> Parser<'a> {
                             ));
                             let name = Identifier {
                                 span: node.token.span,
-                                token: node.token,
+                                token: node.token.clone(),
                                 value: node.value,
                             };
                             last_arg.span.end = last_arg.colon.span.end;
@@ -1958,7 +1958,7 @@ impl<'a> Parser<'a> {
             let token = self.empty_token();
             return Ok(List {
                 span: token.span,
-                start: token,
+                start: token.clone(),
                 items: vec![],
                 end: token,
             });

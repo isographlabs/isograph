@@ -43,7 +43,7 @@ fn main() {
         // @
         111..111,
     ];
-    let printer = SourcePrinter;
+    let printer = SourcePrinter::default();
     for test_case in test_cases.into_iter() {
         let mut res = String::new();
         printer
