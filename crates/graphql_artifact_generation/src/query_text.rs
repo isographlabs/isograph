@@ -113,7 +113,7 @@ fn write_selections_for_query_text<'a>(
                     indentation_level + 1,
                 );
                 query_text.push_str(&"  ".repeat(indentation_level as usize).to_string());
-                query_text.push_str("}},\\\n")
+                query_text.push_str("},\\\n")
             }
         }
     }
