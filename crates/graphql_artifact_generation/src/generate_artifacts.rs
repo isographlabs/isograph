@@ -501,11 +501,6 @@ derive_display!(ReaderAst);
 pub(crate) struct NormalizationAstText(pub String);
 derive_display!(NormalizationAstText);
 
-#[allow(dead_code)]
-#[derive(Debug)]
-pub(crate) struct ConvertFunction(pub String);
-derive_display!(ConvertFunction);
-
 #[derive(Debug)]
 pub(crate) struct RefetchQueryArtifactImport(pub String);
 derive_display!(RefetchQueryArtifactImport);
