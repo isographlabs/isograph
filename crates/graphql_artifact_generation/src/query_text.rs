@@ -23,7 +23,7 @@ pub(crate) fn generate_query_text(
         "{} {} {} {{\\\n",
         root_operation_name.0, query_name, variable_text
     ));
-    write_selections_for_query_text(&mut query_text, schema, selection_map.values(), 1);
+    write_selections_for_query_text(&mut query_text, selection_map.values(), 1);
     query_text.push('}');
     QueryText(query_text)
 }
@@ -65,30 +65,9 @@ fn write_variables_to_string<'a>(
     }
 }
 
-/// TODO: Please double check if `schema` really needed.
-///
-/// ```text
-/// error: parameter is only used in recursion
-///    --> crates/graphql_artifact_generation/src/query_text.rs:70:5
-///     |
-/// 70  |     schema: &ValidatedSchema,
-///     |     ^^^^^^ help: if this is intentional, prefix it with an underscore: `_schema`
-///     |
-/// note: parameter used here
-///    --> crates/graphql_artifact_generation/src/query_text.rs:96:21
-///     |
-/// 96  |                     schema,
-///     |                     ^^^^^^
-/// ...
-/// 113 |                     schema,
-///     |                     ^^^^^^
-///     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#only_used_in_recursion
-///     = note: `-D clippy::only-used-in-recursion` implied by `-D warnings`
-/// ```
 #[allow(clippy::only_used_in_recursion)]
 fn write_selections_for_query_text<'a>(
     query_text: &mut String,
-    schema: &ValidatedSchema,
     items: impl Iterator<Item = &'a MergedServerSelection> + 'a,
     indentation_level: u8,
 ) {
@@ -114,7 +93,6 @@ fn write_selections_for_query_text<'a>(
                 query_text.push_str(&format!("{}{} {{\\\n", name, arguments));
                 write_selections_for_query_text(
                     query_text,
-                    schema,
                     linked_field.selection_map.values(),
                     indentation_level + 1,
                 );
@@ -131,7 +109,6 @@ fn write_selections_for_query_text<'a>(
                 ));
                 write_selections_for_query_text(
                     query_text,
-                    schema,
                     inline_fragment.selection_map.values(),
                     indentation_level + 1,
                 );
