@@ -36,9 +36,7 @@ async fn main() {
                 std::process::exit(1);
             }
         };
-    } else {
-        if let Err(_) = compile_and_print(&config) {
-            std::process::exit(1);
-        }
+    } else if compile_and_print(&config).is_err() {
+        std::process::exit(1);
     }
 }

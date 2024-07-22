@@ -37,7 +37,7 @@ pub(crate) fn text_with_carats_and_line_count_buffer(
     let mut last_line_with_span = 0;
 
     let mut span_state = SpanState::Before;
-    for line_content in text.split("\n").into_iter() {
+    for line_content in text.split('\n') {
         output_lines.push(line_content.to_string());
 
         let start_of_line = cur_index;

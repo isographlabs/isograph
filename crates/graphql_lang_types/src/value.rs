@@ -131,7 +131,7 @@ pub struct NameValuePair<TName, TValue: ValueType> {
 impl<TName, TValue: ValueType> NameValuePair<TName, TValue> {
     pub fn map_name<U>(self, map: impl FnOnce(TName) -> U) -> NameValuePair<U, TValue> {
         NameValuePair {
-            name: self.name.map(|tname| map(tname)),
+            name: self.name.map(map),
             value: self.value,
         }
     }

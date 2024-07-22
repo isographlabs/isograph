@@ -127,12 +127,12 @@ impl UnvalidatedSchema {
         // TODO what is going on here. Should mutation_field have a checked way of converting to LinkedField?
         let top_level_schema_field_name = mutation_field.name.item.lookup().intern().into();
         let mutation_field_arguments = mutation_field.arguments.clone();
-        let description = mutation_field.description.clone();
+        let description = mutation_field.description;
         let payload_id = self
             .server_field_data
             .defined_types
             .get(&mutation_field_payload_type_name)
-            .map(|x| *x);
+            .copied();
 
         if let Some(SelectableServerFieldId::Object(mutation_field_object_id)) = payload_id {
             let processed_field_map_items = skip_arguments_contained_in_field_map(
@@ -168,7 +168,7 @@ impl UnvalidatedSchema {
 
                         // TODO validate that the payload object has no plural fields in between
 
-                        let primary_type = self.server_field_data.defined_types.get(inner).clone();
+                        let primary_type = self.server_field_data.defined_types.get(inner);
 
                         if let Some(SelectableServerFieldId::Object(
                             client_field_parent_object_id,

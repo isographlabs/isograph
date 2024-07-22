@@ -67,8 +67,8 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
     }
 }
 
-pub(crate) fn get_artifact_for_imperatively_loaded_field<'schema>(
-    schema: &'schema ValidatedSchema,
+pub(crate) fn get_artifact_for_imperatively_loaded_field(
+    schema: &ValidatedSchema,
     imperatively_loaded_field_artifact_info: ImperativelyLoadedFieldArtifactInfo,
 ) -> ArtifactPathAndContent {
     let ImperativelyLoadedFieldArtifactInfo {

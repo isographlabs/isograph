@@ -1,11 +1,11 @@
-use intern::Lookup;
-use std::{collections::BTreeSet, path::PathBuf, str::FromStr};
-
 use common_lang_types::ArtifactPathAndContent;
+use intern::Lookup;
 use isograph_schema::{
     ScalarClientFieldTraversalState, UserWrittenClientFieldInfo, UserWrittenComponentVariant,
     ValidatedClientField, ValidatedSchema,
 };
+use std::path::Path;
+use std::{collections::BTreeSet, path::PathBuf, str::FromStr};
 
 use crate::{
     generate_artifacts::{
@@ -22,8 +22,8 @@ use crate::{
 pub(crate) fn generate_eager_reader_artifact(
     schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
-    project_root: &PathBuf,
-    artifact_directory: &PathBuf,
+    project_root: &Path,
+    artifact_directory: &Path,
     info: UserWrittenClientFieldInfo,
     scalar_client_field_traversal_state: &ScalarClientFieldTraversalState,
 ) -> ArtifactPathAndContent {
@@ -34,7 +34,7 @@ pub(crate) fn generate_eager_reader_artifact(
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
-        &*client_field.selection_set_for_parent_query(),
+        client_field.selection_set_for_parent_query(),
         0,
         &scalar_client_field_traversal_state.refetch_paths,
     );
@@ -115,8 +115,8 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
     let mut loadable_field_encountered = false;
     let client_field_parameter_type = generate_client_field_parameter_type(
         schema,
-        &*client_field.selection_set_for_parent_query(),
-        parent_type.into(),
+        client_field.selection_set_for_parent_query(),
+        parent_type,
         &mut param_type_imports,
         0,
         &mut loadable_field_encountered,
@@ -146,8 +146,8 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
 pub(crate) fn generate_eager_reader_output_type_artifact(
     schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
-    project_root: &PathBuf,
-    artifact_directory: &PathBuf,
+    project_root: &Path,
+    artifact_directory: &Path,
     info: UserWrittenClientFieldInfo,
 ) -> ArtifactPathAndContent {
     let parent_type = schema
@@ -186,8 +186,8 @@ pub(crate) fn generate_eager_reader_output_type_artifact(
 
 /// Example: import { PetUpdater as resolver } from '../../../PetUpdater';
 fn generate_function_import_statement(
-    project_root: &PathBuf,
-    artifact_directory: &PathBuf,
+    project_root: &Path,
+    artifact_directory: &Path,
     user_written_client_field_info: UserWrittenClientFieldInfo,
 ) -> ClientFieldFunctionImportStatement {
     let const_export_name = user_written_client_field_info.const_export_name;

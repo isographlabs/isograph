@@ -15,6 +15,7 @@ lazy_static! {
     static ref LOADABLE_DIRECTIVE_NAME: IsographDirectiveName = "loadable".intern().into();
 }
 
+#[allow(clippy::complexity)]
 pub fn validate_isograph_field_directives(
     client_fields: Vec<(
         WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>,

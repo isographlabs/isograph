@@ -126,11 +126,7 @@ pub(crate) fn handle_compile_command(
         // - validate fields with selection sets
         // Validation state: fully validated
 
-        let fetchable_types = schema
-            .fetchable_types
-            .iter()
-            .map(|(fetchable_object_id, _)| *fetchable_object_id)
-            .collect::<Vec<_>>();
+        let fetchable_types: Vec<_> = schema.fetchable_types.keys().copied().collect();
         for fetchable_object_id in fetchable_types.into_iter() {
             schema.add_exposed_fields_to_parent_object_types(fetchable_object_id)?;
         }
@@ -264,6 +260,7 @@ fn process_client_fields_and_entrypoints(
     }
 }
 
+#[allow(clippy::complexity)]
 fn extract_iso_literals(
     project_files: Vec<(PathBuf, String)>,
     canonicalized_root_path: PathBuf,
@@ -350,12 +347,13 @@ fn process_iso_literal_extraction(
 
     // TODO return errors if any occurred, otherwise Ok
     let iso_literal_extraction_result = parse_iso_literal(
-        &iso_literal_text,
+        iso_literal_text,
         interned_file_path,
         const_export_name,
         text_source,
     )?;
 
+    #[allow(clippy::collapsible_if)]
     if matches!(
         &iso_literal_extraction_result,
         IsoLiteralExtractionResult::ClientFieldDeclaration(_)
@@ -400,7 +398,10 @@ pub enum BatchCompileError {
     #[error(
         "{}{}",
         if messages.len() == 1 { "Unable to parse Isograph literal:" } else { "Unable to parse Isograph literals:" },
-        messages.into_iter().map(|x| format!("\n\n{x}")).collect::<String>()
+        messages.iter().fold(String::new(), |mut output, x| {
+            output.push_str(&format!("\n\n{}", x));
+            output
+        })
     )]
     UnableToParseIsographLiterals {
         messages: Vec<WithLocation<IsographLiteralParseError>>,
@@ -416,7 +417,10 @@ pub enum BatchCompileError {
         } else {
             "Errors when processing client field declarations:"
         },
-        messages.into_iter().map(|x| format!("\n\n{x}")).collect::<String>()
+        messages.iter().fold(String::new(), |mut output, x| {
+            output.push_str(&format!("\n\n{}", x));
+            output
+        })
     )]
     ErrorWhenProcessingClientFieldDeclaration {
         messages: Vec<WithLocation<isograph_schema::ProcessClientFieldDeclarationError>>,
@@ -433,7 +437,10 @@ pub enum BatchCompileError {
     #[error(
         "{} when validating schema, client fields and entrypoint declarations.{}",
         if messages.len() == 1 { "Error" } else { "Errors" },
-        messages.into_iter().map(|x| format!("\n\n{x}")).collect::<String>()
+        messages.iter().fold(String::new(), |mut output, x| {
+            output.push_str(&format!("\n\n{}", x));
+            output
+        })
     )]
     UnableToValidateSchema {
         messages: Vec<WithLocation<isograph_schema::ValidateSchemaError>>,

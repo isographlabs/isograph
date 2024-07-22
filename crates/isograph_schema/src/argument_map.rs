@@ -22,9 +22,7 @@ impl ArgumentMap {
         Self {
             arguments: arguments
                 .into_iter()
-                .map(|with_location| {
-                    with_location.map(|argument| PotentiallyModifiedArgument::Unmodified(argument))
-                })
+                .map(|with_location| with_location.map(PotentiallyModifiedArgument::Unmodified))
                 .collect(),
         }
     }
@@ -95,16 +93,14 @@ impl ArgumentMap {
                         }
 
                         self.arguments.swap_remove(index_of_argument);
-                        let processed_field_map_item =
-                            ProcessedFieldMapItem(field_map_item.clone());
-                        processed_field_map_item
+
+                        ProcessedFieldMapItem(field_map_item.clone())
                     }
                     Some((first, rest)) => {
                         let mut arg =
                             ModifiedArgument::from_unmodified(unmodified_argument, schema);
 
-                        let _processed_field_map_item =
-                            arg.remove_to_field(schema, *first, rest, primary_type_name)?;
+                        arg.remove_to_field(schema, *first, rest, primary_type_name)?;
 
                         *argument =
                             WithLocation::new(PotentiallyModifiedArgument::Modified(arg), location);
@@ -253,7 +249,7 @@ impl ModifiedArgument {
         let argument_object = self.object.inner_mut();
 
         let key = first.lookup().intern().into();
-        let _ = match argument_object
+        match argument_object
             .field_map
             // TODO make this a no-op
             .get_mut(&key)

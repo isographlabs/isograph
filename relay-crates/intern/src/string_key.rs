@@ -50,6 +50,9 @@ impl StringKey {
         StringId::from_index_checked(index).map(Self)
     }
 
+    /// # Safety
+    ///
+    /// Unchecked version of [`from_index_checked`]. Users must make sure that the index is valid.
     pub unsafe fn from_index(index: u32) -> Self {
         Self(StringId::from_index(index))
     }

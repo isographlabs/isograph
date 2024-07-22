@@ -148,7 +148,7 @@ impl ValidatedSchema {
         if errors.is_empty() {
             let objects = objects
                 .into_iter()
-                .map(|object| transform_object_field_ids(object))
+                .map(transform_object_field_ids)
                 .collect();
 
             Ok(Self {
@@ -275,22 +275,21 @@ fn validate_and_transform_field(
             }
         };
 
-    let valid_arguments = match {
-        get_all_errors_or_all_ok(empty_field.arguments.into_iter().map(|arg| {
+    let valid_arguments =
+        match get_all_errors_or_all_ok(empty_field.arguments.into_iter().map(|arg| {
             validate_server_field_argument(
                 arg,
                 schema_data,
                 empty_field.parent_type_id,
                 empty_field.name,
             )
-        }))
-    } {
-        Ok(arguments) => Some(arguments),
-        Err(e) => {
-            errors.extend(e);
-            None
-        }
-    };
+        })) {
+            Ok(arguments) => Some(arguments),
+            Err(e) => {
+                errors.extend(e);
+                None
+            }
+        };
 
     if let Some(field_type) = field_type {
         if let Some(valid_arguments) = valid_arguments {
@@ -377,21 +376,19 @@ fn validate_client_field_selection_set(
     let selection_set = unvalidated_client_field
         .reader_selection_set
         .map(|selection_set| {
-            Ok::<_, WithLocation<ValidateSchemaError>>(
-                validate_client_field_definition_selections_exist_and_types_match(
-                    schema_data,
-                    selection_set,
-                    parent_object,
-                    server_fields,
-                )
-                .map_err(|err| {
-                    validate_selections_error_to_validate_schema_error(
-                        err,
-                        parent_object,
-                        unvalidated_client_field.name,
-                    )
-                })?,
+            validate_client_field_definition_selections_exist_and_types_match(
+                schema_data,
+                selection_set,
+                parent_object,
+                server_fields,
             )
+            .map_err(|err| {
+                validate_selections_error_to_validate_schema_error(
+                    err,
+                    parent_object,
+                    unvalidated_client_field.name,
+                )
+            })
         })
         .transpose()?;
 
@@ -537,7 +534,7 @@ fn validate_selections_error_to_validate_schema_error(
 
 type ValidateSelectionsResult<T> = Result<T, WithLocation<ValidateSelectionsError>>;
 
-#[allow(unused)]
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug)]
 enum ValidateSelectionsError {
     FieldDoesNotExist(IsographObjectTypeName, SelectableFieldName),
@@ -568,7 +565,7 @@ fn validate_client_field_definition_selections_exist_and_types_match(
     // Currently, we only check that each field exists and has an appropriate type, not that
     // there are no selection conflicts due to aliases or parameters.
 
-    Ok(selection_set
+    selection_set
         .into_iter()
         .map(|selection| {
             validate_client_field_definition_selection_exists_and_type_matches(
@@ -578,7 +575,7 @@ fn validate_client_field_definition_selections_exist_and_types_match(
                 server_fields,
             )
         })
-        .collect::<Result<_, _>>()?)
+        .collect::<Result<_, _>>()
 }
 
 fn validate_client_field_definition_selection_exists_and_type_matches(
@@ -681,7 +678,7 @@ fn validate_field_type_exists_and_is_linked(
     server_fields: &[UnvalidatedSchemaServerField],
 ) -> ValidateSelectionsResult<ValidatedLinkedFieldSelection> {
     let linked_field_name = linked_field_selection.name.item.into();
-    match (&parent_object.encountered_fields).get(&linked_field_name) {
+    match (parent_object.encountered_fields).get(&linked_field_name) {
         Some(defined_field_type) => match defined_field_type {
             FieldDefinitionLocation::Server(server_field_id) => {
                 let server_field = &server_fields[server_field_id.as_usize()];

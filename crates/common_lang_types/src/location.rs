@@ -22,7 +22,7 @@ impl TextSource {
         // TODO maybe intern these or somehow avoid reading a bajillion times.
         // This is especially important for when we display many errors.
         let file_path = self.path.lookup();
-        let file_contents = std::fs::read_to_string(&file_path).expect("file should exist");
+        let file_contents = std::fs::read_to_string(file_path).expect("file should exist");
         if let Some(span) = self.span {
             // TODO we're cloning here unnecessarily, I think!
             (file_path, file_contents[span.as_usize_range()].to_string())

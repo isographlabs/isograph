@@ -61,9 +61,6 @@ fn generate_normalization_ast_node(
                 indentation_level + 1,
             );
 
-            // TODO this is bad, name is a WithLocation which impl's Display
-            let name = name;
-
             format!(
                 "{indent}{{\n\
                 {indent_2}kind: \"Linked\",\n\

@@ -225,13 +225,13 @@ impl UnvalidatedSchema {
                                     let subtype_name =
                                         self.server_field_data.object(subtype_id).name;
 
-                                    return Err(WithLocation::new(
+                                    Err(WithLocation::new(
                                         ProcessTypeDefinitionError::ObjectIsScalar {
                                             type_name: supertype_name.item,
                                             implementing_object: subtype_name,
                                         },
                                         supertype_name.location,
-                                    ));
+                                    ))
                                 }
                                 SelectableServerFieldId::Object(supertype_object_id) => {
                                     Ok(*supertype_object_id)
@@ -267,7 +267,7 @@ impl UnvalidatedSchema {
                     // a way to execute GraphQL-specific code in isograph-land without actually
                     // putting the code here.)
 
-                    let value = subtypes.into_iter().map(|subtype_id| subtype_id).collect();
+                    let value = subtypes.into_iter().collect();
                     match supertype_to_subtype_map.entry(*supertype_object_id) {
                         Entry::Occupied(_) => {
                             panic!("Encountered duplicate supertype. This is indicative of a bug in Isograph.")
@@ -349,9 +349,7 @@ impl UnvalidatedSchema {
                             panic!("Adding interfaces in schema extensions is not allowed, yet.");
                         }
 
-                        schema_object
-                            .directives
-                            .extend(object_extension.directives.into_iter());
+                        schema_object.directives.extend(object_extension.directives);
 
                         Ok(())
                     }
@@ -384,8 +382,8 @@ impl UnvalidatedSchema {
         } = self;
         let next_object_id = schema_data.server_objects.len().into();
         let string_type_for_typename = schema_data.scalar(self.string_type_id).name;
-        let ref mut type_names = schema_data.defined_types;
-        let ref mut objects = schema_data.server_objects;
+        let type_names = &mut schema_data.defined_types;
+        let objects = &mut schema_data.server_objects;
         let encountered_root_kind = match type_names.entry(object_type_definition.name.item.into())
         {
             Entry::Occupied(_) => {
@@ -409,7 +407,7 @@ impl UnvalidatedSchema {
                     type_def_2.fields,
                     schema_fields.len(),
                     next_object_id,
-                    type_def_2.name.item.into(),
+                    type_def_2.name.item,
                     get_typename_type(string_type_for_typename.item),
                     may_have_id_field,
                     options,
@@ -481,8 +479,8 @@ impl UnvalidatedSchema {
             ..
         } = self;
         let next_scalar_id = schema_data.server_scalars.len().into();
-        let ref mut type_names = schema_data.defined_types;
-        let ref mut scalars = schema_data.server_scalars;
+        let type_names = &mut schema_data.defined_types;
+        let scalars = &mut schema_data.server_scalars;
         match type_names.entry(scalar_type_definition.name.item.into()) {
             Entry::Occupied(_) => {
                 return Err(WithLocation::new(
@@ -587,7 +585,7 @@ impl FieldMapItem {
 
         SplitToArg {
             to_argument_name: to_argument_name.intern().into(),
-            to_field_names: split.into_iter().map(|x| x.intern().into()).collect(),
+            to_field_names: split.map(|x| x.intern().into()).collect(),
         }
     }
 }
@@ -735,7 +733,7 @@ fn set_and_validate_id_field(
 
     match field.item.type_.inner_non_null_named_type() {
         Some(type_) => {
-            if (*type_).0.item.lookup() != ID_GRAPHQL_TYPE.lookup() {
+            if type_.0.item.lookup() != ID_GRAPHQL_TYPE.lookup() {
                 options.on_invalid_id_type.on_failure(|| {
                     WithLocation::new(
                         ProcessTypeDefinitionError::IdFieldMustBeNonNullIdType {

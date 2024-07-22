@@ -43,6 +43,9 @@ impl<'source> PeekableLexer<'source> {
     /// Get the next token (and advance)
     pub fn parse_token(&mut self) -> WithSpan<TokenKind> {
         // Skip over (and record) any invalid tokens until either a valid token or an EOF is encountered
+        //
+        // TODO: remove this allow after logic changed.
+        #[allow(clippy::never_loop)]
         loop {
             let kind = self.lexer.next().unwrap_or(TokenKind::EndOfFile);
             match kind {

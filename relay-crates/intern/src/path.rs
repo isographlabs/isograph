@@ -158,7 +158,7 @@ impl PathNode {
     }
 
     /// Linearize this path as a PathBuf.
-    fn to_path_buf(&self) -> PathBuf {
+    fn to_path_buf(self) -> PathBuf {
         let mut path = match self.parent {
             Some(parent) => parent.to_path_buf(),
             None => PathBuf::new(),

@@ -80,9 +80,7 @@ impl MergedServerSelection {
     }
 }
 
-fn get_variables<'a>(
-    arguments: &'a [SelectionFieldArgument],
-) -> impl Iterator<Item = VariableName> + 'a {
+fn get_variables(arguments: &[SelectionFieldArgument]) -> impl Iterator<Item = VariableName> + '_ {
     arguments.iter().flat_map(|arg| match arg.value.item {
         isograph_lang_types::NonConstantValue::Variable(v) => Some(v),
         _ => None,
@@ -365,17 +363,15 @@ pub fn get_imperatively_loaded_artifact_info(
         client_field_id: _,
     } = path_to_refetch_field_info;
 
-    let artifact_info = process_imperatively_loaded_field(
+    process_imperatively_loaded_field(
         schema,
         imperatively_loaded_field_variant,
         refetch_field_parent_id,
         nested_selection_map,
         entrypoint,
         index,
-        &reachable_variables,
-    );
-
-    artifact_info
+        reachable_variables,
+    )
 }
 
 pub fn get_reachable_variables(selection_map: &MergedSelectionMap) -> BTreeSet<VariableName> {
@@ -401,12 +397,11 @@ fn process_imperatively_loaded_field(
         primary_field_info,
         root_object_id,
     } = variant;
-    let client_field_scalar_selection_name = client_field_scalar_selection_name;
     // This could be Pet
     let refetch_field_parent_type = schema.server_field_data.object(refetch_field_parent_id);
 
     let mut definitions_of_used_variables =
-        get_used_variable_definitions(&reachable_variables, entrypoint);
+        get_used_variable_definitions(reachable_variables, entrypoint);
 
     let requires_refinement = if primary_field_info
         .as_ref()
@@ -518,13 +513,15 @@ fn get_used_variable_definitions(
                         .variable_definitions
                         .iter()
                         .find(|definition| definition.item.name.item == *variable_name)
-                        .expect(&format!(
-                            "Did not find matching variable definition. \
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "Did not find matching variable definition. \
                             This might not be validated yet. For now, each client field \
                             containing a __refetch field must re-defined all used variables. \
                             Client field {} is missing variable definition {}",
-                            entrypoint.name, variable_name
-                        ))
+                                entrypoint.name, variable_name
+                            )
+                        })
                         .clone(),
                 )
             }
@@ -781,6 +778,7 @@ fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn merge_scalar_client_field(
     parent_type: &SchemaObject,
     schema: &ValidatedSchema,
@@ -799,7 +797,7 @@ fn merge_scalar_client_field(
     } = create_merged_selection_map_and_insert_into_global_map(
         schema,
         parent_type,
-        &*newly_encountered_scalar_client_field.selection_set_for_parent_query(),
+        newly_encountered_scalar_client_field.selection_set_for_parent_query(),
         global_client_field_map,
         newly_encountered_scalar_client_field,
         was_selected_loadably,
@@ -1020,7 +1018,7 @@ pub fn selection_map_wrapped(
     top_level_selection_set
 }
 
-fn is_typename_selection<'a>(selection: &'a &MergedServerSelection) -> bool {
+fn is_typename_selection(selection: &MergedServerSelection) -> bool {
     if let MergedServerSelection::ScalarField(s) = &selection {
         s.name == *TYPENAME_FIELD_NAME
     } else {
@@ -1029,7 +1027,7 @@ fn is_typename_selection<'a>(selection: &'a &MergedServerSelection) -> bool {
 }
 
 fn maybe_add_typename_selection(selections: &mut MergedSelectionMap) {
-    let has_typename = selections.values().find(is_typename_selection).is_some();
+    let has_typename = selections.values().any(is_typename_selection);
     if !has_typename {
         // This should be first, so this a huge bummer
         selections.insert(

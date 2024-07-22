@@ -739,8 +739,8 @@ fn parse_constant_value(
                     let without_quotes = with_quotes.map(|string_literal| {
                         let inner_str = &string_literal.lookup();
                         let len = inner_str.len();
-                        let without_quotes = (&inner_str[1..(len - 1)]).intern().into();
-                        without_quotes
+
+                        (&inner_str[1..(len - 1)]).intern().into()
                     });
                     without_quotes.map(ConstantValue::String)
                 })
@@ -772,7 +772,7 @@ fn parse_constant_value(
         to_control_flow(|| {
             tokens
                 .parse_string_key_type(TokenKind::Identifier)
-                .map(|x| x.map(|s| ConstantValue::Enum(s)))
+                .map(|x| x.map(ConstantValue::Enum))
                 .map(|x| x.to_with_location(text_source))
         })?;
 
@@ -840,8 +840,8 @@ fn from_control_flow<T, E>(control_flow: impl FnOnce() -> ControlFlow<T, E>) -> 
     }
 }
 
-fn parse_optional_fields<'a>(
-    tokens: &mut PeekableLexer<'a>,
+fn parse_optional_fields(
+    tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
 ) -> ParseResult<Vec<WithLocation<GraphQLFieldDefinition>>> {
     let brace = tokens.parse_token_of_kind(TokenKind::OpenBrace);
@@ -858,8 +858,8 @@ fn parse_optional_fields<'a>(
     Ok(fields)
 }
 
-fn parse_field<'a>(
-    tokens: &mut PeekableLexer<'a>,
+fn parse_field(
+    tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
 ) -> ParseResult<WithLocation<GraphQLFieldDefinition>> {
     let with_span = tokens
@@ -975,8 +975,8 @@ fn parse_optional_enclosed_items<'a, T>(
     }
 }
 
-fn parse_argument_definition<'a>(
-    tokens: &mut PeekableLexer<'a>,
+fn parse_argument_definition(
+    tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
 ) -> ParseResult<WithSpan<GraphQLInputValueDefinition>> {
     tokens
@@ -1004,8 +1004,8 @@ fn parse_argument_definition<'a>(
         .transpose()
 }
 
-fn parse_optional_constant_default_value<'a>(
-    tokens: &mut PeekableLexer<'a>,
+fn parse_optional_constant_default_value(
+    tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
 ) -> ParseResult<Option<WithLocation<ConstantValue>>> {
     let equal = tokens.parse_token_of_kind(TokenKind::Equals);
