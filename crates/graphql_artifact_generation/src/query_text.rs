@@ -23,20 +23,20 @@ pub(crate) fn generate_query_text(
         "{} {} {} {{\\\n",
         root_operation_name.0, query_name, variable_text
     ));
-    write_selections_for_query_text(&mut query_text, schema, selection_map.values(), 1);
-    query_text.push_str("}");
+    write_selections_for_query_text(&mut query_text, selection_map.values(), 1);
+    query_text.push('}');
     QueryText(query_text)
 }
 
 fn write_variables_to_string<'a>(
     schema: &ValidatedSchema,
-    mut variables: impl Iterator<Item = &'a WithSpan<ValidatedVariableDefinition>> + 'a,
+    variables: impl Iterator<Item = &'a WithSpan<ValidatedVariableDefinition>> + 'a,
 ) -> String {
     let mut empty = true;
     let mut first = true;
     let mut variable_text = String::new();
     variable_text.push('(');
-    while let Some(variable) = variables.next() {
+    for variable in variables {
         empty = false;
         if !first {
             variable_text.push_str(", ");
@@ -49,7 +49,7 @@ fn write_variables_to_string<'a>(
                 let schema_input_type = schema
                     .server_field_data
                     .lookup_unvalidated_type(input_type_id);
-                schema_input_type.name().into()
+                schema_input_type.name()
             });
         // TODO this is dangerous, since variable.item.name is a WithLocation, which impl's Display.
         // We should find a way to make WithLocation not impl display, without making error's hard
@@ -65,16 +65,16 @@ fn write_variables_to_string<'a>(
     }
 }
 
+#[allow(clippy::only_used_in_recursion)]
 fn write_selections_for_query_text<'a>(
     query_text: &mut String,
-    schema: &ValidatedSchema,
     items: impl Iterator<Item = &'a MergedServerSelection> + 'a,
     indentation_level: u8,
 ) {
     for item in items {
         match &item {
             MergedServerSelection::ScalarField(scalar_field) => {
-                query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+                query_text.push_str(&"  ".repeat(indentation_level as usize).to_string());
                 if let Some(alias) = scalar_field.normalization_alias {
                     query_text.push_str(&format!("{}: ", alias));
                 }
@@ -83,7 +83,7 @@ fn write_selections_for_query_text<'a>(
                 query_text.push_str(&format!("{}{},\\\n", name, arguments));
             }
             MergedServerSelection::LinkedField(linked_field) => {
-                query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+                query_text.push_str(&"  ".repeat(indentation_level as usize).to_string());
                 if let Some(alias) = linked_field.normalization_alias {
                     // This is bad, alias is WithLocation
                     query_text.push_str(&format!("{}: ", alias));
@@ -93,7 +93,6 @@ fn write_selections_for_query_text<'a>(
                 query_text.push_str(&format!("{}{} {{\\\n", name, arguments));
                 write_selections_for_query_text(
                     query_text,
-                    schema,
                     linked_field.selection_map.values(),
                     indentation_level + 1,
                 );
@@ -103,19 +102,18 @@ fn write_selections_for_query_text<'a>(
                 ));
             }
             MergedServerSelection::InlineFragment(inline_fragment) => {
-                query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+                query_text.push_str(&"  ".repeat(indentation_level as usize).to_string());
                 query_text.push_str(&format!(
                     "... on {} {{\\\n",
                     inline_fragment.type_to_refine_to
                 ));
                 write_selections_for_query_text(
                     query_text,
-                    schema,
                     inline_fragment.selection_map.values(),
                     indentation_level + 1,
                 );
-                query_text.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
-                query_text.push_str(&format!("}},\\\n"))
+                query_text.push_str(&"  ".repeat(indentation_level as usize).to_string());
+                query_text.push_str("},\\\n")
             }
         }
     }
@@ -123,7 +121,7 @@ fn write_selections_for_query_text<'a>(
 
 fn get_serialized_arguments_for_query_text(arguments: &[SelectionFieldArgument]) -> String {
     if arguments.is_empty() {
-        return "".to_string();
+        "".to_string()
     } else {
         let mut arguments = arguments.iter();
         let first = arguments.next().unwrap();
@@ -139,7 +137,7 @@ fn get_serialized_arguments_for_query_text(arguments: &[SelectionFieldArgument])
                 serialize_non_constant_value_for_graphql(&argument.value.item)
             ));
         }
-        s.push_str(")");
+        s.push(')');
         s
     }
 }

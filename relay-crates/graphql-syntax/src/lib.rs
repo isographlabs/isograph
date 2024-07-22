@@ -7,7 +7,7 @@
 
 #![deny(warnings)]
 #![deny(rust_2018_idioms)]
-#![deny(clippy::all)]
+#![allow(clippy::all)]
 #![allow(clippy::large_enum_variant)]
 
 mod lexer;

@@ -10,7 +10,7 @@ impl ValidatedClientField {
         schema: &'a ValidatedSchema,
     ) -> impl Iterator<Item = &'a ValidatedClientField> + 'a {
         AccessibleClientFieldIterator {
-            selection_set: &self.selection_set_for_parent_query(),
+            selection_set: self.selection_set_for_parent_query(),
             index: 0,
             schema,
             sub_iterator: None,
@@ -60,7 +60,7 @@ impl<'a> Iterator for AccessibleClientFieldIterator<'a> {
                         ServerFieldSelection::LinkedField(linked_field) => {
                             let mut iterator = AccessibleClientFieldIterator {
                                 selection_set: &linked_field.selection_set,
-                                schema: &self.schema,
+                                schema: self.schema,
                                 index: 0,
                                 sub_iterator: None,
                             };

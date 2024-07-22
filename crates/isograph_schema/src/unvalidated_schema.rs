@@ -60,6 +60,12 @@ pub type UnvalidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
 pub(crate) type UnvalidatedSchemaServerField =
     SchemaServerField<GraphQLTypeAnnotation<SelectableServerFieldId>>;
 
+impl Default for UnvalidatedSchema {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UnvalidatedSchema {
     pub fn new() -> Self {
         // TODO add __typename
@@ -141,7 +147,7 @@ fn add_schema_defined_scalar_type(
     });
     defined_types.insert(
         typename.item.into(),
-        SelectableServerFieldId::Scalar(scalar_id.into()),
+        SelectableServerFieldId::Scalar(scalar_id),
     );
     scalar_id
 }

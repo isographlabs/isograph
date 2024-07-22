@@ -28,7 +28,7 @@ pub async fn handle_watch_command(
     for extension in &config.schema_extensions {
         watcher
             .watcher()
-            .watch(&extension, RecursiveMode::Recursive)
+            .watch(extension, RecursiveMode::Recursive)
             .expect("Failing when watching schema extension");
     }
 
@@ -68,6 +68,7 @@ fn any_modified_path_is_outside_artifact_directory(
     false
 }
 
+#[allow(clippy::complexity)]
 fn create_debounced_file_watcher() -> (
     Receiver<Result<Vec<DebouncedEvent>, Vec<Error>>>,
     Debouncer<RecommendedWatcher, FileIdMap>,

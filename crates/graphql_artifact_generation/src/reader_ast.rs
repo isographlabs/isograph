@@ -47,7 +47,7 @@ fn generate_reader_ast_node(
                 }
             }
             ServerFieldSelection::LinkedField(linked_field) => {
-                path.push(into_name_and_arguments(&linked_field));
+                path.push(into_name_and_arguments(linked_field));
 
                 let inner_reader_ast = generate_reader_ast_with_path(
                     schema,
@@ -169,7 +169,7 @@ fn user_written_variant_ast_node(
         refetched_paths_for_client_field(nested_client_field, schema, path);
 
     let nested_refetch_queries = get_nested_refetch_query_text(
-        &root_refetched_paths,
+        root_refetched_paths,
         &paths_to_refetch_field_in_client_field,
     );
 
@@ -204,6 +204,7 @@ fn user_written_variant_ast_node(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn imperatively_loaded_variant_ast_node(
     schema: &ValidatedSchema,
     nested_client_field: &ValidatedClientField,
@@ -257,7 +258,7 @@ fn imperatively_loaded_variant_ast_node(
     let paths_to_refetch_field_in_client_field =
         refetched_paths_for_client_field(nested_client_field, schema, path);
     let nested_refetch_queries = get_nested_refetch_query_text(
-        &root_refetched_paths,
+        root_refetched_paths,
         &paths_to_refetch_field_in_client_field,
     );
 
@@ -321,7 +322,7 @@ fn generate_reader_ast_with_path<'schema>(
             schema,
             indentation_level + 1,
             nested_client_field_imports,
-            &root_refetched_paths,
+            root_refetched_paths,
             path,
         );
         reader_ast.push_str(&s);
@@ -358,7 +359,7 @@ fn get_nested_refetch_query_text(
             This is indicative of a bug in Isograph."
         );
     }
-    s.push_str("]");
+    s.push(']');
     s
 }
 
@@ -371,7 +372,7 @@ fn find_imperatively_fetchable_query_index(
         .iter()
         .enumerate()
         .find_map(|(index, ((path, _), root_refetch_path))| {
-            if &path.linked_fields == outer_path
+            if path.linked_fields == outer_path
                 && root_refetch_path.field_name == imperatively_fetchable_field_name
             {
                 Some(RefetchQueryIndex(index as u32))
@@ -413,7 +414,7 @@ fn refetched_paths_for_client_field(
     // the client field may have a refetch query at baz.__refetch. In this case,
     // this method would return something containing foo.bar.baz.__refetch
     let path_set = refetched_paths_with_path(
-        &*nested_client_field.selection_set_for_parent_query(),
+        nested_client_field.selection_set_for_parent_query(),
         schema,
         path,
     );
@@ -461,7 +462,7 @@ fn refetched_paths_with_path(
                                     // For non-refetch fields, we need to recurse into the selection set
                                     // (if there is one)
                                     let new_paths = refetched_paths_with_path(
-                                        &*client_field.selection_set_for_parent_query(),
+                                        client_field.selection_set_for_parent_query(),
                                         schema,
                                         path,
                                     );

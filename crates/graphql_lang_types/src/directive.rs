@@ -172,7 +172,7 @@ impl<'de> Deserializer<'de> for ConstantValueDeserializer<'de> {
                 visitor.visit_seq(seq_access)
             }
             ConstantValue::Object(obj) => {
-                let serializer = NameValuePairVecDeserializer::new(&obj);
+                let serializer = NameValuePairVecDeserializer::new(obj);
                 visitor.visit_map(serializer)
             }
         }

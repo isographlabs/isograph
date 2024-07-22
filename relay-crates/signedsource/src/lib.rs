@@ -7,7 +7,7 @@
 
 #![deny(warnings)]
 #![deny(rust_2018_idioms)]
-#![deny(clippy::all)]
+#![allow(clippy::all)]
 
 use lazy_static::lazy_static;
 use md5::Digest;

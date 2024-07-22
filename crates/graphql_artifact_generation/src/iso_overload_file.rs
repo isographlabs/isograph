@@ -8,7 +8,7 @@ use isograph_schema::{
 
 use crate::generate_artifacts::ISO_TS;
 
-fn build_iso_overload_for_entrypoint<'schema>(
+fn build_iso_overload_for_entrypoint(
     validated_client_field: &ValidatedClientField,
 ) -> (String, String) {
     let mut s: String = "".to_string();
@@ -71,9 +71,7 @@ export function iso<T>(
     (import, s)
 }
 
-pub(crate) fn build_iso_overload<'schema>(
-    schema: &'schema ValidatedSchema,
-) -> ArtifactPathAndContent {
+pub(crate) fn build_iso_overload(schema: &ValidatedSchema) -> ArtifactPathAndContent {
     let mut imports = "import type {IsographEntrypoint} from '@isograph/react';\n".to_string();
     let mut content = String::from(
         "
@@ -225,13 +223,13 @@ fn sort_field_name(field_1: SelectableFieldName, field_2: SelectableFieldName) -
     } else if field_2.starts_with(field_1) {
         Ordering::Greater
     } else {
-        field_1.cmp(&field_2)
+        field_1.cmp(field_2)
     }
 }
 
-fn user_written_fields<'a>(
-    schema: &'a ValidatedSchema,
-) -> impl Iterator<Item = (&'a ValidatedClientField, UserWrittenComponentVariant)> + 'a {
+fn user_written_fields(
+    schema: &ValidatedSchema,
+) -> impl Iterator<Item = (&ValidatedClientField, UserWrittenComponentVariant)> + '_ {
     schema
         .client_fields
         .iter()

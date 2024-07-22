@@ -34,7 +34,7 @@ impl UnvalidatedSchema {
         let parent_type_id = self
             .server_field_data
             .defined_types
-            .get(&parent_type.item.into())
+            .get(&parent_type.item)
             .ok_or(WithLocation::new(
                 ValidateEntrypointDeclarationError::ParentTypeNotDefined {
                     parent_type_name: parent_type.item,
@@ -50,8 +50,8 @@ impl UnvalidatedSchema {
                             parent_type_name: parent_type.item,
                             fetchable_types: self
                                 .fetchable_types
-                                .iter()
-                                .map(|(object_id, _)| {
+                                .keys()
+                                .map(|object_id| {
                                     self.server_field_data.object(*object_id).name.to_string()
                                 })
                                 .collect::<Vec<_>>()

@@ -1,9 +1,3 @@
-use std::{
-    collections::{BTreeMap, HashSet},
-    fmt::{self, Debug, Display},
-    path::PathBuf,
-};
-
 use common_lang_types::{
     ArtifactFileType, ArtifactPathAndContent, DescriptionValue, IsographObjectTypeName,
     SelectableFieldName, WithSpan,
@@ -19,6 +13,12 @@ use isograph_schema::{
     UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema, ValidatedSelection,
 };
 use lazy_static::lazy_static;
+use std::path::Path;
+use std::{
+    collections::{BTreeMap, HashSet},
+    fmt::{self, Debug, Display},
+    path::PathBuf,
+};
 
 use crate::{
     eager_reader_artifact::{
@@ -63,10 +63,10 @@ lazy_static! {
 /// Also, for each user-written resolver, we must generate a param_type artifact.
 /// For each resolver that is reachable from a reader, we must also generate an
 /// output_type artifact.
-pub fn get_artifact_path_and_content<'schema>(
-    schema: &'schema ValidatedSchema,
-    project_root: &PathBuf,
-    artifact_directory: &PathBuf,
+pub fn get_artifact_path_and_content(
+    schema: &ValidatedSchema,
+    project_root: &Path,
+    artifact_directory: &Path,
 ) -> Vec<ArtifactPathAndContent> {
     let mut global_client_field_map = BTreeMap::new();
     let mut path_and_contents = vec![];
@@ -238,24 +238,23 @@ pub(crate) fn get_serialized_field_arguments(
 }
 
 pub(crate) fn generate_output_type(client_field: &ValidatedClientField) -> ClientFieldOutputType {
-    match &client_field.variant {
-        variant => match variant {
-            ClientFieldVariant::UserWritten(info) => match info.user_written_component_variant {
-                UserWrittenComponentVariant::Eager => {
-                    ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
-                }
-                UserWrittenComponentVariant::Component => ClientFieldOutputType(
-                    "(React.FC<ExtractSecondParam<typeof resolver>>)".to_string(),
-                ),
-            },
-            ClientFieldVariant::ImperativelyLoadedField(params) => {
-                // N.B. the string is a stable id for deduplicating
-                match params.primary_field_info {
-                    Some(_) => ClientFieldOutputType("[string, (params: any) => void]".to_string()),
-                    None => ClientFieldOutputType("[string, () => void]".to_string()),
-                }
+    let variant = &client_field.variant;
+    match variant {
+        ClientFieldVariant::UserWritten(info) => match info.user_written_component_variant {
+            UserWrittenComponentVariant::Eager => {
+                ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
+            }
+            UserWrittenComponentVariant::Component => {
+                ClientFieldOutputType("(React.FC<ExtractSecondParam<typeof resolver>>)".to_string())
             }
         },
+        ClientFieldVariant::ImperativelyLoadedField(params) => {
+            // N.B. the string is a stable id for deduplicating
+            match params.primary_field_info {
+                Some(_) => ClientFieldOutputType("[string, (params: any) => void]".to_string()),
+                None => ClientFieldOutputType("[string, () => void]".to_string()),
+            }
+        }
     }
 }
 
@@ -307,7 +306,7 @@ fn write_query_types_from_selection(
                 match scalar_field.associated_data.location {
                     FieldDefinitionLocation::Server(_server_field) => {
                         query_type_declaration
-                            .push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+                            .push_str(&"  ".repeat(indentation_level as usize).to_string());
                         let parent_field = parent_type
                             .encountered_fields
                             .get(&scalar_field.name.item.into())
@@ -349,7 +348,7 @@ fn write_query_types_from_selection(
                             indentation_level,
                         );
                         query_type_declaration
-                            .push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+                            .push_str(&"  ".repeat(indentation_level as usize).to_string());
 
                         nested_client_field_imports.insert(client_field.type_and_field);
                         let inner_output_type = format!(
@@ -384,7 +383,7 @@ fn write_query_types_from_selection(
                     indentation_level,
                 );
                 query_type_declaration
-                    .push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+                    .push_str(&"  ".repeat(indentation_level as usize).to_string());
                 let name_or_alias = linked_field.name_or_alias().item;
                 let type_annotation = field.associated_data.clone().map(|output_type_id| {
                     let object_id = output_type_id.try_into().expect(
@@ -392,15 +391,14 @@ fn write_query_types_from_selection(
                         This is indicative of a bug in Isograph.",
                     );
                     let object = schema.server_field_data.object(object_id);
-                    let inner = generate_client_field_parameter_type(
+                    generate_client_field_parameter_type(
                         schema,
                         &linked_field.selection_set,
-                        object.into(),
+                        object,
                         nested_client_field_imports,
                         indentation_level,
                         loadable_field_encountered,
-                    );
-                    inner
+                    )
                 });
                 query_type_declaration.push_str(&format!(
                     "{}: {},\n",
@@ -418,11 +416,11 @@ fn write_optional_description(
     indentation_level: u8,
 ) {
     if let Some(description) = description {
-        query_type_declaration.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+        query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
         query_type_declaration.push_str("/**\n");
         query_type_declaration.push_str(description.lookup());
-        query_type_declaration.push_str("\n");
-        query_type_declaration.push_str(&format!("{}", "  ".repeat(indentation_level as usize)));
+        query_type_declaration.push('\n');
+        query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
         query_type_declaration.push_str("*/\n");
     }
 }
@@ -439,7 +437,7 @@ fn print_type_annotation_impl<T: Display>(
 ) {
     match &type_annotation {
         GraphQLTypeAnnotation::Named(named) => {
-            s.push_str("(");
+            s.push('(');
             s.push_str(&named.item.to_string());
             s.push_str(" | null)");
         }
@@ -453,7 +451,7 @@ fn print_type_annotation_impl<T: Display>(
 }
 
 fn print_list_type_annotation<T: Display>(list: &ListTypeAnnotation<T>, s: &mut String) {
-    s.push_str("(");
+    s.push('(');
     print_type_annotation_impl(&list.0, s);
     s.push_str(")[]");
 }
@@ -502,10 +500,6 @@ derive_display!(ReaderAst);
 #[derive(Debug)]
 pub(crate) struct NormalizationAstText(pub String);
 derive_display!(NormalizationAstText);
-
-#[derive(Debug)]
-pub(crate) struct ConvertFunction(pub String);
-derive_display!(ConvertFunction);
 
 #[derive(Debug)]
 pub(crate) struct RefetchQueryArtifactImport(pub String);

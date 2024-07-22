@@ -7,7 +7,7 @@
 
 #![deny(warnings)]
 #![deny(rust_2018_idioms)]
-#![deny(clippy::all)]
+#![allow(clippy::all)]
 
 //! This crate aims to make it easy to write integration tests for any function
 //! that transforms an input string to some output string.

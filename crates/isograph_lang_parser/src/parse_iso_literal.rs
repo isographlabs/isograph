@@ -113,13 +113,13 @@ fn parse_iso_client_field_declaration(
     Ok(client_field_declaration)
 }
 
-fn parse_client_field_declaration_inner<'a>(
-    tokens: &mut PeekableLexer<'a>,
+fn parse_client_field_declaration_inner(
+    tokens: &mut PeekableLexer<'_>,
     definition_file_path: FilePath,
     const_export_name: Option<&str>,
     text_source: TextSource,
 ) -> ParseResultWithSpan<WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>> {
-    let client_field_declaration = tokens
+    tokens
         .with_span(|tokens| {
             let parent_type = tokens
                 .parse_string_key_type(IsographLangTokenKind::Identifier)
@@ -144,7 +144,7 @@ fn parse_client_field_declaration_inner<'a>(
             let const_export_name = const_export_name.ok_or_else(|| {
                 WithSpan::new(
                     IsographLiteralParseError::ExpectedLiteralToBeExported {
-                        suggested_const_export_name: client_field_name.item.into(),
+                        suggested_const_export_name: client_field_name.item,
                     },
                     Span::todo_generated(),
                 )
@@ -168,14 +168,15 @@ fn parse_client_field_declaration_inner<'a>(
                 variable_definitions,
             })
         })
-        .transpose();
-
-    client_field_declaration
+        .transpose()
 }
 
 // Note: for now, top-level selection sets are required
-fn parse_selection_set_and_unwraps<'a>(
-    tokens: &mut PeekableLexer<'a>,
+//
+// TODO: perform some refactor to make type easier to read.
+#[allow(clippy::type_complexity)]
+fn parse_selection_set_and_unwraps(
+    tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
 ) -> ParseResultWithSpan<(
     Vec<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>>,
@@ -195,8 +196,8 @@ fn parse_selection_set_and_unwraps<'a>(
 }
 
 // TODO this should not parse an optional selection set, but a required one
-fn parse_optional_selection_set<'a>(
-    tokens: &mut PeekableLexer<'a>,
+fn parse_optional_selection_set(
+    tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
 ) -> ParseResultWithSpan<Option<Vec<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>>>> {
     let open_brace = tokens.parse_token_of_kind(IsographLangTokenKind::OpenBrace);
@@ -258,13 +259,12 @@ fn parse_delimited_list<'a, TResult>(
     Ok(items)
 }
 
-fn parse_comma_line_break_or_curly<'a>(tokens: &mut PeekableLexer<'a>) -> ParseResultWithSpan<()> {
+fn parse_comma_line_break_or_curly(tokens: &mut PeekableLexer<'_>) -> ParseResultWithSpan<()> {
     let comma = tokens.parse_token_of_kind(IsographLangTokenKind::Comma);
-    if comma.is_ok() {
-        Ok(())
-    } else if tokens.source(tokens.white_space_span()).contains('\n') {
-        Ok(())
-    } else if matches!(tokens.peek().item, IsographLangTokenKind::CloseBrace) {
+    if comma.is_ok()
+        || tokens.source(tokens.white_space_span()).contains('\n')
+        || matches!(tokens.peek().item, IsographLangTokenKind::CloseBrace)
+    {
         Ok(())
     } else {
         Err(WithSpan::new(
@@ -274,8 +274,8 @@ fn parse_comma_line_break_or_curly<'a>(tokens: &mut PeekableLexer<'a>) -> ParseR
     }
 }
 
-fn parse_selection<'a>(
-    tokens: &mut PeekableLexer<'a>,
+fn parse_selection(
+    tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
 ) -> ParseResultWithSpan<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>> {
     tokens

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::Deserialize;
 
-pub static ISOGRAPH_FOLDER: &'static str = "__isograph";
+pub static ISOGRAPH_FOLDER: &str = "__isograph";
 
 use std::error::Error;
 
@@ -108,28 +108,34 @@ pub fn create_config(mut config_location: PathBuf) -> CompilerConfig {
                 .as_ref()
                 .unwrap_or(&config_parsed.project_root),
         )
-        .join(&*ISOGRAPH_FOLDER);
+        .join(ISOGRAPH_FOLDER);
     std::fs::create_dir_all(&artifact_dir).expect("Unable to create artifact directory");
 
     let project_root_dir = config_dir.join(&config_parsed.project_root);
     std::fs::create_dir_all(&project_root_dir).expect("Unable to create project root directory");
 
     CompilerConfig {
-        project_root: project_root_dir.canonicalize().expect(&format!(
-            "Unable to canonicalize project root at {:?}.",
-            config_parsed.project_root
-        )),
-        artifact_directory: artifact_dir.canonicalize().expect(&format!(
-            "Unable to canonicalize artifact directory at {:?}.",
-            config_parsed.artifact_directory
-        )),
+        project_root: project_root_dir.canonicalize().unwrap_or_else(|_| {
+            panic!(
+                "Unable to canonicalize project root at {:?}.",
+                config_parsed.project_root
+            )
+        }),
+        artifact_directory: artifact_dir.canonicalize().unwrap_or_else(|_| {
+            panic!(
+                "Unable to canonicalize artifact directory at {:?}.",
+                config_parsed.artifact_directory
+            )
+        }),
         schema: config_dir
             .join(&config_parsed.schema)
             .canonicalize()
-            .expect(&format!(
-                "Unable to canonicalize schema path. Does {:?} exist?",
-                config_parsed.schema
-            )),
+            .unwrap_or_else(|_| {
+                panic!(
+                    "Unable to canonicalize schema path. Does {:?} exist?",
+                    config_parsed.schema
+                )
+            }),
         schema_extensions: config_parsed
             .schema_extensions
             .into_iter()
@@ -137,10 +143,12 @@ pub fn create_config(mut config_location: PathBuf) -> CompilerConfig {
                 config_dir
                     .join(&schema_extension)
                     .canonicalize()
-                    .expect(&format!(
-                        "Unable to canonicalize schema extension path. Does {:?} exist?",
-                        schema_extension
-                    ))
+                    .unwrap_or_else(|_| {
+                        panic!(
+                            "Unable to canonicalize schema extension path. Does {:?} exist?",
+                            schema_extension
+                        )
+                    })
             })
             .collect(),
         options: create_options(config_parsed.options),

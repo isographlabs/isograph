@@ -7,19 +7,19 @@ use std::{
 use common_lang_types::ArtifactPathAndContent;
 use thiserror::Error;
 
-pub(crate) fn write_to_disk<'schema>(
+pub(crate) fn write_to_disk(
     paths_and_contents: impl Iterator<Item = ArtifactPathAndContent>,
     artifact_directory: &PathBuf,
 ) -> Result<usize, GenerateArtifactsError> {
     if artifact_directory.exists() {
-        fs::remove_dir_all(&artifact_directory).map_err(|e| {
+        fs::remove_dir_all(artifact_directory).map_err(|e| {
             GenerateArtifactsError::UnableToDeleteDirectory {
                 path: artifact_directory.clone(),
                 message: e,
             }
         })?;
     }
-    fs::create_dir_all(&artifact_directory).map_err(|e| {
+    fs::create_dir_all(artifact_directory).map_err(|e| {
         GenerateArtifactsError::UnableToCreateDirectory {
             path: artifact_directory.clone(),
             message: e,
@@ -57,6 +57,7 @@ pub(crate) fn write_to_disk<'schema>(
     Ok(count)
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Error)]
 pub enum GenerateArtifactsError {
     #[error("Unable to write to artifact file at path {path:?}.\nReason: {message:?}")]

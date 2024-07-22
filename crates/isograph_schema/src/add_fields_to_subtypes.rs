@@ -33,9 +33,10 @@ impl UnvalidatedSchema {
                         crate::FieldDefinitionLocation::Client(_) => {
                             let subtype = self.server_field_data.object_mut(*subtype_id);
 
-                            if let Some(_) = subtype
+                            if subtype
                                 .encountered_fields
-                                .insert(*supertype_field_name, defined_field.clone())
+                                .insert(*supertype_field_name, *defined_field)
+                                .is_some()
                             {
                                 return Err(WithLocation::new(
                                     ProcessTypeDefinitionError::FieldExistsOnSubtype {

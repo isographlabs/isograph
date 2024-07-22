@@ -44,7 +44,7 @@ pub(crate) fn generate_refetch_reader_artifact(
                 )
                 .refetch_selection_set()
         } else {
-            &*client_field.selection_set_for_parent_query()
+            client_field.selection_set_for_parent_query()
         },
         0,
         &scalar_client_field_traversal_state.refetch_paths,
@@ -107,7 +107,7 @@ pub(crate) fn generate_refetch_output_type_artifact(
 }
 
 fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctionImportStatement {
-    let include_read_out_data = get_read_out_data(&vec![FieldMapItem {
+    let include_read_out_data = get_read_out_data(&[FieldMapItem {
         from: "id".intern().into(),
         to: "id".intern().into(),
     }]);
@@ -152,7 +152,7 @@ fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctio
 fn generate_function_import_statement_for_mutation_reader(
     field_map: &[FieldMapItem],
 ) -> ClientFieldFunctionImportStatement {
-    let include_read_out_data = get_read_out_data(&field_map);
+    let include_read_out_data = get_read_out_data(field_map);
     let indent = "  ";
     ClientFieldFunctionImportStatement(format!(
         "{include_read_out_data}\n\

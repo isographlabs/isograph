@@ -29,10 +29,10 @@ struct EntrypointArtifactInfo<'schema> {
     refetch_query_artifact_import: RefetchQueryArtifactImport,
 }
 
-pub(crate) fn generate_entrypoint_artifacts<'a>(
+pub(crate) fn generate_entrypoint_artifacts(
     schema: &ValidatedSchema,
     entrypoint_id: ClientFieldId,
-    global_client_field_map: &'a mut ClientFieldToCompletedMergeTraversalStateMap,
+    global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
 ) -> Vec<ArtifactPathAndContent> {
     let entrypoint = schema.client_field(entrypoint_id);
 
@@ -46,7 +46,7 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
     } = create_merged_selection_map_and_insert_into_global_map(
         schema,
         schema.server_field_data.object(entrypoint.parent_object_id),
-        &*entrypoint.selection_set_for_parent_query(),
+        entrypoint.selection_set_for_parent_query(),
         global_client_field_map,
         entrypoint,
         false,
@@ -98,7 +98,7 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
                 }
             };
 
-            let reachable_variables = get_reachable_variables(&current_target_merged_selections);
+            let reachable_variables = get_reachable_variables(current_target_merged_selections);
             (
                 root_refetch_path.clone(),
                 current_target_merged_selections,
@@ -116,7 +116,7 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
     let mut paths_and_contents = vec![EntrypointArtifactInfo {
         query_text,
         query_name,
-        parent_type: parent_object.into(),
+        parent_type: parent_object,
         normalization_ast_text,
         refetch_query_artifact_import,
     }
@@ -129,7 +129,7 @@ pub(crate) fn generate_entrypoint_artifacts<'a>(
             schema,
             entrypoint,
             root_refetch_path,
-            &nested_selection_map,
+            nested_selection_map,
             &reachable_variables,
             index,
         );

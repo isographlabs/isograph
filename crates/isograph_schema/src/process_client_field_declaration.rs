@@ -27,7 +27,7 @@ impl UnvalidatedSchema {
         let parent_type_id = self
             .server_field_data
             .defined_types
-            .get(&client_field_declaration.item.parent_type.item.into())
+            .get(&client_field_declaration.item.parent_type.item)
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
                     parent_type_name: client_field_declaration.item.parent_type.item,
@@ -78,7 +78,7 @@ impl UnvalidatedSchema {
             // Did not insert, so this object already has a field with the same name :(
             return Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ParentAlreadyHasField {
-                    parent_type_name: object.name.into(),
+                    parent_type_name: object.name,
                     client_field_name: client_field_name.into(),
                 },
                 client_field_name_span,
@@ -211,11 +211,11 @@ fn get_client_variant<TScalarField, TLinkedField>(
             });
         }
     }
-    return ClientFieldVariant::UserWritten(UserWrittenClientFieldInfo {
+    ClientFieldVariant::UserWritten(UserWrittenClientFieldInfo {
         const_export_name: client_field_declaration.const_export_name,
         file_path: client_field_declaration.definition_path,
         user_written_component_variant: UserWrittenComponentVariant::Eager,
-    });
+    })
 }
 
 pub fn id_top_level_arguments() -> Vec<SelectionFieldArgument> {
