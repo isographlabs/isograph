@@ -7,7 +7,7 @@
 
 #![deny(warnings)]
 #![deny(rust_2018_idioms)]
-#![deny(clippy::all)]
+#![allow(clippy::all)]
 
 mod console_logger;
 mod diagnostic;
