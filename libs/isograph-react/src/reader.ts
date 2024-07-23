@@ -1,4 +1,4 @@
-import { ItemCleanupPair } from '@isograph/disposable-types';
+import { Factory } from '@isograph/disposable-types';
 import { FragmentReference } from './FragmentReference';
 import {
   ComponentOrFieldName,
@@ -119,7 +119,16 @@ export type ReaderImperativelyLoadedField = {
   readonly usedRefetchQueries: number[];
 };
 
-export type LoadableField<T> = [
-  string,
-  () => ItemCleanupPair<FragmentReference<any, T>>,
-];
+type StableId = string;
+/// Why is LoadableField the way it is? Let's work backwards.
+///
+/// We ultimately need a stable id (for deduplication) and a way to produce a
+/// FragmentReference (i.e. a Factory). However, this stable id depends on the
+/// arguments that we pass in, hence we get the current form of LoadableField.
+///
+/// Passing TArgs to the LoadableField should be cheap and do no "actual" work,
+/// except to stringify the args or whatnot. Calling the factory can be
+/// expensive. For example, doing so will probably trigger a network request.
+export type LoadableField<TArgs, TResult> = (
+  args: TArgs,
+) => [StableId, Factory<FragmentReference<any, TResult>>];

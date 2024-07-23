@@ -222,8 +222,8 @@ function readData<TReadFromStore>(
 
           // Second, we allow the user to call the resolver, which will ultimately
           // use the resolver reader AST to get the resolver parameters.
-          target[field.alias] = [
-            // DataId
+          target[field.alias] = (_args: void) => [
+            // Stable id
             root + '__' + field.name,
             // Fetcher
             field.refetchReaderArtifact.resolver(

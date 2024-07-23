@@ -359,7 +359,7 @@ fn write_query_types_from_selection(
                             IsographSelectionVariant::Regular => inner_output_type,
                             IsographSelectionVariant::Loadable(_) => {
                                 *loadable_field_encountered = true;
-                                format!("LoadableField<{inner_output_type}>")
+                                format!("LoadableField<void, {inner_output_type}>")
                             }
                         };
 

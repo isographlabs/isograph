@@ -3,5 +3,5 @@ import { type Pet__PetCheckinsCard__output_type } from '../../Pet/PetCheckinsCar
 import { type LoadableField } from '@isograph/react';
 export type Pet__PetDetailDeferredRouteInnerComponent__param = {
   name: string,
-  PetCheckinsCard: LoadableField<Pet__PetCheckinsCard__output_type>,
+  PetCheckinsCard: LoadableField<void, Pet__PetCheckinsCard__output_type>,
 };
