@@ -118,7 +118,6 @@
 //! and drop a context during serialization, you must create and drop it at the
 //! same point during deserialization and vice versa.
 #![allow(clippy::all)]
-#![allow(static_mut_refs)]
 
 mod atomic_arena;
 #[doc(hidden)]

@@ -195,7 +195,7 @@ jobs:
         run: './scripts/check-git-status.sh'
 
   rustfmt:
-    name: Run cargo fmt
+    name: Run cargo fmt and clippy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -207,6 +207,8 @@ jobs:
           components: rustfmt
       - name: Run cargo fmt
         run: cargo fmt
+      - name: Run cargo fmt
+        run: cargo clippy
       - name: 'Check working directory status'
         run: './scripts/check-git-status.sh'
 
