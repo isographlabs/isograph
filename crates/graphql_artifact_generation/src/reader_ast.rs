@@ -3,9 +3,9 @@ use std::collections::{BTreeSet, HashSet};
 use common_lang_types::{SelectableFieldName, WithSpan};
 use isograph_lang_types::{ClientFieldId, RefetchQueryIndex, Selection, ServerFieldSelection};
 use isograph_schema::{
-    into_name_and_arguments, ArgumentKeyAndValue, ClientFieldVariant, FieldDefinitionLocation,
-    NameAndArguments, PathToRefetchField, RefetchedPathsMap, ValidatedClientField,
-    ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
+    categorize_field_loadability, into_name_and_arguments, ArgumentKeyAndValue, ClientFieldVariant,
+    FieldDefinitionLocation, Loadability, NameAndArguments, PathToRefetchField, RefetchedPathsMap,
+    ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
     ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSelection,
 };
 
@@ -105,13 +105,14 @@ fn scalar_client_defined_field_ast_node(
     root_refetched_paths: &RefetchedPathsMap,
     reader_imports: &mut ReaderImports,
 ) -> String {
-    // This field is a client field, so we need to look up the field in the
-    // schema.
+    // This field is a client field, so we need to look up the field in the schema.
     let nested_client_field = schema.client_field(client_field_id);
 
-    // This is indicative of poor data modeling.
-    match nested_client_field.variant {
-        ClientFieldVariant::ImperativelyLoadedField(_) => imperatively_loaded_variant_ast_node(
+    match categorize_field_loadability(
+        nested_client_field,
+        &scalar_field_selection.associated_data.selection_variant,
+    ) {
+        Some(l) => imperatively_loaded_variant_ast_node(
             schema,
             nested_client_field,
             reader_imports,
@@ -119,35 +120,17 @@ fn scalar_client_defined_field_ast_node(
             path,
             indentation_level,
             scalar_field_selection,
-            false,
+            l,
         ),
-        ClientFieldVariant::UserWritten(_) => {
-            if matches!(
-                scalar_field_selection.associated_data.selection_variant,
-                ValidatedIsographSelectionVariant::Loadable(_)
-            ) {
-                imperatively_loaded_variant_ast_node(
-                    schema,
-                    nested_client_field,
-                    reader_imports,
-                    root_refetched_paths,
-                    path,
-                    indentation_level,
-                    scalar_field_selection,
-                    true,
-                )
-            } else {
-                user_written_variant_ast_node(
-                    scalar_field_selection,
-                    indentation_level,
-                    nested_client_field,
-                    schema,
-                    path,
-                    root_refetched_paths,
-                    reader_imports,
-                )
-            }
-        }
+        None => user_written_variant_ast_node(
+            scalar_field_selection,
+            indentation_level,
+            nested_client_field,
+            schema,
+            path,
+            root_refetched_paths,
+            reader_imports,
+        ),
     }
 }
 
@@ -211,8 +194,7 @@ fn imperatively_loaded_variant_ast_node(
     path: &mut Vec<NameAndArguments>,
     indentation_level: u8,
     scalar_field_selection: &ValidatedScalarFieldSelection,
-    // This is indicative of poor modeling
-    selected_loadably: bool,
+    loadability: Loadability,
 ) -> String {
     let alias = scalar_field_selection.name_or_alias().item;
     let indent_1 = "  ".repeat(indentation_level as usize);
@@ -223,18 +205,21 @@ fn imperatively_loaded_variant_ast_node(
         nested_client_field.type_and_field.underscore_separated()
     );
 
-    let resolver_reader_artifact_import_name = if selected_loadably {
-        reader_imports.insert((
-            nested_client_field.type_and_field,
-            ResolverReaderOrRefetchResolver::ResolverReader,
-        ));
-        format!(
-            "{}__resolver_reader",
-            nested_client_field.type_and_field.underscore_separated()
-        )
-    } else {
-        "null".to_string()
-    };
+    // Loadably selected fields include resolver readers. Regular imperative readers are
+    // fire-and-forget.
+    let resolver_reader_artifact_import_name =
+        if matches!(loadability, Loadability::LoadablySelectedField(_)) {
+            reader_imports.insert((
+                nested_client_field.type_and_field,
+                ResolverReaderOrRefetchResolver::ResolverReader,
+            ));
+            format!(
+                "{}__resolver_reader",
+                nested_client_field.type_and_field.underscore_separated()
+            )
+        } else {
+            "null".to_string()
+        };
 
     reader_imports.insert((
         nested_client_field.type_and_field,

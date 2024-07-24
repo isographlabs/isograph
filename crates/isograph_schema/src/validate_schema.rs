@@ -13,10 +13,11 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    ClientField, FieldDefinitionLocation, RefetchStrategy, Schema, SchemaIdField, SchemaObject,
-    SchemaServerField, SchemaValidationState, ServerFieldData, UnvalidatedClientField,
-    UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy, UnvalidatedSchema,
-    UnvalidatedSchemaField, UnvalidatedSchemaServerField, UseRefetchFieldRefetchStrategy,
+    ClientField, ClientFieldVariant, FieldDefinitionLocation, ImperativelyLoadedFieldVariant,
+    RefetchStrategy, Schema, SchemaIdField, SchemaObject, SchemaServerField, SchemaValidationState,
+    ServerFieldData, UnvalidatedClientField, UnvalidatedLinkedFieldSelection,
+    UnvalidatedRefetchFieldStrategy, UnvalidatedSchema, UnvalidatedSchemaField,
+    UnvalidatedSchemaServerField, UseRefetchFieldRefetchStrategy,
     ValidateEntrypointDeclarationError,
 };
 
@@ -758,6 +759,38 @@ fn validate_field_type_exists_and_is_linked(
             ValidateSelectionsError::FieldDoesNotExist(parent_object.name, linked_field_name),
             linked_field_selection.name.location,
         )),
+    }
+}
+
+pub enum Loadability<'a> {
+    LoadablySelectedField(&'a LoadableVariant),
+    ImperativelyLoadedField(&'a ImperativelyLoadedFieldVariant),
+}
+
+/// Why do we do this? Because how we handle a field is determined by both the
+/// the field defition (e.g. exposed fields can only be fetched imperatively)
+/// and the selection (i.e. we can also take non-imperative fields and make them
+/// imperative.)
+///
+/// The eventual plan is to clean this model up. Instead, imperative fields will
+/// need to be explicitly selected loadably. If they are not, they will be fetched
+/// as an immediate follow-up request. Once we do this, there will always be one
+/// source of truth for whether a field is fetched imperatively: the presence of the
+/// @loadable directive.
+pub fn categorize_field_loadability<'a>(
+    client_field: &'a ValidatedClientField,
+    selection_variant: &'a ValidatedIsographSelectionVariant,
+) -> Option<Loadability<'a>> {
+    match &client_field.variant {
+        ClientFieldVariant::UserWritten(_) => match selection_variant {
+            ValidatedIsographSelectionVariant::Regular => None,
+            ValidatedIsographSelectionVariant::Loadable(l) => {
+                Some(Loadability::LoadablySelectedField(l))
+            }
+        },
+        ClientFieldVariant::ImperativelyLoadedField(i) => {
+            Some(Loadability::ImperativelyLoadedField(i))
+        }
     }
 }
 

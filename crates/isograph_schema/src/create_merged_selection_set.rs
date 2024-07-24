@@ -10,17 +10,18 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ClientFieldId, IsographSelectionVariant, NonConstantValue, RefetchQueryIndex,
+    ClientFieldId, IsographSelectionVariant, LoadableVariant, NonConstantValue, RefetchQueryIndex,
     SelectableServerFieldId, Selection, SelectionFieldArgument, ServerFieldSelection,
     ServerObjectId, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
 use crate::{
-    expose_field_directive::RequiresRefinement, ArgumentKeyAndValue, ClientFieldVariant,
-    FieldDefinitionLocation, ImperativelyLoadedFieldVariant, NameAndArguments, PathToRefetchField,
-    RootOperationName, SchemaObject, ValidatedClientField, ValidatedIsographSelectionVariant,
-    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection,
+    categorize_field_loadability, expose_field_directive::RequiresRefinement, ArgumentKeyAndValue,
+    FieldDefinitionLocation, ImperativelyLoadedFieldVariant, Loadability, NameAndArguments,
+    PathToRefetchField, RootOperationName, SchemaObject, ValidatedClientField,
+    ValidatedIsographSelectionVariant, ValidatedScalarFieldSelection, ValidatedSchema,
+    ValidatedSchemaIdField, ValidatedSelection,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -591,54 +592,32 @@ fn merge_validated_selections_into_selection_map(
                                 let newly_encountered_scalar_client_field =
                                     schema.client_field(*client_field_id);
 
-                                if let ValidatedIsographSelectionVariant::Loadable(l) =
-                                    scalar_field_selection.associated_data.selection_variant
-                                {
-                                    merge_traversal_state.refetch_paths.insert(
-                                        (
-                                            PathToRefetchField {
-                                                linked_fields: merge_traversal_state
-                                                    .traversal_path
-                                                    .clone(),
-                                                field_name: newly_encountered_scalar_client_field
-                                                    .name,
-                                            },
-                                            IsographSelectionVariant::Loadable(l),
-                                        ),
-                                        RootRefetchedPath {
-                                            field_name: newly_encountered_scalar_client_field.name,
-                                            path_to_refetch_field_info: PathToRefetchFieldInfo {
-                                                refetch_field_parent_id: parent_type.id,
-                                                imperatively_loaded_field_variant:
-                                                    ImperativelyLoadedFieldVariant {
-                                                        client_field_scalar_selection_name:
-                                                            scalar_field_selection.name.item,
-                                                        top_level_schema_field_name:
-                                                            *NODE_FIELD_NAME,
-                                                        top_level_schema_field_arguments:
-                                                            id_arguments(),
-                                                        primary_field_info: None,
-                                                        root_object_id: schema.query_id(),
-                                                    },
-                                                extra_selections: BTreeMap::new(),
-                                                client_field_id: *client_field_id,
-                                            },
-                                        },
-                                    );
-                                }
-
-                                if let Some((path, info)) = optional_field_refetch_info(
+                                // If the field is selected loadably or is imperative, we must note the refetch path,
+                                // because this results in an artifact being generated.
+                                if let Some(loadability) = categorize_field_loadability(
                                     newly_encountered_scalar_client_field,
-                                    merge_traversal_state,
-                                    parent_type,
+                                    &scalar_field_selection.associated_data.selection_variant,
                                 ) {
-                                    merge_traversal_state.refetch_paths.insert(
-                                        (path, IsographSelectionVariant::Regular),
-                                        RootRefetchedPath {
-                                            field_name: newly_encountered_scalar_client_field.name,
-                                            path_to_refetch_field_info: info,
-                                        },
-                                    );
+                                    match loadability {
+                                        Loadability::LoadablySelectedField(loadable_variant) => {
+                                            insert_loadable_field_into_refetch_paths(
+                                                merge_traversal_state,
+                                                newly_encountered_scalar_client_field,
+                                                loadable_variant,
+                                                parent_type,
+                                                scalar_field_selection,
+                                                schema,
+                                            );
+                                        }
+                                        Loadability::ImperativelyLoadedField(variant) => {
+                                            insert_imperative_field_into_refetch_paths(
+                                                merge_traversal_state,
+                                                newly_encountered_scalar_client_field,
+                                                parent_type,
+                                                variant,
+                                            );
+                                        }
+                                    }
                                 }
 
                                 merge_traversal_state
@@ -738,27 +717,63 @@ fn merge_validated_selections_into_selection_map(
     select_typename_and_id_fields_in_merged_selection(schema, parent_map, parent_type);
 }
 
-// TODO remove
-fn optional_field_refetch_info(
-    client_field: &ValidatedClientField,
+fn insert_imperative_field_into_refetch_paths(
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
+    newly_encountered_scalar_client_field: &ValidatedClientField,
     parent_type: &SchemaObject,
-) -> Option<(PathToRefetchField, PathToRefetchFieldInfo)> {
-    match &client_field.variant {
-        ClientFieldVariant::ImperativelyLoadedField(variant) => Some((
+    variant: &ImperativelyLoadedFieldVariant,
+) {
+    let path = PathToRefetchField {
+        linked_fields: merge_traversal_state.traversal_path.clone(),
+        field_name: newly_encountered_scalar_client_field.name,
+    };
+    let info = PathToRefetchFieldInfo {
+        refetch_field_parent_id: parent_type.id,
+        imperatively_loaded_field_variant: variant.clone(),
+        extra_selections: BTreeMap::new(),
+        client_field_id: newly_encountered_scalar_client_field.id,
+    };
+    merge_traversal_state.refetch_paths.insert(
+        (path, IsographSelectionVariant::Regular),
+        RootRefetchedPath {
+            field_name: newly_encountered_scalar_client_field.name,
+            path_to_refetch_field_info: info,
+        },
+    );
+}
+
+fn insert_loadable_field_into_refetch_paths(
+    merge_traversal_state: &mut ScalarClientFieldTraversalState,
+    newly_encountered_scalar_client_field: &ValidatedClientField,
+    loadable_variant: &LoadableVariant,
+    parent_type: &SchemaObject,
+    scalar_field_selection: &ValidatedScalarFieldSelection,
+    schema: &ValidatedSchema,
+) {
+    merge_traversal_state.refetch_paths.insert(
+        (
             PathToRefetchField {
                 linked_fields: merge_traversal_state.traversal_path.clone(),
-                field_name: client_field.name,
+                field_name: newly_encountered_scalar_client_field.name,
             },
-            PathToRefetchFieldInfo {
+            IsographSelectionVariant::Loadable(loadable_variant.clone()),
+        ),
+        RootRefetchedPath {
+            field_name: newly_encountered_scalar_client_field.name,
+            path_to_refetch_field_info: PathToRefetchFieldInfo {
                 refetch_field_parent_id: parent_type.id,
-                imperatively_loaded_field_variant: variant.clone(),
+                imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant {
+                    client_field_scalar_selection_name: scalar_field_selection.name.item,
+                    top_level_schema_field_name: *NODE_FIELD_NAME,
+                    top_level_schema_field_arguments: id_arguments(),
+                    primary_field_info: None,
+                    root_object_id: schema.query_id(),
+                },
                 extra_selections: BTreeMap::new(),
-                client_field_id: client_field.id,
+                client_field_id: newly_encountered_scalar_client_field.id,
             },
-        )),
-        _ => None,
-    }
+        },
+    );
 }
 
 fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {

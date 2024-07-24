@@ -14,7 +14,6 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 
 ### id from args
 
-- model imperatively loaded fields and loadable fields consistently
 - add default value (and description?) to client field definitions variable defs
 - convert client fields (etc) to use variable defs instead of GraphQLInputValueDefinition
 - validate that each field selection has the right variables and handle missing args
@@ -294,3 +293,9 @@ type MutationConfig<TVariables> = {
   - If selected non-loadably, fetch as immediate follow-ups (for `root`, or `parent` if the current field is nullable) or are merged into parent (for `self` or `parent` if the current field not nullable).
   - And maybe one should allow users to choose to make the `root` field always be fetched along with the parent (i.e. merged) if the root type is the same, otherwise as a simultaneous request?
 - But in any case, that allows us to make `@loadable` the only way to fetch this, and otherwise all fields can have type `MaybeLoaded<OutputType>`, which can then be unwrapped.
+
+## Refetch field artifact cleanup
+
+- We only need to generate queries, not normalization ASTs. The normalization AST should be a reference into the existing normalization AST.
+- We should not need to do so for loadable fields, instead generating a query text and normalization AST for each loadable field once (i.e. it's not unique to the entrypoint.)
+  - At least until we start specializing for variables, e.g. BlogPost(showDetail: false) might be able to be pruned.
