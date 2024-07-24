@@ -41,7 +41,7 @@ pub type ValidatedVariableDefinition = VariableDefinition<SelectableServerFieldI
 pub type ValidatedClientField = ClientField<
     <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldVariableDefinitionAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
 >;
 
 pub type ValidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
@@ -79,7 +79,7 @@ impl SchemaValidationState for ValidatedSchemaState {
     type FieldTypeAssociatedData = SelectableServerFieldId;
     type ClientFieldSelectionScalarFieldAssociatedData = ValidatedScalarFieldAssociatedData;
     type ClientFieldSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
-    type ClientFieldVariableDefinitionAssociatedData = SelectableServerFieldId;
+    type VariableDefinitionInnerType = SelectableServerFieldId;
     type Entrypoint = HashSet<ClientFieldId>;
 }
 

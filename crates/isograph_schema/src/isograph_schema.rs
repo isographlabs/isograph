@@ -48,7 +48,7 @@ pub trait SchemaValidationState: Debug {
     /// The associated data type of client fields' variable definitions
     /// - Unvalidated: UnvalidatedTypeName
     /// - Validated: FieldDefinition
-    type ClientFieldVariableDefinitionAssociatedData: Debug;
+    type VariableDefinitionInnerType: Debug;
 
     /// What we store in entrypoints
     /// - Unvalidated: (TextSource, WithSpan<ObjectTypeAndField>)
@@ -76,7 +76,7 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
         ClientField<
             TSchemaValidationState::ClientFieldSelectionScalarFieldAssociatedData,
             TSchemaValidationState::ClientFieldSelectionLinkedFieldAssociatedData,
-            TSchemaValidationState::ClientFieldVariableDefinitionAssociatedData,
+            TSchemaValidationState::VariableDefinitionInnerType,
         >,
     >,
     // TODO consider whether this belongs here. It could just be a free variable.
@@ -164,7 +164,7 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
     ) -> &ClientField<
         TSchemaValidationState::ClientFieldSelectionScalarFieldAssociatedData,
         TSchemaValidationState::ClientFieldSelectionLinkedFieldAssociatedData,
-        TSchemaValidationState::ClientFieldVariableDefinitionAssociatedData,
+        TSchemaValidationState::VariableDefinitionInnerType,
     > {
         &self.client_fields[client_field_id.as_usize()]
     }

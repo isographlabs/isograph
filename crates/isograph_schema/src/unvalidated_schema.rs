@@ -27,7 +27,7 @@ impl SchemaValidationState for UnvalidatedSchemaState {
     type FieldTypeAssociatedData = UnvalidatedTypeName;
     type ClientFieldSelectionScalarFieldAssociatedData = IsographSelectionVariant;
     type ClientFieldSelectionLinkedFieldAssociatedData = IsographSelectionVariant;
-    type ClientFieldVariableDefinitionAssociatedData = UnvalidatedTypeName;
+    type VariableDefinitionInnerType = UnvalidatedTypeName;
     type Entrypoint = Vec<(TextSource, WithSpan<EntrypointTypeAndField>)>;
 }
 
@@ -38,15 +38,16 @@ pub type UnvalidatedSchema = Schema<UnvalidatedSchemaState>;
 /// client field.)
 pub type UnvalidatedObjectFieldInfo = FieldDefinitionLocation<ServerFieldId, ClientFieldId>;
 
-pub(crate) type UnvalidatedSchemaSchemaField =
-    SchemaServerField<GraphQLTypeAnnotation<
-        <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldVariableDefinitionAssociatedData
-    >>;
+pub(crate) type UnvalidatedSchemaSchemaField = SchemaServerField<
+    GraphQLTypeAnnotation<
+        <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+    >,
+>;
 
 pub type UnvalidatedClientField = ClientField<
     <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
-    <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldVariableDefinitionAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
 >;
 
 pub type UnvalidatedLinkedFieldSelection = LinkedFieldSelection<
