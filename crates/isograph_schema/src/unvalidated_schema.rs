@@ -59,9 +59,6 @@ pub type UnvalidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
     <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
 >;
 
-pub(crate) type UnvalidatedSchemaServerField =
-    SchemaServerField<GraphQLTypeAnnotation<SelectableServerFieldId>>;
-
 impl Default for UnvalidatedSchema {
     fn default() -> Self {
         Self::new()

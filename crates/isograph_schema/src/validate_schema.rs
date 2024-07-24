@@ -17,8 +17,7 @@ use crate::{
     RefetchStrategy, Schema, SchemaIdField, SchemaObject, SchemaServerField, SchemaValidationState,
     ServerFieldData, UnvalidatedClientField, UnvalidatedLinkedFieldSelection,
     UnvalidatedRefetchFieldStrategy, UnvalidatedSchema, UnvalidatedSchemaField,
-    UnvalidatedSchemaServerField, UseRefetchFieldRefetchStrategy,
-    ValidateEntrypointDeclarationError,
+    UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
 };
 
 pub type ValidatedSchemaServerField = SchemaServerField<
@@ -366,7 +365,7 @@ fn validate_server_field_argument(
 fn validate_and_transform_client_fields(
     client_fields: Vec<UnvalidatedClientField>,
     schema_data: &ServerFieldData,
-    server_fields: &[UnvalidatedSchemaServerField],
+    server_fields: &[ValidatedSchemaServerField],
 ) -> Result<Vec<ValidatedClientField>, Vec<WithLocation<ValidateSchemaError>>> {
     get_all_errors_or_all_ok(client_fields.into_iter().map(|client_field| {
         validate_client_field_selection_set(schema_data, client_field, server_fields)
@@ -376,7 +375,7 @@ fn validate_and_transform_client_fields(
 fn validate_client_field_selection_set(
     schema_data: &ServerFieldData,
     unvalidated_client_field: UnvalidatedClientField,
-    server_fields: &[UnvalidatedSchemaServerField],
+    server_fields: &[ValidatedSchemaServerField],
 ) -> ValidateSchemaResult<ValidatedClientField> {
     let variable_definitions =
         validate_variable_definitions(schema_data, unvalidated_client_field.variable_definitions)?;
@@ -435,7 +434,7 @@ fn validate_client_field_selection_set(
 fn validate_use_refetch_field_strategy(
     schema_data: &ServerFieldData,
     use_refetch_field_strategy: UnvalidatedRefetchFieldStrategy,
-    server_fields: &[UnvalidatedSchemaServerField],
+    server_fields: &[ValidatedSchemaServerField],
     parent_object: &SchemaObject,
     client_field_name: SelectableFieldName,
 ) -> ValidateSchemaResult<ValidatedRefetchFieldStrategy> {
@@ -570,7 +569,7 @@ fn validate_client_field_definition_selections_exist_and_types_match(
     schema_data: &ServerFieldData,
     selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     parent_object: &SchemaObject,
-    server_fields: &[UnvalidatedSchemaServerField],
+    server_fields: &[ValidatedSchemaServerField],
 ) -> ValidateSelectionsResult<Vec<WithSpan<ValidatedSelection>>> {
     // Currently, we only check that each field exists and has an appropriate type, not that
     // there are no selection conflicts due to aliases or parameters.
@@ -592,7 +591,7 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
     selection: WithSpan<UnvalidatedSelection>,
     parent_object: &SchemaObject,
     schema_data: &ServerFieldData,
-    server_fields: &[UnvalidatedSchemaServerField],
+    server_fields: &[ValidatedSchemaServerField],
 ) -> ValidateSelectionsResult<WithSpan<ValidatedSelection>> {
     selection.and_then(|selection| {
         selection.and_then(&mut |field_selection| {
@@ -624,7 +623,7 @@ fn validate_field_type_exists_and_is_scalar(
     schema_data: &ServerFieldData,
     parent_object: &SchemaObject,
     scalar_field_selection: UnvalidatedScalarFieldSelection,
-    server_fields: &[UnvalidatedSchemaServerField],
+    server_fields: &[ValidatedSchemaServerField],
 ) -> ValidateSelectionsResult<ValidatedScalarFieldSelection> {
     let scalar_field_name = scalar_field_selection.name.item.into();
     match parent_object.encountered_fields.get(&scalar_field_name) {
@@ -699,7 +698,7 @@ fn validate_field_type_exists_and_is_linked(
     schema_data: &ServerFieldData,
     parent_object: &SchemaObject,
     linked_field_selection: UnvalidatedLinkedFieldSelection,
-    server_fields: &[UnvalidatedSchemaServerField],
+    server_fields: &[ValidatedSchemaServerField],
 ) -> ValidateSelectionsResult<ValidatedLinkedFieldSelection> {
     let linked_field_name = linked_field_selection.name.item.into();
     match (parent_object.encountered_fields).get(&linked_field_name) {
