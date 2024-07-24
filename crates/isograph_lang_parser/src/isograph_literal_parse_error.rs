@@ -35,8 +35,8 @@ pub enum IsographLiteralParseError {
     #[error("Expected a valid value, like $foo, 42, \"bar\", true or false")]
     ExpectedNonConstantValue,
 
-    #[error("Expected a valid constant value, like 42, \"bar\", true or false")]
-    ExpectedConstantValue,
+    #[error("Found a variable, like $foo, in a context where variables are not allowed")]
+    UnexpectedVariable,
 
     #[error("Descriptions are currently disallowed")]
     DescriptionsAreDisallowed,

@@ -3,7 +3,7 @@ use common_lang_types::{
     LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName, SelectableFieldName,
     UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
-use graphql_lang_types::{ConstantValue, GraphQLTypeAnnotation};
+use graphql_lang_types::GraphQLTypeAnnotation;
 use serde::Deserialize;
 
 use crate::IsographFieldDirective;
@@ -315,6 +315,24 @@ impl NonConstantValue {
             // l for literal, i.e. this is shared with others
             NonConstantValue::Integer(int_value) => format!("l_{}", int_value),
             NonConstantValue::Boolean(bool) => format!("l_{}", bool),
+        }
+    }
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub enum ConstantValue {
+    Integer(u64),
+    Boolean(bool),
+}
+
+impl TryFrom<NonConstantValue> for ConstantValue {
+    type Error = VariableName;
+
+    fn try_from(value: NonConstantValue) -> Result<Self, Self::Error> {
+        match value {
+            NonConstantValue::Variable(variable_name) => Err(variable_name),
+            NonConstantValue::Integer(i) => Ok(ConstantValue::Integer(i)),
+            NonConstantValue::Boolean(b) => Ok(ConstantValue::Boolean(b)),
         }
     }
 }

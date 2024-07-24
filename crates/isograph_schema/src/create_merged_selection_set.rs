@@ -438,7 +438,15 @@ fn process_imperatively_loaded_field(
                                     this indicates a bug in Isograph",
                                 )
                         }),
-                        default_value: x.default_value,
+                        default_value: x.default_value.map(|with_location| {
+                            with_location.map(|constant_value| {
+                                convert_graphql_constant_value_to_isograph_constant_value(
+                                    constant_value,
+                                ).expect(
+                                    "Unexpected unsupported constant value in GraphQL. This is indicative of a \
+                                    missing feature in Isograph.")
+                            })
+                        }),
                     },
                     span: Span::todo_generated(),
                 });
@@ -518,9 +526,9 @@ fn get_used_variable_definitions(
                         .unwrap_or_else(|| {
                             panic!(
                                 "Did not find matching variable definition. \
-                            This might not be validated yet. For now, each client field \
-                            containing a __refetch field must re-defined all used variables. \
-                            Client field {} is missing variable definition {}",
+                                This might not be validated yet. For now, each client field \
+                                containing a __refetch field must re-defined all used variables. \
+                                Client field {} is missing variable definition {}",
                                 entrypoint.name, variable_name
                             )
                         })
@@ -529,6 +537,23 @@ fn get_used_variable_definitions(
             }
         })
         .collect::<Vec<_>>()
+}
+
+pub fn convert_graphql_constant_value_to_isograph_constant_value(
+    graphql_constant_value: graphql_lang_types::ConstantValue,
+) -> Option<isograph_lang_types::ConstantValue> {
+    match graphql_constant_value {
+        graphql_lang_types::ConstantValue::Int(i) => Some(
+            isograph_lang_types::ConstantValue::Integer(i.try_into().expect(
+                "Negative integers are not supported at the moment.\
+                This is indicative of an unimplemented feature in Isograph.",
+            )),
+        ),
+        graphql_lang_types::ConstantValue::Boolean(b) => {
+            Some(isograph_lang_types::ConstantValue::Boolean(b))
+        }
+        _ => None,
+    }
 }
 
 fn create_selection_map_with_merge_traversal_state(

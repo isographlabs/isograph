@@ -9,7 +9,7 @@ use graphql_lang_types::{
 };
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
-    ClientFieldDeclaration, ClientFieldDeclarationWithUnvalidatedDirectives,
+    ClientFieldDeclaration, ClientFieldDeclarationWithUnvalidatedDirectives, ConstantValue,
     EntrypointTypeAndField, IsographFieldDirective, LinkedFieldSelection, NonConstantValue,
     ScalarFieldSelection, Selection, SelectionFieldArgument, ServerFieldSelection,
     UnvalidatedSelectionWithUnvalidatedDirectives, Unwrap, VariableDefinition,
@@ -514,14 +514,40 @@ fn parse_variable_definition(
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
             let type_ = parse_type_annotation(tokens)?;
 
+            let default_value = parse_optional_default_value(tokens, text_source)?;
+
             Ok::<_, WithSpan<IsographLiteralParseError>>(VariableDefinition {
                 name,
                 type_,
-                default_value: None,
+                default_value,
             })
         })
         .transpose()?;
     Ok(variable_definition)
+}
+
+fn parse_optional_default_value(
+    tokens: &mut PeekableLexer<'_>,
+    text_source: TextSource,
+) -> ParseResultWithSpan<Option<WithLocation<ConstantValue>>> {
+    if tokens
+        .parse_token_of_kind(IsographLangTokenKind::Equals)
+        .is_ok()
+    {
+        let non_constant_value = parse_non_constant_value(tokens)?;
+        let constant_value: ConstantValue = non_constant_value.item.try_into().map_err(|_| {
+            WithSpan::new(
+                IsographLiteralParseError::UnexpectedVariable,
+                non_constant_value.span,
+            )
+        })?;
+        Ok(Some(WithLocation::new(
+            constant_value,
+            Location::new(text_source, non_constant_value.span),
+        )))
+    } else {
+        Ok(None)
+    }
 }
 
 fn parse_type_annotation(
