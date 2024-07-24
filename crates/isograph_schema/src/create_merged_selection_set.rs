@@ -540,16 +540,16 @@ fn get_used_variable_definitions(
 }
 
 pub fn convert_graphql_constant_value_to_isograph_constant_value(
-    graphql_constant_value: graphql_lang_types::ConstantValue,
+    graphql_constant_value: graphql_lang_types::GraphQLConstantValue,
 ) -> Option<isograph_lang_types::ConstantValue> {
     match graphql_constant_value {
-        graphql_lang_types::ConstantValue::Int(i) => Some(
+        graphql_lang_types::GraphQLConstantValue::Int(i) => Some(
             isograph_lang_types::ConstantValue::Integer(i.try_into().expect(
                 "Negative integers are not supported at the moment.\
                 This is indicative of an unimplemented feature in Isograph.",
             )),
         ),
-        graphql_lang_types::ConstantValue::Boolean(b) => {
+        graphql_lang_types::GraphQLConstantValue::Boolean(b) => {
             Some(isograph_lang_types::ConstantValue::Boolean(b))
         }
         _ => None,

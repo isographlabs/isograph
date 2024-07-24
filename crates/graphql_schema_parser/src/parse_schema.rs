@@ -11,7 +11,7 @@ use intern::{
 };
 
 use graphql_lang_types::{
-    ConstantValue, DirectiveLocation, GraphQLDirective, GraphQLDirectiveDefinition,
+    GraphQLConstantValue, DirectiveLocation, GraphQLDirective, GraphQLDirectiveDefinition,
     GraphQLEnumDefinition, GraphQLEnumValueDefinition, GraphQLFieldDefinition,
     GraphQLInputObjectTypeDefinition, GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition,
     GraphQLObjectTypeDefinition, GraphQLObjectTypeExtension, GraphQLScalarTypeDefinition,
@@ -626,7 +626,7 @@ fn parse_interfaces(
 fn parse_constant_directives(
     tokens: &mut PeekableLexer,
     text_source: TextSource,
-) -> ParseResult<Vec<GraphQLDirective<ConstantValue>>> {
+) -> ParseResult<Vec<GraphQLDirective<GraphQLConstantValue>>> {
     let mut directives = vec![];
     while tokens.parse_token_of_kind(TokenKind::At).is_ok() {
         directives.push(GraphQLDirective {
@@ -644,7 +644,7 @@ fn parse_constant_directives(
 fn parse_optional_constant_arguments<T: From<StringKey>>(
     tokens: &mut PeekableLexer,
     text_source: TextSource,
-) -> ParseResult<Vec<NameValuePair<T, ConstantValue>>> {
+) -> ParseResult<Vec<NameValuePair<T, GraphQLConstantValue>>> {
     if tokens.parse_token_of_kind(TokenKind::OpenParen).is_ok() {
         let first_name_value_pair = parse_constant_name_value_pair(
             tokens,
@@ -689,7 +689,7 @@ fn parse_constant_name_value_pair<T: From<StringKey>, TValue: ValueType>(
 fn parse_constant_value(
     tokens: &mut PeekableLexer,
     text_source: TextSource,
-) -> ParseResult<WithLocation<ConstantValue>> {
+) -> ParseResult<WithLocation<GraphQLConstantValue>> {
     from_control_flow(|| {
         to_control_flow(|| {
             tokens
@@ -698,7 +698,7 @@ fn parse_constant_value(
                 .and_then(|int_literal_string| {
                     int_literal_string.and_then(|raw_int_value| {
                         match raw_int_value.parse::<i64>() {
-                            Ok(value) => Ok(ConstantValue::Int(value)),
+                            Ok(value) => Ok(GraphQLConstantValue::Int(value)),
                             Err(_) => Err(WithSpan::new(
                                 SchemaParseError::InvalidIntValue {
                                     text: raw_int_value.to_string(),
@@ -718,7 +718,7 @@ fn parse_constant_value(
                 .and_then(|float_literal_string| {
                     float_literal_string.and_then(|raw_float_value| {
                         match raw_float_value.parse::<f64>() {
-                            Ok(value) => Ok(ConstantValue::Float(value.into())),
+                            Ok(value) => Ok(GraphQLConstantValue::Float(value.into())),
                             Err(_) => Err(WithSpan::new(
                                 SchemaParseError::InvalidFloatValue {
                                     text: raw_float_value.to_string(),
@@ -742,7 +742,7 @@ fn parse_constant_value(
 
                         (&inner_str[1..(len - 1)]).intern().into()
                     });
-                    without_quotes.map(ConstantValue::String)
+                    without_quotes.map(GraphQLConstantValue::String)
                 })
                 .map(|x| x.to_with_location(text_source))
         })?;
@@ -750,20 +750,20 @@ fn parse_constant_value(
         to_control_flow(|| {
             tokens
                 .parse_matching_identifier("true")
-                .map(|x| x.map(|_| ConstantValue::Boolean(true)))
+                .map(|x| x.map(|_| GraphQLConstantValue::Boolean(true)))
                 .map(|x| x.to_with_location(text_source))
         })?;
         to_control_flow(|| {
             tokens
                 .parse_matching_identifier("false")
-                .map(|x| x.map(|_| ConstantValue::Boolean(false)))
+                .map(|x| x.map(|_| GraphQLConstantValue::Boolean(false)))
                 .map(|x| x.to_with_location(text_source))
         })?;
 
         to_control_flow(|| {
             tokens
                 .parse_matching_identifier("null")
-                .map(|x| x.map(|_| ConstantValue::Null))
+                .map(|x| x.map(|_| GraphQLConstantValue::Null))
                 .map(|x| x.to_with_location(text_source))
         })?;
 
@@ -772,7 +772,7 @@ fn parse_constant_value(
         to_control_flow(|| {
             tokens
                 .parse_string_key_type(TokenKind::Identifier)
-                .map(|x| x.map(ConstantValue::Enum))
+                .map(|x| x.map(GraphQLConstantValue::Enum))
                 .map(|x| x.to_with_location(text_source))
         })?;
 
@@ -786,7 +786,7 @@ fn parse_constant_value(
                     while tokens.parse_token_of_kind(TokenKind::CloseBracket).is_err() {
                         values.push(parse_constant_value(tokens, text_source)?);
                     }
-                    Ok(ConstantValue::List(values))
+                    Ok(GraphQLConstantValue::List(values))
                 })
                 .transpose()
                 .map(|x| x.to_with_location(text_source));
@@ -812,7 +812,7 @@ fn parse_constant_value(
                         let value = parse_constant_value(tokens, text_source)?;
                         values.push(NameValuePair { name, value });
                     }
-                    Ok(ConstantValue::Object(values))
+                    Ok(GraphQLConstantValue::Object(values))
                 })
                 .transpose()
                 .map(|x| x.to_with_location(text_source));
@@ -1007,7 +1007,7 @@ fn parse_argument_definition(
 fn parse_optional_constant_default_value(
     tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
-) -> ParseResult<Option<WithLocation<ConstantValue>>> {
+) -> ParseResult<Option<WithLocation<GraphQLConstantValue>>> {
     let equal = tokens.parse_token_of_kind(TokenKind::Equals);
     if equal.is_err() {
         return Ok(None);

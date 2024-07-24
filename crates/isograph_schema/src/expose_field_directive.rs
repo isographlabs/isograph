@@ -3,7 +3,7 @@ use common_lang_types::{
     SelectableFieldName, Span, StringLiteralValue, ValueKeyName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    from_graph_ql_directive, ConstantValue, DeserializationError, GraphQLDirective,
+    from_graph_ql_directive, GraphQLConstantValue, DeserializationError, GraphQLDirective,
     GraphQLInputValueDefinition,
 };
 use intern::{string_key::Intern, Lookup};
@@ -331,7 +331,7 @@ impl UnvalidatedSchema {
 
     fn parse_expose_field_directive(
         &self,
-        d: &GraphQLDirective<ConstantValue>,
+        d: &GraphQLDirective<GraphQLConstantValue>,
     ) -> ProcessTypeDefinitionResult<Option<ExposeFieldDirective>> {
         if d.name.item == *EXPOSE_FIELD_DIRECTIVE {
             let expose_field_directive = from_graph_ql_directive(d).map_err(|err| match err {

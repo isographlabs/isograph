@@ -1,7 +1,7 @@
 use std::fmt;
 
 use super::{write::write_arguments, NameValuePair, ValueType};
-use crate::ConstantValue;
+use crate::GraphQLConstantValue;
 use common_lang_types::{DirectiveArgumentName, DirectiveName, WithEmbeddedLocation};
 use intern::Lookup;
 use serde::{
@@ -26,14 +26,14 @@ impl<T: ValueType> fmt::Display for GraphQLDirective<T> {
 }
 
 pub fn from_graph_ql_directive<'a, T: Deserialize<'a>>(
-    directive: &'a GraphQLDirective<ConstantValue>,
+    directive: &'a GraphQLDirective<GraphQLConstantValue>,
 ) -> Result<T, DeserializationError> {
     T::deserialize(GraphQLDirectiveDeserializer { directive })
 }
 
 #[derive(Debug)]
 struct GraphQLDirectiveDeserializer<'a> {
-    directive: &'a GraphQLDirective<ConstantValue>,
+    directive: &'a GraphQLDirective<GraphQLConstantValue>,
 }
 
 #[derive(Debug, Error)]
@@ -69,12 +69,12 @@ impl<'de> Deserializer<'de> for GraphQLDirectiveDeserializer<'de> {
 }
 
 struct NameValuePairVecDeserializer<'a, T> {
-    arguments: &'a Vec<NameValuePair<T, ConstantValue>>,
+    arguments: &'a Vec<NameValuePair<T, GraphQLConstantValue>>,
     field_idx: usize,
 }
 
 impl<'a, T> NameValuePairVecDeserializer<'a, T> {
-    fn new(args: &'a Vec<NameValuePair<T, ConstantValue>>) -> Self {
+    fn new(args: &'a Vec<NameValuePair<T, GraphQLConstantValue>>) -> Self {
         NameValuePairVecDeserializer {
             arguments: args,
             field_idx: 0,
@@ -142,10 +142,10 @@ impl<'de, TName: Lookup + Copy, TValue: ValueType> Deserializer<'de>
 }
 
 pub struct ConstantValueDeserializer<'de> {
-    value: &'de ConstantValue,
+    value: &'de GraphQLConstantValue,
 }
 
-impl<'de> IntoDeserializer<'de, DeserializationError> for &'de ConstantValue {
+impl<'de> IntoDeserializer<'de, DeserializationError> for &'de GraphQLConstantValue {
     type Deserializer = ConstantValueDeserializer<'de>;
 
     fn into_deserializer(self) -> Self::Deserializer {
@@ -161,17 +161,17 @@ impl<'de> Deserializer<'de> for ConstantValueDeserializer<'de> {
         V: de::Visitor<'de>,
     {
         match self.value {
-            ConstantValue::Boolean(bool) => visitor.visit_bool(*bool),
-            ConstantValue::Enum(enum_literal) => visitor.visit_borrowed_str(enum_literal.lookup()),
-            ConstantValue::Float(float_value) => visitor.visit_f64(float_value.as_float()),
-            ConstantValue::Int(i_64) => visitor.visit_i64(*i_64),
-            ConstantValue::String(string) => visitor.visit_borrowed_str(string.lookup()),
-            ConstantValue::Null => visitor.visit_none(),
-            ConstantValue::List(seq) => {
+            GraphQLConstantValue::Boolean(bool) => visitor.visit_bool(*bool),
+            GraphQLConstantValue::Enum(enum_literal) => visitor.visit_borrowed_str(enum_literal.lookup()),
+            GraphQLConstantValue::Float(float_value) => visitor.visit_f64(float_value.as_float()),
+            GraphQLConstantValue::Int(i_64) => visitor.visit_i64(*i_64),
+            GraphQLConstantValue::String(string) => visitor.visit_borrowed_str(string.lookup()),
+            GraphQLConstantValue::Null => visitor.visit_none(),
+            GraphQLConstantValue::List(seq) => {
                 let seq_access = SeqDeserializer::new(seq.iter().map(|entry| &entry.item));
                 visitor.visit_seq(seq_access)
             }
-            ConstantValue::Object(obj) => {
+            GraphQLConstantValue::Object(obj) => {
                 let serializer = NameValuePairVecDeserializer::new(obj);
                 visitor.visit_map(serializer)
             }
@@ -192,7 +192,7 @@ impl<'de> Deserializer<'de> for ConstantValueDeserializer<'de> {
     }
 }
 
-impl<'de, TName> Deserializer<'de> for ValueDeserializer<'de, TName, ConstantValue> {
+impl<'de, TName> Deserializer<'de> for ValueDeserializer<'de, TName, GraphQLConstantValue> {
     type Error = DeserializationError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>

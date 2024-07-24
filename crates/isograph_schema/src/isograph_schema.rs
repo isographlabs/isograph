@@ -6,9 +6,9 @@ use common_lang_types::{
     SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    ConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInputObjectTypeDefinition,
-    GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition,
-    GraphQLTypeAnnotation, NamedTypeAnnotation,
+    GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition,
+    GraphQLInputObjectTypeDefinition, GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition,
+    GraphQLObjectTypeDefinition, GraphQLTypeAnnotation, NamedTypeAnnotation,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -284,7 +284,7 @@ pub struct IsographObjectTypeDefinition {
     pub interfaces: Vec<WithLocation<GraphQLInterfaceTypeName>>,
     /// Directives that we don't know about. Maybe this should be validated to be
     /// empty, or not exist.
-    pub directives: Vec<GraphQLDirective<ConstantValue>>,
+    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
     // TODO the spans of these fields are wrong
     // TODO use a shared field type
     pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
@@ -339,7 +339,7 @@ pub struct SchemaObject {
     pub name: IsographObjectTypeName,
     pub id: ServerObjectId,
     // We probably don't want this
-    pub directives: Vec<GraphQLDirective<ConstantValue>>,
+    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,

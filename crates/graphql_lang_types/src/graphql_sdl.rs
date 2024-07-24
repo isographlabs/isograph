@@ -2,7 +2,7 @@ use std::{fmt, ops::Deref};
 
 use crate::{GraphQLDirective, GraphQLTypeAnnotation};
 
-use super::{write_arguments, write_directives, ConstantValue};
+use super::{write_arguments, write_directives, GraphQLConstantValue};
 use common_lang_types::{
     DescriptionValue, DirectiveName, EnumLiteralValue, GraphQLInterfaceTypeName,
     GraphQLObjectTypeName, GraphQLScalarTypeName, GraphQLUnionTypeName, InputTypeName,
@@ -116,7 +116,7 @@ pub struct GraphQLObjectTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<GraphQLObjectTypeName>,
     pub interfaces: Vec<WithLocation<GraphQLInterfaceTypeName>>,
-    pub directives: Vec<GraphQLDirective<ConstantValue>>,
+    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
     pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
 }
 
@@ -124,7 +124,7 @@ pub struct GraphQLObjectTypeDefinition {
 pub struct GraphQLObjectTypeExtension {
     pub name: WithLocation<GraphQLObjectTypeName>,
     pub interfaces: Vec<WithLocation<GraphQLInterfaceTypeName>>,
-    pub directives: Vec<GraphQLDirective<ConstantValue>>,
+    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
     pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
 }
 
@@ -132,7 +132,7 @@ pub struct GraphQLObjectTypeExtension {
 pub struct GraphQLScalarTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<GraphQLScalarTypeName>,
-    pub directives: Vec<GraphQLDirective<ConstantValue>>,
+    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -140,7 +140,7 @@ pub struct GraphQLInterfaceTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<GraphQLInterfaceTypeName>,
     pub interfaces: Vec<WithLocation<GraphQLInterfaceTypeName>>,
-    pub directives: Vec<GraphQLDirective<ConstantValue>>,
+    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
     pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
 }
 
@@ -148,7 +148,7 @@ pub struct GraphQLInterfaceTypeDefinition {
 pub struct GraphQLInputObjectTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<GraphQLInterfaceTypeName>,
-    pub directives: Vec<GraphQLDirective<ConstantValue>>,
+    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
     pub fields: Vec<WithLocation<GraphQLInputValueDefinition>>,
 }
 
@@ -158,7 +158,7 @@ pub struct GraphQLSchemaDefinition {
     pub query: Option<WithLocation<GraphQLObjectTypeName>>,
     pub subscription: Option<WithLocation<GraphQLObjectTypeName>>,
     pub mutation: Option<WithLocation<GraphQLObjectTypeName>>,
-    pub directives: Vec<GraphQLDirective<ConstantValue>>,
+    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
 }
 
 #[allow(unused)]
@@ -199,7 +199,7 @@ pub struct GraphQLDirectiveDefinition {
 pub struct GraphQLEnumDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<DirectiveName>,
-    pub directives: Vec<GraphQLDirective<ConstantValue>>,
+    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
     pub enum_value_definitions: Vec<WithLocation<GraphQLEnumValueDefinition>>,
 }
 
@@ -207,14 +207,14 @@ pub struct GraphQLEnumDefinition {
 pub struct GraphQLEnumValueDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub value: WithLocation<EnumLiteralValue>,
-    pub directives: Vec<GraphQLDirective<ConstantValue>>,
+    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct GraphQLUnionTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<GraphQLUnionTypeName>,
-    pub directives: Vec<GraphQLDirective<ConstantValue>>,
+    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
     pub union_member_types: Vec<WithLocation<GraphQLObjectTypeName>>,
 }
 
@@ -239,7 +239,7 @@ pub struct GraphQLFieldDefinition {
     pub name: WithLocation<SelectableFieldName>,
     pub type_: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     pub arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
-    pub directives: Vec<GraphQLDirective<ConstantValue>>,
+    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
 }
 
 impl fmt::Display for GraphQLFieldDefinition {
@@ -260,8 +260,8 @@ pub struct GraphQLInputValueDefinition {
     pub type_: GraphQLTypeAnnotation<InputTypeName>,
     // This unused, except for printing. Isograph does not care about this,
     // except inasmuch as it means that the type is nullable.
-    pub default_value: Option<WithLocation<ConstantValue>>,
-    pub directives: Vec<GraphQLDirective<ConstantValue>>,
+    pub default_value: Option<WithLocation<GraphQLConstantValue>>,
+    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
 }
 
 impl fmt::Display for GraphQLInputValueDefinition {

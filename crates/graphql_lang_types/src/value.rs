@@ -5,7 +5,7 @@ use common_lang_types::{
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum ConstantValue {
+pub enum GraphQLConstantValue {
     Int(i64),
     Float(FloatValue),
     String(StringLiteralValue),
@@ -13,14 +13,14 @@ pub enum ConstantValue {
     Null,
     Enum(EnumLiteralValue),
     // This is weird! We can be more consistent vis-a-vis where the WithSpan appears.
-    List(Vec<WithLocation<ConstantValue>>),
-    Object(Vec<NameValuePair<ValueKeyName, ConstantValue>>),
+    List(Vec<WithLocation<GraphQLConstantValue>>),
+    Object(Vec<NameValuePair<ValueKeyName, GraphQLConstantValue>>),
 }
 
-impl ConstantValue {
+impl GraphQLConstantValue {
     pub fn as_string(&self) -> Option<StringLiteralValue> {
         match self {
-            ConstantValue::String(s) => Some(*s),
+            GraphQLConstantValue::String(s) => Some(*s),
             _ => None,
         }
     }
@@ -47,18 +47,18 @@ pub enum Value {
 pub trait ValueType: fmt::Display {}
 
 impl ValueType for Value {}
-impl ValueType for ConstantValue {}
+impl ValueType for GraphQLConstantValue {}
 
-impl fmt::Display for ConstantValue {
+impl fmt::Display for GraphQLConstantValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ConstantValue::Int(value) => f.write_fmt(format_args!("{}", value)),
-            ConstantValue::Float(value) => f.write_fmt(format_args!("{}", value)),
-            ConstantValue::String(value) => f.write_fmt(format_args!("\"{}\"", value)),
-            ConstantValue::Boolean(value) => f.write_fmt(format_args!("{}", value)),
-            ConstantValue::Null => f.write_str("null"),
-            ConstantValue::Enum(value) => f.write_fmt(format_args!("{}", value)),
-            ConstantValue::List(value) => f.write_fmt(format_args!(
+            GraphQLConstantValue::Int(value) => f.write_fmt(format_args!("{}", value)),
+            GraphQLConstantValue::Float(value) => f.write_fmt(format_args!("{}", value)),
+            GraphQLConstantValue::String(value) => f.write_fmt(format_args!("\"{}\"", value)),
+            GraphQLConstantValue::Boolean(value) => f.write_fmt(format_args!("{}", value)),
+            GraphQLConstantValue::Null => f.write_str("null"),
+            GraphQLConstantValue::Enum(value) => f.write_fmt(format_args!("{}", value)),
+            GraphQLConstantValue::List(value) => f.write_fmt(format_args!(
                 "[{}]",
                 value
                     .iter()
@@ -66,7 +66,7 @@ impl fmt::Display for ConstantValue {
                     .collect::<Vec<String>>()
                     .join(", ")
             )),
-            ConstantValue::Object(value) => f.write_fmt(format_args!(
+            GraphQLConstantValue::Object(value) => f.write_fmt(format_args!(
                 "{{{}}}",
                 value
                     .iter()

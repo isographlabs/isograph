@@ -1,6 +1,6 @@
 use common_lang_types::{SelectableFieldName, StringLiteralValue, TextSource};
 use graphql_lang_types::{
-    from_graph_ql_directive, ConstantValue, DeserializationError, GraphQLDirective,
+    from_graph_ql_directive, GraphQLConstantValue, DeserializationError, GraphQLDirective,
 };
 use intern::string_key::Intern;
 use isograph_schema::{ExposeFieldDirective, FieldMapItem};
@@ -10,7 +10,7 @@ use graphql_lang_types::{GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionO
 
 fn unwrap_directive(
     extension_or_definition: GraphQLTypeSystemExtensionOrDefinition,
-) -> Result<Vec<GraphQLDirective<ConstantValue>>, Box<dyn Error>> {
+) -> Result<Vec<GraphQLDirective<GraphQLConstantValue>>, Box<dyn Error>> {
     if let GraphQLTypeSystemExtensionOrDefinition::Extension(extension) = extension_or_definition {
         let GraphQLTypeSystemExtension::ObjectTypeExtension(object_type_extension) = extension;
         return Ok(object_type_extension.directives.clone());
@@ -30,7 +30,7 @@ fn parse_mutation(source: &str) -> Result<Vec<ExposeFieldDirective>, Box<dyn Err
         .into_iter()
         .map(|dir| unwrap_directive(dir.item))
         .collect::<Result<Vec<_>, _>>()?;
-    let directives: Vec<GraphQLDirective<ConstantValue>> =
+    let directives: Vec<GraphQLDirective<GraphQLConstantValue>> =
         directives.into_iter().flatten().collect();
     let expose_field_directives: Result<Vec<ExposeFieldDirective>, _> = directives
         .into_iter()
