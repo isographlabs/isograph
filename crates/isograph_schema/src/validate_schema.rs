@@ -482,6 +482,7 @@ fn validate_variable_definitions(
                             )),
                         }
                     })?,
+                    default_value: vd.default_value,
                 })
             })
         })

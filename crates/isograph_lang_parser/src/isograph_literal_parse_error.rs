@@ -32,8 +32,11 @@ pub enum IsographLiteralParseError {
         suggested_const_export_name: ScalarFieldName,
     },
 
-    #[error("Expected a valid value, like $foo, 42, true or false")]
+    #[error("Expected a valid value, like $foo, 42, \"bar\", true or false")]
     ExpectedNonConstantValue,
+
+    #[error("Expected a valid constant value, like 42, \"bar\", true or false")]
+    ExpectedConstantValue,
 
     #[error("Descriptions are currently disallowed")]
     DescriptionsAreDisallowed,

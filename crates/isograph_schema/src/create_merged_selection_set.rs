@@ -438,6 +438,7 @@ fn process_imperatively_loaded_field(
                                     this indicates a bug in Isograph",
                                 )
                         }),
+                        default_value: x.default_value,
                     },
                     span: Span::todo_generated(),
                 });

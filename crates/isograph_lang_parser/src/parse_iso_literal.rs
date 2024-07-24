@@ -514,7 +514,11 @@ fn parse_variable_definition(
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
             let type_ = parse_type_annotation(tokens)?;
 
-            Ok::<_, WithSpan<IsographLiteralParseError>>(VariableDefinition { name, type_ })
+            Ok::<_, WithSpan<IsographLiteralParseError>>(VariableDefinition {
+                name,
+                type_,
+                default_value: None,
+            })
         })
         .transpose()?;
     Ok(variable_definition)

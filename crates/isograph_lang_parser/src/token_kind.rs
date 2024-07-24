@@ -29,8 +29,9 @@ pub enum IsographLangTokenKind {
     Dollar,
     EndOfFile,
 
-    // #[token("=")]
-    // Equals,
+    #[token("=")]
+    Equals,
+
     #[token("!")]
     Exclamation,
 
@@ -159,7 +160,7 @@ impl fmt::Display for IsographLangTokenKind {
             // IsographLangTokenKind::Colon => "colon (':')",
             IsographLangTokenKind::Dollar => "dollar ('$')",
             IsographLangTokenKind::EndOfFile => "end of file",
-            // IsographLangTokenKind::Equals => "equals ('=')",
+            IsographLangTokenKind::Equals => "equals ('=')",
             IsographLangTokenKind::Exclamation => "exclamation mark ('!')",
             // IsographLangTokenKind::FloatLiteral => "floating point value (e.g. '3.14')",
             IsographLangTokenKind::Identifier => "non-variable identifier (e.g. 'x' or 'Foo')",

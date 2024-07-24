@@ -3,7 +3,7 @@ use common_lang_types::{
     LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName, SelectableFieldName,
     UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
-use graphql_lang_types::GraphQLTypeAnnotation;
+use graphql_lang_types::{ConstantValue, GraphQLTypeAnnotation};
 use serde::Deserialize;
 
 use crate::IsographFieldDirective;
@@ -323,7 +323,7 @@ impl NonConstantValue {
 pub struct VariableDefinition<TValue> {
     pub name: WithLocation<VariableName>,
     pub type_: GraphQLTypeAnnotation<TValue>,
-    // pub default_value: Option<WithLocation<ConstantValue>>,
+    pub default_value: Option<WithLocation<ConstantValue>>,
 }
 
 impl<TValue> VariableDefinition<TValue> {
@@ -334,6 +334,7 @@ impl<TValue> VariableDefinition<TValue> {
         VariableDefinition {
             name: self.name,
             type_: self.type_.map(map),
+            default_value: self.default_value,
         }
     }
 
@@ -344,6 +345,7 @@ impl<TValue> VariableDefinition<TValue> {
         Ok(VariableDefinition {
             name: self.name,
             type_: self.type_.and_then(map)?,
+            default_value: self.default_value,
         })
     }
 }
