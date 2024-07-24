@@ -7,7 +7,7 @@ import {
   useLazyReference,
   useResult,
 } from '@isograph/react';
-import { PetDetailDeferredRoute, Route, useNavigateTo } from './routes';
+import { PetDetailDeferredRoute, useNavigateTo } from './routes';
 
 export const PetDetailDeferredRouteComponent = iso(`
   field Query.PetDetailDeferredRoute($id: ID!) @component {

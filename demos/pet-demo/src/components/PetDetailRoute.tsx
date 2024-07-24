@@ -2,7 +2,7 @@ import React from 'react';
 import { iso } from '@iso';
 import { Container, Stack } from '@mui/material';
 import { useLazyReference, useResult } from '@isograph/react';
-import { Route, PetDetailRoute, useNavigateTo } from './routes';
+import { PetDetailRoute, useNavigateTo } from './routes';
 
 export const PetDetailRouteComponent = iso(`
   field Query.PetDetailRoute($id: ID!) @component {
