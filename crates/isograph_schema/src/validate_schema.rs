@@ -21,8 +21,9 @@ use crate::{
     ValidateEntrypointDeclarationError,
 };
 
-pub type ValidatedSchemaServerField =
-    SchemaServerField<GraphQLTypeAnnotation<SelectableServerFieldId>>;
+pub type ValidatedSchemaServerField = SchemaServerField<
+    GraphQLTypeAnnotation<<ValidatedSchemaState as SchemaValidationState>::FieldTypeAssociatedData>,
+>;
 
 pub type ValidatedSelection = Selection<
     <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
