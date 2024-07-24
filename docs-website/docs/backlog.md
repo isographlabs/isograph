@@ -12,6 +12,14 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 - Userland impl of pagination, live queries, useQueryLoader (w/ intersection observer)
 - Load normalization ASTs (etc) when a non-null network response is received. Does this require `as Foo`?
 
+### id from args
+
+- model imperatively loaded fields and loadable fields consistently
+- add default value (and description?) to client field definitions variable defs
+- convert client fields (etc) to use variable defs instead of GraphQLInputValueDefinition
+- validate that each field selection has the right variables and handle missing args
+- update type gen and query gen to show missing args
+
 ## GraphQL conf 2024 nice-to-haves
 
 - Fix granular re-renders with AST
