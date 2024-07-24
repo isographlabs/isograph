@@ -319,7 +319,7 @@ impl NonConstantValue {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum ConstantValue {
     Integer(i64),
     Boolean(bool),
@@ -337,7 +337,7 @@ impl TryFrom<NonConstantValue> for ConstantValue {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct VariableDefinition<TValue> {
     pub name: WithLocation<VariableName>,
     pub type_: GraphQLTypeAnnotation<TValue>,

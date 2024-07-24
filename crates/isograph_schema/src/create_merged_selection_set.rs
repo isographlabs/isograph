@@ -5,9 +5,7 @@ use common_lang_types::{
     ScalarFieldAlias, ScalarFieldName, SelectableFieldName, Span, VariableName, WithLocation,
     WithSpan,
 };
-use graphql_lang_types::{
-    GraphQLInputValueDefinition, GraphQLTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
-};
+use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ClientFieldId, IsographSelectionVariant, LoadableVariant, NonConstantValue, RefetchQueryIndex,
@@ -19,9 +17,9 @@ use lazy_static::lazy_static;
 use crate::{
     categorize_field_loadability, expose_field_directive::RequiresRefinement, ArgumentKeyAndValue,
     FieldDefinitionLocation, ImperativelyLoadedFieldVariant, Loadability, NameAndArguments,
-    PathToRefetchField, RootOperationName, SchemaObject, ValidatedClientField,
-    ValidatedIsographSelectionVariant, ValidatedScalarFieldSelection, ValidatedSchema,
-    ValidatedSchemaIdField, ValidatedSelection,
+    PathToRefetchField, RootOperationName, SchemaObject, UnvalidatedVariableDefinition,
+    ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedScalarFieldSelection,
+    ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -438,15 +436,7 @@ fn process_imperatively_loaded_field(
                                     this indicates a bug in Isograph",
                                 )
                         }),
-                        default_value: x.default_value.map(|with_location| {
-                            with_location.map(|constant_value| {
-                                convert_graphql_constant_value_to_isograph_constant_value(
-                                    constant_value,
-                                ).expect(
-                                    "Unexpected unsupported constant value in GraphQL. This is indicative of a \
-                                    missing feature in Isograph.")
-                            })
-                        }),
+                        default_value: x.default_value,
                     },
                     span: Span::todo_generated(),
                 });
@@ -537,23 +527,6 @@ fn get_used_variable_definitions(
             }
         })
         .collect::<Vec<_>>()
-}
-
-pub fn convert_graphql_constant_value_to_isograph_constant_value(
-    graphql_constant_value: graphql_lang_types::GraphQLConstantValue,
-) -> Option<isograph_lang_types::ConstantValue> {
-    match graphql_constant_value {
-        graphql_lang_types::GraphQLConstantValue::Int(i) => Some(
-            isograph_lang_types::ConstantValue::Integer(i.try_into().expect(
-                "Negative integers are not supported at the moment.\
-                This is indicative of an unimplemented feature in Isograph.",
-            )),
-        ),
-        graphql_lang_types::GraphQLConstantValue::Boolean(b) => {
-            Some(isograph_lang_types::ConstantValue::Boolean(b))
-        }
-        _ => None,
-    }
 }
 
 fn create_selection_map_with_merge_traversal_state(
@@ -1100,14 +1073,12 @@ fn get_aliased_mutation_field_name(
     s
 }
 
-pub fn id_arguments() -> Vec<GraphQLInputValueDefinition> {
-    vec![GraphQLInputValueDefinition {
-        description: None,
+pub fn id_arguments() -> Vec<UnvalidatedVariableDefinition> {
+    vec![VariableDefinition {
         name: WithLocation::new("id".intern().into(), Location::generated()),
         type_: GraphQLTypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
             NamedTypeAnnotation(WithSpan::new("ID".intern().into(), Span::todo_generated())),
         ))),
         default_value: None,
-        directives: vec![],
     }]
 }

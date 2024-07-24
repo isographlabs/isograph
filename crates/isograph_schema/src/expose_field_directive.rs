@@ -3,8 +3,7 @@ use common_lang_types::{
     SelectableFieldName, Span, StringLiteralValue, ValueKeyName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    from_graph_ql_directive, GraphQLConstantValue, DeserializationError, GraphQLDirective,
-    GraphQLInputValueDefinition,
+    from_graph_ql_directive, DeserializationError, GraphQLConstantValue, GraphQLDirective,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -18,7 +17,7 @@ use crate::{
     generate_refetch_field_strategy, ArgumentMap, ClientField, ClientFieldVariant,
     FieldDefinitionLocation, FieldMapItem, ImperativelyLoadedFieldVariant, ObjectTypeAndFieldName,
     PrimaryFieldInfo, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
-    ProcessedFieldMapItem, UnvalidatedSchema,
+    ProcessedFieldMapItem, UnvalidatedSchema, UnvalidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -384,7 +383,7 @@ impl UnvalidatedSchema {
 fn skip_arguments_contained_in_field_map(
     // TODO move this to impl Schema
     schema: &mut UnvalidatedSchema,
-    arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+    arguments: Vec<WithLocation<UnvalidatedVariableDefinition>>,
     primary_type_name: IsographObjectTypeName,
     mutation_object_name: IsographObjectTypeName,
     mutation_field_name: SelectableFieldName,

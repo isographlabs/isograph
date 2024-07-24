@@ -1,10 +1,10 @@
 use std::collections::HashSet;
 
 use common_lang_types::{
-    InputTypeName, InputValueName, IsographObjectTypeName, SelectableFieldName,
-    UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
+    IsographObjectTypeName, SelectableFieldName, UnvalidatedTypeName, VariableName, WithLocation,
+    WithSpan,
 };
-use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation, NamedTypeAnnotation};
+use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation};
 use isograph_lang_types::{
     ClientFieldId, IsographSelectionVariant, LinkedFieldSelection, LoadableVariant,
     ScalarFieldSelection, SelectableServerFieldId, Selection, ServerFieldId, ServerObjectId,
@@ -17,11 +17,13 @@ use crate::{
     RefetchStrategy, Schema, SchemaIdField, SchemaObject, SchemaServerField, SchemaValidationState,
     ServerFieldData, UnvalidatedClientField, UnvalidatedLinkedFieldSelection,
     UnvalidatedRefetchFieldStrategy, UnvalidatedSchema, UnvalidatedSchemaSchemaField,
-    UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
+    UnvalidatedSchemaState, UnvalidatedVariableDefinition, UseRefetchFieldRefetchStrategy,
+    ValidateEntrypointDeclarationError,
 };
 
 pub type ValidatedSchemaServerField = SchemaServerField<
     GraphQLTypeAnnotation<<ValidatedSchemaState as SchemaValidationState>::FieldTypeAssociatedData>,
+    <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
 >;
 
 pub type ValidatedSelection = Selection<
@@ -284,9 +286,9 @@ fn validate_and_transform_field(
         };
 
     let valid_arguments =
-        match get_all_errors_or_all_ok(empty_field.arguments.into_iter().map(|arg| {
+        match get_all_errors_or_all_ok(empty_field.arguments.into_iter().map(|argument| {
             validate_server_field_argument(
-                arg,
+                argument,
                 schema_data,
                 empty_field.parent_type_id,
                 empty_field.name,
@@ -318,7 +320,10 @@ fn validate_and_transform_field(
 fn validate_server_field_type_exists(
     schema_data: &ServerFieldData,
     server_field_type: &GraphQLTypeAnnotation<UnvalidatedTypeName>,
-    field: &SchemaServerField<()>,
+    field: &SchemaServerField<
+        (),
+        <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+    >,
 ) -> ValidateSchemaResult<GraphQLTypeAnnotation<SelectableServerFieldId>> {
     // look up the item in defined_types. If it's not there, error.
     match schema_data.defined_types.get(server_field_type.inner()) {
@@ -336,11 +341,11 @@ fn validate_server_field_type_exists(
 }
 
 fn validate_server_field_argument(
-    argument: WithLocation<GraphQLInputValueDefinition>,
+    argument: WithLocation<UnvalidatedVariableDefinition>,
     schema_data: &ServerFieldData,
     parent_type_id: ServerObjectId,
     name: WithLocation<SelectableFieldName>,
-) -> ValidateSchemaResult<WithLocation<GraphQLInputValueDefinition>> {
+) -> ValidateSchemaResult<WithLocation<ValidatedVariableDefinition>> {
     // Isograph doesn't care about the default value, and that remains
     // unvalidated.
 
@@ -349,7 +354,14 @@ fn validate_server_field_argument(
         .defined_types
         .get(&(*argument.item.type_.inner()).into())
     {
-        Some(_) => Ok(argument),
+        Some(selectable_server_field_id) => Ok(WithLocation::new(
+            VariableDefinition {
+                name: argument.item.name,
+                type_: argument.item.type_.map(|_| *selectable_server_field_id),
+                default_value: argument.item.default_value,
+            },
+            argument.location,
+        )),
         None => Err(WithLocation::new(
             ValidateSchemaError::FieldArgumentTypeDoesNotExist {
                 parent_type_name: schema_data.object(parent_type_id).name,
@@ -458,7 +470,7 @@ fn validate_use_refetch_field_strategy(
 
 fn validate_variable_definitions(
     schema_data: &ServerFieldData,
-    variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
+    variable_definitions: Vec<WithSpan<UnvalidatedVariableDefinition>>,
 ) -> ValidateSchemaResult<Vec<WithSpan<ValidatedVariableDefinition>>> {
     variable_definitions
         .into_iter()
@@ -812,10 +824,10 @@ pub enum ValidateSchemaError {
         "The argument `{argument_name}` on field `{parent_type_name}.{field_name}` has inner type `{argument_type}`, which does not exist."
     )]
     FieldArgumentTypeDoesNotExist {
-        argument_name: InputValueName,
+        argument_name: VariableName,
         parent_type_name: IsographObjectTypeName,
         field_name: SelectableFieldName,
-        argument_type: InputTypeName,
+        argument_type: UnvalidatedTypeName,
     },
 
     #[error(

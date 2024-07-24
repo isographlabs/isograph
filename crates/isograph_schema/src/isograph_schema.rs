@@ -7,8 +7,8 @@ use common_lang_types::{
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition,
-    GraphQLInputObjectTypeDefinition, GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition,
-    GraphQLObjectTypeDefinition, GraphQLTypeAnnotation, NamedTypeAnnotation,
+    GraphQLInputObjectTypeDefinition, GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition,
+    GraphQLTypeAnnotation, NamedTypeAnnotation,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -48,7 +48,7 @@ pub trait SchemaValidationState: Debug {
     /// The associated data type of client fields' variable definitions
     /// - Unvalidated: UnvalidatedTypeName
     /// - Validated: FieldDefinition
-    type VariableDefinitionInnerType: Debug;
+    type VariableDefinitionInnerType: Debug + Clone;
 
     /// What we store in entrypoints
     /// - Unvalidated: (TextSource, WithSpan<ObjectTypeAndField>)
@@ -70,7 +70,10 @@ pub struct RootOperationName(pub String);
 #[derive(Debug)]
 pub struct Schema<TSchemaValidationState: SchemaValidationState> {
     pub server_fields: Vec<
-        SchemaServerField<GraphQLTypeAnnotation<TSchemaValidationState::FieldTypeAssociatedData>>,
+        SchemaServerField<
+            GraphQLTypeAnnotation<TSchemaValidationState::FieldTypeAssociatedData>,
+            TSchemaValidationState::VariableDefinitionInnerType,
+        >,
     >,
     pub client_fields: Vec<
         ClientField<
@@ -152,8 +155,10 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
     pub fn server_field(
         &self,
         server_field_id: ServerFieldId,
-    ) -> &SchemaServerField<GraphQLTypeAnnotation<TSchemaValidationState::FieldTypeAssociatedData>>
-    {
+    ) -> &SchemaServerField<
+        GraphQLTypeAnnotation<TSchemaValidationState::FieldTypeAssociatedData>,
+        TSchemaValidationState::VariableDefinitionInnerType,
+    > {
         &self.server_fields[server_field_id.as_usize()]
     }
 
@@ -356,7 +361,7 @@ pub struct ValidRefinement {
 }
 
 #[derive(Debug, Clone)]
-pub struct SchemaServerField<TData> {
+pub struct SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData> {
     pub description: Option<DescriptionValue>,
     /// The name of the server field and the location where it was defined
     /// (i.e. for client fields, an iso literal, and for server fields, the schema
@@ -366,14 +371,17 @@ pub struct SchemaServerField<TData> {
     pub associated_data: TData,
     pub parent_type_id: ServerObjectId,
     // pub directives: Vec<Directive<ConstantValue>>,
-    pub arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+    pub arguments:
+        Vec<WithLocation<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
 }
 
-impl<TData> SchemaServerField<TData> {
+impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone>
+    SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData>
+{
     pub fn and_then<TData2, E>(
         &self,
         convert: impl FnOnce(&TData) -> Result<TData2, E>,
-    ) -> Result<SchemaServerField<TData2>, E> {
+    ) -> Result<SchemaServerField<TData2, TClientFieldVariableDefinitionAssociatedData>, E> {
         Ok(SchemaServerField {
             description: self.description,
             name: self.name,
@@ -397,10 +405,15 @@ pub struct SchemaIdField<TData> {
     // pub directives: Vec<Directive<ConstantValue>>,
 }
 
-impl<TData: Copy> TryFrom<SchemaServerField<TData>> for SchemaIdField<TData> {
+impl<TData: Copy, TClientFieldVariableDefinitionAssociatedData>
+    TryFrom<SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData>>
+    for SchemaIdField<TData>
+{
     type Error = ();
 
-    fn try_from(value: SchemaServerField<TData>) -> Result<Self, Self::Error> {
+    fn try_from(
+        value: SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData>,
+    ) -> Result<Self, Self::Error> {
         // If the field is valid as an id field, we succeed, otherwise, fail.
         // Initially, that will mean checking that there are no arguments.
         // This will result in a lot of false positives, and that can be improved
@@ -574,9 +587,9 @@ pub struct ArgumentKeyAndValue {
     pub value: NonConstantValue,
 }
 
-impl<T> SchemaServerField<T> {
+impl<T, VariableDefinitionInnerType> SchemaServerField<T, VariableDefinitionInnerType> {
     // TODO probably unnecessary, and can be replaced with .map and .transpose
-    pub fn split(self) -> (SchemaServerField<()>, T) {
+    pub fn split(self) -> (SchemaServerField<(), VariableDefinitionInnerType>, T) {
         let Self {
             description,
             name,

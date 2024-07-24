@@ -7,7 +7,7 @@ use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ClientFieldId, EntrypointTypeAndField, IsographSelectionVariant, LinkedFieldSelection,
-    SelectableServerFieldId, ServerFieldId, ServerScalarId,
+    SelectableServerFieldId, ServerFieldId, ServerScalarId, VariableDefinition,
 };
 
 use crate::{
@@ -42,6 +42,11 @@ pub(crate) type UnvalidatedSchemaSchemaField = SchemaServerField<
     GraphQLTypeAnnotation<
         <UnvalidatedSchemaState as SchemaValidationState>::FieldTypeAssociatedData,
     >,
+    <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+>;
+
+pub type UnvalidatedVariableDefinition = VariableDefinition<
+    <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
 >;
 
 pub type UnvalidatedClientField = ClientField<

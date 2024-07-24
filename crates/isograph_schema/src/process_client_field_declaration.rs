@@ -3,7 +3,6 @@ use common_lang_types::{
     Location, ScalarFieldName, SelectableFieldName, Span, TextSource, UnvalidatedTypeName,
     WithLocation, WithSpan,
 };
-use graphql_lang_types::GraphQLInputValueDefinition;
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ClientFieldDeclaration, ClientFieldDeclarationWithValidatedDirectives, DeserializationError,
@@ -15,7 +14,7 @@ use thiserror::Error;
 use crate::{
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
     ClientField, FieldDefinitionLocation, FieldMapItem, ObjectTypeAndFieldName, RequiresRefinement,
-    UnvalidatedSchema, NODE_FIELD_NAME,
+    UnvalidatedSchema, UnvalidatedVariableDefinition, NODE_FIELD_NAME,
 };
 
 impl UnvalidatedSchema {
@@ -165,7 +164,7 @@ pub struct ImperativelyLoadedFieldVariant {
     pub top_level_schema_field_name: LinkedFieldName,
     /// The arguments we must pass to the top level schema field, e.g. id: ID!
     /// for node(id: $id)
-    pub top_level_schema_field_arguments: Vec<GraphQLInputValueDefinition>,
+    pub top_level_schema_field_arguments: Vec<UnvalidatedVariableDefinition>,
 
     /// If we need to select a sub-field, this is Some(...). We should model
     /// this differently, this is very awkward!

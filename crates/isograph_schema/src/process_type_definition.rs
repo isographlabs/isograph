@@ -8,17 +8,21 @@ use crate::{
 };
 use common_lang_types::{
     GraphQLObjectTypeName, GraphQLScalarTypeName, IsographObjectTypeName, Location,
-    SelectableFieldName, Span, StringLiteralValue, UnvalidatedTypeName, WithLocation, WithSpan,
+    SelectableFieldName, Span, StringLiteralValue, UnvalidatedTypeName, VariableName, WithLocation,
+    WithSpan,
 };
 use graphql_lang_types::{
-    GraphQLFieldDefinition, GraphQLScalarTypeDefinition, GraphQLTypeAnnotation,
-    GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument, GraphQLTypeSystemExtension,
-    GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition,
-    NamedTypeAnnotation, NonNullTypeAnnotation, RootOperationKind,
+    GraphQLFieldDefinition, GraphQLInputValueDefinition, GraphQLScalarTypeDefinition,
+    GraphQLTypeAnnotation, GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument,
+    GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
+    GraphQLTypeSystemExtensionOrDefinition, NamedTypeAnnotation, NonNullTypeAnnotation,
+    RootOperationKind,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_config::ConfigOptions;
-use isograph_lang_types::{SelectableServerFieldId, ServerObjectId, ServerStrongIdFieldId};
+use isograph_lang_types::{
+    SelectableServerFieldId, ServerObjectId, ServerStrongIdFieldId, VariableDefinition,
+};
 use lazy_static::lazy_static;
 use serde::Deserialize;
 use thiserror::Error;
@@ -654,7 +658,12 @@ fn get_field_objects_ids_and_names(
                     id: next_server_field_id,
                     associated_data: field.item.type_,
                     parent_type_id,
-                    arguments: field.item.arguments,
+                    arguments: field
+                        .item
+                        .arguments
+                        .into_iter()
+                        .map(graphql_input_value_definition_to_variable_definition)
+                        .collect::<Result<Vec<_>, _>>()?,
                 });
                 server_field_ids.push(next_server_field_id);
             }
@@ -713,6 +722,40 @@ fn get_field_objects_ids_and_names(
     })
 }
 
+pub fn graphql_input_value_definition_to_variable_definition(
+    input_value_definition: WithLocation<GraphQLInputValueDefinition>,
+) -> ProcessTypeDefinitionResult<WithLocation<VariableDefinition<UnvalidatedTypeName>>> {
+    let default_value = input_value_definition
+        .item
+        .default_value
+        .map(|graphql_constant_value| {
+            Ok::<_, WithLocation<ProcessTypeDefinitionError>>(WithLocation::new(
+                convert_graphql_constant_value_to_isograph_constant_value(
+                    graphql_constant_value.item,
+                )
+                .ok_or_else(|| {
+                    WithLocation::new(
+                        ProcessTypeDefinitionError::UnsupportedConstant,
+                        graphql_constant_value.location,
+                    )
+                })?,
+                graphql_constant_value.location,
+            ))
+        })
+        .transpose()?;
+    Ok(WithLocation::new(
+        VariableDefinition {
+            name: input_value_definition.item.name.map(VariableName::from),
+            type_: input_value_definition
+                .item
+                .type_
+                .map(UnvalidatedTypeName::from),
+            default_value,
+        },
+        input_value_definition.location,
+    ))
+}
+
 /// If we have encountered an id field, we can:
 /// - validate that the id field is properly defined, i.e. has type ID!
 /// - set the id field
@@ -760,6 +803,20 @@ fn set_and_validate_id_field(
             })?;
             Ok(())
         }
+    }
+}
+
+fn convert_graphql_constant_value_to_isograph_constant_value(
+    graphql_constant_value: graphql_lang_types::GraphQLConstantValue,
+) -> Option<isograph_lang_types::ConstantValue> {
+    match graphql_constant_value {
+        graphql_lang_types::GraphQLConstantValue::Int(i) => {
+            Some(isograph_lang_types::ConstantValue::Integer(i))
+        }
+        graphql_lang_types::GraphQLConstantValue::Boolean(b) => {
+            Some(isograph_lang_types::ConstantValue::Boolean(b))
+        }
+        _ => None,
     }
 }
 
@@ -906,4 +963,7 @@ pub enum ProcessTypeDefinitionError {
 
     #[error("Failed to deserialize {0}")]
     FailedToDeserialize(String),
+
+    #[error("Unsupported constant value. Not all GraphQL constants are currently supported in Isograph.")]
+    UnsupportedConstant,
 }

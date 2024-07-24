@@ -1,16 +1,16 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    InputValueName, IsographObjectTypeName, Location, SelectableFieldName, StringLiteralValue,
+    IsographObjectTypeName, Location, SelectableFieldName, StringLiteralValue, VariableName,
     WithLocation,
 };
-use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
+use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{SelectableServerFieldId, ServerFieldId};
 
 use crate::{
     FieldDefinitionLocation, FieldMapItem, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
-    ProcessedFieldMapItem, UnvalidatedSchema,
+    ProcessedFieldMapItem, UnvalidatedSchema, UnvalidatedVariableDefinition,
 };
 
 pub(crate) struct ArgumentMap {
@@ -18,7 +18,7 @@ pub(crate) struct ArgumentMap {
 }
 
 impl ArgumentMap {
-    pub(crate) fn new(arguments: Vec<WithLocation<GraphQLInputValueDefinition>>) -> Self {
+    pub(crate) fn new(arguments: Vec<WithLocation<UnvalidatedVariableDefinition>>) -> Self {
         Self {
             arguments: arguments
                 .into_iter()
@@ -139,7 +139,7 @@ impl ArgumentMap {
 }
 
 enum PotentiallyModifiedArgument {
-    Unmodified(GraphQLInputValueDefinition),
+    Unmodified(UnvalidatedVariableDefinition),
     Modified(ModifiedArgument),
 }
 
@@ -181,7 +181,7 @@ pub(crate) struct ModifiedField {
 
 #[derive(Debug)]
 struct ModifiedArgument {
-    name: WithLocation<InputValueName>,
+    name: WithLocation<VariableName>,
     object: GraphQLTypeAnnotation<ModifiedObject>,
 }
 
@@ -195,7 +195,7 @@ impl ModifiedArgument {
     ///
     /// This panics if unmodified's type is a scalar.
     pub fn from_unmodified(
-        unmodified: &GraphQLInputValueDefinition,
+        unmodified: &UnvalidatedVariableDefinition,
         schema: &UnvalidatedSchema,
     ) -> Self {
         // TODO I think we have validated that the item exists already.
