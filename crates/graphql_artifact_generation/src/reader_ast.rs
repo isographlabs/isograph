@@ -1,14 +1,12 @@
 use std::collections::{BTreeSet, HashSet};
 
 use common_lang_types::{SelectableFieldName, WithSpan};
-use isograph_lang_types::{
-    ClientFieldId, IsographSelectionVariant, RefetchQueryIndex, Selection, ServerFieldSelection,
-};
+use isograph_lang_types::{ClientFieldId, RefetchQueryIndex, Selection, ServerFieldSelection};
 use isograph_schema::{
     into_name_and_arguments, ArgumentKeyAndValue, ClientFieldVariant, FieldDefinitionLocation,
     NameAndArguments, PathToRefetchField, RefetchedPathsMap, ValidatedClientField,
-    ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection, ValidatedSchema,
-    ValidatedSelection,
+    ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
+    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSelection,
 };
 
 use crate::{
@@ -126,7 +124,7 @@ fn scalar_client_defined_field_ast_node(
         ClientFieldVariant::UserWritten(_) => {
             if matches!(
                 scalar_field_selection.associated_data.selection_variant,
-                IsographSelectionVariant::Loadable(_)
+                ValidatedIsographSelectionVariant::Loadable(_)
             ) {
                 imperatively_loaded_variant_ast_node(
                     schema,
@@ -451,7 +449,7 @@ fn refetched_paths_with_path(
                                 _ => {
                                     if matches!(
                                         scalar_field_selection.associated_data.selection_variant,
-                                        IsographSelectionVariant::Loadable(_)
+                                        ValidatedIsographSelectionVariant::Loadable(_)
                                     ) {
                                         paths.insert(PathToRefetchField {
                                             linked_fields: path.clone(),

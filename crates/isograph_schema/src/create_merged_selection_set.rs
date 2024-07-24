@@ -19,8 +19,8 @@ use lazy_static::lazy_static;
 use crate::{
     expose_field_directive::RequiresRefinement, ArgumentKeyAndValue, ClientFieldVariant,
     FieldDefinitionLocation, ImperativelyLoadedFieldVariant, NameAndArguments, PathToRefetchField,
-    RootOperationName, SchemaObject, ValidatedClientField, ValidatedScalarFieldSelection,
-    ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection,
+    RootOperationName, SchemaObject, ValidatedClientField, ValidatedIsographSelectionVariant,
+    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -591,7 +591,7 @@ fn merge_validated_selections_into_selection_map(
                                 let newly_encountered_scalar_client_field =
                                     schema.client_field(*client_field_id);
 
-                                if let IsographSelectionVariant::Loadable(l) =
+                                if let ValidatedIsographSelectionVariant::Loadable(l) =
                                     scalar_field_selection.associated_data.selection_variant
                                 {
                                     merge_traversal_state.refetch_paths.insert(
@@ -786,10 +786,13 @@ fn merge_scalar_client_field(
     parent_merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_scalar_client_field: &ValidatedClientField,
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
-    selection_variant: &IsographSelectionVariant,
+    selection_variant: &ValidatedIsographSelectionVariant,
     recurse_into_loadable_fields: bool,
 ) {
-    let was_selected_loadably = matches!(selection_variant, &IsographSelectionVariant::Loadable(_));
+    let was_selected_loadably = matches!(
+        selection_variant,
+        &ValidatedIsographSelectionVariant::Loadable(_)
+    );
     let ClientFieldTraversalResult {
         traversal_state,
         complete_merged_selection_map,

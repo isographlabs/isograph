@@ -5,12 +5,13 @@ use common_lang_types::{
 use graphql_lang_types::{GraphQLTypeAnnotation, ListTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ClientFieldId, IsographSelectionVariant, NonConstantValue, SelectableServerFieldId, Selection,
-    SelectionFieldArgument, ServerFieldSelection,
+    ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection, SelectionFieldArgument,
+    ServerFieldSelection,
 };
 use isograph_schema::{
     ClientFieldTraversalResult, ClientFieldVariant, FieldDefinitionLocation, SchemaObject,
-    UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema, ValidatedSelection,
+    UserWrittenComponentVariant, ValidatedClientField, ValidatedIsographSelectionVariant,
+    ValidatedSchema, ValidatedSelection,
 };
 use lazy_static::lazy_static;
 use std::path::Path;
@@ -356,8 +357,8 @@ fn write_query_types_from_selection(
                             client_field.type_and_field.underscore_separated()
                         );
                         let output_type = match scalar_field.associated_data.selection_variant {
-                            IsographSelectionVariant::Regular => inner_output_type,
-                            IsographSelectionVariant::Loadable(_) => {
+                            ValidatedIsographSelectionVariant::Regular => inner_output_type,
+                            ValidatedIsographSelectionVariant::Loadable(_) => {
                                 *loadable_field_encountered = true;
                                 format!("LoadableField<void, {inner_output_type}>")
                             }

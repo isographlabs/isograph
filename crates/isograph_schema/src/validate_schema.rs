@@ -6,9 +6,9 @@ use common_lang_types::{
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation, NamedTypeAnnotation};
 use isograph_lang_types::{
-    ClientFieldId, IsographSelectionVariant, LinkedFieldSelection, ScalarFieldSelection,
-    SelectableServerFieldId, Selection, ServerFieldId, ServerObjectId, ServerScalarId,
-    UnvalidatedScalarFieldSelection, UnvalidatedSelection, VariableDefinition,
+    ClientFieldId, IsographSelectionVariant, LinkedFieldSelection, LoadableVariant,
+    ScalarFieldSelection, SelectableServerFieldId, Selection, ServerFieldId, ServerObjectId,
+    ServerScalarId, UnvalidatedScalarFieldSelection, UnvalidatedSelection, VariableDefinition,
 };
 use thiserror::Error;
 
@@ -56,13 +56,20 @@ pub type ValidatedSchemaIdField = SchemaIdField<NamedTypeAnnotation<ServerScalar
 #[derive(Debug)]
 pub struct ValidatedLinkedFieldAssociatedData {
     pub parent_object_id: ServerObjectId,
-    pub selection_variant: IsographSelectionVariant,
+    // N.B. we don't actually support loadable linked fields
+    pub selection_variant: ValidatedIsographSelectionVariant,
 }
 
 #[derive(Debug)]
 pub struct ValidatedScalarFieldAssociatedData {
     pub location: ValidatedFieldDefinitionLocation,
-    pub selection_variant: IsographSelectionVariant,
+    pub selection_variant: ValidatedIsographSelectionVariant,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ValidatedIsographSelectionVariant {
+    Regular,
+    Loadable(LoadableVariant),
 }
 
 #[derive(Debug)]
@@ -627,7 +634,14 @@ fn validate_field_type_exists_and_is_scalar(
                         name: scalar_field_selection.name,
                         associated_data: ValidatedScalarFieldAssociatedData {
                             location: FieldDefinitionLocation::Server(*server_field_id),
-                            selection_variant: scalar_field_selection.associated_data,
+                            selection_variant: match scalar_field_selection.associated_data {
+                                IsographSelectionVariant::Regular => {
+                                    ValidatedIsographSelectionVariant::Regular
+                                }
+                                IsographSelectionVariant::Loadable(l) => {
+                                    ValidatedIsographSelectionVariant::Loadable(l)
+                                }
+                            },
                         },
                         reader_alias: scalar_field_selection.reader_alias,
                         normalization_alias: scalar_field_selection.normalization_alias,
@@ -654,7 +668,14 @@ fn validate_field_type_exists_and_is_scalar(
                     unwraps: scalar_field_selection.unwraps,
                     associated_data: ValidatedScalarFieldAssociatedData {
                         location: FieldDefinitionLocation::Client(*client_field_id),
-                        selection_variant: scalar_field_selection.associated_data,
+                        selection_variant: match scalar_field_selection.associated_data {
+                            IsographSelectionVariant::Regular => {
+                                ValidatedIsographSelectionVariant::Regular
+                            }
+                            IsographSelectionVariant::Loadable(l) => {
+                                ValidatedIsographSelectionVariant::Loadable(l)
+                            }
+                        },
                     },
                     arguments: scalar_field_selection.arguments,
                     normalization_alias: scalar_field_selection.normalization_alias,
@@ -714,7 +735,10 @@ fn validate_field_type_exists_and_is_linked(
                                 unwraps: linked_field_selection.unwraps,
                                 associated_data: ValidatedLinkedFieldAssociatedData {
                                     parent_object_id: *object_id,
-                                    selection_variant: linked_field_selection.associated_data,
+                                    selection_variant: match linked_field_selection.associated_data {
+                                        IsographSelectionVariant::Regular => ValidatedIsographSelectionVariant::Regular,
+                                        IsographSelectionVariant::Loadable(l) => ValidatedIsographSelectionVariant::Loadable(l),
+                                    },
                                 },
                                 arguments: linked_field_selection.arguments,
                                 directives: linked_field_selection.directives
