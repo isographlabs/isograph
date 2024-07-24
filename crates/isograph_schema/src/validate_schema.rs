@@ -16,7 +16,7 @@ use crate::{
     ClientField, ClientFieldVariant, FieldDefinitionLocation, ImperativelyLoadedFieldVariant,
     RefetchStrategy, Schema, SchemaIdField, SchemaObject, SchemaServerField, SchemaValidationState,
     ServerFieldData, UnvalidatedClientField, UnvalidatedLinkedFieldSelection,
-    UnvalidatedRefetchFieldStrategy, UnvalidatedSchema, UnvalidatedSchemaField,
+    UnvalidatedRefetchFieldStrategy, UnvalidatedSchema, UnvalidatedSchemaSchemaField,
     UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
 };
 
@@ -215,7 +215,7 @@ fn transform_object_field_ids(unvalidated_object: SchemaObject) -> SchemaObject 
 }
 
 fn validate_and_transform_fields(
-    fields: Vec<UnvalidatedSchemaField>,
+    fields: Vec<UnvalidatedSchemaSchemaField>,
     schema_data: &ServerFieldData,
 ) -> Result<Vec<ValidatedSchemaServerField>, Vec<WithLocation<ValidateSchemaError>>> {
     get_all_errors_or_all_ok_iter(
@@ -266,7 +266,7 @@ fn get_all_errors_or_all_ok_iter<T, E>(
 }
 
 fn validate_and_transform_field(
-    field: UnvalidatedSchemaField,
+    field: UnvalidatedSchemaSchemaField,
     schema_data: &ServerFieldData,
 ) -> Result<ValidatedSchemaServerField, impl Iterator<Item = WithLocation<ValidateSchemaError>>> {
     // TODO rewrite as field.map(...).transpose()

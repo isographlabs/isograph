@@ -3,7 +3,7 @@ use std::collections::{hash_map::Entry, HashMap};
 use crate::{
     EncounteredRootTypes, FieldDefinitionLocation, IsographObjectTypeDefinition,
     ProcessedRootTypes, RootOperationName, RootTypes, Schema, SchemaObject, SchemaScalar,
-    SchemaServerField, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaField,
+    SchemaServerField, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaSchemaField,
     ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
 };
 use common_lang_types::{
@@ -603,7 +603,7 @@ fn get_typename_type(
 }
 
 struct FieldObjectIdsEtc {
-    unvalidated_schema_fields: Vec<UnvalidatedSchemaField>,
+    unvalidated_schema_fields: Vec<UnvalidatedSchemaSchemaField>,
     // TODO this should be HashMap<_, WithLocation<_>> or something
     encountered_fields: HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
     // TODO this should not be a ServerFieldId, but a special type

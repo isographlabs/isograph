@@ -38,7 +38,7 @@ pub type UnvalidatedSchema = Schema<UnvalidatedSchemaState>;
 /// client field.)
 pub type UnvalidatedObjectFieldInfo = FieldDefinitionLocation<ServerFieldId, ClientFieldId>;
 
-pub(crate) type UnvalidatedSchemaField =
+pub(crate) type UnvalidatedSchemaSchemaField =
     SchemaServerField<GraphQLTypeAnnotation<
         <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldVariableDefinitionAssociatedData
     >>;
