@@ -28,7 +28,7 @@ impl GraphQLConstantValue {
 
 #[allow(dead_code)]
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum Value {
+pub enum GraphQLNonConstantValue {
     Variable(VariableName),
     Int(i64),
     Float(FloatValue),
@@ -37,8 +37,8 @@ pub enum Value {
     Null,
     Enum(EnumLiteralValue),
     // This is weird! We can be more consistent vis-a-vis where the WithSpan appears.
-    List(Vec<WithSpan<Value>>),
-    Object(Vec<NameValuePair<ValueKeyName, Value>>),
+    List(Vec<WithSpan<GraphQLNonConstantValue>>),
+    Object(Vec<NameValuePair<ValueKeyName, GraphQLNonConstantValue>>),
 }
 
 /// ValueType is a trait that is only fulfilled by values and constant
@@ -46,7 +46,7 @@ pub enum Value {
 /// variables.
 pub trait ValueType: fmt::Display {}
 
-impl ValueType for Value {}
+impl ValueType for GraphQLNonConstantValue {}
 impl ValueType for GraphQLConstantValue {}
 
 impl fmt::Display for GraphQLConstantValue {
@@ -78,7 +78,7 @@ impl fmt::Display for GraphQLConstantValue {
     }
 }
 
-impl fmt::Display for Value {
+impl fmt::Display for GraphQLNonConstantValue {
     fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
         todo!()
     }
