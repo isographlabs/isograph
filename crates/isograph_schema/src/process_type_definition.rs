@@ -732,13 +732,7 @@ pub fn graphql_input_value_definition_to_variable_definition(
             Ok::<_, WithLocation<ProcessTypeDefinitionError>>(WithLocation::new(
                 convert_graphql_constant_value_to_isograph_constant_value(
                     graphql_constant_value.item,
-                )
-                .ok_or_else(|| {
-                    WithLocation::new(
-                        ProcessTypeDefinitionError::UnsupportedConstant,
-                        graphql_constant_value.location,
-                    )
-                })?,
+                ),
                 graphql_constant_value.location,
             ))
         })
@@ -808,54 +802,50 @@ fn set_and_validate_id_field(
 
 fn convert_graphql_constant_value_to_isograph_constant_value(
     graphql_constant_value: graphql_lang_types::GraphQLConstantValue,
-) -> Option<isograph_lang_types::ConstantValue> {
+) -> isograph_lang_types::ConstantValue {
     match graphql_constant_value {
         graphql_lang_types::GraphQLConstantValue::Int(i) => {
-            Some(isograph_lang_types::ConstantValue::Integer(i))
+            isograph_lang_types::ConstantValue::Integer(i)
         }
         graphql_lang_types::GraphQLConstantValue::Boolean(b) => {
-            Some(isograph_lang_types::ConstantValue::Boolean(b))
+            isograph_lang_types::ConstantValue::Boolean(b)
         }
         graphql_lang_types::GraphQLConstantValue::String(s) => {
-            Some(isograph_lang_types::ConstantValue::String(s))
+            isograph_lang_types::ConstantValue::String(s)
         }
         graphql_lang_types::GraphQLConstantValue::Float(f) => {
-            Some(isograph_lang_types::ConstantValue::Float(f))
+            isograph_lang_types::ConstantValue::Float(f)
         }
-        graphql_lang_types::GraphQLConstantValue::Null => {
-            Some(isograph_lang_types::ConstantValue::Null)
-        }
+        graphql_lang_types::GraphQLConstantValue::Null => isograph_lang_types::ConstantValue::Null,
         graphql_lang_types::GraphQLConstantValue::Enum(e) => {
-            Some(isograph_lang_types::ConstantValue::Enum(e))
+            isograph_lang_types::ConstantValue::Enum(e)
         }
         graphql_lang_types::GraphQLConstantValue::List(l) => {
             let converted_list = l
                 .into_iter()
                 .map(|x| {
-                    Some(WithLocation::new(
-                        convert_graphql_constant_value_to_isograph_constant_value(x.item)?,
+                    WithLocation::new(
+                        convert_graphql_constant_value_to_isograph_constant_value(x.item),
                         x.location,
-                    ))
+                    )
                 })
-                .collect::<Option<Vec<_>>>()?;
-            Some(isograph_lang_types::ConstantValue::List(converted_list))
+                .collect::<Vec<_>>();
+            isograph_lang_types::ConstantValue::List(converted_list)
         }
         graphql_lang_types::GraphQLConstantValue::Object(o) => {
             let converted_object = o
                 .into_iter()
-                .map(|name_value_pair| {
-                    Some(NameValuePair {
-                        name: name_value_pair.name,
-                        value: WithLocation::new(
-                            convert_graphql_constant_value_to_isograph_constant_value(
-                                name_value_pair.value.item,
-                            )?,
-                            name_value_pair.value.location,
+                .map(|name_value_pair| NameValuePair {
+                    name: name_value_pair.name,
+                    value: WithLocation::new(
+                        convert_graphql_constant_value_to_isograph_constant_value(
+                            name_value_pair.value.item,
                         ),
-                    })
+                        name_value_pair.value.location,
+                    ),
                 })
-                .collect::<Option<Vec<_>>>()?;
-            Some(isograph_lang_types::ConstantValue::Object(converted_object))
+                .collect::<Vec<_>>();
+            isograph_lang_types::ConstantValue::Object(converted_object)
         }
     }
 }
@@ -1003,7 +993,4 @@ pub enum ProcessTypeDefinitionError {
 
     #[error("Failed to deserialize {0}")]
     FailedToDeserialize(String),
-
-    #[error("Unsupported constant value. Not all GraphQL constants are currently supported in Isograph.")]
-    UnsupportedConstant,
 }
