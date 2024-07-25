@@ -11,6 +11,7 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 - Network errors
 - Userland impl of pagination, live queries, useQueryLoader (w/ intersection observer)
 - Load normalization ASTs (etc) when a non-null network response is received. Does this require `as Foo`?
+  - load normalization ASTs for loadable fields after a request is made
 
 ### id from args
 
