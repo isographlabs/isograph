@@ -68,6 +68,11 @@ export const schema = createSchema({
   resolvers: {
     Query: {
       pet: (_obj, args) => getPet(args.id),
+      petByName: (_obj, args) =>
+        pets.find(
+          (pet) =>
+            pet.name.split(' ')[0].toLowerCase() === args.name.toLowerCase(),
+        ),
       pets: () => pets,
       node: (_obj, args) => {
         return getPet(args.id);

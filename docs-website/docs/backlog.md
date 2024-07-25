@@ -14,7 +14,6 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 
 ### id from args
 
-- convert client fields (etc) to use variable defs instead of GraphQLInputValueDefinition
 - validate that each field selection has the right variables and handle missing args
 - update type gen and query gen to show missing args
 

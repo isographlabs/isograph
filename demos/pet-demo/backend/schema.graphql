@@ -1,6 +1,7 @@
 type Query {
   pets: [Pet!]!
   pet(id: ID!): Pet
+  petByName(name: String!): Pet
   node(id: ID!): Node
 }
 

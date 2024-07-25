@@ -2,7 +2,11 @@ import { useRouter } from 'next/router';
 
 export type PetId = string;
 
-export type Route = HomeRoute | PetDetailRoute | PetDetailDeferredRoute;
+export type Route =
+  | HomeRoute
+  | PetDetailRoute
+  | PetDetailDeferredRoute
+  | PetByNameRoute;
 
 export type HomeRoute = {
   kind: 'Home';
@@ -16,6 +20,11 @@ export type PetDetailRoute = {
 export type PetDetailDeferredRoute = {
   kind: 'PetDetailDeferred';
   id: PetId;
+};
+
+export type PetByNameRoute = {
+  kind: 'PetByName';
+  name: string;
 };
 
 export function useNavigateTo() {
@@ -33,6 +42,9 @@ function toRouteUrl(route: Route): string {
     }
     case 'PetDetailDeferred': {
       return `/pet/with-defer/${route.id}`;
+    }
+    case 'PetByName': {
+      return `/pet/by-name/${route.name}`;
     }
   }
 }
