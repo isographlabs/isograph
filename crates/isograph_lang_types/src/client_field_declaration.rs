@@ -3,7 +3,7 @@ use common_lang_types::{
     LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName, SelectableFieldName,
     StringLiteralValue, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
-use graphql_lang_types::GraphQLTypeAnnotation;
+use graphql_lang_types::{FloatValue, GraphQLTypeAnnotation};
 use serde::Deserialize;
 
 use crate::IsographFieldDirective;
@@ -299,6 +299,7 @@ pub enum NonConstantValue {
     Integer(i64),
     Boolean(bool),
     String(StringLiteralValue),
+    Float(FloatValue),
 }
 
 impl NonConstantValue {
@@ -319,6 +320,8 @@ impl NonConstantValue {
             // spaces, which would break things.
             // TODO get a solution or validate
             NonConstantValue::String(string) => format!("s_{}", string),
+            // Also not correct
+            NonConstantValue::Float(f) => format!("l_{}", f.as_float()),
         }
     }
 }
@@ -328,6 +331,7 @@ pub enum ConstantValue {
     Integer(i64),
     Boolean(bool),
     String(StringLiteralValue),
+    Float(FloatValue),
 }
 
 impl TryFrom<NonConstantValue> for ConstantValue {
@@ -339,6 +343,7 @@ impl TryFrom<NonConstantValue> for ConstantValue {
             NonConstantValue::Integer(i) => Ok(ConstantValue::Integer(i)),
             NonConstantValue::Boolean(b) => Ok(ConstantValue::Boolean(b)),
             NonConstantValue::String(s) => Ok(ConstantValue::String(s)),
+            NonConstantValue::Float(f) => Ok(ConstantValue::Float(f)),
         }
     }
 }
