@@ -1,10 +1,10 @@
 use common_lang_types::{
     ConstExportName, DescriptionValue, EnumLiteralValue, FieldArgumentName, FieldNameOrAlias,
     FilePath, HasName, LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName,
-    SelectableFieldName, StringLiteralValue, UnvalidatedTypeName, VariableName, WithLocation,
-    WithSpan,
+    SelectableFieldName, StringLiteralValue, UnvalidatedTypeName, ValueKeyName, VariableName,
+    WithLocation, WithSpan,
 };
-use graphql_lang_types::{FloatValue, GraphQLTypeAnnotation};
+use graphql_lang_types::{FloatValue, GraphQLTypeAnnotation, NameValuePair};
 use serde::Deserialize;
 
 use crate::IsographFieldDirective;
@@ -305,6 +305,7 @@ pub enum NonConstantValue {
     Enum(EnumLiteralValue),
     // This is weird! We can be more consistent vis-a-vis where the WithSpan appears.
     List(Vec<WithLocation<NonConstantValue>>),
+    Object(Vec<NameValuePair<ValueKeyName, NonConstantValue>>),
 }
 
 impl NonConstantValue {
@@ -330,6 +331,7 @@ impl NonConstantValue {
             NonConstantValue::Null => format!("l_null"),
             NonConstantValue::Enum(e) => format!("e_{e}"),
             NonConstantValue::List(_) => panic!("Lists are not supported here"),
+            NonConstantValue::Object(_) => panic!("Objects not supported here"),
         }
     }
 }
@@ -344,6 +346,7 @@ pub enum ConstantValue {
     Enum(EnumLiteralValue),
     // This is weird! We can be more consistent vis-a-vis where the WithSpan appears.
     List(Vec<WithLocation<ConstantValue>>),
+    Object(Vec<NameValuePair<ValueKeyName, ConstantValue>>),
 }
 
 impl TryFrom<NonConstantValue> for ConstantValue {
@@ -366,6 +369,21 @@ impl TryFrom<NonConstantValue> for ConstantValue {
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(ConstantValue::List(converted_list))
+            }
+            NonConstantValue::Object(o) => {
+                let converted_object = o
+                    .into_iter()
+                    .map(|name_value_pair| {
+                        Ok::<_, Self::Error>(NameValuePair {
+                            name: name_value_pair.name,
+                            value: WithLocation::new(
+                                name_value_pair.value.item.try_into()?,
+                                name_value_pair.value.location,
+                            ),
+                        })
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(ConstantValue::Object(converted_object))
             }
         }
     }

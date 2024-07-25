@@ -15,8 +15,8 @@ use graphql_lang_types::{
     GraphQLFieldDefinition, GraphQLInputValueDefinition, GraphQLScalarTypeDefinition,
     GraphQLTypeAnnotation, GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument,
     GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
-    GraphQLTypeSystemExtensionOrDefinition, NamedTypeAnnotation, NonNullTypeAnnotation,
-    RootOperationKind,
+    GraphQLTypeSystemExtensionOrDefinition, NameValuePair, NamedTypeAnnotation,
+    NonNullTypeAnnotation, RootOperationKind,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_config::ConfigOptions;
@@ -838,7 +838,23 @@ fn convert_graphql_constant_value_to_isograph_constant_value(
                 .collect::<Option<Vec<_>>>()?;
             Some(isograph_lang_types::ConstantValue::List(converted_list))
         }
-        graphql_lang_types::GraphQLConstantValue::Object(_) => None,
+        graphql_lang_types::GraphQLConstantValue::Object(o) => {
+            let converted_object = o
+                .into_iter()
+                .map(|name_value_pair| {
+                    Some(NameValuePair {
+                        name: name_value_pair.name,
+                        value: WithLocation::new(
+                            convert_graphql_constant_value_to_isograph_constant_value(
+                                name_value_pair.value.item,
+                            )?,
+                            name_value_pair.value.location,
+                        ),
+                    })
+                })
+                .collect::<Option<Vec<_>>>()?;
+            Some(isograph_lang_types::ConstantValue::Object(converted_object))
+        }
     }
 }
 

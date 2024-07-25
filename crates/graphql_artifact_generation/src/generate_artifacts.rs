@@ -267,6 +267,7 @@ pub(crate) fn get_serialized_field_arguments(
                 )
             }
             NonConstantValue::List(_) => panic!("Lists are not supported here"),
+            NonConstantValue::Object(_) => panic!("Objects not supported here"),
         };
 
         s.push_str(&arg_value);

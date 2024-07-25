@@ -160,6 +160,7 @@ impl<'de> Deserializer<'de> for NonConstantValueDeserializer<'de> {
             NonConstantValue::List(_) => {
                 panic!("Deserializing from lists is not yet supported here.")
             }
+            NonConstantValue::Object(_) => panic!("Deserializing objects not yet supported here."),
         }
     }
 
