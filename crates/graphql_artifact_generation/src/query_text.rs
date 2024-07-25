@@ -150,5 +150,6 @@ fn serialize_non_constant_value_for_graphql(value: &NonConstantValue) -> String 
         // This clearly isn't correct — the string might have quotes in it and such
         NonConstantValue::String(s) => format!("\"{}\"", s.to_string()),
         NonConstantValue::Float(f) => f.as_float().to_string(),
+        NonConstantValue::Null => "null".to_string(),
     }
 }

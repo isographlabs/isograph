@@ -300,6 +300,7 @@ pub enum NonConstantValue {
     Boolean(bool),
     String(StringLiteralValue),
     Float(FloatValue),
+    Null,
 }
 
 impl NonConstantValue {
@@ -322,6 +323,7 @@ impl NonConstantValue {
             NonConstantValue::String(string) => format!("s_{}", string),
             // Also not correct
             NonConstantValue::Float(f) => format!("l_{}", f.as_float()),
+            NonConstantValue::Null => format!("l_null"),
         }
     }
 }
@@ -332,6 +334,7 @@ pub enum ConstantValue {
     Boolean(bool),
     String(StringLiteralValue),
     Float(FloatValue),
+    Null,
 }
 
 impl TryFrom<NonConstantValue> for ConstantValue {
@@ -344,6 +347,7 @@ impl TryFrom<NonConstantValue> for ConstantValue {
             NonConstantValue::Boolean(b) => Ok(ConstantValue::Boolean(b)),
             NonConstantValue::String(s) => Ok(ConstantValue::String(s)),
             NonConstantValue::Float(f) => Ok(ConstantValue::Float(f)),
+            NonConstantValue::Null => Ok(ConstantValue::Null),
         }
     }
 }
