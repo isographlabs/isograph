@@ -1,6 +1,6 @@
 use std::fmt;
 
-use super::{write::write_arguments, NameValuePair, ValueType};
+use super::{write::write_arguments, NameValuePair};
 use crate::GraphQLConstantValue;
 use common_lang_types::{DirectiveArgumentName, DirectiveName, WithEmbeddedLocation};
 use intern::Lookup;
@@ -12,12 +12,12 @@ use thiserror::Error;
 
 // TODO maybe this should be NameAndArguments and a field should be the same thing...?
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct GraphQLDirective<T: ValueType> {
+pub struct GraphQLDirective<T> {
     pub name: WithEmbeddedLocation<DirectiveName>,
     pub arguments: Vec<NameValuePair<DirectiveArgumentName, T>>,
 }
 
-impl<T: ValueType> fmt::Display for GraphQLDirective<T> {
+impl<T: fmt::Display> fmt::Display for GraphQLDirective<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "@{}", self.name)?;
         write_arguments(f, &self.arguments)?;
@@ -114,17 +114,15 @@ impl<'de, T: Lookup + Copy> MapAccess<'de> for NameValuePairVecDeserializer<'de,
     }
 }
 
-struct NameDeserializer<'a, TName, TValue: ValueType> {
+struct NameDeserializer<'a, TName, TValue> {
     name_value_pair: &'a NameValuePair<TName, TValue>,
 }
 
-struct ValueDeserializer<'a, TName, TValue: ValueType> {
+struct ValueDeserializer<'a, TName, TValue> {
     name_value_pair: &'a NameValuePair<TName, TValue>,
 }
 
-impl<'de, TName: Lookup + Copy, TValue: ValueType> Deserializer<'de>
-    for NameDeserializer<'de, TName, TValue>
-{
+impl<'de, TName: Lookup + Copy, TValue> Deserializer<'de> for NameDeserializer<'de, TName, TValue> {
     type Error = DeserializationError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -162,7 +160,9 @@ impl<'de> Deserializer<'de> for ConstantValueDeserializer<'de> {
     {
         match self.value {
             GraphQLConstantValue::Boolean(bool) => visitor.visit_bool(*bool),
-            GraphQLConstantValue::Enum(enum_literal) => visitor.visit_borrowed_str(enum_literal.lookup()),
+            GraphQLConstantValue::Enum(enum_literal) => {
+                visitor.visit_borrowed_str(enum_literal.lookup())
+            }
             GraphQLConstantValue::Float(float_value) => visitor.visit_f64(float_value.as_float()),
             GraphQLConstantValue::Int(i_64) => visitor.visit_i64(*i_64),
             GraphQLConstantValue::String(string) => visitor.visit_borrowed_str(string.lookup()),

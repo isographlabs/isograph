@@ -1,10 +1,10 @@
 use std::fmt;
 
-use super::{GraphQLDirective, ValueType};
+use super::GraphQLDirective;
 
 // This should probably be its own crate?
 
-pub fn write_directives<T: ValueType>(
+pub fn write_directives<T: fmt::Display>(
     f: &mut fmt::Formatter<'_>,
     directives: &[GraphQLDirective<T>],
 ) -> fmt::Result {

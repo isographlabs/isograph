@@ -41,14 +41,6 @@ pub enum GraphQLNonConstantValue {
     Object(Vec<NameValuePair<ValueKeyName, GraphQLNonConstantValue>>),
 }
 
-/// ValueType is a trait that is only fulfilled by values and constant
-/// values, where the only difference is whether they can contain
-/// variables.
-pub trait ValueType: fmt::Display {}
-
-impl ValueType for GraphQLNonConstantValue {}
-impl ValueType for GraphQLConstantValue {}
-
 impl fmt::Display for GraphQLConstantValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -123,12 +115,12 @@ impl std::convert::From<i64> for FloatValue {
 
 // TODO get rid of this WithSpan and move it to the generic
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct NameValuePair<TName, TValue: ValueType> {
+pub struct NameValuePair<TName, TValue> {
     pub name: WithLocation<TName>,
     pub value: WithLocation<TValue>,
 }
 
-impl<TName, TValue: ValueType> NameValuePair<TName, TValue> {
+impl<TName, TValue> NameValuePair<TName, TValue> {
     pub fn map_name<U>(self, map: impl FnOnce(TName) -> U) -> NameValuePair<U, TValue> {
         NameValuePair {
             name: self.name.map(map),
@@ -137,7 +129,7 @@ impl<TName, TValue: ValueType> NameValuePair<TName, TValue> {
     }
 }
 
-impl<TName: fmt::Display, TValue: ValueType> fmt::Display for NameValuePair<TName, TValue> {
+impl<TName: fmt::Display, TValue: fmt::Display> fmt::Display for NameValuePair<TName, TValue> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!("{}: {}", self.name, self.value))
     }

@@ -11,14 +11,14 @@ use intern::{
 };
 
 use graphql_lang_types::{
-    GraphQLConstantValue, DirectiveLocation, GraphQLDirective, GraphQLDirectiveDefinition,
+    DirectiveLocation, GraphQLConstantValue, GraphQLDirective, GraphQLDirectiveDefinition,
     GraphQLEnumDefinition, GraphQLEnumValueDefinition, GraphQLFieldDefinition,
     GraphQLInputObjectTypeDefinition, GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition,
     GraphQLObjectTypeDefinition, GraphQLObjectTypeExtension, GraphQLScalarTypeDefinition,
     GraphQLSchemaDefinition, GraphQLTypeAnnotation, GraphQLTypeSystemDefinition,
     GraphQLTypeSystemDocument, GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
     GraphQLTypeSystemExtensionOrDefinition, GraphQLUnionTypeDefinition, ListTypeAnnotation,
-    NameValuePair, NamedTypeAnnotation, NonNullTypeAnnotation, RootOperationKind, ValueType,
+    NameValuePair, NamedTypeAnnotation, NonNullTypeAnnotation, RootOperationKind,
 };
 
 use crate::ParseResult;
@@ -669,7 +669,7 @@ fn parse_optional_constant_arguments<T: From<StringKey>>(
 }
 
 /// The state of the PeekableLexer is that it is about to parse the "foo" in "foo: bar"
-fn parse_constant_name_value_pair<T: From<StringKey>, TValue: ValueType>(
+fn parse_constant_name_value_pair<T: From<StringKey>, TValue>(
     tokens: &mut PeekableLexer,
     parse_value: impl Fn(&mut PeekableLexer) -> ParseResult<WithLocation<TValue>>,
     text_source: TextSource,
