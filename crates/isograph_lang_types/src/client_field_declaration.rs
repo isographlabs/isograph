@@ -303,6 +303,8 @@ pub enum NonConstantValue {
     Float(FloatValue),
     Null,
     Enum(EnumLiteralValue),
+    // This is weird! We can be more consistent vis-a-vis where the WithSpan appears.
+    List(Vec<WithLocation<NonConstantValue>>),
 }
 
 impl NonConstantValue {
@@ -327,6 +329,7 @@ impl NonConstantValue {
             NonConstantValue::Float(f) => format!("l_{}", f.as_float()),
             NonConstantValue::Null => format!("l_null"),
             NonConstantValue::Enum(e) => format!("e_{e}"),
+            NonConstantValue::List(_) => panic!("Lists are not supported here"),
         }
     }
 }
@@ -339,6 +342,8 @@ pub enum ConstantValue {
     Float(FloatValue),
     Null,
     Enum(EnumLiteralValue),
+    // This is weird! We can be more consistent vis-a-vis where the WithSpan appears.
+    List(Vec<WithLocation<ConstantValue>>),
 }
 
 impl TryFrom<NonConstantValue> for ConstantValue {
@@ -353,6 +358,15 @@ impl TryFrom<NonConstantValue> for ConstantValue {
             NonConstantValue::Float(f) => Ok(ConstantValue::Float(f)),
             NonConstantValue::Null => Ok(ConstantValue::Null),
             NonConstantValue::Enum(e) => Ok(ConstantValue::Enum(e)),
+            NonConstantValue::List(l) => {
+                let converted_list = l
+                    .into_iter()
+                    .map(|x| {
+                        Ok::<_, Self::Error>(WithLocation::new(x.item.try_into()?, x.location))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(ConstantValue::List(converted_list))
+            }
         }
     }
 }

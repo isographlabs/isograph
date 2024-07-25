@@ -826,7 +826,18 @@ fn convert_graphql_constant_value_to_isograph_constant_value(
         graphql_lang_types::GraphQLConstantValue::Enum(e) => {
             Some(isograph_lang_types::ConstantValue::Enum(e))
         }
-        graphql_lang_types::GraphQLConstantValue::List(_) => None,
+        graphql_lang_types::GraphQLConstantValue::List(l) => {
+            let converted_list = l
+                .into_iter()
+                .map(|x| {
+                    Some(WithLocation::new(
+                        convert_graphql_constant_value_to_isograph_constant_value(x.item)?,
+                        x.location,
+                    ))
+                })
+                .collect::<Option<Vec<_>>>()?;
+            Some(isograph_lang_types::ConstantValue::List(converted_list))
+        }
         graphql_lang_types::GraphQLConstantValue::Object(_) => None,
     }
 }
