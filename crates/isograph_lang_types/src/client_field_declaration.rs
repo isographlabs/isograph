@@ -296,7 +296,7 @@ impl SelectionFieldArgument {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum NonConstantValue {
     Variable(VariableName),
-    Integer(u64),
+    Integer(i64),
     Boolean(bool),
 }
 
@@ -321,7 +321,7 @@ impl NonConstantValue {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum ConstantValue {
-    Integer(u64),
+    Integer(i64),
     Boolean(bool),
 }
 
