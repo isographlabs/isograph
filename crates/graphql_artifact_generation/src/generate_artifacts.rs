@@ -200,7 +200,7 @@ pub(crate) fn get_serialized_field_arguments(
 
     for argument in arguments {
         let argument_name = argument.name.item;
-        let arg_value = match argument.value.item {
+        let arg_value = match &argument.value.item {
             NonConstantValue::Variable(variable_name) => {
                 format!(
                     "\n\
@@ -225,7 +225,16 @@ pub(crate) fn get_serialized_field_arguments(
                     "\n\
                     {indent_1}[\n\
                     {indent_2}\"{argument_name}\",\n\
-                    {indent_2}\"{{ kind: \"Literal\", value: {bool_string} }},\n\
+                    {indent_2}{{ kind: \"Literal\", value: {bool_string} }},\n\
+                    {indent_1}],\n"
+                )
+            }
+            NonConstantValue::String(s) => {
+                format!(
+                    "\n\
+                    {indent_1}[\n\
+                    {indent_2}\"{argument_name}\",\n\
+                    {indent_2}{{ kind: \"String\", value: \"{s}\" }},\n\
                     {indent_1}],\n"
                 )
             }

@@ -1,7 +1,7 @@
 use common_lang_types::{
     ConstExportName, DescriptionValue, FieldArgumentName, FieldNameOrAlias, FilePath, HasName,
     LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName, SelectableFieldName,
-    UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
+    StringLiteralValue, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use serde::Deserialize;
@@ -298,14 +298,14 @@ pub enum NonConstantValue {
     Variable(VariableName),
     Integer(i64),
     Boolean(bool),
+    String(StringLiteralValue),
 }
 
 impl NonConstantValue {
     pub fn reachable_variables(&self) -> Vec<VariableName> {
         match self {
             NonConstantValue::Variable(name) => vec![*name],
-            NonConstantValue::Integer(_) => vec![],
-            NonConstantValue::Boolean(_) => vec![],
+            _ => vec![],
         }
     }
 
@@ -315,6 +315,10 @@ impl NonConstantValue {
             // l for literal, i.e. this is shared with others
             NonConstantValue::Integer(int_value) => format!("l_{}", int_value),
             NonConstantValue::Boolean(bool) => format!("l_{}", bool),
+            // N.B. This clearly isn't correct, the string can (for example) include
+            // spaces, which would break things.
+            // TODO get a solution or validate
+            NonConstantValue::String(string) => format!("s_{}", string),
         }
     }
 }
@@ -323,6 +327,7 @@ impl NonConstantValue {
 pub enum ConstantValue {
     Integer(i64),
     Boolean(bool),
+    String(StringLiteralValue),
 }
 
 impl TryFrom<NonConstantValue> for ConstantValue {
@@ -333,6 +338,7 @@ impl TryFrom<NonConstantValue> for ConstantValue {
             NonConstantValue::Variable(variable_name) => Err(variable_name),
             NonConstantValue::Integer(i) => Ok(ConstantValue::Integer(i)),
             NonConstantValue::Boolean(b) => Ok(ConstantValue::Boolean(b)),
+            NonConstantValue::String(s) => Ok(ConstantValue::String(s)),
         }
     }
 }

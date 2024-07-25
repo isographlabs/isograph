@@ -153,6 +153,7 @@ impl<'de> Deserializer<'de> for NonConstantValueDeserializer<'de> {
             NonConstantValue::Variable(_variable) => todo!("Variable?"),
             NonConstantValue::Integer(i_64) => visitor.visit_i64(*i_64),
             NonConstantValue::Boolean(bool) => visitor.visit_bool(*bool),
+            NonConstantValue::String(s) => visitor.visit_str(s.lookup()),
         }
     }
 

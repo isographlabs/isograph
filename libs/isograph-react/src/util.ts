@@ -12,4 +12,8 @@ export type ArgumentValue =
   | {
       readonly kind: 'Literal';
       readonly value: any;
+    }
+  | {
+      readonly kind: 'String';
+      readonly value: string;
     };

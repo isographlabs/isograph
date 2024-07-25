@@ -650,6 +650,9 @@ function getStoreKeyChunkForArgumentValue(
     case 'Variable': {
       return variables[argumentValue.name];
     }
+    case 'String': {
+      return argumentValue.value;
+    }
     default: {
       // TODO configure eslint to allow unused vars starting with _
       // Ensure we have covered all variants
@@ -681,6 +684,10 @@ function getNetworkResponseKey(
         }
         case 'Variable': {
           argumentValueChunk = 'v_' + argumentValue.name;
+          break;
+        }
+        case 'String': {
+          argumentValueChunk = 's_' + argumentValue.value;
           break;
         }
         default: {
