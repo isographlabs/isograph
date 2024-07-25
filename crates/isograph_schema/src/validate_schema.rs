@@ -72,7 +72,7 @@ pub struct ValidatedScalarFieldAssociatedData {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ValidatedIsographSelectionVariant {
     Regular,
-    Loadable(LoadableVariant),
+    Loadable((LoadableVariant,)),
 }
 
 #[derive(Debug)]
@@ -653,7 +653,7 @@ fn validate_field_type_exists_and_is_scalar(
                                     ValidatedIsographSelectionVariant::Regular
                                 }
                                 IsographSelectionVariant::Loadable(l) => {
-                                    ValidatedIsographSelectionVariant::Loadable(l)
+                                    ValidatedIsographSelectionVariant::Loadable((l,))
                                 }
                             },
                         },
@@ -687,7 +687,7 @@ fn validate_field_type_exists_and_is_scalar(
                                 ValidatedIsographSelectionVariant::Regular
                             }
                             IsographSelectionVariant::Loadable(l) => {
-                                ValidatedIsographSelectionVariant::Loadable(l)
+                                ValidatedIsographSelectionVariant::Loadable((l,))
                             }
                         },
                     },
@@ -751,7 +751,7 @@ fn validate_field_type_exists_and_is_linked(
                                     parent_object_id: *object_id,
                                     selection_variant: match linked_field_selection.associated_data {
                                         IsographSelectionVariant::Regular => ValidatedIsographSelectionVariant::Regular,
-                                        IsographSelectionVariant::Loadable(l) => ValidatedIsographSelectionVariant::Loadable(l),
+                                        IsographSelectionVariant::Loadable(l) => ValidatedIsographSelectionVariant::Loadable((l,)),
                                     },
                                 },
                                 arguments: linked_field_selection.arguments,
@@ -797,7 +797,7 @@ pub fn categorize_field_loadability<'a>(
     match &client_field.variant {
         ClientFieldVariant::UserWritten(_) => match selection_variant {
             ValidatedIsographSelectionVariant::Regular => None,
-            ValidatedIsographSelectionVariant::Loadable(l) => {
+            ValidatedIsographSelectionVariant::Loadable((l,)) => {
                 Some(Loadability::LoadablySelectedField(l))
             }
         },
