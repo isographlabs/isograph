@@ -8,9 +8,9 @@ use common_lang_types::{
 use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ClientFieldId, IsographSelectionVariant, LoadableVariant, NonConstantValue, RefetchQueryIndex,
-    SelectableServerFieldId, Selection, SelectionFieldArgument, ServerFieldSelection,
-    ServerObjectId, VariableDefinition,
+    ClientFieldId, IsographSelectionVariant, LoadableDirectiveParameters, NonConstantValue,
+    RefetchQueryIndex, SelectableServerFieldId, Selection, SelectionFieldArgument,
+    ServerFieldSelection, ServerObjectId, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -744,7 +744,7 @@ fn insert_imperative_field_into_refetch_paths(
 fn insert_loadable_field_into_refetch_paths(
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_scalar_client_field: &ValidatedClientField,
-    loadable_variant: &LoadableVariant,
+    loadable_variant: &LoadableDirectiveParameters,
     parent_type: &SchemaObject,
     scalar_field_selection: &ValidatedScalarFieldSelection,
     schema: &ValidatedSchema,

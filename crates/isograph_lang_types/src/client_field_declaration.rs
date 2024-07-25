@@ -42,12 +42,12 @@ pub type ClientFieldDeclarationWithValidatedDirectives =
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum IsographSelectionVariant {
     Regular,
-    Loadable(LoadableVariant),
+    Loadable(LoadableDirectiveParameters),
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct LoadableVariant {
+pub struct LoadableDirectiveParameters {
     #[allow(dead_code)]
     #[serde(default)]
     complete_selection_set: bool,

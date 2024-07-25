@@ -6,7 +6,7 @@ use common_lang_types::{
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation};
 use isograph_lang_types::{
-    ClientFieldId, IsographSelectionVariant, LinkedFieldSelection, LoadableVariant,
+    ClientFieldId, IsographSelectionVariant, LinkedFieldSelection, LoadableDirectiveParameters,
     ScalarFieldSelection, SelectableServerFieldId, Selection, ServerFieldId, ServerObjectId,
     ServerScalarId, UnvalidatedScalarFieldSelection, UnvalidatedSelection, VariableDefinition,
 };
@@ -72,7 +72,7 @@ pub struct ValidatedScalarFieldAssociatedData {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ValidatedIsographSelectionVariant {
     Regular,
-    Loadable((LoadableVariant,)),
+    Loadable((LoadableDirectiveParameters,)),
 }
 
 #[derive(Debug)]
@@ -776,7 +776,7 @@ fn validate_field_type_exists_and_is_linked(
 }
 
 pub enum Loadability<'a> {
-    LoadablySelectedField(&'a LoadableVariant),
+    LoadablySelectedField(&'a LoadableDirectiveParameters),
     ImperativelyLoadedField(&'a ImperativelyLoadedFieldVariant),
 }
 
