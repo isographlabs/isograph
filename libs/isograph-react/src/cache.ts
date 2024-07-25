@@ -653,6 +653,9 @@ function getStoreKeyChunkForArgumentValue(
     case 'String': {
       return argumentValue.value;
     }
+    case 'Enum': {
+      return argumentValue.value;
+    }
     default: {
       // TODO configure eslint to allow unused vars starting with _
       // Ensure we have covered all variants
@@ -688,6 +691,10 @@ function getNetworkResponseKey(
         }
         case 'String': {
           argumentValueChunk = 's_' + argumentValue.value;
+          break;
+        }
+        case 'Enum': {
+          argumentValueChunk = 'e_' + argumentValue.value;
           break;
         }
         default: {

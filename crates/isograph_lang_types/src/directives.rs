@@ -156,6 +156,7 @@ impl<'de> Deserializer<'de> for NonConstantValueDeserializer<'de> {
             NonConstantValue::String(s) => visitor.visit_str(s.lookup()),
             NonConstantValue::Float(f) => visitor.visit_f64(f.as_float()),
             NonConstantValue::Null => visitor.visit_none(),
+            NonConstantValue::Enum(_) => panic!("Enums not supported when deserializing"),
         }
     }
 

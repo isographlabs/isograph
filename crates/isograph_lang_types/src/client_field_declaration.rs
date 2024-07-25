@@ -1,7 +1,8 @@
 use common_lang_types::{
-    ConstExportName, DescriptionValue, FieldArgumentName, FieldNameOrAlias, FilePath, HasName,
-    LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName, SelectableFieldName,
-    StringLiteralValue, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
+    ConstExportName, DescriptionValue, EnumLiteralValue, FieldArgumentName, FieldNameOrAlias,
+    FilePath, HasName, LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName,
+    SelectableFieldName, StringLiteralValue, UnvalidatedTypeName, VariableName, WithLocation,
+    WithSpan,
 };
 use graphql_lang_types::{FloatValue, GraphQLTypeAnnotation};
 use serde::Deserialize;
@@ -301,6 +302,7 @@ pub enum NonConstantValue {
     String(StringLiteralValue),
     Float(FloatValue),
     Null,
+    Enum(EnumLiteralValue),
 }
 
 impl NonConstantValue {
@@ -324,6 +326,7 @@ impl NonConstantValue {
             // Also not correct
             NonConstantValue::Float(f) => format!("l_{}", f.as_float()),
             NonConstantValue::Null => format!("l_null"),
+            NonConstantValue::Enum(e) => format!("e_{e}"),
         }
     }
 }
@@ -335,6 +338,7 @@ pub enum ConstantValue {
     String(StringLiteralValue),
     Float(FloatValue),
     Null,
+    Enum(EnumLiteralValue),
 }
 
 impl TryFrom<NonConstantValue> for ConstantValue {
@@ -348,6 +352,7 @@ impl TryFrom<NonConstantValue> for ConstantValue {
             NonConstantValue::String(s) => Ok(ConstantValue::String(s)),
             NonConstantValue::Float(f) => Ok(ConstantValue::Float(f)),
             NonConstantValue::Null => Ok(ConstantValue::Null),
+            NonConstantValue::Enum(e) => Ok(ConstantValue::Enum(e)),
         }
     }
 }

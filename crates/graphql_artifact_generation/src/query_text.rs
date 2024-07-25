@@ -151,5 +151,6 @@ fn serialize_non_constant_value_for_graphql(value: &NonConstantValue) -> String 
         NonConstantValue::String(s) => format!("\"{}\"", s.to_string()),
         NonConstantValue::Float(f) => f.as_float().to_string(),
         NonConstantValue::Null => "null".to_string(),
+        NonConstantValue::Enum(e) => e.to_string(),
     }
 }

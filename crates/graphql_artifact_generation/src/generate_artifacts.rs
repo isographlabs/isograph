@@ -257,6 +257,15 @@ pub(crate) fn get_serialized_field_arguments(
                     {indent_1}],\n"
                 )
             }
+            NonConstantValue::Enum(e) => {
+                format!(
+                    "\n\
+                    {indent_1}[\n\
+                    {indent_2}\"{argument_name}\",\n\
+                    {indent_2}{{ kind: \"Enum\", value: \"{e}\" }},\n\
+                    {indent_1}],\n"
+                )
+            }
         };
 
         s.push_str(&arg_value);

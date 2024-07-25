@@ -823,7 +823,9 @@ fn convert_graphql_constant_value_to_isograph_constant_value(
             Some(isograph_lang_types::ConstantValue::Float(f))
         }
         graphql_lang_types::GraphQLConstantValue::Null => None,
-        graphql_lang_types::GraphQLConstantValue::Enum(_) => None,
+        graphql_lang_types::GraphQLConstantValue::Enum(e) => {
+            Some(isograph_lang_types::ConstantValue::Enum(e))
+        }
         graphql_lang_types::GraphQLConstantValue::List(_) => None,
         graphql_lang_types::GraphQLConstantValue::Object(_) => None,
     }
