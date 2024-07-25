@@ -1,14 +1,16 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use common_lang_types::{
-    IsographObjectTypeName, SelectableFieldName, UnvalidatedTypeName, VariableName, WithLocation,
-    WithSpan,
+    IsographObjectTypeName, Location, SelectableFieldName, UnvalidatedTypeName, VariableName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation};
+use intern::Lookup;
 use isograph_lang_types::{
     ClientFieldId, IsographSelectionVariant, LinkedFieldSelection, LoadableDirectiveParameters,
-    ScalarFieldSelection, SelectableServerFieldId, Selection, ServerFieldId, ServerObjectId,
-    ServerScalarId, UnvalidatedScalarFieldSelection, UnvalidatedSelection, VariableDefinition,
+    ScalarFieldSelection, SelectableServerFieldId, Selection, SelectionFieldArgument,
+    ServerFieldId, ServerObjectId, ServerScalarId, UnvalidatedScalarFieldSelection,
+    UnvalidatedSelection, VariableDefinition,
 };
 use thiserror::Error;
 
@@ -72,8 +74,10 @@ pub struct ValidatedScalarFieldAssociatedData {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ValidatedIsographSelectionVariant {
     Regular,
-    Loadable((LoadableDirectiveParameters,)),
+    Loadable((LoadableDirectiveParameters, MissingArguments)),
 }
+
+pub type MissingArguments = Vec<ValidatedVariableDefinition>;
 
 #[derive(Debug)]
 pub struct ValidatedSchemaState {}
@@ -227,6 +231,28 @@ fn validate_and_transform_fields(
     )
 }
 
+fn get_all_errors_or_all_ok_as_hashmap<K: std::cmp::Eq + std::hash::Hash, V, E>(
+    items: impl Iterator<Item = Result<(K, V), E>>,
+) -> Result<HashMap<K, V>, Vec<E>> {
+    let mut oks = HashMap::new();
+    let mut errors = vec![];
+
+    for item in items {
+        match item {
+            Ok((k, v)) => {
+                oks.insert(k, v);
+            }
+            Err(e) => errors.push(e),
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(oks)
+    } else {
+        Err(errors)
+    }
+}
+
 fn get_all_errors_or_all_ok<T, E>(
     items: impl Iterator<Item = Result<T, E>>,
 ) -> Result<Vec<T>, Vec<E>> {
@@ -374,13 +400,37 @@ fn validate_server_field_argument(
     }
 }
 
+type ClientFieldArgsMap = HashMap<ClientFieldId, Vec<WithSpan<ValidatedVariableDefinition>>>;
+
 fn validate_and_transform_client_fields(
     client_fields: Vec<UnvalidatedClientField>,
     schema_data: &ServerFieldData,
     server_fields: &[ValidatedSchemaServerField],
 ) -> Result<Vec<ValidatedClientField>, Vec<WithLocation<ValidateSchemaError>>> {
+    // TODO this smells. We probably should do this in two passes instead of doing it this
+    // way. We are validating client fields, which includes validating their selections. When
+    // validating a selection of a client field, we need to ensure that we pass the correct
+    // arguments to the client field (e.g. no missing fields unless it was selected loadably.)
+    //
+    // For now, we'll make a new datastructure containing all of the client field's arguments,
+    // cloned.
+    let client_field_args = get_all_errors_or_all_ok_as_hashmap(client_fields.iter().map(
+        |unvalidated_client_field| {
+            let validated_variable_definitions = validate_variable_definitions(
+                schema_data,
+                unvalidated_client_field.variable_definitions.clone(),
+            )?;
+            Ok((unvalidated_client_field.id, validated_variable_definitions))
+        },
+    ))?;
+
     get_all_errors_or_all_ok(client_fields.into_iter().map(|client_field| {
-        validate_client_field_selection_set(schema_data, client_field, server_fields)
+        validate_client_field_selection_set(
+            schema_data,
+            client_field,
+            server_fields,
+            &client_field_args,
+        )
     }))
 }
 
@@ -388,9 +438,15 @@ fn validate_client_field_selection_set(
     schema_data: &ServerFieldData,
     unvalidated_client_field: UnvalidatedClientField,
     server_fields: &[ValidatedSchemaServerField],
+    client_field_args: &ClientFieldArgsMap,
 ) -> ValidateSchemaResult<ValidatedClientField> {
-    let variable_definitions =
-        validate_variable_definitions(schema_data, unvalidated_client_field.variable_definitions)?;
+    let variable_definitions = client_field_args
+        .get(&unvalidated_client_field.id)
+        .expect(
+            "Expected variable definitions to exist. \
+            This is indicative of a bug in Isograph",
+        )
+        .clone();
 
     let parent_object = schema_data.object(unvalidated_client_field.parent_object_id);
     let selection_set = unvalidated_client_field
@@ -401,6 +457,7 @@ fn validate_client_field_selection_set(
                 selection_set,
                 parent_object,
                 server_fields,
+                client_field_args,
             )
             .map_err(|err| {
                 validate_selections_error_to_validate_schema_error(
@@ -433,6 +490,7 @@ fn validate_client_field_selection_set(
                             server_fields,
                             parent_object,
                             unvalidated_client_field.name,
+                            client_field_args,
                         )?,
                     ))
                 }
@@ -449,12 +507,14 @@ fn validate_use_refetch_field_strategy(
     server_fields: &[ValidatedSchemaServerField],
     parent_object: &SchemaObject,
     client_field_name: SelectableFieldName,
+    client_field_args: &ClientFieldArgsMap,
 ) -> ValidateSchemaResult<ValidatedRefetchFieldStrategy> {
     let refetch_selection_set = validate_client_field_definition_selections_exist_and_types_match(
         schema_data,
         use_refetch_field_strategy.refetch_selection_set,
         parent_object,
         server_fields,
+        client_field_args,
     )
     .map_err(|err| {
         validate_selections_error_to_validate_schema_error(err, parent_object, client_field_name)
@@ -474,8 +534,8 @@ fn validate_variable_definitions(
 ) -> ValidateSchemaResult<Vec<WithSpan<ValidatedVariableDefinition>>> {
     variable_definitions
         .into_iter()
-        .map(|x| {
-            x.and_then(|vd| {
+        .map(|with_span| {
+            with_span.and_then(|vd| {
                 // TODO this should be doable in the error branch
                 let type_string = vd.type_.to_string();
                 let inner_type = *vd.type_.inner();
@@ -550,6 +610,12 @@ fn validate_selections_error_to_validate_schema_error(
             field_parent_type_name,
             field_name,
         },
+        ValidateSelectionsError::ServerFieldCannotBeSelectedLoadably { server_field_name } => {
+            ValidateSchemaError::ServerFieldCannotBeSelectedLoadably { server_field_name }
+        }
+        ValidateSelectionsError::MissingArguments { missing_arguments } => {
+            ValidateSchemaError::MissingArguments { missing_arguments }
+        }
     })
 }
 
@@ -575,6 +641,12 @@ enum ValidateSelectionsError {
         field_parent_type_name: IsographObjectTypeName,
         field_name: SelectableFieldName,
     },
+    ServerFieldCannotBeSelectedLoadably {
+        server_field_name: SelectableFieldName,
+    },
+    MissingArguments {
+        missing_arguments: Vec<ValidatedVariableDefinition>,
+    },
 }
 
 fn validate_client_field_definition_selections_exist_and_types_match(
@@ -582,6 +654,7 @@ fn validate_client_field_definition_selections_exist_and_types_match(
     selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     parent_object: &SchemaObject,
     server_fields: &[ValidatedSchemaServerField],
+    client_field_args: &ClientFieldArgsMap,
 ) -> ValidateSelectionsResult<Vec<WithSpan<ValidatedSelection>>> {
     // Currently, we only check that each field exists and has an appropriate type, not that
     // there are no selection conflicts due to aliases or parameters.
@@ -594,6 +667,7 @@ fn validate_client_field_definition_selections_exist_and_types_match(
                 parent_object,
                 schema_data,
                 server_fields,
+                client_field_args,
             )
         })
         .collect::<Result<_, _>>()
@@ -604,6 +678,7 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
     parent_object: &SchemaObject,
     schema_data: &ServerFieldData,
     server_fields: &[ValidatedSchemaServerField],
+    client_field_args: &ClientFieldArgsMap,
 ) -> ValidateSelectionsResult<WithSpan<ValidatedSelection>> {
     selection.and_then(|selection| {
         selection.and_then(&mut |field_selection| {
@@ -614,6 +689,7 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
                         parent_object,
                         scalar_field_selection,
                         server_fields,
+                        client_field_args,
                     )
                 },
                 &mut |linked_field_selection| {
@@ -622,6 +698,7 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
                         parent_object,
                         linked_field_selection,
                         server_fields,
+                        client_field_args,
                     )
                 },
             )
@@ -636,12 +713,20 @@ fn validate_field_type_exists_and_is_scalar(
     parent_object: &SchemaObject,
     scalar_field_selection: UnvalidatedScalarFieldSelection,
     server_fields: &[ValidatedSchemaServerField],
+    client_field_args: &ClientFieldArgsMap,
 ) -> ValidateSelectionsResult<ValidatedScalarFieldSelection> {
     let scalar_field_name = scalar_field_selection.name.item.into();
     match parent_object.encountered_fields.get(&scalar_field_name) {
         Some(defined_field_type) => match defined_field_type {
             FieldDefinitionLocation::Server(server_field_id) => {
                 let server_field = &server_fields[server_field_id.as_usize()];
+                let missing_arguments = get_missing_arguments_and_validate_argument_types(
+                    server_field
+                        .arguments
+                        .iter()
+                        .map(|variable_definition| &variable_definition.item),
+                    &scalar_field_selection.arguments,
+                );
 
                 match server_field.associated_data.inner() {
                     SelectableServerFieldId::Scalar(_) => Ok(ScalarFieldSelection {
@@ -650,10 +735,21 @@ fn validate_field_type_exists_and_is_scalar(
                             location: FieldDefinitionLocation::Server(*server_field_id),
                             selection_variant: match scalar_field_selection.associated_data {
                                 IsographSelectionVariant::Regular => {
+                                    assert_no_missing_arguments(
+                                        missing_arguments,
+                                        scalar_field_selection.name.location,
+                                    )?;
                                     ValidatedIsographSelectionVariant::Regular
                                 }
                                 IsographSelectionVariant::Loadable(l) => {
-                                    ValidatedIsographSelectionVariant::Loadable((l,))
+                                    server_field_cannot_be_selected_loadably(
+                                        scalar_field_name,
+                                        scalar_field_selection.name.location,
+                                    )?;
+                                    ValidatedIsographSelectionVariant::Loadable((
+                                        l,
+                                        missing_arguments,
+                                    ))
                                 }
                             },
                         },
@@ -675,7 +771,17 @@ fn validate_field_type_exists_and_is_scalar(
                 }
             }
             FieldDefinitionLocation::Client(client_field_id) => {
-                // TODO confirm this works if resolver_name is an alias
+                let argument_definitions = client_field_args.get(client_field_id).expect(
+                    "Expected client field to exist in map. \
+                    This is indicative of a bug in Isograph.",
+                );
+                let missing_arguments = get_missing_arguments_and_validate_argument_types(
+                    argument_definitions
+                        .iter()
+                        .map(|variable_definition| &variable_definition.item),
+                    &scalar_field_selection.arguments,
+                );
+
                 Ok(ScalarFieldSelection {
                     name: scalar_field_selection.name,
                     reader_alias: scalar_field_selection.reader_alias,
@@ -684,10 +790,14 @@ fn validate_field_type_exists_and_is_scalar(
                         location: FieldDefinitionLocation::Client(*client_field_id),
                         selection_variant: match scalar_field_selection.associated_data {
                             IsographSelectionVariant::Regular => {
+                                assert_no_missing_arguments(
+                                    missing_arguments,
+                                    scalar_field_selection.name.location,
+                                )?;
                                 ValidatedIsographSelectionVariant::Regular
                             }
                             IsographSelectionVariant::Loadable(l) => {
-                                ValidatedIsographSelectionVariant::Loadable((l,))
+                                ValidatedIsographSelectionVariant::Loadable((l, missing_arguments))
                             }
                         },
                     },
@@ -711,6 +821,7 @@ fn validate_field_type_exists_and_is_linked(
     parent_object: &SchemaObject,
     linked_field_selection: UnvalidatedLinkedFieldSelection,
     server_fields: &[ValidatedSchemaServerField],
+    client_field_args: &ClientFieldArgsMap,
 ) -> ValidateSelectionsResult<ValidatedLinkedFieldSelection> {
     let linked_field_name = linked_field_selection.name.item.into();
     match (parent_object.encountered_fields).get(&linked_field_name) {
@@ -732,6 +843,15 @@ fn validate_field_type_exists_and_is_linked(
                             .server_objects
                             .get(object_id.as_usize())
                             .unwrap();
+
+                        let missing_arguments = get_missing_arguments_and_validate_argument_types(
+                            server_field
+                                .arguments
+                                .iter()
+                                .map(|variable_definition| &variable_definition.item),
+                            &linked_field_selection.arguments,
+                        );
+
                         Ok(LinkedFieldSelection {
                                 name: linked_field_selection.name,
                                 reader_alias: linked_field_selection.reader_alias,
@@ -742,7 +862,8 @@ fn validate_field_type_exists_and_is_linked(
                                             selection,
                                             object,
                                             schema_data,
-                                            server_fields
+                                            server_fields,
+                                            client_field_args
                                         )
                                     },
                                 ).collect::<Result<Vec<_>, _>>()?,
@@ -750,8 +871,14 @@ fn validate_field_type_exists_and_is_linked(
                                 associated_data: ValidatedLinkedFieldAssociatedData {
                                     parent_object_id: *object_id,
                                     selection_variant: match linked_field_selection.associated_data {
-                                        IsographSelectionVariant::Regular => ValidatedIsographSelectionVariant::Regular,
-                                        IsographSelectionVariant::Loadable(l) => ValidatedIsographSelectionVariant::Loadable((l,)),
+                                        IsographSelectionVariant::Regular => {
+                                            assert_no_missing_arguments(missing_arguments, linked_field_selection.name.location)?;
+                                            ValidatedIsographSelectionVariant::Regular
+                                        },
+                                        IsographSelectionVariant::Loadable(l) => {
+                                            server_field_cannot_be_selected_loadably(linked_field_name, linked_field_selection.name.location)?;
+                                            ValidatedIsographSelectionVariant::Loadable((l, missing_arguments))
+                                        },
                                     },
                                 },
                                 arguments: linked_field_selection.arguments,
@@ -773,6 +900,29 @@ fn validate_field_type_exists_and_is_linked(
             linked_field_selection.name.location,
         )),
     }
+}
+
+fn server_field_cannot_be_selected_loadably(
+    server_field_name: SelectableFieldName,
+    location: Location,
+) -> ValidateSelectionsResult<()> {
+    Err(WithLocation::new(
+        ValidateSelectionsError::ServerFieldCannotBeSelectedLoadably { server_field_name },
+        location,
+    ))
+}
+
+fn assert_no_missing_arguments(
+    missing_arguments: Vec<ValidatedVariableDefinition>,
+    location: Location,
+) -> ValidateSelectionsResult<()> {
+    if !missing_arguments.is_empty() {
+        return Err(WithLocation::new(
+            ValidateSelectionsError::MissingArguments { missing_arguments },
+            location,
+        ));
+    }
+    Ok(())
 }
 
 pub enum Loadability<'a> {
@@ -797,7 +947,7 @@ pub fn categorize_field_loadability<'a>(
     match &client_field.variant {
         ClientFieldVariant::UserWritten(_) => match selection_variant {
             ValidatedIsographSelectionVariant::Regular => None,
-            ValidatedIsographSelectionVariant::Loadable((l,)) => {
+            ValidatedIsographSelectionVariant::Loadable((l, _)) => {
                 Some(Loadability::LoadablySelectedField(l))
             }
         },
@@ -805,6 +955,32 @@ pub fn categorize_field_loadability<'a>(
             Some(Loadability::ImperativelyLoadedField(i))
         }
     }
+}
+
+fn get_missing_arguments_and_validate_argument_types<'a>(
+    argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
+    arguments: &[WithLocation<SelectionFieldArgument>],
+) -> Vec<ValidatedVariableDefinition> {
+    // TODO validate argument types
+
+    argument_definitions
+        .filter_map(|definition| {
+            if definition.default_value.is_some() || definition.type_.is_nullable() {
+                return None;
+            }
+
+            let user_has_supplied_argument = arguments
+                .iter()
+                // TODO do not call .lookup
+                .find(|arg| definition.name.item.lookup() == arg.item.name.item.lookup())
+                .is_some();
+            if user_has_supplied_argument {
+                None
+            } else {
+                Some(definition.clone())
+            }
+        })
+        .collect()
 }
 
 type ValidateSchemaResult<T> = Result<T, WithLocation<ValidateSchemaError>>;
@@ -881,6 +1057,17 @@ pub enum ValidateSchemaError {
         field_parent_type_name: IsographObjectTypeName,
         field_name: SelectableFieldName,
     },
+
+    #[error("`{server_field_name}` is a server field, and cannot be selected with `@loadable`")]
+    ServerFieldCannotBeSelectedLoadably {
+        server_field_name: SelectableFieldName,
+    },
+
+    #[error(
+        "This field has missing arguments: {0}",
+        missing_arguments.into_iter().map(|arg| {arg.name.item.lookup()}).collect::<Vec<_>>().join(", ")
+    )]
+    MissingArguments { missing_arguments: MissingArguments },
 
     #[error(
         "The variable `{variable_name}` has type `{type_}`, but the inner type \

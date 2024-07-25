@@ -10,7 +10,7 @@ import { RepoGitHubLink } from './RepoGitHubLink';
 export const HomePage = iso(`
   field Query.HomePage($first: Int!) @component {
     Header
-    HomePageList
+    HomePageList(first: $first)
   }
 `)(function HomePageComponent(
   data,

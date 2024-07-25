@@ -70,6 +70,13 @@ impl<TValue> GraphQLTypeAnnotation<TValue> {
             },
         }
     }
+
+    pub fn is_nullable(&self) -> bool {
+        matches!(
+            self,
+            GraphQLTypeAnnotation::Named(_) | GraphQLTypeAnnotation::List(_)
+        )
+    }
 }
 
 impl<TValue: fmt::Display> fmt::Display for GraphQLTypeAnnotation<TValue> {
