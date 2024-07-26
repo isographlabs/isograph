@@ -7,16 +7,13 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 ## GraphQL conf 2024 priorities
 
 - VSCode extension: syntax highlighting
-- Loadable fields: id from args, (args) => [id, foo]
+- Loadable fields:
+  - generate types from missing args
+  - pass correct params to fields when variables are renamed in query text
 - Network errors
 - Userland impl of pagination, live queries, useQueryLoader (w/ intersection observer)
 - Load normalization ASTs (etc) when a non-null network response is received. Does this require `as Foo`?
   - load normalization ASTs for loadable fields after a request is made
-
-### id from args
-
-- validate that each field selection has the right variables and handle missing args
-- update type gen and query gen to show missing args
 
 ## GraphQL conf 2024 nice-to-haves
 
