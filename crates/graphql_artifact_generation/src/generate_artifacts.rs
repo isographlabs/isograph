@@ -316,7 +316,7 @@ pub(crate) fn generate_client_field_parameter_type(
     // TODO use unwraps
     let mut client_field_parameter_type = "{\n".to_string();
     for selection in selection_map.iter() {
-        write_query_types_from_selection(
+        write_param_type_from_selection(
             schema,
             &mut client_field_parameter_type,
             selection,
@@ -331,7 +331,7 @@ pub(crate) fn generate_client_field_parameter_type(
     ClientFieldParameterType(client_field_parameter_type)
 }
 
-fn write_query_types_from_selection(
+fn write_param_type_from_selection(
     schema: &ValidatedSchema,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
