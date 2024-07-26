@@ -42,7 +42,7 @@ export const PetStatsCard = iso(`
         ) : null}
         <Button
           variant="contained"
-          onClick={() => pet.stats?.refetch_pet_stats[1]({ id: pet.id })}
+          onClick={() => pet.stats?.refetch_pet_stats({ id: pet.id })[1]()}
         >
           Refetch pet
         </Button>

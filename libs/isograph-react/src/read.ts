@@ -222,7 +222,7 @@ function readData<TReadFromStore>(
 
           // Second, we allow the user to call the resolver, which will ultimately
           // use the resolver reader AST to get the resolver parameters.
-          target[field.alias] = (_args: void) => [
+          target[field.alias] = (args: any) => [
             // Stable id
             root + '__' + field.name,
             // Fetcher
@@ -230,7 +230,7 @@ function readData<TReadFromStore>(
               environment,
               refetchQueryArtifact,
               data.data,
-              filterVariables(variables, allowedVariables),
+              filterVariables({ ...args, ...variables }, allowedVariables),
               root,
               field.resolverReaderArtifact,
               field.usedRefetchQueries.map((id) => nestedRefetchQueries[id]),

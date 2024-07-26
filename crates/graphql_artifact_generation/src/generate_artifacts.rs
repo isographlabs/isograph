@@ -291,8 +291,10 @@ pub(crate) fn generate_output_type(client_field: &ValidatedClientField) -> Clien
         ClientFieldVariant::ImperativelyLoadedField(params) => {
             // N.B. the string is a stable id for deduplicating
             match params.primary_field_info {
-                Some(_) => ClientFieldOutputType("[string, (params: any) => void]".to_string()),
-                None => ClientFieldOutputType("[string, () => void]".to_string()),
+                Some(_) => {
+                    ClientFieldOutputType("(params: any) => [string, () => void]".to_string())
+                }
+                None => ClientFieldOutputType("() => [string, () => void]".to_string()),
             }
         }
     }
@@ -374,6 +376,7 @@ fn write_param_type_from_selection(
                                 };
                             schema.server_field_data.scalar(scalar_id).javascript_name
                         });
+
                         query_type_declaration.push_str(&format!(
                             "{}: {},\n",
                             name_or_alias,

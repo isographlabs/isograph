@@ -171,8 +171,8 @@ fn generate_function_import_statement_for_mutation_reader(
         {indent}// TODO type this\n\
         {indent}readerArtifact: TopLevelReaderArtifact<any, any, any>,\n\
         {indent}nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],\n\
-        ) => (mutationParams: any): ItemCleanupPair<FragmentReference<any, any>> | undefined => {{\n\
-        {indent}const variables = includeReadOutData({{...filteredVariables, ...mutationParams}}, readOutData);\n\
+        ) => (): ItemCleanupPair<FragmentReference<any, any>> | undefined => {{\n\
+        {indent}const variables = includeReadOutData(filteredVariables, readOutData);\n\
         {indent}const [_networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables);\n\
         {indent}if (readerArtifact == null) return;\n\
         {indent}const fragmentReference = {{\n\
