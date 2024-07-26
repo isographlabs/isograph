@@ -79,7 +79,7 @@ fn linked_field_ast_node(
         &linked_field
             .arguments
             .iter()
-            .map(|x| x.item.clone())
+            .map(|x| (&x.item).into())
             .collect::<Vec<_>>(),
         indentation_level + 1,
     );
@@ -159,7 +159,7 @@ fn user_written_variant_ast_node(
             .arguments
             .iter()
             // TODO we shouldn't need to clone here
-            .map(|x| x.item.clone())
+            .map(|x| (&x.item).into())
             .collect::<Vec<_>>(),
         indentation_level + 1,
     );
@@ -271,7 +271,7 @@ fn server_defined_scalar_field_ast_node(
         &scalar_field
             .arguments
             .iter()
-            .map(|x| x.item.clone())
+            .map(|x| (&x.item).into())
             .collect::<Vec<_>>(),
         indentation_level + 1,
     );

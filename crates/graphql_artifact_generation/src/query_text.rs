@@ -1,9 +1,9 @@
 use common_lang_types::{HasName, QueryOperationName, UnvalidatedTypeName, WithSpan};
 use graphql_lang_types::GraphQLTypeAnnotation;
-use isograph_lang_types::{NonConstantValue, SelectionFieldArgument};
+use isograph_lang_types::NonConstantValue;
 use isograph_schema::{
-    MergedSelectionMap, MergedServerSelection, RootOperationName, ValidatedSchema,
-    ValidatedVariableDefinition,
+    MergedSelectionFieldArgument, MergedSelectionMap, MergedServerSelection, RootOperationName,
+    ValidatedSchema, ValidatedVariableDefinition,
 };
 
 use crate::generate_artifacts::QueryText;
@@ -119,7 +119,7 @@ fn write_selections_for_query_text<'a>(
     }
 }
 
-fn get_serialized_arguments_for_query_text(arguments: &[SelectionFieldArgument]) -> String {
+fn get_serialized_arguments_for_query_text(arguments: &[MergedSelectionFieldArgument]) -> String {
     if arguments.is_empty() {
         "".to_string()
     } else {
@@ -127,14 +127,14 @@ fn get_serialized_arguments_for_query_text(arguments: &[SelectionFieldArgument])
         let first = arguments.next().unwrap();
         let mut s = format!(
             "({}: {}",
-            first.name.item,
-            serialize_non_constant_value_for_graphql(&first.value.item)
+            first.name,
+            serialize_non_constant_value_for_graphql(&first.value)
         );
         for argument in arguments {
             s.push_str(&format!(
                 ", {}: {}",
-                argument.name.item,
-                serialize_non_constant_value_for_graphql(&argument.value.item)
+                argument.name,
+                serialize_non_constant_value_for_graphql(&argument.value)
             ));
         }
         s.push(')');

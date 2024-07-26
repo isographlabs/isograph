@@ -1,9 +1,9 @@
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, HashSet};
 
 use common_lang_types::{
-    IsographObjectTypeName, LinkedFieldAlias, LinkedFieldName, Location, QueryOperationName,
-    ScalarFieldAlias, ScalarFieldName, SelectableFieldName, Span, VariableName, WithLocation,
-    WithSpan,
+    FieldArgumentName, IsographObjectTypeName, LinkedFieldAlias, LinkedFieldName, Location,
+    QueryOperationName, ScalarFieldAlias, ScalarFieldName, SelectableFieldName, Span, VariableName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
@@ -79,8 +79,10 @@ impl MergedServerSelection {
     }
 }
 
-fn get_variables(arguments: &[SelectionFieldArgument]) -> impl Iterator<Item = VariableName> + '_ {
-    arguments.iter().flat_map(|arg| match arg.value.item {
+fn get_variables(
+    arguments: &[MergedSelectionFieldArgument],
+) -> impl Iterator<Item = VariableName> + '_ {
+    arguments.iter().flat_map(|arg| match arg.value {
         isograph_lang_types::NonConstantValue::Variable(v) => Some(v),
         _ => None,
     })
@@ -92,7 +94,19 @@ pub struct MergedScalarFieldSelection {
     pub name: ScalarFieldName,
     // TODO calculate this when needed
     pub normalization_alias: Option<ScalarFieldAlias>,
-    pub arguments: Vec<SelectionFieldArgument>,
+    pub arguments: Vec<MergedSelectionFieldArgument>,
+}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+pub struct MergedSelectionFieldArgument {
+    pub name: FieldArgumentName,
+    pub value: NonConstantValue,
+}
+
+impl MergedSelectionFieldArgument {
+    pub fn to_alias_str_chunk(&self) -> String {
+        format!("{}___{}", self.name, self.value.to_alias_str_chunk())
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -102,7 +116,7 @@ pub struct MergedLinkedFieldSelection {
     // TODO calculate this when needed
     pub normalization_alias: Option<LinkedFieldAlias>,
     pub selection_map: MergedSelectionMap,
-    pub arguments: Vec<SelectionFieldArgument>,
+    pub arguments: Vec<MergedSelectionFieldArgument>,
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -441,15 +455,9 @@ fn process_imperatively_loaded_field(
                     span: Span::todo_generated(),
                 });
 
-                SelectionFieldArgument {
-                    name: WithSpan::new(
-                        x.name.item.lookup().intern().into(),
-                        Span::todo_generated(),
-                    ),
-                    value: WithSpan::new(
-                        NonConstantValue::Variable(x.name.item.into()),
-                        Span::todo_generated(),
-                    ),
+                MergedSelectionFieldArgument {
+                    name: x.name.item.lookup().intern().into(),
+                    value: NonConstantValue::Variable(x.name.item.into()),
                 }
             })
             .collect(),
@@ -671,7 +679,7 @@ fn merge_validated_selections_into_selection_map(
                                     arguments: linked_field_selection
                                         .arguments
                                         .iter()
-                                        .map(|x| x.item.clone())
+                                        .map(|arg| (&arg.item).into())
                                         .collect(),
                                 })
                             });
@@ -893,7 +901,7 @@ fn merge_scalar_server_field(
                     arguments: scalar_field
                         .arguments
                         .iter()
-                        .map(|x| x.item.clone())
+                        .map(|arg| (&arg.item).into())
                         .collect(),
                     normalization_alias: scalar_field.normalization_alias.map(|x| x.item),
                 },
@@ -964,7 +972,7 @@ fn select_typename_and_id_fields_in_merged_selection(
 pub fn selection_map_wrapped(
     mut inner_selection_map: MergedSelectionMap,
     top_level_field: LinkedFieldName,
-    top_level_field_arguments: Vec<SelectionFieldArgument>,
+    top_level_field_arguments: Vec<MergedSelectionFieldArgument>,
     // TODO support arguments and vectors of subfields
     subfield: Option<LinkedFieldName>,
     type_to_refine_to: RequiresRefinement,
@@ -1060,7 +1068,7 @@ fn maybe_add_typename_selection(selections: &mut MergedSelectionMap) {
 
 fn get_aliased_mutation_field_name(
     name: SelectableFieldName,
-    parameters: &[SelectionFieldArgument],
+    parameters: &[MergedSelectionFieldArgument],
 ) -> String {
     let mut s = name.to_string();
 
@@ -1081,4 +1089,13 @@ pub fn id_arguments() -> Vec<UnvalidatedVariableDefinition> {
         ))),
         default_value: None,
     }]
+}
+
+impl From<&SelectionFieldArgument> for MergedSelectionFieldArgument {
+    fn from(arg: &SelectionFieldArgument) -> Self {
+        Self {
+            name: arg.name.item,
+            value: arg.value.item.clone(),
+        }
+    }
 }

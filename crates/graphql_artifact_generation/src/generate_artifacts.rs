@@ -5,13 +5,12 @@ use common_lang_types::{
 use graphql_lang_types::{GraphQLTypeAnnotation, ListTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection, SelectionFieldArgument,
-    ServerFieldSelection,
+    ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection, ServerFieldSelection,
 };
 use isograph_schema::{
-    ClientFieldTraversalResult, ClientFieldVariant, FieldDefinitionLocation, SchemaObject,
-    UserWrittenComponentVariant, ValidatedClientField, ValidatedIsographSelectionVariant,
-    ValidatedSchema, ValidatedSelection,
+    ClientFieldTraversalResult, ClientFieldVariant, FieldDefinitionLocation,
+    MergedSelectionFieldArgument, SchemaObject, UserWrittenComponentVariant, ValidatedClientField,
+    ValidatedIsographSelectionVariant, ValidatedSchema, ValidatedSelection,
 };
 use lazy_static::lazy_static;
 use std::path::Path;
@@ -187,7 +186,7 @@ pub fn get_artifact_path_and_content(
 
 pub(crate) fn get_serialized_field_arguments(
     // TODO make this an iterator
-    arguments: &[SelectionFieldArgument],
+    arguments: &[MergedSelectionFieldArgument],
     indentation_level: u8,
 ) -> String {
     if arguments.is_empty() {
@@ -199,8 +198,8 @@ pub(crate) fn get_serialized_field_arguments(
     let indent_2 = "  ".repeat((indentation_level + 2) as usize);
 
     for argument in arguments {
-        let argument_name = argument.name.item;
-        let arg_value = match &argument.value.item {
+        let argument_name = argument.name;
+        let arg_value = match &argument.value {
             NonConstantValue::Variable(variable_name) => {
                 format!(
                     "\n\
