@@ -336,6 +336,34 @@ impl NonConstantValue {
     }
 }
 
+impl From<ConstantValue> for NonConstantValue {
+    fn from(value: ConstantValue) -> Self {
+        match value {
+            ConstantValue::Integer(i) => NonConstantValue::Integer(i),
+            ConstantValue::Boolean(value) => NonConstantValue::Boolean(value),
+            ConstantValue::String(value) => NonConstantValue::String(value),
+            ConstantValue::Float(value) => NonConstantValue::Float(value),
+            ConstantValue::Null => NonConstantValue::Null,
+            ConstantValue::Enum(value) => NonConstantValue::Enum(value),
+            ConstantValue::List(value) => NonConstantValue::List(
+                value
+                    .into_iter()
+                    .map(|with_location| with_location.map(NonConstantValue::from))
+                    .collect(),
+            ),
+            ConstantValue::Object(value) => NonConstantValue::Object(
+                value
+                    .into_iter()
+                    .map(|name_value_pair| NameValuePair {
+                        name: name_value_pair.name,
+                        value: name_value_pair.value.map(NonConstantValue::from),
+                    })
+                    .collect(),
+            ),
+        }
+    }
+}
+
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum ConstantValue {
     Integer(i64),
