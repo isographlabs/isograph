@@ -48,6 +48,7 @@ pub(crate) fn generate_refetch_reader_artifact(
         },
         0,
         &scalar_client_field_traversal_state.refetch_paths,
+        &client_field.initial_variable_context(),
     );
 
     let relative_directory = generate_path(parent_type.name, client_field.name);

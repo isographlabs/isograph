@@ -50,6 +50,7 @@ pub(crate) fn generate_entrypoint_artifacts(
         global_client_field_map,
         entrypoint,
         false,
+        &entrypoint.initial_variable_context(),
     );
 
     // TODO when we do not call generate_entrypoint_artifact extraneously,

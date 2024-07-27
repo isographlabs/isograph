@@ -37,6 +37,7 @@ pub(crate) fn generate_eager_reader_artifact(
         client_field.selection_set_for_parent_query(),
         0,
         &scalar_client_field_traversal_state.refetch_paths,
+        &client_field.initial_variable_context(),
     );
 
     let function_import_statement =

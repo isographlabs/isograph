@@ -19,7 +19,7 @@ use crate::{
     FieldDefinitionLocation, ImperativelyLoadedFieldVariant, Loadability, NameAndArguments,
     PathToRefetchField, RootOperationName, SchemaObject, UnvalidatedVariableDefinition,
     ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedScalarFieldSelection,
-    ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection,
+    ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection, VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -312,6 +312,7 @@ pub fn create_merged_selection_map_and_insert_into_global_map(
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
     root_object: &ValidatedClientField,
     was_selected_loadably: bool,
+    variable_context: &VariableContext,
 ) -> ClientFieldTraversalResult {
     // TODO move this check outside of this function
     match global_client_field_map.get_mut(&root_object.id) {
@@ -332,6 +333,7 @@ pub fn create_merged_selection_map_and_insert_into_global_map(
                     validated_selections,
                     &mut merge_traversal_state,
                     global_client_field_map,
+                    variable_context,
                 );
 
             // N.B. global_client_field_map might actually have an item stored in root_object.id,
@@ -543,6 +545,7 @@ fn create_selection_map_with_merge_traversal_state(
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
+    variable_context: &VariableContext,
 ) -> (MergedSelectionMap, MergedSelectionMap) {
     // TODO do these in one iteration
 
@@ -555,6 +558,7 @@ fn create_selection_map_with_merge_traversal_state(
         merge_traversal_state,
         global_client_field_map,
         false,
+        variable_context,
     );
 
     let mut complete_merged_selection_map = BTreeMap::new();
@@ -566,6 +570,7 @@ fn create_selection_map_with_merge_traversal_state(
         merge_traversal_state,
         global_client_field_map,
         true,
+        variable_context,
     );
 
     (outer_merged_selection_map, complete_merged_selection_map)
@@ -580,6 +585,7 @@ fn merge_validated_selections_into_selection_map(
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
     // TODO use an enum
     recurse_into_loadable_fields: bool,
+    variable_context: &VariableContext,
 ) {
     for validated_selection in validated_selections.iter().filter(filter_id_fields) {
         match &validated_selection.item {
@@ -593,7 +599,11 @@ fn merge_validated_selections_into_selection_map(
                     ServerFieldSelection::ScalarField(scalar_field_selection) => {
                         match &scalar_field_selection.associated_data.location {
                             FieldDefinitionLocation::Server(_) => {
-                                merge_scalar_server_field(scalar_field_selection, parent_map);
+                                merge_scalar_server_field(
+                                    scalar_field_selection,
+                                    parent_map,
+                                    variable_context,
+                                );
                             }
                             FieldDefinitionLocation::Client(client_field_id) => {
                                 let newly_encountered_scalar_client_field =
@@ -640,6 +650,8 @@ fn merge_validated_selections_into_selection_map(
                                     global_client_field_map,
                                     &scalar_field_selection.associated_data.selection_variant,
                                     recurse_into_loadable_fields,
+                                    variable_context,
+                                    &scalar_field_selection.arguments,
                                 )
                             }
                         };
@@ -679,7 +691,12 @@ fn merge_validated_selections_into_selection_map(
                                     arguments: linked_field_selection
                                         .arguments
                                         .iter()
-                                        .map(|arg| (&arg.item).into())
+                                        .map(|arg| {
+                                            from_selection_field_argument_and_context(
+                                                &arg.item,
+                                                variable_context,
+                                            )
+                                        })
                                         .collect(),
                                 })
                             });
@@ -704,6 +721,7 @@ fn merge_validated_selections_into_selection_map(
                                     merge_traversal_state,
                                     global_client_field_map,
                                     recurse_into_loadable_fields,
+                                    variable_context,
                                 );
                             }
                             MergedServerSelection::InlineFragment(_) => {
@@ -810,7 +828,14 @@ fn merge_scalar_client_field(
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
     selection_variant: &ValidatedIsographSelectionVariant,
     recurse_into_loadable_fields: bool,
+    parent_variable_context: &VariableContext,
+    selection_arguments: &[WithLocation<SelectionFieldArgument>],
 ) {
+    let child_field_variable_context = parent_variable_context.child_variable_context(
+        selection_arguments,
+        &newly_encountered_scalar_client_field.variable_definitions,
+    );
+
     let was_selected_loadably = matches!(
         selection_variant,
         &ValidatedIsographSelectionVariant::Loadable(_)
@@ -826,6 +851,7 @@ fn merge_scalar_client_field(
         global_client_field_map,
         newly_encountered_scalar_client_field,
         was_selected_loadably,
+        &child_field_variable_context,
     );
 
     if was_selected_loadably {
@@ -857,6 +883,7 @@ fn merge_scalar_client_field(
                     .refetch_selection_set(),
                 &mut merge_traversal_state,
                 &mut Default::default(),
+                parent_variable_context,
             )
         };
         merge_selections_into_selection_map(
@@ -874,6 +901,7 @@ fn merge_scalar_client_field(
 fn merge_scalar_server_field(
     scalar_field: &ValidatedScalarFieldSelection,
     parent_map: &mut MergedSelectionMap,
+    variable_context: &VariableContext,
 ) {
     let normalization_key = NormalizationKey::ServerField(name_and_arguments(
         scalar_field.name.item.into(),
@@ -901,7 +929,9 @@ fn merge_scalar_server_field(
                     arguments: scalar_field
                         .arguments
                         .iter()
-                        .map(|arg| (&arg.item).into())
+                        .map(|arg| {
+                            from_selection_field_argument_and_context(&arg.item, variable_context)
+                        })
                         .collect(),
                     normalization_alias: scalar_field.normalization_alias.map(|x| x.item),
                 },
@@ -1091,11 +1121,28 @@ pub fn id_arguments() -> Vec<UnvalidatedVariableDefinition> {
     }]
 }
 
-impl From<&SelectionFieldArgument> for MergedSelectionFieldArgument {
-    fn from(arg: &SelectionFieldArgument) -> Self {
-        Self {
+pub fn from_selection_field_argument_and_context(
+    arg: &SelectionFieldArgument,
+    variable_context: &VariableContext,
+) -> MergedSelectionFieldArgument {
+    if let NonConstantValue::Variable(used_variable_name) = &arg.value.item {
+        // Look up the variable in the variables in context, and use that value
+        return MergedSelectionFieldArgument {
             name: arg.name.item,
-            value: arg.value.item.clone(),
-        }
+            value: variable_context
+                .0
+                .get(used_variable_name)
+                .expect(
+                    "Expected the variable used here to have been defined. \
+                    This should have been validated already. \
+                    This is indicative of a bug in Isograph.",
+                )
+                .clone(),
+        };
+    }
+
+    MergedSelectionFieldArgument {
+        name: arg.name.item,
+        value: arg.value.item.clone(),
     }
 }

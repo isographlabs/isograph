@@ -3,10 +3,11 @@ use std::collections::{BTreeSet, HashSet};
 use common_lang_types::{SelectableFieldName, WithSpan};
 use isograph_lang_types::{ClientFieldId, RefetchQueryIndex, Selection, ServerFieldSelection};
 use isograph_schema::{
-    categorize_field_loadability, into_name_and_arguments, ArgumentKeyAndValue, ClientFieldVariant,
-    FieldDefinitionLocation, Loadability, NameAndArguments, PathToRefetchField, RefetchedPathsMap,
-    ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
-    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSelection,
+    categorize_field_loadability, from_selection_field_argument_and_context,
+    into_name_and_arguments, ArgumentKeyAndValue, ClientFieldVariant, FieldDefinitionLocation,
+    Loadability, NameAndArguments, PathToRefetchField, RefetchedPathsMap, ValidatedClientField,
+    ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
+    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSelection, VariableContext,
 };
 
 use crate::{
@@ -23,14 +24,17 @@ fn generate_reader_ast_node(
     // TODO use this to generate usedRefetchQueries
     root_refetched_paths: &RefetchedPathsMap,
     path: &mut Vec<NameAndArguments>,
+    initial_variable_context: &VariableContext,
 ) -> String {
     match &selection.item {
         Selection::ServerField(field) => match field {
             ServerFieldSelection::ScalarField(scalar_field) => {
                 match scalar_field.associated_data.location {
-                    FieldDefinitionLocation::Server(_) => {
-                        server_defined_scalar_field_ast_node(scalar_field, indentation_level)
-                    }
+                    FieldDefinitionLocation::Server(_) => server_defined_scalar_field_ast_node(
+                        scalar_field,
+                        indentation_level,
+                        initial_variable_context,
+                    ),
                     FieldDefinitionLocation::Client(client_field_id) => {
                         scalar_client_defined_field_ast_node(
                             scalar_field,
@@ -40,6 +44,7 @@ fn generate_reader_ast_node(
                             path,
                             root_refetched_paths,
                             reader_imports,
+                            initial_variable_context,
                         )
                     }
                 }
@@ -54,11 +59,17 @@ fn generate_reader_ast_node(
                     reader_imports,
                     root_refetched_paths,
                     path,
+                    initial_variable_context,
                 );
 
                 path.pop();
 
-                linked_field_ast_node(linked_field, indentation_level, inner_reader_ast)
+                linked_field_ast_node(
+                    linked_field,
+                    indentation_level,
+                    inner_reader_ast,
+                    initial_variable_context,
+                )
             }
         },
     }
@@ -68,6 +79,7 @@ fn linked_field_ast_node(
     linked_field: &ValidatedLinkedFieldSelection,
     indentation_level: u8,
     inner_reader_ast: ReaderAst,
+    initial_variable_context: &VariableContext,
 ) -> String {
     let name = linked_field.name.item;
     let alias = linked_field
@@ -79,7 +91,7 @@ fn linked_field_ast_node(
         &linked_field
             .arguments
             .iter()
-            .map(|x| (&x.item).into())
+            .map(|x| from_selection_field_argument_and_context(&x.item, initial_variable_context))
             .collect::<Vec<_>>(),
         indentation_level + 1,
     );
@@ -104,6 +116,7 @@ fn scalar_client_defined_field_ast_node(
     path: &mut Vec<NameAndArguments>,
     root_refetched_paths: &RefetchedPathsMap,
     reader_imports: &mut ReaderImports,
+    initial_variable_context: &VariableContext,
 ) -> String {
     // This field is a client field, so we need to look up the field in the schema.
     let nested_client_field = schema.client_field(client_field_id);
@@ -130,6 +143,7 @@ fn scalar_client_defined_field_ast_node(
             path,
             root_refetched_paths,
             reader_imports,
+            initial_variable_context,
         ),
     }
 }
@@ -142,6 +156,7 @@ fn user_written_variant_ast_node(
     path: &mut Vec<NameAndArguments>,
     root_refetched_paths: &RefetchedPathsMap,
     reader_imports: &mut ReaderImports,
+    initial_variable_context: &VariableContext,
 ) -> String {
     let alias = scalar_field_selection.name_or_alias().item;
     let indent_1 = "  ".repeat(indentation_level as usize);
@@ -159,7 +174,7 @@ fn user_written_variant_ast_node(
             .arguments
             .iter()
             // TODO we shouldn't need to clone here
-            .map(|x| (&x.item).into())
+            .map(|x| from_selection_field_argument_and_context(&x.item, initial_variable_context))
             .collect::<Vec<_>>(),
         indentation_level + 1,
     );
@@ -261,6 +276,7 @@ fn imperatively_loaded_variant_ast_node(
 fn server_defined_scalar_field_ast_node(
     scalar_field: &ValidatedScalarFieldSelection,
     indentation_level: u8,
+    initial_variable_context: &VariableContext,
 ) -> String {
     let field_name = scalar_field.name.item;
     let alias = scalar_field
@@ -271,7 +287,7 @@ fn server_defined_scalar_field_ast_node(
         &scalar_field
             .arguments
             .iter()
-            .map(|x| (&x.item).into())
+            .map(|x| from_selection_field_argument_and_context(&x.item, initial_variable_context))
             .collect::<Vec<_>>(),
         indentation_level + 1,
     );
@@ -297,6 +313,7 @@ fn generate_reader_ast_with_path<'schema>(
     // N.B. this is not root_refetched_paths when we're generating a non-fetchable client field :(
     root_refetched_paths: &RefetchedPathsMap,
     path: &mut Vec<NameAndArguments>,
+    initial_variable_context: &VariableContext,
 ) -> ReaderAst {
     let mut reader_ast = "[\n".to_string();
     for item in selection_set {
@@ -307,6 +324,7 @@ fn generate_reader_ast_with_path<'schema>(
             nested_client_field_imports,
             root_refetched_paths,
             path,
+            initial_variable_context,
         );
         reader_ast.push_str(&s);
     }
@@ -373,6 +391,7 @@ pub(crate) fn generate_reader_ast<'schema>(
     // N.B. this is not root_refetched_paths when we're generating an entrypoint :(
     // ????
     root_refetched_paths: &RefetchedPathsMap,
+    initial_variable_context: &VariableContext,
 ) -> (ReaderAst, ReaderImports) {
     let mut client_field_imports = BTreeSet::new();
     let reader_ast = generate_reader_ast_with_path(
@@ -384,6 +403,7 @@ pub(crate) fn generate_reader_ast<'schema>(
         // TODO we are not starting at the root when generating ASTs for reader artifacts
         // (and in theory some entrypoints).
         &mut vec![],
+        initial_variable_context,
     );
     (reader_ast, client_field_imports)
 }

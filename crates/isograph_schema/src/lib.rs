@@ -11,6 +11,7 @@ mod root_types;
 mod unvalidated_schema;
 mod validate_entrypoint;
 mod validate_schema;
+mod variable_context;
 
 use argument_map::*;
 
@@ -24,3 +25,4 @@ use root_types::*;
 pub use unvalidated_schema::*;
 pub use validate_entrypoint::*;
 pub use validate_schema::*;
+pub use variable_context::*;
