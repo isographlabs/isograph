@@ -9,6 +9,7 @@ import {
   IsographEnvironment,
 } from './IsographEnvironment';
 import { ReaderAst } from './reader';
+import { Arguments } from './util';
 
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: Set<DataId>;
@@ -272,7 +273,7 @@ function readData<TReadFromStore>(
               kind: 'FragmentReference',
               readerArtifact: field.readerArtifact,
               root,
-              variables,
+              variables: generateChildVariableMap(variables, field.arguments),
               nestedRefetchQueries: resolverRefetchQueries,
             } as const,
           );
@@ -304,4 +305,25 @@ function filterVariables(
     result[key] = variables[key];
   }
   return result;
+}
+
+function generateChildVariableMap(
+  variables: Variables,
+  fieldArguments: Arguments | null,
+): Variables {
+  if (fieldArguments == null) {
+    return {};
+  }
+
+  const childVars: Variables = {};
+  for (const [name, value] of fieldArguments) {
+    if (value.kind === 'Variable') {
+      // @ts-expect-error
+      childVars[name] = variables[value.name];
+    } else {
+      // @ts-expect-error
+      childVars[name] = value;
+    }
+  }
+  return childVars;
 }
