@@ -47,6 +47,7 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 
 ## Top cleanup priorities
 
+- validate no unused params and no unused variables
 - useLazyReference should refetch when props change
 
 ## V2 release
