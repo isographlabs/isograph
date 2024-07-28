@@ -15,6 +15,7 @@ import { Pet__UnreachableFromEntrypoint__param } from './Pet/UnreachableFromEntr
 import { Query__HomeRoute__param } from './Query/HomeRoute/param_type';
 import { Query__PetByName__param } from './Query/PetByName/param_type';
 import { Query__PetDetailDeferredRoute__param } from './Query/PetDetailDeferredRoute/param_type';
+import { Query__PetDetailRouteInner__param } from './Query/PetDetailRouteInner/param_type';
 import { Query__PetDetailRoute__param } from './Query/PetDetailRoute/param_type';
 import { Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/param_type';
 import entrypoint_Mutation__SetTagline from '../__isograph/Mutation/SetTagline/entrypoint';
@@ -132,6 +133,10 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.PetDetailDeferredRoute', T>
 ): IdentityWithParamComponent<Query__PetDetailDeferredRoute__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.PetDetailRouteInner', T>
+): IdentityWithParamComponent<Query__PetDetailRouteInner__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.PetDetailRoute', T>

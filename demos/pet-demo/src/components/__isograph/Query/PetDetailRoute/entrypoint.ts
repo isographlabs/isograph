@@ -16,7 +16,7 @@ const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [
 ];
 
 const queryText = 'query PetDetailRoute ($id: ID!) {\
-  pet____id___v_id: pet(id: $id) {\
+  pet____id___v_actualId: pet(id: $id) {\
     id,\
     age,\
     best_friend_relationship {\
