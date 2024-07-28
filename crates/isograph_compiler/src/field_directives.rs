@@ -140,7 +140,6 @@ fn and_then_selection_set_and_collect_errors<
                                     LinkedFieldSelection {
                                         name: l.name,
                                         reader_alias: l.reader_alias,
-                                        normalization_alias: l.normalization_alias,
                                         associated_data: new_linked_field,
                                         selection_set: new_selection_set,
                                         unwraps: l.unwraps,
@@ -163,7 +162,6 @@ fn and_then_selection_set_and_collect_errors<
                             ScalarFieldSelection {
                                 name: s.name,
                                 reader_alias: s.reader_alias,
-                                normalization_alias: s.normalization_alias,
                                 associated_data: new_scalar_field_data,
                                 unwraps: s.unwraps,
                                 arguments: s.arguments,

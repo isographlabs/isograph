@@ -754,7 +754,6 @@ fn validate_field_type_exists_and_is_scalar(
                             },
                         },
                         reader_alias: scalar_field_selection.reader_alias,
-                        normalization_alias: scalar_field_selection.normalization_alias,
                         unwraps: scalar_field_selection.unwraps,
                         arguments: scalar_field_selection.arguments,
                         directives: scalar_field_selection.directives,
@@ -802,7 +801,6 @@ fn validate_field_type_exists_and_is_scalar(
                         },
                     },
                     arguments: scalar_field_selection.arguments,
-                    normalization_alias: scalar_field_selection.normalization_alias,
                     directives: scalar_field_selection.directives,
                 })
             }
@@ -855,7 +853,6 @@ fn validate_field_type_exists_and_is_linked(
                         Ok(LinkedFieldSelection {
                                 name: linked_field_selection.name,
                                 reader_alias: linked_field_selection.reader_alias,
-                                normalization_alias: linked_field_selection.normalization_alias,
                                 selection_set: linked_field_selection.selection_set.into_iter().map(
                                     |selection| {
                                         validate_client_field_definition_selection_exists_and_type_matches(

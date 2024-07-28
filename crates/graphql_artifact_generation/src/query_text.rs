@@ -75,7 +75,7 @@ fn write_selections_for_query_text<'a>(
         match &item {
             MergedServerSelection::ScalarField(scalar_field) => {
                 query_text.push_str(&"  ".repeat(indentation_level as usize).to_string());
-                if let Some(alias) = scalar_field.normalization_alias {
+                if let Some(alias) = scalar_field.normalization_alias() {
                     query_text.push_str(&format!("{}: ", alias));
                 }
                 let name = scalar_field.name;
@@ -84,7 +84,7 @@ fn write_selections_for_query_text<'a>(
             }
             MergedServerSelection::LinkedField(linked_field) => {
                 query_text.push_str(&"  ".repeat(indentation_level as usize).to_string());
-                if let Some(alias) = linked_field.normalization_alias {
+                if let Some(alias) = linked_field.normalization_alias() {
                     // This is bad, alias is WithLocation
                     query_text.push_str(&format!("{}: ", alias));
                 }

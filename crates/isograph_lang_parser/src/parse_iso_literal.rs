@@ -1,8 +1,8 @@
 use std::{collections::HashSet, ops::ControlFlow};
 
 use common_lang_types::{
-    FilePath, Location, ScalarFieldName, SelectableFieldName, Span, StringKeyNewtype, TextSource,
-    UnvalidatedTypeName, WithLocation, WithSpan,
+    FilePath, Location, ScalarFieldName, Span, TextSource, UnvalidatedTypeName, WithLocation,
+    WithSpan,
 };
 use graphql_lang_types::{
     GraphQLTypeAnnotation, ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
@@ -306,11 +306,6 @@ fn parse_selection(
                         associated_data: (),
                         selection_set,
                         unwraps,
-                        normalization_alias:
-                            HACK_combine_name_and_variables_into_normalization_alias(
-                                field_name.map(|x| x.into()),
-                                &arguments,
-                            ),
                         arguments,
                         directives,
                     },
@@ -322,11 +317,6 @@ fn parse_selection(
                             .map(|with_span| with_span.map(|string_key| string_key.into())),
                         associated_data: (),
                         unwraps,
-                        normalization_alias:
-                            HACK_combine_name_and_variables_into_normalization_alias(
-                                field_name.map(|x| x.into()),
-                                &arguments,
-                            ),
                         arguments,
                         directives,
                     },
@@ -621,29 +611,6 @@ fn from_control_flow<T, E>(control_flow: impl FnOnce() -> ControlFlow<T, E>) -> 
     match control_flow() {
         ControlFlow::Break(t) => Ok(t),
         ControlFlow::Continue(e) => Err(e),
-    }
-}
-
-/// In order to avoid requiring a normalization AST, we write the variables
-/// used in the alias. Once we have a normalization AST, we can remove this.
-#[allow(non_snake_case)]
-fn HACK_combine_name_and_variables_into_normalization_alias<T: StringKeyNewtype>(
-    name: WithLocation<SelectableFieldName>,
-    arguments: &[WithLocation<SelectionFieldArgument>],
-) -> Option<WithLocation<T>> {
-    if arguments.is_empty() {
-        None
-    } else {
-        let mut alias_str = name.item.to_string();
-
-        for argument in arguments {
-            alias_str.push_str(&format!(
-                // this will not be necessary once we have normalization ASTs
-                "____{}",
-                argument.item.to_alias_str_chunk()
-            ));
-        }
-        Some(name.map(|_| T::from(alias_str.intern())))
     }
 }
 

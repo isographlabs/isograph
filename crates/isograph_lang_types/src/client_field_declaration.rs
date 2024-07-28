@@ -173,7 +173,6 @@ impl<TScalarField, TLinkedField> HasName for ServerFieldSelection<TScalarField, 
 pub struct ScalarFieldSelection<TScalarField> {
     pub name: WithLocation<ScalarFieldName>,
     pub reader_alias: Option<WithLocation<ScalarFieldAlias>>,
-    pub normalization_alias: Option<WithLocation<ScalarFieldAlias>>,
     pub associated_data: TScalarField,
     pub unwraps: Vec<WithSpan<Unwrap>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
@@ -188,7 +187,6 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
             associated_data: map(self.associated_data),
             unwraps: self.unwraps,
             arguments: self.arguments,
-            normalization_alias: self.normalization_alias,
             directives: self.directives,
         }
     }
@@ -203,7 +201,6 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
             associated_data: map(self.associated_data)?,
             unwraps: self.unwraps,
             arguments: self.arguments,
-            normalization_alias: self.normalization_alias,
             directives: self.directives,
         })
     }
@@ -219,7 +216,6 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
 pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
     pub name: WithLocation<LinkedFieldName>,
     pub reader_alias: Option<WithLocation<LinkedFieldAlias>>,
-    pub normalization_alias: Option<WithLocation<LinkedFieldAlias>>,
     pub associated_data: TLinkedField,
     pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
     pub unwraps: Vec<WithSpan<Unwrap>>,
@@ -236,7 +232,6 @@ impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField
         LinkedFieldSelection {
             name: self.name,
             reader_alias: self.reader_alias,
-            normalization_alias: self.normalization_alias,
             associated_data: map_linked(self.associated_data),
             selection_set: self
                 .selection_set

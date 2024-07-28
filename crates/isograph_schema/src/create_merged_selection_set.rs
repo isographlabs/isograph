@@ -1,9 +1,8 @@
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, HashSet};
 
 use common_lang_types::{
-    FieldArgumentName, IsographObjectTypeName, LinkedFieldAlias, LinkedFieldName, Location,
-    QueryOperationName, ScalarFieldAlias, ScalarFieldName, SelectableFieldName, Span, VariableName,
-    WithLocation, WithSpan,
+    FieldArgumentName, IsographObjectTypeName, LinkedFieldName, Location, QueryOperationName,
+    ScalarFieldName, SelectableFieldName, Span, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
@@ -92,9 +91,43 @@ fn get_variables(
 pub struct MergedScalarFieldSelection {
     // TODO no location
     pub name: ScalarFieldName,
-    // TODO calculate this when needed
-    pub normalization_alias: Option<ScalarFieldAlias>,
     pub arguments: Vec<MergedSelectionFieldArgument>,
+}
+
+impl MergedScalarFieldSelection {
+    pub fn normalization_alias(&self) -> Option<String> {
+        // None if the alias is the same as the name (i.e. there are no args)
+        if self.arguments.is_empty() {
+            None
+        } else {
+            Some(get_aliased_mutation_field_name(
+                self.name.into(),
+                &self.arguments,
+            ))
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct MergedLinkedFieldSelection {
+    // TODO no location
+    pub name: LinkedFieldName,
+    pub selection_map: MergedSelectionMap,
+    pub arguments: Vec<MergedSelectionFieldArgument>,
+}
+
+impl MergedLinkedFieldSelection {
+    pub fn normalization_alias(&self) -> Option<String> {
+        // None if the alias is the same as the name (i.e. there are no args)
+        if self.arguments.is_empty() {
+            None
+        } else {
+            Some(get_aliased_mutation_field_name(
+                self.name.into(),
+                &self.arguments,
+            ))
+        }
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -107,16 +140,6 @@ impl MergedSelectionFieldArgument {
     pub fn to_alias_str_chunk(&self) -> String {
         format!("{}___{}", self.name, self.value.to_alias_str_chunk())
     }
-}
-
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct MergedLinkedFieldSelection {
-    // TODO no location
-    pub name: LinkedFieldName,
-    // TODO calculate this when needed
-    pub normalization_alias: Option<LinkedFieldAlias>,
-    pub selection_map: MergedSelectionMap,
-    pub arguments: Vec<MergedSelectionFieldArgument>,
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -684,9 +707,6 @@ fn merge_validated_selections_into_selection_map(
                             parent_map.entry(normalization_key).or_insert_with(|| {
                                 MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
                                     name: linked_field_selection.name.item,
-                                    normalization_alias: linked_field_selection
-                                        .normalization_alias
-                                        .map(|x| x.item),
                                     selection_map: BTreeMap::new(),
                                     arguments: linked_field_selection
                                         .arguments
@@ -933,7 +953,6 @@ fn merge_scalar_server_field(
                             from_selection_field_argument_and_context(&arg.item, variable_context)
                         })
                         .collect(),
-                    normalization_alias: scalar_field.normalization_alias.map(|x| x.item),
                 },
             ));
         }
@@ -990,8 +1009,6 @@ fn select_typename_and_id_fields_in_merged_selection(
                         // major HACK alert
                         name: id_field.name.item.lookup().intern().into(),
                         arguments: vec![],
-                        // This indicates that there should be a separate MergedServerFieldSelection variant
-                        normalization_alias: None,
                     },
                 ));
             }
@@ -1038,8 +1055,6 @@ pub fn selection_map_wrapped(
                 }),
                 MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
                     name: subfield,
-                    // TODO
-                    normalization_alias: None,
                     selection_map: selection_set_with_inline_fragment,
                     arguments: vec![],
                 }),
@@ -1059,12 +1074,6 @@ pub fn selection_map_wrapped(
         }),
         MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
             name: top_level_field,
-            normalization_alias: Some(
-                get_aliased_mutation_field_name(top_level_field.into(), &top_level_field_arguments)
-                    .intern()
-                    .into(),
-            ),
-
             selection_map: selection_set_with_subfield,
             arguments: top_level_field_arguments,
         }),
@@ -1089,7 +1098,6 @@ fn maybe_add_typename_selection(selections: &mut MergedSelectionMap) {
             NormalizationKey::Discriminator,
             MergedServerSelection::ScalarField(MergedScalarFieldSelection {
                 name: *TYPENAME_FIELD_NAME,
-                normalization_alias: None,
                 arguments: vec![],
             }),
         );

@@ -157,7 +157,6 @@ pub fn id_selection() -> WithSpan<Selection<IsographSelectionVariant, IsographSe
         Selection::ServerField(ServerFieldSelection::ScalarField(ScalarFieldSelection {
             name: WithLocation::new("id".intern().into(), Location::generated()),
             reader_alias: None,
-            normalization_alias: None,
             associated_data: IsographSelectionVariant::Regular,
             unwraps: vec![],
             arguments: vec![],
