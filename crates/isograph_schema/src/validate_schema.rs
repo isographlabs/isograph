@@ -954,7 +954,7 @@ pub fn categorize_field_loadability<'a>(
     }
 }
 
-fn get_missing_arguments_and_validate_argument_types<'a>(
+pub fn get_missing_arguments_and_validate_argument_types<'a>(
     argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
     arguments: &[WithLocation<SelectionFieldArgument>],
 ) -> Vec<ValidatedVariableDefinition> {

@@ -8,8 +8,9 @@ use isograph_lang_types::{
     ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection, ServerFieldSelection,
 };
 use isograph_schema::{
-    ClientFieldTraversalResult, ClientFieldVariant, FieldDefinitionLocation,
-    MergedSelectionFieldArgument, SchemaObject, UserWrittenComponentVariant, ValidatedClientField,
+    get_missing_arguments_and_validate_argument_types, ClientFieldTraversalResult,
+    ClientFieldVariant, FieldDefinitionLocation, MergedSelectionFieldArgument, MissingArguments,
+    SchemaObject, UserWrittenComponentVariant, ValidatedClientField,
     ValidatedIsographSelectionVariant, ValidatedSchema, ValidatedSelection,
 };
 use lazy_static::lazy_static;
@@ -343,14 +344,14 @@ fn write_param_type_from_selection(
 ) {
     match &selection.item {
         Selection::ServerField(field) => match field {
-            ServerFieldSelection::ScalarField(scalar_field) => {
-                match scalar_field.associated_data.location {
+            ServerFieldSelection::ScalarField(scalar_field_selection) => {
+                match scalar_field_selection.associated_data.location {
                     FieldDefinitionLocation::Server(_server_field) => {
                         query_type_declaration
                             .push_str(&"  ".repeat(indentation_level as usize).to_string());
                         let parent_field = parent_type
                             .encountered_fields
-                            .get(&scalar_field.name.item.into())
+                            .get(&scalar_field_selection.name.item.into())
                             .expect("parent_field should exist 1")
                             .as_server_field()
                             .expect("parent_field should exist and be server field");
@@ -362,7 +363,7 @@ fn write_param_type_from_selection(
                             indentation_level,
                         );
 
-                        let name_or_alias = scalar_field.name_or_alias().item;
+                        let name_or_alias = scalar_field_selection.name_or_alias().item;
 
                         // TODO there should be a clever way to print without cloning
                         let output_type = field.associated_data.clone().map(|output_type_id| {
@@ -397,16 +398,39 @@ fn write_param_type_from_selection(
                             "{}__output_type",
                             client_field.type_and_field.underscore_separated()
                         );
-                        let output_type = match scalar_field.associated_data.selection_variant {
+
+                        let output_type = match scalar_field_selection
+                            .associated_data
+                            .selection_variant
+                        {
                             ValidatedIsographSelectionVariant::Regular => inner_output_type,
                             ValidatedIsographSelectionVariant::Loadable(_) => {
+                                let missing_arguments =
+                                    get_missing_arguments_and_validate_argument_types(
+                                        client_field.variable_definitions.iter().map(|x| &x.item),
+                                        &scalar_field_selection.arguments,
+                                    );
+
+                                let loadable_field_argument_type = if missing_arguments.is_empty() {
+                                    "void".to_string()
+                                } else {
+                                    get_loadable_field_type_from_missing_arguments(
+                                        schema,
+                                        missing_arguments,
+                                    )
+                                };
+
                                 *loadable_field_encountered = true;
-                                format!("LoadableField<void, {inner_output_type}>")
+                                format!("LoadableField<{loadable_field_argument_type}, {inner_output_type}>")
                             }
                         };
 
                         query_type_declaration.push_str(
-                            &(format!("{}: {},\n", scalar_field.name_or_alias().item, output_type)),
+                            &(format!(
+                                "{}: {},\n",
+                                scalar_field_selection.name_or_alias().item,
+                                output_type
+                            )),
                         );
                     }
                 }
@@ -447,6 +471,62 @@ fn write_param_type_from_selection(
                     name_or_alias,
                     print_type_annotation(&type_annotation),
                 ));
+            }
+        },
+    }
+}
+
+fn get_loadable_field_type_from_missing_arguments(
+    schema: &ValidatedSchema,
+    missing_arguments: MissingArguments,
+) -> String {
+    let mut loadable_field_type = "{".to_string();
+    for arg in missing_arguments.iter() {
+        loadable_field_type.push_str(&format!(
+            "{}: {}",
+            arg.name.item,
+            format_type_for_js(schema, arg.type_.clone())
+        ));
+    }
+    loadable_field_type.push('}');
+    loadable_field_type
+}
+
+fn format_type_for_js(
+    schema: &ValidatedSchema,
+    type_: GraphQLTypeAnnotation<SelectableServerFieldId>,
+) -> String {
+    let new_type = type_.map(
+        |selectable_server_field_id| match selectable_server_field_id {
+            SelectableServerFieldId::Object(_) => {
+                panic!(
+                    "Unexpected object. Objects are not supported as parameters, yet. \
+                    This is indicative of an unimplemented feature in Isograph."
+                )
+            }
+            SelectableServerFieldId::Scalar(scalar_id) => {
+                schema.server_field_data.scalar(scalar_id).javascript_name
+            }
+        },
+    );
+
+    format_type_for_js_inner(new_type)
+}
+
+fn format_type_for_js_inner(
+    new_type: GraphQLTypeAnnotation<common_lang_types::JavascriptName>,
+) -> String {
+    match new_type {
+        GraphQLTypeAnnotation::Named(named_inner_type) => {
+            format!("{} | null", named_inner_type.0.item)
+        }
+        GraphQLTypeAnnotation::List(list) => {
+            format!("ReadonlyArray<{}> | null", format_type_for_js_inner(list.0))
+        }
+        GraphQLTypeAnnotation::NonNull(non_null) => match *non_null {
+            NonNullTypeAnnotation::Named(named_inner_type) => named_inner_type.0.item.to_string(),
+            NonNullTypeAnnotation::List(list) => {
+                format!("ReadonlyArray<{}>", format_type_for_js_inner(list.0))
             }
         },
     }

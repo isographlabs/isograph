@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use common_lang_types::{VariableName, WithLocation, WithSpan};
 use isograph_lang_types::{ConstantValue, NonConstantValue, SelectionFieldArgument};
 
-use crate::{ClientField, ValidatedVariableDefinition};
+use crate::{ClientField, ValidatedIsographSelectionVariant, ValidatedVariableDefinition};
 
 #[derive(Debug)]
 pub struct VariableContext(pub HashMap<VariableName, NonConstantValue>);
@@ -14,6 +14,7 @@ impl VariableContext {
         &self,
         selection_arguments: &[WithLocation<SelectionFieldArgument>],
         child_variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
+        selection_variant: &ValidatedIsographSelectionVariant,
     ) -> Self {
         // We need to take a parent context ({$id: NonConstantValue1 }), the argument parameters ({blah: $id}),
         // and the child variable definitions ({ $blah: Option<NonConstantValue2> }) and create a new child
@@ -37,7 +38,18 @@ impl VariableContext {
                 }) {
                     Some(arg) => arg,
                     None => {
-                        if let Some(default_value) = variable_definition.item.default_value.as_ref()
+                        if matches!(
+                            selection_variant,
+                            ValidatedIsographSelectionVariant::Loadable(_)
+                        ) {
+                            // If this field was selected loadably, missing arguments are allowed.
+                            // These missing arguments become variables that are provided at
+                            // runtime. If they are missing at runtime, they will fall back to
+                            // their default value (if any is present.) (Or at least, that's the
+                            // intended behavior.)
+                            return (variable_name, NonConstantValue::Variable(variable_name));
+                        } else if let Some(default_value) =
+                            variable_definition.item.default_value.as_ref()
                         {
                             return (variable_name, default_value.clone().item.into());
                         } else {

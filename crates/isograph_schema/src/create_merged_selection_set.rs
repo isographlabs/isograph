@@ -854,6 +854,7 @@ fn merge_scalar_client_field(
     let child_field_variable_context = parent_variable_context.child_variable_context(
         selection_arguments,
         &newly_encountered_scalar_client_field.variable_definitions,
+        selection_variant,
     );
 
     let was_selected_loadably = matches!(
