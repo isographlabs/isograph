@@ -1,6 +1,6 @@
 use common_lang_types::{SelectableFieldName, StringLiteralValue, TextSource};
 use graphql_lang_types::{
-    from_graph_ql_directive, GraphQLConstantValue, DeserializationError, GraphQLDirective,
+    from_graph_ql_directive, DeserializationError, GraphQLConstantValue, GraphQLDirective,
 };
 use intern::string_key::Intern;
 use isograph_schema::{ExposeFieldDirective, FieldMapItem};
