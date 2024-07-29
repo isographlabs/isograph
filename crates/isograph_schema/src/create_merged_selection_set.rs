@@ -527,7 +527,6 @@ fn process_imperatively_loaded_field(
         root_operation_name,
         query_name,
     }
-    // todo!("Process imperatively loaded field")
 }
 
 fn get_used_variable_definitions(
