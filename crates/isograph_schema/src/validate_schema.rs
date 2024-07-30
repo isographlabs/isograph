@@ -1062,7 +1062,7 @@ pub enum ValidateSchemaError {
 
     #[error(
         "This field has missing arguments: {0}",
-        missing_arguments.into_iter().map(|arg| {arg.name.item.lookup()}).collect::<Vec<_>>().join(", ")
+        missing_arguments.into_iter().map(|arg| format!("${}", arg.name.item)).collect::<Vec<_>>().join(", ")
     )]
     MissingArguments { missing_arguments: MissingArguments },
 
