@@ -92,8 +92,16 @@ export const schema = createSchema({
             otherPet.id !== pet.best_friend_relationship?.best_friend
           );
         }),
-      checkins: (pet) => {
-        return checkins.filter((checkin) => checkin.pet_id === pet.id);
+      checkins: (pet, args) => {
+        const allCheckins = checkins.filter(
+          (checkin) => checkin.pet_id === pet.id,
+        );
+        const count = args?.count;
+        if (count != null) {
+          return allCheckins.slice(0, count);
+        } else {
+          return allCheckins;
+        }
       },
     },
     BestFriendRelationship: {
