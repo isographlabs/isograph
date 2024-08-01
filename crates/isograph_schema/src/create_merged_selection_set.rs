@@ -202,8 +202,11 @@ pub struct ScalarClientFieldTraversalState {
     /// As we traverse, if we encounter a refetch path, we note it here
     pub refetch_paths: RefetchedPathsMap,
 
+    // TODO this should not be NormalizationKey, since a NormalizationKey can represent
+    // a scalar field, and a path cannot include scalar fields. So, it should be a two-
+    // variant enum, with variants for linked field and for inline fragment.
     /// The (mutable) path from the current client field to wherever we are iterating
-    traversal_path: Vec<NameAndArguments>,
+    traversal_path: Vec<NormalizationKey>,
 
     /// Client fields that are directly accessed by this client field
     pub accessible_client_fields: HashSet<ClientFieldId>,
@@ -233,14 +236,11 @@ impl ScalarClientFieldTraversalState {
                     // self.traversal_path is already transformed, i.e. uses the correct variables
                     let mut complete_path = self.traversal_path.clone();
 
-                    complete_path.extend(path.linked_fields.into_iter().map(
-                        |name_and_arguments| {
-                            transform_name_and_arguments_with_child_variable_context(
-                                name_and_arguments,
-                                transformed_child_variable_context,
-                            )
-                        },
-                    ));
+                    complete_path.extend(path.linked_fields.into_iter().map(|normalization_key| {
+                        normalization_key.transform_with_parent_variable_context(
+                            transformed_child_variable_context,
+                        )
+                    }));
                     path.linked_fields = complete_path;
 
                     ((path, *selection_variant), root_refetched_path.clone())
@@ -254,12 +254,12 @@ impl ScalarClientFieldTraversalState {
 // to follow the traversal path from the "root" selection map to the nested
 // one
 pub fn current_target_merged_selections<'a>(
-    traversal_path: &[NameAndArguments],
+    traversal_path: &[NormalizationKey],
     mut parent_selection_map: &'a MergedSelectionMap,
 ) -> &'a MergedSelectionMap {
-    for linked_field in traversal_path {
+    for normalization_key in traversal_path {
         match parent_selection_map
-            .get(&linked_field.normalization_key())
+            .get(normalization_key)
             .expect("Expected linked field to exist by now. This is indicate of a bug in Isograph.")
         {
             MergedServerSelection::ScalarField(_) => {
@@ -268,8 +268,8 @@ pub fn current_target_merged_selections<'a>(
             MergedServerSelection::LinkedField(ref linked_field) => {
                 parent_selection_map = &linked_field.selection_map;
             }
-            MergedServerSelection::InlineFragment(_) => {
-                panic!("Expected a linked field, found inline fragment. This is indicative of a bug in Isograph.")
+            MergedServerSelection::InlineFragment(ref inline_fragment) => {
+                parent_selection_map = &inline_fragment.selection_map;
             }
         }
     }
@@ -724,17 +724,9 @@ fn merge_validated_selections_into_selection_map(
                         )
                         .normalization_key();
 
-                        let value = NameAndArguments {
-                            name: linked_field_selection.name.item.into(),
-                            arguments: transform_arguments_with_child_context(
-                                linked_field_selection
-                                    .arguments
-                                    .iter()
-                                    .map(|arg| arg.item.into_key_and_value()),
-                                variable_context,
-                            ),
-                        };
-                        merge_traversal_state.traversal_path.push(value);
+                        merge_traversal_state
+                            .traversal_path
+                            .push(normalization_key.clone());
 
                         // We are creating the linked field, and inserting it into the parent object
                         // first, because otherwise, when we try to merge the results into the parent

@@ -4,8 +4,8 @@ use common_lang_types::{SelectableFieldName, WithSpan};
 use isograph_lang_types::{RefetchQueryIndex, Selection, ServerFieldSelection};
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, FieldDefinitionLocation,
-    Loadability, NameAndArguments, PathToRefetchField, RefetchedPathsMap, ValidatedClientField,
-    ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
+    Loadability, NameAndArguments, NormalizationKey, PathToRefetchField, RefetchedPathsMap,
+    ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
     ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSelection, VariableContext,
 };
 
@@ -22,7 +22,7 @@ fn generate_reader_ast_node(
     reader_imports: &mut ReaderImports,
     // TODO use this to generate usedRefetchQueries
     root_refetched_paths: &RefetchedPathsMap,
-    path: &mut Vec<NameAndArguments>,
+    path: &mut Vec<NormalizationKey>,
     initial_variable_context: &VariableContext,
 ) -> String {
     match &selection.item {
@@ -50,20 +50,23 @@ fn generate_reader_ast_node(
                 }
             }
             ServerFieldSelection::LinkedField(linked_field_selection) => {
-                path.push(NameAndArguments {
-                    // TODO use alias
-                    name: linked_field_selection.name.item.into(),
-                    // TODO this clearly does something, but why are we able to pass
-                    // the initial variable context here??
-                    arguments: transform_arguments_with_child_context(
-                        linked_field_selection
-                            .arguments
-                            .iter()
-                            .map(|x| x.item.into_key_and_value()),
-                        // TODO why is this not the transformed context?
-                        initial_variable_context,
-                    ),
-                });
+                path.push(
+                    NameAndArguments {
+                        // TODO use alias
+                        name: linked_field_selection.name.item.into(),
+                        // TODO this clearly does something, but why are we able to pass
+                        // the initial variable context here??
+                        arguments: transform_arguments_with_child_context(
+                            linked_field_selection
+                                .arguments
+                                .iter()
+                                .map(|x| x.item.into_key_and_value()),
+                            // TODO why is this not the transformed context?
+                            initial_variable_context,
+                        ),
+                    }
+                    .normalization_key(),
+                );
 
                 let inner_reader_ast = generate_reader_ast_with_path(
                     schema,
@@ -129,7 +132,7 @@ fn scalar_client_defined_field_ast_node(
     schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
     indentation_level: u8,
-    path: &mut Vec<NameAndArguments>,
+    path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
     reader_imports: &mut ReaderImports,
     parent_variable_context: &VariableContext,
@@ -180,7 +183,7 @@ fn user_written_variant_ast_node(
     indentation_level: u8,
     nested_client_field: &ValidatedClientField,
     schema: &ValidatedSchema,
-    path: &mut Vec<NameAndArguments>,
+    path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
     reader_imports: &mut ReaderImports,
     client_field_variable_context: &VariableContext,
@@ -244,7 +247,7 @@ fn imperatively_loaded_variant_ast_node(
     nested_client_field: &ValidatedClientField,
     reader_imports: &mut ReaderImports,
     root_refetched_paths: &RefetchedPathsMap,
-    path: &[NameAndArguments],
+    path: &[NormalizationKey],
     indentation_level: u8,
     scalar_field_selection: &ValidatedScalarFieldSelection,
 ) -> String {
@@ -390,7 +393,7 @@ fn generate_reader_ast_with_path<'schema>(
     nested_client_field_imports: &mut ReaderImports,
     // N.B. this is not root_refetched_paths when we're generating a non-fetchable client field :(
     root_refetched_paths: &RefetchedPathsMap,
-    path: &mut Vec<NameAndArguments>,
+    path: &mut Vec<NormalizationKey>,
     initial_variable_context: &VariableContext,
 ) -> ReaderAst {
     let mut reader_ast = "[\n".to_string();
@@ -444,7 +447,7 @@ fn get_nested_refetch_query_text(
 
 fn find_imperatively_fetchable_query_index(
     paths: &RefetchedPathsMap,
-    outer_path: &[NameAndArguments],
+    outer_path: &[NormalizationKey],
     imperatively_fetchable_field_name: SelectableFieldName,
 ) -> RefetchQueryIndex {
     paths
@@ -489,7 +492,7 @@ pub(crate) fn generate_reader_ast<'schema>(
 fn refetched_paths_for_client_field(
     nested_client_field: &ValidatedClientField,
     schema: &ValidatedSchema,
-    path: &mut Vec<NameAndArguments>,
+    path: &mut Vec<NormalizationKey>,
     client_field_variable_context: &VariableContext,
 ) -> Vec<PathToRefetchField> {
     // Here, path is acting as a prefix. We will receive (for example) foo.bar, and
@@ -511,7 +514,7 @@ fn refetched_paths_for_client_field(
 fn refetched_paths_with_path(
     selection_set: &[WithSpan<ValidatedSelection>],
     schema: &ValidatedSchema,
-    path: &mut Vec<NameAndArguments>,
+    path: &mut Vec<NormalizationKey>,
     initial_variable_context: &VariableContext,
 ) -> HashSet<PathToRefetchField> {
     let mut paths = HashSet::default();
@@ -558,19 +561,22 @@ fn refetched_paths_with_path(
                     }
                 }
                 ServerFieldSelection::LinkedField(linked_field_selection) => {
-                    path.push(NameAndArguments {
-                        // TODO use alias
-                        name: linked_field_selection.name.item.into(),
-                        arguments: transform_arguments_with_child_context(
-                            linked_field_selection
-                                .arguments
-                                .iter()
-                                .map(|x| x.item.into_key_and_value()),
-                            // TODO this clearly does something, but why are we able to pass
-                            // the initial variable context here??
-                            initial_variable_context,
-                        ),
-                    });
+                    path.push(
+                        NameAndArguments {
+                            // TODO use alias
+                            name: linked_field_selection.name.item.into(),
+                            arguments: transform_arguments_with_child_context(
+                                linked_field_selection
+                                    .arguments
+                                    .iter()
+                                    .map(|x| x.item.into_key_and_value()),
+                                // TODO this clearly does something, but why are we able to pass
+                                // the initial variable context here??
+                                initial_variable_context,
+                            ),
+                        }
+                        .normalization_key(),
+                    );
 
                     let new_paths = refetched_paths_with_path(
                         &linked_field_selection.selection_set,

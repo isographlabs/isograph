@@ -552,7 +552,7 @@ impl<
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PathToRefetchField {
-    pub linked_fields: Vec<NameAndArguments>,
+    pub linked_fields: Vec<NormalizationKey>,
     pub field_name: SelectableFieldName,
 }
 
