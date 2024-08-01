@@ -432,6 +432,41 @@ impl TryFrom<NonConstantValue> for ConstantValue {
     }
 }
 
+impl ConstantValue {
+    pub fn print_to_string(&self) -> String {
+        match self {
+            ConstantValue::Integer(i) => i.to_string(),
+            ConstantValue::Boolean(b) => b.to_string(),
+            ConstantValue::String(s) => format!("\"{s}\""),
+            ConstantValue::Float(f) => f.as_float().to_string(),
+            ConstantValue::Null => "null".to_string(),
+            ConstantValue::Enum(e) => e.to_string(),
+            ConstantValue::List(l) => {
+                let inner = l
+                    .iter()
+                    .map(|value| value.item.print_to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("[{inner}]")
+            }
+            ConstantValue::Object(o) => {
+                let inner = o
+                    .iter()
+                    .map(|key_value| {
+                        format!(
+                            "{}: {}",
+                            key_value.name.item,
+                            key_value.value.item.print_to_string()
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("{{{inner}}}")
+            }
+        }
+    }
+}
+
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct VariableDefinition<TValue> {
     pub name: WithLocation<VariableName>,
