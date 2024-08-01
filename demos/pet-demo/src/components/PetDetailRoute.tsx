@@ -16,7 +16,7 @@ export const PetDetailRouteInner = iso(`
   field Query.PetDetailRouteInner($actualId: ID!) @component {
     pet(id: $actualId) {
       name
-      PetCheckinsCard
+      PetCheckinsCard(count: 42)
       PetBestFriendCard
       PetPhraseCard
       PetTaglineCard

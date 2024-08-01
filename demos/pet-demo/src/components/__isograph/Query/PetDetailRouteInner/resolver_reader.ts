@@ -28,7 +28,12 @@ const readerAst: ReaderAst<Query__PetDetailRouteInner__param> = [
       {
         kind: "Resolver",
         alias: "PetCheckinsCard",
-        arguments: null,
+        arguments: [
+          [
+            "count",
+            { kind: "Literal", value: 42 },
+          ],
+        ],
         readerArtifact: Pet__PetCheckinsCard__resolver_reader,
         usedRefetchQueries: [3, ],
       },

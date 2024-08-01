@@ -7,7 +7,7 @@ const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [
   { artifact: refetchQuery0, allowedVariables: ["checkin_id", ] },
 ];
 
-const queryText = 'query PetCheckinsCard ($count: Int! = 42, $id: ID!) {\
+const queryText = 'query PetCheckinsCard ($count: Int!, $id: ID!) {\
   node____id___v_id: node(id: $id) {\
     ... on Pet {\
       __typename,\

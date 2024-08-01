@@ -372,14 +372,13 @@ function generateChildVariableMap(
     return {};
   }
 
-  const childVars: Variables = {};
+  type Writable<T> = { -readonly [P in keyof T]: T[P] };
+  const childVars: Writable<Variables> = {};
   for (const [name, value] of fieldArguments) {
     if (value.kind === 'Variable') {
-      // @ts-expect-error
       childVars[name] = variables[value.name];
     } else {
-      // @ts-expect-error
-      childVars[name] = value;
+      childVars[name] = value.value;
     }
   }
   return childVars;

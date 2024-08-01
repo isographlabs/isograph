@@ -31,7 +31,6 @@ export const PetDetailDeferredRouteInnerComponent = iso(`
   }
 `)((pet) => {
   const navigateTo = useNavigateTo();
-  // @ts-expect-error
   const petCheckinsCard = useClientSideDefer(pet.PetCheckinsCard, {
     count: 2,
   });
