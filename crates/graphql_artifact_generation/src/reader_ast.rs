@@ -1,10 +1,9 @@
 use std::collections::{BTreeSet, HashSet};
 
 use common_lang_types::{SelectableFieldName, WithSpan};
-use isograph_lang_types::{ClientFieldId, RefetchQueryIndex, Selection, ServerFieldSelection};
+use isograph_lang_types::{RefetchQueryIndex, Selection, ServerFieldSelection};
 use isograph_schema::{
-    categorize_field_loadability, from_selection_field_argument_and_context,
-    into_name_and_arguments, ArgumentKeyAndValue, ClientFieldVariant, FieldDefinitionLocation,
+    categorize_field_loadability, transform_arguments_with_child_context, FieldDefinitionLocation,
     Loadability, NameAndArguments, PathToRefetchField, RefetchedPathsMap, ValidatedClientField,
     ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
     ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSelection, VariableContext,
@@ -12,7 +11,7 @@ use isograph_schema::{
 
 use crate::{
     generate_artifacts::{get_serialized_field_arguments, ReaderAst},
-    import_statements::{ReaderImports, ResolverReaderOrRefetchResolver},
+    import_statements::{ImportedFileCategory, ReaderImports},
 };
 
 // Can we do this when visiting the client field in when generating entrypoints?
@@ -28,18 +27,19 @@ fn generate_reader_ast_node(
 ) -> String {
     match &selection.item {
         Selection::ServerField(field) => match field {
-            ServerFieldSelection::ScalarField(scalar_field) => {
-                match scalar_field.associated_data.location {
+            ServerFieldSelection::ScalarField(scalar_field_selection) => {
+                match scalar_field_selection.associated_data.location {
                     FieldDefinitionLocation::Server(_) => server_defined_scalar_field_ast_node(
-                        scalar_field,
+                        scalar_field_selection,
                         indentation_level,
                         initial_variable_context,
                     ),
                     FieldDefinitionLocation::Client(client_field_id) => {
+                        let client_field = schema.client_field(client_field_id);
                         scalar_client_defined_field_ast_node(
-                            scalar_field,
+                            scalar_field_selection,
                             schema,
-                            client_field_id,
+                            client_field,
                             indentation_level,
                             path,
                             root_refetched_paths,
@@ -49,12 +49,25 @@ fn generate_reader_ast_node(
                     }
                 }
             }
-            ServerFieldSelection::LinkedField(linked_field) => {
-                path.push(into_name_and_arguments(linked_field));
+            ServerFieldSelection::LinkedField(linked_field_selection) => {
+                path.push(NameAndArguments {
+                    // TODO use alias
+                    name: linked_field_selection.name.item.into(),
+                    // TODO this clearly does something, but why are we able to pass
+                    // the initial variable context here??
+                    arguments: transform_arguments_with_child_context(
+                        linked_field_selection
+                            .arguments
+                            .iter()
+                            .map(|x| x.item.into_key_and_value()),
+                        // TODO why is this not the transformed context?
+                        initial_variable_context,
+                    ),
+                });
 
                 let inner_reader_ast = generate_reader_ast_with_path(
                     schema,
-                    &linked_field.selection_set,
+                    &linked_field_selection.selection_set,
                     indentation_level + 1,
                     reader_imports,
                     root_refetched_paths,
@@ -65,7 +78,7 @@ fn generate_reader_ast_node(
                 path.pop();
 
                 linked_field_ast_node(
-                    linked_field,
+                    linked_field_selection,
                     indentation_level,
                     inner_reader_ast,
                     initial_variable_context,
@@ -88,11 +101,13 @@ fn linked_field_ast_node(
         .unwrap_or("null".to_string());
 
     let arguments = get_serialized_field_arguments(
-        &linked_field
-            .arguments
-            .iter()
-            .map(|x| from_selection_field_argument_and_context(&x.item, initial_variable_context))
-            .collect::<Vec<_>>(),
+        &transform_arguments_with_child_context(
+            linked_field
+                .arguments
+                .iter()
+                .map(|x| x.item.into_key_and_value()),
+            initial_variable_context,
+        ),
         indentation_level + 1,
     );
     let indent_1 = "  ".repeat(indentation_level as usize);
@@ -108,46 +123,58 @@ fn linked_field_ast_node(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn scalar_client_defined_field_ast_node(
     scalar_field_selection: &ValidatedScalarFieldSelection,
     schema: &ValidatedSchema,
-    client_field_id: ClientFieldId,
+    client_field: &ValidatedClientField,
     indentation_level: u8,
     path: &mut Vec<NameAndArguments>,
     root_refetched_paths: &RefetchedPathsMap,
     reader_imports: &mut ReaderImports,
-    initial_variable_context: &VariableContext,
+    parent_variable_context: &VariableContext,
 ) -> String {
-    // This field is a client field, so we need to look up the field in the schema.
-    let nested_client_field = schema.client_field(client_field_id);
+    let client_field_variable_context = parent_variable_context.child_variable_context(
+        &scalar_field_selection.arguments,
+        &client_field.variable_definitions,
+        &scalar_field_selection.associated_data.selection_variant,
+    );
 
     match categorize_field_loadability(
-        nested_client_field,
+        client_field,
         &scalar_field_selection.associated_data.selection_variant,
     ) {
-        Some(l) => imperatively_loaded_variant_ast_node(
+        Some(Loadability::LoadablySelectedField(_)) => loadably_selected_field_ast_node(
             schema,
-            nested_client_field,
+            client_field,
+            reader_imports,
+            indentation_level,
+            scalar_field_selection,
+            &client_field_variable_context,
+        ),
+        Some(Loadability::ImperativelyLoadedField(_)) => imperatively_loaded_variant_ast_node(
+            client_field,
             reader_imports,
             root_refetched_paths,
             path,
             indentation_level,
             scalar_field_selection,
-            l,
         ),
         None => user_written_variant_ast_node(
             scalar_field_selection,
             indentation_level,
-            nested_client_field,
+            client_field,
             schema,
             path,
             root_refetched_paths,
             reader_imports,
-            initial_variable_context,
+            &client_field_variable_context,
+            parent_variable_context,
         ),
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn user_written_variant_ast_node(
     scalar_field_selection: &ValidatedScalarFieldSelection,
     indentation_level: u8,
@@ -156,13 +183,21 @@ fn user_written_variant_ast_node(
     path: &mut Vec<NameAndArguments>,
     root_refetched_paths: &RefetchedPathsMap,
     reader_imports: &mut ReaderImports,
+    client_field_variable_context: &VariableContext,
     initial_variable_context: &VariableContext,
 ) -> String {
     let alias = scalar_field_selection.name_or_alias().item;
     let indent_1 = "  ".repeat(indentation_level as usize);
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
-    let paths_to_refetch_field_in_client_field =
-        refetched_paths_for_client_field(nested_client_field, schema, path);
+    // Note: this is confusing. We're using the parent context to determine the
+    // arguments **to** the client field (below), and the child context (here) for
+    // the refetch paths **within** the client field.
+    let paths_to_refetch_field_in_client_field = refetched_paths_for_client_field(
+        nested_client_field,
+        schema,
+        path,
+        client_field_variable_context,
+    );
 
     let nested_refetch_queries = get_nested_refetch_query_text(
         root_refetched_paths,
@@ -170,12 +205,16 @@ fn user_written_variant_ast_node(
     );
 
     let arguments = get_serialized_field_arguments(
-        &scalar_field_selection
-            .arguments
-            .iter()
-            // TODO we shouldn't need to clone here
-            .map(|x| from_selection_field_argument_and_context(&x.item, initial_variable_context))
-            .collect::<Vec<_>>(),
+        // Note: this is confusing. We're using the parent context to determine the
+        // arguments **to** the client field, and the child context (above) for the
+        // refetch paths **within** the client field.
+        &transform_arguments_with_child_context(
+            scalar_field_selection
+                .arguments
+                .iter()
+                .map(|x| x.item.into_key_and_value()),
+            initial_variable_context,
+        ),
         indentation_level + 1,
     );
 
@@ -186,7 +225,7 @@ fn user_written_variant_ast_node(
 
     reader_imports.insert((
         nested_client_field.type_and_field,
-        ResolverReaderOrRefetchResolver::ResolverReader,
+        ImportedFileCategory::ResolverReader,
     ));
 
     format!(
@@ -202,14 +241,12 @@ fn user_written_variant_ast_node(
 
 #[allow(clippy::too_many_arguments)]
 fn imperatively_loaded_variant_ast_node(
-    schema: &ValidatedSchema,
     nested_client_field: &ValidatedClientField,
     reader_imports: &mut ReaderImports,
     root_refetched_paths: &RefetchedPathsMap,
-    path: &mut Vec<NameAndArguments>,
+    path: &[NameAndArguments],
     indentation_level: u8,
     scalar_field_selection: &ValidatedScalarFieldSelection,
-    loadability: Loadability,
 ) -> String {
     let alias = scalar_field_selection.name_or_alias().item;
     let indent_1 = "  ".repeat(indentation_level as usize);
@@ -220,25 +257,9 @@ fn imperatively_loaded_variant_ast_node(
         nested_client_field.type_and_field.underscore_separated()
     );
 
-    // Loadably selected fields include resolver readers. Regular imperative readers are
-    // fire-and-forget.
-    let resolver_reader_artifact_import_name =
-        if matches!(loadability, Loadability::LoadablySelectedField(_)) {
-            reader_imports.insert((
-                nested_client_field.type_and_field,
-                ResolverReaderOrRefetchResolver::ResolverReader,
-            ));
-            format!(
-                "{}__resolver_reader",
-                nested_client_field.type_and_field.underscore_separated()
-            )
-        } else {
-            "null".to_string()
-        };
-
     reader_imports.insert((
         nested_client_field.type_and_field,
-        ResolverReaderOrRefetchResolver::RefetchReader,
+        ImportedFileCategory::RefetchReader,
     ));
 
     let refetch_query_index = find_imperatively_fetchable_query_index(
@@ -253,42 +274,99 @@ fn imperatively_loaded_variant_ast_node(
     // may or may not be what we want here.
     let name = scalar_field_selection.name.item;
 
-    let paths_to_refetch_field_in_client_field =
-        refetched_paths_for_client_field(nested_client_field, schema, path);
-    let nested_refetch_queries = get_nested_refetch_query_text(
-        root_refetched_paths,
-        &paths_to_refetch_field_in_client_field,
-    );
-
     format!(
         "{indent_1}{{\n\
         {indent_2}kind: \"ImperativelyLoadedField\",\n\
         {indent_2}alias: \"{alias}\",\n\
         {indent_2}refetchReaderArtifact: {refetch_reader_artifact_import_name},\n\
-        {indent_2}resolverReaderArtifact: {resolver_reader_artifact_import_name},\n\
         {indent_2}refetchQuery: {refetch_query_index},\n\
         {indent_2}name: \"{name}\",\n\
-        {indent_2}usedRefetchQueries: {nested_refetch_queries},\n\
         {indent_1}}},\n",
     )
 }
 
+fn loadably_selected_field_ast_node(
+    schema: &ValidatedSchema,
+    client_field: &ValidatedClientField,
+    reader_imports: &mut ReaderImports,
+    indentation_level: u8,
+    scalar_field_selection: &ValidatedScalarFieldSelection,
+    client_field_variable_context: &VariableContext,
+) -> String {
+    let name = scalar_field_selection.name.item;
+    let alias = scalar_field_selection.name_or_alias().item;
+    let indent_1 = "  ".repeat(indentation_level as usize);
+    let indent_2 = "  ".repeat((indentation_level + 1) as usize);
+
+    reader_imports.insert((
+        client_field.type_and_field,
+        ImportedFileCategory::Entrypoint,
+    ));
+    let type_and_field = client_field.type_and_field.underscore_separated();
+
+    let arguments = get_serialized_field_arguments(
+        &transform_arguments_with_child_context(
+            scalar_field_selection
+                .arguments
+                .iter()
+                .map(|x| x.item.into_key_and_value()),
+            client_field_variable_context,
+        ),
+        indentation_level + 1,
+    );
+
+    let (reader_ast, additional_reader_imports) = generate_reader_ast(
+        schema,
+        client_field
+            .refetch_strategy
+            .as_ref()
+            .expect(
+                "Expected refetch strategy. \
+                    This is indicative of a bug in Isograph.",
+            )
+            .refetch_selection_set(),
+        indentation_level + 1,
+        // This is weird!
+        &Default::default(),
+        client_field_variable_context,
+    );
+
+    // N.B. additional_reader_imports will be empty for now, but at some point, we may have
+    // refetch selection sets that import other things! Who knows!
+    for import in additional_reader_imports {
+        reader_imports.insert(import);
+    }
+
+    format!(
+        "{indent_1}{{\n\
+        {indent_2}kind: \"LoadablySelectedField\",\n\
+        {indent_2}alias: \"{alias}\",\n\
+        {indent_2}name: \"{name}\",\n\
+        {indent_2}queryArguments: {arguments},\n\
+        {indent_2}refetchReaderAst: {reader_ast},\n\
+        {indent_2}entrypoint: {type_and_field}__entrypoint,\n\
+        {indent_1}}},\n"
+    )
+}
+
 fn server_defined_scalar_field_ast_node(
-    scalar_field: &ValidatedScalarFieldSelection,
+    scalar_field_selection: &ValidatedScalarFieldSelection,
     indentation_level: u8,
     initial_variable_context: &VariableContext,
 ) -> String {
-    let field_name = scalar_field.name.item;
-    let alias = scalar_field
+    let field_name = scalar_field_selection.name.item;
+    let alias = scalar_field_selection
         .reader_alias
         .map(|x| format!("\"{}\"", x.item))
         .unwrap_or("null".to_string());
     let arguments = get_serialized_field_arguments(
-        &scalar_field
-            .arguments
-            .iter()
-            .map(|x| from_selection_field_argument_and_context(&x.item, initial_variable_context))
-            .collect::<Vec<_>>(),
+        &transform_arguments_with_child_context(
+            scalar_field_selection
+                .arguments
+                .iter()
+                .map(|x| x.item.into_key_and_value()),
+            initial_variable_context,
+        ),
         indentation_level + 1,
     );
 
@@ -412,14 +490,17 @@ fn refetched_paths_for_client_field(
     nested_client_field: &ValidatedClientField,
     schema: &ValidatedSchema,
     path: &mut Vec<NameAndArguments>,
+    client_field_variable_context: &VariableContext,
 ) -> Vec<PathToRefetchField> {
     // Here, path is acting as a prefix. We will receive (for example) foo.bar, and
     // the client field may have a refetch query at baz.__refetch. In this case,
     // this method would return something containing foo.bar.baz.__refetch
+    // TODO return a BTreeSet
     let path_set = refetched_paths_with_path(
         nested_client_field.selection_set_for_parent_query(),
         schema,
         path,
+        client_field_variable_context,
     );
 
     let mut paths: Vec<_> = path_set.into_iter().collect();
@@ -431,6 +512,7 @@ fn refetched_paths_with_path(
     selection_set: &[WithSpan<ValidatedSelection>],
     schema: &ValidatedSchema,
     path: &mut Vec<NameAndArguments>,
+    initial_variable_context: &VariableContext,
 ) -> HashSet<PathToRefetchField> {
     let mut paths = HashSet::default();
 
@@ -444,30 +526,29 @@ fn refetched_paths_with_path(
                         }
                         FieldDefinitionLocation::Client(client_field_id) => {
                             let client_field = schema.client_field(client_field_id);
-                            match client_field.variant {
-                                ClientFieldVariant::ImperativelyLoadedField(_) => {
+                            match categorize_field_loadability(
+                                client_field,
+                                &scalar_field_selection.associated_data.selection_variant,
+                            ) {
+                                Some(Loadability::ImperativelyLoadedField(_)) => {
                                     paths.insert(PathToRefetchField {
                                         linked_fields: path.clone(),
                                         field_name: client_field.name,
                                     });
                                 }
-                                _ => {
-                                    if matches!(
-                                        scalar_field_selection.associated_data.selection_variant,
-                                        ValidatedIsographSelectionVariant::Loadable(_)
-                                    ) {
-                                        paths.insert(PathToRefetchField {
-                                            linked_fields: path.clone(),
-                                            field_name: client_field.name,
-                                        });
-                                    }
-
-                                    // For non-refetch fields, we need to recurse into the selection set
-                                    // (if there is one)
+                                Some(Loadability::LoadablySelectedField(_)) => {
+                                    // Do not recurse into selections of loadable fields
+                                }
+                                None => {
                                     let new_paths = refetched_paths_with_path(
                                         client_field.selection_set_for_parent_query(),
                                         schema,
                                         path,
+                                        &initial_variable_context.child_variable_context(
+                                            &scalar_field_selection.arguments,
+                                            &client_field.variable_definitions,
+                                            &ValidatedIsographSelectionVariant::Regular,
+                                        ),
                                     );
 
                                     paths.extend(new_paths.into_iter());
@@ -478,21 +559,24 @@ fn refetched_paths_with_path(
                 }
                 ServerFieldSelection::LinkedField(linked_field_selection) => {
                     path.push(NameAndArguments {
+                        // TODO use alias
                         name: linked_field_selection.name.item.into(),
-                        arguments: linked_field_selection
-                            .arguments
-                            .iter()
-                            .map(|x| ArgumentKeyAndValue {
-                                key: x.item.name.item,
-                                value: x.item.value.item.clone(),
-                            })
-                            .collect::<Vec<_>>(),
+                        arguments: transform_arguments_with_child_context(
+                            linked_field_selection
+                                .arguments
+                                .iter()
+                                .map(|x| x.item.into_key_and_value()),
+                            // TODO this clearly does something, but why are we able to pass
+                            // the initial variable context here??
+                            initial_variable_context,
+                        ),
                     });
 
                     let new_paths = refetched_paths_with_path(
                         &linked_field_selection.selection_set,
                         schema,
                         path,
+                        initial_variable_context,
                     );
 
                     paths.extend(new_paths.into_iter());

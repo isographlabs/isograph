@@ -4,7 +4,7 @@ import {Query__HomePage__output_type} from './output_type';
 import readerResolver from './resolver_reader';
 import refetchQuery0 from './__refetch__0';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [
-  { artifact: refetchQuery0, allowedVariables: ["first", "id", ] },
+  { artifact: refetchQuery0, allowedVariables: ["id", ] },
 ];
 
 const queryText = 'query HomePage ($first: Int!) {\
@@ -25,11 +25,11 @@ const queryText = 'query HomePage ($first: Int!) {\
             id,\
             login,\
           },\
-          pullRequests____first___v_first: pullRequests(first: $first) {\
+          pullRequests____first___l_null: pullRequests(first: null) {\
             totalCount,\
           },\
           stargazerCount,\
-          watchers____first___v_first: watchers(first: $first) {\
+          watchers____first___l_null: watchers(first: null) {\
             totalCount,\
           },\
         },\
@@ -132,7 +132,7 @@ const normalizationAst: NormalizationAst = [
                     arguments: [
                       [
                         "first",
-                        { kind: "Variable", name: "first" },
+                        { kind: "Literal", value: null },
                       ],
                     ],
                     selections: [
@@ -154,7 +154,7 @@ const normalizationAst: NormalizationAst = [
                     arguments: [
                       [
                         "first",
-                        { kind: "Variable", name: "first" },
+                        { kind: "Literal", value: null },
                       ],
                     ],
                     selections: [

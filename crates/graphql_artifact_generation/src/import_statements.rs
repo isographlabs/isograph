@@ -3,21 +3,23 @@ use std::collections::BTreeSet;
 use isograph_schema::ObjectTypeAndFieldName;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum ResolverReaderOrRefetchResolver {
+pub(crate) enum ImportedFileCategory {
     ResolverReader,
     RefetchReader,
+    Entrypoint,
 }
 
-impl ResolverReaderOrRefetchResolver {
+impl ImportedFileCategory {
     pub fn filename(&self) -> &'static str {
         match self {
-            ResolverReaderOrRefetchResolver::ResolverReader => "resolver_reader",
-            ResolverReaderOrRefetchResolver::RefetchReader => "refetch_reader",
+            ImportedFileCategory::ResolverReader => "resolver_reader",
+            ImportedFileCategory::RefetchReader => "refetch_reader",
+            ImportedFileCategory::Entrypoint => "entrypoint",
         }
     }
 }
 
-pub(crate) type ReaderImports = BTreeSet<(ObjectTypeAndFieldName, ResolverReaderOrRefetchResolver)>;
+pub(crate) type ReaderImports = BTreeSet<(ObjectTypeAndFieldName, ImportedFileCategory)>;
 pub(crate) type ParamTypeImports = BTreeSet<ObjectTypeAndFieldName>;
 
 pub(crate) fn reader_imports_to_import_statement(reader_imports: &ReaderImports) -> String {

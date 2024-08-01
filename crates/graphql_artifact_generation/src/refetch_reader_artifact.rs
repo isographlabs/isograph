@@ -1,8 +1,7 @@
 use common_lang_types::ArtifactPathAndContent;
 use intern::string_key::Intern;
 use isograph_schema::{
-    FieldMapItem, PrimaryFieldInfo, ScalarClientFieldTraversalState, ValidatedClientField,
-    ValidatedSchema,
+    FieldMapItem, PrimaryFieldInfo, RefetchedPathsMap, ValidatedClientField, ValidatedSchema,
 };
 
 use crate::{
@@ -18,7 +17,7 @@ pub(crate) fn generate_refetch_reader_artifact(
     schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
     primary_field_info: Option<&PrimaryFieldInfo>,
-    scalar_client_field_traversal_state: &ScalarClientFieldTraversalState,
+    refetched_paths: &RefetchedPathsMap,
     was_selected_loadably: bool,
 ) -> ArtifactPathAndContent {
     let function_import_statement = match primary_field_info {
@@ -47,7 +46,7 @@ pub(crate) fn generate_refetch_reader_artifact(
             client_field.selection_set_for_parent_query()
         },
         0,
-        &scalar_client_field_traversal_state.refetch_paths,
+        refetched_paths,
         &client_field.initial_variable_context(),
     );
 

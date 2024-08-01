@@ -1,10 +1,14 @@
 use intern::Lookup;
 use std::collections::HashMap;
 
-use common_lang_types::{VariableName, WithLocation, WithSpan};
-use isograph_lang_types::{ConstantValue, NonConstantValue, SelectionFieldArgument};
+use common_lang_types::{SelectableFieldName, VariableName, WithLocation, WithSpan};
+use isograph_lang_types::{
+    ArgumentKeyAndValue, ConstantValue, NonConstantValue, SelectionFieldArgument,
+};
 
-use crate::{ClientField, ValidatedIsographSelectionVariant, ValidatedVariableDefinition};
+use crate::{
+    ClientField, NameAndArguments, ValidatedIsographSelectionVariant, ValidatedVariableDefinition,
+};
 
 #[derive(Debug)]
 pub struct VariableContext(pub HashMap<VariableName, NonConstantValue>);
@@ -53,12 +57,9 @@ impl VariableContext {
                         {
                             return (variable_name, default_value.clone().item.into());
                         } else {
-                            panic!(
-                                "Expected variable definition `${variable_name}` \
-                                to have a default value. \
-                                This should have been validated already. \
-                                This is indicative of a bug in Isograph."
-                            );
+                            // TODO this is only valid if the arg is nullable, which we should
+                            // validate
+                            return (variable_name, NonConstantValue::Null);
                         }
                     }
                 };
@@ -72,11 +73,10 @@ impl VariableContext {
                             .get(&e)
                             .expect(
                                 "Parent context has missing variable. \
-                            This should have been validated already. \
-                            This is indicative of a bug in Isograph.",
+                                This should have been validated already. \
+                                This is indicative of a bug in Isograph.",
                             )
-                            .clone()
-                            .into(),
+                            .clone(),
                     };
 
                 (variable_name, child_value)
@@ -126,5 +126,77 @@ impl<
             })
             .collect();
         VariableContext(variable_context)
+    }
+}
+
+fn transform_selection_field_argument_into_merged_arg_with_child_context(
+    arg: ArgumentKeyAndValue,
+    variable_context: &VariableContext,
+) -> ArgumentKeyAndValue {
+    if let NonConstantValue::Variable(used_variable_name) = arg.value {
+        // Look up the variable in the variables in context, and use that value
+        //
+        // This will give us the *actual value* that we need for the merged selection set.
+        let value = variable_context.0.get(&used_variable_name);
+
+        return match value {
+            Some(value) => ArgumentKeyAndValue {
+                key: arg.key,
+                value: value.clone(),
+            },
+            None => {
+                // There is no variable. The value is missing! It had better be optional.
+                // TODO we should validate that
+                ArgumentKeyAndValue {
+                    key: arg.key,
+                    value: NonConstantValue::Null,
+                }
+            }
+        };
+    }
+
+    arg
+}
+
+pub fn transform_arguments_with_child_context(
+    arguments: impl Iterator<Item = ArgumentKeyAndValue>,
+    transformed_child_variable_context: &VariableContext,
+) -> Vec<ArgumentKeyAndValue> {
+    arguments
+        .map(|arg| {
+            transform_selection_field_argument_into_merged_arg_with_child_context(
+                arg,
+                transformed_child_variable_context,
+            )
+        })
+        .collect::<Vec<_>>()
+}
+
+pub fn transform_name_and_arguments_with_child_variable_context(
+    name_and_arguments: NameAndArguments,
+    transformed_child_variable_context: &VariableContext,
+) -> NameAndArguments {
+    NameAndArguments {
+        name: name_and_arguments.name,
+        arguments: transform_arguments_with_child_context(
+            name_and_arguments.arguments.into_iter(),
+            transformed_child_variable_context,
+        ),
+    }
+}
+
+pub fn create_transformed_name_and_arguments(
+    name: SelectableFieldName,
+    arguments: &[WithLocation<SelectionFieldArgument>],
+    variable_context: &VariableContext,
+) -> NameAndArguments {
+    NameAndArguments {
+        name,
+        arguments: transform_arguments_with_child_context(
+            arguments
+                .iter()
+                .map(|selection_field_argument| selection_field_argument.item.into_key_and_value()),
+            variable_context,
+        ),
     }
 }

@@ -5,17 +5,16 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ClientFieldDeclaration, ClientFieldDeclarationWithValidatedDirectives, DeserializationError,
-    NonConstantValue, SelectableServerFieldId, ServerObjectId,
+    ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDeclarationWithValidatedDirectives,
+    DeserializationError, NonConstantValue, SelectableServerFieldId, ServerObjectId,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
-    ClientField, FieldDefinitionLocation, FieldMapItem, MergedSelectionFieldArgument,
-    ObjectTypeAndFieldName, RequiresRefinement, UnvalidatedSchema, UnvalidatedVariableDefinition,
-    NODE_FIELD_NAME,
+    ClientField, FieldDefinitionLocation, FieldMapItem, ObjectTypeAndFieldName, RequiresRefinement,
+    UnvalidatedSchema, UnvalidatedVariableDefinition, NODE_FIELD_NAME,
 };
 
 impl UnvalidatedSchema {
@@ -218,9 +217,9 @@ fn get_client_variant<TScalarField, TLinkedField>(
     })
 }
 
-pub fn id_top_level_arguments() -> Vec<MergedSelectionFieldArgument> {
-    vec![MergedSelectionFieldArgument {
-        name: "id".intern().into(),
+pub fn id_top_level_arguments() -> Vec<ArgumentKeyAndValue> {
+    vec![ArgumentKeyAndValue {
+        key: "id".intern().into(),
         value: NonConstantValue::Variable("id".intern().into()),
     }]
 }

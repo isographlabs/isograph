@@ -5,12 +5,12 @@ import readerResolver from './resolver_reader';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
 const queryText = 'query PullRequest ($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!) {\
-  repository____owner___v_repositoryOwner____name___v_repositoryName: repository(owner: $repositoryOwner, name: $repositoryName) {\
+  repository____owner___l_null____name___l_null: repository(owner: null, name: null) {\
     id,\
-    pullRequest____number___v_pullRequestNumber: pullRequest(number: $pullRequestNumber) {\
+    pullRequest____number___l_null: pullRequest(number: null) {\
       id,\
       bodyHTML,\
-      comments____last___v_last: comments(last: $last) {\
+      comments____last___l_null: comments(last: null) {\
         edges {\
           node {\
             id,\
@@ -39,12 +39,12 @@ const normalizationAst: NormalizationAst = [
     arguments: [
       [
         "owner",
-        { kind: "Variable", name: "repositoryOwner" },
+        { kind: "Literal", value: null },
       ],
 
       [
         "name",
-        { kind: "Variable", name: "repositoryName" },
+        { kind: "Literal", value: null },
       ],
     ],
     selections: [
@@ -59,7 +59,7 @@ const normalizationAst: NormalizationAst = [
         arguments: [
           [
             "number",
-            { kind: "Variable", name: "pullRequestNumber" },
+            { kind: "Literal", value: null },
           ],
         ],
         selections: [
@@ -79,7 +79,7 @@ const normalizationAst: NormalizationAst = [
             arguments: [
               [
                 "last",
-                { kind: "Variable", name: "last" },
+                { kind: "Literal", value: null },
               ],
             ],
             selections: [

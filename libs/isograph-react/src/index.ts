@@ -29,12 +29,11 @@ export { EntrypointReader } from './EntrypointReader';
 export {
   EagerReaderArtifact,
   ComponentReaderArtifact,
-  MutationReaderArtifact,
   RefetchReaderArtifact,
   ReaderAst,
   ReaderAstNode,
   ReaderLinkedField,
-  ReaderResolverField,
+  ReaderNonLoadableResolverField,
   ReaderScalarField,
   TopLevelReaderArtifact,
   LoadableField,

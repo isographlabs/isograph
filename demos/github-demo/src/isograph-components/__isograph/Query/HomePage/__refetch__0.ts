@@ -1,5 +1,5 @@
 import type { IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact } from '@isograph/react';
-const queryText = 'query User__refetch ($first: Int!, $id: ID!) {\
+const queryText = 'query User__refetch ($id: ID!) {\
   node____id___v_id: node(id: $id) {\
     ... on User {\
       __typename,\
@@ -19,11 +19,11 @@ const queryText = 'query User__refetch ($first: Int!, $id: ID!) {\
               id,\
               login,\
             },\
-            pullRequests____first___v_first: pullRequests(first: $first) {\
+            pullRequests____first___l_null: pullRequests(first: null) {\
               totalCount,\
             },\
             stargazerCount,\
-            watchers____first___v_first: watchers(first: $first) {\
+            watchers____first___l_null: watchers(first: null) {\
               totalCount,\
             },\
           },\
@@ -141,7 +141,7 @@ const normalizationAst: NormalizationAst = [
                         arguments: [
                           [
                             "first",
-                            { kind: "Variable", name: "first" },
+                            { kind: "Literal", value: null },
                           ],
                         ],
                         selections: [
@@ -163,7 +163,7 @@ const normalizationAst: NormalizationAst = [
                         arguments: [
                           [
                             "first",
-                            { kind: "Variable", name: "first" },
+                            { kind: "Literal", value: null },
                           ],
                         ],
                         selections: [

@@ -1,10 +1,9 @@
 import type { IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact } from '@isograph/react';
-const queryText = 'query Pet__refetch ($id: ID!) {\
-  node____id___v_id: node(id: $id) {\
-    ... on Pet {\
-      __typename,\
-      id,\
-      checkins {\
+const queryText = 'mutation Pet__make_super ($checkin_id: ID!) {\
+  make_checkin_super____checkin_id___v_checkin_id: make_checkin_super(checkin_id: $checkin_id) {\
+    checkin {\
+      ... on Checkin {\
+        __typename,\
         id,\
         location,\
         time,\
@@ -16,33 +15,28 @@ const queryText = 'query Pet__refetch ($id: ID!) {\
 const normalizationAst: NormalizationAst = [
   {
     kind: "Linked",
-    fieldName: "node",
+    fieldName: "make_checkin_super",
     arguments: [
       [
-        "id",
-        { kind: "Variable", name: "id" },
+        "checkin_id",
+        { kind: "Variable", name: "checkin_id" },
       ],
     ],
     selections: [
       {
-        kind: "InlineFragment",
-        type: "Pet",
+        kind: "Linked",
+        fieldName: "checkin",
+        arguments: null,
         selections: [
           {
-            kind: "Scalar",
-            fieldName: "__typename",
-            arguments: null,
-          },
-          {
-            kind: "Scalar",
-            fieldName: "id",
-            arguments: null,
-          },
-          {
-            kind: "Linked",
-            fieldName: "checkins",
-            arguments: null,
+            kind: "InlineFragment",
+            type: "Checkin",
             selections: [
+              {
+                kind: "Scalar",
+                fieldName: "__typename",
+                arguments: null,
+              },
               {
                 kind: "Scalar",
                 fieldName: "id",

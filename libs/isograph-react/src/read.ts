@@ -1,4 +1,4 @@
-import { getParentRecordKey, onNextChange } from './cache';
+import { getParentRecordKey, makeNetworkRequest, onNextChange } from './cache';
 import { getOrCreateCachedComponent } from './componentCache';
 import { RefetchQueryNormalizationArtifactWrapper } from './entrypoint';
 import { FragmentReference, Variables } from './FragmentReference';
@@ -233,8 +233,9 @@ function readData<TReadFromStore>(
               data.data,
               filterVariables({ ...args, ...variables }, allowedVariables),
               root,
-              field.resolverReaderArtifact,
-              field.usedRefetchQueries.map((id) => nestedRefetchQueries[id]),
+              // TODO these params should be removed
+              null,
+              [],
             ),
           ];
         }
@@ -277,6 +278,62 @@ function readData<TReadFromStore>(
               nestedRefetchQueries: resolverRefetchQueries,
             } as const,
           );
+        }
+        break;
+      }
+      case 'LoadablySelectedField': {
+        const refetchReaderParams = readData(
+          environment,
+          field.refetchReaderAst,
+          root,
+          variables,
+          // Refetch fields just read the id, and don't need refetch query artifacts
+          [],
+          mutableEncounteredRecords,
+        );
+        if (refetchReaderParams.kind === 'MissingData') {
+          return {
+            kind: 'MissingData',
+            reason: 'Missing data for ' + field.alias + ' on root ' + root,
+            nestedReason: refetchReaderParams,
+          };
+        } else {
+          target[field.alias] = (args: any) => [
+            // Stable id
+            root + '__' + field.name,
+            // Fetcher
+            () => {
+              // TODO we should use the reader AST for this
+              const includeReadOutData = (variables: any, readOutData: any) => {
+                variables.id = readOutData.id;
+                return variables;
+              };
+              const localVariables = includeReadOutData(
+                args ?? {},
+                refetchReaderParams.data,
+              );
+              writeQueryArgsToVariables(
+                localVariables,
+                field.queryArguments,
+                variables,
+              );
+              const [_networkRequest, disposeNetworkRequest] =
+                makeNetworkRequest(
+                  environment,
+                  field.entrypoint,
+                  localVariables,
+                );
+              const fragmentReference = {
+                kind: 'FragmentReference',
+                readerArtifact: field.entrypoint.readerArtifact,
+                // TODO localVariables is not guaranteed to have an id field
+                root: localVariables.id,
+                variables: localVariables,
+                nestedRefetchQueries: field.entrypoint.nestedRefetchQueries,
+              } as const;
+              return [fragmentReference, disposeNetworkRequest];
+            },
+          ];
         }
         break;
       }
@@ -326,4 +383,39 @@ function generateChildVariableMap(
     }
   }
   return childVars;
+}
+
+function writeQueryArgsToVariables(
+  targetVariables: any,
+  queryArgs: Arguments | null,
+  variables: Variables,
+) {
+  if (queryArgs == null) {
+    return;
+  }
+  for (const [name, argType] of queryArgs) {
+    switch (argType.kind) {
+      case 'Variable': {
+        targetVariables[name] = variables[argType.name];
+        break;
+      }
+      case 'Enum': {
+        targetVariables[name] = argType.value;
+        break;
+      }
+      case 'Literal': {
+        targetVariables[name] = argType.value;
+        break;
+      }
+      case 'String': {
+        targetVariables[name] = argType.value;
+        break;
+      }
+      default: {
+        const _: never = argType;
+        _;
+        throw new Error('Unexpected case');
+      }
+    }
+  }
 }

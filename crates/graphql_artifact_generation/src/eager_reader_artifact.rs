@@ -1,7 +1,7 @@
 use common_lang_types::ArtifactPathAndContent;
 use intern::Lookup;
 use isograph_schema::{
-    ScalarClientFieldTraversalState, UserWrittenClientFieldInfo, UserWrittenComponentVariant,
+    RefetchedPathsMap, UserWrittenClientFieldInfo, UserWrittenComponentVariant,
     ValidatedClientField, ValidatedSchema,
 };
 use std::path::Path;
@@ -25,7 +25,7 @@ pub(crate) fn generate_eager_reader_artifact(
     project_root: &Path,
     artifact_directory: &Path,
     info: UserWrittenClientFieldInfo,
-    scalar_client_field_traversal_state: &ScalarClientFieldTraversalState,
+    refetched_paths: &RefetchedPathsMap,
 ) -> ArtifactPathAndContent {
     let user_written_component_variant = info.user_written_component_variant;
     let parent_type = schema
@@ -36,7 +36,7 @@ pub(crate) fn generate_eager_reader_artifact(
         schema,
         client_field.selection_set_for_parent_query(),
         0,
-        &scalar_client_field_traversal_state.refetch_paths,
+        refetched_paths,
         &client_field.initial_variable_context(),
     );
 

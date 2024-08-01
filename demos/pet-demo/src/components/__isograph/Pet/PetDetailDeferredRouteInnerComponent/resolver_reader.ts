@@ -1,8 +1,7 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Pet__PetDetailDeferredRouteInnerComponent__param } from './param_type';
 import { PetDetailDeferredRouteInnerComponent as resolver } from '../../../PetDetailDeferredRoute';
-import Pet__PetCheckinsCard__resolver_reader from '../../Pet/PetCheckinsCard/resolver_reader';
-import Pet__PetCheckinsCard__refetch_reader from '../../Pet/PetCheckinsCard/refetch_reader';
+import Pet__PetCheckinsCard__entrypoint from '../../Pet/PetCheckinsCard/entrypoint';
 
 const readerAst: ReaderAst<Pet__PetDetailDeferredRouteInnerComponent__param> = [
   {
@@ -12,13 +11,19 @@ const readerAst: ReaderAst<Pet__PetDetailDeferredRouteInnerComponent__param> = [
     arguments: null,
   },
   {
-    kind: "ImperativelyLoadedField",
+    kind: "LoadablySelectedField",
     alias: "PetCheckinsCard",
-    refetchReaderArtifact: Pet__PetCheckinsCard__refetch_reader,
-    resolverReaderArtifact: Pet__PetCheckinsCard__resolver_reader,
-    refetchQuery: 0,
     name: "PetCheckinsCard",
-    usedRefetchQueries: [1, ],
+    queryArguments: null,
+    refetchReaderAst: [
+      {
+        kind: "Scalar",
+        fieldName: "id",
+        alias: null,
+        arguments: null,
+      },
+    ],
+    entrypoint: Pet__PetCheckinsCard__entrypoint,
   },
 ];
 

@@ -7,17 +7,17 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ClientFieldId, IsographSelectionVariant, NonConstantValue, ScalarFieldSelection,
-    SelectableServerFieldId, Selection, ServerFieldId, ServerFieldSelection, ServerObjectId,
+    ArgumentKeyAndValue, ClientFieldId, IsographSelectionVariant, NonConstantValue,
+    ScalarFieldSelection, SelectableServerFieldId, Selection, ServerFieldId, ServerFieldSelection,
+    ServerObjectId,
 };
 use serde::Deserialize;
 
 use crate::{
     generate_refetch_field_strategy, ArgumentMap, ClientField, ClientFieldVariant,
-    FieldDefinitionLocation, FieldMapItem, ImperativelyLoadedFieldVariant,
-    MergedSelectionFieldArgument, ObjectTypeAndFieldName, PrimaryFieldInfo,
-    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
-    UnvalidatedSchema, UnvalidatedVariableDefinition,
+    FieldDefinitionLocation, FieldMapItem, ImperativelyLoadedFieldVariant, ObjectTypeAndFieldName,
+    PrimaryFieldInfo, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
+    ProcessedFieldMapItem, UnvalidatedSchema, UnvalidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -219,8 +219,8 @@ impl UnvalidatedSchema {
                 .iter()
                 .map(|input_value_def| {
                     let arg_name = input_value_def.item.name.item.lookup().intern();
-                    MergedSelectionFieldArgument {
-                        name: arg_name.into(),
+                    ArgumentKeyAndValue {
+                        key: arg_name.into(),
                         value: NonConstantValue::Variable(arg_name.into()),
                     }
                 })

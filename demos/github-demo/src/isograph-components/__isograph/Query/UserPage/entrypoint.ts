@@ -5,7 +5,7 @@ import readerResolver from './resolver_reader';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
 const queryText = 'query UserPage ($first: Int!, $userLogin: String!) {\
-  user____login___v_userLogin: user(login: $userLogin) {\
+  user____login___l_null: user(login: null) {\
     id,\
     name,\
     repositories____last___l_10: repositories(last: 10) {\
@@ -20,11 +20,11 @@ const queryText = 'query UserPage ($first: Int!, $userLogin: String!) {\
             id,\
             login,\
           },\
-          pullRequests____first___v_first: pullRequests(first: $first) {\
+          pullRequests____first___l_null: pullRequests(first: null) {\
             totalCount,\
           },\
           stargazerCount,\
-          watchers____first___v_first: watchers(first: $first) {\
+          watchers____first___l_null: watchers(first: null) {\
             totalCount,\
           },\
         },\
@@ -45,7 +45,7 @@ const normalizationAst: NormalizationAst = [
     arguments: [
       [
         "login",
-        { kind: "Variable", name: "userLogin" },
+        { kind: "Literal", value: null },
       ],
     ],
     selections: [
@@ -127,7 +127,7 @@ const normalizationAst: NormalizationAst = [
                     arguments: [
                       [
                         "first",
-                        { kind: "Variable", name: "first" },
+                        { kind: "Literal", value: null },
                       ],
                     ],
                     selections: [
@@ -149,7 +149,7 @@ const normalizationAst: NormalizationAst = [
                     arguments: [
                       [
                         "first",
-                        { kind: "Variable", name: "first" },
+                        { kind: "Literal", value: null },
                       ],
                     ],
                     selections: [

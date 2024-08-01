@@ -20,10 +20,8 @@ const readerAst: ReaderAst<Checkin__CheckinDisplay__param> = [
     kind: "ImperativelyLoadedField",
     alias: "make_super",
     refetchReaderArtifact: ICheckin__make_super__refetch_reader,
-    resolverReaderArtifact: null,
     refetchQuery: 0,
     name: "make_super",
-    usedRefetchQueries: [],
   },
 ];
 

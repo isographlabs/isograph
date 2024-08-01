@@ -1,9 +1,12 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt::Debug,
+};
 
 use common_lang_types::{
-    ArtifactFileType, DescriptionValue, FieldArgumentName, GraphQLInterfaceTypeName,
-    GraphQLScalarTypeName, HasName, InputTypeName, IsographObjectTypeName, JavascriptName,
-    SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
+    ArtifactFileType, DescriptionValue, GraphQLInterfaceTypeName, GraphQLScalarTypeName, HasName,
+    InputTypeName, IsographObjectTypeName, JavascriptName, SelectableFieldName,
+    UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition,
@@ -12,9 +15,8 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ClientFieldId, LinkedFieldSelection, NonConstantValue, SelectableServerFieldId, Selection,
-    ServerFieldId, ServerObjectId, ServerScalarId, ServerStrongIdFieldId, Unwrap,
-    VariableDefinition,
+    ArgumentKeyAndValue, ClientFieldId, SelectableServerFieldId, Selection, ServerFieldId,
+    ServerObjectId, ServerScalarId, ServerStrongIdFieldId, Unwrap, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -93,7 +95,7 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
     pub boolean_type_id: ServerScalarId,
     pub int_type_id: ServerScalarId,
 
-    pub fetchable_types: HashMap<ServerObjectId, RootOperationName>,
+    pub fetchable_types: BTreeMap<ServerObjectId, RootOperationName>,
 }
 
 impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationState> {
@@ -473,6 +475,9 @@ pub struct ClientField<
     // TODO make this a ClientFieldName that can be converted into a SelectableFieldName
     pub name: SelectableFieldName,
     pub id: ClientFieldId,
+    // TODO model this so that reader_selection_sets are required for
+    // non-imperative client fields. (Are imperatively loaded fields
+    // true client fields? Probably not!)
     pub reader_selection_set: Option<
         Vec<
             WithSpan<
@@ -565,27 +570,6 @@ impl NameAndArguments {
             NormalizationKey::ServerField(self.clone())
         }
     }
-}
-
-pub fn into_name_and_arguments<T, U>(field: &LinkedFieldSelection<T, U>) -> NameAndArguments {
-    NameAndArguments {
-        name: field.name.item.into(),
-        arguments: field
-            .arguments
-            .iter()
-            .map(|selection_field_argument| ArgumentKeyAndValue {
-                key: selection_field_argument.item.name.item,
-                // TODO do we need to clone here?
-                value: selection_field_argument.item.value.item.clone(),
-            })
-            .collect(),
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct ArgumentKeyAndValue {
-    pub key: FieldArgumentName,
-    pub value: NonConstantValue,
 }
 
 impl<T, VariableDefinitionInnerType> SchemaServerField<T, VariableDefinitionInnerType> {

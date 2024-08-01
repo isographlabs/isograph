@@ -71,7 +71,7 @@ const readerAst: ReaderAst<User__RepositoryList__param> = [
                 arguments: [
                   [
                     "first",
-                    { kind: "Variable", name: "first" },
+                    { kind: "Literal", value: null },
                   ],
                 ],
                 selections: [
@@ -96,7 +96,7 @@ const readerAst: ReaderAst<User__RepositoryList__param> = [
                 arguments: [
                   [
                     "first",
-                    { kind: "Variable", name: "first" },
+                    { kind: "Literal", value: null },
                   ],
                 ],
                 selections: [

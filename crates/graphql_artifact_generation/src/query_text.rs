@@ -1,9 +1,9 @@
 use common_lang_types::{HasName, QueryOperationName, UnvalidatedTypeName, WithSpan};
 use graphql_lang_types::GraphQLTypeAnnotation;
-use isograph_lang_types::NonConstantValue;
+use isograph_lang_types::{ArgumentKeyAndValue, NonConstantValue};
 use isograph_schema::{
-    MergedSelectionFieldArgument, MergedSelectionMap, MergedServerSelection, RootOperationName,
-    ValidatedSchema, ValidatedVariableDefinition,
+    MergedSelectionMap, MergedServerSelection, RootOperationName, ValidatedSchema,
+    ValidatedVariableDefinition,
 };
 
 use crate::generate_artifacts::QueryText;
@@ -119,7 +119,7 @@ fn write_selections_for_query_text<'a>(
     }
 }
 
-fn get_serialized_arguments_for_query_text(arguments: &[MergedSelectionFieldArgument]) -> String {
+fn get_serialized_arguments_for_query_text(arguments: &[ArgumentKeyAndValue]) -> String {
     if arguments.is_empty() {
         "".to_string()
     } else {
@@ -127,13 +127,13 @@ fn get_serialized_arguments_for_query_text(arguments: &[MergedSelectionFieldArgu
         let first = arguments.next().unwrap();
         let mut s = format!(
             "({}: {}",
-            first.name,
+            first.key,
             serialize_non_constant_value_for_graphql(&first.value)
         );
         for argument in arguments {
             s.push_str(&format!(
                 ", {}: {}",
-                argument.name,
+                argument.key,
                 serialize_non_constant_value_for_graphql(&argument.value)
             ));
         }
@@ -148,7 +148,7 @@ fn serialize_non_constant_value_for_graphql(value: &NonConstantValue) -> String 
         NonConstantValue::Integer(int_value) => int_value.to_string(),
         NonConstantValue::Boolean(bool) => bool.to_string(),
         // This clearly isn't correct — the string might have quotes in it and such
-        NonConstantValue::String(s) => format!("\"{}\"", s.to_string()),
+        NonConstantValue::String(s) => format!("\"{}\"", s),
         NonConstantValue::Float(f) => f.as_float().to_string(),
         NonConstantValue::Null => "null".to_string(),
         NonConstantValue::Enum(e) => e.to_string(),

@@ -6,6 +6,7 @@ import {
   IsographEnvironment,
 } from './IsographEnvironment';
 import {
+  IsographEntrypoint,
   RefetchQueryNormalizationArtifact,
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
@@ -58,28 +59,12 @@ export type RefetchReaderArtifact = {
   ) => () => void;
 };
 
-export type MutationReaderArtifact<TReadFromStore extends Object> = {
-  readonly kind: 'MutationReaderArtifact';
-  readonly readerAst: ReaderAst<unknown>;
-  readonly resolver: (
-    environment: IsographEnvironment,
-    // TODO type this better
-    entrypoint: RefetchQueryNormalizationArtifact,
-    readOutData: TReadFromStore,
-    // TODO type this better
-    filteredVariables: any,
-    rootId: DataId,
-    readerArtifact: TopLevelReaderArtifact<any, any, any> | null,
-    // TODO type this better
-    nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
-  ) => (mutationParams: any) => void;
-};
-
 export type ReaderAstNode =
   | ReaderScalarField
   | ReaderLinkedField
-  | ReaderResolverField
-  | ReaderImperativelyLoadedField;
+  | ReaderNonLoadableResolverField
+  | ReaderImperativelyLoadedField
+  | ReaderLoadableField;
 
 // @ts-ignore
 export type ReaderAst<TReadFromStore> = ReadonlyArray<ReaderAstNode>;
@@ -98,7 +83,7 @@ export type ReaderLinkedField = {
   readonly arguments: Arguments | null;
 };
 
-export type ReaderResolverField = {
+export type ReaderNonLoadableResolverField = {
   readonly kind: 'Resolver';
   readonly alias: string;
   // TODO don't type this as any
@@ -110,13 +95,23 @@ export type ReaderResolverField = {
 export type ReaderImperativelyLoadedField = {
   readonly kind: 'ImperativelyLoadedField';
   readonly alias: string;
-  readonly refetchReaderArtifact:
-    | MutationReaderArtifact<any>
-    | RefetchReaderArtifact;
-  readonly resolverReaderArtifact: TopLevelReaderArtifact<any, any, any> | null;
+  readonly refetchReaderArtifact: RefetchReaderArtifact;
   readonly refetchQuery: number;
   readonly name: string;
-  readonly usedRefetchQueries: number[];
+};
+
+export type ReaderLoadableField = {
+  readonly kind: 'LoadablySelectedField';
+  readonly alias: string;
+
+  // To generate a stable id, we need the parent id + the name + the args that
+  // we pass to the field, which come from: queryArgs, refetchReaderAst
+  // (technically, but in practice that is always "id") and the user-provided args.
+  readonly name: string;
+  readonly queryArguments: Arguments | null;
+  readonly refetchReaderAst: ReaderAst<any>;
+
+  readonly entrypoint: IsographEntrypoint<any, any>;
 };
 
 type StableId = string;

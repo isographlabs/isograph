@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use common_lang_types::{
     JavascriptName, Location, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
@@ -127,7 +127,7 @@ impl UnvalidatedSchema {
             float_type_id,
             boolean_type_id,
 
-            fetchable_types: HashMap::new(),
+            fetchable_types: BTreeMap::new(),
         }
     }
 }

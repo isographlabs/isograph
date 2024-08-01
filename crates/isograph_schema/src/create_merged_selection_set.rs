@@ -1,24 +1,26 @@
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, HashSet};
 
 use common_lang_types::{
-    FieldArgumentName, IsographObjectTypeName, LinkedFieldName, Location, QueryOperationName,
-    ScalarFieldName, SelectableFieldName, Span, VariableName, WithLocation, WithSpan,
+    IsographObjectTypeName, LinkedFieldName, Location, QueryOperationName, ScalarFieldName,
+    SelectableFieldName, Span, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ClientFieldId, IsographSelectionVariant, LoadableDirectiveParameters, NonConstantValue,
+    ArgumentKeyAndValue, ClientFieldId, IsographSelectionVariant, NonConstantValue,
     RefetchQueryIndex, SelectableServerFieldId, Selection, SelectionFieldArgument,
     ServerFieldSelection, ServerObjectId, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
 use crate::{
-    categorize_field_loadability, expose_field_directive::RequiresRefinement, ArgumentKeyAndValue,
-    FieldDefinitionLocation, ImperativelyLoadedFieldVariant, Loadability, NameAndArguments,
-    PathToRefetchField, RootOperationName, SchemaObject, UnvalidatedVariableDefinition,
-    ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedScalarFieldSelection,
-    ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection, VariableContext,
+    categorize_field_loadability, create_transformed_name_and_arguments,
+    expose_field_directive::RequiresRefinement, transform_arguments_with_child_context,
+    transform_name_and_arguments_with_child_variable_context, FieldDefinitionLocation,
+    ImperativelyLoadedFieldVariant, Loadability, NameAndArguments, PathToRefetchField,
+    RootOperationName, SchemaObject, UnvalidatedVariableDefinition, ValidatedClientField,
+    ValidatedIsographSelectionVariant, ValidatedScalarFieldSelection, ValidatedSchema,
+    ValidatedSchemaIdField, ValidatedSelection, VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -31,11 +33,7 @@ pub type ClientFieldToCompletedMergeTraversalStateMap =
 pub struct ClientFieldTraversalResult {
     pub traversal_state: ScalarClientFieldTraversalState,
     /// This is used to generate the normalization AST and query text
-    /// TODO: make this a newtype
-    pub outer_merged_selection_map: MergedSelectionMap,
-    /// This is used to generate refetch queries
-    /// TODO: make this a newtype
-    pub complete_merged_selection_map: MergedSelectionMap,
+    pub merged_selection_map: MergedSelectionMap,
     // TODO change this to Option<SelectionSet>?
     pub was_ever_selected_loadably: bool,
 }
@@ -78,9 +76,7 @@ impl MergedServerSelection {
     }
 }
 
-fn get_variables(
-    arguments: &[MergedSelectionFieldArgument],
-) -> impl Iterator<Item = VariableName> + '_ {
+fn get_variables(arguments: &[ArgumentKeyAndValue]) -> impl Iterator<Item = VariableName> + '_ {
     arguments.iter().flat_map(|arg| match arg.value {
         isograph_lang_types::NonConstantValue::Variable(v) => Some(v),
         _ => None,
@@ -91,7 +87,7 @@ fn get_variables(
 pub struct MergedScalarFieldSelection {
     // TODO no location
     pub name: ScalarFieldName,
-    pub arguments: Vec<MergedSelectionFieldArgument>,
+    pub arguments: Vec<ArgumentKeyAndValue>,
 }
 
 impl MergedScalarFieldSelection {
@@ -113,7 +109,7 @@ pub struct MergedLinkedFieldSelection {
     // TODO no location
     pub name: LinkedFieldName,
     pub selection_map: MergedSelectionMap,
-    pub arguments: Vec<MergedSelectionFieldArgument>,
+    pub arguments: Vec<ArgumentKeyAndValue>,
 }
 
 impl MergedLinkedFieldSelection {
@@ -127,18 +123,6 @@ impl MergedLinkedFieldSelection {
                 &self.arguments,
             ))
         }
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct MergedSelectionFieldArgument {
-    pub name: FieldArgumentName,
-    pub value: NonConstantValue,
-}
-
-impl MergedSelectionFieldArgument {
-    pub fn to_alias_str_chunk(&self) -> String {
-        format!("{}___{}", self.name, self.value.to_alias_str_chunk())
     }
 }
 
@@ -156,6 +140,26 @@ pub enum NormalizationKey {
     // TODO this should not have NameAndArguments, but LinkedFieldNameAndArguments
     ServerField(NameAndArguments),
     InlineFragment(IsographObjectTypeName),
+}
+
+impl NormalizationKey {
+    fn transform_with_parent_variable_context(
+        &self,
+        parent_variable_context: &VariableContext,
+    ) -> Self {
+        // from_selection_field_argument_and_context(arg, variable_context)
+        match &self {
+            NormalizationKey::Discriminator => NormalizationKey::Discriminator,
+            NormalizationKey::Id => NormalizationKey::Id,
+            NormalizationKey::ServerField(s) => NormalizationKey::ServerField(
+                transform_name_and_arguments_with_child_variable_context(
+                    s.clone(),
+                    parent_variable_context,
+                ),
+            ),
+            NormalizationKey::InlineFragment(o) => NormalizationKey::InlineFragment(*o),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -198,9 +202,6 @@ pub struct ScalarClientFieldTraversalState {
     /// As we traverse, if we encounter a refetch path, we note it here
     pub refetch_paths: RefetchedPathsMap,
 
-    /// Likewise for reachable variables
-    pub reachable_variables: HashSet<VariableName>,
-
     /// The (mutable) path from the current client field to wherever we are iterating
     traversal_path: Vec<NameAndArguments>,
 
@@ -212,7 +213,6 @@ impl ScalarClientFieldTraversalState {
     fn new() -> Self {
         Self {
             refetch_paths: BTreeMap::new(),
-            reachable_variables: HashSet::new(),
             traversal_path: vec![],
             accessible_client_fields: HashSet::new(),
         }
@@ -222,18 +222,25 @@ impl ScalarClientFieldTraversalState {
     fn incorporate_results_of_iterating_into_child(
         &mut self,
         child_traversal_state: &ScalarClientFieldTraversalState,
+        transformed_child_variable_context: &VariableContext,
     ) {
-        self.reachable_variables
-            .extend(child_traversal_state.reachable_variables.iter());
-
         // TODO self.path_since_client_field should be a parameter to this function
         self.refetch_paths
             .extend(child_traversal_state.refetch_paths.iter().map(
-                |((path, selection_variant), root_refetched_path)| {
-                    // TODO don't clone
-                    let mut path = path.clone();
+                |((untransformed_path_in_child, selection_variant), root_refetched_path)| {
+                    let mut path = untransformed_path_in_child.clone();
+
+                    // self.traversal_path is already transformed, i.e. uses the correct variables
                     let mut complete_path = self.traversal_path.clone();
-                    complete_path.extend(path.linked_fields);
+
+                    complete_path.extend(path.linked_fields.into_iter().map(
+                        |name_and_arguments| {
+                            transform_name_and_arguments_with_child_variable_context(
+                                name_and_arguments,
+                                transformed_child_variable_context,
+                            )
+                        },
+                    ));
                     path.linked_fields = complete_path;
 
                     ((path, *selection_variant), root_refetched_path.clone())
@@ -246,10 +253,10 @@ impl ScalarClientFieldTraversalState {
 // we already have passed the correct nested selection map, so we don't need
 // to follow the traversal path from the "root" selection map to the nested
 // one
-pub fn current_target_merged_selections<'a, 'b>(
-    traversal_path: impl Iterator<Item = &'a NameAndArguments> + 'a,
-    mut parent_selection_map: &'b MergedSelectionMap,
-) -> &'b MergedSelectionMap {
+pub fn current_target_merged_selections<'a>(
+    traversal_path: &[NameAndArguments],
+    mut parent_selection_map: &'a MergedSelectionMap,
+) -> &'a MergedSelectionMap {
     for linked_field in traversal_path {
         match parent_selection_map
             .get(&linked_field.normalization_key())
@@ -269,14 +276,52 @@ pub fn current_target_merged_selections<'a, 'b>(
     parent_selection_map
 }
 
-fn merge_selections_into_selection_map(
-    mutable_destination_map: &mut MergedSelectionMap,
-    source_map: &MergedSelectionMap,
+fn transform_and_merge_child_selection_map_into_parent_map(
+    parent_map: &mut MergedSelectionMap,
+    untransformed_child_map: &MergedSelectionMap,
+    parent_variable_context: &VariableContext,
 ) {
-    for (new_normalization_key, new_server_field_selection) in source_map.iter() {
-        match mutable_destination_map.entry(new_normalization_key.clone()) {
+    for (normalization_key, new_server_field_selection) in untransformed_child_map.iter() {
+        let transformed_normalization_key =
+            normalization_key.transform_with_parent_variable_context(parent_variable_context);
+
+        match parent_map.entry(transformed_normalization_key.clone()) {
             Entry::Vacant(vacant) => {
-                vacant.insert(new_server_field_selection.clone());
+                let selection = new_server_field_selection.clone();
+                let transformed = match selection {
+                    MergedServerSelection::ScalarField(scalar_field_selection) => {
+                        MergedServerSelection::ScalarField(MergedScalarFieldSelection {
+                            name: scalar_field_selection.name,
+                            arguments: transform_arguments_with_child_context(
+                                scalar_field_selection.arguments.into_iter(),
+                                parent_variable_context,
+                            ),
+                        })
+                    }
+                    MergedServerSelection::LinkedField(linked_field_selection) => {
+                        MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
+                            name: linked_field_selection.name,
+                            selection_map: transform_child_map_with_parent_context(
+                                &linked_field_selection.selection_map,
+                                parent_variable_context,
+                            ),
+                            arguments: transform_arguments_with_child_context(
+                                linked_field_selection.arguments.into_iter(),
+                                parent_variable_context,
+                            ),
+                        })
+                    }
+                    MergedServerSelection::InlineFragment(inline_fragment_selection) => {
+                        MergedServerSelection::InlineFragment(MergedInlineFragmentSelection {
+                            type_to_refine_to: inline_fragment_selection.type_to_refine_to,
+                            selection_map: transform_child_map_with_parent_context(
+                                &inline_fragment_selection.selection_map,
+                                parent_variable_context,
+                            ),
+                        })
+                    }
+                };
+                vacant.insert(transformed);
             }
             Entry::Occupied(mut occupied) => {
                 let inner = occupied.get_mut();
@@ -296,9 +341,10 @@ fn merge_selections_into_selection_map(
                         if let MergedServerSelection::LinkedField(child_linked_field) =
                             new_server_field_selection
                         {
-                            merge_selections_into_selection_map(
+                            transform_and_merge_child_selection_map_into_parent_map(
                                 &mut target_linked_field.selection_map,
                                 &child_linked_field.selection_map,
+                                parent_variable_context,
                             )
                         } else {
                             panic!(
@@ -311,9 +357,10 @@ fn merge_selections_into_selection_map(
                         if let MergedServerSelection::InlineFragment(child_inline_fragment) =
                             new_server_field_selection
                         {
-                            merge_selections_into_selection_map(
+                            transform_and_merge_child_selection_map_into_parent_map(
                                 &mut target_inline_fragment.selection_map,
                                 &child_inline_fragment.selection_map,
+                                parent_variable_context,
                             )
                         } else {
                             panic!(
@@ -328,55 +375,58 @@ fn merge_selections_into_selection_map(
     }
 }
 
-pub fn create_merged_selection_map_and_insert_into_global_map(
+fn transform_child_map_with_parent_context(
+    selection_map: &MergedSelectionMap,
+    parent_variable_context: &VariableContext,
+) -> BTreeMap<NormalizationKey, MergedServerSelection> {
+    let mut transformed_child_map = BTreeMap::new();
+    transform_and_merge_child_selection_map_into_parent_map(
+        &mut transformed_child_map,
+        selection_map,
+        parent_variable_context,
+    );
+    transformed_child_map
+}
+
+pub fn create_merged_selection_map_for_client_field_and_insert_into_global_map(
     schema: &ValidatedSchema,
     parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
-    root_object: &ValidatedClientField,
-    was_selected_loadably: bool,
+    root_client_field: &ValidatedClientField,
     variable_context: &VariableContext,
+    // TODO return Cow?
 ) -> ClientFieldTraversalResult {
     // TODO move this check outside of this function
-    match global_client_field_map.get_mut(&root_object.id) {
-        Some(traversal_result) => {
-            // What are we doing here? We are noting whether we ever encountered this field
-            // loadably. If we never encounter it loadably, we generate some files. If it was
-            // ever encountered loadably, we also generate additional files.
-            traversal_result.was_ever_selected_loadably =
-                traversal_result.was_ever_selected_loadably || was_selected_loadably;
-            traversal_result.clone()
-        }
+    match global_client_field_map.get_mut(&root_client_field.id) {
+        Some(traversal_result) => traversal_result.clone(),
         None => {
             let mut merge_traversal_state = ScalarClientFieldTraversalState::new();
-            let (outer_merged_selection_map, complete_merged_selection_map) =
-                create_selection_map_with_merge_traversal_state(
-                    schema,
-                    parent_type,
-                    validated_selections,
-                    &mut merge_traversal_state,
-                    global_client_field_map,
-                    variable_context,
-                );
+            let merged_selection_map = create_selection_map_with_merge_traversal_state(
+                schema,
+                parent_type,
+                validated_selections,
+                &mut merge_traversal_state,
+                global_client_field_map,
+                variable_context,
+            );
 
             // N.B. global_client_field_map might actually have an item stored in root_object.id,
             // if we have some sort of recursion. That probably stack overflows right now.
             global_client_field_map.insert(
-                root_object.id,
+                root_client_field.id,
                 ClientFieldTraversalResult {
                     traversal_state: merge_traversal_state.clone(),
-                    outer_merged_selection_map: outer_merged_selection_map.clone(),
-                    complete_merged_selection_map: complete_merged_selection_map.clone(),
-                    was_ever_selected_loadably: was_selected_loadably,
+                    merged_selection_map: merged_selection_map.clone(),
+                    was_ever_selected_loadably: false,
                 },
             );
 
             // TODO we don't always use this return value, so we shouldn't always clone above
             ClientFieldTraversalResult {
                 traversal_state: merge_traversal_state,
-                outer_merged_selection_map,
-                complete_merged_selection_map,
-                was_ever_selected_loadably: was_selected_loadably,
+                merged_selection_map,
+                was_ever_selected_loadably: false,
             }
         }
     }
@@ -398,8 +448,10 @@ pub fn get_imperatively_loaded_artifact_info(
         refetch_field_parent_id,
         imperatively_loaded_field_variant,
         extra_selections: _,
-        client_field_id: _,
+        client_field_id,
     } = path_to_refetch_field_info;
+
+    let client_field = schema.client_field(client_field_id);
 
     process_imperatively_loaded_field(
         schema,
@@ -409,6 +461,7 @@ pub fn get_imperatively_loaded_artifact_info(
         entrypoint,
         index,
         reachable_variables,
+        client_field,
     )
 }
 
@@ -419,6 +472,7 @@ pub fn get_reachable_variables(selection_map: &MergedSelectionMap) -> BTreeSet<V
         .collect()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn process_imperatively_loaded_field(
     schema: &ValidatedSchema,
     variant: ImperativelyLoadedFieldVariant,
@@ -427,6 +481,7 @@ fn process_imperatively_loaded_field(
     entrypoint: &ValidatedClientField,
     index: usize,
     reachable_variables: &BTreeSet<VariableName>,
+    client_field: &ValidatedClientField,
 ) -> ImperativelyLoadedFieldArtifactInfo {
     let ImperativelyLoadedFieldVariant {
         client_field_scalar_selection_name,
@@ -439,7 +494,7 @@ fn process_imperatively_loaded_field(
     let refetch_field_parent_type = schema.server_field_data.object(refetch_field_parent_id);
 
     let mut definitions_of_used_variables =
-        get_used_variable_definitions(reachable_variables, entrypoint);
+        get_used_variable_definitions(reachable_variables, client_field);
 
     let requires_refinement = if primary_field_info
         .as_ref()
@@ -461,7 +516,7 @@ fn process_imperatively_loaded_field(
             // TODO don't clone
             .cloned()
             .map(|x| {
-                let variable_name = x.name.map(|value_name| value_name.into());
+                let variable_name = x.name;
                 definitions_of_used_variables.push(WithSpan {
                     item: VariableDefinition {
                         name: variable_name,
@@ -469,7 +524,7 @@ fn process_imperatively_loaded_field(
                             *schema
                                 .server_field_data
                                 .defined_types
-                                .get(&type_name.into())
+                                .get(&type_name)
                                 .expect(
                                     "Expected type to be found, \
                                     this indicates a bug in Isograph",
@@ -480,9 +535,9 @@ fn process_imperatively_loaded_field(
                     span: Span::todo_generated(),
                 });
 
-                MergedSelectionFieldArgument {
-                    name: x.name.item.lookup().intern().into(),
-                    value: NonConstantValue::Variable(x.name.item.into()),
+                ArgumentKeyAndValue {
+                    key: x.name.item.lookup().intern().into(),
+                    value: NonConstantValue::Variable(x.name.item),
                 }
             })
             .collect(),
@@ -568,34 +623,19 @@ fn create_selection_map_with_merge_traversal_state(
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
-) -> (MergedSelectionMap, MergedSelectionMap) {
-    // TODO do these in one iteration
-
-    let mut outer_merged_selection_map = BTreeMap::new();
+) -> MergedSelectionMap {
+    let mut merged_selection_map = BTreeMap::new();
     merge_validated_selections_into_selection_map(
         schema,
-        &mut outer_merged_selection_map,
+        &mut merged_selection_map,
         parent_type,
         validated_selections,
         merge_traversal_state,
         global_client_field_map,
-        false,
         variable_context,
     );
 
-    let mut complete_merged_selection_map = BTreeMap::new();
-    merge_validated_selections_into_selection_map(
-        schema,
-        &mut complete_merged_selection_map,
-        parent_type,
-        validated_selections,
-        merge_traversal_state,
-        global_client_field_map,
-        true,
-        variable_context,
-    );
-
-    (outer_merged_selection_map, complete_merged_selection_map)
+    merged_selection_map
 }
 
 fn merge_validated_selections_into_selection_map(
@@ -605,18 +645,11 @@ fn merge_validated_selections_into_selection_map(
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
-    // TODO use an enum
-    recurse_into_loadable_fields: bool,
     variable_context: &VariableContext,
 ) {
     for validated_selection in validated_selections.iter().filter(filter_id_fields) {
         match &validated_selection.item {
             Selection::ServerField(validated_server_field) => {
-                let variables = validated_server_field.variables();
-                merge_traversal_state
-                    .reachable_variables
-                    .extend(variables.into_iter());
-
                 match validated_server_field {
                     ServerFieldSelection::ScalarField(scalar_field_selection) => {
                         match &scalar_field_selection.associated_data.location {
@@ -633,68 +666,75 @@ fn merge_validated_selections_into_selection_map(
 
                                 // If the field is selected loadably or is imperative, we must note the refetch path,
                                 // because this results in an artifact being generated.
-                                if let Some(loadability) = categorize_field_loadability(
+                                match categorize_field_loadability(
                                     newly_encountered_scalar_client_field,
                                     &scalar_field_selection.associated_data.selection_variant,
                                 ) {
-                                    match loadability {
-                                        Loadability::LoadablySelectedField(loadable_variant) => {
-                                            insert_loadable_field_into_refetch_paths(
-                                                merge_traversal_state,
-                                                newly_encountered_scalar_client_field,
-                                                loadable_variant,
-                                                parent_type,
-                                                scalar_field_selection,
-                                                schema,
+                                    Some(Loadability::LoadablySelectedField(_loadable_variant)) => {
+                                        create_merged_selection_map_for_client_field_and_insert_into_global_map(
+                                            schema,
+                                            parent_type,
+                                            newly_encountered_scalar_client_field.selection_set_for_parent_query(),
+                                            global_client_field_map,
+                                            newly_encountered_scalar_client_field,
+                                            &newly_encountered_scalar_client_field.initial_variable_context(),
+                                        );
+
+                                        let state = global_client_field_map
+                                            .get_mut(client_field_id)
+                                            .expect(
+                                                "Expected field to exist when \
+                                                it is encountered loadably",
                                             );
-                                        }
-                                        Loadability::ImperativelyLoadedField(variant) => {
-                                            insert_imperative_field_into_refetch_paths(
-                                                merge_traversal_state,
-                                                newly_encountered_scalar_client_field,
-                                                parent_type,
-                                                variant,
-                                            );
-                                        }
+                                        state.was_ever_selected_loadably = true;
                                     }
+                                    Some(Loadability::ImperativelyLoadedField(variant)) => {
+                                        insert_imperative_field_into_refetch_paths(
+                                            schema,
+                                            global_client_field_map,
+                                            merge_traversal_state,
+                                            newly_encountered_scalar_client_field,
+                                            parent_type,
+                                            variant,
+                                        );
+                                    }
+                                    None => merge_non_loadable_scalar_client_field(
+                                        parent_type,
+                                        schema,
+                                        parent_map,
+                                        merge_traversal_state,
+                                        newly_encountered_scalar_client_field,
+                                        global_client_field_map,
+                                        variable_context,
+                                        &scalar_field_selection.arguments,
+                                    ),
                                 }
 
                                 merge_traversal_state
                                     .accessible_client_fields
                                     .insert(*client_field_id);
-
-                                merge_scalar_client_field(
-                                    parent_type,
-                                    schema,
-                                    parent_map,
-                                    merge_traversal_state,
-                                    newly_encountered_scalar_client_field,
-                                    global_client_field_map,
-                                    &scalar_field_selection.associated_data.selection_variant,
-                                    recurse_into_loadable_fields,
-                                    variable_context,
-                                    &scalar_field_selection.arguments,
-                                )
                             }
                         };
                     }
                     ServerFieldSelection::LinkedField(linked_field_selection) => {
-                        let normalization_key = name_and_arguments(
+                        let normalization_key = create_transformed_name_and_arguments(
                             linked_field_selection.name.item.into(),
                             &linked_field_selection.arguments,
+                            variable_context,
                         )
                         .normalization_key();
-                        merge_traversal_state.traversal_path.push(NameAndArguments {
+
+                        let value = NameAndArguments {
                             name: linked_field_selection.name.item.into(),
-                            arguments: linked_field_selection
-                                .arguments
-                                .iter()
-                                .map(|argument| ArgumentKeyAndValue {
-                                    key: argument.item.name.item,
-                                    value: argument.item.value.item.clone(),
-                                })
-                                .collect(),
-                        });
+                            arguments: transform_arguments_with_child_context(
+                                linked_field_selection
+                                    .arguments
+                                    .iter()
+                                    .map(|arg| arg.item.into_key_and_value()),
+                                variable_context,
+                            ),
+                        };
+                        merge_traversal_state.traversal_path.push(value);
 
                         // We are creating the linked field, and inserting it into the parent object
                         // first, because otherwise, when we try to merge the results into the parent
@@ -707,16 +747,13 @@ fn merge_validated_selections_into_selection_map(
                                 MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
                                     name: linked_field_selection.name.item,
                                     selection_map: BTreeMap::new(),
-                                    arguments: linked_field_selection
-                                        .arguments
-                                        .iter()
-                                        .map(|arg| {
-                                            from_selection_field_argument_and_context(
-                                                &arg.item,
-                                                variable_context,
-                                            )
-                                        })
-                                        .collect(),
+                                    arguments: transform_arguments_with_child_context(
+                                        linked_field_selection
+                                            .arguments
+                                            .iter()
+                                            .map(|arg| arg.item.into_key_and_value()),
+                                        variable_context,
+                                    ),
                                 })
                             });
                         match linked_field {
@@ -739,7 +776,6 @@ fn merge_validated_selections_into_selection_map(
                                     &linked_field_selection.selection_set,
                                     merge_traversal_state,
                                     global_client_field_map,
-                                    recurse_into_loadable_fields,
                                     variable_context,
                                 );
                             }
@@ -762,6 +798,8 @@ fn merge_validated_selections_into_selection_map(
 }
 
 fn insert_imperative_field_into_refetch_paths(
+    schema: &ValidatedSchema,
+    global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_scalar_client_field: &ValidatedClientField,
     parent_type: &SchemaObject,
@@ -784,39 +822,22 @@ fn insert_imperative_field_into_refetch_paths(
             path_to_refetch_field_info: info,
         },
     );
-}
 
-fn insert_loadable_field_into_refetch_paths(
-    merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    newly_encountered_scalar_client_field: &ValidatedClientField,
-    loadable_variant: &LoadableDirectiveParameters,
-    parent_type: &SchemaObject,
-    scalar_field_selection: &ValidatedScalarFieldSelection,
-    schema: &ValidatedSchema,
-) {
-    merge_traversal_state.refetch_paths.insert(
-        (
-            PathToRefetchField {
-                linked_fields: merge_traversal_state.traversal_path.clone(),
-                field_name: newly_encountered_scalar_client_field.name,
-            },
-            IsographSelectionVariant::Loadable(loadable_variant.clone()),
-        ),
-        RootRefetchedPath {
-            field_name: newly_encountered_scalar_client_field.name,
-            path_to_refetch_field_info: PathToRefetchFieldInfo {
-                refetch_field_parent_id: parent_type.id,
-                imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant {
-                    client_field_scalar_selection_name: scalar_field_selection.name.item,
-                    top_level_schema_field_name: *NODE_FIELD_NAME,
-                    top_level_schema_field_arguments: id_arguments(),
-                    primary_field_info: None,
-                    root_object_id: schema.query_id(),
-                },
-                extra_selections: BTreeMap::new(),
-                client_field_id: newly_encountered_scalar_client_field.id,
-            },
-        },
+    // Generate a merged selection set, but using the refetch strategy
+    create_merged_selection_map_for_client_field_and_insert_into_global_map(
+        schema,
+        parent_type,
+        newly_encountered_scalar_client_field
+            .refetch_strategy
+            .as_ref()
+            .expect(
+                "Expected refetch strategy. \
+                    This is indicative of a bug in Isograph.",
+            )
+            .refetch_selection_set(),
+        global_client_field_map,
+        newly_encountered_scalar_client_field,
+        &newly_encountered_scalar_client_field.initial_variable_context(),
     );
 }
 
@@ -838,84 +859,51 @@ fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn merge_scalar_client_field(
+fn merge_non_loadable_scalar_client_field(
     parent_type: &SchemaObject,
     schema: &ValidatedSchema,
     parent_map: &mut MergedSelectionMap,
     parent_merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_scalar_client_field: &ValidatedClientField,
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
-    selection_variant: &ValidatedIsographSelectionVariant,
-    recurse_into_loadable_fields: bool,
     parent_variable_context: &VariableContext,
     selection_arguments: &[WithLocation<SelectionFieldArgument>],
 ) {
-    let child_field_variable_context = parent_variable_context.child_variable_context(
-        selection_arguments,
-        &newly_encountered_scalar_client_field.variable_definitions,
-        selection_variant,
-    );
-
-    let was_selected_loadably = matches!(
-        selection_variant,
-        &ValidatedIsographSelectionVariant::Loadable(_)
-    );
+    // Here, we are doing a bunch of work, just so that we can have the refetched paths,
+    // which is really really silly.
     let ClientFieldTraversalResult {
         traversal_state,
-        complete_merged_selection_map,
+        merged_selection_map: child_merged_selection_map,
         ..
-    } = create_merged_selection_map_and_insert_into_global_map(
+    } = create_merged_selection_map_for_client_field_and_insert_into_global_map(
         schema,
         parent_type,
-        newly_encountered_scalar_client_field.selection_set_for_parent_query(),
+        newly_encountered_scalar_client_field
+            .reader_selection_set
+            .as_ref()
+            .expect(
+                "Expected selection set to exist. \
+                This is indicative of a bug in Isograph.",
+            ),
         global_client_field_map,
         newly_encountered_scalar_client_field,
-        was_selected_loadably,
-        &child_field_variable_context,
+        &newly_encountered_scalar_client_field.initial_variable_context(),
     );
 
-    if was_selected_loadably {
-        // since the field has been selected loadably, we need to actually generate a different
-        // merged selection map (one from the refetch_selection_set instead of from the
-        // reader_selection_map).
-        //
-        // The way we're doing this now is awkward. This should probably be done as part of
-        // create_merged_selection_map_and_insert_into_global_map.
-        //
-        // Note that we do not need to call incorporate_results_of_iterating_into_child, since
-        // that is a no-op. We only need to call merge_selections_into_selection_map to ensure
-        // that whatever fields are mapped are selected.
-        //
-        // (For now, we only select the id field, so... this is also a no-op.)
-        // Anyway, we should model this better.
-        let (outer_merged_selection_map_from_refetch_selection_set, _) = {
-            let mut merge_traversal_state = ScalarClientFieldTraversalState::new();
-            &create_selection_map_with_merge_traversal_state(
-                schema,
-                parent_type,
-                newly_encountered_scalar_client_field
-                    .refetch_strategy
-                    .as_ref()
-                    .expect(
-                        "Expected refetch_strategy to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .refetch_selection_set(),
-                &mut merge_traversal_state,
-                &mut Default::default(),
-                parent_variable_context,
-            )
-        };
-        merge_selections_into_selection_map(
-            parent_map,
-            outer_merged_selection_map_from_refetch_selection_set,
-        )
-    }
-
-    if !was_selected_loadably || recurse_into_loadable_fields {
-        parent_merge_traversal_state.incorporate_results_of_iterating_into_child(&traversal_state);
-        merge_selections_into_selection_map(parent_map, &complete_merged_selection_map);
-    }
+    let transformed_child_variable_context = parent_variable_context.child_variable_context(
+        selection_arguments,
+        &newly_encountered_scalar_client_field.variable_definitions,
+        &ValidatedIsographSelectionVariant::Regular,
+    );
+    transform_and_merge_child_selection_map_into_parent_map(
+        parent_map,
+        &child_merged_selection_map,
+        &transformed_child_variable_context,
+    );
+    parent_merge_traversal_state.incorporate_results_of_iterating_into_child(
+        &traversal_state,
+        &transformed_child_variable_context,
+    );
 }
 
 fn merge_scalar_server_field(
@@ -923,9 +911,10 @@ fn merge_scalar_server_field(
     parent_map: &mut MergedSelectionMap,
     variable_context: &VariableContext,
 ) {
-    let normalization_key = NormalizationKey::ServerField(name_and_arguments(
+    let normalization_key = NormalizationKey::ServerField(create_transformed_name_and_arguments(
         scalar_field.name.item.into(),
         &scalar_field.arguments,
+        variable_context,
     ));
     match parent_map.entry(normalization_key) {
         Entry::Occupied(occupied) => {
@@ -946,32 +935,16 @@ fn merge_scalar_server_field(
             vacant_entry.insert(MergedServerSelection::ScalarField(
                 MergedScalarFieldSelection {
                     name: scalar_field.name.item,
-                    arguments: scalar_field
-                        .arguments
-                        .iter()
-                        .map(|arg| {
-                            from_selection_field_argument_and_context(&arg.item, variable_context)
-                        })
-                        .collect(),
+                    arguments: transform_arguments_with_child_context(
+                        scalar_field
+                            .arguments
+                            .iter()
+                            .map(|arg| arg.item.into_key_and_value()),
+                        variable_context,
+                    ),
                 },
             ));
         }
-    }
-}
-
-fn name_and_arguments(
-    name: SelectableFieldName,
-    arguments: &[WithLocation<SelectionFieldArgument>],
-) -> NameAndArguments {
-    NameAndArguments {
-        name,
-        arguments: arguments
-            .iter()
-            .map(|selection_field_argument| ArgumentKeyAndValue {
-                key: selection_field_argument.item.name.item,
-                value: selection_field_argument.item.value.item.clone(),
-            })
-            .collect(),
     }
 }
 
@@ -1019,7 +992,7 @@ fn select_typename_and_id_fields_in_merged_selection(
 pub fn selection_map_wrapped(
     mut inner_selection_map: MergedSelectionMap,
     top_level_field: LinkedFieldName,
-    top_level_field_arguments: Vec<MergedSelectionFieldArgument>,
+    top_level_field_arguments: Vec<ArgumentKeyAndValue>,
     // TODO support arguments and vectors of subfields
     subfield: Option<LinkedFieldName>,
     type_to_refine_to: RequiresRefinement,
@@ -1106,7 +1079,7 @@ fn maybe_add_typename_selection(selections: &mut MergedSelectionMap) {
 
 fn get_aliased_mutation_field_name(
     name: SelectableFieldName,
-    parameters: &[MergedSelectionFieldArgument],
+    parameters: &[ArgumentKeyAndValue],
 ) -> String {
     let mut s = name.to_string();
 
@@ -1127,30 +1100,4 @@ pub fn id_arguments() -> Vec<UnvalidatedVariableDefinition> {
         ))),
         default_value: None,
     }]
-}
-
-pub fn from_selection_field_argument_and_context(
-    arg: &SelectionFieldArgument,
-    variable_context: &VariableContext,
-) -> MergedSelectionFieldArgument {
-    if let NonConstantValue::Variable(used_variable_name) = &arg.value.item {
-        // Look up the variable in the variables in context, and use that value
-        return MergedSelectionFieldArgument {
-            name: arg.name.item,
-            value: variable_context
-                .0
-                .get(used_variable_name)
-                .expect(
-                    "Expected the variable used here to have been defined. \
-                    This should have been validated already. \
-                    This is indicative of a bug in Isograph.",
-                )
-                .clone(),
-        };
-    }
-
-    MergedSelectionFieldArgument {
-        name: arg.name.item,
-        value: arg.value.item.clone(),
-    }
 }

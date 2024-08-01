@@ -204,7 +204,7 @@ impl ModifiedArgument {
             let defined_type_id = *schema
                 .server_field_data
                 .defined_types
-                .get(&input_type_name.into())
+                .get(&input_type_name)
                 .expect(
                     "Expected type to be defined by now. This is indicative of a bug in Isograph.",
                 );

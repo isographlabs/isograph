@@ -376,10 +376,7 @@ fn validate_server_field_argument(
     // unvalidated.
 
     // look up the item in defined_types. If it's not there, error.
-    match schema_data
-        .defined_types
-        .get(&(*argument.item.type_.inner()).into())
-    {
+    match schema_data.defined_types.get(argument.item.type_.inner()) {
         Some(selectable_server_field_id) => Ok(WithLocation::new(
             VariableDefinition {
                 name: argument.item.name,
@@ -969,8 +966,7 @@ pub fn get_missing_arguments_and_validate_argument_types<'a>(
             let user_has_supplied_argument = arguments
                 .iter()
                 // TODO do not call .lookup
-                .find(|arg| definition.name.item.lookup() == arg.item.name.item.lookup())
-                .is_some();
+                .any(|arg| definition.name.item.lookup() == arg.item.name.item.lookup());
             if user_has_supplied_argument {
                 None
             } else {
@@ -1062,7 +1058,7 @@ pub enum ValidateSchemaError {
 
     #[error(
         "This field has missing arguments: {0}",
-        missing_arguments.into_iter().map(|arg| format!("${}", arg.name.item)).collect::<Vec<_>>().join(", ")
+        missing_arguments.iter().map(|arg| format!("${}", arg.name.item)).collect::<Vec<_>>().join(", ")
     )]
     MissingArguments { missing_arguments: MissingArguments },
 

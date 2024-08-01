@@ -5,12 +5,12 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    IsographSelectionVariant, ScalarFieldSelection, Selection, ServerFieldSelection, ServerObjectId,
+    ArgumentKeyAndValue, IsographSelectionVariant, ScalarFieldSelection, Selection,
+    ServerFieldSelection, ServerObjectId,
 };
 
 use crate::{
-    get_reachable_variables, selection_map_wrapped, MergedSelectionFieldArgument,
-    MergedSelectionMap, RequiresRefinement,
+    get_reachable_variables, selection_map_wrapped, MergedSelectionMap, RequiresRefinement,
 };
 
 #[derive(Debug)]
@@ -69,7 +69,7 @@ pub fn generate_refetch_field_strategy<
     root_fetchable_type: ServerObjectId,
     refetch_query_name: QueryOperationName,
     top_level_field_name: LinkedFieldName,
-    top_level_arguments: Vec<MergedSelectionFieldArgument>,
+    top_level_arguments: Vec<ArgumentKeyAndValue>,
     refine_to_type: RequiresRefinement,
     subfield: Option<LinkedFieldName>,
 ) -> UseRefetchFieldRefetchStrategy<
@@ -126,7 +126,7 @@ pub trait GenerateRefetchQueryFn: Debug {
 #[derive(Debug)]
 struct GenerateRefetchQueryImpl {
     top_level_field_name: LinkedFieldName,
-    top_level_arguments: Vec<MergedSelectionFieldArgument>,
+    top_level_arguments: Vec<ArgumentKeyAndValue>,
     refine_to_type: RequiresRefinement,
     subfield: Option<LinkedFieldName>,
 }

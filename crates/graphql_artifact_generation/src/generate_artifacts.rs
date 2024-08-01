@@ -5,13 +5,14 @@ use common_lang_types::{
 use graphql_lang_types::{GraphQLTypeAnnotation, ListTypeAnnotation, NonNullTypeAnnotation};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection, ServerFieldSelection,
+    ArgumentKeyAndValue, ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection,
+    ServerFieldSelection,
 };
 use isograph_schema::{
     get_missing_arguments_and_validate_argument_types, ClientFieldTraversalResult,
-    ClientFieldVariant, FieldDefinitionLocation, MergedSelectionFieldArgument, MissingArguments,
-    SchemaObject, UserWrittenComponentVariant, ValidatedClientField,
-    ValidatedIsographSelectionVariant, ValidatedSchema, ValidatedSelection,
+    ClientFieldVariant, FieldDefinitionLocation, MissingArguments, SchemaObject,
+    UserWrittenComponentVariant, ValidatedClientField, ValidatedIsographSelectionVariant,
+    ValidatedSchema, ValidatedSelection,
 };
 use lazy_static::lazy_static;
 use std::path::Path;
@@ -21,6 +22,7 @@ use std::{
     path::PathBuf,
 };
 
+use crate::entrypoint_artifact::generate_entrypoint_artifacts_with_client_field_traversal_result;
 use crate::{
     eager_reader_artifact::{
         generate_eager_reader_artifact, generate_eager_reader_output_type_artifact,
@@ -87,13 +89,13 @@ pub fn get_artifact_path_and_content(
         encountered_client_field_id,
         ClientFieldTraversalResult {
             traversal_state,
+            merged_selection_map,
             was_ever_selected_loadably,
             ..
         },
     ) in &global_client_field_map
     {
         let encountered_client_field = schema.client_field(*encountered_client_field_id);
-
         // Generate reader ASTs for all encountered client fields, which may be reader or refetch reader
         match &encountered_client_field.variant {
             ClientFieldVariant::UserWritten(info) => {
@@ -103,7 +105,7 @@ pub fn get_artifact_path_and_content(
                     project_root,
                     artifact_directory,
                     *info,
-                    traversal_state,
+                    &traversal_state.refetch_paths,
                 ));
 
                 if *was_ever_selected_loadably {
@@ -111,9 +113,22 @@ pub fn get_artifact_path_and_content(
                         schema,
                         encountered_client_field,
                         None,
-                        traversal_state,
+                        &traversal_state.refetch_paths,
                         true,
-                    ))
+                    ));
+                    path_and_contents.extend(
+                        // TODO this generates queries/normalization ASTs that are not wrapped in node(...), which is what
+                        // should happen!
+                        // We also generate resolver readers that need to be wrapped as well. Not sure
+                        // how I would do that.
+                        generate_entrypoint_artifacts_with_client_field_traversal_result(
+                            schema,
+                            encountered_client_field,
+                            merged_selection_map,
+                            traversal_state,
+                            &global_client_field_map,
+                        ),
+                    );
                 }
             }
             ClientFieldVariant::ImperativelyLoadedField(variant) => {
@@ -121,9 +136,9 @@ pub fn get_artifact_path_and_content(
                     schema,
                     encountered_client_field,
                     variant.primary_field_info.as_ref(),
-                    traversal_state,
+                    &traversal_state.refetch_paths,
                     false,
-                ))
+                ));
             }
         };
     }
@@ -187,7 +202,7 @@ pub fn get_artifact_path_and_content(
 
 pub(crate) fn get_serialized_field_arguments(
     // TODO make this an iterator
-    arguments: &[MergedSelectionFieldArgument],
+    arguments: &[ArgumentKeyAndValue],
     indentation_level: u8,
 ) -> String {
     if arguments.is_empty() {
@@ -199,7 +214,7 @@ pub(crate) fn get_serialized_field_arguments(
     let indent_2 = "  ".repeat((indentation_level + 2) as usize);
 
     for argument in arguments {
-        let argument_name = argument.name;
+        let argument_name = argument.key;
         let arg_value = match &argument.value {
             NonConstantValue::Variable(variable_name) => {
                 format!(

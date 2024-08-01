@@ -215,6 +215,7 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
     pub name: WithLocation<LinkedFieldName>,
+    // pub alias
     pub reader_alias: Option<WithLocation<LinkedFieldAlias>>,
     pub associated_data: TLinkedField,
     pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
@@ -287,6 +288,25 @@ impl SelectionFieldArgument {
             self.value.item.to_alias_str_chunk()
         )
     }
+
+    pub fn into_key_and_value(&self) -> ArgumentKeyAndValue {
+        ArgumentKeyAndValue {
+            key: self.name.item,
+            value: self.value.item.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ArgumentKeyAndValue {
+    pub key: FieldArgumentName,
+    pub value: NonConstantValue,
+}
+
+impl ArgumentKeyAndValue {
+    pub fn to_alias_str_chunk(&self) -> String {
+        format!("{}___{}", self.key, self.value.to_alias_str_chunk())
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
@@ -323,7 +343,7 @@ impl NonConstantValue {
             NonConstantValue::String(string) => format!("s_{}", string),
             // Also not correct
             NonConstantValue::Float(f) => format!("l_{}", f.as_float()),
-            NonConstantValue::Null => format!("l_null"),
+            NonConstantValue::Null => "l_null".to_string(),
             NonConstantValue::Enum(e) => format!("e_{e}"),
             NonConstantValue::List(_) => panic!("Lists are not supported here"),
             NonConstantValue::Object(_) => panic!("Objects not supported here"),
