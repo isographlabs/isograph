@@ -14,7 +14,12 @@ const readerAst: ReaderAst<Pet__PetCheckinsCard__param> = [
     kind: "Linked",
     fieldName: "checkins",
     alias: null,
-    arguments: null,
+    arguments: [
+      [
+        "count",
+        { kind: "Variable", name: "count" },
+      ],
+    ],
     selections: [
       {
         kind: "Resolver",

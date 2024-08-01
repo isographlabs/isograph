@@ -12,7 +12,7 @@ const queryText = 'mutation Query__set_best_friend ($id: ID!, $new_best_friend_i
         },\
         picture_together,\
       },\
-      checkins {\
+      checkins____count___l_42: checkins(count: 42) {\
         id,\
         location,\
         time,\
@@ -105,7 +105,12 @@ const normalizationAst: NormalizationAst = [
           {
             kind: "Linked",
             fieldName: "checkins",
-            arguments: null,
+            arguments: [
+              [
+                "count",
+                { kind: "Literal", value: 42 },
+              ],
+            ],
             selections: [
               {
                 kind: "Scalar",

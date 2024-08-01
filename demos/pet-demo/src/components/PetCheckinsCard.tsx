@@ -5,7 +5,7 @@ import { Button, Card, CardContent } from '@mui/material';
 export const PetCheckinsCard = iso(`
   field Pet.PetCheckinsCard($count: Int! = 42) @component {
     id
-    checkins {
+    checkins(count: $count) {
       CheckinDisplay
       id
     }

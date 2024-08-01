@@ -27,7 +27,7 @@ const queryText = 'query PetDetailRoute ($id: ID!) {\
       },\
       picture_together,\
     },\
-    checkins {\
+    checkins____count___l_42: checkins(count: 42) {\
       id,\
       location,\
       time,\
@@ -109,7 +109,12 @@ const normalizationAst: NormalizationAst = [
       {
         kind: "Linked",
         fieldName: "checkins",
-        arguments: null,
+        arguments: [
+          [
+            "count",
+            { kind: "Literal", value: 42 },
+          ],
+        ],
         selections: [
           {
             kind: "Scalar",

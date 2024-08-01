@@ -1,4 +1,4 @@
-use common_lang_types::{HasName, QueryOperationName, UnvalidatedTypeName, WithSpan};
+use common_lang_types::{HasName, QueryOperationName, UnvalidatedTypeName};
 use graphql_lang_types::GraphQLTypeAnnotation;
 use isograph_lang_types::{ArgumentKeyAndValue, NonConstantValue};
 use isograph_schema::{
@@ -8,16 +8,16 @@ use isograph_schema::{
 
 use crate::generate_artifacts::QueryText;
 
-pub(crate) fn generate_query_text(
+pub(crate) fn generate_query_text<'a>(
     query_name: QueryOperationName,
     schema: &ValidatedSchema,
     selection_map: &MergedSelectionMap,
-    query_variables: &[WithSpan<ValidatedVariableDefinition>],
+    query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
     root_operation_name: &RootOperationName,
 ) -> QueryText {
     let mut query_text = String::new();
 
-    let variable_text = write_variables_to_string(schema, query_variables.iter());
+    let variable_text = write_variables_to_string(schema, query_variables);
 
     query_text.push_str(&format!(
         "{} {} {} {{\\\n",
@@ -30,7 +30,7 @@ pub(crate) fn generate_query_text(
 
 fn write_variables_to_string<'a>(
     schema: &ValidatedSchema,
-    variables: impl Iterator<Item = &'a WithSpan<ValidatedVariableDefinition>> + 'a,
+    variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
 ) -> String {
     let mut empty = true;
     let mut first = true;
@@ -45,7 +45,7 @@ fn write_variables_to_string<'a>(
         }
         // TODO can we consume the variables here?
         let x: GraphQLTypeAnnotation<UnvalidatedTypeName> =
-            variable.item.type_.clone().map(|input_type_id| {
+            variable.type_.clone().map(|input_type_id| {
                 let schema_input_type = schema
                     .server_field_data
                     .lookup_unvalidated_type(input_type_id);
@@ -54,7 +54,10 @@ fn write_variables_to_string<'a>(
         // TODO this is dangerous, since variable.item.name is a WithLocation, which impl's Display.
         // We should find a way to make WithLocation not impl display, without making error's hard
         // to work with.
-        variable_text.push_str(&format!("${}: {}", variable.item.name.item, x));
+        variable_text.push_str(&format!("${}: {}", variable.name.item, x));
+        if let Some(default_value) = &variable.default_value {
+            variable_text.push_str(&format!(" = {}", default_value.item.print_to_string()));
+        }
     }
 
     if empty {

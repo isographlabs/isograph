@@ -9,6 +9,7 @@ use isograph_schema::{
     get_reachable_variables, ClientFieldToCompletedMergeTraversalStateMap,
     ClientFieldTraversalResult, MergedSelectionMap, RootRefetchedPath,
     ScalarClientFieldTraversalState, SchemaObject, ValidatedClientField, ValidatedSchema,
+    ValidatedVariableDefinition,
 };
 
 use crate::{
@@ -56,15 +57,20 @@ pub(crate) fn generate_entrypoint_artifacts(
         &merged_selection_map,
         &traversal_state,
         global_client_field_map,
+        entrypoint
+            .variable_definitions
+            .iter()
+            .map(|variable_definition| &variable_definition.item),
     )
 }
 
-pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result(
+pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'a>(
     schema: &ValidatedSchema,
     entrypoint: &ValidatedClientField,
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
     global_client_field_map: &ClientFieldToCompletedMergeTraversalStateMap,
+    variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
 ) -> Vec<ArtifactPathAndContent> {
     let query_name = entrypoint.name.into();
     // TODO when we do not call generate_entrypoint_artifact extraneously,
@@ -88,7 +94,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result(
         query_name,
         schema,
         merged_selection_map,
-        &entrypoint.variable_definitions,
+        variable_definitions,
         root_operation_name,
     );
     let refetch_paths_with_variables = traversal_state

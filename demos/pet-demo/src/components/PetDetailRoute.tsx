@@ -6,7 +6,7 @@ import { PetDetailRoute, useNavigateTo } from './routes';
 
 export const PetDetailRouteComponent = iso(`
   field Query.PetDetailRoute($id: ID!) @component {
-    PetDetailRouteInner(actualId: $id)
+    PetDetailRouteInner(actualId: $id) 
   }
 `)(function PetDetailRouteComponent(data) {
   return <data.PetDetailRouteInner />;

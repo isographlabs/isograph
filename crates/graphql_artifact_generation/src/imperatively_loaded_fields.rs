@@ -85,7 +85,9 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field(
         query_name,
         schema,
         &merged_selection_set,
-        &variable_definitions,
+        variable_definitions
+            .iter()
+            .map(|variable_definition| &variable_definition.item),
         &root_operation_name,
     );
 

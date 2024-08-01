@@ -1033,9 +1033,7 @@ pub fn selection_map_wrapped(
     top_level_selection_set.insert(
         NormalizationKey::ServerField(NameAndArguments {
             name: top_level_field.into(),
-            // TODO provide arguments. They don't matter, because there is only one
-            // selection at this level.
-            arguments: vec![],
+            arguments: top_level_field_arguments.clone(),
         }),
         MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
             name: top_level_field,

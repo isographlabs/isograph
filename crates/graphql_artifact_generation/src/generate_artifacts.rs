@@ -1,18 +1,21 @@
 use common_lang_types::{
-    ArtifactFileType, ArtifactPathAndContent, DescriptionValue, IsographObjectTypeName,
-    SelectableFieldName, WithSpan,
+    ArtifactFileType, ArtifactPathAndContent, DescriptionValue, IsographObjectTypeName, Location,
+    SelectableFieldName, Span, WithLocation, WithSpan,
 };
-use graphql_lang_types::{GraphQLTypeAnnotation, ListTypeAnnotation, NonNullTypeAnnotation};
+use graphql_lang_types::{
+    GraphQLTypeAnnotation, ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
+};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection,
     ServerFieldSelection,
 };
 use isograph_schema::{
-    get_missing_arguments_and_validate_argument_types, ClientFieldTraversalResult,
-    ClientFieldVariant, FieldDefinitionLocation, MissingArguments, SchemaObject,
+    get_missing_arguments_and_validate_argument_types, selection_map_wrapped,
+    ClientFieldTraversalResult, ClientFieldVariant, FieldDefinitionLocation, MissingArguments,
+    NameAndArguments, NormalizationKey, RequiresRefinement, SchemaObject,
     UserWrittenComponentVariant, ValidatedClientField, ValidatedIsographSelectionVariant,
-    ValidatedSchema, ValidatedSelection,
+    ValidatedSchema, ValidatedSelection, ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use std::path::Path;
@@ -116,17 +119,74 @@ pub fn get_artifact_path_and_content(
                         &traversal_state.refetch_paths,
                         true,
                     ));
+
+                    // Everything about this is quite sus
+                    let id_arg = ArgumentKeyAndValue {
+                        key: "id".intern().into(),
+                        value: NonConstantValue::Variable("id".intern().into()),
+                    };
+
+                    let type_to_refine_to = schema
+                        .server_field_data
+                        .object(encountered_client_field.parent_object_id)
+                        .name;
+
+                    if schema
+                        .fetchable_types
+                        .contains_key(&encountered_client_field.parent_object_id)
+                    {
+                        panic!("Loadable fields on root objects are not yet supported");
+                    }
+
+                    let wrapped_map = selection_map_wrapped(
+                        merged_selection_map.clone(),
+                        "node".intern().into(),
+                        vec![id_arg.clone()],
+                        None,
+                        RequiresRefinement::Yes(type_to_refine_to),
+                    );
+                    let id_var = ValidatedVariableDefinition {
+                        name: WithLocation::new("id".intern().into(), Location::Generated),
+                        type_: GraphQLTypeAnnotation::NonNull(Box::new(
+                            NonNullTypeAnnotation::Named(NamedTypeAnnotation(WithSpan::new(
+                                SelectableServerFieldId::Scalar(schema.id_type_id),
+                                Span::todo_generated(),
+                            ))),
+                        )),
+                        default_value: None,
+                    };
+                    let variable_definitions_iter = encountered_client_field
+                        .variable_definitions
+                        .iter()
+                        .map(|variable_defition| &variable_defition.item)
+                        .chain(std::iter::once(&id_var));
+                    let mut traversal_state = traversal_state.clone();
+                    traversal_state.refetch_paths = traversal_state
+                        .refetch_paths
+                        .into_iter()
+                        .map(|(mut key, value)| {
+                            key.0
+                                .linked_fields
+                                .insert(0, NormalizationKey::InlineFragment(type_to_refine_to));
+                            key.0.linked_fields.insert(
+                                0,
+                                NormalizationKey::ServerField(NameAndArguments {
+                                    name: "node".intern().into(),
+                                    arguments: vec![id_arg.clone()],
+                                }),
+                            );
+                            (key, value)
+                        })
+                        .collect();
+
                     path_and_contents.extend(
-                        // TODO this generates queries/normalization ASTs that are not wrapped in node(...), which is what
-                        // should happen!
-                        // We also generate resolver readers that need to be wrapped as well. Not sure
-                        // how I would do that.
                         generate_entrypoint_artifacts_with_client_field_traversal_result(
                             schema,
                             encountered_client_field,
-                            merged_selection_map,
-                            traversal_state,
+                            &wrapped_map,
+                            &traversal_state,
                             &global_client_field_map,
+                            variable_definitions_iter,
                         ),
                     );
                 }
