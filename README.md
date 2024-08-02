@@ -13,7 +13,7 @@ Isograph is a UI framework for building React apps that are powered by GraphQL d
 
 ## About Isograph: Fetching data and app structure
 
-### What is Isograph, and what are resolvers?
+### What is Isograph, and what are client fields?
 
 Isograph is a framework for building React applications that are backed by GraphQL data. In Isograph, components that read data can be selected from the graph, and automatically have the data they require passed in. Consider this example Avatar component:
 
@@ -23,12 +23,12 @@ export const Avatar = iso(`
     name
     avatar_url
   }
-`)(function AvatarComponent(data, otherRuntimeProps) {
+`)(function AvatarComponent(data) {
   return <CircleImage image={data.avatar_url} />;
 });
 ```
 
-This avatar component is available on any GraphQL User. You might use this avatar component in another component, such as a button that navigates to a given user's profile.
+This defines a new client field named `Avatar`, which is then available on any GraphQL User. You might use this avatar field in another component, such as a button that navigates to a given user's profile.
 
 ```js
 export const UserProfileButton = iso(`
@@ -49,19 +49,17 @@ export const UserProfileButton = iso(`
 });
 ```
 
-These calls to `iso` define client fields, which are functions from graph data (such as the user's name) to an arbitrary value. With Isograph, it's resolvers all the way down — your entire app can be built in this way!
+These calls to `iso` define client fields, which are functions from graph data (such as the user's name) to an arbitrary value. With Isograph, it's client fields all the way down — your entire app can be built in this way!
 
 ### How does Isograph fetch data?
 
-At the root of each page, you will define an entrypoint with `iso`. Isograph's compiler finds and processes all the entrypoints in your codebase, and will generate the appropriate GraphQL query.
+At the root of each page, you will define an entrypoint. Isograph's compiler finds and processes all the entrypoints in your codebase, and will generate the appropriate GraphQL query.
 
-So, if the compiler encounters ``iso(`entrypoint Query.UserList `);``, it would generate a query that would fetch all the server fields needed for the `Query.UserList` resolver and all of the resolvers that it references. Then, when the user navigates to the user list page, that query would be executed.
+So, if the compiler encounters ``iso(`entrypoint Query.UserList`);``, it would generate a query that would fetch all the server fields needed for the `Query.UserList` client field and all of the nested client fields that are reachable from that root. Then, when the user navigates to the user list page, that query would be executed.
 
 For example, the data might be fetched during render as follows:
 
 ```js
-import UserListPageEntrypoint from '@iso/Query/UserList/entrypoint';
-
 function UserListPageRoute() {
   const queryVariables = {};
   const { queryReference } = useLazyReference(
@@ -81,20 +79,58 @@ Now, when `UserListPageRoute` is initially rendered, Isograph will make an API c
 
 ### How do components receive their data?
 
-You may have noticed that when we rendered `<data.Avatar />`, we did not pass the data that the `Avatar` needs! Instead, when the component is rendered, Isograph will `read` the data that the `Avatar` component needs, and pass it to `Avatar`. The calling component:
+You may have noticed that when we rendered `<data.Avatar />`, we did not explicitly pass the data that the `Avatar` needs! Instead, when the component is rendered, Isograph will `read` the data that the `Avatar` component needs, and pass it to `Avatar`. The calling component:
 
 - only passes additional props that don't affect the query data, like `onClick`, and
 - does **not** know what data `Avatar` expects, and never sees the data that `Avatar` reads out. This is called **data masking**, and it's a crucial reason that teams of multiple developers can move quickly when building apps with Isograph: because no component sees the data that another component selected, changing one component cannot affect another!
 
 ### Big picture
 
-At the root of a page, you will define an `iso` entrypoint. For any such entrypoint, Isograph will:
+At the root of a page, you will define an entrypoint. For any such entrypoint, Isograph will:
 
-- Recursively walk it's dependencies and create a single GraphQL query that fetches **all** of the data reachable from this literal.
+- Recursively walk it's dependencies and create a single GraphQL query that fetches **all** of the data reachable from this root.
 - When that page renders, or possibly sooner, Isograph will make the API call to fetch that data.
 - Each resolver will independently read the data that it specifically required.
 
+## About Isograph: `@loadable` fields
+
+Selections of client fields can be declared as `@loadable`, meaning that the data for that client field is not included as part of the parent request. Instead, the value that is read out contains a function that you can call to make a new network request for just the `@loadable` field. Consider:
+
+```tsx
+export const UserDetailPage = iso(`
+  field User.UserDetailPage {
+    name
+    CreditCardInfo @loadable
+  }
+`)((data) => {
+  const CreditCardInfo = useClientSideDefer(data.CreditCardInfo);
+
+  return (
+    <>
+      <h1>Hello {data.name}</h1>
+      <React.Suspense fallback="Loading credit card info">
+        <EntrypointReader queryReference={CreditCardInfo} />
+      </React.Suspense>
+    </>
+  );
+});
+```
+
+In this example, the `CreditCardInfo` component is slow to calculate. This might be because it has to make an API call to an external service. We would not like to slow down the entire page as a result of that. So, instead, label this field `@loadable`.
+
+Now, instead of returning a component that can be directly rendered, we get back something that contains a function that executes the network request to fetch the `CreditCardInfo`'s data. We pass that to `useClientSideDefer`, which makes that network request during the initial render of the component.
+
+There we go! Now, our parent component can load quickly, and we make a follow-up request for the rest of the data!
+
+:::note
+You are not expected to use the `@loadable` field directly. Instead, always pass it to a handler like `useClientSideDefer`.
+:::
+
 ## About Isograph: `@exposeField`
+
+:::note
+The `@exposeField` feature will change before the next release.
+:::
 
 > Currently, `@exposeField` is only processed if it is on the Mutation type. But, it will be made more generally available at some point.
 
@@ -115,6 +151,7 @@ type Mutation
     field: "set_user_name" # expose this field
     path: "updated_user" # on the type at this path (relative to the response object)
     fieldMap: [{ from: "id", to: "id" }] # mapping these fields
+    # as: "custom_field_name"
   ) {
   set_user_name(input: SetUserNameParams!): SetUserNameResponse!
 }
@@ -129,7 +166,9 @@ export const UpdateUserNameButton = iso(`
   }
 `)((data) => {
   return (
-    <div onClick={() => data.set_user_name({ input: { new_name: 'Maybe' } })}>
+    <div
+      onClick={() => data.set_user_name({ input: { new_name: 'Maybe' } })[1]()}
+    >
       Call me, maybe
     </div>
   );
