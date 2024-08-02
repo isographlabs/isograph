@@ -19,7 +19,8 @@
     "watch-libs": "cargo watch -s 'pnpm -r compile' -d 0.1 -w ./libs",
     "format": "yarn run format-prettier && yarn run format-rust",
     "format-prettier": "prettier --config ./.prettier.config.js --write .",
-    "format-rust": "cargo fmt"
+    "format-rust": "cargo fmt",
+    "tsc": "pnpm -r tsc"
   },
   "license": "MIT",
   "repository": {
