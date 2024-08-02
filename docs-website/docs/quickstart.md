@@ -308,9 +308,12 @@ import { useLazyReference } from '@isograph/react';
 import { iso } from '@iso';
 
 export default function HomePageRoute() {
-  const { queryReference } = useLazyReference(iso(`entrypoint Root.HomePage`), {
-    /* query variables */
-  });
+  const { fragmentReference } = useLazyReference(
+    iso(`entrypoint Root.HomePage`),
+    {
+      /* query variables */
+    },
+  );
   return null;
 }
 ```
@@ -339,10 +342,13 @@ import { useLazyReference, useResult } from '@isograph/react';
 import { iso } from '@iso';
 
 export default function HomePageRoute() {
-  const { queryReference } = useLazyReference(iso(`entrypoint Root.HomePage`), {
-    /* query variables */
-  });
-  const HomePage = useResult(queryReference);
+  const { fragmentReference } = useLazyReference(
+    iso(`entrypoint Root.HomePage`),
+    {
+      /* query variables */
+    },
+  );
+  const HomePage = useResult(fragmentReference);
   return <HomePage />;
 }
 ```

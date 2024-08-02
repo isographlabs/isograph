@@ -43,7 +43,7 @@ export function PullRequestRoute({
   route: PullRequestRouteType;
   setRoute: (route: Route) => void;
 }) {
-  const { queryReference } = useLazyReference(
+  const { fragmentReference } = useLazyReference(
     iso(`entrypoint Query.PullRequest`),
     {
       pullRequestNumber: route.pullRequestNumber,
@@ -53,6 +53,6 @@ export function PullRequestRoute({
     },
   );
 
-  const Component = useResult(queryReference);
+  const Component = useResult(fragmentReference);
   return <Component route={route} setRoute={setRoute} />;
 }

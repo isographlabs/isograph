@@ -47,7 +47,7 @@ export const PetDetailDeferredRouteInnerComponent = iso(`
       <React.Suspense fallback={<h2>Loading pet details...</h2>}>
         <Stack direction="row" spacing={4}>
           <Stack direction="column" spacing={4}>
-            <EntrypointReader queryReference={petCheckinsCard} />
+            <EntrypointReader fragmentReference={petCheckinsCard} />
           </Stack>
         </Stack>
       </React.Suspense>
@@ -60,11 +60,11 @@ export function PetDetailDeferredRouteLoader({
 }: {
   route: PetDetailDeferredRoute;
 }) {
-  const { queryReference } = useLazyReference(
+  const { fragmentReference } = useLazyReference(
     iso(`entrypoint Query.PetDetailDeferredRoute`),
     { id: route.id },
   );
 
-  const Component = useResult(queryReference);
+  const Component = useResult(fragmentReference);
   return <Component />;
 }

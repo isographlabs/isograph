@@ -48,7 +48,7 @@ export function RepositoryRoute({
   route: RepositoryRouteType;
   setRoute: (route: Route) => void;
 }) {
-  const { queryReference } = useLazyReference(
+  const { fragmentReference } = useLazyReference(
     iso(`entrypoint Query.RepositoryPage`),
     {
       repositoryName: route.repositoryName,
@@ -56,6 +56,6 @@ export function RepositoryRoute({
       first: 20,
     },
   );
-  const Component = useResult(queryReference);
+  const Component = useResult(fragmentReference);
   return <Component route={route} setRoute={setRoute} />;
 }

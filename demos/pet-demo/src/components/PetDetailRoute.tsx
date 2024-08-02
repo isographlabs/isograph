@@ -57,11 +57,11 @@ export const PetDetailRouteInner = iso(`
 });
 
 export function PetDetailRouteLoader({ route }: { route: PetDetailRoute }) {
-  const { queryReference } = useLazyReference(
+  const { fragmentReference } = useLazyReference(
     iso(`entrypoint Query.PetDetailRoute`),
     { id: route.id },
   );
 
-  const Component = useResult(queryReference);
+  const Component = useResult(fragmentReference);
   return <Component />;
 }

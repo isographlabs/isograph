@@ -62,18 +62,18 @@ For example, the data might be fetched during render as follows:
 ```js
 function UserListPageRoute() {
   const queryVariables = {};
-  const { queryReference } = useLazyReference(
+  const { fragmentReference } = useLazyReference(
     iso(`entrypoint Query.UserList`),
     queryVariables,
   );
 
   const additionalRenderProps = {};
-  const Component = read(queryReference);
+  const Component = read(fragmentReference);
   return <Component {...additionalRenderProps} />;
 }
 ```
 
-> Note that the call to `read(queryReference)` will suspend if the required data is not present in the store, so make sure that either `UserListPageRoute` is wrapped in a `React.Suspense` boundary, or that the `queryReference` is only read in a child component that is wrapped in a suspense boundary.
+> Note that the call to `read(fragmentReference)` will suspend if the required data is not present in the store, so make sure that either `UserListPageRoute` is wrapped in a `React.Suspense` boundary, or that the `fragmentReference` is only read in a child component that is wrapped in a suspense boundary.
 
 Now, when `UserListPageRoute` is initially rendered, Isograph will make an API call.
 
@@ -109,7 +109,7 @@ export const UserDetailPage = iso(`
     <>
       <h1>Hello {data.name}</h1>
       <React.Suspense fallback="Loading credit card info">
-        <EntrypointReader queryReference={CreditCardInfo} />
+        <EntrypointReader fragmentReference={CreditCardInfo} />
       </React.Suspense>
     </>
   );

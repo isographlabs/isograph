@@ -26,11 +26,11 @@ export const HomeRoute = iso(`
 });
 
 export function HomeRouteLoader() {
-  const { queryReference } = useLazyReference(
+  const { fragmentReference } = useLazyReference(
     iso(`entrypoint Query.HomeRoute`),
     {},
   );
 
-  const Component = useResult(queryReference);
+  const Component = useResult(fragmentReference);
   return <Component />;
 }

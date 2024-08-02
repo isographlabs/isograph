@@ -12,7 +12,7 @@ export function useLazyReference<
   entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
   variables: Variables,
 ): {
-  queryReference: FragmentReference<TReadFromStore, TClientFieldValue>;
+  fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>;
 } {
   const environment = useIsographEnvironment();
   const cache = getOrCreateCacheForArtifact(environment, entrypoint, variables);
@@ -22,7 +22,7 @@ export function useLazyReference<
   const _data = useLazyDisposableState(cache).state;
 
   return {
-    queryReference: {
+    fragmentReference: {
       kind: 'FragmentReference',
       readerArtifact: entrypoint.readerArtifact,
       root: ROOT_ID,

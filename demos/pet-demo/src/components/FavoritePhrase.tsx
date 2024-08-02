@@ -8,19 +8,19 @@ export const FavoritePhraseLoader = iso(`
     id
   }
 `)((pet) => {
-  const { queryReference, loadQueryReference } = useImperativeReference(
+  const { fragmentReference, loadfragmentReference } = useImperativeReference(
     iso(`entrypoint Query.PetFavoritePhrase`),
   );
 
   return (
     <>
-      {queryReference == UNASSIGNED_STATE ? (
-        <button onClick={() => loadQueryReference({ id: pet.id })}>
+      {fragmentReference == UNASSIGNED_STATE ? (
+        <button onClick={() => loadfragmentReference({ id: pet.id })}>
           Reveal favorite phrase
         </button>
       ) : (
         <React.Suspense fallback="Loading favorite phrase...">
-          <EntrypointReader queryReference={queryReference} />
+          <EntrypointReader fragmentReference={fragmentReference} />
         </React.Suspense>
       )}
     </>

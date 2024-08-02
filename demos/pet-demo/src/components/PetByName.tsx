@@ -19,11 +19,11 @@ export const PetByNameRouteComponent = iso(`
 });
 
 export function PetByNameRouteLoader({ route }: { route: PetByNameRoute }) {
-  const { queryReference } = useLazyReference(
+  const { fragmentReference } = useLazyReference(
     iso(`entrypoint Query.PetByName`),
     { name: route.name },
   );
 
-  const Component = useResult(queryReference);
+  const Component = useResult(fragmentReference);
   return <Component />;
 }

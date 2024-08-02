@@ -9,20 +9,20 @@ export function EntrypointReader<
 >(
   props: TProps extends Record<string, never>
     ? {
-        queryReference: FragmentReference<
+        fragmentReference: FragmentReference<
           ExtractReadFromStore<TEntrypoint>,
           React.FC<TProps>
         >;
         additionalProps?: TProps;
       }
     : {
-        queryReference: FragmentReference<
+        fragmentReference: FragmentReference<
           ExtractReadFromStore<TEntrypoint>,
           React.FC<TProps>
         >;
         additionalProps: TProps;
       },
 ): React.ReactNode {
-  const Component = useResult(props.queryReference);
+  const Component = useResult(props.fragmentReference);
   return <Component {...props.additionalProps} />;
 }

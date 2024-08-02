@@ -47,12 +47,12 @@ const resolverDefinition = `
 import {iso} from '@iso';
 
 export default function PetListRoute() {
-  const {queryReference} = useLazyReference(
+  const {fragmentReference} = useLazyReference(
     iso(\`entrypoint Query.PetList\`),
     {}
   );
 
-  const PetList = useResult(queryReference);
+  const PetList = useResult(fragmentReference);
 
   return <PetList />;
 }

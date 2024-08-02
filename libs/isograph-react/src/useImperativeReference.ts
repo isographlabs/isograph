@@ -14,10 +14,10 @@ export function useImperativeReference<
 >(
   entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
 ): {
-  queryReference:
+  fragmentReference:
     | FragmentReference<TReadFromStore, TClientFieldValue>
     | UnassignedState;
-  loadQueryReference: (variables: Variables) => void;
+  loadfragmentReference: (variables: Variables) => void;
 } {
   const { state, setState } =
     useUpdatableDisposableState<
@@ -25,8 +25,8 @@ export function useImperativeReference<
     >();
   const environment = useIsographEnvironment();
   return {
-    queryReference: state,
-    loadQueryReference: (variables: Variables) => {
+    fragmentReference: state,
+    loadfragmentReference: (variables: Variables) => {
       const [_networkRequest, disposeNetworkRequest] = makeNetworkRequest(
         environment,
         entrypoint,

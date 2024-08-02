@@ -43,13 +43,13 @@ export function UserRoute({
   route: UserRouteType;
   setRoute: (route: Route) => void;
 }) {
-  const { queryReference } = useLazyReference(
+  const { fragmentReference } = useLazyReference(
     iso(`entrypoint Query.UserPage`),
     {
       userLogin: route.userLogin,
       first: 20,
     },
   );
-  const Component = useResult(queryReference);
+  const Component = useResult(fragmentReference);
   return <Component route={route} setRoute={setRoute} />;
 }

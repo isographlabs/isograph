@@ -10,8 +10,10 @@ field Pet.PetTaglineCard @component {
   tagline
 }
 `)(function PetTaglineCardComponent(pet) {
-  const { queryReference: mutationRef, loadQueryReference: loadMutation } =
-    useImperativeReference(iso(`entrypoint Mutation.SetTagline`));
+  const {
+    fragmentReference: mutationRef,
+    loadfragmentReference: loadMutation,
+  } = useImperativeReference(iso(`entrypoint Mutation.SetTagline`));
 
   return (
     <Card

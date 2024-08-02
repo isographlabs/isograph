@@ -19,14 +19,14 @@ You should also see [the quickstart guide](../../quickstart) for more one-time s
 
 In order to make a network request and read the results, the following occurs:
 
-- the developer calls ``const {queryReference} = useLazyReference(iso(`entrypoint Query.HomePage`));``. This will make the network request when that component renders.
+- the developer calls ``const {fragmentReference} = useLazyReference(iso(`entrypoint Query.HomePage`));``. This will make the network request when that component renders.
   - The babel plugin changes the `iso` entrypoint call to a `require` call that imports the generated `Query/HomePage/entrypoint.ts` file.
-- The developer calls `const HomePage = useResult(queryReference);`. This will attempt to read the `Query.HomePage` resolver. This may suspend. In particular, if there isn't enough data in the store to read all of the data required by the `HomePage` resolver, the call to `read` will suspend.
-  - It is a good practice to pass the `queryReference` to a child component, which is wrapped in a `<Suspense>` boundary. This isn't required for `useLazyReference` to work correctly, but it does eliminate some edge cases (namely, if the network response takes too long to come back), and does make refetching on error easier.
+- The developer calls `const HomePage = useResult(fragmentReference);`. This will attempt to read the `Query.HomePage` resolver. This may suspend. In particular, if there isn't enough data in the store to read all of the data required by the `HomePage` resolver, the call to `read` will suspend.
+  - It is a good practice to pass the `fragmentReference` to a child component, which is wrapped in a `<Suspense>` boundary. This isn't required for `useLazyReference` to work correctly, but it does eliminate some edge cases (namely, if the network response takes too long to come back), and does make refetching on error easier.
   - In the future, there will be other APIs, akin to Relay's `loadQuery` and `useQueryLoader`. These have not been implemented. The `@isograph/react-disposable-state` library contains their building blocks.
 - The network response completes, and the normalization AST (part of the `Query/HomePage/entrypoint.ts` file) is used to write the data to the [global store](#store).
 - The subscribe callback is triggered, causing the component tree to re-render.
-- On second render, the `read(queryReference)` call is re-evaluated. This time, there is enough data to read the fields required by `HomePage`, so the `HomePage` resolver function is called. Assuming it is a react component (i.e. the resolver was declared with `@component`), we can then render the component as follows: `<HomePage {...additionaProps} />`.
+- On second render, the `read(fragmentReference)` call is re-evaluated. This time, there is enough data to read the fields required by `HomePage`, so the `HomePage` resolver function is called. Assuming it is a react component (i.e. the resolver was declared with `@component`), we can then render the component as follows: `<HomePage {...additionaProps} />`.
 - When `<HomePage />` renders, it may itself have selected other components (e.g. `Header` or `Avatar`). The data for these was likely provided by initial network request, so they will not suspend, and the whole tree will render.
   - In the future, when Isograph supports `@defer` or `@stream`, child resolvers may suspend at this point. If data in the Isograph store changes, child resolvers may also suspend.
 
