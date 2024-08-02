@@ -129,7 +129,7 @@ export function makeNetworkRequest<T>(
     .networkFunction(artifact.queryText, variables)
     .then((networkResponse) => {
       if (typeof window !== 'undefined' && window.__LOG) {
-        console.log('network response', artifact, artifact);
+        console.log('network response', artifact, networkResponse);
       }
 
       if (status.kind === 'UndisposedIncomplete') {
