@@ -20,13 +20,6 @@ export {
   defaultMissingFieldHandler,
 } from './core/IsographEnvironment';
 export {
-  IsographEnvironmentProvider,
-  useIsographEnvironment,
-  type IsographEnvironmentProviderProps,
-} from './react/IsographEnvironmentProvider';
-export { useImperativeReference } from './react/useImperativeReference';
-export { EntrypointReader } from './react/EntrypointReader';
-export {
   EagerReaderArtifact,
   ComponentReaderArtifact,
   RefetchReaderArtifact,
@@ -49,9 +42,6 @@ export {
   RefetchQueryNormalizationArtifactWrapper,
 } from './core/entrypoint';
 export { readButDoNotEvaluate } from './core/read';
-export { useResult } from './react/useResult';
-export { type FragmentReference } from './core/FragmentReference';
-export { useLazyReference } from './react/useLazyReference';
 export {
   ExtractSecondParam,
   Argument,
@@ -59,5 +49,17 @@ export {
   ArgumentValue,
   Arguments,
 } from './core/util';
+export { type FragmentReference } from './core/FragmentReference';
+
+export {
+  IsographEnvironmentProvider,
+  useIsographEnvironment,
+  type IsographEnvironmentProviderProps,
+} from './react/IsographEnvironmentProvider';
+export { useImperativeReference } from './react/useImperativeReference';
+export { EntrypointReader } from './react/EntrypointReader';
+export { useResult } from './react/useResult';
+export { useLazyReference } from './react/useLazyReference';
 export { useRerenderOnChange } from './react/useRerenderOnChange';
+
 export { useClientSideDefer } from './loadable-hooks/useClientSideDefer';
