@@ -22,6 +22,9 @@ export function useLazyReference<
   const _data = useLazyDisposableState(cache).state;
 
   return {
+    queryReference: {
+      
+    }
     fragmentReference: {
       kind: 'FragmentReference',
       readerArtifact: entrypoint.readerArtifact,

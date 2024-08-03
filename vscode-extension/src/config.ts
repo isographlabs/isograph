@@ -1,4 +1,4 @@
-import { ConfigurationScope } from 'vscode';
+import { workspace, ConfigurationScope } from "vscode";
 
 export type Config = {
   rootDirectory: string | null;
@@ -7,9 +7,10 @@ export type Config = {
 };
 
 export function getConfig(scope?: ConfigurationScope): Config {
+  const configuration = workspace.getConfiguration("isograph", scope);
   return {
-    rootDirectory: '.',
-    pathToIsograph: null,
-    pathToConfig: null,
+    rootDirectory: configuration.rootDirectory,
+    pathToIsograph: configuration.pathToIsograph,
+    pathToConfig: configuration.pathToConfig,
   };
 }

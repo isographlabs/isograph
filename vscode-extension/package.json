@@ -25,7 +25,39 @@
   ],
   "contributes": {
     "commands": [],
-    "configuration": {},
+    "configuration": {
+      "type": "object",
+      "title": "Isograph",
+      "properties": {
+        "isograph.pathToIsograph": {
+          "scope": "workspace",
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Absolute path to the isograph binary. If not provided, the extension will look in the nearest node_modules directory"
+        },
+        "isograph.pathToConfig": {
+          "scope": "workspace",
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Path to a isograph config relative to the `rootDirectory`. Without this, the compiler will search for your config. This is helpful if your isograph project is in a nested directory."
+        },
+        "isograph.rootDirectory": {
+          "scope": "workspace",
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "A path relative to the root of your VSCode project for the extension to work from. The default value is the root of your project. This will change where we start looking for the isograph-compiler node module. This will also affect where the LSP server is started, therefore affecting how the isograph config is found. This is helpful if your project is in a nested directory."
+        }
+      }
+    },
     "jsonValidation": []
   },
   "scripts": {
