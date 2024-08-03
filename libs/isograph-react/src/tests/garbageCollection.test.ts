@@ -1,6 +1,12 @@
 import { describe, test, expect } from 'vitest';
-import { ROOT_ID, createIsographEnvironment } from '../IsographEnvironment';
-import { garbageCollectEnvironment, retainQuery } from '../garbageCollection';
+import {
+  ROOT_ID,
+  createIsographEnvironment,
+} from '../core/IsographEnvironment';
+import {
+  garbageCollectEnvironment,
+  retainQuery,
+} from '../core/garbageCollection';
 import { iso } from './__isograph/iso';
 import { nodeFieldRetainedQuery } from './nodeQuery';
 
