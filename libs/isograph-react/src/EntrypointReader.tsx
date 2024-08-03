@@ -11,7 +11,7 @@ export function EntrypointReader<
     ? {
         fragmentReference: FragmentReference<
           ExtractReadFromStore<TEntrypoint>,
-          React.FC<TProps>
+          React.FC<{}>
         >;
         additionalProps?: TProps;
       }
