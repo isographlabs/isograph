@@ -14,11 +14,7 @@ use structopt::StructOpt;
 #[tokio::main]
 async fn main() {
     let opt = Opt::from_args();
-    let command = opt.command.unwrap_or_else(|| {
-        Command::Compile(
-            opt.compile
-        )
-    });
+    let command = opt.command.unwrap_or_else(|| Command::Compile(opt.compile));
     match command {
         Command::Compile(compile_command) => {
             start_compiler(compile_command).await;

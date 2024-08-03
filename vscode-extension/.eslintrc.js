@@ -26,7 +26,7 @@ module.exports = {
         'no-use-before-define': 'off',
         '@typescript-eslint/no-use-before-define': [
           'error',
-          {functions: false},
+          { functions: false },
         ],
         'class-methods-use-this': 'off',
       },

@@ -1,8 +1,8 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as semver from 'semver';
-import {OutputChannel, window, workspace} from 'vscode';
-import {getConfig} from '../config';
+import { OutputChannel, window, workspace } from 'vscode';
+import { getConfig } from '../config';
 
 async function exists(file: string): Promise<boolean> {
   return fs
@@ -76,10 +76,10 @@ async function findIsographCompilerDirectory(
 }
 
 type IsographCompilerPackageInformation =
-  | {kind: 'compilerFound'; path: string; version: string}
-  | {kind: 'prereleaseCompilerFound'; path: string; version: string}
-  | {kind: 'architectureNotSupported'}
-  | {kind: 'packageNotFound'}
+  | { kind: 'compilerFound'; path: string; version: string }
+  | { kind: 'prereleaseCompilerFound'; path: string; version: string }
+  | { kind: 'architectureNotSupported' }
+  | { kind: 'packageNotFound' }
   | {
       kind: 'versionDidNotMatch';
       path: string;
@@ -90,18 +90,17 @@ type IsographCompilerPackageInformation =
 async function findIsographCompilerBinary(
   rootPath: string,
 ): Promise<IsographCompilerPackageInformation> {
-  const isographCompilerDirectory = await findIsographCompilerDirectory(
-    rootPath,
-  );
+  const isographCompilerDirectory =
+    await findIsographCompilerDirectory(rootPath);
 
   if (!isographCompilerDirectory) {
-    return {kind: 'packageNotFound'};
+    return { kind: 'packageNotFound' };
   }
 
   const isographBinaryRelativeToPackage = getBinaryPathRelativeToPackage();
 
   if (!isographBinaryRelativeToPackage) {
-    return {kind: 'architectureNotSupported'};
+    return { kind: 'architectureNotSupported' };
   }
 
   const packageManifest = JSON.parse(
@@ -177,7 +176,7 @@ export async function findIsographBinaryWithWarnings(
       "You've manually specified 'isograph.pathToBinary'. We cannot confirm this version of the Isograph Compiler is supported by this version of the extension. I hope you know what you're doing.",
     );
 
-    return {path: config.pathToIsograph};
+    return { path: config.pathToIsograph };
   }
   if (isographBinaryResult.kind === 'versionDidNotMatch') {
     window.showErrorMessage(

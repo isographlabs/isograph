@@ -1,18 +1,17 @@
-import {ExtensionContext, window, workspace} from 'vscode';
-import {getConfig} from './config';
-import {IsographExtensionContext} from './context';
-import {findIsographBinaryWithWarnings} from './utils/findIsographBinary';
+import { ExtensionContext, window, workspace } from 'vscode';
+import { getConfig } from './config';
+import { IsographExtensionContext } from './context';
+import { findIsographBinaryWithWarnings } from './utils/findIsographBinary';
 import path = require('path');
-import {createAndStartLanguageClient} from './languageClient';
+import { createAndStartLanguageClient } from './languageClient';
 
 let isographExtensionContext: IsographExtensionContext | null = null;
 
 export async function activate(extensionContext: ExtensionContext) {
   const config = getConfig();
 
-  isographExtensionContext = await buildIsographExtensionContext(
-    extensionContext,
-  );
+  isographExtensionContext =
+    await buildIsographExtensionContext(extensionContext);
 
   if (isographExtensionContext) {
     isographExtensionContext.primaryOutputChannel.appendLine(

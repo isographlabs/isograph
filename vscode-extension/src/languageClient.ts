@@ -2,11 +2,11 @@ import {
   LanguageClientOptions,
   RevealOutputChannelOn,
 } from 'vscode-languageclient';
-import {ServerOptions, LanguageClient} from 'vscode-languageclient/node';
-import {window} from 'vscode';
+import { ServerOptions, LanguageClient } from 'vscode-languageclient/node';
+import { window } from 'vscode';
 import * as path from 'path';
-import {getConfig} from './config';
-import {IsographExtensionContext} from './context';
+import { getConfig } from './config';
+import { IsographExtensionContext } from './context';
 
 export function createAndStartLanguageClient(
   context: IsographExtensionContext,
@@ -41,11 +41,11 @@ export function createAndStartLanguageClient(
       isTrusted: true,
     },
     documentSelector: [
-      {scheme: 'file', language: 'javascript'},
-      {scheme: 'file', language: 'typescript'},
-      {scheme: 'file', language: 'typescriptreact'},
-      {scheme: 'file', language: 'javascriptreact'},
-      {scheme: 'file', language: 'graphql'},
+      { scheme: 'file', language: 'javascript' },
+      { scheme: 'file', language: 'typescript' },
+      { scheme: 'file', language: 'typescriptreact' },
+      { scheme: 'file', language: 'javascriptreact' },
+      { scheme: 'file', language: 'graphql' },
     ],
 
     outputChannel: context.lspOutputChannel,
@@ -54,7 +54,7 @@ export function createAndStartLanguageClient(
     // in VSCode shows up a lot. This tells vscode not to show it in any case.
     revealOutputChannelOn: RevealOutputChannelOn.Never,
 
-    initializationFailedHandler: error => {
+    initializationFailedHandler: (error) => {
       context?.primaryOutputChannel.appendLine(
         `initializationFailedHandler ${error}`,
       );
