@@ -18,7 +18,6 @@ async fn main() {
     let command = opt.command.unwrap_or_else(|| {
         Command::Compile(
             opt.compile
-                .expect("Command not provided and compile options not set"),
         )
     });
     match command {
@@ -32,7 +31,11 @@ async fn main() {
 }
 
 async fn start_compiler(compile_command: CompileCommand) {
-    let config = create_config(compile_command.config.unwrap_or("./isograph.config.json".into()));
+    let config = create_config(
+        compile_command
+            .config
+            .unwrap_or("./isograph.config.json".into()),
+    );
 
     if compile_command.watch {
         match handle_watch_command(config).await {

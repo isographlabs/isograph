@@ -1,22 +1,21 @@
 use std::path::PathBuf;
-
 use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 pub struct Opt {
-    #[clap(subcommand)]
+    #[structopt(subcommand)]
     pub command: Option<Command>,
 
-    #[clap(flatten)]
-    pub compile: Option<CompileCommand>,
+    #[structopt(flatten)]
+    pub compile: CompileCommand,
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt )]
 pub enum Command {
     Compile(CompileCommand),
     LSP(LSPCommand),
 }
 /// Compile
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt )]
 pub(crate) struct CompileCommand {
     #[structopt(long)]
     pub watch: bool,
@@ -28,7 +27,7 @@ pub(crate) struct CompileCommand {
 }
 
 /// LSP
-#[derive(Debug, StructOpt)]
+#[derive(Debug, StructOpt )]
 pub(crate) struct LSPCommand {
     /// Compile using this config file. If not provided, searches for a config in
     /// package.json under the `isograph` key.
