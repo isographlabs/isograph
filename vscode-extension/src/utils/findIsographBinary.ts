@@ -46,7 +46,7 @@ async function findIsographCompilerDirectory(
   while (true) {
     if (counter >= 5000) {
       throw new Error(
-        'Could not find isograph-compiler directory after 5000 traversals. This is likely a bug in the extension code and should be reported to https://github.com/facebook/isograph/issues',
+        'Could not find isograph-compiler directory after 5000 traversals. This is likely a bug in the extension code and should be reported to https://github.com/isographlabs/isograph/issues',
       );
     }
 
