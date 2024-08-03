@@ -12,7 +12,7 @@ pub struct Opt {
 #[derive(Debug, StructOpt)]
 pub enum Command {
     Compile(CompileCommand),
-    LSP(LSPCommand),
+    Lsp(LspCommand),
 }
 /// Compile
 #[derive(Debug, StructOpt)]
@@ -28,7 +28,7 @@ pub(crate) struct CompileCommand {
 
 /// LSP
 #[derive(Debug, StructOpt)]
-pub(crate) struct LSPCommand {
+pub(crate) struct LspCommand {
     /// Compile using this config file. If not provided, searches for a config in
     /// package.json under the `isograph` key.
     #[structopt(long)]

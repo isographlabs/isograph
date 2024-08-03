@@ -36,7 +36,7 @@ pub async fn run(
     _params: InitializeParams,
 ) -> LSPProcessResult<()> {
     eprintln!("Running server loop");
-    while let Some(message) = connection.receiver.recv().ok() {
+    while let Ok(message) = connection.receiver.recv() {
         eprintln!("Received message: {:?}", message);
     }
 

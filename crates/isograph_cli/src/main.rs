@@ -7,19 +7,19 @@ use isograph_config::create_config;
 use isograph_lsp::lsp_process_error::LSPProcessError;
 use opt::Command;
 use opt::CompileCommand;
-use opt::LSPCommand;
+use opt::LspCommand;
 use opt::Opt;
 use structopt::StructOpt;
 
 #[tokio::main]
 async fn main() {
     let opt = Opt::from_args();
-    let command = opt.command.unwrap_or_else(|| Command::Compile(opt.compile));
+    let command = opt.command.unwrap_or(Command::Compile(opt.compile));
     match command {
         Command::Compile(compile_command) => {
             start_compiler(compile_command).await;
         }
-        Command::LSP(lsp_command) => {
+        Command::Lsp(lsp_command) => {
             start_language_server(lsp_command).await.unwrap();
         }
     }
@@ -60,7 +60,7 @@ async fn start_compiler(compile_command: CompileCommand) {
         std::process::exit(1);
     }
 }
-async fn start_language_server(lsp_command: LSPCommand) -> Result<(), LSPProcessError> {
+async fn start_language_server(lsp_command: LspCommand) -> Result<(), LSPProcessError> {
     let config = create_config(
         lsp_command
             .config
