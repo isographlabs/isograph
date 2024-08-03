@@ -1,9 +1,5 @@
-import {
-  Factory,
-  ItemCleanupPair,
-  ParentCache,
-} from '@isograph/react-disposable-state';
-import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
+import { Factory, ParentCache } from '@isograph/react-disposable-state';
+import { PromiseWrapper } from './PromiseWrapper';
 import {
   DataId,
   ROOT_ID,
@@ -14,18 +10,11 @@ import {
   getLink,
 } from './IsographEnvironment';
 import {
-  RetainedQuery,
-  garbageCollectEnvironment,
-  retainQuery,
-  unretainQuery,
-} from './garbageCollection';
-import {
   IsographEntrypoint,
   NormalizationAst,
   NormalizationInlineFragment,
   NormalizationLinkedField,
   NormalizationScalarField,
-  RefetchQueryNormalizationArtifact,
   RefetchQueryNormalizationArtifactWrapper,
 } from '../core/entrypoint';
 import { ReaderLinkedField, ReaderScalarField } from './reader';
@@ -33,6 +22,7 @@ import { Argument, ArgumentValue } from './util';
 import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
 import { FragmentReference, Variables } from './FragmentReference';
 import { areEqualObjectsWithDeepComparison } from './areEqualWithDeepComparison';
+import { makeNetworkRequest } from './makeNetworkRequest';
 
 const TYPENAME_FIELD_NAME = '__typename';
 
@@ -99,81 +89,6 @@ export function getOrCreateCacheForArtifact<
     cacheKey,
     factory,
   );
-}
-
-type NetworkRequestStatus =
-  | {
-      readonly kind: 'UndisposedIncomplete';
-    }
-  | {
-      readonly kind: 'Disposed';
-    }
-  | {
-      readonly kind: 'UndisposedComplete';
-      readonly retainedQuery: RetainedQuery;
-    };
-
-export function makeNetworkRequest<T>(
-  environment: IsographEnvironment,
-  artifact: RefetchQueryNormalizationArtifact | IsographEntrypoint<any, any>,
-  variables: Variables,
-): ItemCleanupPair<PromiseWrapper<T>> {
-  if (typeof window !== 'undefined' && window.__LOG) {
-    console.log('make network request', artifact, variables);
-  }
-  let status: NetworkRequestStatus = {
-    kind: 'UndisposedIncomplete',
-  };
-  // This should be an observable, not a promise
-  const promise = environment
-    .networkFunction(artifact.queryText, variables)
-    .then((networkResponse) => {
-      if (typeof window !== 'undefined' && window.__LOG) {
-        console.log('network response', artifact, networkResponse);
-      }
-
-      if (status.kind === 'UndisposedIncomplete') {
-        normalizeData(
-          environment,
-          artifact.normalizationAst,
-          networkResponse.data,
-          variables,
-          artifact.kind === 'Entrypoint' ? artifact.nestedRefetchQueries : [],
-        );
-        const retainedQuery = {
-          normalizationAst: artifact.normalizationAst,
-          variables,
-        };
-        status = {
-          kind: 'UndisposedComplete',
-          retainedQuery,
-        };
-        retainQuery(environment, retainedQuery);
-      }
-      // TODO return null
-      return networkResponse;
-    });
-
-  const wrapper = wrapPromise(promise);
-
-  const response: ItemCleanupPair<PromiseWrapper<T>> = [
-    wrapper,
-    () => {
-      if (status.kind === 'UndisposedComplete') {
-        const didUnretainSomeQuery = unretainQuery(
-          environment,
-          status.retainedQuery,
-        );
-        if (didUnretainSomeQuery) {
-          garbageCollectEnvironment(environment);
-        }
-      }
-      status = {
-        kind: 'Disposed',
-      };
-    },
-  ];
-  return response;
 }
 
 type NetworkResponseScalarValue = string | number | boolean;
