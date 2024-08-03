@@ -1,7 +1,10 @@
 import { iso } from '@iso';
 import React from 'react';
 import { UNASSIGNED_STATE } from '@isograph/react-disposable-state';
-import { EntrypointReader, useImperativeReference } from '@isograph/react';
+import {
+  FragmentReferenceReader,
+  useImperativeReference,
+} from '@isograph/react';
 
 export const FavoritePhraseLoader = iso(`
   field Pet.FavoritePhraseLoader @component {
@@ -20,7 +23,7 @@ export const FavoritePhraseLoader = iso(`
         </button>
       ) : (
         <React.Suspense fallback="Loading favorite phrase...">
-          <EntrypointReader fragmentReference={fragmentReference} />
+          <FragmentReferenceReader fragmentReference={fragmentReference} />
         </React.Suspense>
       )}
     </>

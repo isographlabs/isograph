@@ -109,7 +109,7 @@ export const UserDetailPage = iso(`
     <>
       <h1>Hello {data.name}</h1>
       <React.Suspense fallback="Loading credit card info">
-        <EntrypointReader fragmentReference={CreditCardInfo} />
+        <FragmentReferenceReader fragmentReference={CreditCardInfo} />
       </React.Suspense>
     </>
   );

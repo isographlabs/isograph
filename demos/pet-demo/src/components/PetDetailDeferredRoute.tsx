@@ -2,7 +2,7 @@ import React from 'react';
 import { iso } from '@iso';
 import { Container, Stack } from '@mui/material';
 import {
-  EntrypointReader,
+  FragmentReferenceReader,
   useClientSideDefer,
   useLazyReference,
   useResult,
@@ -47,7 +47,7 @@ export const PetDetailDeferredRouteInnerComponent = iso(`
       <React.Suspense fallback={<h2>Loading pet details...</h2>}>
         <Stack direction="row" spacing={4}>
           <Stack direction="column" spacing={4}>
-            <EntrypointReader fragmentReference={petCheckinsCard} />
+            <FragmentReferenceReader fragmentReference={petCheckinsCard} />
           </Stack>
         </Stack>
       </React.Suspense>

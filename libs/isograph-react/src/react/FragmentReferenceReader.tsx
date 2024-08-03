@@ -3,7 +3,7 @@ import { ExtractReadFromStore, IsographEntrypoint } from '../core/entrypoint';
 import { FragmentReference } from '../core/FragmentReference';
 import { useResult } from './useResult';
 
-export function EntrypointReader<
+export function FragmentReferenceReader<
   TProps extends Record<any, any>,
   TEntrypoint extends IsographEntrypoint<any, React.FC<TProps>>,
 >(

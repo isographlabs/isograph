@@ -57,7 +57,7 @@ export {
   type IsographEnvironmentProviderProps,
 } from './react/IsographEnvironmentProvider';
 export { useImperativeReference } from './react/useImperativeReference';
-export { EntrypointReader } from './react/EntrypointReader';
+export { FragmentReferenceReader } from './react/FragmentReferenceReader';
 export { useResult } from './react/useResult';
 export { useLazyReference } from './react/useLazyReference';
 export { useRerenderOnChange } from './react/useRerenderOnChange';
