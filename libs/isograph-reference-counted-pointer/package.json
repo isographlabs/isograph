@@ -12,7 +12,8 @@
     "compile-watch": "tsc -p tsconfig.pkg.json --watch",
     "test": "vitest run",
     "test-watch": "vitest watch",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "tsc": "tsc"
   },
   "dependencies": {
     "@isograph/disposable-types": "0.1.1",
