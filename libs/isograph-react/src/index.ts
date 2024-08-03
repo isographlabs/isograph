@@ -3,9 +3,9 @@ export {
   unretainQuery,
   type RetainedQuery,
   garbageCollectEnvironment,
-} from './garbageCollection';
-export { type PromiseWrapper } from './PromiseWrapper';
-export { makeNetworkRequest, subscribe, normalizeData } from './cache';
+} from './core/garbageCollection';
+export { type PromiseWrapper } from './core/PromiseWrapper';
+export { makeNetworkRequest, subscribe, normalizeData } from './core/cache';
 export {
   ROOT_ID,
   type DataId,
@@ -18,14 +18,14 @@ export {
   createIsographEnvironment,
   createIsographStore,
   defaultMissingFieldHandler,
-} from './IsographEnvironment';
+} from './core/IsographEnvironment';
 export {
   IsographEnvironmentProvider,
   useIsographEnvironment,
   type IsographEnvironmentProviderProps,
-} from './IsographEnvironmentProvider';
-export { useImperativeReference } from './useImperativeReference';
-export { EntrypointReader } from './EntrypointReader';
+} from './react/IsographEnvironmentProvider';
+export { useImperativeReference } from './react/useImperativeReference';
+export { EntrypointReader } from './react/EntrypointReader';
 export {
   EagerReaderArtifact,
   ComponentReaderArtifact,
@@ -37,7 +37,7 @@ export {
   ReaderScalarField,
   TopLevelReaderArtifact,
   LoadableField,
-} from './reader';
+} from './core/reader';
 export {
   NormalizationAst,
   NormalizationAstNode,
@@ -47,17 +47,17 @@ export {
   assertIsEntrypoint,
   RefetchQueryNormalizationArtifact,
   RefetchQueryNormalizationArtifactWrapper,
-} from './entrypoint';
-export { readButDoNotEvaluate } from './read';
-export { useResult } from './useResult';
-export { type FragmentReference } from './FragmentReference';
-export { useLazyReference } from './useLazyReference';
+} from './core/entrypoint';
+export { readButDoNotEvaluate } from './core/read';
+export { useResult } from './react/useResult';
+export { type FragmentReference } from './core/FragmentReference';
+export { useLazyReference } from './react/useLazyReference';
 export {
   ExtractSecondParam,
   Argument,
   ArgumentName,
   ArgumentValue,
   Arguments,
-} from './util';
-export { useRerenderOnChange } from './useRerenderOnChange';
+} from './core/util';
+export { useRerenderOnChange } from './react/useRerenderOnChange';
 export { useClientSideDefer } from './loadable-hooks/useClientSideDefer';

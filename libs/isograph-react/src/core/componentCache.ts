@@ -1,7 +1,7 @@
 import { stableCopy } from './cache';
 import { IsographEnvironment } from './IsographEnvironment';
 import { FragmentReference } from './FragmentReference';
-import { useReadAndSubscribe } from './useReadAndSubscribe';
+import { useReadAndSubscribe } from '../react/useReadAndSubscribe';
 
 export function getOrCreateCachedComponent(
   environment: IsographEnvironment,

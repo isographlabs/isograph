@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { ExtractReadFromStore, IsographEntrypoint } from './entrypoint';
-import { FragmentReference } from './FragmentReference';
+import { ExtractReadFromStore, IsographEntrypoint } from '../core/entrypoint';
+import { FragmentReference } from '../core/FragmentReference';
 import { useResult } from './useResult';
 
 export function EntrypointReader<

@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { ReactNode, createContext, useContext } from 'react';
-import { type IsographEnvironment } from './IsographEnvironment';
+import { type IsographEnvironment } from '../core/IsographEnvironment';
 
 export const IsographEnvironmentContext =
   createContext<IsographEnvironment | null>(null);

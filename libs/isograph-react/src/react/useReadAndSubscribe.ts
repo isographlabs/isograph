@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { FragmentReference } from './FragmentReference';
-import { IsographEnvironment } from './IsographEnvironment';
-import { readButDoNotEvaluate } from './read';
+import { FragmentReference } from '../core/FragmentReference';
+import { IsographEnvironment } from '../core/IsographEnvironment';
+import { readButDoNotEvaluate } from '../core/read';
 import { useRerenderOnChange } from './useRerenderOnChange';
 
 /**

@@ -1,5 +1,5 @@
 import { DataId } from './IsographEnvironment';
-import { RefetchQueryNormalizationArtifactWrapper } from './entrypoint';
+import { RefetchQueryNormalizationArtifactWrapper } from '../core/entrypoint';
 import { TopLevelReaderArtifact } from './reader';
 
 // TODO type this better

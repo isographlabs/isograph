@@ -27,7 +27,7 @@ import {
   NormalizationScalarField,
   RefetchQueryNormalizationArtifact,
   RefetchQueryNormalizationArtifactWrapper,
-} from './entrypoint';
+} from '../core/entrypoint';
 import { ReaderLinkedField, ReaderScalarField } from './reader';
 import { Argument, ArgumentValue } from './util';
 import { WithEncounteredRecords, readButDoNotEvaluate } from './read';

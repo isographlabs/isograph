@@ -1,6 +1,6 @@
-import { useIsographEnvironment } from './IsographEnvironmentProvider';
-import { FragmentReference } from './FragmentReference';
-import { getOrCreateCachedComponent } from './componentCache';
+import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
+import { FragmentReference } from '../core/FragmentReference';
+import { getOrCreateCachedComponent } from '../core/componentCache';
 import { useReadAndSubscribe } from './useReadAndSubscribe';
 
 export function useResult<TReadFromStore extends Object, TClientFieldValue>(

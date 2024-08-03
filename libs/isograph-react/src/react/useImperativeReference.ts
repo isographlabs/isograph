@@ -2,11 +2,11 @@ import {
   UnassignedState,
   useUpdatableDisposableState,
 } from '@isograph/react-disposable-state';
-import { IsographEntrypoint } from './entrypoint';
-import { FragmentReference, Variables } from './FragmentReference';
+import { IsographEntrypoint } from '../core/entrypoint';
+import { FragmentReference, Variables } from '../core/FragmentReference';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
-import { makeNetworkRequest } from './cache';
-import { ROOT_ID } from './IsographEnvironment';
+import { makeNetworkRequest } from '../core/cache';
+import { ROOT_ID } from '../core/IsographEnvironment';
 
 export function useImperativeReference<
   TReadFromStore extends Object,

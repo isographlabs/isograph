@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
-import { IsographEnvironment } from './IsographEnvironment';
-import { subscribe } from './cache';
-import { WithEncounteredRecords } from './read';
-import { FragmentReference } from './FragmentReference';
+import { IsographEnvironment } from '../core/IsographEnvironment';
+import { subscribe } from '../core/cache';
+import { WithEncounteredRecords } from '../core/read';
+import { FragmentReference } from '../core/FragmentReference';
 
 // TODO add unit tests for this. Add integration tests that test
 // behavior when the encounteredRecords underneath a fragment change.

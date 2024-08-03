@@ -1,8 +1,8 @@
-import { FragmentReference } from '../FragmentReference';
-import { useIsographEnvironment } from '../IsographEnvironmentProvider';
-import { getOrCreateCache } from '../cache';
+import { FragmentReference } from '../core/FragmentReference';
+import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
+import { getOrCreateCache } from '../core/cache';
 import { useLazyDisposableState } from '@isograph/react-disposable-state';
-import { LoadableField } from '../reader';
+import { LoadableField } from '../core/reader';
 
 export function useClientSideDefer<TResult>(
   loadableField: LoadableField<void, TResult>,

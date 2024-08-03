@@ -1,8 +1,8 @@
-import { FragmentReference, Variables } from './FragmentReference';
+import { FragmentReference, Variables } from '../core/FragmentReference';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
-import { ROOT_ID } from './IsographEnvironment';
-import { IsographEntrypoint } from './entrypoint';
-import { getOrCreateCacheForArtifact } from './cache';
+import { ROOT_ID } from '../core/IsographEnvironment';
+import { IsographEntrypoint } from '../core/entrypoint';
+import { getOrCreateCacheForArtifact } from '../core/cache';
 import { useLazyDisposableState } from '@isograph/react-disposable-state';
 
 export function useLazyReference<
