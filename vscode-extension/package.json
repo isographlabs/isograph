@@ -1,6 +1,6 @@
 {
   "name": "isograph",
-  "displayName": "Isograph GraphQL",
+  "displayName": "Isograph",
   "version": "0.0.4",
   "description": "Isograph-powered IDE experience",
   "repository": {
@@ -15,12 +15,10 @@
     "Programming Languages"
   ],
   "activationEvents": [
-    "onLanguage:plaintext",
     "onLanguage:javascript",
     "onLanguage:javascriptreact",
     "onLanguage:typescript",
-    "onLanguage:typescriptreact",
-    "onLanguage:graphql"
+    "onLanguage:typescriptreact"
   ],
   "extensionDependencies": [
     "GraphQL.vscode-graphql-syntax"
@@ -30,15 +28,8 @@
     "configuration": {},
     "jsonValidation": []
   },
-  "prettier": {
-    "arrowParens": "avoid",
-    "bracketSameLine": true,
-    "bracketSpacing": false,
-    "singleQuote": true,
-    "trailingComma": "all"
-  },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc",
     "prettier-check": "prettier -c .",
     "prettier-write": "prettier --write .",
     "lint": "eslint --max-warnings 0 .",
