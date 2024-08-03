@@ -1,4 +1,4 @@
-import { getParentRecordKey, makeNetworkRequest, onNextChange } from './cache';
+import { getParentRecordKey, onNextChange } from './cache';
 import { getOrCreateCachedComponent } from './componentCache';
 import { RefetchQueryNormalizationArtifactWrapper } from './entrypoint';
 import { FragmentReference, Variables } from './FragmentReference';
@@ -8,6 +8,7 @@ import {
   defaultMissingFieldHandler,
   IsographEnvironment,
 } from './IsographEnvironment';
+import { makeNetworkRequest } from './makeNetworkRequest';
 import { ReaderAst } from './reader';
 import { Arguments } from './util';
 

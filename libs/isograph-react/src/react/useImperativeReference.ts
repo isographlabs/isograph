@@ -5,8 +5,8 @@ import {
 import { IsographEntrypoint } from '../core/entrypoint';
 import { FragmentReference, Variables } from '../core/FragmentReference';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
-import { makeNetworkRequest } from '../core/cache';
 import { ROOT_ID } from '../core/IsographEnvironment';
+import { makeNetworkRequest } from '../core/makeNetworkRequest';
 
 export function useImperativeReference<
   TReadFromStore extends Object,
