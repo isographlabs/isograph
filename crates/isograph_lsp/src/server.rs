@@ -1,24 +1,11 @@
 use crate::lsp_process_error::LSPProcessResult;
-use crossbeam::channel::Receiver;
-use crossbeam::select;
 use isograph_config::CompilerConfig as Config;
-use log::debug;
 use lsp_server::Connection;
-use lsp_server::Message;
-use lsp_types::request::Request;
-use lsp_types::CodeActionProviderCapability;
-use lsp_types::CompletionOptions;
-use lsp_types::HoverProviderCapability;
-use lsp_types::InitializeParams;
-use lsp_types::SemanticTokensFullOptions;
-use lsp_types::SemanticTokensLegend;
-use lsp_types::SemanticTokensOptions;
-use lsp_types::SemanticTokensServerCapabilities;
-use lsp_types::ServerCapabilities;
-use lsp_types::TextDocumentSyncCapability;
-use lsp_types::TextDocumentSyncKind;
-use lsp_types::WorkDoneProgressOptions;
-use std::sync::Arc;
+use lsp_types::{
+    InitializeParams, SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
+    SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentSyncCapability,
+    TextDocumentSyncKind, WorkDoneProgressOptions,
+};
 
 /// Initializes an LSP connection, handling the `initialize` message and `initialized` notification
 /// handshake.
@@ -45,7 +32,7 @@ pub fn initialize(connection: &Connection) -> LSPProcessResult<InitializeParams>
 /// Run the main server loop
 pub async fn run(
     connection: Connection,
-    mut config: Config,
+    _config: Config,
     _params: InitializeParams,
 ) -> LSPProcessResult<()> {
     eprintln!("Running server loop");
