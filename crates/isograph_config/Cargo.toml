@@ -10,4 +10,3 @@ serde = "1.0.190"
 serde_json = "1.0.108"
 colorize = "0.1.0"
 common_lang_types = { path = "../common_lang_types" }
-
