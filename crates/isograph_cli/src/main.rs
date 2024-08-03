@@ -4,15 +4,35 @@ use colored::Colorize;
 use isograph_compiler::compile_and_print;
 use isograph_compiler::handle_watch_command;
 use isograph_config::create_config;
-use opt::CliOptions;
+use isograph_lsp::lsp_process_error::LSPProcessError;
+use opt::Command;
+use opt::CompileCommand;
+use opt::LSPCommand;
+use opt::Opt;
 use structopt::StructOpt;
 
 #[tokio::main]
 async fn main() {
-    let opt = CliOptions::from_args();
-    let config = create_config(opt.config.unwrap_or("./isograph.config.json".into()));
+    let opt = Opt::from_args();
+    let command = opt.command.unwrap_or_else(|| Command::Compile(opt.compile));
+    match command {
+        Command::Compile(compile_command) => {
+            start_compiler(compile_command).await;
+        }
+        Command::LSP(lsp_command) => {
+            start_language_server(lsp_command).await.unwrap();
+        }
+    }
+}
 
-    if opt.watch {
+async fn start_compiler(compile_command: CompileCommand) {
+    let config = create_config(
+        compile_command
+            .config
+            .unwrap_or("./isograph.config.json".into()),
+    );
+
+    if compile_command.watch {
         match handle_watch_command(config).await {
             Ok(res) => match res {
                 Ok(_) => {
@@ -39,4 +59,14 @@ async fn main() {
     } else if compile_and_print(&config).is_err() {
         std::process::exit(1);
     }
+}
+async fn start_language_server(lsp_command: LSPCommand) -> Result<(), LSPProcessError> {
+    let config = create_config(
+        lsp_command
+            .config
+            .unwrap_or("./isograph.config.json".into()),
+    );
+    eprintln!("Starting language server");
+    isograph_lsp::start_language_server(config).await?;
+    Ok(())
 }
