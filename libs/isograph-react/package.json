@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test-watch": "vitest watch",
     "coverage": "vitest run --coverage",
-    "prepack": "yarn run test && yarn run compile"
+    "prepack": "yarn run test && yarn run compile",
+    "tsc": "tsc"
   },
   "dependencies": {
     "@isograph/disposable-types": "0.1.1",
