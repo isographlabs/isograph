@@ -5,7 +5,6 @@ use isograph_compiler::compile_and_print;
 use isograph_compiler::handle_watch_command;
 use isograph_config::create_config;
 use isograph_lsp::lsp_process_error::LSPProcessError;
-use isograph_lsp::server;
 use opt::Command;
 use opt::CompileCommand;
 use opt::LSPCommand;
