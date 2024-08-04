@@ -1,8 +1,13 @@
 import React from 'react';
 import { iso } from '@iso';
 import { Container, Stack } from '@mui/material';
-import { useLazyReference, useResult } from '@isograph/react';
-import { PetDetailRoute, useNavigateTo } from './routes';
+import {
+  FragmentReader,
+  NetworkErrorReader,
+  useLazyReference,
+} from '@isograph/react';
+import { FullPageLoading, PetDetailRoute, useNavigateTo } from './routes';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export const PetDetailRouteComponent = iso(`
   field Query.PetDetailRoute($id: ID!) @component {
@@ -57,11 +62,18 @@ export const PetDetailRouteInner = iso(`
 });
 
 export function PetDetailRouteLoader({ route }: { route: PetDetailRoute }) {
-  const { fragmentReference } = useLazyReference(
+  const { fragmentReference, networkRequestReference } = useLazyReference(
     iso(`entrypoint Query.PetDetailRoute`),
     { id: route.id },
   );
 
-  const Component = useResult(fragmentReference);
-  return <Component />;
+  return (
+    <ErrorBoundary>
+      <React.Suspense fallback={<FullPageLoading />}>
+        <NetworkErrorReader networkRequestReference={networkRequestReference}>
+          <FragmentReader fragmentReference={fragmentReference} />
+        </NetworkErrorReader>
+      </React.Suspense>
+    </ErrorBoundary>
+  );
 }

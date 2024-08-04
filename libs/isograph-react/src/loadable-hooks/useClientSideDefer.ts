@@ -13,10 +13,10 @@ export function useClientSideDefer<TArgs, TResult>(
   args: TArgs,
 ): FragmentReference<any, TResult>;
 
-// TODO allow the user to pass props somehow
 export function useClientSideDefer<TArgs, TResult>(
   loadableField: LoadableField<TArgs, TResult>,
   args?: TArgs,
+  // TODO this should return { fragmentReference, networkRequestReference }
 ): FragmentReference<any, TResult> {
   // @ts-expect-error args is missing iff it has the type void
   const [id, loader] = loadableField(args);

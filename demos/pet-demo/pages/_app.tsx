@@ -17,7 +17,17 @@ function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ query: queryText, variables }),
-  }).then((response) => response.json());
+  }).then(async (response) => {
+    const json = await response.json();
+
+    if (response.ok) {
+      return json;
+    } else {
+      throw new Error('NetworkError', {
+        cause: json,
+      });
+    }
+  });
   return promise;
 }
 const missingFieldHandler = (

@@ -1,29 +1,26 @@
 import { iso } from '@iso';
 import React from 'react';
 import { UNASSIGNED_STATE } from '@isograph/react-disposable-state';
-import {
-  FragmentReferenceReader,
-  useImperativeReference,
-} from '@isograph/react';
+import { FragmentReader, useImperativeReference } from '@isograph/react';
 
 export const FavoritePhraseLoader = iso(`
   field Pet.FavoritePhraseLoader @component {
     id
   }
 `)((pet) => {
-  const { fragmentReference, loadfragmentReference } = useImperativeReference(
+  const { fragmentReference, loadFragmentReference } = useImperativeReference(
     iso(`entrypoint Query.PetFavoritePhrase`),
   );
 
   return (
     <>
       {fragmentReference == UNASSIGNED_STATE ? (
-        <button onClick={() => loadfragmentReference({ id: pet.id })}>
+        <button onClick={() => loadFragmentReference({ id: pet.id })}>
           Reveal favorite phrase
         </button>
       ) : (
         <React.Suspense fallback="Loading favorite phrase...">
-          <FragmentReferenceReader fragmentReference={fragmentReference} />
+          <FragmentReader fragmentReference={fragmentReference} />
         </React.Suspense>
       )}
     </>

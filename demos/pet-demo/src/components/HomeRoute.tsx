@@ -1,7 +1,13 @@
 import React from 'react';
 import { iso } from '@iso';
 import { Container, Stack } from '@mui/material';
-import { useLazyReference, useResult } from '@isograph/react';
+import {
+  FragmentReader,
+  NetworkErrorReader,
+  useLazyReference,
+} from '@isograph/react';
+import { FullPageLoading } from './routes';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export const HomeRoute = iso(`
   field Query.HomeRoute @component {
@@ -26,11 +32,18 @@ export const HomeRoute = iso(`
 });
 
 export function HomeRouteLoader() {
-  const { fragmentReference } = useLazyReference(
+  const { fragmentReference, networkRequestReference } = useLazyReference(
     iso(`entrypoint Query.HomeRoute`),
     {},
   );
 
-  const Component = useResult(fragmentReference);
-  return <Component />;
+  return (
+    <ErrorBoundary>
+      <React.Suspense fallback={<FullPageLoading />}>
+        <NetworkErrorReader networkRequestReference={networkRequestReference}>
+          <FragmentReader fragmentReference={fragmentReference} />
+        </NetworkErrorReader>
+      </React.Suspense>
+    </ErrorBoundary>
+  );
 }

@@ -1,5 +1,5 @@
 import { Factory, ParentCache } from '@isograph/react-disposable-state';
-import { PromiseWrapper } from './PromiseWrapper';
+import { AnyError, PromiseWrapper } from './PromiseWrapper';
 import {
   DataId,
   ROOT_ID,
@@ -80,15 +80,10 @@ export function getOrCreateCacheForArtifact<
   environment: IsographEnvironment,
   artifact: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
   variables: Variables,
-): ParentCache<PromiseWrapper<TClientFieldValue>> {
+): ParentCache<PromiseWrapper<void, AnyError>> {
   const cacheKey = artifact.queryText + JSON.stringify(stableCopy(variables));
-  const factory: Factory<PromiseWrapper<TClientFieldValue>> = () =>
-    makeNetworkRequest<TClientFieldValue>(environment, artifact, variables);
-  return getOrCreateCache<PromiseWrapper<TClientFieldValue>>(
-    environment,
-    cacheKey,
-    factory,
-  );
+  const factory = () => makeNetworkRequest(environment, artifact, variables);
+  return getOrCreateCache(environment, cacheKey, factory);
 }
 
 type NetworkResponseScalarValue = string | number | boolean;

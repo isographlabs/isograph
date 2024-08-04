@@ -11,14 +11,14 @@ import {
   unretainQuery,
 } from './garbageCollection';
 import { IsographEnvironment } from './IsographEnvironment';
-import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
+import { AnyError, PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { normalizeData } from './cache';
 
-export function makeNetworkRequest<T>(
+export function makeNetworkRequest(
   environment: IsographEnvironment,
   artifact: RefetchQueryNormalizationArtifact | IsographEntrypoint<any, any>,
   variables: Variables,
-): ItemCleanupPair<PromiseWrapper<T>> {
+): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
   if (typeof window !== 'undefined' && window.__LOG) {
     console.log('make network request', artifact, variables);
   }
@@ -51,13 +51,11 @@ export function makeNetworkRequest<T>(
         };
         retainQuery(environment, retainedQuery);
       }
-      // TODO return null
-      return networkResponse;
     });
 
   const wrapper = wrapPromise(promise);
 
-  const response: ItemCleanupPair<PromiseWrapper<T>> = [
+  const response: ItemCleanupPair<PromiseWrapper<void, AnyError>> = [
     wrapper,
     () => {
       if (status.kind === 'UndisposedComplete') {

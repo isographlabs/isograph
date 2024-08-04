@@ -12,7 +12,7 @@ field Pet.PetTaglineCard @component {
 `)(function PetTaglineCardComponent(pet) {
   const {
     fragmentReference: mutationRef,
-    loadfragmentReference: loadMutation,
+    loadFragmentReference: loadMutation,
   } = useImperativeReference(iso(`entrypoint Mutation.SetTagline`));
 
   return (

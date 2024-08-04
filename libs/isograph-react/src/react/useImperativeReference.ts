@@ -17,7 +17,7 @@ export function useImperativeReference<
   fragmentReference:
     | FragmentReference<TReadFromStore, TClientFieldValue>
     | UnassignedState;
-  loadfragmentReference: (variables: Variables) => void;
+  loadFragmentReference: (variables: Variables) => void;
 } {
   const { state, setState } =
     useUpdatableDisposableState<
@@ -26,7 +26,7 @@ export function useImperativeReference<
   const environment = useIsographEnvironment();
   return {
     fragmentReference: state,
-    loadfragmentReference: (variables: Variables) => {
+    loadFragmentReference: (variables: Variables) => {
       const [_networkRequest, disposeNetworkRequest] = makeNetworkRequest(
         environment,
         entrypoint,

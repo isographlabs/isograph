@@ -2,12 +2,17 @@ import React from 'react';
 import { iso } from '@iso';
 import { Container, Stack } from '@mui/material';
 import {
-  FragmentReferenceReader,
+  FragmentReader,
+  NetworkErrorReader,
   useClientSideDefer,
   useLazyReference,
-  useResult,
 } from '@isograph/react';
-import { PetDetailDeferredRoute, useNavigateTo } from './routes';
+import {
+  FullPageLoading,
+  PetDetailDeferredRoute,
+  useNavigateTo,
+} from './routes';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export const PetDetailDeferredRouteComponent = iso(`
   field Query.PetDetailDeferredRoute($id: ID!) @component {
@@ -47,7 +52,7 @@ export const PetDetailDeferredRouteInnerComponent = iso(`
       <React.Suspense fallback={<h2>Loading pet details...</h2>}>
         <Stack direction="row" spacing={4}>
           <Stack direction="column" spacing={4}>
-            <FragmentReferenceReader fragmentReference={petCheckinsCard} />
+            <FragmentReader fragmentReference={petCheckinsCard} />
           </Stack>
         </Stack>
       </React.Suspense>
@@ -60,11 +65,18 @@ export function PetDetailDeferredRouteLoader({
 }: {
   route: PetDetailDeferredRoute;
 }) {
-  const { fragmentReference } = useLazyReference(
+  const { fragmentReference, networkRequestReference } = useLazyReference(
     iso(`entrypoint Query.PetDetailDeferredRoute`),
     { id: route.id },
   );
 
-  const Component = useResult(fragmentReference);
-  return <Component />;
+  return (
+    <ErrorBoundary>
+      <React.Suspense fallback={<FullPageLoading />}>
+        <NetworkErrorReader networkRequestReference={networkRequestReference}>
+          <FragmentReader fragmentReference={fragmentReference} />
+        </NetworkErrorReader>
+      </React.Suspense>
+    </ErrorBoundary>
+  );
 }

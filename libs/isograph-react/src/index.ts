@@ -4,7 +4,11 @@ export {
   type RetainedQuery,
   garbageCollectEnvironment,
 } from './core/garbageCollection';
-export { type PromiseWrapper } from './core/PromiseWrapper';
+export {
+  type PromiseWrapper,
+  readPromise,
+  getPromiseState,
+} from './core/PromiseWrapper';
 export { subscribe, normalizeData } from './core/cache';
 export { makeNetworkRequest } from './core/makeNetworkRequest';
 export {
@@ -21,36 +25,43 @@ export {
   defaultMissingFieldHandler,
 } from './core/IsographEnvironment';
 export {
-  EagerReaderArtifact,
-  ComponentReaderArtifact,
-  RefetchReaderArtifact,
-  ReaderAst,
-  ReaderAstNode,
-  ReaderLinkedField,
-  ReaderNonLoadableResolverField,
-  ReaderScalarField,
-  TopLevelReaderArtifact,
-  LoadableField,
+  type EagerReaderArtifact,
+  type ComponentReaderArtifact,
+  type RefetchReaderArtifact,
+  type ReaderAst,
+  type ReaderAstNode,
+  type ReaderLinkedField,
+  type ReaderNonLoadableResolverField,
+  type ReaderScalarField,
+  type TopLevelReaderArtifact,
+  type LoadableField,
 } from './core/reader';
 export {
-  NormalizationAst,
-  NormalizationAstNode,
-  NormalizationLinkedField,
-  NormalizationScalarField,
-  IsographEntrypoint,
+  type NormalizationAst,
+  type NormalizationAstNode,
+  type NormalizationLinkedField,
+  type NormalizationScalarField,
+  type IsographEntrypoint,
   assertIsEntrypoint,
-  RefetchQueryNormalizationArtifact,
-  RefetchQueryNormalizationArtifactWrapper,
+  type RefetchQueryNormalizationArtifact,
+  type RefetchQueryNormalizationArtifactWrapper,
+  type ExtractProps,
+  type ExtractReadFromStore,
+  type ExtractResolverResult,
 } from './core/entrypoint';
 export { readButDoNotEvaluate } from './core/read';
 export {
-  ExtractSecondParam,
-  Argument,
-  ArgumentName,
-  ArgumentValue,
-  Arguments,
+  type ExtractSecondParam,
+  type Argument,
+  type ArgumentName,
+  type ArgumentValue,
+  type Arguments,
 } from './core/util';
-export { type FragmentReference } from './core/FragmentReference';
+export {
+  type FragmentReference,
+  type Variables,
+} from './core/FragmentReference';
+export { type NetworkRequestReference } from './core/NetworkRequestReference';
 
 export {
   IsographEnvironmentProvider,
@@ -58,7 +69,11 @@ export {
   type IsographEnvironmentProviderProps,
 } from './react/IsographEnvironmentProvider';
 export { useImperativeReference } from './react/useImperativeReference';
-export { FragmentReferenceReader } from './react/FragmentReferenceReader';
+export { FragmentReader } from './react/FragmentReader';
+export {
+  NetworkRequestReader,
+  NetworkErrorReader,
+} from './react/NetworkRequestReader';
 export { useResult } from './react/useResult';
 export { useLazyReference } from './react/useLazyReference';
 export { useRerenderOnChange } from './react/useRerenderOnChange';
