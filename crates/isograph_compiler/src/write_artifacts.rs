@@ -60,12 +60,24 @@ pub(crate) fn write_to_disk(
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, Error)]
 pub enum GenerateArtifactsError {
-    #[error("Unable to write to artifact file at path {path:?}.\nReason: {message:?}")]
+    #[error(
+        "Unable to write to artifact file at path {path:?}. \
+        Is there another instance of the Isograph compiler running?\
+        \nReason: {message:?}"
+    )]
     UnableToWriteToArtifactFile { path: PathBuf, message: io::Error },
 
-    #[error("Unable to create directory at path {path:?}.\nReason: {message:?}")]
+    #[error(
+        "Unable to create directory at path {path:?}. \
+        Is there another instance of the Isograph compiler running?\
+        \nReason: {message:?}"
+    )]
     UnableToCreateDirectory { path: PathBuf, message: io::Error },
 
-    #[error("Unable to delete directory at path {path:?}.\nReason: {message:?}")]
+    #[error(
+        "Unable to delete directory at path {path:?}. \
+        Is there another instance of the Isograph compiler running?\
+        \nReason: {message:?}"
+    )]
     UnableToDeleteDirectory { path: PathBuf, message: io::Error },
 }
