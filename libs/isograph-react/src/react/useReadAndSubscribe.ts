@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { FragmentReference } from '../core/FragmentReference';
 import { IsographEnvironment } from '../core/IsographEnvironment';
-import { readButDoNotEvaluate } from '../core/read';
+import {
+  NetworkRequestReaderOptions,
+  readButDoNotEvaluate,
+} from '../core/read';
 import { useRerenderOnChange } from './useRerenderOnChange';
 
 /**
@@ -11,9 +14,10 @@ import { useRerenderOnChange } from './useRerenderOnChange';
 export function useReadAndSubscribe<TReadFromStore extends Object>(
   environment: IsographEnvironment,
   fragmentReference: FragmentReference<TReadFromStore, any>,
+  networkRequestOptions: NetworkRequestReaderOptions,
 ): TReadFromStore {
   const [readOutDataAndRecords, setReadOutDataAndRecords] = useState(() =>
-    readButDoNotEvaluate(environment, fragmentReference),
+    readButDoNotEvaluate(environment, fragmentReference, networkRequestOptions),
   );
   useRerenderOnChange(
     environment,

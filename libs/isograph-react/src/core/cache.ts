@@ -178,64 +178,92 @@ export function onNextChange(environment: IsographEnvironment): Promise<void> {
   });
 }
 
+// Calls to readButDoNotEvaluate can suspend (i.e. throw a promise).
+// Maybe in the future, they will be able to throw errors.
+//
+// That's probably okay to ignore. We don't, however, want to prevent
+// updating other subscriptions if one subscription had missing data.
+function withErrorHandling<T>(f: (t: T) => void): (t: T) => void {
+  return (t) => {
+    try {
+      return f(t);
+    } catch {}
+  };
+}
+
 function callSubscriptions(
   environment: IsographEnvironment,
   recordsEncounteredWhenNormalizing: Set<DataId>,
 ) {
-  environment.subscriptions.forEach((subscription) => {
-    switch (subscription.kind) {
-      case 'FragmentSubscription': {
-        // TODO if there are multiple components subscribed to the same
-        // fragment, we will call readButNotEvaluate multiple times. We
-        // should fix that.
-        if (
-          hasOverlappingIds(
-            recordsEncounteredWhenNormalizing,
-            subscription.encounteredDataAndRecords.encounteredRecords,
-          )
-        ) {
-          const newEncounteredDataAndRecords = readButDoNotEvaluate(
-            environment,
-            subscription.fragmentReference,
-          );
-
+  environment.subscriptions.forEach(
+    withErrorHandling((subscription) => {
+      switch (subscription.kind) {
+        case 'FragmentSubscription': {
+          // TODO if there are multiple components subscribed to the same
+          // fragment, we will call readButNotEvaluate multiple times. We
+          // should fix that.
           if (
-            !areEqualObjectsWithDeepComparison(
-              subscription.encounteredDataAndRecords.item,
-              newEncounteredDataAndRecords.item,
+            hasOverlappingIds(
+              recordsEncounteredWhenNormalizing,
+              subscription.encounteredDataAndRecords.encounteredRecords,
             )
           ) {
-            if (typeof window !== 'undefined' && window.__LOG) {
-              console.log('Deep equality - No', {
-                fragmentReference: subscription.fragmentReference,
-                old: subscription.encounteredDataAndRecords.item,
-                new: newEncounteredDataAndRecords.item,
-              });
-            }
-            // TODO deep compare values
-            subscription.callback(newEncounteredDataAndRecords);
-          } else {
-            if (typeof window !== 'undefined' && window.__LOG) {
-              console.log('Deep equality - Yes', {
-                fragmentReference: subscription.fragmentReference,
-                old: subscription.encounteredDataAndRecords.item,
-              });
+            const newEncounteredDataAndRecords = readButDoNotEvaluate(
+              environment,
+              subscription.fragmentReference,
+              // Is this wrong?
+              // Reasons to think no:
+              // - we are only updating the read-out value, and the network
+              //   options only affect whether we throw.
+              // - the component will re-render, and re-throw on its own, anyway.
+              //
+              // Reasons to think not:
+              // - it seems more efficient to suspend here and not update state,
+              //   if we expect that the component will just throw anyway
+              // - consistency
+              // - it's also weird, this is called from makeNetworkRequest, where
+              //   we don't currently pass network request options
+              {},
+            );
+
+            if (
+              !areEqualObjectsWithDeepComparison(
+                subscription.encounteredDataAndRecords.item,
+                newEncounteredDataAndRecords.item,
+              )
+            ) {
+              if (typeof window !== 'undefined' && window.__LOG) {
+                console.log('Deep equality - No', {
+                  fragmentReference: subscription.fragmentReference,
+                  old: subscription.encounteredDataAndRecords.item,
+                  new: newEncounteredDataAndRecords.item,
+                });
+              }
+              // TODO deep compare values
+              subscription.callback(newEncounteredDataAndRecords);
+            } else {
+              if (typeof window !== 'undefined' && window.__LOG) {
+                console.log('Deep equality - Yes', {
+                  fragmentReference: subscription.fragmentReference,
+                  old: subscription.encounteredDataAndRecords.item,
+                });
+              }
             }
           }
+          return;
         }
-        return;
+        case 'AnyRecords': {
+          return subscription.callback();
+        }
+        default: {
+          // Ensure we have covered all variants
+          const _: never = subscription;
+          _;
+          throw new Error('Unexpected case');
+        }
       }
-      case 'AnyRecords': {
-        return subscription.callback();
-      }
-      default: {
-        // Ensure we have covered all variants
-        const _: never = subscription;
-        _;
-        throw new Error('Unexpected case');
-      }
-    }
-  });
+    }),
+  );
 }
 
 function hasOverlappingIds(set1: Set<DataId>, set2: Set<DataId>): boolean {

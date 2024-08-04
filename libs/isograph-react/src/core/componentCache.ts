@@ -2,11 +2,13 @@ import { stableCopy } from './cache';
 import { IsographEnvironment } from './IsographEnvironment';
 import { FragmentReference } from './FragmentReference';
 import { useReadAndSubscribe } from '../react/useReadAndSubscribe';
+import { NetworkRequestReaderOptions } from './read';
 
 export function getOrCreateCachedComponent(
   environment: IsographEnvironment,
   componentName: string,
   fragmentReference: FragmentReference<any, any>,
+  networkRequestOptions: NetworkRequestReaderOptions,
 ): React.FC<any> {
   // cachedComponentsById is a three layer cache: id, then component name, then
   // stringified args. These three, together, uniquely identify a read at a given
@@ -27,7 +29,11 @@ export function getOrCreateCachedComponent(
     byArgs[stringifiedArgs] ??
     (() => {
       function Component(additionalRuntimeProps: { [key: string]: any }) {
-        const data = useReadAndSubscribe(environment, fragmentReference);
+        const data = useReadAndSubscribe(
+          environment,
+          fragmentReference,
+          networkRequestOptions,
+        );
 
         if (typeof window !== 'undefined' && window.__LOG) {
           console.log(

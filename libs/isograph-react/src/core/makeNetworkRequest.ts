@@ -33,6 +33,13 @@ export function makeNetworkRequest(
         console.log('network response', artifact, networkResponse);
       }
 
+      if (networkResponse.errors != null) {
+        // @ts-expect-error Why are we getting the wrong constructor here?
+        throw new Error('GraphQL network response had errors', {
+          cause: networkResponse,
+        });
+      }
+
       if (status.kind === 'UndisposedIncomplete') {
         normalizeData(
           environment,

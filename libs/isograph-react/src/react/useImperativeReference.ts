@@ -27,7 +27,7 @@ export function useImperativeReference<
   return {
     fragmentReference: state,
     loadFragmentReference: (variables: Variables) => {
-      const [_networkRequest, disposeNetworkRequest] = makeNetworkRequest(
+      const [networkRequest, disposeNetworkRequest] = makeNetworkRequest(
         environment,
         entrypoint,
         variables,
@@ -39,6 +39,7 @@ export function useImperativeReference<
           root: ROOT_ID,
           variables,
           nestedRefetchQueries: entrypoint.nestedRefetchQueries,
+          networkRequest,
         },
         () => {
           disposeNetworkRequest();

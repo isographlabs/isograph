@@ -55,6 +55,7 @@ export function readPromise<T, E>(p: PromiseWrapper<T, E>): T {
 export type PromiseState<T, E> =
   | {
       kind: 'Pending';
+      promise: Promise<T>;
     }
   | Result<T, E>;
 
@@ -69,5 +70,6 @@ export function getPromiseState<T, E>(
   }
   return {
     kind: 'Pending',
+    promise: p.promise,
   };
 }

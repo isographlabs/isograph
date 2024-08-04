@@ -16,7 +16,7 @@ const resolver = (
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
 ) => (): ItemCleanupPair<FragmentReference<any, any>> | undefined => {
   const variables = includeReadOutData(filteredVariables, readOutData);
-  const [_networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables);
+  const [networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables);
   if (readerArtifact == null) return;
   const fragmentReference = {
     kind: 'FragmentReference',
@@ -24,6 +24,7 @@ const resolver = (
     root: rootId,
     variables,
     nestedRefetchQueries,
+    networkRequest,
   } as const;
   return [fragmentReference, disposeNetworkRequest];
 };

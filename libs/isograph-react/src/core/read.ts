@@ -9,6 +9,7 @@ import {
   IsographEnvironment,
 } from './IsographEnvironment';
 import { makeNetworkRequest } from './makeNetworkRequest';
+import { PromiseWrapper } from './PromiseWrapper';
 import { ReaderAst } from './reader';
 import { Arguments } from './util';
 
@@ -19,21 +20,43 @@ export type WithEncounteredRecords<T> = {
 
 export function readButDoNotEvaluate<TReadFromStore extends Object>(
   environment: IsographEnvironment,
-  reference: FragmentReference<TReadFromStore, unknown>,
+  fragmentReference: FragmentReference<TReadFromStore, unknown>,
+  networkRequestOptions: NetworkRequestReaderOptions,
 ): WithEncounteredRecords<TReadFromStore> {
   const mutableEncounteredRecords = new Set<DataId>();
   const response = readData(
     environment,
-    reference.readerArtifact.readerAst,
-    reference.root,
-    reference.variables ?? {},
-    reference.nestedRefetchQueries,
+    fragmentReference.readerArtifact.readerAst,
+    fragmentReference.root,
+    fragmentReference.variables ?? {},
+    fragmentReference.nestedRefetchQueries,
+    fragmentReference.networkRequest,
+    networkRequestOptions,
     mutableEncounteredRecords,
   );
   if (typeof window !== 'undefined' && window.__LOG) {
     console.log('done reading', { response });
   }
   if (response.kind === 'MissingData') {
+    // There are two cases here that we care about:
+    // 1. the network request is in flight, we haven't suspend on it, and we want
+    //    to throw if it errors out. So, networkRequestOptions.suspendIfInFlight === false
+    //    and networkRequestOptions.throwOnNetworkError === true.
+    // 2. everything else
+    //
+    // In the first case, we cannot simply throw onNextChange, because if the network
+    // response errors out, we will not update the store, so the onNextChange promise
+    // will not resolve.
+    if (
+      !networkRequestOptions.suspendIfInFlight &&
+      networkRequestOptions.throwOnNetworkError
+    ) {
+      // TODO assert that the network request state is not Err
+      throw new Promise((resolve, reject) => {
+        onNextChange(environment).then(resolve);
+        fragmentReference.networkRequest.promise.catch(reject);
+      });
+    }
     throw onNextChange(environment);
   } else {
     return {
@@ -61,6 +84,8 @@ function readData<TReadFromStore>(
   root: DataId,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
+  networkRequest: PromiseWrapper<void, any>,
+  networkRequestOptions: NetworkRequestReaderOptions,
   mutableEncounteredRecords: Set<DataId>,
 ): ReadDataResult<TReadFromStore> {
   mutableEncounteredRecords.add(root);
@@ -126,6 +151,8 @@ function readData<TReadFromStore>(
               link.__link,
               variables,
               nestedRefetchQueries,
+              networkRequest,
+              networkRequestOptions,
               mutableEncounteredRecords,
             );
             if (result.kind === 'MissingData') {
@@ -183,6 +210,8 @@ function readData<TReadFromStore>(
           targetId,
           variables,
           nestedRefetchQueries,
+          networkRequest,
+          networkRequestOptions,
           mutableEncounteredRecords,
         );
         if (data.kind === 'MissingData') {
@@ -205,6 +234,10 @@ function readData<TReadFromStore>(
           variables,
           // Refetch fields just read the id, and don't need refetch query artifacts
           [],
+          // This is probably indicative of the fact that we are doing redundant checks
+          // on the status of this network request...
+          networkRequest,
+          networkRequestOptions,
           mutableEncounteredRecords,
         );
         if (data.kind === 'MissingData') {
@@ -256,6 +289,8 @@ function readData<TReadFromStore>(
             root,
             variables,
             resolverRefetchQueries,
+            networkRequest,
+            networkRequestOptions,
             mutableEncounteredRecords,
           );
           if (data.kind === 'MissingData') {
@@ -276,8 +311,10 @@ function readData<TReadFromStore>(
               readerArtifact: field.readerArtifact,
               root,
               variables: generateChildVariableMap(variables, field.arguments),
+              networkRequest,
               nestedRefetchQueries: resolverRefetchQueries,
             } as const,
+            networkRequestOptions,
           );
         }
         break;
@@ -290,6 +327,8 @@ function readData<TReadFromStore>(
           variables,
           // Refetch fields just read the id, and don't need refetch query artifacts
           [],
+          networkRequest,
+          networkRequestOptions,
           mutableEncounteredRecords,
         );
         if (refetchReaderParams.kind === 'MissingData') {
@@ -318,7 +357,7 @@ function readData<TReadFromStore>(
                 field.queryArguments,
                 variables,
               );
-              const [_networkRequest, disposeNetworkRequest] =
+              const [networkRequest, disposeNetworkRequest] =
                 makeNetworkRequest(
                   environment,
                   field.entrypoint,
@@ -331,7 +370,8 @@ function readData<TReadFromStore>(
                 root: localVariables.id,
                 variables: localVariables,
                 nestedRefetchQueries: field.entrypoint.nestedRefetchQueries,
-              } as const;
+                networkRequest,
+              } as FragmentReference<any, any>;
               return [fragmentReference, disposeNetworkRequest];
             },
           ];
@@ -419,3 +459,8 @@ function writeQueryArgsToVariables(
     }
   }
 }
+
+export type NetworkRequestReaderOptions = {
+  suspendIfInFlight?: boolean;
+  throwOnNetworkError?: boolean;
+};

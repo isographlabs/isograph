@@ -17,9 +17,7 @@ export function useLazyReference<
   const environment = useIsographEnvironment();
   const cache = getOrCreateCacheForArtifact(environment, entrypoint, variables);
 
-  // TODO add comment explaining why we never use this value
-  // @ts-ignore(6133)
-  const wrapper = useLazyDisposableState(cache).state;
+  const networkRequest = useLazyDisposableState(cache).state;
 
   return {
     fragmentReference: {
@@ -28,6 +26,7 @@ export function useLazyReference<
       root: ROOT_ID,
       variables,
       nestedRefetchQueries: entrypoint.nestedRefetchQueries,
+      networkRequest,
     },
   };
 }

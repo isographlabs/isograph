@@ -134,7 +134,7 @@ fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctio
         {indent}nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],\n\
         ) => (): ItemCleanupPair<FragmentReference<any, any>> | undefined => {{\n\
         {indent}const variables = includeReadOutData(filteredVariables, readOutData);\n\
-        {indent}const [_networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables);\n\
+        {indent}const [networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables);\n\
         {indent}if (readerArtifact == null) return;\n\
         {indent}const fragmentReference = {{\n\
         {indent}  kind: 'FragmentReference',\n\
@@ -142,6 +142,7 @@ fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctio
         {indent}  root: rootId,\n\
         {indent}  variables,\n\
         {indent}  nestedRefetchQueries,\n\
+        {indent}  networkRequest,\n\
         {indent}}} as const;\n\
         {indent}return [fragmentReference, disposeNetworkRequest];\n\
         }};\n"
@@ -173,7 +174,7 @@ fn generate_function_import_statement_for_mutation_reader(
         {indent}nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],\n\
         ) => (): ItemCleanupPair<FragmentReference<any, any>> | undefined => {{\n\
         {indent}const variables = includeReadOutData(filteredVariables, readOutData);\n\
-        {indent}const [_networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables);\n\
+        {indent}const [networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables);\n\
         {indent}if (readerArtifact == null) return;\n\
         {indent}const fragmentReference = {{\n\
         {indent}  kind: 'FragmentReference',\n\
@@ -181,6 +182,7 @@ fn generate_function_import_statement_for_mutation_reader(
         {indent}  root: rootId,\n\
         {indent}  variables,\n\
         {indent}  nestedRefetchQueries,\n\
+        {indent}  networkRequest,\n\
         {indent}}} as const;\n\
         {indent}return [fragmentReference, disposeNetworkRequest];\n\
         }};\n\
