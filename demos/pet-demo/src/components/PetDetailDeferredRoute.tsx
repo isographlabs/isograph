@@ -3,7 +3,6 @@ import { iso } from '@iso';
 import { Container, Stack } from '@mui/material';
 import {
   FragmentReader,
-  NetworkErrorReader,
   useClientSideDefer,
   useLazyReference,
 } from '@isograph/react';
@@ -65,7 +64,7 @@ export function PetDetailDeferredRouteLoader({
 }: {
   route: PetDetailDeferredRoute;
 }) {
-  const { fragmentReference, networkRequestReference } = useLazyReference(
+  const { fragmentReference } = useLazyReference(
     iso(`entrypoint Query.PetDetailDeferredRoute`),
     { id: route.id },
   );
@@ -73,9 +72,7 @@ export function PetDetailDeferredRouteLoader({
   return (
     <ErrorBoundary>
       <React.Suspense fallback={<FullPageLoading />}>
-        <NetworkErrorReader networkRequestReference={networkRequestReference}>
-          <FragmentReader fragmentReference={fragmentReference} />
-        </NetworkErrorReader>
+        <FragmentReader fragmentReference={fragmentReference} />
       </React.Suspense>
     </ErrorBoundary>
   );

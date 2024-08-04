@@ -4,7 +4,6 @@ import { ROOT_ID } from '../core/IsographEnvironment';
 import { IsographEntrypoint } from '../core/entrypoint';
 import { getOrCreateCacheForArtifact } from '../core/cache';
 import { useLazyDisposableState } from '@isograph/react-disposable-state';
-import { type NetworkRequestReference } from '../core/NetworkRequestReference';
 
 export function useLazyReference<
   TReadFromStore extends Object,
@@ -13,7 +12,6 @@ export function useLazyReference<
   entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
   variables: Variables,
 ): {
-  networkRequestReference: NetworkRequestReference;
   fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>;
 } {
   const environment = useIsographEnvironment();
@@ -24,10 +22,6 @@ export function useLazyReference<
   const wrapper = useLazyDisposableState(cache).state;
 
   return {
-    networkRequestReference: {
-      kind: 'NetworkRequestReference',
-      promise: wrapper,
-    },
     fragmentReference: {
       kind: 'FragmentReference',
       readerArtifact: entrypoint.readerArtifact,

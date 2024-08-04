@@ -61,7 +61,6 @@ export {
   type FragmentReference,
   type Variables,
 } from './core/FragmentReference';
-export { type NetworkRequestReference } from './core/NetworkRequestReference';
 
 export {
   IsographEnvironmentProvider,
@@ -70,10 +69,6 @@ export {
 } from './react/IsographEnvironmentProvider';
 export { useImperativeReference } from './react/useImperativeReference';
 export { FragmentReader } from './react/FragmentReader';
-export {
-  NetworkRequestReader,
-  NetworkErrorReader,
-} from './react/NetworkRequestReader';
 export { useResult } from './react/useResult';
 export { useLazyReference } from './react/useLazyReference';
 export { useRerenderOnChange } from './react/useRerenderOnChange';
