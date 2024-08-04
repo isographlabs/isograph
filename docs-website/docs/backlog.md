@@ -7,7 +7,6 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 ## GraphQL conf 2024 priorities
 
 - VSCode extension: syntax highlighting
-- Network errors
 - Userland impl of pagination, live queries, useQueryLoader (w/ intersection observer)
   - useResult should not call useReadAndSubscribe, probably
 - Load normalization ASTs (etc) when a non-null network response is received. Does this require `as Foo`?
