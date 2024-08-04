@@ -9,6 +9,7 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 - VSCode extension: syntax highlighting
 - Network errors
 - Userland impl of pagination, live queries, useQueryLoader (w/ intersection observer)
+  - useResult should not call useReadAndSubscribe, probably
 - Load normalization ASTs (etc) when a non-null network response is received. Does this require `as Foo`?
   - load normalization ASTs for loadable fields after a request is made
 
@@ -17,6 +18,7 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 - Fix granular re-renders with AST
 - Proper selection sets (i.e. rooted at the closest loadable field?)
 - Limit exposed fields to specific selections
+- Typing of entrypoint variables
 
 ## Top mid-term runtime priorities
 
