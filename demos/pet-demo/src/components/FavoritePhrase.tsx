@@ -2,6 +2,7 @@ import { iso } from '@iso';
 import React from 'react';
 import { UNASSIGNED_STATE } from '@isograph/react-disposable-state';
 import { FragmentReader, useImperativeReference } from '@isograph/react';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export const FavoritePhraseLoader = iso(`
   field Pet.FavoritePhraseLoader @component {
@@ -19,9 +20,11 @@ export const FavoritePhraseLoader = iso(`
           Reveal favorite phrase
         </button>
       ) : (
-        <React.Suspense fallback="Loading favorite phrase...">
-          <FragmentReader fragmentReference={fragmentReference} />
-        </React.Suspense>
+        <ErrorBoundary>
+          <React.Suspense fallback="Loading favorite phrase...">
+            <FragmentReader fragmentReference={fragmentReference} />
+          </React.Suspense>
+        </ErrorBoundary>
       )}
     </>
   );

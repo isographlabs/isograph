@@ -72,7 +72,10 @@ export function PetDetailDeferredRouteLoader({
   return (
     <ErrorBoundary>
       <React.Suspense fallback={<FullPageLoading />}>
-        <FragmentReader fragmentReference={fragmentReference} />
+        <FragmentReader
+          fragmentReference={fragmentReference}
+          networkRequestOptions={{ suspendIfInFlight: false }}
+        />
       </React.Suspense>
     </ErrorBoundary>
   );

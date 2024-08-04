@@ -68,7 +68,7 @@ export function PetDetailRouteLoader({ route }: { route: PetDetailRoute }) {
       <React.Suspense fallback={<FullPageLoading />}>
         <FragmentReader
           fragmentReference={fragmentReference}
-          networkRequestOptions={{ throwOnNetworkError: true }}
+          networkRequestOptions={{ suspendIfInFlight: false }}
         />
       </React.Suspense>
     </ErrorBoundary>
