@@ -586,7 +586,7 @@ function getStoreKeyChunkForArgumentValue(
       return argumentValue.value;
     }
     case 'Variable': {
-      return variables[argumentValue.name];
+      return variables[argumentValue.name] ?? 'null';
     }
     case 'String': {
       return argumentValue.value;
