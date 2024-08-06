@@ -53,6 +53,6 @@ export function PullRequestRoute({
     },
   );
 
-  const Component = useResult(fragmentReference);
+  const Component = useResult(fragmentReference, {});
   return <Component route={route} setRoute={setRoute} />;
 }

@@ -50,6 +50,6 @@ export function HomeRoute({
       first: 15,
     },
   );
-  const Component = useResult(fragmentReference);
+  const Component = useResult(fragmentReference, {});
   return <Component route={route} setRoute={setRoute} />;
 }

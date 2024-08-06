@@ -24,6 +24,6 @@ export function PetByNameRouteLoader({ route }: { route: PetByNameRoute }) {
     { name: route.name },
   );
 
-  const Component = useResult(fragmentReference);
+  const Component = useResult(fragmentReference, {});
   return <Component />;
 }
