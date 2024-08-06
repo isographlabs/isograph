@@ -338,43 +338,50 @@ function readData<TReadFromStore>(
             nestedReason: refetchReaderParams,
           };
         } else {
-          target[field.alias] = (args: any) => [
-            // Stable id
-            root + '__' + field.name,
-            // Fetcher
-            () => {
-              // TODO we should use the reader AST for this
-              const includeReadOutData = (variables: any, readOutData: any) => {
-                variables.id = readOutData.id;
-                return variables;
-              };
-              const localVariables = includeReadOutData(
-                args ?? {},
-                refetchReaderParams.data,
-              );
-              writeQueryArgsToVariables(
-                localVariables,
-                field.queryArguments,
-                variables,
-              );
-              const [networkRequest, disposeNetworkRequest] =
-                makeNetworkRequest(
-                  environment,
-                  field.entrypoint,
-                  localVariables,
-                );
-              const fragmentReference = {
-                kind: 'FragmentReference',
-                readerArtifact: field.entrypoint.readerArtifact,
-                // TODO localVariables is not guaranteed to have an id field
-                root: localVariables.id,
-                variables: localVariables,
-                nestedRefetchQueries: field.entrypoint.nestedRefetchQueries,
-                networkRequest,
-              } as FragmentReference<any, any>;
-              return [fragmentReference, disposeNetworkRequest];
-            },
-          ];
+          target[field.alias] = (args: any) => {
+            // TODO we should use the reader AST for this
+            const includeReadOutData = (variables: any, readOutData: any) => {
+              variables.id = readOutData.id;
+              return variables;
+            };
+            const localVariables = includeReadOutData(
+              args ?? {},
+              refetchReaderParams.data,
+            );
+            writeQueryArgsToVariables(
+              localVariables,
+              field.queryArguments,
+              variables,
+            );
+
+            return [
+              // Stable id
+              root +
+                '/' +
+                field.name +
+                '/' +
+                stableStringifyArgs(localVariables),
+              // Fetcher
+              () => {
+                const [networkRequest, disposeNetworkRequest] =
+                  makeNetworkRequest(
+                    environment,
+                    field.entrypoint,
+                    localVariables,
+                  );
+                const fragmentReference = {
+                  kind: 'FragmentReference',
+                  readerArtifact: field.entrypoint.readerArtifact,
+                  // TODO localVariables is not guaranteed to have an id field
+                  root: localVariables.id,
+                  variables: localVariables,
+                  nestedRefetchQueries: field.entrypoint.nestedRefetchQueries,
+                  networkRequest,
+                } as FragmentReference<any, any>;
+                return [fragmentReference, disposeNetworkRequest];
+              },
+            ];
+          };
         }
         break;
       }
@@ -464,3 +471,18 @@ export type NetworkRequestReaderOptions = {
   suspendIfInFlight?: boolean;
   throwOnNetworkError?: boolean;
 };
+
+// TODO use a description of the params for this?
+// TODO call stableStringifyArgs on the variable values, as well.
+// This doesn't matter for now, since we are just using primitive values
+// in the demo.
+function stableStringifyArgs(args: Object) {
+  const keys = Object.keys(args);
+  keys.sort();
+  let s = '';
+  for (const key of keys) {
+    // @ts-expect-error
+    s += `${key}=${JSON.stringify(args[key])};`;
+  }
+  return s;
+}
