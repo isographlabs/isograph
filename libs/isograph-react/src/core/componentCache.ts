@@ -30,7 +30,6 @@ export function getOrCreateCachedComponent(
     (() => {
       function Component(additionalRuntimeProps: { [key: string]: any }) {
         const data = useReadAndSubscribe(
-          environment,
           fragmentReference,
           networkRequestOptions,
         );

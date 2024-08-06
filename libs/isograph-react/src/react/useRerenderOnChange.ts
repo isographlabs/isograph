@@ -1,19 +1,19 @@
 import { useEffect } from 'react';
-import { IsographEnvironment } from '../core/IsographEnvironment';
 import { subscribe } from '../core/cache';
 import { WithEncounteredRecords } from '../core/read';
 import { FragmentReference } from '../core/FragmentReference';
+import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
 // TODO add unit tests for this. Add integration tests that test
 // behavior when the encounteredRecords underneath a fragment change.
 export function useRerenderOnChange<TReadFromStore extends Object>(
-  environment: IsographEnvironment,
   encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
   fragmentReference: FragmentReference<any, any>,
   setEncounteredDataAndRecords: (
     data: WithEncounteredRecords<TReadFromStore>,
   ) => void,
 ) {
+  const environment = useIsographEnvironment();
   useEffect(() => {
     return subscribe(
       environment,

@@ -28,7 +28,6 @@ export function useResult<TReadFromStore extends Object, TClientFieldValue>(
     }
     case 'EagerReaderArtifact': {
       const data = useReadAndSubscribe(
-        environment,
         fragmentReference,
         networkRequestOptions,
       );
