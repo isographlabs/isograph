@@ -556,7 +556,12 @@ fn get_loadable_field_type_from_missing_arguments(
     missing_arguments: MissingArguments,
 ) -> String {
     let mut loadable_field_type = "{".to_string();
+    let mut is_first = true;
     for arg in missing_arguments.iter() {
+        if !is_first {
+            loadable_field_type.push_str(", ");
+        }
+        is_first = false;
         loadable_field_type.push_str(&format!(
             "{}: {}",
             arg.name.item,
