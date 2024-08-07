@@ -484,6 +484,7 @@ fn write_param_type_from_selection(
                                     get_missing_arguments_and_validate_argument_types(
                                         client_field.variable_definitions.iter().map(|x| &x.item),
                                         &scalar_field_selection.arguments,
+                                        true,
                                     );
 
                                 let loadable_field_argument_type = if missing_arguments.is_empty() {

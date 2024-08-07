@@ -74,7 +74,13 @@ pub struct ValidatedScalarFieldAssociatedData {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ValidatedIsographSelectionVariant {
     Regular,
-    Loadable((LoadableDirectiveParameters, MissingArguments)),
+    Loadable(
+        (
+            LoadableDirectiveParameters,
+            // TODO this is unused
+            MissingArguments,
+        ),
+    ),
 }
 
 pub type MissingArguments = Vec<ValidatedVariableDefinition>;
@@ -723,6 +729,7 @@ fn validate_field_type_exists_and_is_scalar(
                         .iter()
                         .map(|variable_definition| &variable_definition.item),
                     &scalar_field_selection.arguments,
+                    false,
                 );
 
                 match server_field.associated_data.inner() {
@@ -776,6 +783,7 @@ fn validate_field_type_exists_and_is_scalar(
                         .iter()
                         .map(|variable_definition| &variable_definition.item),
                     &scalar_field_selection.arguments,
+                    false,
                 );
 
                 Ok(ScalarFieldSelection {
@@ -845,6 +853,7 @@ fn validate_field_type_exists_and_is_linked(
                                 .iter()
                                 .map(|variable_definition| &variable_definition.item),
                             &linked_field_selection.arguments,
+                            false,
                         );
 
                         Ok(LinkedFieldSelection {
@@ -954,12 +963,15 @@ pub fn categorize_field_loadability<'a>(
 pub fn get_missing_arguments_and_validate_argument_types<'a>(
     argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
     arguments: &[WithLocation<SelectionFieldArgument>],
+    include_optional_args: bool,
 ) -> Vec<ValidatedVariableDefinition> {
     // TODO validate argument types
 
     argument_definitions
         .filter_map(|definition| {
-            if definition.default_value.is_some() || definition.type_.is_nullable() {
+            if definition.default_value.is_some()
+                || definition.type_.is_nullable() && !include_optional_args
+            {
                 return None;
             }
 
