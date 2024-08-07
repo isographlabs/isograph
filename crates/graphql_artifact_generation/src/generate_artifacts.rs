@@ -599,7 +599,7 @@ fn format_type_for_js_inner(
 ) -> String {
     match new_type {
         GraphQLTypeAnnotation::Named(named_inner_type) => {
-            format!("{} | null", named_inner_type.0.item)
+            format!("{} | null | void", named_inner_type.0.item)
         }
         GraphQLTypeAnnotation::List(list) => {
             format!("ReadonlyArray<{}> | null", format_type_for_js_inner(list.0))
