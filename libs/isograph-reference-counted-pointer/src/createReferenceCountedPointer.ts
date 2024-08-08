@@ -9,7 +9,7 @@ import type { CleanupFn, ItemCleanupPair } from '@isograph/disposable-types';
  * disposed, the underlying item will be disposed.
  *
  * Additional reference-counted pointers guarding the same item can be
- * created by calling retainIfNotDisposed().
+ * created by calling cloneIfNotDisposed().
  *
  * ## Structural sharing
  *
