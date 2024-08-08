@@ -563,9 +563,11 @@ fn get_loadable_field_type_from_missing_arguments(
             loadable_field_type.push_str(", ");
         }
         is_first = false;
+        let is_optional = !matches!(arg.type_, GraphQLTypeAnnotation::NonNull(_));
         loadable_field_type.push_str(&format!(
-            "{}: {}",
+            "{}{}: {}",
             arg.name.item,
+            if is_optional { "?" } else { "" },
             format_type_for_js(schema, arg.type_.clone())
         ));
     }
