@@ -60,6 +60,7 @@ export {
 export {
   type FragmentReference,
   type Variables,
+  stableIdForFragmentReference,
 } from './core/FragmentReference';
 
 export {

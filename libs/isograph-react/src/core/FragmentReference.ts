@@ -24,3 +24,19 @@ export type FragmentReference<
   readonly nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[];
   readonly networkRequest: PromiseWrapper<void, any>;
 };
+
+export function stableIdForFragmentReference(
+  fragmentReference: FragmentReference<any, any>,
+): string {
+  return `${fragmentReference.root}/TODO_FRAGMENT_NAME/${serializeVariables(fragmentReference.variables ?? {})}`;
+}
+
+function serializeVariables(variables: Variables) {
+  let s = '';
+  const keys = Object.keys(variables);
+  keys.sort();
+  for (const key of keys) {
+    s += `${key}:${variables[key]},`;
+  }
+  return s;
+}
