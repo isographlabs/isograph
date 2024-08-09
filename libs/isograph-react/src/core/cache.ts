@@ -8,6 +8,7 @@ import {
   type IsographEnvironment,
   DataTypeValue,
   getLink,
+  FragmentSubscription,
 } from './IsographEnvironment';
 import {
   IsographEntrypoint,
@@ -131,6 +132,7 @@ export function normalizeData(
     console.log('after normalization', {
       store: environment.store,
       encounteredIds,
+      environment,
     });
   }
   callSubscriptions(environment, encounteredIds);
@@ -149,6 +151,7 @@ export function subscribeToAnyChange(
   return () => environment.subscriptions.delete(subscription);
 }
 
+// TODO we should re-read and call callback if the value has changed
 export function subscribe<TReadFromStore extends Object>(
   environment: IsographEnvironment,
   encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
@@ -157,12 +160,12 @@ export function subscribe<TReadFromStore extends Object>(
     newEncounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
   ) => void,
 ): () => void {
-  const fragmentSubscription = {
+  const fragmentSubscription: FragmentSubscription<TReadFromStore> = {
     kind: 'FragmentSubscription',
     callback,
     encounteredDataAndRecords,
     fragmentReference,
-  } as const;
+  };
   // @ts-expect-error
   environment.subscriptions.add(fragmentSubscription);
   // @ts-expect-error

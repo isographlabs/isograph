@@ -36,7 +36,7 @@ export const PetDetailDeferredRouteInnerComponent = iso(`
 `)((pet) => {
   const navigateTo = useNavigateTo();
   const petCheckinsCard = useClientSideDefer(pet.PetCheckinsCard, {
-    count: 2,
+    limit: 2,
   });
 
   return (

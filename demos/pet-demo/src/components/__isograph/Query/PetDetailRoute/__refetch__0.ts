@@ -13,7 +13,7 @@ const queryText = 'query Pet__refetch ($id: ID!) {\
         },\
         picture_together,\
       },\
-      checkins____count___l_42: checkins(count: 42) {\
+      checkins____skip___l_null____limit___l_null: checkins(skip: null, limit: null) {\
         id,\
         location,\
         time,\
@@ -107,8 +107,13 @@ const normalizationAst: NormalizationAst = [
             fieldName: "checkins",
             arguments: [
               [
-                "count",
-                { kind: "Literal", value: 42 },
+                "skip",
+                { kind: "Literal", value: null },
+              ],
+
+              [
+                "limit",
+                { kind: "Literal", value: null },
               ],
             ],
             selections: [

@@ -11,7 +11,7 @@ type ComponentCache = {
   };
 };
 
-type FragmentSubscription<TReadFromStore extends Object> = {
+export type FragmentSubscription<TReadFromStore extends Object> = {
   readonly kind: 'FragmentSubscription';
   readonly callback: (
     newEncounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,

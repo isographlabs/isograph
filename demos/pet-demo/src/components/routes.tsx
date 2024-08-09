@@ -6,7 +6,8 @@ export type Route =
   | HomeRoute
   | PetDetailRoute
   | PetDetailDeferredRoute
-  | PetByNameRoute;
+  | PetByNameRoute
+  | PetCheckinListRoute;
 
 export type HomeRoute = {
   kind: 'Home';
@@ -27,6 +28,11 @@ export type PetByNameRoute = {
   name: string;
 };
 
+export type PetCheckinListRoute = {
+  kind: 'PetCheckinList';
+  id: PetId;
+};
+
 export function useNavigateTo() {
   const router = useRouter();
   return (route: Route) => router.push(toRouteUrl(route));
@@ -45,6 +51,9 @@ function toRouteUrl(route: Route): string {
     }
     case 'PetByName': {
       return `/pet/by-name/${route.name}`;
+    }
+    case 'PetCheckinList': {
+      return `/pet/${route.id}/checkin-list`;
     }
   }
 }

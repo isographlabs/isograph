@@ -258,6 +258,9 @@ importers:
       '@isograph/react-disposable-state':
         specifier: '*'
         version: link:../isograph-react-disposable-state
+      '@isograph/reference-counted-pointer':
+        specifier: '*'
+        version: link:../isograph-reference-counted-pointer
       react:
         specifier: ^18.2.0
         version: 18.2.0

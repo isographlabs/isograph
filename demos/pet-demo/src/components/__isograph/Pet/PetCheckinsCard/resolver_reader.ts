@@ -16,8 +16,13 @@ const readerAst: ReaderAst<Pet__PetCheckinsCard__param> = [
     alias: null,
     arguments: [
       [
-        "count",
-        { kind: "Variable", name: "count" },
+        "skip",
+        { kind: "Variable", name: "skip" },
+      ],
+
+      [
+        "limit",
+        { kind: "Variable", name: "limit" },
       ],
     ],
     selections: [

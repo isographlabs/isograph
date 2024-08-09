@@ -19,6 +19,7 @@
   "dependencies": {
     "@isograph/disposable-types": "0.1.1",
     "@isograph/react-disposable-state": "*",
+    "@isograph/reference-counted-pointer": "*",
     "react": "^18.2.0"
   },
   "devDependencies": {

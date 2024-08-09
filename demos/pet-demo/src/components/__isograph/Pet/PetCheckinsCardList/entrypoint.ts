@@ -1,13 +1,13 @@
 import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
-import {Pet__PetCheckinsCard__param} from './param_type';
-import {Pet__PetCheckinsCard__output_type} from './output_type';
+import {Pet__PetCheckinsCardList__param} from './param_type';
+import {Pet__PetCheckinsCardList__output_type} from './output_type';
 import readerResolver from './resolver_reader';
 import refetchQuery0 from './__refetch__0';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [
   { artifact: refetchQuery0, allowedVariables: ["checkin_id", ] },
 ];
 
-const queryText = 'query PetCheckinsCard ($skip: Int, $limit: Int, $id: ID!) {\
+const queryText = 'query PetCheckinsCardList ($skip: Int, $limit: Int, $id: ID!) {\
   node____id___v_id: node(id: $id) {\
     ... on Pet {\
       __typename,\
@@ -84,8 +84,8 @@ const normalizationAst: NormalizationAst = [
   },
 ];
 const artifact: IsographEntrypoint<
-  Pet__PetCheckinsCard__param,
-  Pet__PetCheckinsCard__output_type
+  Pet__PetCheckinsCardList__param,
+  Pet__PetCheckinsCardList__output_type
 > = {
   kind: "Entrypoint",
   queryText,

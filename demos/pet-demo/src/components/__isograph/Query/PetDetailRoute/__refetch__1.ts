@@ -12,7 +12,7 @@ const queryText = 'mutation Query__set_best_friend ($id: ID!, $new_best_friend_i
         },\
         picture_together,\
       },\
-      checkins____count___l_42: checkins(count: 42) {\
+      checkins____skip___l_null____limit___l_null: checkins(skip: null, limit: null) {\
         id,\
         location,\
         time,\
@@ -107,8 +107,13 @@ const normalizationAst: NormalizationAst = [
             fieldName: "checkins",
             arguments: [
               [
-                "count",
-                { kind: "Literal", value: 42 },
+                "skip",
+                { kind: "Literal", value: null },
+              ],
+
+              [
+                "limit",
+                { kind: "Literal", value: null },
               ],
             ],
             selections: [

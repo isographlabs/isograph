@@ -46,7 +46,7 @@ type Pet implements Node {
   alt_tagline: String!
   potential_new_best_friends: [Pet!]!
 
-  checkins(count: Int!): [Checkin!]!
+  checkins(limit: Int, skip: Int): [Checkin!]!
   favorite_phrase: String
 }
 

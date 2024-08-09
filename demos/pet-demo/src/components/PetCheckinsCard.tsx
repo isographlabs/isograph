@@ -3,9 +3,9 @@ import { iso } from '@iso';
 import { Button, Card, CardContent } from '@mui/material';
 
 export const PetCheckinsCard = iso(`
-  field Pet.PetCheckinsCard($count: Int!) @component {
+  field Pet.PetCheckinsCard($skip: Int, $limit: Int) @component {
     id
-    checkins(count: $count) {
+    checkins(skip: $skip, limit: $limit) {
       CheckinDisplay
       id
     }
@@ -44,3 +44,13 @@ export const CheckinDisplay = iso(`
     </Button>
   </b>
 ));
+
+export const PetCheckinsCard2 = iso(`
+  field Pet.PetCheckinsCardList($skip: Int, $limit: Int) {
+    checkins(skip: $skip, limit: $limit) {
+      CheckinDisplay
+    }
+  }
+`)(function PetCheckinsCardComponent(data) {
+  return data.checkins;
+});

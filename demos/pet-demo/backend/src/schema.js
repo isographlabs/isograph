@@ -173,12 +173,9 @@ export const schema = createSchema({
         const allCheckins = checkins.filter(
           (checkin) => checkin.pet_id === pet.id,
         );
-        const count = args?.count;
-        if (count != null) {
-          return allCheckins.slice(0, count);
-        } else {
-          return allCheckins;
-        }
+        const limit = args?.limit ?? Infinity;
+        const skip = args?.skip ?? 0;
+        return allCheckins.slice(skip, skip + limit);
       },
     },
     BestFriendRelationship: {

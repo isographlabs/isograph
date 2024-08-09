@@ -71,7 +71,12 @@ export {
 export { useImperativeReference } from './react/useImperativeReference';
 export { FragmentReader } from './react/FragmentReader';
 export { useResult } from './react/useResult';
+export {
+  useReadAndSubscribe,
+  useSubscribeToMultiple,
+} from './react/useReadAndSubscribe';
 export { useLazyReference } from './react/useLazyReference';
 export { useRerenderOnChange } from './react/useRerenderOnChange';
 
 export { useClientSideDefer } from './loadable-hooks/useClientSideDefer';
+export { useSuspensefulSkipLimitPagination } from './loadable-hooks/useSuspensefulSkipLimitPagination';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { iso } from '@iso';
-import { Avatar, Card, CardContent, Stack } from '@mui/material';
+import { Avatar, Button, Card, CardContent, Stack } from '@mui/material';
 import { useNavigateTo } from './routes';
 
 export const PetSummaryCard = iso(`
@@ -46,6 +46,16 @@ export const PetSummaryCard = iso(`
               <i>{data.tagline}</i>
             </div>
             <data.FavoritePhraseLoader />
+            <div>
+              <Button
+                onClick={() =>
+                  navigateTo({ kind: 'PetCheckinList', id: data.id })
+                }
+                variant="text"
+              >
+                Checkins
+              </Button>
+            </div>
           </div>
         </Stack>
       </CardContent>
