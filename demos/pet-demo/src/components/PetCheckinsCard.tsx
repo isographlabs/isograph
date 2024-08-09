@@ -49,6 +49,7 @@ export const PetCheckinsCard2 = iso(`
   field Pet.PetCheckinsCardList($skip: Int, $limit: Int) {
     checkins(skip: $skip, limit: $limit) {
       CheckinDisplay
+      id
     }
   }
 `)(function PetCheckinsCardComponent(data) {

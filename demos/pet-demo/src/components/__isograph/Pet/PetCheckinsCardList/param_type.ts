@@ -3,5 +3,6 @@ import { type Checkin__CheckinDisplay__output_type } from '../../Checkin/Checkin
 export type Pet__PetCheckinsCardList__param = {
   checkins: ({
     CheckinDisplay: Checkin__CheckinDisplay__output_type,
+    id: string,
   })[],
 };

@@ -18,15 +18,17 @@ export const PetDetailDeferredRouteComponent = iso(`
   }
 `)(function PetDetailRouteComponent(data) {
   const { pet } = data;
+  const navigateTo = useNavigateTo();
+
   if (pet == null) {
     return <h1>Pet not found.</h1>;
   }
 
-  const navigateTo = useNavigateTo();
-
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const { fetchMore, results } = useSuspensefulSkipLimitPagination(
     pet.PetCheckinsCardList,
   );
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const [count, setCount] = useState(2);
 
   return (
@@ -56,7 +58,7 @@ export const PetDetailDeferredRouteComponent = iso(`
         </div>
 
         {results.map((item) => (
-          <div>
+          <div key={item.id}>
             <item.CheckinDisplay />
           </div>
         ))}

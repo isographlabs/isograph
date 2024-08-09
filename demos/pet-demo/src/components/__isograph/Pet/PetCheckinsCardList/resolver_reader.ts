@@ -28,6 +28,12 @@ const readerAst: ReaderAst<Pet__PetCheckinsCardList__param> = [
         readerArtifact: Checkin__CheckinDisplay__resolver_reader,
         usedRefetchQueries: [0, ],
       },
+      {
+        kind: "Scalar",
+        fieldName: "id",
+        alias: null,
+        arguments: null,
+      },
     ],
   },
 ];
