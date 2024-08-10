@@ -226,7 +226,10 @@ function callSubscriptions(
               // - consistency
               // - it's also weird, this is called from makeNetworkRequest, where
               //   we don't currently pass network request options
-              {},
+              {
+                suspendIfInFlight: false,
+                throwOnNetworkError: false,
+              },
             );
 
             if (

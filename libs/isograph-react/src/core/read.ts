@@ -468,9 +468,18 @@ function writeQueryArgsToVariables(
 }
 
 export type NetworkRequestReaderOptions = {
-  suspendIfInFlight?: boolean;
-  throwOnNetworkError?: boolean;
+  suspendIfInFlight: boolean;
+  throwOnNetworkError: boolean;
 };
+
+export function getNetworkRequestOptionsWithDefaults(
+  networkRequestOptions?: Partial<NetworkRequestReaderOptions> | void,
+): NetworkRequestReaderOptions {
+  return {
+    suspendIfInFlight: networkRequestOptions?.suspendIfInFlight ?? false,
+    throwOnNetworkError: networkRequestOptions?.throwOnNetworkError ?? true,
+  };
+}
 
 // TODO use a description of the params for this?
 // TODO call stableStringifyArgs on the variable values, as well.
