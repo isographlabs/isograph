@@ -2,10 +2,7 @@ import * as React from 'react';
 import { ExtractReadFromStore, IsographEntrypoint } from '../core/entrypoint';
 import { FragmentReference } from '../core/FragmentReference';
 import { useResult } from './useResult';
-import {
-  getNetworkRequestOptionsWithDefaults,
-  NetworkRequestReaderOptions,
-} from '../core/read';
+import { NetworkRequestReaderOptions } from '../core/read';
 
 export function FragmentReader<
   TProps extends Record<any, any>,
@@ -29,9 +26,9 @@ export function FragmentReader<
         networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
       },
 ): React.ReactNode {
-  const networkRequestOptions = getNetworkRequestOptionsWithDefaults(
+  const Component = useResult(
+    props.fragmentReference,
     props.networkRequestOptions,
   );
-  const Component = useResult(props.fragmentReference, networkRequestOptions);
   return <Component {...props.additionalProps} />;
 }

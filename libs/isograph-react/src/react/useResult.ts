@@ -2,14 +2,20 @@ import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { FragmentReference } from '../core/FragmentReference';
 import { getOrCreateCachedComponent } from '../core/componentCache';
 import { useReadAndSubscribe } from './useReadAndSubscribe';
-import { NetworkRequestReaderOptions } from '../core/read';
+import {
+  getNetworkRequestOptionsWithDefaults,
+  NetworkRequestReaderOptions,
+} from '../core/read';
 import { getPromiseState, PromiseWrapper } from '../core/PromiseWrapper';
 
 export function useResult<TReadFromStore extends Object, TClientFieldValue>(
   fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>,
-  networkRequestOptions: NetworkRequestReaderOptions,
+  partialNetworkRequestOptions?: Partial<NetworkRequestReaderOptions> | void,
 ): TClientFieldValue {
   const environment = useIsographEnvironment();
+  const networkRequestOptions = getNetworkRequestOptionsWithDefaults(
+    partialNetworkRequestOptions,
+  );
 
   maybeUnwrapNetworkRequest(
     fragmentReference.networkRequest,
