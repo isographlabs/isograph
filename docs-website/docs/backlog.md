@@ -11,6 +11,7 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
   - useResult should not call useReadAndSubscribe, probably
 - Load normalization ASTs (etc) when a non-null network response is received. Does this require `as Foo`?
   - load normalization ASTs for loadable fields after a request is made
+- `isInFlight` function
 
 ## GraphQL conf 2024 nice-to-haves
 
@@ -59,6 +60,7 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 - validate no unknown directives left over
 - Handle unions etc. correctly
 - Special fields (or syntax?) for type casts (i.e. type refinement)
+- Auto generate description of each arg for client fields
 
 ## Feature backlog
 
