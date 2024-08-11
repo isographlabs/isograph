@@ -1,6 +1,5 @@
 import { FragmentReference, Variables } from '../core/FragmentReference';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
-import { ROOT_ID } from '../core/IsographEnvironment';
 import { IsographEntrypoint } from '../core/entrypoint';
 import { getOrCreateCacheForArtifact } from '../core/cache';
 import { useLazyDisposableState } from '@isograph/react-disposable-state';
@@ -17,16 +16,7 @@ export function useLazyReference<
   const environment = useIsographEnvironment();
   const cache = getOrCreateCacheForArtifact(environment, entrypoint, variables);
 
-  const networkRequest = useLazyDisposableState(cache).state;
-
   return {
-    fragmentReference: {
-      kind: 'FragmentReference',
-      readerArtifact: entrypoint.readerArtifact,
-      root: ROOT_ID,
-      variables,
-      nestedRefetchQueries: entrypoint.nestedRefetchQueries,
-      networkRequest,
-    },
+    fragmentReference: useLazyDisposableState(cache).state,
   };
 }

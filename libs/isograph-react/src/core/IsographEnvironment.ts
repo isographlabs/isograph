@@ -27,7 +27,7 @@ type AnyRecordSubscription = {
 
 type Subscription = FragmentSubscription<Object> | AnyRecordSubscription;
 type Subscriptions = Set<Subscription>;
-type SuspenseCache = { [index: string]: ParentCache<any> };
+type CacheMap<T> = { [index: string]: ParentCache<T> };
 
 export type IsographEnvironment = {
   readonly store: IsographStore;
@@ -35,7 +35,9 @@ export type IsographEnvironment = {
   readonly missingFieldHandler: MissingFieldHandler | null;
   readonly componentCache: ComponentCache;
   readonly subscriptions: Subscriptions;
-  readonly suspenseCache: SuspenseCache;
+  // N.B. this must be <any, any>, but all *usages* of this should go through
+  // a function that adds type parameters.
+  readonly fragmentCache: CacheMap<FragmentReference<any, any>>;
   readonly retainedQueries: Set<RetainedQuery>;
   readonly gcBuffer: Array<RetainedQuery>;
   readonly gcBufferSize: number;
@@ -100,7 +102,7 @@ export function createIsographEnvironment(
     missingFieldHandler: missingFieldHandler ?? null,
     componentCache: {},
     subscriptions: new Set(),
-    suspenseCache: {},
+    fragmentCache: {},
     retainedQueries: new Set(),
     gcBuffer: [],
     gcBufferSize: DEFAULT_GC_BUFFER_SIZE,

@@ -1,5 +1,8 @@
-import { Factory, ParentCache } from '@isograph/react-disposable-state';
-import { AnyError, PromiseWrapper } from './PromiseWrapper';
+import {
+  Factory,
+  ItemCleanupPair,
+  ParentCache,
+} from '@isograph/react-disposable-state';
 import {
   DataId,
   ROOT_ID,
@@ -33,23 +36,26 @@ declare global {
   }
 }
 
-export function getOrCreateCache<T>(
+export function getOrCreateItemInSuspenseCache<
+  TReadFromStore extends Object,
+  TClientFieldValue,
+>(
   environment: IsographEnvironment,
   index: string,
-  factory: Factory<T>,
-): ParentCache<T> {
+  factory: Factory<FragmentReference<TReadFromStore, TClientFieldValue>>,
+): ParentCache<FragmentReference<TReadFromStore, TClientFieldValue>> {
   if (typeof window !== 'undefined' && window.__LOG) {
     console.log('getting cache for', {
       index,
-      cache: Object.keys(environment.suspenseCache),
-      found: !!environment.suspenseCache[index],
+      cache: Object.keys(environment.fragmentCache),
+      found: !!environment.fragmentCache[index],
     });
   }
-  if (environment.suspenseCache[index] == null) {
-    environment.suspenseCache[index] = new ParentCache(factory);
+  if (environment.fragmentCache[index] == null) {
+    environment.fragmentCache[index] = new ParentCache(factory);
   }
 
-  return environment.suspenseCache[index];
+  return environment.fragmentCache[index];
 }
 
 /**
@@ -79,12 +85,32 @@ export function getOrCreateCacheForArtifact<
   TClientFieldValue,
 >(
   environment: IsographEnvironment,
-  artifact: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
+  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
   variables: Variables,
-): ParentCache<PromiseWrapper<void, AnyError>> {
-  const cacheKey = artifact.queryText + JSON.stringify(stableCopy(variables));
-  const factory = () => makeNetworkRequest(environment, artifact, variables);
-  return getOrCreateCache(environment, cacheKey, factory);
+): ParentCache<FragmentReference<TReadFromStore, TClientFieldValue>> {
+  const cacheKey = entrypoint.queryText + JSON.stringify(stableCopy(variables));
+  const factory = () => {
+    const [networkRequest, disposeNetworkRequest] = makeNetworkRequest(
+      environment,
+      entrypoint,
+      variables,
+    );
+    const itemCleanupPair: ItemCleanupPair<
+      FragmentReference<TReadFromStore, TClientFieldValue>
+    > = [
+      {
+        kind: 'FragmentReference',
+        readerArtifact: entrypoint.readerArtifact,
+        root: ROOT_ID,
+        variables,
+        nestedRefetchQueries: entrypoint.nestedRefetchQueries,
+        networkRequest: networkRequest,
+      },
+      disposeNetworkRequest,
+    ];
+    return itemCleanupPair;
+  };
+  return getOrCreateItemInSuspenseCache(environment, cacheKey, factory);
 }
 
 type NetworkResponseScalarValue = string | number | boolean;
