@@ -369,7 +369,7 @@ function readData<TReadFromStore>(
                     field.entrypoint,
                     localVariables,
                   );
-                const fragmentReference = {
+                const fragmentReference: FragmentReference<any, any> = {
                   kind: 'FragmentReference',
                   readerArtifact: field.entrypoint.readerArtifact,
                   // TODO localVariables is not guaranteed to have an id field
@@ -377,7 +377,7 @@ function readData<TReadFromStore>(
                   variables: localVariables,
                   nestedRefetchQueries: field.entrypoint.nestedRefetchQueries,
                   networkRequest,
-                } as FragmentReference<any, any>;
+                };
                 return [fragmentReference, disposeNetworkRequest];
               },
             ];
