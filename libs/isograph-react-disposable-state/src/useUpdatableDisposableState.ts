@@ -2,7 +2,7 @@ import { ItemCleanupPair } from '@isograph/disposable-types';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useHasCommittedRef } from './useHasCommittedRef';
 
-export const UNASSIGNED_STATE = Symbol();
+export const UNASSIGNED_STATE: unique symbol = Symbol();
 export type UnassignedState = typeof UNASSIGNED_STATE;
 
 type UseUpdatableDisposableStateReturnValue<T> = {
