@@ -293,7 +293,7 @@ jobs:
         env:
           RELEASE_COMMIT_SHA: ${{ github.sha }}
       - name: Publish to jsr
-        run: cd libs/isograph-disposable-types && npx jsr publish --dry-run
+        run: cd libs/isograph-disposable-types && npx jsr publish --dry-run --allow-dirty
 
   main-release:
     name: Release packages to NPM (main)
