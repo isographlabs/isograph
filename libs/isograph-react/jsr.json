@@ -1,5 +1,5 @@
 {
   "name": "@isographtestscope/isograph-react",
-  "version": "0.1.1",
+  "version": "0.0.0-main-3a1418bf",
   "exports": "./src/index.ts"
 }
