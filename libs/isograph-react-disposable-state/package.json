@@ -18,9 +18,7 @@
     "tsc": "tsc"
   },
   "dependencies": {
-    "@isograph/disposable-types": "0.1.1"
-  },
-  "peerDependencies": {
+    "@isograph/disposable-types": "0.1.1",
     "react": "18.2.0"
   },
   "devDependencies": {
