@@ -1,5 +1,5 @@
 {
-  "name": "@isograph/react",
+  "name": "@isographtestscope/reference-counted-pointer",
   "version": "0.1.1",
   "exports": "./src/index.ts"
 }
