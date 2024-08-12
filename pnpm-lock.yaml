@@ -284,7 +284,7 @@ importers:
         specifier: 0.1.1
         version: link:../isograph-disposable-types
       react:
-        specifier: ^18.2.0
+        specifier: 18.2.0
         version: 18.2.0
     devDependencies:
       '@types/react':
@@ -306,7 +306,7 @@ importers:
         specifier: 0.1.1
         version: link:../isograph-disposable-types
       react:
-        specifier: ^18.2.0
+        specifier: 18.2.0
         version: 18.2.0
     devDependencies:
       '@types/react':
