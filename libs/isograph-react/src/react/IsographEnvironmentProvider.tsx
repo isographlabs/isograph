@@ -13,7 +13,7 @@ export type IsographEnvironmentProviderProps = {
 export function IsographEnvironmentProvider({
   environment,
   children,
-}: IsographEnvironmentProviderProps) {
+}: IsographEnvironmentProviderProps): React.ReactElement {
   return (
     <IsographEnvironmentContext.Provider value={environment}>
       {children}

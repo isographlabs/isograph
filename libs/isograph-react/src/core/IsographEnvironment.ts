@@ -109,7 +109,7 @@ export function createIsographEnvironment(
   };
 }
 
-export function createIsographStore() {
+export function createIsographStore(): IsographStore {
   return {
     [ROOT_ID]: {},
   };
