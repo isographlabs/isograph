@@ -7,14 +7,24 @@ import {
 } from '@isograph/react';
 
 function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
-  let promise = fetch('https://api.github.com/graphql', {
+  const promise = fetch('https://api.github.com/graphql', {
     method: 'POST',
     headers: {
       Authorization: 'Bearer ' + process.env.NEXT_PUBLIC_GITHUB_TOKEN,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ query: queryText, variables }),
-  }).then((response) => response.json());
+  }).then(async (response) => {
+    const json = await response.json();
+
+    if (response.ok) {
+      return json;
+    } else {
+      throw new Error('NetworkError', {
+        cause: json,
+      });
+    }
+  });
   return promise;
 }
 

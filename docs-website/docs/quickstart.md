@@ -129,7 +129,7 @@ import {
 } from '@isograph/react';
 
 function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
-  let promise = fetch(
+  const promise = fetch(
     'https://swapi-graphql.netlify.app/.netlify/functions/index',
     {
       method: 'POST',
@@ -138,7 +138,17 @@ function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
       },
       body: JSON.stringify({ query: queryText, variables }),
     },
-  ).then((response) => response.json());
+  ).then(async (response) => {
+    const json = await response.json();
+
+    if (response.ok) {
+      return json;
+    } else {
+      throw new Error('NetworkError', {
+        cause: json,
+      });
+    }
+  });
   return promise;
 }
 
