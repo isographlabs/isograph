@@ -37,6 +37,7 @@ const missingFieldHandler = (
   arguments_: { [index: string]: any } | null,
   variables: { [index: string]: any } | null,
 ): Link | undefined => {
+  // @ts-expect-error
   if (typeof window !== 'undefined' && window.__LOG) {
     console.log('Missing field handler called', {
       storeRecord,
@@ -85,5 +86,6 @@ export default function App({ Component, pageProps }: AppProps) {
 
 // If window.__LOG is true, Isograph will log a bunch of diagnostics.
 if (typeof window !== 'undefined') {
+  // @ts-expect-error
   window.__LOG = true;
 }
