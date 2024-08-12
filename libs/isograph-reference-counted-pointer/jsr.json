@@ -1,5 +1,8 @@
 {
   "name": "@isographtestscope/reference-counted-pointer",
   "version": "0.1.1",
-  "exports": "./src/index.ts"
+  "exports": "./src/index.ts",
+  "imports": {
+    "@isograph/disposable-types": "jsr:@isograph/disposable-types"
+  }
 }

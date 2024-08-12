@@ -3,6 +3,8 @@
   "version": "0.1.1",
   "exports": "./src/index.ts",
   "imports": {
-    "@isograph/react-disposable-state": "npm:@isograph/react-disposable-state@0.0.0-main-783c4ec3"
+    "@isograph/react-disposable-state": "jsr:@isograph/react-disposable-state",
+    "@isograph/disposable-types": "jsr:@isograph/disposable-types",
+    "@isograph/reference-counted-pointer": "jsr:@isograph/reference-counted-pointer"
   }
 }
