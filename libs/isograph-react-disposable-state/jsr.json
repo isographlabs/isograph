@@ -3,6 +3,7 @@
   "version": "0.1.1",
   "exports": "./src/index.ts",
   "imports": {
-    "@isograph/disposable-types": "jsr:@isographtestscope/disposable-types"
+    "@isograph/disposable-types": "jsr:@isograph/disposable-types",
+    "react": "^18.2.0"
   }
 }
