@@ -298,7 +298,7 @@ jobs:
       - name: Publish to jsr (@isograph/react-disposable-state)
         run: cd libs/isograph-react-disposable-state && npx jsr publish --allow-dirty
       - name: Publish to jsr
-        run: cd libs/isograph-referece-counted-pointer && npx jsr publish --allow-dirty
+        run: cd libs/isograph-reference-counted-pointer && npx jsr publish --allow-dirty
       - name: Publish to jsr
         run: cd libs/isograph-react && npx jsr publish --allow-dirty
 
