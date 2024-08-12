@@ -34,6 +34,7 @@ export function getOrCreateCachedComponent(
           networkRequestOptions,
         );
 
+        // @ts-expect-error
         if (typeof window !== 'undefined' && window.__LOG) {
           console.log(
             'Component re-rendered: ' +

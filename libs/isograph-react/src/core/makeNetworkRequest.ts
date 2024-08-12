@@ -19,6 +19,7 @@ export function makeNetworkRequest(
   artifact: RefetchQueryNormalizationArtifact | IsographEntrypoint<any, any>,
   variables: Variables,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
+  // @ts-expect-error
   if (typeof window !== 'undefined' && window.__LOG) {
     console.log('make network request', artifact, variables);
   }
@@ -29,6 +30,7 @@ export function makeNetworkRequest(
   const promise = environment
     .networkFunction(artifact.queryText, variables)
     .then((networkResponse) => {
+      // @ts-expect-error
       if (typeof window !== 'undefined' && window.__LOG) {
         console.log('network response', artifact, networkResponse);
       }

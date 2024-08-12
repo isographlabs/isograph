@@ -34,6 +34,7 @@ export function readButDoNotEvaluate<TReadFromStore extends Object>(
     networkRequestOptions,
     mutableEncounteredRecords,
   );
+  // @ts-expect-error
   if (typeof window !== 'undefined' && window.__LOG) {
     console.log('done reading', { response });
   }

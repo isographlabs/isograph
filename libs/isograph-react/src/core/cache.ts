@@ -30,12 +30,6 @@ import { makeNetworkRequest } from './makeNetworkRequest';
 
 const TYPENAME_FIELD_NAME = '__typename';
 
-declare global {
-  interface Window {
-    __LOG: boolean;
-  }
-}
-
 export function getOrCreateItemInSuspenseCache<
   TReadFromStore extends Object,
   TClientFieldValue,
@@ -44,6 +38,7 @@ export function getOrCreateItemInSuspenseCache<
   index: string,
   factory: Factory<FragmentReference<TReadFromStore, TClientFieldValue>>,
 ): ParentCache<FragmentReference<TReadFromStore, TClientFieldValue>> {
+  // @ts-expect-error
   if (typeof window !== 'undefined' && window.__LOG) {
     console.log('getting cache for', {
       index,
@@ -136,6 +131,7 @@ export function normalizeData(
 ): Set<DataId> {
   const encounteredIds = new Set<DataId>();
 
+  // @ts-expect-error
   if (typeof window !== 'undefined' && window.__LOG) {
     console.log(
       'about to normalize',
@@ -154,6 +150,7 @@ export function normalizeData(
     nestedRefetchQueries,
     encounteredIds,
   );
+  // @ts-expect-error
   if (typeof window !== 'undefined' && window.__LOG) {
     console.log('after normalization', {
       store: environment.store,
@@ -264,6 +261,7 @@ function callSubscriptions(
                 newEncounteredDataAndRecords.item,
               )
             ) {
+              // @ts-expect-error
               if (typeof window !== 'undefined' && window.__LOG) {
                 console.log('Deep equality - No', {
                   fragmentReference: subscription.fragmentReference,
@@ -274,6 +272,7 @@ function callSubscriptions(
               // TODO deep compare values
               subscription.callback(newEncounteredDataAndRecords);
             } else {
+              // @ts-expect-error
               if (typeof window !== 'undefined' && window.__LOG) {
                 console.log('Deep equality - Yes', {
                   fragmentReference: subscription.fragmentReference,
