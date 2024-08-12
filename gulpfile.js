@@ -82,7 +82,9 @@ const setMainVersion = async () => {
       if (jsrJson.imports != null) {
         const newImports = {};
         Object.keys(jsrJson.imports).forEach((importName) => {
-          newImports[importName] = `jsr:${importName}@${VERSION}`;
+          // TODO remove testscope
+          newImports[importName] =
+            `jsr:${importName.replace('/', 'testscope/')}@${VERSION}`;
         });
         jsrJson.imports = newImports;
       }
