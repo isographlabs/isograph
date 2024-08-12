@@ -81,10 +81,15 @@ const setMainVersion = async () => {
 
       if (jsrJson.imports != null) {
         const newImports = {};
-        Object.keys(jsrJson.imports).forEach((importName) => {
-          // TODO remove testscope
-          newImports[importName] =
-            `jsr:${importName.replace('/', 'testscope/')}@${VERSION}`;
+        const imports = jsrJson.imports;
+        Object.keys(imports).forEach((importName) => {
+          if (importName.contains('isograph')) {
+            // TODO remove testscope
+            newImports[importName] =
+              `jsr:${importName.replace('/', 'testscope/')}@${VERSION}`;
+          } else {
+            newImports[importName] = imports[importName];
+          }
         });
         jsrJson.imports = newImports;
       }
