@@ -292,8 +292,15 @@ jobs:
         run: yarn gulp setMainVersion
         env:
           RELEASE_COMMIT_SHA: ${{ github.sha }}
-      - name: Publish to jsr
-        run: cd libs/isograph-disposable-types && npx jsr publish --dry-run --allow-dirty
+      # TODO move this into a bash file or something
+      - name: Publish to jsr (@isograph/disposable-types)
+        run: cd libs/isograph-disposable-types && npx jsr publish
+      - name: Publish to jsr (@isograph/react-disposable-state)
+        run: cd libs/isograph-react-disposable-state && npx jsr publish --dry-run
+      # - name: Publish to jsr
+      #   run: cd libs/isograph-referece-counted-pointer && npx jsr publish
+      # - name: Publish to jsr
+      #   run: cd libs/isograph-react && npx jsr publish
 
   main-release:
     name: Release packages to NPM (main)
