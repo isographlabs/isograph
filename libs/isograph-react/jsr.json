@@ -5,6 +5,7 @@
   "imports": {
     "@isograph/react-disposable-state": "jsr:@isograph/react-disposable-state",
     "@isograph/disposable-types": "jsr:@isograph/disposable-types",
-    "@isograph/reference-counted-pointer": "jsr:@isograph/reference-counted-pointer"
+    "@isograph/reference-counted-pointer": "jsr:@isograph/reference-counted-pointer",
+    "react": "npm:react@18.2.0"
   }
 }
