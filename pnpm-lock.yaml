@@ -305,16 +305,7 @@ importers:
       '@isograph/disposable-types':
         specifier: 0.1.1
         version: link:../isograph-disposable-types
-      react:
-        specifier: 18.2.0
-        version: 18.2.0
     devDependencies:
-      '@types/react':
-        specifier: ^18.0.31
-        version: 18.2.12
-      react-test-renderer:
-        specifier: ^18.2.0
-        version: 18.2.0(react@18.2.0)
       typescript:
         specifier: ^5.0.3
         version: 5.1.3
