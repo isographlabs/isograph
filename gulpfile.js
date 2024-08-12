@@ -78,6 +78,15 @@ const setMainVersion = async () => {
       const jsrJsonPath = path.join('.', 'libs', build.folder, 'jsr.json');
       const jsrJson = JSON.parse(fs.readFileSync(jsrJsonPath, 'utf8'));
       jsrJson.version = VERSION;
+
+      if (jsrJson.imports != null) {
+        const newImports = {};
+        Object.keys(jsrJson.imports).forEach((importName) => {
+          newImports[importName] = `jsr:${importName}@${VERSION}`;
+        });
+        jsrJson.imports = newImports;
+      }
+
       fs.writeFileSync(
         jsrJsonPath,
         JSON.stringify(jsrJson, null, 2) + '\n',
