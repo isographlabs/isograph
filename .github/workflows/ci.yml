@@ -292,7 +292,7 @@ jobs:
         run: yarn gulp setMainVersion
         env:
           RELEASE_COMMIT_SHA: ${{ github.sha }}
-      # TODO move this into a bash file or something
+      # TODO move this into a bash file
       - name: Publish to jsr (@isograph/disposable-types)
         run: cd libs/isograph-disposable-types && npx jsr publish --allow-dirty
       - name: Publish to jsr (@isograph/react-disposable-state)
