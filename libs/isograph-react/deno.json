@@ -1,0 +1,5 @@
+{
+  "imports": {
+    "@isograph/react-disposable-state": "npm:@isograph/react-disposable-state@0.0.0-main-783c4ec3"
+  }
+}
