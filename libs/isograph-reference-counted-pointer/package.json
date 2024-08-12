@@ -18,12 +18,7 @@
   "dependencies": {
     "@isograph/disposable-types": "0.1.1"
   },
-  "peerDependencies": {
-    "react": "18.2.0"
-  },
   "devDependencies": {
-    "@types/react": "^18.0.31",
-    "react-test-renderer": "^18.2.0",
     "typescript": "^5.0.3",
     "vitest": "^0.29.8"
   },
