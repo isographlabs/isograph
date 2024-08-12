@@ -268,8 +268,32 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
+  main-release-jsr:
+    name: Release packages to jsr (main)
+    runs-on: macos-latest
+    if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref == 'refs/heads/deploy-test' || github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    needs: [all-checks-passed]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - uses: actions/setup-node@v2
+        with:
+          node-version: 18
+          registry-url: https://registry.npmjs.org/
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Change package versions to commit
+        run: yarn gulp setMainVersion
+        env:
+          RELEASE_COMMIT_SHA: ${{ github.sha }}
+      - name: Publish to jsr
+        run: cd libs/isograph-react && npx jsr publish --dry-run
+
   main-release:
-    name: Release packages to NPM
+    name: Release packages to NPM (main)
     runs-on: macos-latest
     if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref == 'refs/heads/main' || github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
     needs: [all-checks-passed]

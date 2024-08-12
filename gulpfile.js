@@ -10,26 +10,32 @@ const builds = [
   {
     folder: 'isograph-babel-plugin',
     packageName: '@isograph/babel-plugin',
+    hasJsr: false,
   },
   {
     folder: 'isograph-disposable-types',
     packageName: '@isograph/disposable-types',
+    hasJsr: true,
   },
   {
     folder: 'isograph-react',
     packageName: '@isograph/react',
+    hasJsr: true,
   },
   {
     folder: 'isograph-react-disposable-state',
     packageName: '@isograph/react-disposable-state',
+    hasJsr: true,
   },
   {
     folder: 'isograph-reference-counted-pointer',
     packageName: '@isograph/reference-counted-pointer',
+    hasJsr: true,
   },
   {
     folder: 'isograph-compiler',
     packageName: '@isograph/compiler',
+    hasJsr: false,
   },
 ];
 
@@ -40,8 +46,14 @@ const setMainVersion = async () => {
 
   const packages = builds.map((build) => build.packageName);
   builds.forEach((build) => {
-    const pkgJsonPath = path.join('.', 'libs', build.folder, 'package.json');
-    const packageJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
+    // package.json
+    const packageJsonPath = path.join(
+      '.',
+      'libs',
+      build.folder,
+      'package.json',
+    );
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
     packageJson.version = VERSION;
     for (const depKind of [
       'dependencies',
@@ -56,10 +68,22 @@ const setMainVersion = async () => {
       }
     }
     fs.writeFileSync(
-      pkgJsonPath,
+      packageJsonPath,
       JSON.stringify(packageJson, null, 2) + '\n',
       'utf8',
     );
+
+    // jsr.json
+    if (build.hasJsr) {
+      const jsrJsonPath = path.join('.', 'libs', build.folder, 'jsr.json');
+      const jsrJson = JSON.parse(fs.readFileSync(jsrJsonPath, 'utf8'));
+      jsrJson.version = VERSION;
+      fs.writeFileSync(
+        jsrJsonPath,
+        JSON.stringify(jsrJson, null, 2) + '\n',
+        'utf8',
+      );
+    }
   });
 };
 
