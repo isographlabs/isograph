@@ -270,7 +270,7 @@ jobs:
 
   main-release-jsr:
     name: Release packages to jsr (main)
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref == 'refs/heads/deploy-test' || github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
     # needs: [all-checks-passed]
     permissions:
