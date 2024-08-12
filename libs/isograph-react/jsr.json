@@ -1,5 +1,8 @@
 {
   "name": "@isographtestscope/isograph-react",
   "version": "0.0.0-main-3a1418bf",
-  "exports": "./src/index.ts"
+  "exports": "./src/index.ts",
+  "imports": {
+    "@isograph/react-disposable-state": "npm:@isograph/react-disposable-state@0.0.0-main-783c4ec3"
+  }
 }
