@@ -83,7 +83,7 @@ const setMainVersion = async () => {
         const newImports = {};
         const imports = jsrJson.imports;
         Object.keys(imports).forEach((importName) => {
-          if (importName.contains('isograph')) {
+          if (importName.includes('isograph')) {
             // TODO remove testscope
             newImports[importName] =
               `jsr:${importName.replace('/', 'testscope/')}@${VERSION}`;
