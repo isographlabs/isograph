@@ -19,11 +19,14 @@ const resolver = (
   const [networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables);
   if (readerArtifact == null) return;
   const fragmentReference = {
-    kind: 'FragmentReference',
-    readerArtifact,
+    kind: "FragmentReference",
+    readerWithRefetchQueries: {
+      kind: "ReaderWithRefetchQueries",
+      readerArtifact,
+      nestedRefetchQueries,
+    },
     root: rootId,
     variables,
-    nestedRefetchQueries,
     networkRequest,
   } as const;
   return [fragmentReference, disposeNetworkRequest];

@@ -1,6 +1,5 @@
 import { DataId } from './IsographEnvironment';
-import { RefetchQueryNormalizationArtifactWrapper } from '../core/entrypoint';
-import { TopLevelReaderArtifact } from './reader';
+import { ReaderWithRefetchQueries } from '../core/entrypoint';
 import { PromiseWrapper } from './PromiseWrapper';
 
 // TODO type this better
@@ -13,15 +12,12 @@ export type FragmentReference<
   TClientFieldValue,
 > = {
   readonly kind: 'FragmentReference';
-  readonly readerArtifact: TopLevelReaderArtifact<
+  readonly readerWithRefetchQueries: ReaderWithRefetchQueries<
     TReadFromStore,
-    TClientFieldValue,
-    any
+    TClientFieldValue
   >;
   readonly root: DataId;
   readonly variables: Variables | null;
-  // TODO: We should instead have ReaderAst<TClientFieldProps>
-  readonly nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[];
   readonly networkRequest: PromiseWrapper<void, any>;
 };
 

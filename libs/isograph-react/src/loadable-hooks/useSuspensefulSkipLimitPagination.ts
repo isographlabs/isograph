@@ -91,7 +91,7 @@ export function useSuspensefulSkipLimitPagination<
       fragmentReference,
       networkRequestOptions,
     );
-    return fragmentReference.readerArtifact.resolver(
+    return fragmentReference.readerWithRefetchQueries.readerArtifact.resolver(
       data.item,
       undefined,
     ) as ReadonlyArray<any>;

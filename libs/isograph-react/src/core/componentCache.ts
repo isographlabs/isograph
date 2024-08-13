@@ -44,7 +44,7 @@ export function getOrCreateCachedComponent(
           );
         }
 
-        return fragmentReference.readerArtifact.resolver(
+        return fragmentReference.readerWithRefetchQueries.readerArtifact.resolver(
           data,
           additionalRuntimeProps,
         );

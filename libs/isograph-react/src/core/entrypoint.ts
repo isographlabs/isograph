@@ -1,7 +1,7 @@
 import { TopLevelReaderArtifact } from './reader';
 import { Arguments } from './util';
 
-type ReaderWithRefetchQueries<
+export type ReaderWithRefetchQueries<
   TReadFromStore extends Object,
   TClientFieldValue,
 > = {

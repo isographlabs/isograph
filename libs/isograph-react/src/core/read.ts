@@ -26,10 +26,10 @@ export function readButDoNotEvaluate<TReadFromStore extends Object>(
   const mutableEncounteredRecords = new Set<DataId>();
   const response = readData(
     environment,
-    fragmentReference.readerArtifact.readerAst,
+    fragmentReference.readerWithRefetchQueries.readerArtifact.readerAst,
     fragmentReference.root,
     fragmentReference.variables ?? {},
-    fragmentReference.nestedRefetchQueries,
+    fragmentReference.readerWithRefetchQueries.nestedRefetchQueries,
     fragmentReference.networkRequest,
     networkRequestOptions,
     mutableEncounteredRecords,
@@ -309,11 +309,14 @@ function readData<TReadFromStore>(
             field.readerArtifact.componentName,
             {
               kind: 'FragmentReference',
-              readerArtifact: field.readerArtifact,
+              readerWithRefetchQueries: {
+                kind: 'ReaderWithRefetchQueries',
+                readerArtifact: field.readerArtifact,
+                nestedRefetchQueries: resolverRefetchQueries,
+              },
               root,
               variables: generateChildVariableMap(variables, field.arguments),
               networkRequest,
-              nestedRefetchQueries: resolverRefetchQueries,
             } as const,
             networkRequestOptions,
           );
@@ -372,14 +375,17 @@ function readData<TReadFromStore>(
                   );
                 const fragmentReference: FragmentReference<any, any> = {
                   kind: 'FragmentReference',
-                  readerArtifact:
-                    field.entrypoint.readerWithRefetchQueries.readerArtifact,
+                  readerWithRefetchQueries: {
+                    kind: 'ReaderWithRefetchQueries',
+                    readerArtifact:
+                      field.entrypoint.readerWithRefetchQueries.readerArtifact,
+                    nestedRefetchQueries:
+                      field.entrypoint.readerWithRefetchQueries
+                        .nestedRefetchQueries,
+                  },
                   // TODO localVariables is not guaranteed to have an id field
                   root: localVariables.id,
                   variables: localVariables,
-                  nestedRefetchQueries:
-                    field.entrypoint.readerWithRefetchQueries
-                      .nestedRefetchQueries,
                   networkRequest,
                 };
                 return [fragmentReference, disposeNetworkRequest];

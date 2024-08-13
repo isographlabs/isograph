@@ -22,12 +22,12 @@ export function useResult<TReadFromStore extends Object, TClientFieldValue>(
     networkRequestOptions,
   );
 
-  switch (fragmentReference.readerArtifact.kind) {
+  switch (fragmentReference.readerWithRefetchQueries.readerArtifact.kind) {
     case 'ComponentReaderArtifact': {
       // @ts-expect-error
       return getOrCreateCachedComponent(
         environment,
-        fragmentReference.readerArtifact.componentName,
+        fragmentReference.readerWithRefetchQueries.readerArtifact.componentName,
         fragmentReference,
         networkRequestOptions,
       );
@@ -37,7 +37,9 @@ export function useResult<TReadFromStore extends Object, TClientFieldValue>(
         fragmentReference,
         networkRequestOptions,
       );
-      return fragmentReference.readerArtifact.resolver(data);
+      return fragmentReference.readerWithRefetchQueries.readerArtifact.resolver(
+        data,
+      );
     }
   }
 }

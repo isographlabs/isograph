@@ -137,11 +137,14 @@ fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctio
         {indent}const [networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables);\n\
         {indent}if (readerArtifact == null) return;\n\
         {indent}const fragmentReference = {{\n\
-        {indent}  kind: 'FragmentReference',\n\
-        {indent}  readerArtifact,\n\
+        {indent}  kind: \"FragmentReference\",\n\
+        {indent}  readerWithRefetchQueries: {{\n\
+        {indent}    kind: \"ReaderWithRefetchQueries\",\n\
+        {indent}    readerArtifact,\n\
+        {indent}    nestedRefetchQueries,\n\
+        {indent}  }},\n\
         {indent}  root: rootId,\n\
         {indent}  variables,\n\
-        {indent}  nestedRefetchQueries,\n\
         {indent}  networkRequest,\n\
         {indent}}} as const;\n\
         {indent}return [fragmentReference, disposeNetworkRequest];\n\
@@ -177,11 +180,14 @@ fn generate_function_import_statement_for_mutation_reader(
         {indent}const [networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables);\n\
         {indent}if (readerArtifact == null) return;\n\
         {indent}const fragmentReference = {{\n\
-        {indent}  kind: 'FragmentReference',\n\
-        {indent}  readerArtifact,\n\
+        {indent}  kind: \"FragmentReference\",\n\
+        {indent}  readerWithRefetchQueries: {{\n\
+        {indent}    kind: \"ReaderWithRefetchQueries\",\n\
+        {indent}    readerArtifact,\n\
+        {indent}    nestedRefetchQueries,\n\
+        {indent}  }},\n\
         {indent}  root: rootId,\n\
         {indent}  variables,\n\
-        {indent}  nestedRefetchQueries,\n\
         {indent}  networkRequest,\n\
         {indent}}} as const;\n\
         {indent}return [fragmentReference, disposeNetworkRequest];\n\
