@@ -29,6 +29,17 @@ export type IsographEntrypoint<
   >;
 };
 
+export type IsographEntrypointLoader<
+  TReadFromStore extends Object,
+  TClientFieldValue,
+> = {
+  readonly kind: 'EntrypointLoader';
+  readonly typeAndField: string;
+  readonly loader: () => Promise<
+    IsographEntrypoint<TReadFromStore, TClientFieldValue>
+  >;
+};
+
 export type NormalizationAstNode =
   | NormalizationScalarField
   | NormalizationLinkedField

@@ -7,6 +7,7 @@ import {
 } from './IsographEnvironment';
 import {
   IsographEntrypoint,
+  IsographEntrypointLoader,
   RefetchQueryNormalizationArtifact,
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
@@ -111,7 +112,10 @@ export type ReaderLoadableField = {
   readonly queryArguments: Arguments | null;
   readonly refetchReaderAst: ReaderAst<any>;
 
-  readonly entrypoint: IsographEntrypoint<any, any>;
+  // TODO we should not type these as any
+  readonly entrypoint:
+    | IsographEntrypoint<any, any>
+    | IsographEntrypointLoader<any, any>;
 };
 
 type StableId = string;

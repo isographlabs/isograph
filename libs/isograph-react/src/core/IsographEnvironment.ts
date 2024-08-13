@@ -2,6 +2,8 @@ import { ParentCache } from '@isograph/react-disposable-state';
 import { RetainedQuery } from './garbageCollection';
 import { WithEncounteredRecords } from './read';
 import { FragmentReference, Variables } from './FragmentReference';
+import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
+import { IsographEntrypoint } from './entrypoint';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -27,6 +29,7 @@ type AnyRecordSubscription = {
 
 type Subscription = FragmentSubscription<Object> | AnyRecordSubscription;
 type Subscriptions = Set<Subscription>;
+// Should this be a map?
 type CacheMap<T> = { [index: string]: ParentCache<T> };
 
 export type IsographEnvironment = {
@@ -38,6 +41,11 @@ export type IsographEnvironment = {
   // N.B. this must be <any, any>, but all *usages* of this should go through
   // a function that adds type parameters.
   readonly fragmentCache: CacheMap<FragmentReference<any, any>>;
+  // TODO make this a CacheMap and add GC
+  readonly entrypointArtifactCache: Map<
+    string,
+    PromiseWrapper<IsographEntrypoint<any, any>>
+  >;
   readonly retainedQueries: Set<RetainedQuery>;
   readonly gcBuffer: Array<RetainedQuery>;
   readonly gcBufferSize: number;
@@ -103,6 +111,7 @@ export function createIsographEnvironment(
     componentCache: {},
     subscriptions: new Set(),
     fragmentCache: {},
+    entrypointArtifactCache: new Map(),
     retainedQueries: new Set(),
     gcBuffer: [],
     gcBufferSize: DEFAULT_GC_BUFFER_SIZE,
@@ -157,4 +166,18 @@ export function getLink(maybeLink: DataTypeValue): Link | null {
     return maybeLink as any;
   }
   return null;
+}
+
+export function getOrLoadIsographArtifact(
+  environment: IsographEnvironment,
+  key: string,
+  loader: () => Promise<IsographEntrypoint<any, any>>,
+): PromiseWrapper<IsographEntrypoint<any, any>> {
+  const value = environment.entrypointArtifactCache.get(key);
+  if (value != null) {
+    return value;
+  }
+  const wrapped = wrapPromise(loader());
+  environment.entrypointArtifactCache.set(key, wrapped);
+  return wrapped;
 }
