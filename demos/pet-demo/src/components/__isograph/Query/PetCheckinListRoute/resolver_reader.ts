@@ -1,7 +1,6 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Query__PetCheckinListRoute__param } from './param_type';
 import { PetDetailDeferredRouteComponent as resolver } from '../../../PetCheckinListRoute';
-import Pet__PetCheckinsCardList__entrypoint from '../../Pet/PetCheckinsCardList/entrypoint';
 
 const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
   {
@@ -34,7 +33,11 @@ const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
             arguments: null,
           },
         ],
-        entrypoint: Pet__PetCheckinsCardList__entrypoint,
+        entrypoint: { 
+          kind: "EntrypointLoader",
+          typeAndField: "Pet__PetCheckinsCardList",
+          loader: () => import("../../Pet/PetCheckinsCardList/entrypoint").then(module => module.default),
+        },
       },
     ],
   },
