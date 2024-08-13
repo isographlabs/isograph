@@ -34,6 +34,9 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
   - pagination, etc.
   - live queries
   - useQueryLoader and variants
+- lazy load normalization ASTs
+- clean up (unify) lazy loading code
+- extract query text and normalization AST into their own struct
 
 ## Top mid-term compiler/syntax priorities
 
