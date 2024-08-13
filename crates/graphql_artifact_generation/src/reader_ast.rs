@@ -1,7 +1,9 @@
 use std::collections::{BTreeSet, HashSet};
 
 use common_lang_types::{SelectableFieldName, WithSpan};
-use isograph_lang_types::{RefetchQueryIndex, Selection, ServerFieldSelection};
+use isograph_lang_types::{
+    LoadableDirectiveParameters, RefetchQueryIndex, Selection, ServerFieldSelection,
+};
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, FieldDefinitionLocation,
     Loadability, NameAndArguments, NormalizationKey, PathToRefetchField, RefetchedPathsMap,
@@ -147,14 +149,17 @@ fn scalar_client_defined_field_ast_node(
         client_field,
         &scalar_field_selection.associated_data.selection_variant,
     ) {
-        Some(Loadability::LoadablySelectedField(_)) => loadably_selected_field_ast_node(
-            schema,
-            client_field,
-            reader_imports,
-            indentation_level,
-            scalar_field_selection,
-            &client_field_variable_context,
-        ),
+        Some(Loadability::LoadablySelectedField(loadable_directive_parameters)) => {
+            loadably_selected_field_ast_node(
+                schema,
+                client_field,
+                reader_imports,
+                indentation_level,
+                scalar_field_selection,
+                &client_field_variable_context,
+                &loadable_directive_parameters,
+            )
+        }
         Some(Loadability::ImperativelyLoadedField(_)) => imperatively_loaded_variant_ast_node(
             client_field,
             reader_imports,
@@ -295,17 +300,31 @@ fn loadably_selected_field_ast_node(
     indentation_level: u8,
     scalar_field_selection: &ValidatedScalarFieldSelection,
     client_field_variable_context: &VariableContext,
+    loadable_directive_parameters: &LoadableDirectiveParameters,
 ) -> String {
     let name = scalar_field_selection.name.item;
     let alias = scalar_field_selection.name_or_alias().item;
     let indent_1 = "  ".repeat(indentation_level as usize);
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
-    reader_imports.insert((
-        client_field.type_and_field,
-        ImportedFileCategory::Entrypoint,
-    ));
     let type_and_field = client_field.type_and_field.underscore_separated();
+    let entrypoint_text = if !loadable_directive_parameters.lazy_load_artifact {
+        reader_imports.insert((
+            client_field.type_and_field,
+            ImportedFileCategory::Entrypoint,
+        ));
+        format!("{type_and_field}__entrypoint")
+    } else {
+        let indent_3 = "  ".repeat((indentation_level + 2) as usize);
+        let field_parent_type = client_field.type_and_field.type_name;
+        format!(
+            "{{ \n\
+            {indent_3}kind: \"EntrypointLoader\",\n\
+            {indent_3}typeAndField: \"{type_and_field}\",\n\
+            {indent_3}loader: () => import(\"../../{field_parent_type}/{name}/entrypoint\").then(module => module.default),\n\
+            {indent_2}}}"
+        )
+    };
 
     let arguments = get_serialized_field_arguments(
         &transform_arguments_with_child_context(
@@ -347,7 +366,7 @@ fn loadably_selected_field_ast_node(
         {indent_2}name: \"{name}\",\n\
         {indent_2}queryArguments: {arguments},\n\
         {indent_2}refetchReaderAst: {reader_ast},\n\
-        {indent_2}entrypoint: {type_and_field}__entrypoint,\n\
+        {indent_2}entrypoint: {entrypoint_text},\n\
         {indent_1}}},\n"
     )
 }

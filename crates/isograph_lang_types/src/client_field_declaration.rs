@@ -48,9 +48,10 @@ pub enum IsographSelectionVariant {
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LoadableDirectiveParameters {
-    #[allow(dead_code)]
     #[serde(default)]
     complete_selection_set: bool,
+    #[serde(default)]
+    pub lazy_load_artifact: bool,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
