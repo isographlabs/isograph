@@ -27,6 +27,7 @@ import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
 import { FragmentReference, Variables } from './FragmentReference';
 import { areEqualObjectsWithDeepComparison } from './areEqualWithDeepComparison';
 import { makeNetworkRequest } from './makeNetworkRequest';
+import { wrapResolvedValue } from './PromiseWrapper';
 
 const TYPENAME_FIELD_NAME = '__typename';
 
@@ -95,12 +96,12 @@ export function getOrCreateCacheForArtifact<
     > = [
       {
         kind: 'FragmentReference',
-        readerWithRefetchQueries: {
+        readerWithRefetchQueries: wrapResolvedValue({
           kind: 'ReaderWithRefetchQueries',
           readerArtifact: entrypoint.readerWithRefetchQueries.readerArtifact,
           nestedRefetchQueries:
             entrypoint.readerWithRefetchQueries.nestedRefetchQueries,
-        },
+        }),
         root: ROOT_ID,
         variables,
         networkRequest: networkRequest,

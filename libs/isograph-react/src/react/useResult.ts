@@ -6,7 +6,11 @@ import {
   getNetworkRequestOptionsWithDefaults,
   NetworkRequestReaderOptions,
 } from '../core/read';
-import { getPromiseState, PromiseWrapper } from '../core/PromiseWrapper';
+import {
+  getPromiseState,
+  PromiseWrapper,
+  readPromise,
+} from '../core/PromiseWrapper';
 
 export function useResult<TReadFromStore extends Object, TClientFieldValue>(
   fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>,
@@ -21,13 +25,16 @@ export function useResult<TReadFromStore extends Object, TClientFieldValue>(
     fragmentReference.networkRequest,
     networkRequestOptions,
   );
+  const readerWithRefetchQueries = readPromise(
+    fragmentReference.readerWithRefetchQueries,
+  );
 
-  switch (fragmentReference.readerWithRefetchQueries.readerArtifact.kind) {
+  switch (readerWithRefetchQueries.readerArtifact.kind) {
     case 'ComponentReaderArtifact': {
       // @ts-expect-error
       return getOrCreateCachedComponent(
         environment,
-        fragmentReference.readerWithRefetchQueries.readerArtifact.componentName,
+        readerWithRefetchQueries.readerArtifact.componentName,
         fragmentReference,
         networkRequestOptions,
       );
@@ -37,9 +44,7 @@ export function useResult<TReadFromStore extends Object, TClientFieldValue>(
         fragmentReference,
         networkRequestOptions,
       );
-      return fragmentReference.readerWithRefetchQueries.readerArtifact.resolver(
-        data,
-      );
+      return readerWithRefetchQueries.readerArtifact.resolver(data);
     }
   }
 }

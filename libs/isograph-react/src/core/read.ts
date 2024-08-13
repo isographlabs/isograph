@@ -9,7 +9,11 @@ import {
   IsographEnvironment,
 } from './IsographEnvironment';
 import { makeNetworkRequest } from './makeNetworkRequest';
-import { PromiseWrapper } from './PromiseWrapper';
+import {
+  PromiseWrapper,
+  readPromise,
+  wrapResolvedValue,
+} from './PromiseWrapper';
 import { ReaderAst } from './reader';
 import { Arguments } from './util';
 
@@ -24,12 +28,17 @@ export function readButDoNotEvaluate<TReadFromStore extends Object>(
   networkRequestOptions: NetworkRequestReaderOptions,
 ): WithEncounteredRecords<TReadFromStore> {
   const mutableEncounteredRecords = new Set<DataId>();
+
+  const readerWithRefetchQueries = readPromise(
+    fragmentReference.readerWithRefetchQueries,
+  );
+
   const response = readData(
     environment,
-    fragmentReference.readerWithRefetchQueries.readerArtifact.readerAst,
+    readerWithRefetchQueries.readerArtifact.readerAst,
     fragmentReference.root,
     fragmentReference.variables ?? {},
-    fragmentReference.readerWithRefetchQueries.nestedRefetchQueries,
+    readerWithRefetchQueries.nestedRefetchQueries,
     fragmentReference.networkRequest,
     networkRequestOptions,
     mutableEncounteredRecords,
@@ -309,11 +318,11 @@ function readData<TReadFromStore>(
             field.readerArtifact.componentName,
             {
               kind: 'FragmentReference',
-              readerWithRefetchQueries: {
+              readerWithRefetchQueries: wrapResolvedValue({
                 kind: 'ReaderWithRefetchQueries',
                 readerArtifact: field.readerArtifact,
                 nestedRefetchQueries: resolverRefetchQueries,
-              },
+              }),
               root,
               variables: generateChildVariableMap(variables, field.arguments),
               networkRequest,
@@ -373,16 +382,18 @@ function readData<TReadFromStore>(
                     field.entrypoint,
                     localVariables,
                   );
+
                 const fragmentReference: FragmentReference<any, any> = {
                   kind: 'FragmentReference',
-                  readerWithRefetchQueries: {
+                  readerWithRefetchQueries: wrapResolvedValue({
                     kind: 'ReaderWithRefetchQueries',
                     readerArtifact:
                       field.entrypoint.readerWithRefetchQueries.readerArtifact,
                     nestedRefetchQueries:
                       field.entrypoint.readerWithRefetchQueries
                         .nestedRefetchQueries,
-                  },
+                  } as const),
+
                   // TODO localVariables is not guaranteed to have an id field
                   root: localVariables.id,
                   variables: localVariables,

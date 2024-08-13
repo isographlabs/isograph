@@ -7,6 +7,7 @@ import { FragmentReference, Variables } from '../core/FragmentReference';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import { ROOT_ID } from '../core/IsographEnvironment';
 import { makeNetworkRequest } from '../core/makeNetworkRequest';
+import { wrapResolvedValue } from '../core/PromiseWrapper';
 
 export function useImperativeReference<
   TReadFromStore extends Object,
@@ -35,12 +36,12 @@ export function useImperativeReference<
       setState([
         {
           kind: 'FragmentReference',
-          readerWithRefetchQueries: {
+          readerWithRefetchQueries: wrapResolvedValue({
             kind: 'ReaderWithRefetchQueries',
             readerArtifact: entrypoint.readerWithRefetchQueries.readerArtifact,
             nestedRefetchQueries:
               entrypoint.readerWithRefetchQueries.nestedRefetchQueries,
-          },
+          }),
           root: ROOT_ID,
           variables,
           networkRequest,

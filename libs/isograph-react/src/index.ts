@@ -8,6 +8,8 @@ export {
   type PromiseWrapper,
   readPromise,
   getPromiseState,
+  wrapResolvedValue,
+  wrapPromise,
 } from './core/PromiseWrapper';
 export { subscribe, normalizeData } from './core/cache';
 export { makeNetworkRequest } from './core/makeNetworkRequest';

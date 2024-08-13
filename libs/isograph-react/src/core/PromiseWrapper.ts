@@ -17,7 +17,7 @@ type Result<T, E> =
  * Invariant:
  * Before the promise is resolved, value becomes non-null.
  */
-export type PromiseWrapper<T, E> = {
+export type PromiseWrapper<T, E = any> = {
   readonly promise: Promise<T>;
   result: Result<Exclude<T, NotSet>, E> | NotSet;
 };
@@ -35,6 +35,17 @@ export function wrapPromise<T>(promise: Promise<T>): PromiseWrapper<T, any> {
       wrapper.result = { kind: 'Err', error: e as any };
     });
   return wrapper;
+}
+
+export function wrapResolvedValue<T>(value: T): PromiseWrapper<T, never> {
+  return {
+    promise: Promise.resolve(value),
+    result: {
+      kind: 'Ok',
+      // @ts-expect-error one should not call wrapResolvedValue with NOT_SET
+      value,
+    },
+  };
 }
 
 export function readPromise<T, E>(p: PromiseWrapper<T, E>): T {

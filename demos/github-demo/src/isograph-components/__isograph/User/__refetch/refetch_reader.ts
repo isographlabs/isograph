@@ -4,7 +4,7 @@ const includeReadOutData = (variables: any, readOutData: any) => {
   return variables;
 };
 
-import { makeNetworkRequest, type IsographEnvironment, type FragmentReference, type RefetchQueryNormalizationArtifactWrapper, type DataId, type TopLevelReaderArtifact } from '@isograph/react';
+import { makeNetworkRequest, wrapResolvedValue, type IsographEnvironment, type FragmentReference, type RefetchQueryNormalizationArtifactWrapper, type DataId, type TopLevelReaderArtifact } from '@isograph/react';
 import { type ItemCleanupPair } from '@isograph/react-disposable-state';
 const resolver = (
   environment: IsographEnvironment,
@@ -21,11 +21,11 @@ const resolver = (
   if (readerArtifact == null) return;
   const fragmentReference = {
     kind: "FragmentReference",
-    readerWithRefetchQueries: {
+    readerWithRefetchQueries: wrapResolvedValue({
       kind: "ReaderWithRefetchQueries",
       readerArtifact,
       nestedRefetchQueries,
-    },
+    }),
     root: rootId,
     variables,
     networkRequest,

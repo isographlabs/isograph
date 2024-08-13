@@ -3,6 +3,7 @@ import { IsographEnvironment } from './IsographEnvironment';
 import { FragmentReference } from './FragmentReference';
 import { useReadAndSubscribe } from '../react/useReadAndSubscribe';
 import { NetworkRequestReaderOptions } from './read';
+import { readPromise } from './PromiseWrapper';
 
 export function getOrCreateCachedComponent(
   environment: IsographEnvironment,
@@ -44,7 +45,11 @@ export function getOrCreateCachedComponent(
           );
         }
 
-        return fragmentReference.readerWithRefetchQueries.readerArtifact.resolver(
+        const readerWithRefetchQueries = readPromise(
+          fragmentReference.readerWithRefetchQueries,
+        );
+
+        return readerWithRefetchQueries.readerArtifact.resolver(
           data,
           additionalRuntimeProps,
         );

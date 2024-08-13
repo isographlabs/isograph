@@ -12,6 +12,7 @@ import {
   createReferenceCountedPointer,
   ReferenceCountedPointer,
 } from '@isograph/reference-counted-pointer';
+import { readPromise } from '../core/PromiseWrapper';
 
 type SkipOrLimit = 'skip' | 'limit';
 type OmitSkipLimit<TArgs> = keyof Omit<TArgs, SkipOrLimit> extends never
@@ -91,7 +92,12 @@ export function useSuspensefulSkipLimitPagination<
       fragmentReference,
       networkRequestOptions,
     );
-    return fragmentReference.readerWithRefetchQueries.readerArtifact.resolver(
+
+    const readerWithRefetchQueries = readPromise(
+      fragmentReference.readerWithRefetchQueries,
+    );
+
+    return readerWithRefetchQueries.readerArtifact.resolver(
       data.item,
       undefined,
     ) as ReadonlyArray<any>;

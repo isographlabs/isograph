@@ -12,9 +12,8 @@ export type FragmentReference<
   TClientFieldValue,
 > = {
   readonly kind: 'FragmentReference';
-  readonly readerWithRefetchQueries: ReaderWithRefetchQueries<
-    TReadFromStore,
-    TClientFieldValue
+  readonly readerWithRefetchQueries: PromiseWrapper<
+    ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
   >;
   readonly root: DataId;
   readonly variables: Variables | null;

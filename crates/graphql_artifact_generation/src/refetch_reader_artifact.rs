@@ -118,7 +118,7 @@ fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctio
     // It should probably be passed from the original entrypoint.
     let content = format!(
         "{include_read_out_data}\n\
-        import {{ makeNetworkRequest, type IsographEnvironment, \
+        import {{ makeNetworkRequest, wrapResolvedValue, type IsographEnvironment, \
         type FragmentReference, type RefetchQueryNormalizationArtifactWrapper, \
         type DataId, type TopLevelReaderArtifact }} \
         from '@isograph/react';\n\
@@ -138,11 +138,11 @@ fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctio
         {indent}if (readerArtifact == null) return;\n\
         {indent}const fragmentReference = {{\n\
         {indent}  kind: \"FragmentReference\",\n\
-        {indent}  readerWithRefetchQueries: {{\n\
+        {indent}  readerWithRefetchQueries: wrapResolvedValue({{\n\
         {indent}    kind: \"ReaderWithRefetchQueries\",\n\
         {indent}    readerArtifact,\n\
         {indent}    nestedRefetchQueries,\n\
-        {indent}  }},\n\
+        {indent}  }} as const),\n\
         {indent}  root: rootId,\n\
         {indent}  variables,\n\
         {indent}  networkRequest,\n\
@@ -160,7 +160,7 @@ fn generate_function_import_statement_for_mutation_reader(
     let indent = "  ";
     ClientFieldFunctionImportStatement(format!(
         "{include_read_out_data}\n\
-        import {{ makeNetworkRequest, type IsographEnvironment, \
+        import {{ makeNetworkRequest, wrapResolvedValue, type IsographEnvironment, \
         type DataId, type TopLevelReaderArtifact, \
         type FragmentReference, \
         type RefetchQueryNormalizationArtifactWrapper \
@@ -181,11 +181,11 @@ fn generate_function_import_statement_for_mutation_reader(
         {indent}if (readerArtifact == null) return;\n\
         {indent}const fragmentReference = {{\n\
         {indent}  kind: \"FragmentReference\",\n\
-        {indent}  readerWithRefetchQueries: {{\n\
+        {indent}  readerWithRefetchQueries: wrapResolvedValue({{\n\
         {indent}    kind: \"ReaderWithRefetchQueries\",\n\
         {indent}    readerArtifact,\n\
         {indent}    nestedRefetchQueries,\n\
-        {indent}  }},\n\
+        {indent}  }} as const),\n\
         {indent}  root: rootId,\n\
         {indent}  variables,\n\
         {indent}  networkRequest,\n\
