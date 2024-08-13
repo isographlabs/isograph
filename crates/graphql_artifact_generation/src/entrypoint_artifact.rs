@@ -261,7 +261,7 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             {}  kind: \"ReaderWithRefetchQueries\",\n\
             {}  nestedRefetchQueries,\n\
             {}  readerArtifact: readerResolver,\n\
-            {}}}
+            {}}},\n\
             }};\n\n\
             export default artifact;\n",
             "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  "

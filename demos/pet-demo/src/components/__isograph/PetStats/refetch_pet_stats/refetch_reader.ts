@@ -24,7 +24,7 @@ const resolver = (
       kind: "ReaderWithRefetchQueries",
       readerArtifact,
       nestedRefetchQueries,
-    }),
+    } as const),
     root: rootId,
     variables,
     networkRequest,

@@ -263,7 +263,7 @@ const artifact: IsographEntrypoint<
     kind: "ReaderWithRefetchQueries",
     nestedRefetchQueries,
     readerArtifact: readerResolver,
-  }
-            };
+  },
+};
 
 export default artifact;
