@@ -257,11 +257,14 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             {}kind: \"Entrypoint\",\n\
             {}queryText,\n\
             {}normalizationAst,\n\
-            {}nestedRefetchQueries,\n\
-            {}readerArtifact: readerResolver,\n\
+            {}readerWithRefetchQueries: {{\n\
+            {}  kind: \"ReaderWithRefetchQueries\",\n\
+            {}  nestedRefetchQueries,\n\
+            {}  readerArtifact: readerResolver,\n\
+            {}}}
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ", "  ",
+            "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  "
         )
     }
 }

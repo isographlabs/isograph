@@ -1,6 +1,20 @@
 import { TopLevelReaderArtifact } from './reader';
 import { Arguments } from './util';
 
+type ReaderWithRefetchQueries<
+  TReadFromStore extends Object,
+  TClientFieldValue,
+> = {
+  readonly kind: 'ReaderWithRefetchQueries';
+  readonly readerArtifact: TopLevelReaderArtifact<
+    TReadFromStore,
+    TClientFieldValue,
+    // TODO don't type this as any
+    any
+  >;
+  readonly nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[];
+};
+
 // This type should be treated as an opaque type.
 export type IsographEntrypoint<
   TReadFromStore extends Object,
@@ -9,13 +23,10 @@ export type IsographEntrypoint<
   readonly kind: 'Entrypoint';
   readonly queryText: string;
   readonly normalizationAst: NormalizationAst;
-  readonly readerArtifact: TopLevelReaderArtifact<
+  readonly readerWithRefetchQueries: ReaderWithRefetchQueries<
     TReadFromStore,
-    TClientFieldValue,
-    // TODO don't type this as any
-    any
+    TClientFieldValue
   >;
-  readonly nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[];
 };
 
 export type NormalizationAstNode =

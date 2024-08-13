@@ -95,10 +95,11 @@ export function getOrCreateCacheForArtifact<
     > = [
       {
         kind: 'FragmentReference',
-        readerArtifact: entrypoint.readerArtifact,
+        readerArtifact: entrypoint.readerWithRefetchQueries.readerArtifact,
         root: ROOT_ID,
         variables,
-        nestedRefetchQueries: entrypoint.nestedRefetchQueries,
+        nestedRefetchQueries:
+          entrypoint.readerWithRefetchQueries.nestedRefetchQueries,
         networkRequest: networkRequest,
       },
       disposeNetworkRequest,

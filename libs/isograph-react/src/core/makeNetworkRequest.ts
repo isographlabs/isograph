@@ -48,7 +48,9 @@ export function makeNetworkRequest(
           artifact.normalizationAst,
           networkResponse.data ?? {},
           variables,
-          artifact.kind === 'Entrypoint' ? artifact.nestedRefetchQueries : [],
+          artifact.kind === 'Entrypoint'
+            ? artifact.readerWithRefetchQueries.nestedRefetchQueries
+            : [],
         );
         const retainedQuery = {
           normalizationAst: artifact.normalizationAst,
