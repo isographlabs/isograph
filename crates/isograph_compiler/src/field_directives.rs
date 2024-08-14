@@ -5,8 +5,8 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     from_isograph_field_directive, ClientFieldDeclaration,
     ClientFieldDeclarationWithUnvalidatedDirectives, ClientFieldDeclarationWithValidatedDirectives,
-    IsographSelectionVariant, LinkedFieldSelection, ScalarFieldSelection, Selection,
-    ServerFieldSelection,
+    IsographFieldDirective, IsographSelectionVariant, LinkedFieldSelection, ScalarFieldSelection,
+    Selection, ServerFieldSelection,
 };
 use isograph_schema::ProcessClientFieldDeclarationError;
 use lazy_static::lazy_static;
@@ -45,11 +45,10 @@ pub fn validate_isograph_field_directives(
         let selecton_set_or_errors = and_then_selection_set_and_collect_errors(
             selection_set,
             &|scalar_field_selection| {
-                if let Some(directive) = scalar_field_selection
-                    .directives
-                    .iter()
-                    .find(|directive| directive.item.name.item == *LOADABLE_DIRECTIVE_NAME)
-                {
+                if let Some(directive) = find_directive_named(
+                    &scalar_field_selection.directives,
+                    *LOADABLE_DIRECTIVE_NAME,
+                ) {
                     let loadable_variant =
                         from_isograph_field_directive(&directive.item).map_err(|message| {
                             WithLocation::new(
@@ -181,4 +180,13 @@ fn and_then_selection_set_and_collect_errors<
     } else {
         Err(errors)
     }
+}
+
+fn find_directive_named(
+    directives: &[WithSpan<IsographFieldDirective>],
+    name: IsographDirectiveName,
+) -> Option<&WithSpan<IsographFieldDirective>> {
+    directives
+        .iter()
+        .find(|directive| directive.item.name.item == name)
 }
