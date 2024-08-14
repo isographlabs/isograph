@@ -7,10 +7,10 @@ use common_lang_types::{
 use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation};
 use intern::Lookup;
 use isograph_lang_types::{
-    ClientFieldId, IsographSelectionVariant, LazyLoadedArtifactDirectiveParameters,
-    LinkedFieldSelection, LoadableDirectiveParameters, ScalarFieldSelection,
-    SelectableServerFieldId, Selection, SelectionFieldArgument, ServerFieldId, ServerObjectId,
-    ServerScalarId, UnvalidatedScalarFieldSelection, UnvalidatedSelection, VariableDefinition,
+    ClientFieldId, IsographSelectionVariant, LinkedFieldSelection, LoadableDirectiveParameters,
+    ScalarFieldSelection, SelectableServerFieldId, Selection, SelectionFieldArgument,
+    ServerFieldId, ServerObjectId, ServerScalarId, UnvalidatedScalarFieldSelection,
+    UnvalidatedSelection, VariableDefinition,
 };
 use thiserror::Error;
 
@@ -73,11 +73,10 @@ pub struct ValidatedScalarFieldAssociatedData {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ValidatedIsographSelectionVariant {
-    Regular(Option<LazyLoadedArtifactDirectiveParameters>),
+    Regular,
     Loadable(
         (
             LoadableDirectiveParameters,
-            Option<LazyLoadedArtifactDirectiveParameters>,
             // TODO this is unused
             MissingArguments,
         ),
@@ -739,21 +738,20 @@ fn validate_field_type_exists_and_is_scalar(
                         associated_data: ValidatedScalarFieldAssociatedData {
                             location: FieldDefinitionLocation::Server(*server_field_id),
                             selection_variant: match scalar_field_selection.associated_data {
-                                IsographSelectionVariant::Regular(lazy) => {
+                                IsographSelectionVariant::Regular => {
                                     assert_no_missing_arguments(
                                         missing_arguments,
                                         scalar_field_selection.name.location,
                                     )?;
-                                    ValidatedIsographSelectionVariant::Regular(lazy)
+                                    ValidatedIsographSelectionVariant::Regular
                                 }
-                                IsographSelectionVariant::Loadable((loadable, lazy)) => {
+                                IsographSelectionVariant::Loadable(l) => {
                                     server_field_cannot_be_selected_loadably(
                                         scalar_field_name,
                                         scalar_field_selection.name.location,
                                     )?;
                                     ValidatedIsographSelectionVariant::Loadable((
-                                        loadable,
-                                        lazy,
+                                        l,
                                         missing_arguments,
                                     ))
                                 }
@@ -795,19 +793,15 @@ fn validate_field_type_exists_and_is_scalar(
                     associated_data: ValidatedScalarFieldAssociatedData {
                         location: FieldDefinitionLocation::Client(*client_field_id),
                         selection_variant: match scalar_field_selection.associated_data {
-                            IsographSelectionVariant::Regular(lazy) => {
+                            IsographSelectionVariant::Regular => {
                                 assert_no_missing_arguments(
                                     missing_arguments,
                                     scalar_field_selection.name.location,
                                 )?;
-                                ValidatedIsographSelectionVariant::Regular(lazy)
+                                ValidatedIsographSelectionVariant::Regular
                             }
-                            IsographSelectionVariant::Loadable((loadable, lazy)) => {
-                                ValidatedIsographSelectionVariant::Loadable((
-                                    loadable,
-                                    lazy,
-                                    missing_arguments,
-                                ))
+                            IsographSelectionVariant::Loadable(l) => {
+                                ValidatedIsographSelectionVariant::Loadable((l, missing_arguments))
                             }
                         },
                     },
@@ -880,13 +874,13 @@ fn validate_field_type_exists_and_is_linked(
                                 associated_data: ValidatedLinkedFieldAssociatedData {
                                     parent_object_id: *object_id,
                                     selection_variant: match linked_field_selection.associated_data {
-                                        IsographSelectionVariant::Regular(lazy) => {
+                                        IsographSelectionVariant::Regular => {
                                             assert_no_missing_arguments(missing_arguments, linked_field_selection.name.location)?;
-                                            ValidatedIsographSelectionVariant::Regular(lazy)
+                                            ValidatedIsographSelectionVariant::Regular
                                         },
-                                        IsographSelectionVariant::Loadable((loadable, lazy)) => {
+                                        IsographSelectionVariant::Loadable(l) => {
                                             server_field_cannot_be_selected_loadably(linked_field_name, linked_field_selection.name.location)?;
-                                            ValidatedIsographSelectionVariant::Loadable((loadable, lazy, missing_arguments))
+                                            ValidatedIsographSelectionVariant::Loadable((l, missing_arguments))
                                         },
                                     },
                                 },
@@ -955,9 +949,9 @@ pub fn categorize_field_loadability<'a>(
 ) -> Option<Loadability<'a>> {
     match &client_field.variant {
         ClientFieldVariant::UserWritten(_) => match selection_variant {
-            ValidatedIsographSelectionVariant::Regular(_) => None,
-            ValidatedIsographSelectionVariant::Loadable((loadable, _, _)) => {
-                Some(Loadability::LoadablySelectedField(loadable))
+            ValidatedIsographSelectionVariant::Regular => None,
+            ValidatedIsographSelectionVariant::Loadable((l, _)) => {
+                Some(Loadability::LoadablySelectedField(l))
             }
         },
         ClientFieldVariant::ImperativelyLoadedField(i) => {

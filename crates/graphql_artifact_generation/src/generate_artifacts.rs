@@ -478,7 +478,7 @@ fn write_param_type_from_selection(
                             .associated_data
                             .selection_variant
                         {
-                            ValidatedIsographSelectionVariant::Regular(_) => inner_output_type,
+                            ValidatedIsographSelectionVariant::Regular => inner_output_type,
                             ValidatedIsographSelectionVariant::Loadable(_) => {
                                 let missing_arguments =
                                     get_missing_arguments_and_validate_argument_types(

@@ -808,7 +808,7 @@ fn insert_imperative_field_into_refetch_paths(
         client_field_id: newly_encountered_scalar_client_field.id,
     };
     merge_traversal_state.refetch_paths.insert(
-        (path, IsographSelectionVariant::Regular(None)),
+        (path, IsographSelectionVariant::Regular),
         RootRefetchedPath {
             field_name: newly_encountered_scalar_client_field.name,
             path_to_refetch_field_info: info,
@@ -885,7 +885,7 @@ fn merge_non_loadable_scalar_client_field(
     let transformed_child_variable_context = parent_variable_context.child_variable_context(
         selection_arguments,
         &newly_encountered_scalar_client_field.variable_definitions,
-        &ValidatedIsographSelectionVariant::Regular(None),
+        &ValidatedIsographSelectionVariant::Regular,
     );
     transform_and_merge_child_selection_map_into_parent_map(
         parent_map,

@@ -102,7 +102,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
         .iter()
         .map(|((path, selection_variant), root_refetch_path)| {
             let current_target_merged_selections = match selection_variant {
-                IsographSelectionVariant::Regular(_) => {
+                IsographSelectionVariant::Regular => {
                     current_target_merged_selections(&path.linked_fields, merged_selection_map)
                 }
                 IsographSelectionVariant::Loadable(_) => {
