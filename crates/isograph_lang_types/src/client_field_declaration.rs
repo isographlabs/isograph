@@ -39,6 +39,8 @@ pub type ClientFieldDeclarationWithUnvalidatedDirectives = ClientFieldDeclaratio
 pub type ClientFieldDeclarationWithValidatedDirectives =
     ClientFieldDeclaration<IsographSelectionVariant, IsographSelectionVariant>;
 
+// TODO we should not have an enum, but instead a struct with fields lazy_load_artifact_info
+// and loadable_info or something.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum IsographSelectionVariant {
     Regular(Option<LazyLoadedArtifactDirectiveParameters>),
