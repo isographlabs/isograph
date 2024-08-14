@@ -198,7 +198,7 @@ impl UnvalidatedSchema {
                             Location::generated(),
                         ),
                         reader_alias: None,
-                        associated_data: IsographSelectionVariant::Regular,
+                        associated_data: IsographSelectionVariant::Regular(None),
                         unwraps: vec![],
                         // TODO what about arguments? How would we handle them?
                         arguments: vec![],

@@ -13,6 +13,8 @@ use lazy_static::lazy_static;
 
 lazy_static! {
     static ref LOADABLE_DIRECTIVE_NAME: IsographDirectiveName = "loadable".intern().into();
+    static ref LAZY_LOAD_ARTIFACT_DIRECTIVE_NAME: IsographDirectiveName =
+        "lazyLoadArtifact".intern().into();
 }
 
 #[allow(clippy::complexity)]
@@ -45,6 +47,23 @@ pub fn validate_isograph_field_directives(
         let selecton_set_or_errors = and_then_selection_set_and_collect_errors(
             selection_set,
             &|scalar_field_selection| {
+                let lazy_load_artifact_info = find_directive_named(
+                    &scalar_field_selection.directives,
+                    *LAZY_LOAD_ARTIFACT_DIRECTIVE_NAME,
+                )
+                .map(|directive| {
+                    from_isograph_field_directive(&directive.item).map_err(|message| {
+                        WithLocation::new(
+                            ProcessClientFieldDeclarationError::UnableToDeserialize {
+                                directive_name: *LAZY_LOAD_ARTIFACT_DIRECTIVE_NAME,
+                                message,
+                            },
+                            Location::generated(),
+                        )
+                    })
+                })
+                .transpose()?;
+
                 if let Some(directive) = find_directive_named(
                     &scalar_field_selection.directives,
                     *LOADABLE_DIRECTIVE_NAME,
@@ -59,14 +78,18 @@ pub fn validate_isograph_field_directives(
                                 Location::generated(),
                             )
                         })?;
+
                     // TODO validate that the field is actually loadable (i.e. implements Node or
                     // whatnot)
-                    Ok(IsographSelectionVariant::Loadable(loadable_variant))
+                    Ok(IsographSelectionVariant::Loadable((
+                        loadable_variant,
+                        lazy_load_artifact_info,
+                    )))
                 } else {
-                    Ok(IsographSelectionVariant::Regular)
+                    Ok(IsographSelectionVariant::Regular(lazy_load_artifact_info))
                 }
             },
-            &|_linked_field_selection| Ok(IsographSelectionVariant::Regular),
+            &|_linked_field_selection| Ok(IsographSelectionVariant::Regular(None)),
         );
         match selecton_set_or_errors {
             Ok(new_selection_set) => transformed_client_fields.push((

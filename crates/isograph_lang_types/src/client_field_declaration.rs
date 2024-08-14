@@ -41,8 +41,13 @@ pub type ClientFieldDeclarationWithValidatedDirectives =
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum IsographSelectionVariant {
-    Regular,
-    Loadable(LoadableDirectiveParameters),
+    Regular(Option<LazyLoadedArtifactDirectiveParameters>),
+    Loadable(
+        (
+            LoadableDirectiveParameters,
+            Option<LazyLoadedArtifactDirectiveParameters>,
+        ),
+    ),
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy)]
@@ -50,9 +55,11 @@ pub enum IsographSelectionVariant {
 pub struct LoadableDirectiveParameters {
     #[serde(default)]
     complete_selection_set: bool,
-    #[serde(default)]
-    pub lazy_load_artifact: bool,
 }
+
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LazyLoadedArtifactDirectiveParameters {}
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum Selection<TScalarField, TLinkedField> {

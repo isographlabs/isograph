@@ -13,7 +13,7 @@ export const PetDetailDeferredRouteComponent = iso(`
   field Query.PetCheckinListRoute($id: ID!) @component {
     pet(id: $id) {
       name
-      PetCheckinsCardList @loadable(lazyLoadArtifact: true)
+      PetCheckinsCardList @loadable @lazyLoadArtifact
     }
   }
 `)(function PetDetailRouteComponent(data) {

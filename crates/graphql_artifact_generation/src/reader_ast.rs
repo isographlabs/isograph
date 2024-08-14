@@ -2,7 +2,7 @@ use std::collections::{BTreeSet, HashSet};
 
 use common_lang_types::{SelectableFieldName, WithSpan};
 use isograph_lang_types::{
-    LoadableDirectiveParameters, RefetchQueryIndex, Selection, ServerFieldSelection,
+    LazyLoadedArtifactDirectiveParameters, RefetchQueryIndex, Selection, ServerFieldSelection,
 };
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, FieldDefinitionLocation,
@@ -149,17 +149,17 @@ fn scalar_client_defined_field_ast_node(
         client_field,
         &scalar_field_selection.associated_data.selection_variant,
     ) {
-        Some(Loadability::LoadablySelectedField(loadable_directive_parameters)) => {
-            loadably_selected_field_ast_node(
-                schema,
-                client_field,
-                reader_imports,
-                indentation_level,
-                scalar_field_selection,
-                &client_field_variable_context,
-                &loadable_directive_parameters,
-            )
-        }
+        Some(Loadability::LoadablySelectedField(_)) => loadably_selected_field_ast_node(
+            schema,
+            client_field,
+            reader_imports,
+            indentation_level,
+            scalar_field_selection,
+            &client_field_variable_context,
+            get_lazy_load_artifact_parameters(
+                &scalar_field_selection.associated_data.selection_variant,
+            ),
+        ),
         Some(Loadability::ImperativelyLoadedField(_)) => imperatively_loaded_variant_ast_node(
             client_field,
             reader_imports,
@@ -300,7 +300,7 @@ fn loadably_selected_field_ast_node(
     indentation_level: u8,
     scalar_field_selection: &ValidatedScalarFieldSelection,
     client_field_variable_context: &VariableContext,
-    loadable_directive_parameters: &LoadableDirectiveParameters,
+    lazy_loaded_variant: &Option<LazyLoadedArtifactDirectiveParameters>,
 ) -> String {
     let name = scalar_field_selection.name.item;
     let alias = scalar_field_selection.name_or_alias().item;
@@ -308,22 +308,25 @@ fn loadably_selected_field_ast_node(
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
     let type_and_field = client_field.type_and_field.underscore_separated();
-    let entrypoint_text = if !loadable_directive_parameters.lazy_load_artifact {
-        reader_imports.insert((
-            client_field.type_and_field,
-            ImportedFileCategory::Entrypoint,
-        ));
-        format!("{type_and_field}__entrypoint")
-    } else {
-        let indent_3 = "  ".repeat((indentation_level + 2) as usize);
-        let field_parent_type = client_field.type_and_field.type_name;
-        format!(
+    let entrypoint_text = match lazy_loaded_variant {
+        Some(_) => {
+            let indent_3 = "  ".repeat((indentation_level + 2) as usize);
+            let field_parent_type = client_field.type_and_field.type_name;
+            format!(
             "{{ \n\
             {indent_3}kind: \"EntrypointLoader\",\n\
             {indent_3}typeAndField: \"{type_and_field}\",\n\
             {indent_3}loader: () => import(\"../../{field_parent_type}/{name}/entrypoint\").then(module => module.default),\n\
             {indent_2}}}"
         )
+        }
+        None => {
+            reader_imports.insert((
+                client_field.type_and_field,
+                ImportedFileCategory::Entrypoint,
+            ));
+            format!("{type_and_field}__entrypoint")
+        }
     };
 
     let arguments = get_serialized_field_arguments(
@@ -569,7 +572,14 @@ fn refetched_paths_with_path(
                                         &initial_variable_context.child_variable_context(
                                             &scalar_field_selection.arguments,
                                             &client_field.variable_definitions,
-                                            &ValidatedIsographSelectionVariant::Regular,
+                                            &ValidatedIsographSelectionVariant::Regular(
+                                                get_lazy_load_artifact_parameters(
+                                                    &scalar_field_selection
+                                                        .associated_data
+                                                        .selection_variant,
+                                                )
+                                                .clone(),
+                                            ),
                                         ),
                                     );
 
@@ -613,4 +623,13 @@ fn refetched_paths_with_path(
     }
 
     paths
+}
+
+fn get_lazy_load_artifact_parameters(
+    selection_variant: &ValidatedIsographSelectionVariant,
+) -> &Option<LazyLoadedArtifactDirectiveParameters> {
+    match selection_variant {
+        ValidatedIsographSelectionVariant::Regular(lazy) => lazy,
+        ValidatedIsographSelectionVariant::Loadable((_, lazy, _)) => lazy,
+    }
 }
