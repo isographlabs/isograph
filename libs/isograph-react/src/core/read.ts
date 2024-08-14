@@ -296,44 +296,53 @@ function readData<TReadFromStore>(
           (index) => nestedRefetchQueries[index],
         );
 
-        const kind = field.readerArtifact.kind;
-        if (kind === 'EagerReaderArtifact') {
-          const data = readData(
-            environment,
-            field.readerArtifact.readerAst,
-            root,
-            variables,
-            resolverRefetchQueries,
-            networkRequest,
-            networkRequestOptions,
-            mutableEncounteredRecords,
-          );
-          if (data.kind === 'MissingData') {
-            return {
-              kind: 'MissingData',
-              reason: 'Missing data for ' + field.alias + ' on root ' + root,
-              nestedReason: data,
-            };
-          } else {
-            target[field.alias] = field.readerArtifact.resolver(data.data);
-          }
-        } else if (kind === 'ComponentReaderArtifact') {
-          target[field.alias] = getOrCreateCachedComponent(
-            environment,
-            field.readerArtifact.componentName,
-            {
-              kind: 'FragmentReference',
-              readerWithRefetchQueries: wrapResolvedValue({
-                kind: 'ReaderWithRefetchQueries',
-                readerArtifact: field.readerArtifact,
-                nestedRefetchQueries: resolverRefetchQueries,
-              }),
+        switch (field.readerArtifact.kind) {
+          case 'EagerReaderArtifact': {
+            const data = readData(
+              environment,
+              field.readerArtifact.readerAst,
               root,
-              variables: generateChildVariableMap(variables, field.arguments),
+              variables,
+              resolverRefetchQueries,
               networkRequest,
-            } as const,
-            networkRequestOptions,
-          );
+              networkRequestOptions,
+              mutableEncounteredRecords,
+            );
+            if (data.kind === 'MissingData') {
+              return {
+                kind: 'MissingData',
+                reason: 'Missing data for ' + field.alias + ' on root ' + root,
+                nestedReason: data,
+              };
+            } else {
+              target[field.alias] = field.readerArtifact.resolver(data.data);
+            }
+            break;
+          }
+          case 'ComponentReaderArtifact': {
+            target[field.alias] = getOrCreateCachedComponent(
+              environment,
+              field.readerArtifact.componentName,
+              {
+                kind: 'FragmentReference',
+                readerWithRefetchQueries: wrapResolvedValue({
+                  kind: 'ReaderWithRefetchQueries',
+                  readerArtifact: field.readerArtifact,
+                  nestedRefetchQueries: resolverRefetchQueries,
+                }),
+                root,
+                variables: generateChildVariableMap(variables, field.arguments),
+                networkRequest,
+              } as const,
+              networkRequestOptions,
+            );
+            break;
+          }
+          default: {
+            let _: never = field.readerArtifact;
+            _;
+            throw new Error('Unexpected kind');
+          }
         }
         break;
       }
