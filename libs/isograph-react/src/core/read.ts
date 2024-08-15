@@ -1,7 +1,10 @@
 import { CleanupFn } from '@isograph/isograph-disposable-types/dist';
 import { getParentRecordKey, onNextChange } from './cache';
 import { getOrCreateCachedComponent } from './componentCache';
-import { RefetchQueryNormalizationArtifactWrapper } from './entrypoint';
+import {
+  IsographEntrypoint,
+  RefetchQueryNormalizationArtifactWrapper,
+} from './entrypoint';
 import { FragmentReference, Variables } from './FragmentReference';
 import {
   assertLink,
@@ -20,7 +23,6 @@ import {
 } from './PromiseWrapper';
 import { ReaderAst } from './reader';
 import { Arguments } from './util';
-import { IsographEntrypoint } from '@isograph/isograph-react/dist';
 
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: Set<DataId>;
