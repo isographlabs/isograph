@@ -10,7 +10,6 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 - Userland impl of pagination, live queries, useQueryLoader (w/ intersection observer)
   - useResult should not call useReadAndSubscribe, probably
 - `isInFlight` function
-- `asFoo` fields
 
 ## GraphQL conf 2024 nice-to-haves
 
@@ -37,6 +36,8 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 - extract query text and normalization AST into their own struct
 - Load normalization ASTs (etc) when a non-null network response is received. Does this require `as Foo`?
   - Basically, requires normalization time stuff
+- `asFoo` fields
+  - requires client pointers
 
 ## Top mid-term compiler/syntax priorities
 
