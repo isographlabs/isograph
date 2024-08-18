@@ -1,7 +1,7 @@
 import type { EagerReaderArtifact, ReaderAst } from '@isograph/react';
 import { Pet__PetCheckinsCardList__param } from './param_type';
 import { Pet__PetCheckinsCardList__output_type } from './output_type';
-import { PetCheckinsCard2 as resolver } from '../../../PetCheckinsCard';
+import { PetCheckinsCardList as resolver } from '../../../PetCheckinsCard';
 import Checkin__CheckinDisplay__resolver_reader from '../../Checkin/CheckinDisplay/resolver_reader';
 
 const readerAst: ReaderAst<Pet__PetCheckinsCardList__param> = [

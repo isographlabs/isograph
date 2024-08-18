@@ -45,7 +45,7 @@ export const CheckinDisplay = iso(`
   </b>
 ));
 
-export const PetCheckinsCard2 = iso(`
+export const PetCheckinsCardList = iso(`
   field Pet.PetCheckinsCardList($skip: Int, $limit: Int) {
     checkins(skip: $skip, limit: $limit) {
       CheckinDisplay
