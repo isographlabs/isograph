@@ -9,6 +9,8 @@ import { ROOT_ID } from '../core/IsographEnvironment';
 import { makeNetworkRequest } from '../core/makeNetworkRequest';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
 
+// TODO rename this to useImperativelyLoadedEntrypoint
+
 export function useImperativeReference<
   TReadFromStore extends Object,
   TClientFieldValue,

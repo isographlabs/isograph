@@ -82,3 +82,4 @@ export { useRerenderOnChange } from './react/useRerenderOnChange';
 
 export { useClientSideDefer } from './loadable-hooks/useClientSideDefer';
 export { useSkipLimitPagination } from './loadable-hooks/useSkipLimitPagination';
+export { useImperativeLoadableField } from './loadable-hooks/useImperativeLoadableField';
