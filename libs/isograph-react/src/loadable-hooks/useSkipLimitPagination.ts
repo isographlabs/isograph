@@ -129,21 +129,17 @@ export function useSkipLimitPagination<
         limit: count,
       })[1]();
       const newPointer = createReferenceCountedPointer(loadedField);
-      const clonedPointers = [
-        ...loadedReferences.map(([refCountedPointer]) => {
-          const clonedRefCountedPointer =
-            refCountedPointer.cloneIfNotDisposed();
-          if (clonedRefCountedPointer == null) {
-            throw new Error(
-              'This reference counted pointer has already been disposed. \
+      const clonedPointers = loadedReferences.map(([refCountedPointer]) => {
+        const clonedRefCountedPointer = refCountedPointer.cloneIfNotDisposed();
+        if (clonedRefCountedPointer == null) {
+          throw new Error(
+            'This reference counted pointer has already been disposed. \
               This is indicative of a bug in useSkipLimitPagination.',
-            );
-          }
-          return clonedRefCountedPointer;
-        }),
-      ];
-
-      const allPointers = [...clonedPointers, newPointer];
+          );
+        }
+        return clonedRefCountedPointer;
+      });
+      clonedPointers.push(newPointer);
 
       const totalItemCleanupPair: ItemCleanupPair<
         ReadonlyArray<
@@ -152,9 +148,9 @@ export function useSkipLimitPagination<
           >
         >
       > = [
-        allPointers,
+        clonedPointers,
         () => {
-          allPointers.forEach(([, dispose]) => {
+          clonedPointers.forEach(([, dispose]) => {
             dispose();
           });
         },
