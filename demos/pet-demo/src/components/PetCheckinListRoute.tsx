@@ -4,7 +4,7 @@ import { Container, Stack, Input, Button } from '@mui/material';
 import {
   FragmentReader,
   useLazyReference,
-  useSuspensefulSkipLimitPagination,
+  useSkipLimitPagination,
 } from '@isograph/react';
 import { FullPageLoading, PetCheckinListRoute, useNavigateTo } from './routes';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -25,7 +25,7 @@ export const PetDetailDeferredRouteComponent = iso(`
   }
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
-  const { fetchMore, results } = useSuspensefulSkipLimitPagination(
+  const skipLimitPaginationState = useSkipLimitPagination(
     pet.PetCheckinsCardList,
   );
   // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -43,7 +43,12 @@ export const PetDetailDeferredRouteComponent = iso(`
         </h3>
         <div>
           <Button
-            onClick={() => fetchMore(undefined, count)}
+            onClick={() =>
+              skipLimitPaginationState.kind === 'Complete'
+                ? skipLimitPaginationState.fetchMore(undefined, count)
+                : null
+            }
+            disabled={skipLimitPaginationState.kind === 'Pending'}
             variant="contained"
           >
             Load more
@@ -57,11 +62,12 @@ export const PetDetailDeferredRouteComponent = iso(`
           />
         </div>
 
-        {results.map((item) => (
+        {skipLimitPaginationState.results.map((item) => (
           <div key={item.id}>
             <item.CheckinDisplay />
           </div>
         ))}
+        {skipLimitPaginationState.kind === 'Pending' && <div>Loading...</div>}
       </Stack>
     </Container>
   );

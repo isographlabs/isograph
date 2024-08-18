@@ -12,17 +12,24 @@ import {
   createReferenceCountedPointer,
   ReferenceCountedPointer,
 } from '@isograph/reference-counted-pointer';
-import { readPromise } from '../core/PromiseWrapper';
+import { getPromiseState, readPromise } from '../core/PromiseWrapper';
 
 type SkipOrLimit = 'skip' | 'limit';
 type OmitSkipLimit<TArgs> = keyof Omit<TArgs, SkipOrLimit> extends never
   ? void | Record<string, never>
   : Omit<TArgs, SkipOrLimit>;
 
-type UseSkipLimitReturnValue<TArgs, TItem> = {
-  readonly fetchMore: (args: OmitSkipLimit<TArgs>, count: number) => void;
-  readonly results: ReadonlyArray<TItem>;
-};
+type UseSkipLimitReturnValue<TArgs, TItem> =
+  | {
+      readonly kind: 'Complete';
+      readonly fetchMore: (args: OmitSkipLimit<TArgs>, count: number) => void;
+      readonly results: ReadonlyArray<TItem>;
+    }
+  | {
+      readonly kind: 'Pending';
+      readonly results: ReadonlyArray<TItem>;
+      readonly pendingFragment: FragmentReference<any, ReadonlyArray<TItem>>;
+    };
 
 type ArrayFragmentReference<TItem> = FragmentReference<
   any,
@@ -54,7 +61,7 @@ function flatten<T>(arr: ReadonlyArray<ReadonlyArray<T>>): ReadonlyArray<T> {
  *
  * Calling fetchMore before the hook mounts is a no-op.
  */
-export function useSuspensefulSkipLimitPagination<
+export function useSkipLimitPagination<
   TArgs extends {
     skip: number | void | null;
     limit: number | void | null;
@@ -72,42 +79,49 @@ export function useSuspensefulSkipLimitPagination<
 
   const environment = useIsographEnvironment();
 
-  const loadedReferences = state === UNASSIGNED_STATE ? [] : state;
-
-  const results = loadedReferences.map(([pointer]) => {
-    const fragmentReference = pointer.getItemIfNotDisposed();
-    if (fragmentReference == null) {
-      throw new Error(
-        'FragmentReference is unexpectedly disposed. \
+  function readCompletedFragmentReferences(
+    completedReferences: ReadonlyArray<
+      ItemCleanupPair<ReferenceCountedPointer<ArrayFragmentReference<TItem>>>
+    >,
+  ) {
+    // In general, this will not suspend. But it could, if there is missing data.
+    // A better version of this hook would not do any reading here.
+    const results = completedReferences.map(([pointer]) => {
+      const fragmentReference = pointer.getItemIfNotDisposed();
+      if (fragmentReference == null) {
+        throw new Error(
+          'FragmentReference is unexpectedly disposed. \
         This is indicative of a bug in Isograph.',
+        );
+      }
+
+      maybeUnwrapNetworkRequest(
+        fragmentReference.networkRequest,
+        networkRequestOptions,
       );
-    }
+      const data = readButDoNotEvaluate(
+        environment,
+        fragmentReference,
+        networkRequestOptions,
+      );
 
-    maybeUnwrapNetworkRequest(
-      fragmentReference.networkRequest,
-      networkRequestOptions,
-    );
-    const data = readButDoNotEvaluate(
-      environment,
-      fragmentReference,
-      networkRequestOptions,
-    );
+      const readerWithRefetchQueries = readPromise(
+        fragmentReference.readerWithRefetchQueries,
+      );
 
-    const readerWithRefetchQueries = readPromise(
-      fragmentReference.readerWithRefetchQueries,
-    );
+      return readerWithRefetchQueries.readerArtifact.resolver(
+        data.item,
+        undefined,
+      ) as ReadonlyArray<any>;
+    });
 
-    return readerWithRefetchQueries.readerArtifact.resolver(
-      data.item,
-      undefined,
-    ) as ReadonlyArray<any>;
-  });
+    const items = flatten(results);
+    return items;
+  }
 
-  const items = flatten(results);
-  const loadedSoFar = items.length;
-
-  return {
-    fetchMore: (args, count) => {
+  const getFetchMore =
+    (loadedSoFar: number) =>
+    (args: OmitSkipLimit<TArgs>, count: number): void => {
       // @ts-expect-error
       const loadedField = loadableField({
         ...args,
@@ -122,7 +136,7 @@ export function useSuspensefulSkipLimitPagination<
           if (clonedRefCountedPointer == null) {
             throw new Error(
               'This reference counted pointer has already been disposed. \
-              This is indicative of a bug in useSuspensefulSkipLimitPagination.',
+              This is indicative of a bug in useSkipLimitPagination.',
             );
           }
           return clonedRefCountedPointer;
@@ -147,7 +161,51 @@ export function useSuspensefulSkipLimitPagination<
       ];
 
       setState(totalItemCleanupPair);
-    },
-    results: items,
-  };
+    };
+
+  const loadedReferences = state === UNASSIGNED_STATE ? [] : state;
+  if (loadedReferences.length === 0) {
+    return {
+      kind: 'Complete',
+      fetchMore: getFetchMore(0),
+      results: [],
+    };
+  }
+
+  const mostRecentItem = loadedReferences[loadedReferences.length - 1];
+  const mostRecentFragmentReference = mostRecentItem[0].getItemIfNotDisposed();
+  if (mostRecentFragmentReference === null) {
+    throw new Error(
+      'FragmentReference is unexpectedly disposed. \
+        This is indicative of a bug in Isograph.',
+    );
+  }
+
+  const networkRequestStatus = getPromiseState(
+    mostRecentFragmentReference.networkRequest,
+  );
+  switch (networkRequestStatus.kind) {
+    case 'Pending': {
+      const completedFragmentReferences = loadedReferences.slice(
+        0,
+        loadedReferences.length - 1,
+      );
+      return {
+        kind: 'Pending',
+        pendingFragment: mostRecentFragmentReference,
+        results: readCompletedFragmentReferences(completedFragmentReferences),
+      };
+    }
+    case 'Err': {
+      throw networkRequestStatus.error;
+    }
+    case 'Ok': {
+      const results = readCompletedFragmentReferences(loadedReferences);
+      return {
+        kind: 'Complete',
+        results,
+        fetchMore: getFetchMore(results.length),
+      };
+    }
+  }
 }

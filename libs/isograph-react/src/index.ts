@@ -81,4 +81,4 @@ export { useLazyReference } from './react/useLazyReference';
 export { useRerenderOnChange } from './react/useRerenderOnChange';
 
 export { useClientSideDefer } from './loadable-hooks/useClientSideDefer';
-export { useSuspensefulSkipLimitPagination } from './loadable-hooks/useSuspensefulSkipLimitPagination';
+export { useSkipLimitPagination } from './loadable-hooks/useSkipLimitPagination';
