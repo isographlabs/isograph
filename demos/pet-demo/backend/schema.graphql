@@ -3,6 +3,12 @@ type Query {
   pet(id: ID!): Pet
   petByName(name: String!): Pet
   node(id: ID!): Node
+  viewer: Viewer!
+}
+
+type Viewer implements Node {
+  id: ID!
+  newsfeed(limit: Int!, skip: Int!, additionalSkip: Int): [NewsfeedItem!]!
 }
 
 type Mutation {
@@ -80,4 +86,32 @@ interface ICheckin {
   id: ID!
   location: String!
   time: String!
+}
+
+type NewsfeedItem {
+  id: ID!
+  # Here, we are imitating an interface via optional fields.
+  # In practice, exactly one of these will be non-null
+  blogItem: BlogItem
+  adItem: AdItem
+}
+
+type BlogItem implements Node {
+  id: ID!
+  author: String!
+  title: String!
+  content: String!
+  moreContent: String!
+  image: Image
+}
+
+type Image implements Node {
+  id: ID!
+  url: String!
+}
+
+type AdItem implements Node {
+  id: ID!
+  advertiser: String!
+  message: String!
 }

@@ -1,4 +1,11 @@
 import { createSchema } from 'graphql-yoga';
+import {
+  getAdItem,
+  getBlogItem,
+  getImage,
+  getNewsfeedItems,
+  newsfeedResolvers,
+} from './newsfeed.js';
 import fs from 'fs';
 
 const schemaContents = fs.readFileSync('./schema.graphql').toString();
@@ -152,9 +159,35 @@ export const schema = createSchema({
         ),
       pets: () => pets,
       node: (_obj, args) => {
-        return getPet(args.id);
+        if (args.id === 'Viewer') {
+          return {
+            __typename: 'Viewer',
+            id: 'Viewer',
+          };
+        }
+        return (
+          getPet(args.id) ??
+          getBlogItem(args.id) ??
+          getAdItem(args.id) ??
+          getImage(args.id)
+        );
+      },
+      viewer: () => {
+        return {
+          __typename: 'Viewer',
+          id: 'Viewer',
+        };
       },
     },
+    Viewer: {
+      newsfeed: (_obj, args) => {
+        return getNewsfeedItems(
+          args.skip + (args.additionalSkip ?? 0),
+          args.limit,
+        );
+      },
+    },
+    ...newsfeedResolvers,
     Pet: {
       stats: (pet) => {
         return pet.stats;

@@ -1,6 +1,13 @@
 import type {IsographEntrypoint} from '@isograph/react';
+import { AdItem__AdItemDisplayWrapper__param } from './AdItem/AdItemDisplayWrapper/param_type';
+import { AdItem__AdItemDisplay__param } from './AdItem/AdItemDisplay/param_type';
+import { BlogItem__BlogItemDisplay__param } from './BlogItem/BlogItemDisplay/param_type';
+import { BlogItem__BlogItemMoreDetail__param } from './BlogItem/BlogItemMoreDetail/param_type';
 import { Checkin__CheckinDisplay__param } from './Checkin/CheckinDisplay/param_type';
+import { Image__ImageDisplayWrapper__param } from './Image/ImageDisplayWrapper/param_type';
+import { Image__ImageDisplay__param } from './Image/ImageDisplay/param_type';
 import { Mutation__SetTagline__param } from './Mutation/SetTagline/param_type';
+import { NewsfeedItem__NewsfeedAdOrBlog__param } from './NewsfeedItem/NewsfeedAdOrBlog/param_type';
 import { Pet__FavoritePhraseLoader__param } from './Pet/FavoritePhraseLoader/param_type';
 import { Pet__PetBestFriendCard__param } from './Pet/PetBestFriendCard/param_type';
 import { Pet__PetCheckinsCardList__param } from './Pet/PetCheckinsCardList/param_type';
@@ -14,14 +21,17 @@ import { Pet__PetUpdater__param } from './Pet/PetUpdater/param_type';
 import { Pet__Unreachable2__param } from './Pet/Unreachable2/param_type';
 import { Pet__UnreachableFromEntrypoint__param } from './Pet/UnreachableFromEntrypoint/param_type';
 import { Query__HomeRoute__param } from './Query/HomeRoute/param_type';
+import { Query__Newsfeed__param } from './Query/Newsfeed/param_type';
 import { Query__PetByName__param } from './Query/PetByName/param_type';
 import { Query__PetCheckinListRoute__param } from './Query/PetCheckinListRoute/param_type';
 import { Query__PetDetailDeferredRoute__param } from './Query/PetDetailDeferredRoute/param_type';
 import { Query__PetDetailRouteInner__param } from './Query/PetDetailRouteInner/param_type';
 import { Query__PetDetailRoute__param } from './Query/PetDetailRoute/param_type';
 import { Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/param_type';
+import { Viewer__NewsfeedPaginationComponent__param } from './Viewer/NewsfeedPaginationComponent/param_type';
 import entrypoint_Mutation__SetTagline from '../__isograph/Mutation/SetTagline/entrypoint';
 import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint';
+import entrypoint_Query__Newsfeed from '../__isograph/Query/Newsfeed/entrypoint';
 import entrypoint_Query__PetByName from '../__isograph/Query/PetByName/entrypoint';
 import entrypoint_Query__PetCheckinListRoute from '../__isograph/Query/PetCheckinListRoute/entrypoint';
 import entrypoint_Query__PetDetailDeferredRoute from '../__isograph/Query/PetDetailDeferredRoute/entrypoint';
@@ -74,12 +84,40 @@ type MatchesWhitespaceAndString<
 > = Whitespace<T> extends `${TString}${string}` ? T : never;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field AdItem.AdItemDisplayWrapper', T>
+): IdentityWithParamComponent<AdItem__AdItemDisplayWrapper__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field AdItem.AdItemDisplay', T>
+): IdentityWithParamComponent<AdItem__AdItemDisplay__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field BlogItem.BlogItemDisplay', T>
+): IdentityWithParamComponent<BlogItem__BlogItemDisplay__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field BlogItem.BlogItemMoreDetail', T>
+): IdentityWithParamComponent<BlogItem__BlogItemMoreDetail__param>;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Checkin.CheckinDisplay', T>
 ): IdentityWithParamComponent<Checkin__CheckinDisplay__param>;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Image.ImageDisplayWrapper', T>
+): IdentityWithParamComponent<Image__ImageDisplayWrapper__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Image.ImageDisplay', T>
+): IdentityWithParamComponent<Image__ImageDisplay__param>;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Mutation.SetTagline', T>
 ): IdentityWithParam<Mutation__SetTagline__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field NewsfeedItem.NewsfeedAdOrBlog', T>
+): IdentityWithParamComponent<NewsfeedItem__NewsfeedAdOrBlog__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.FavoritePhraseLoader', T>
@@ -134,6 +172,10 @@ export function iso<T>(
 ): IdentityWithParamComponent<Query__HomeRoute__param>;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.Newsfeed', T>
+): IdentityWithParamComponent<Query__Newsfeed__param>;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.PetByName', T>
 ): IdentityWithParamComponent<Query__PetByName__param>;
 
@@ -158,12 +200,20 @@ export function iso<T>(
 ): IdentityWithParamComponent<Query__PetFavoritePhrase__param>;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Viewer.NewsfeedPaginationComponent', T>
+): IdentityWithParam<Viewer__NewsfeedPaginationComponent__param>;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Mutation.SetTagline', T>
 ): typeof entrypoint_Mutation__SetTagline;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.HomeRoute', T>
 ): typeof entrypoint_Query__HomeRoute;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.Newsfeed', T>
+): typeof entrypoint_Query__Newsfeed;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.PetByName', T>
