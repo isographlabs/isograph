@@ -7,9 +7,7 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 ## GraphQL conf 2024 priorities
 
 - VSCode extension: syntax highlighting
-- Userland impl of pagination, live queries, useQueryLoader (w/ intersection observer)
-  - useResult should not call useReadAndSubscribe, probably
-- `isInFlight` function
+- router integration
 
 ## GraphQL conf 2024 nice-to-haves
 
@@ -38,6 +36,7 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
   - Basically, requires normalization time stuff
 - `asFoo` fields
   - requires client pointers
+- isInFlight
 
 ## Top mid-term compiler/syntax priorities
 
