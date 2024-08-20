@@ -8,6 +8,7 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 
 - VSCode extension: syntax highlighting
 - router integration
+- ({ data, variables })
 
 ## GraphQL conf 2024 nice-to-haves
 
