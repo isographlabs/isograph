@@ -60,6 +60,8 @@ function flatten<T>(arr: ReadonlyArray<ReadonlyArray<T>>): ReadonlyArray<T> {
  * This hook will suspend if any network request is in flight.
  *
  * Calling fetchMore before the hook mounts is a no-op.
+ *
+ * TODO subscribe to changes
  */
 export function useSkipLimitPagination<
   TArgs extends {

@@ -16,6 +16,7 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 - Proper selection sets (i.e. rooted at the closest loadable field?)
 - Limit exposed fields to specific selections
 - Typing of entrypoint variables
+- subscribe to changes in pagination
 
 ## Top mid-term runtime priorities
 
