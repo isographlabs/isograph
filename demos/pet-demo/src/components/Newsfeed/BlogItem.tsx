@@ -43,8 +43,8 @@ export const BlogItem = iso(`
         </Typography>
 
         <Typography variant="h4">by {capitalize(blogItem.author)}</Typography>
-        {blogItem.content.split('\n').map((paragraph) => (
-          <p>{paragraph}</p>
+        {blogItem.content.split('\n').map((paragraph, index) => (
+          <p key={index}>{paragraph}</p>
         ))}
         <Suspense fallback={<p>Loading more...</p>}>
           {fragmentReference !== UNASSIGNED_STATE ? (

@@ -8,5 +8,5 @@ export const BlogItemMoreDetail = iso(`
 `)((blogItem) => {
   return blogItem.moreContent
     .split('\n')
-    .map((paragraph) => <p>{paragraph}</p>);
+    .map((paragraph, index) => <p key={index}>{paragraph}</p>);
 });
