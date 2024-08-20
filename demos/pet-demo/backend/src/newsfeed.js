@@ -82,7 +82,9 @@ function fillNewsfeedItems(limit) {
       });
     } else {
       const image =
-        Math.random() > 0.9 ? images[getRandomInt(images.length)] : null;
+        blogItems.length > 15 && Math.random() > 0.5
+          ? images[getRandomInt(images.length)]
+          : null;
       const blogItem = {
         __typename: 'BlogItem',
         id: `blog_${blogItems.length}`,
