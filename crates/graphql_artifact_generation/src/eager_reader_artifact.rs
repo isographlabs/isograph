@@ -162,7 +162,8 @@ pub(crate) fn generate_eager_reader_output_type_artifact(
     let client_field_output_type = generate_output_type(client_field);
 
     let output_type_text = format!(
-        "{function_import_statement}\n\
+        "import type React from 'react';\n\
+        {function_import_statement}\n\
         export type {}__{}__output_type = {};",
         parent_type.name, client_field.name, client_field_output_type
     );

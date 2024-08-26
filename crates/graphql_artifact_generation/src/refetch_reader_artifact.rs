@@ -96,8 +96,9 @@ pub(crate) fn generate_refetch_output_type_artifact(
         )
     };
     let output_type_text = format!(
-        "import {{ RefetchQueryNormalizationArtifact }} from '@isograph/react';\n\
-            {output_type_text}"
+        "import type React from 'react';\n\
+        import {{ RefetchQueryNormalizationArtifact }} from '@isograph/react';\n\
+        {output_type_text}"
     );
     ArtifactPathAndContent {
         relative_directory: relative_directory.clone(),
