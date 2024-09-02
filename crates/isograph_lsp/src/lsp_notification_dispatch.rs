@@ -75,7 +75,7 @@ mod test {
                 method: "window/logMessage".to_string(),
                 params: serde_json::to_value(LogMessageParams {
                     typ: MessageType::ERROR,
-                    message: "Use Relay!".to_string(),
+                    message: "Use Isograph!".to_string(),
                 })
                 .unwrap(),
             },
