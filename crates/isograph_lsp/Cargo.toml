@@ -4,7 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+common_lang_types = { path = "../common_lang_types"}
+intern = { path = "../../relay-crates/intern" }
 isograph_compiler = { path = "../isograph_compiler"}
+isograph_lang_parser = { path = "../isograph_lang_parser"}
+isograph_lang_types = { path = "../isograph_lang_types"}
 isograph_config = { path = "../isograph_config"}
 log = { version = "0.4.17", features = ["kv_unstable", "kv_unstable_std"] }
 lsp-server = "0.7.2"

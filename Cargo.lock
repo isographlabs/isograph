@@ -717,9 +717,13 @@ dependencies = [
 name = "isograph_lsp"
 version = "0.1.0"
 dependencies = [
+ "common_lang_types",
  "crossbeam",
+ "intern",
  "isograph_compiler",
  "isograph_config",
+ "isograph_lang_parser",
+ "isograph_lang_types",
  "log",
  "lsp-server",
  "lsp-types",

@@ -8,6 +8,8 @@ pub mod lsp_runtime_error;
 mod lsp_state;
 pub mod server;
 pub mod text_document;
+mod lsp_request_dispatch;
+mod semantic_tokens;
 
 pub async fn start_language_server(config: CompilerConfig) -> LSPProcessResult<()> {
     let (connection, io_handles) = Connection::stdio();

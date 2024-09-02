@@ -97,15 +97,15 @@ lazy_static! {
         Regex::new(r"(export const ([^ ]+) =\s+)?iso(\()?`([^`]+)`(\))?(\()?").unwrap();
 }
 
-pub(crate) struct IsoLiteralExtraction<'a> {
-    pub(crate) const_export_name: Option<&'a str>,
-    pub(crate) iso_literal_text: &'a str,
-    pub(crate) iso_literal_start_index: usize,
-    pub(crate) has_associated_js_function: bool,
-    pub(crate) has_paren: bool,
+pub struct IsoLiteralExtraction<'a> {
+    pub const_export_name: Option<&'a str>,
+    pub iso_literal_text: &'a str,
+    pub iso_literal_start_index: usize,
+    pub has_associated_js_function: bool,
+    pub has_paren: bool,
 }
 
-pub(crate) fn extract_iso_literal_from_file_content(
+pub fn extract_iso_literal_from_file_content(
     content: &str,
 ) -> impl Iterator<Item = IsoLiteralExtraction> + '_ {
     EXTRACT_ISO_LITERAL.captures_iter(content).map(|captures| {
