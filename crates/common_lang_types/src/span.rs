@@ -62,6 +62,10 @@ impl Span {
     pub fn as_usize_range(&self) -> Range<usize> {
         (self.start as usize)..(self.end as usize)
     }
+
+    pub fn len(&self) -> u32 {
+        self.end - self.start
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
