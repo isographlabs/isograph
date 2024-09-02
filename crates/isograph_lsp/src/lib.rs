@@ -2,8 +2,12 @@ use isograph_config::CompilerConfig;
 use lsp_process_error::LSPProcessResult;
 use lsp_server::Connection;
 
+pub mod lsp_notification_dispatch;
 pub mod lsp_process_error;
+pub mod lsp_runtime_error;
+mod lsp_state;
 pub mod server;
+pub mod text_document;
 
 pub async fn start_language_server(config: CompilerConfig) -> LSPProcessResult<()> {
     let (connection, io_handles) = Connection::stdio();
