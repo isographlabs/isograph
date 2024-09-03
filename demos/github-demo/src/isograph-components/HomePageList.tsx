@@ -4,7 +4,7 @@ import { Button } from '@mui/material';
 import { Route } from './GithubDemo';
 
 export const HomePageList = iso(`
-  field Query.HomePageList($first: Int!) @component {
+  field Query.HomePageList @component {
     viewer {
       login
       name

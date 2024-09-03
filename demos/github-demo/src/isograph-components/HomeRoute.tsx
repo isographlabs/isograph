@@ -8,9 +8,9 @@ import { FullPageLoading, Route } from './GithubDemo';
 import { RepoGitHubLink } from './RepoGitHubLink';
 
 export const HomePage = iso(`
-  field Query.HomePage($first: Int!) @component {
+  field Query.HomePage @component {
     Header
-    HomePageList(first: $first)
+    HomePageList
   }
 `)(function HomePageComponent(
   data,

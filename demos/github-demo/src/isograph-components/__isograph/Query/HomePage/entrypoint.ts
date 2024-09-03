@@ -7,7 +7,7 @@ const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [
   { artifact: refetchQuery0, allowedVariables: ["id", ] },
 ];
 
-const queryText = 'query HomePage ($first: Int!) {\
+const queryText = 'query HomePage  {\
   viewer {\
     id,\
     avatarUrl,\
