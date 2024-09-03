@@ -9,6 +9,8 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 - VSCode extension: syntax highlighting
 - router integration
 - `({ data, variables })`
+- Apparently string literals aren't allowed as parameters...
+- mutation/query bug for refetch fields... lol
 
 ## GraphQL conf 2024 nice-to-haves
 
