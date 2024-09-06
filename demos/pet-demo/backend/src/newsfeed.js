@@ -15,8 +15,26 @@ const lorem = new LoremIpsum({
   },
 });
 
-const newsfeedItems = [];
-const blogItems = [];
+const firstBlog = {
+  __typename: 'BlogItem',
+  id: 'blog_0',
+  author: 'Relatoris',
+  title: 'Declaratio amoris',
+  content:
+    'Relator se sponso suo satis dementer declarat. Pulchra est. \
+Saltat bene. Habet mirabilem saporem in domibus. \n\
+Ac per hoc se felicissimum esse existimat. \
+Pergit facere meliorem hominem, et sperat unum diem quibusdam modis ei aequare.\n\
+Id abhorret a physicis mundi.',
+  moreContent: 'Is that not enough for you?',
+};
+const newsfeedItems = [
+  {
+    id: 'newsFeed_0',
+    blogItem: firstBlog,
+  },
+];
+const blogItems = [firstBlog];
 const adItems = [];
 const images = [
   {
@@ -82,7 +100,7 @@ function fillNewsfeedItems(limit) {
       });
     } else {
       const image =
-        blogItems.length > 15 && Math.random() > 0.5
+        blogItems.length > 15 && Math.random() > 0.7
           ? images[getRandomInt(images.length)]
           : null;
       const blogItem = {

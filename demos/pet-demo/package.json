@@ -24,6 +24,7 @@
     "eslint-config-next": "13.4.19",
     "graphql": "^16.6.0",
     "graphql-yoga": "^4.0.4",
+    "lorem-ipsum": "^2.0.8",
     "next": "13.4.19",
     "react": "18.2.0",
     "react-dom": "18.2.0",
