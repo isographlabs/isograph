@@ -1,6 +1,7 @@
 import React from 'react';
 import { iso } from '@iso';
 import { Button, Card, CardContent } from '@mui/material';
+import { useImperativeExposedMutationField } from '@isograph/react';
 
 export const PetCheckinsCard = iso(`
   field Pet.PetCheckinsCard($skip: Int, $limit: Int) @component {
@@ -36,14 +37,17 @@ export const CheckinDisplay = iso(`
     time
     make_super
   }
-`)((checkin) => (
-  <b>
-    {checkin.location} at {checkin.time}&nbsp;
-    <Button onClick={() => checkin.make_super({})[1]()} variant="text">
-      🎉
-    </Button>
-  </b>
-));
+`)((checkin) => {
+  const { loadField } = useImperativeExposedMutationField(checkin.make_super);
+  return (
+    <b>
+      {checkin.location} at {checkin.time}&nbsp;
+      <Button onClick={() => loadField({})} variant="text">
+        🎉
+      </Button>
+    </b>
+  );
+});
 
 export const PetCheckinsCardList = iso(`
   field Pet.PetCheckinsCardList($skip: Int, $limit: Int) {
