@@ -1,22 +1,21 @@
-use common_lang_types::Span;
-use common_lang_types::TextSource;
-use common_lang_types::WithSpan;
-use isograph_compiler::extract_iso_literal_from_file_content;
-use isograph_compiler::IsoLiteralExtraction;
-use isograph_lang_parser::parse_iso_literal;
-use isograph_lang_parser::IsoLiteralExtractionResult;
-use isograph_lang_types::ClientFieldDeclarationWithUnvalidatedDirectives;
-use isograph_lang_types::EntrypointTypeAndField;
-use lsp_types::request::SemanticTokensFullRequest;
-use lsp_types::request::Request;
-use lsp_types::SemanticToken;
-use lsp_types::SemanticTokenType;
-use lsp_types::SemanticTokens;
-use lsp_types::SemanticTokensParams;
-use lsp_types::SemanticTokensResult;
-use crate::lsp_runtime_error::LSPRuntimeResult;
-use crate::lsp_state::LSPState;
-use intern::{string_key::Intern, Lookup};
+use std::ops::Range;
+
+use crate::{
+    lsp_runtime_error::LSPRuntimeResult,
+    lsp_state::LSPState,
+    row_col_offset::{diff_from_slice_and_range, get_index_from_diff, ColOffset, RowColDiff},
+};
+use common_lang_types::{Span, TextSource, WithSpan};
+use intern::string_key::Intern;
+use isograph_compiler::{extract_iso_literal_from_file_content, IsoLiteralExtraction};
+use isograph_lang_parser::{parse_iso_literal, IsoLiteralExtractionResult};
+use isograph_lang_types::{
+    ClientFieldDeclarationWithUnvalidatedDirectives, EntrypointTypeAndField,
+};
+use lsp_types::{
+    request::{Request, SemanticTokensFullRequest},
+    SemanticToken, SemanticTokens, SemanticTokensParams, SemanticTokensResult,
+};
 
 pub fn on_semantic_token_full_request(
     state: &mut LSPState,
@@ -24,21 +23,45 @@ pub fn on_semantic_token_full_request(
 ) -> LSPRuntimeResult<<SemanticTokensFullRequest as Request>::Result> {
     let SemanticTokensParams {
         text_document,
-        work_done_progress_params:_,
-        partial_result_params:_,
-        
+        work_done_progress_params: _,
+        partial_result_params: _,
     } = params;
-    let text = state.text_for(&text_document.uri).expect(format!("Retrieving semantic tokens for document not opened before {}", text_document.uri).as_str());
+    let text = state.text_for(&text_document.uri).expect(
+        format!(
+            "Retrieving semantic tokens for document not opened before {}",
+            text_document.uri
+        )
+        .as_str(),
+    );
     let literal_extractions = extract_iso_literal_from_file_content(text);
     let mut semantic_tokens = vec![];
-    for literal_extraction in literal_extractions{
+
+    // SemanticTokens are all relative to the start of the previous one, so we have to
+    // keep track of the start of the last token that we have pushed onto
+    // semantic_tokens
+    let mut index_of_last_token = 0;
+
+    // N.B. we are relying on the literal extractions being in order on the page.
+    for literal_extraction in literal_extractions {
         let IsoLiteralExtraction {
             iso_literal_text,
             iso_literal_start_index,
-            has_associated_js_function,
             const_export_name,
-            has_paren,
+            ..
         } = literal_extraction;
+
+        eprintln!(
+            "start index {iso_literal_start_index}\ntext {}<-\nlast token {index_of_last_token}",
+            text[0..iso_literal_start_index].to_string()
+        );
+        let initial_diff = diff_from_slice_and_range(
+            text,
+            Range {
+                start: index_of_last_token,
+                end: iso_literal_start_index,
+            },
+        );
+
         let file_path = text_document.uri.path().intern();
         let text_source = TextSource {
             path: file_path.into(),
@@ -54,48 +77,101 @@ pub fn on_semantic_token_full_request(
             text_source,
         );
         if let Ok(iso_literal_extraction_result) = iso_literal_extraction_result {
-            semantic_tokens.extend(
-                iso_literal_parse_result_to_tokens(iso_literal_extraction_result )
-            )
+            let (new_tokens, total_diff) = iso_literal_parse_result_to_tokens(
+                iso_literal_extraction_result,
+                iso_literal_text,
+                initial_diff,
+            );
+            semantic_tokens.extend(new_tokens);
+            eprintln!("Total diff {total_diff:?}");
+            let new_index = get_index_from_diff(&text, total_diff);
+            eprintln!("new index {new_index:?}");
+            index_of_last_token = new_index;
         }
     }
-    let result = SemanticTokensResult::Tokens(SemanticTokens{
+    let result = SemanticTokensResult::Tokens(SemanticTokens {
         data: semantic_tokens,
         result_id: None,
     });
     Ok(Some(result))
-
 }
 
-fn iso_literal_parse_result_to_tokens(iso_literal_extraction_result:IsoLiteralExtractionResult) -> Vec<SemanticToken> {
+fn iso_literal_parse_result_to_tokens(
+    iso_literal_extraction_result: IsoLiteralExtractionResult,
+    iso_literal_text: &str,
+    initial_diff: RowColDiff,
+) -> (Vec<SemanticToken>, RowColDiff) {
     match iso_literal_extraction_result {
         IsoLiteralExtractionResult::ClientFieldDeclaration(client_field_declaration) => {
-            client_field_declaration_to_tokens(client_field_declaration)
+            client_field_declaration_to_tokens(
+                client_field_declaration,
+                iso_literal_text,
+                initial_diff,
+            )
         }
         IsoLiteralExtractionResult::EntrypointDeclaration(entrypoint_declaration) => {
-            entrypoint_declaration_to_tokens(entrypoint_declaration)
+            entrypoint_declaration_to_tokens(entrypoint_declaration, iso_literal_text, initial_diff)
         }
     }
 }
 
-fn client_field_declaration_to_tokens(client_field_declaration:WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>) -> Vec<SemanticToken> {
-    vec![]
+fn client_field_declaration_to_tokens(
+    client_field_declaration: WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>,
+    iso_literal_text: &str,
+    initial_diff: RowColDiff,
+) -> (Vec<SemanticToken>, RowColDiff) {
+    (vec![], RowColDiff::SameRow(ColOffset { col_offset: 0 }))
 }
 
-fn entrypoint_declaration_to_tokens(entrypoint_declaration:WithSpan<EntrypointTypeAndField>) -> Vec<SemanticToken> {
-    let parent_semantic_token = SemanticToken{
-        delta_line: 0,
-        delta_start: 0,
-        length: 1,
-        token_type: 1,
+fn entrypoint_declaration_to_tokens(
+    entrypoint_declaration: WithSpan<EntrypointTypeAndField>,
+    iso_literal_text: &str,
+    initial_diff: RowColDiff,
+) -> (Vec<SemanticToken>, RowColDiff) {
+    let parent_type_span = entrypoint_declaration.item.parent_type.span;
+    let parent_type_diff = initial_diff
+        + diff_from_slice_and_range(iso_literal_text, 0..(parent_type_span.start as usize));
+    let parent_type_semantic_token = SemanticToken {
+        delta_line: parent_type_diff.delta_line(),
+        delta_start: parent_type_diff.delta_start(),
+        length: parent_type_span.len(),
+        token_type: 3, // TYPE
         token_modifiers_bitset: 0,
     };
-    let client_field_name_token = SemanticToken{
-        delta_line: 1,
-        delta_start: 1,
-        length: 1,
-        token_type: 0,
+
+    let field_name_span = entrypoint_declaration.item.client_field_name.span;
+    let field_name_diff = diff_from_slice_and_range(
+        iso_literal_text,
+        (parent_type_span.end as usize)..(field_name_span.start as usize),
+    );
+    let field_name_semantic_token = SemanticToken {
+        delta_line: field_name_diff.delta_line(),
+        delta_start: field_name_diff.delta_start() + parent_type_span.len(),
+        length: field_name_span.len(),
+        token_type: 4, // VARIABLE
         token_modifiers_bitset: 0,
     };
-    vec![parent_semantic_token, client_field_name_token]
+
+    let diff_to_last_token = parent_type_diff + field_name_diff;
+
+    (
+        vec![parent_type_semantic_token, field_name_semantic_token],
+        diff_to_last_token,
+    )
+
+    // let parent_type_semantic_token = SemanticToken {
+    //     delta_line: 0,
+    //     delta_start: 2,
+    //     length: 1,
+    //     token_type: 0,
+    //     token_modifiers_bitset: 0,
+    // };
+    // let client_field_name_token = SemanticToken {
+    //     delta_line: 0,
+    //     delta_start: 2,
+    //     length: 1,
+    //     token_type: 0,
+    //     token_modifiers_bitset: 0,
+    // };
+    // vec![parent_type_semantic_token, client_field_name_token]
 }

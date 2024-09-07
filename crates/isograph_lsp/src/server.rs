@@ -30,8 +30,14 @@ pub fn initialize(connection: &Connection) -> LSPProcessResult<InitializeParams>
         semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
             SemanticTokensOptions {
                 work_done_progress_options: WorkDoneProgressOptions::default(),
-                legend: SemanticTokensLegend{
-                    token_types: vec![SemanticTokenType::VARIABLE, SemanticTokenType::KEYWORD],
+                legend: SemanticTokensLegend {
+                    token_types: vec![
+                        SemanticTokenType::VARIABLE,
+                        SemanticTokenType::KEYWORD,
+                        SemanticTokenType::CLASS,
+                        SemanticTokenType::TYPE,
+                        SemanticTokenType::PROPERTY,
+                    ],
                     token_modifiers: vec![],
                 },
                 range: None,
