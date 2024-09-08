@@ -29,7 +29,7 @@ use thiserror::Error;
 use crate::{
     field_directives::validate_isograph_field_directives,
     isograph_literals::{
-        extract_iso_literal_from_file_content, read_files_in_folder, IsoLiteralExtraction,
+        extract_iso_literals_from_file_content, read_files_in_folder, IsoLiteralExtraction,
     },
     refetch_fields::add_refetch_fields_to_objects,
     schema::read_schema_file,
@@ -289,7 +289,7 @@ fn extract_iso_literals(
             .intern()
             .into();
 
-        for iso_literal_extraction in extract_iso_literal_from_file_content(&file_content) {
+        for iso_literal_extraction in extract_iso_literals_from_file_content(&file_content) {
             match process_iso_literal_extraction(
                 iso_literal_extraction,
                 file_name,

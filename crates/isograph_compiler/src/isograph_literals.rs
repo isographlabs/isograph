@@ -105,7 +105,7 @@ pub struct IsoLiteralExtraction<'a> {
     pub has_paren: bool,
 }
 
-pub fn extract_iso_literal_from_file_content(
+pub fn extract_iso_literals_from_file_content(
     content: &str,
 ) -> impl Iterator<Item = IsoLiteralExtraction> + '_ {
     EXTRACT_ISO_LITERAL.captures_iter(content).map(|captures| {

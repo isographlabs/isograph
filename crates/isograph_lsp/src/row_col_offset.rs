@@ -6,6 +6,12 @@ pub(crate) enum RowColDiff {
     DifferentRow(RowAndColOffset),
 }
 
+impl Default for RowColDiff {
+    fn default() -> Self {
+        Self::SameRow(ColOffset { col_offset: 0 })
+    }
+}
+
 impl RowColDiff {
     pub fn delta_start(&self) -> u32 {
         match self {
