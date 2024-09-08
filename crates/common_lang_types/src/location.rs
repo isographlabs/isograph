@@ -68,6 +68,13 @@ impl Location {
     pub fn new(text_source: TextSource, span: Span) -> Self {
         Location::Embedded(EmbeddedLocation::new(text_source, span))
     }
+
+    pub fn span(&self) -> Option<Span> {
+        match self {
+            Location::Embedded(embedded) => Some(embedded.span),
+            Location::Generated => None,
+        }
+    }
 }
 impl EmbeddedLocation {
     pub fn new(text_source: TextSource, span: Span) -> Self {

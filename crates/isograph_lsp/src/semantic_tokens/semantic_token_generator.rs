@@ -21,8 +21,8 @@ impl<'a> SemanticTokenGenerator<'a> {
     pub(crate) fn generate_semantic_token(&mut self, span: Span, token_type: u32) {
         let token = match self.state {
             SemanticTokenGeneratorState::InitialDiff(initial_diff) => {
-                let diff =
-                    initial_diff + diff_to_end_of_slice(&self.text[0..(span.start as usize)]);
+                let new_diff = diff_to_end_of_slice(&self.text[0..(span.start as usize)]);
+                let diff = initial_diff + new_diff;
                 self.state = SemanticTokenGeneratorState::LastSpan(span);
                 self.final_diff = self.final_diff + diff;
                 SemanticToken {

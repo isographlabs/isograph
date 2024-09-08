@@ -33,6 +33,11 @@ pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: FilePath,
+
+    // TODO consider making these behind a cfg flag, since they're only used
+    // by the LSP
+    pub field_keyword: WithSpan<()>,
+    pub dot: WithSpan<()>,
 }
 
 pub type ClientFieldDeclarationWithUnvalidatedDirectives = ClientFieldDeclaration<(), ()>;
@@ -177,6 +182,7 @@ pub struct ScalarFieldSelection<TScalarField> {
     pub name: WithLocation<ScalarFieldName>,
     pub reader_alias: Option<WithLocation<ScalarFieldAlias>>,
     pub associated_data: TScalarField,
+    // TODO remove until we are ready for this :/
     pub unwraps: Vec<WithSpan<Unwrap>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
     pub directives: Vec<WithSpan<IsographFieldDirective>>,

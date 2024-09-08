@@ -1,3 +1,4 @@
+mod client_field;
 mod entrypoint;
 mod semantic_token_generator;
 pub(crate) mod semantic_token_legend;
@@ -7,18 +8,16 @@ use crate::{
     lsp_state::LSPState,
     row_col_offset::{diff_to_end_of_slice, get_index_from_diff, RowColDiff},
 };
-use common_lang_types::{Span, TextSource, WithSpan};
+use client_field::client_field_declaration_to_tokens;
+use common_lang_types::{Span, TextSource};
 use entrypoint::entrypoint_declaration_to_tokens;
 use intern::string_key::Intern;
 use isograph_compiler::{extract_iso_literals_from_file_content, IsoLiteralExtraction};
 use isograph_lang_parser::{parse_iso_literal, IsoLiteralExtractionResult};
-use isograph_lang_types::ClientFieldDeclarationWithUnvalidatedDirectives;
 use lsp_types::{
     request::{Request, SemanticTokensFullRequest},
     SemanticToken, SemanticTokens, SemanticTokensParams, SemanticTokensResult,
 };
-use semantic_token_generator::SemanticTokenGenerator;
-use semantic_token_legend::{semantic_token_method, semantic_token_type};
 
 pub fn on_semantic_token_full_request(
     state: &mut LSPState,
@@ -72,17 +71,15 @@ pub fn on_semantic_token_full_request(
             text_source,
         );
         if let Ok(iso_literal_extraction_result) = iso_literal_extraction_result {
-            let (new_tokens, total_diff) = iso_literal_parse_result_to_tokens(
-                iso_literal_extraction_result,
-                iso_literal_text,
-                initial_diff,
-            );
+            let (new_tokens, diff_from_start_of_file_to_start_of_last_token) =
+                iso_literal_parse_result_to_tokens(
+                    iso_literal_extraction_result,
+                    iso_literal_text,
+                    initial_diff,
+                );
             semantic_tokens.extend(new_tokens);
-            let new_index = get_index_from_diff(
-                &file_text[index_of_last_token..iso_literal_start_index],
-                total_diff,
-            );
-            index_of_last_token = new_index + index_of_last_token;
+            index_of_last_token =
+                get_index_from_diff(&file_text, diff_from_start_of_file_to_start_of_last_token);
         }
     }
     let result = SemanticTokensResult::Tokens(SemanticTokens {
@@ -109,21 +106,4 @@ fn iso_literal_parse_result_to_tokens(
             entrypoint_declaration_to_tokens(entrypoint_declaration, iso_literal_text, initial_diff)
         }
     }
-}
-
-fn client_field_declaration_to_tokens(
-    client_field_declaration: WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>,
-    iso_literal_text: &str,
-    initial_diff: RowColDiff,
-) -> (Vec<SemanticToken>, RowColDiff) {
-    let mut semantic_token_generator = SemanticTokenGenerator::new(iso_literal_text, initial_diff);
-    semantic_token_generator.generate_semantic_token(
-        client_field_declaration.item.parent_type.span,
-        semantic_token_type(),
-    );
-    semantic_token_generator.generate_semantic_token(
-        client_field_declaration.item.client_field_name.span,
-        semantic_token_method(),
-    );
-    semantic_token_generator.consume()
 }

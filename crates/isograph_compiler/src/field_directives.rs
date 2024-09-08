@@ -41,6 +41,8 @@ pub fn validate_isograph_field_directives(
             directives,
             variable_definitions,
             definition_path,
+            dot,
+            field_keyword,
         } = with_span.item;
         let selecton_set_or_errors = and_then_selection_set_and_collect_errors(
             selection_set,
@@ -81,6 +83,8 @@ pub fn validate_isograph_field_directives(
                         directives,
                         variable_definitions,
                         definition_path,
+                        dot,
+                        field_keyword,
                     },
                     with_span.span,
                 ),
