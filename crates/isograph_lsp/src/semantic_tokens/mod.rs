@@ -1,3 +1,4 @@
+mod semantic_token_generator;
 pub(crate) mod semantic_token_legend;
 
 use crate::{
@@ -16,6 +17,7 @@ use lsp_types::{
     request::{Request, SemanticTokensFullRequest},
     SemanticToken, SemanticTokens, SemanticTokensParams, SemanticTokensResult,
 };
+use semantic_token_generator::SemanticTokenGenerator;
 use semantic_token_legend::{semantic_token_property, semantic_token_type};
 
 pub fn on_semantic_token_full_request(
@@ -141,66 +143,4 @@ fn entrypoint_declaration_to_tokens(
         semantic_token_property(),
     );
     semantic_token_generator.consume()
-}
-
-#[derive(Debug)]
-enum SemanticTokenGeneratorState {
-    InitialDiff(RowColDiff),
-    LastSpan(Span),
-}
-
-#[derive(Debug)]
-struct SemanticTokenGenerator<'a> {
-    state: SemanticTokenGeneratorState,
-    text: &'a str,
-    tokens: Vec<SemanticToken>,
-    final_diff: RowColDiff,
-}
-
-impl<'a> SemanticTokenGenerator<'a> {
-    fn generate_semantic_token(&mut self, span: Span, token_type: u32) {
-        let token = match self.state {
-            SemanticTokenGeneratorState::InitialDiff(initial_diff) => {
-                let diff =
-                    initial_diff + diff_to_end_of_slice(&self.text[0..(span.start as usize)]);
-                self.state = SemanticTokenGeneratorState::LastSpan(span);
-                self.final_diff = self.final_diff + diff;
-                SemanticToken {
-                    delta_line: diff.delta_line(),
-                    delta_start: diff.delta_start(),
-                    length: span.len(),
-                    token_type,
-                    token_modifiers_bitset: 0,
-                }
-            }
-            SemanticTokenGeneratorState::LastSpan(last_span) => {
-                let diff = diff_to_end_of_slice(
-                    &self.text[(last_span.start as usize)..(span.start as usize)],
-                );
-                self.final_diff = self.final_diff + diff;
-                self.state = SemanticTokenGeneratorState::LastSpan(span);
-                SemanticToken {
-                    delta_line: diff.delta_line(),
-                    delta_start: diff.delta_start(),
-                    length: span.len(),
-                    token_type,
-                    token_modifiers_bitset: 0,
-                }
-            }
-        };
-        self.tokens.push(token);
-    }
-
-    fn new(text: &'a str, initial_diff: RowColDiff) -> Self {
-        Self {
-            state: SemanticTokenGeneratorState::InitialDiff(initial_diff),
-            text,
-            tokens: vec![],
-            final_diff: RowColDiff::default(),
-        }
-    }
-
-    fn consume(self) -> (Vec<SemanticToken>, RowColDiff) {
-        (self.tokens, self.final_diff)
-    }
 }
