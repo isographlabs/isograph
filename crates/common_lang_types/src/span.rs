@@ -66,6 +66,13 @@ impl Span {
     pub fn len(&self) -> u32 {
         self.end - self.start
     }
+
+    pub fn span_between(&self, other: &Span) -> Span {
+        Span {
+            start: self.end,
+            end: other.start,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
