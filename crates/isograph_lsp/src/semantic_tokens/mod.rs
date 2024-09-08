@@ -18,7 +18,7 @@ use lsp_types::{
     SemanticToken, SemanticTokens, SemanticTokensParams, SemanticTokensResult,
 };
 use semantic_token_generator::SemanticTokenGenerator;
-use semantic_token_legend::{semantic_token_property, semantic_token_type};
+use semantic_token_legend::{semantic_token_method, semantic_token_type};
 
 pub fn on_semantic_token_full_request(
     state: &mut LSPState,
@@ -123,7 +123,7 @@ fn client_field_declaration_to_tokens(
     );
     semantic_token_generator.generate_semantic_token(
         client_field_declaration.item.client_field_name.span,
-        semantic_token_property(),
+        semantic_token_method(),
     );
     semantic_token_generator.consume()
 }
@@ -140,7 +140,7 @@ fn entrypoint_declaration_to_tokens(
     );
     semantic_token_generator.generate_semantic_token(
         entrypoint_declaration.item.client_field_name.span,
-        semantic_token_property(),
+        semantic_token_method(),
     );
     semantic_token_generator.consume()
 }
