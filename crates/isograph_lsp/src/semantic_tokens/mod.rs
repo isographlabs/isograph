@@ -1,3 +1,4 @@
+mod entrypoint;
 mod semantic_token_generator;
 pub(crate) mod semantic_token_legend;
 
@@ -7,12 +8,11 @@ use crate::{
     row_col_offset::{diff_to_end_of_slice, get_index_from_diff, RowColDiff},
 };
 use common_lang_types::{Span, TextSource, WithSpan};
+use entrypoint::entrypoint_declaration_to_tokens;
 use intern::string_key::Intern;
 use isograph_compiler::{extract_iso_literals_from_file_content, IsoLiteralExtraction};
 use isograph_lang_parser::{parse_iso_literal, IsoLiteralExtractionResult};
-use isograph_lang_types::{
-    ClientFieldDeclarationWithUnvalidatedDirectives, EntrypointTypeAndField,
-};
+use isograph_lang_types::ClientFieldDeclarationWithUnvalidatedDirectives;
 use lsp_types::{
     request::{Request, SemanticTokensFullRequest},
     SemanticToken, SemanticTokens, SemanticTokensParams, SemanticTokensResult,
@@ -123,23 +123,6 @@ fn client_field_declaration_to_tokens(
     );
     semantic_token_generator.generate_semantic_token(
         client_field_declaration.item.client_field_name.span,
-        semantic_token_method(),
-    );
-    semantic_token_generator.consume()
-}
-
-fn entrypoint_declaration_to_tokens(
-    entrypoint_declaration: WithSpan<EntrypointTypeAndField>,
-    iso_literal_text: &str,
-    initial_diff: RowColDiff,
-) -> (Vec<SemanticToken>, RowColDiff) {
-    let mut semantic_token_generator = SemanticTokenGenerator::new(iso_literal_text, initial_diff);
-    semantic_token_generator.generate_semantic_token(
-        entrypoint_declaration.item.parent_type.span,
-        semantic_token_type(),
-    );
-    semantic_token_generator.generate_semantic_token(
-        entrypoint_declaration.item.client_field_name.span,
         semantic_token_method(),
     );
     semantic_token_generator.consume()
