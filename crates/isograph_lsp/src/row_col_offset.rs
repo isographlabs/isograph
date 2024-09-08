@@ -60,11 +60,10 @@ impl Add for RowColDiff {
     }
 }
 
-// TODO do not accept range param, do slicing at callsite
-pub(crate) fn diff_from_slice_and_range(source_str: &str, range: Range<usize>) -> RowColDiff {
+pub(crate) fn diff_to_end_of_slice(source_str: &str) -> RowColDiff {
     let mut row_count = 0;
     let mut index_of_start_of_last_row = 0;
-    for (index, char) in source_str[range.start..range.end].chars().enumerate() {
+    for (index, char) in source_str.chars().enumerate() {
         // TODO we need to handle other line breaks
         if char == '\n' {
             row_count += 1;
@@ -74,13 +73,13 @@ pub(crate) fn diff_from_slice_and_range(source_str: &str, range: Range<usize>) -
 
     if row_count == 0 {
         RowColDiff::SameRow(ColOffset {
-            col_offset: range.len(),
+            col_offset: source_str.len(),
         })
     } else {
         RowColDiff::DifferentRow(RowAndColOffset {
             row_offset: row_count,
             // TODO why -1 here?
-            new_col: range.len() - index_of_start_of_last_row - 1,
+            new_col: source_str.len() - index_of_start_of_last_row - 1,
         })
     }
 }

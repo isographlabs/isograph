@@ -3,7 +3,7 @@ use std::ops::Range;
 use crate::{
     lsp_runtime_error::LSPRuntimeResult,
     lsp_state::LSPState,
-    row_col_offset::{diff_from_slice_and_range, get_index_from_diff, ColOffset, RowColDiff},
+    row_col_offset::{diff_to_end_of_slice, get_index_from_diff, ColOffset, RowColDiff},
 };
 use common_lang_types::{Span, TextSource, WithSpan};
 use intern::string_key::Intern;
@@ -54,13 +54,8 @@ pub fn on_semantic_token_full_request(
             "start index {iso_literal_start_index}\ntext {}<-\nlast token {index_of_last_token}",
             text[0..iso_literal_start_index].to_string()
         );
-        let initial_diff = diff_from_slice_and_range(
-            text,
-            Range {
-                start: index_of_last_token,
-                end: iso_literal_start_index,
-            },
-        );
+        let initial_diff =
+            diff_to_end_of_slice(&text[index_of_last_token..iso_literal_start_index]);
 
         let file_path = text_document.uri.path().intern();
         let text_source = TextSource {
@@ -130,7 +125,7 @@ fn entrypoint_declaration_to_tokens(
 ) -> (Vec<SemanticToken>, RowColDiff) {
     let parent_type_span = entrypoint_declaration.item.parent_type.span;
     let parent_type_diff = initial_diff
-        + diff_from_slice_and_range(iso_literal_text, 0..(parent_type_span.start as usize));
+        + diff_to_end_of_slice(&iso_literal_text[0..(parent_type_span.start as usize)]);
     let parent_type_semantic_token = SemanticToken {
         delta_line: parent_type_diff.delta_line(),
         delta_start: parent_type_diff.delta_start(),
@@ -140,9 +135,8 @@ fn entrypoint_declaration_to_tokens(
     };
 
     let field_name_span = entrypoint_declaration.item.client_field_name.span;
-    let field_name_diff = diff_from_slice_and_range(
-        iso_literal_text,
-        (parent_type_span.end as usize)..(field_name_span.start as usize),
+    let field_name_diff = diff_to_end_of_slice(
+        &iso_literal_text[(parent_type_span.end as usize)..(field_name_span.start as usize)],
     );
     let field_name_semantic_token = SemanticToken {
         delta_line: field_name_diff.delta_line(),
@@ -158,20 +152,4 @@ fn entrypoint_declaration_to_tokens(
         vec![parent_type_semantic_token, field_name_semantic_token],
         diff_to_last_token,
     )
-
-    // let parent_type_semantic_token = SemanticToken {
-    //     delta_line: 0,
-    //     delta_start: 2,
-    //     length: 1,
-    //     token_type: 0,
-    //     token_modifiers_bitset: 0,
-    // };
-    // let client_field_name_token = SemanticToken {
-    //     delta_line: 0,
-    //     delta_start: 2,
-    //     length: 1,
-    //     token_type: 0,
-    //     token_modifiers_bitset: 0,
-    // };
-    // vec![parent_type_semantic_token, client_field_name_token]
 }
