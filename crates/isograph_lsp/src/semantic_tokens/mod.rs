@@ -71,15 +71,17 @@ pub fn on_semantic_token_full_request(
             text_source,
         );
         if let Ok(iso_literal_extraction_result) = iso_literal_extraction_result {
-            let (new_tokens, diff_from_start_of_file_to_start_of_last_token) =
-                iso_literal_parse_result_to_tokens(
-                    iso_literal_extraction_result,
-                    iso_literal_text,
-                    initial_diff,
-                );
+            // token_diff is from the start of the previous last token to the
+            // start of the current last token
+            let (new_tokens, token_diff) = iso_literal_parse_result_to_tokens(
+                iso_literal_extraction_result,
+                iso_literal_text,
+                initial_diff,
+            );
             semantic_tokens.extend(new_tokens);
-            index_of_last_token =
-                get_index_from_diff(&file_text, diff_from_start_of_file_to_start_of_last_token);
+            let additional_index =
+                get_index_from_diff(&file_text[index_of_last_token..], token_diff);
+            index_of_last_token = index_of_last_token + additional_index;
         }
     }
     let result = SemanticTokensResult::Tokens(SemanticTokens {
