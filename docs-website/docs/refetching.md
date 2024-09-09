@@ -10,29 +10,24 @@ This is a quite restrictive choice, and more customizability needs to be introdu
 
 ## How do we use this `__refetch` field?
 
-You might use this field like:
+Consider:
 
 ```tsx
-export const PetRefetchButton = iso(`
-  field Pet.PetRefetchButton @component {
-    name,
-    __refetch,
+export const PetRefetcherButtonComponent = iso(`
+  field PetRefetcherButtonComponent on Pet {
+    name
+    __refetch
   }
-`)(PetRefetchButtonComponent);
+`)((data) => {
+  return (
+    <Button onClick={() => data.__refetch()[1]()}>Refetch {data.name}</Button>
+  );
+});
 ```
 
-When read out, the `__refetch` field is a function that when called will make a network request to refetch the field. (Also, in the future, you will be able to do things like get the status of the mutation, suspend on it, etc. For now, it just triggers a mutation in the background.)
+When read out, the `__refetch` field is a function(\*) that when called will make a network request to refetch the field. (Also, in the future, you will be able to do things like get the status of the mutation, suspend on it, etc. For now, it just triggers a mutation in the background.)
 
-You might use it as follows:
-
-```tsx
-// Note: if you inline this function into the iso literal, you will not have to
-// annotate the type of props. But if it is separate, TypeScript will complain that
-// it doesn't know the type of the data param.
-function PetRefetcherButtonComponent(data: PetRefetchButtonParams) {
-  return <Button onClick={() => data.__refetch()}>Refetch {data.name}</Button>;
-}
-```
+> The signature of the `__refetch` field is `(args: Variables) => [string /* unique id */, () => void /* makes network request */]`. It will be changed to be the same signature as loadable fields (i.e. `(args: Variables) => [string /* unique id */, () => [DisposeFn, FragmentReference]]`).
 
 The fields selected on the mutation response (under the pet) will be **exactly the fields that are selected on that Pet in the merged query**, including `name` and the auto-selected `id`, as well as any fields selected on the same `Pet` in other resolvers.
 

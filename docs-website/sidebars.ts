@@ -18,6 +18,7 @@ const sidebars: SidebarsConfig = {
     'isograph-config',
     'refetching',
     'expose-field-directives',
+    'isograph-rules',
     'faq',
     {
       type: 'category',
