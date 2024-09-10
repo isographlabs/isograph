@@ -9,9 +9,8 @@ use crate::lsp_runtime_error::LSPRuntimeResult;
 #[derive(Debug)]
 pub struct LSPState {
     open_docs: HashMap<Url, String>,
-    sender:Sender<Message>
+    sender: Sender<Message>,
 }
-
 
 impl LSPState {
     pub fn new(sender: Sender<Message>) -> Self {
@@ -40,7 +39,7 @@ impl LSPState {
         self.open_docs.get(uri).map(|s| s.as_str())
     }
 
-    pub fn send_message(&self, message:Message){
+    pub fn send_message(&self, message: Message) {
         self.sender.send(message).unwrap();
     }
 }
