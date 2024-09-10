@@ -1,9 +1,9 @@
-import React from "react";
-import { iso } from "@iso";
-import { Container, Stack } from "@mui/material";
-import { FragmentReader, useLazyReference } from "@isograph/react";
-import { FullPageLoading } from "./routes";
-import { ErrorBoundary } from "./ErrorBoundary";
+import React from 'react';
+import { iso } from '@iso';
+import { Container, Stack } from '@mui/material';
+import { FragmentReader, useLazyReference } from '@isograph/react';
+import { FullPageLoading } from './routes';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export const HomeRoute = iso(`
   field Query.HomeRoute @component {
@@ -30,7 +30,7 @@ export const HomeRoute = iso(`
 export function HomeRouteLoader() {
   const { fragmentReference } = useLazyReference(
     iso(`entrypoint Query.HomeRoute`),
-    {}
+    {},
   );
 
   return (
