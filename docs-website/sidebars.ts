@@ -16,6 +16,8 @@ const sidebars: SidebarsConfig = {
     'quickstart',
     'workflow',
     'isograph-config',
+    'loadable-fields',
+    'pagination',
     'refetching',
     'expose-field-directives',
     'isograph-rules',

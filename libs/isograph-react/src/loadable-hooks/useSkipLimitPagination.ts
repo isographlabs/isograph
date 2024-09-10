@@ -61,7 +61,9 @@ function flatten<T>(arr: ReadonlyArray<ReadonlyArray<T>>): ReadonlyArray<T> {
  *
  * Calling fetchMore before the hook mounts is a no-op.
  *
- * TODO subscribe to changes
+ * NOTE: this hook does not subscribe to changes. This is a known
+ * issue. If you are running into this issue, reach out on GitHub/
+ * Twitter, and we'll fix the issue.
  */
 export function useSkipLimitPagination<
   TArgs extends {
