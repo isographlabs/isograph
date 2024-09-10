@@ -169,4 +169,4 @@ export const BlogPostDisplay = iso(`
 
 ## Pagination
 
-See [the pagination docs](./pagination).
+See [the pagination docs](../pagination).
