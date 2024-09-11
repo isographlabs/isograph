@@ -67,4 +67,4 @@ TODO include instructions on how to do this for external libraries.
 
 - In all package.json files, bump the version number. Don't forget to bump the version number of imports.
 - `git add . && git commit -m 'v0.1.0' && git tag v0.1.0 && git push`
-- See [this commit releasing 0.1.1](https://github.com/isographlabs/isograph/commit/e36acab1a018e18bdae0558be08952693af3b6a8)
+- See [this commit releasing 0.2.0](https://github.com/isographlabs/isograph/commit/e36acab1a018e18bdae0558be08952693af3b6a8)
