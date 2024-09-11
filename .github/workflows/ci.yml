@@ -79,7 +79,7 @@ jobs:
           override: true
           target: x86_64-apple-darwin
       - name: 'Download cli binary'
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: isograph_cli-linux-x64
           path: artifacts/linux-x64
@@ -293,22 +293,22 @@ jobs:
       - name: Build
         run: pnpm -r compile
       - name: Download artifact isograph_cli-linux-x64
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: isograph_cli-linux-x64
           path: libs/isograph-compiler/artifacts/linux-x64
       - name: Download artifact isograph_cli-bin-linux-arm64
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: isograph_cli-bin-linux-arm64
           path: libs/isograph-compiler/artifacts/linux-arm64
       - name: Download artifact isograph_cli-macos-x64
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: isograph_cli-macos-x64
           path: libs/isograph-compiler/artifacts/macos-x64
       - name: Download artifact isograph_cli-macos-arm64
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: isograph_cli-macos-arm64
           path: libs/isograph-compiler/artifacts/macos-arm64
@@ -352,22 +352,22 @@ jobs:
       - name: Build
         run: pnpm -r compile
       - name: Download artifact isograph_cli-linux-x64
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: isograph_cli-linux-x64
           path: libs/isograph-compiler/artifacts/linux-x64
       - name: Download artifact isograph_cli-bin-linux-arm64
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: isograph_cli-bin-linux-arm64
           path: libs/isograph-compiler/artifacts/linux-arm64
       - name: Download artifact isograph_cli-macos-x64
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: isograph_cli-macos-x64
           path: libs/isograph-compiler/artifacts/macos-x64
       - name: Download artifact isograph_cli-macos-arm64
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: isograph_cli-macos-arm64
           path: libs/isograph-compiler/artifacts/macos-arm64
