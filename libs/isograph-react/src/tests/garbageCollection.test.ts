@@ -46,9 +46,8 @@ export const meNameField = iso(`
     }
   }
 `)(() => {});
-import meNameEntrypoint from './__isograph/Query/meName/entrypoint';
 import { meNameSuccessorRetainedQuery } from './meNameSuccessor';
-iso(`entrypoint Query.meName`);
+const meNameEntrypoint = iso(`entrypoint Query.meName`);
 const meNameRetainedQuery = {
   normalizationAst: meNameEntrypoint.normalizationAst,
   variables: {},
