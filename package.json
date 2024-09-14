@@ -15,7 +15,7 @@
     "build-demos": "yarn run build-github-demo && yarn run build-pet-demo && yarn run build-isograph-react-demo",
     "build-github-demo": "./target/debug/isograph_cli --config ./demos/github-demo/isograph.config.json",
     "build-pet-demo": "./target/debug/isograph_cli --config ./demos/pet-demo/isograph.config.json",
-    "build-isograph-react-demo": "./target/debug/isograph_cli --config ./libs/isograph-react/src/tests/isograph.config.json",
+    "build-isograph-react-demo": "./target/debug/isograph_cli.exe --config ./libs/isograph-react/isograph.config.json",
     "watch-libs": "cargo watch -s 'pnpm -r compile' -d 0.1 -w ./libs",
     "format": "yarn run format-prettier && yarn run format-rust",
     "format-prettier": "prettier --config ./.prettier.config.js --write .",
