@@ -13,7 +13,7 @@
     "test": "vitest run",
     "test-watch": "vitest watch",
     "coverage": "vitest run --coverage",
-    "prepack": "yarn run test && yarn run compile",
+    "prepack": "pnpm run test && pnpm run compile",
     "tsc": "tsc"
   },
   "dependencies": {
