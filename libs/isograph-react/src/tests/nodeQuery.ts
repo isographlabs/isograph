@@ -9,8 +9,7 @@ export const nodeField = iso(`
     }
   }
 `)(() => {});
-import nodeFieldEntrypoint from './__isograph/Query/nodeField/entrypoint';
-iso(`entrypoint Query.nodeField`);
+const nodeFieldEntrypoint = iso(`entrypoint Query.nodeField`);
 export const nodeFieldRetainedQuery = {
   normalizationAst: nodeFieldEntrypoint.normalizationAst,
   variables: { id: 0 },
