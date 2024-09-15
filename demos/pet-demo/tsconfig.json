@@ -17,9 +17,9 @@
     "paths": {
       "@/*": ["./*"],
       "@iso/*": ["./src/components/__isograph/*"],
-      "@iso": ["./src/components/__isograph/iso.ts"],
-    },
+      "@iso": ["./src/components/__isograph/iso.ts"]
+    }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "backend/src/index.js"],
-  "exclude": ["node_modules"],
+  "exclude": ["node_modules"]
 }

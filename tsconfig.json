@@ -1,12 +1,12 @@
 {
   "extends": "./tsconfig.build.json",
   "compilerOptions": {
-    "baseUrl": "./",
+    "baseUrl": "./"
   },
   "include": [
     "./libs/**/*.ts",
     "libs/isograph-react/src/index.tsx",
-    "libs/isograph-react/src/cache.tsx",
+    "libs/isograph-react/src/cache.tsx"
   ],
-  "exclude": ["./libs/**/dist/*"],
+  "exclude": ["./libs/**/dist/*"]
 }

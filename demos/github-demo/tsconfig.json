@@ -18,10 +18,10 @@
     "paths": {
       "@/*": ["./src/*"],
       "@iso/*": ["./src/isograph-components/__isograph/*"],
-      "@iso": ["./src/isograph-components/__isograph/iso.ts"],
+      "@iso": ["./src/isograph-components/__isograph/iso.ts"]
     },
-    "disableSourceOfProjectReferenceRedirect": false,
+    "disableSourceOfProjectReferenceRedirect": false
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules"],
+  "exclude": ["node_modules"]
 }
