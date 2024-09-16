@@ -13,7 +13,7 @@
     "test": "echo this package has no tests",
     "test-watch": "echo this package has no tests",
     "coverage": "echo this package has no coverage",
-    "prepack": "yarn run compile",
+    "prepack": "pnpm run compile",
     "tsc": "tsc"
   },
   "dependencies": {},

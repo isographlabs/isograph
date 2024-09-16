@@ -14,7 +14,7 @@
     "test-watch": "vitest watch",
     "coverage": "vitest run --coverage",
     "note": "WE SHOULD ALSO TEST HERE",
-    "prepack": "yarn run compile",
+    "prepack": "pnpm run compile",
     "tsc": "tsc"
   },
   "dependencies": {

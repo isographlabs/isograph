@@ -101,8 +101,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: pnpm/action-setup@v2
-        with:
-          version: 8
       - name: Use Node.js 18
         uses: actions/setup-node@v3
         with:
@@ -114,9 +112,9 @@ jobs:
       - name: Build JS files
         run: pnpm -r compile
       - name: Typecheck
-        run: cd ./demos/${{ matrix.target.folder }} && yarn tsc
+        run: cd ./demos/${{ matrix.target.folder }} && pnpm tsc
       - name: Lint
-        run: cd ./demos/${{ matrix.target.folder }} && yarn lint
+        run: cd ./demos/${{ matrix.target.folder }} && pnpm lint
 
   build-js-packages:
     name: Build js packages
@@ -124,8 +122,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: pnpm/action-setup@v2
-        with:
-          version: 8
       - name: Use Node.js 18
         uses: actions/setup-node@v3
         with:
@@ -152,8 +148,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: pnpm/action-setup@v2
-        with:
-          version: 8
       - name: Use Node.js 18
         uses: actions/setup-node@v3
         with:
@@ -162,7 +156,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Build website
-        run: yarn build
+        run: pnpm build
       - name: Upload artifact
         id: upload-artifact
         uses: actions/upload-artifact@v4
@@ -180,8 +174,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: pnpm/action-setup@v2
-        with:
-          version: 8
       - name: Use Node.js 18
         uses: actions/setup-node@v3
         with:
@@ -240,8 +232,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: pnpm/action-setup@v2
-        with:
-          version: 8
       - name: Use Node.js 18
         uses: actions/setup-node@v3
         with:
@@ -276,8 +266,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: pnpm/action-setup@v2
-        with:
-          version: 8
       - uses: actions/setup-node@v2
         with:
           node-version: 18
@@ -286,7 +274,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Change package versions to commit
-        run: yarn gulp setMainVersion
+        run: pnpm gulp setMainVersion
         env:
           RELEASE_COMMIT_SHA: ${{ github.sha }}
       # TODO reuse this somehow?
@@ -337,8 +325,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: pnpm/action-setup@v2
-        with:
-          version: 8
       - uses: actions/setup-node@v2
         with:
           node-version: 18
@@ -347,7 +333,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       # - name: Change package versions to commit
-      #   run: yarn gulp setMainVersion
+      #   run: pnpm gulp setMainVersion
       #   # TODO do this less hackily
       - name: Build
         run: pnpm -r compile
