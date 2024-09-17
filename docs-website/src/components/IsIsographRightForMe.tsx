@@ -28,7 +28,7 @@ export default function () {
                 you to give it a try and provide feedback!
               </p>
               <p>
-                Join the <a href="https://discord.gg/kDCcN3EDR6">Discord</a>.
+                Join the <a href="https://discord.gg/rjDDwvZR">Discord</a>.
                 Follow the{' '}
                 <a href="https://twitter.com/isographlabs">
                   official Twitter account

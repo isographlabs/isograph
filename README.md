@@ -6,7 +6,7 @@ Isograph makes it easy to build robust, performant, data-driven apps.
 
 - Read the [docs](https://isograph.dev/docs/introduction/), especially the [quickstart guide](https://isograph.dev/docs/quickstart/).
 - Watch the [talk at GraphQL Conf](https://www.youtube.com/watch?v=gO65JJRqjuc).
-- Join the [Discord](https://discord.gg/kDCcN3EDR6).
+- Join the [Discord](https://discord.gg/rjDDwvZR).
 - [Follow the official Twitter account](https://twitter.com/isographlabs).
 
 ## What is Isograph?
@@ -201,7 +201,7 @@ There's a lot more. These docs are threadbare.
 
 - See the sample apps in [`./demos`](./demos/).
 - Watch the [talk at GraphQL Conf](https://www.youtube.com/watch?v=gO65JJRqjuc).
-- Join the [Discord](https://discord.gg/kDCcN3EDR6).
+- Join the [Discord](https://discord.gg/rjDDwvZR).
 - [Follow the official Twitter account](https://twitter.com/isographlabs)
 
 ## Other, older resources
