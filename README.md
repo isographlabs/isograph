@@ -28,7 +28,7 @@ Let's do a quick tour of how a basic Isograph app is constructed.
 
 Isograph is a framework for building React applications that are backed by GraphQL data. In Isograph, components that read data can be selected from the graph, and automatically have the data they require passed in. Consider this example Avatar component:
 
-```js
+```jsx
 export const Avatar = iso(`
   field User.Avatar @component {
     avatar_url
@@ -40,7 +40,7 @@ export const Avatar = iso(`
 
 This defines a new client field named `Avatar`, which is then available on any GraphQL User. You might use this avatar field in another component, such as a button that navigates to a given user's profile.
 
-```js
+```jsx
 export const UserProfileButton = iso(`
   field User.UserProfileButton @component {
     Avatar
@@ -75,7 +75,7 @@ If the compiler encounters ``iso(`entrypoint Query.UserList`);``, it would gener
 
 We might set up a component to fetch that `UserList` data as follows:
 
-```js
+```jsx
 function UserListPageRoute() {
   const queryVariables = {};
   const { fragmentReference } = useLazyReference(
@@ -112,7 +112,7 @@ At the root of a page, you will define an entrypoint. For any such entrypoint, I
 
 Selections of client fields can be declared as `@loadable`, meaning that the data for that client field is not included as part of the parent request. Instead, the value that is read out contains a function that you can call to make a new network request for just the `@loadable` field. Consider:
 
-```tsx
+```jsx
 export const UserDetailPage = iso(`
   field User.UserDetailPage {
     name
@@ -175,7 +175,7 @@ type Mutation
 
 In the above example, the `set_user_name` field will be made available on every `User` object, under the key `set_user_name` (this will be customizable.) So, one could write a resolver:
 
-```js
+```jsx
 export const UpdateUserNameButton = iso(`
   field User.UpdateUserNameButton {
     set_user_name
