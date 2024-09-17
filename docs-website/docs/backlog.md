@@ -4,21 +4,9 @@
 See the [open issues](https://github.com/isographlabs/isograph/issues).
 :::
 
-## GraphQL conf 2024 priorities
-
-- VSCode extension: syntax highlighting
-- router integration
-- `({ data, variables })`
-- Apparently string literals aren't allowed as parameters...
-- mutation/query bug for refetch fields... lol
-
-## GraphQL conf 2024 nice-to-haves
-
-- Fix granular re-renders with AST
-- Proper selection sets (i.e. rooted at the closest loadable field?)
-- Limit exposed fields to specific selections
-- Typing of entrypoint variables
-- subscribe to changes in pagination
+:::warning
+This is a disorganized list that is outdated in many places.
+:::
 
 ## Top mid-term runtime priorities
 
@@ -41,33 +29,38 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 - `asFoo` fields
   - requires client pointers
 - isInFlight
+- Typing of entrypoint variables
 
 ## Top mid-term compiler/syntax priorities
 
+- Limit exposed fields to specific selections
+- Proper selection sets (i.e. rooted at the closest loadable field?)
 - Support for selecting arbitrary mutation fields
 - Support for adding/removing fields from mutation field selections
 - asFoo typecast linked fields
   - Or syntax: bar: `as Foo { ... }`? This can always be added on afterward after some thought.
 - connections and pagination
 - client links/pointers
+- `({ data, variables })`
 
 ## Top cleanup priorities
 
 - validate no unused params and no unused variables
 - useLazyReference should refetch when props change
+- subscribe to changes in pagination
+- Apparently string literals aren't allowed as parameters...
+- mutation/query bug for refetch fields... lol
+- error parsing config should not panic, but be a diagnostic
 
 ## V2 release
 
-- network error handling
 - components and "realized" resolvers, as well as ways to invalidate them
   - they could also be lazily calculated
   - may require garbage collection
 - cleanup types
-- error handling
 - validate no unknown directives left over
 - Handle unions etc. correctly
 - Special fields (or syntax?) for type casts (i.e. type refinement)
-- Auto generate description of each arg for client fields
 
 ## Feature backlog
 
@@ -91,6 +84,7 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 ## Cleanup backlog
 
 - Typegen code is a mess
+  - we should use something that parses JS/ts/flow
 - JS code needs structure, etc.
 - Objects which do not have IDs should be merged into their parent object in the store.
   - or weak types are scalars
@@ -99,11 +93,6 @@ See the [open issues](https://github.com/isographlabs/isograph/issues).
 - CLI should be in a separate crate from batch-compile; so should watch mode utils, so as to increase the speed of iteration if the dev is running builds.
 - CLI command to create missing directories (e.g. project_root).
 - do not panic when an unknown token is encountered
-
-## Known bugs
-
-- If a useLazyReference commits then receives new props, it does not make a new network request.
-- error parsing config should not panic, but be a diagnostic
 
 ## Extended backlog
 
