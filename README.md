@@ -2,6 +2,8 @@
 
 The framework for teams that move fast — without breaking things.
 
+Isograph makes it easy to build robust, performant, data-driven apps.
+
 - Read the [docs](https://isograph.dev/docs/introduction/), especially the [quickstart guide](https://isograph.dev/docs/quickstart/).
 - Watch the [talk at GraphQL Conf](https://www.youtube.com/watch?v=gO65JJRqjuc).
 - Join the [Discord](https://discord.gg/kDCcN3EDR6).
@@ -11,7 +13,16 @@ The framework for teams that move fast — without breaking things.
 
 Isograph is a UI framework for building React apps that are powered by GraphQL data. It has ambitions to be a framework for apps powered by data.
 
+It has four goals:
+
+- to remove as much friction as possible from the process of building data-driven apps
+- to give developers the confidence that they won't break production
+- to make it easy to build performant apps
+- to expose powerful primitives so that developers can precisely model their domain
+
 ## About Isograph: Fetching data and app structure
+
+Let's do a quick tour of how a basic Isograph app is constructed.
 
 ### What is Isograph, and what are client fields?
 
@@ -20,7 +31,6 @@ Isograph is a framework for building React applications that are backed by Graph
 ```js
 export const Avatar = iso(`
   field User.Avatar @component {
-    name
     avatar_url
   }
 `)(function AvatarComponent(data) {
@@ -51,13 +61,19 @@ export const UserProfileButton = iso(`
 
 These calls to `iso` define client fields, which are functions from graph data (such as the user's name) to an arbitrary value. With Isograph, it's client fields all the way down — your entire app can be built in this way!
 
+Note what we didn't do:
+
+- The `Avatar` component didn't care how the `avatar_url` field was originally fetched. It just received it.
+- When writing the `UserProfileButton` component, we didn't import the `Avatar` client field
+- The `UserProfileButton` didn't pass any data down to the `Avatar`. It just rendered it! In fact, it didn't see or have access to any of the fields that the `Avatar` selected, so, changes to the fields that the `Avatar` selects will not change the behavior of other client fields!
+
 ### How does Isograph fetch data?
 
 At the root of each page, you will define an entrypoint. Isograph's compiler finds and processes all the entrypoints in your codebase, and will generate the appropriate GraphQL query.
 
-So, if the compiler encounters ``iso(`entrypoint Query.UserList`);``, it would generate a query that would fetch all the server fields needed for the `Query.UserList` client field and all of the nested client fields that are reachable from that root. Then, when the user navigates to the user list page, that query would be executed.
+If the compiler encounters ``iso(`entrypoint Query.UserList`);``, it would generate a query that would fetch all the server fields needed for the `Query.UserList` client field and all of the nested client fields that are reachable from that root.
 
-For example, the data might be fetched during render as follows:
+We might set up a component to fetch that `UserList` data as follows:
 
 ```js
 function UserListPageRoute() {
@@ -68,18 +84,18 @@ function UserListPageRoute() {
   );
 
   const additionalRenderProps = {};
-  const Component = read(fragmentReference);
+  const Component = useResult(fragmentReference);
   return <Component {...additionalRenderProps} />;
 }
 ```
 
-> Note that the call to `read(fragmentReference)` will suspend if the required data is not present in the store, so make sure that either `UserListPageRoute` is wrapped in a `React.Suspense` boundary, or that the `fragmentReference` is only read in a child component that is wrapped in a suspense boundary.
+> Note that the call to `useResult(fragmentReference)` will suspend if the required data is not present in the store, so make sure that either `UserListPageRoute` is wrapped in a `React.Suspense` boundary, or that the `fragmentReference` is only read in a child component that is wrapped in a suspense boundary.
 
 Now, when `UserListPageRoute` is initially rendered, Isograph will make an API call.
 
 ### How do components receive their data?
 
-You may have noticed that when we rendered `<data.Avatar />`, we did not explicitly pass the data that the `Avatar` needs! Instead, when the component is rendered, Isograph will `read` the data that the `Avatar` component needs, and pass it to `Avatar`. The calling component:
+You may have noticed that when we rendered `<data.Avatar />`, we did not explicitly pass the data that the `Avatar` needs! Instead, when the component is rendered, Isograph will read the data that the `Avatar` component needs, and pass it to `Avatar`. The calling component:
 
 - only passes additional props that don't affect the query data, like `onClick`, and
 - does **not** know what data `Avatar` expects, and never sees the data that `Avatar` reads out. This is called **data masking**, and it's a crucial reason that teams of multiple developers can move quickly when building apps with Isograph: because no component sees the data that another component selected, changing one component cannot affect another!
