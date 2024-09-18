@@ -65,10 +65,9 @@ function compileImportStatement(t, path, type, field, artifactType, config) {
 
   const fileToArtifactDir = pathModule.relative(folder, artifactDirectory);
   const artifactDirToArtifact = `/__isograph/${type}/${field}/${artifactType}.ts`;
-  let fileToArtifact = pathModule.join(
-    fileToArtifactDir,
-    artifactDirToArtifact,
-  );
+  let fileToArtifact = pathModule
+    .join(fileToArtifactDir, artifactDirToArtifact)
+    .replace(/\\/g, '/');
 
   // If we do not have to traverse upward, e.g. if the resolver is in
   // src/HomePage, and the artifact directory is src/, then fileToArtifact
