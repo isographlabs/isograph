@@ -28,6 +28,7 @@ describe('useLazyDisposableState', async () => {
   test('on cache change, it should dispose previous cache', async () => {
     const cache1 = createCache(1);
     const cache2 = createCache(2);
+    const renders = vi.fn();
 
     let unmounted = promiseWithResolvers();
     let committed = promiseWithResolvers();
@@ -49,6 +50,8 @@ describe('useLazyDisposableState', async () => {
         committed.resolve();
       }, [state]);
 
+      renders(state);
+
       return null;
     }
 
@@ -60,5 +63,9 @@ describe('useLazyDisposableState', async () => {
     await unmounted.promise;
     expect(cache2.disposeItem).toHaveBeenCalled();
     expect(cache2.cache.factory).toHaveBeenCalledOnce();
+    expect(renders).toHaveBeenCalledTimes(3);
+    expect(renders).toHaveBeenNthCalledWith(1, 1);
+    expect(renders).toHaveBeenNthCalledWith(2, 1);
+    expect(renders).toHaveBeenNthCalledWith(3, 2);
   });
 });
