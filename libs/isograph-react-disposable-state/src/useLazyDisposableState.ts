@@ -1,7 +1,8 @@
 'use strict';
 
-import { useEffect, useRef } from 'react';
 import type { ItemCleanupPair } from '@isograph/disposable-types';
+import { useEffect, useRef, useState } from 'react';
+import { useHasCommittedRef } from './useHasCommittedRef';
 import { ParentCache } from './ParentCache';
 import { useCachedPrecommitValue } from './useCachedPrecommitValue';
 
@@ -23,6 +24,23 @@ export function useLazyDisposableState<T>(parentCache: ParentCache<T>): {
     itemCleanupPairRef.current = pair;
   });
 
+  const hasCommitedRef = useHasCommittedRef();
+  const [, rerender] = useState<{} | null>(null);
+
+  useEffect(() => {
+    if (!hasCommitedRef.current) return;
+
+    const undisposedPair = parentCache.getAndPermanentRetainIfPresent();
+
+    if (undisposedPair !== null) {
+      itemCleanupPairRef.current = undisposedPair;
+    } else {
+      itemCleanupPairRef.current = parentCache.factory();
+    }
+
+    rerender({});
+  }, [parentCache]);
+
   useEffect(() => {
     const cleanupFn = itemCleanupPairRef.current?.[1];
     // TODO confirm useEffect is called in order.
@@ -32,7 +50,7 @@ export function useLazyDisposableState<T>(parentCache: ParentCache<T>): {
       );
     }
     return cleanupFn;
-  }, []);
+  }, [itemCleanupPairRef.current]);
 
   const returnedItem = preCommitItem?.state ?? itemCleanupPairRef.current?.[0];
   if (returnedItem != null) {
