@@ -1,10 +1,14 @@
 'use strict';
 
-import type { ItemCleanupPair } from '@isograph/disposable-types';
-import { useEffect, useRef, useState } from 'react';
-import { useHasCommittedRef } from './useHasCommittedRef';
+import { useEffect, useState } from 'react';
+
 import { ParentCache } from './ParentCache';
 import { useCachedPrecommitValue } from './useCachedPrecommitValue';
+import {
+  UNASSIGNED_STATE,
+  useUpdatableDisposableState,
+  type UnassignedState,
+} from './useUpdatableDisposableState';
 
 /**
  * useLazyDisposableState<T>
@@ -15,15 +19,18 @@ import { useCachedPrecommitValue } from './useCachedPrecommitValue';
  * (on commit) sets it in state. The item continues to be returned after
  * commit and is disposed when the hook unmounts.
  */
-export function useLazyDisposableState<T>(parentCache: ParentCache<T>): {
+export function useLazyDisposableState<T>(
+  parentCache: ParentCache<Exclude<T, UnassignedState>>,
+): {
   state: T;
 } {
-  const itemCleanupPairRef = useRef<ItemCleanupPair<T> | null>(null);
+  const { state: item, setState: setItemCleanupPair } =
+    useUpdatableDisposableState<T>();
 
   const preCommitItem = useCachedPrecommitValue(parentCache, (pair) => {
-    itemCleanupPairRef.current = pair;
+    setItemCleanupPair(pair);
   });
-  const [, rerender] = useState<{} | null>(null);
+
   const [initialCache] = useState(parentCache);
 
   useEffect(() => {
@@ -32,26 +39,15 @@ export function useLazyDisposableState<T>(parentCache: ParentCache<T>): {
     const undisposedPair = parentCache.getAndPermanentRetainIfPresent();
 
     if (undisposedPair !== null) {
-      itemCleanupPairRef.current = undisposedPair;
+      setItemCleanupPair(undisposedPair);
     } else {
-      itemCleanupPairRef.current = parentCache.factory();
+      setItemCleanupPair(parentCache.factory());
     }
-
-    rerender({});
   }, [parentCache]);
 
-  useEffect(() => {
-    const cleanupFn = itemCleanupPairRef.current?.[1];
-    // TODO confirm useEffect is called in order.
-    if (cleanupFn == null) {
-      throw new Error(
-        'cleanupFn unexpectedly null. This indicates a bug in react-disposable-state.',
-      );
-    }
-    return cleanupFn;
-  }, [itemCleanupPairRef.current]);
+  const returnedItem =
+    preCommitItem?.state ?? (item !== UNASSIGNED_STATE ? item : null);
 
-  const returnedItem = preCommitItem?.state ?? itemCleanupPairRef.current?.[0];
   if (returnedItem != null) {
     return { state: returnedItem };
   }
