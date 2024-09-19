@@ -4,6 +4,7 @@ use isograph_schema::{
     RefetchedPathsMap, UserWrittenClientFieldInfo, UserWrittenComponentVariant,
     ValidatedClientField, ValidatedSchema,
 };
+use std::borrow::Cow;
 use std::path::Path;
 use std::{collections::BTreeSet, path::PathBuf, str::FromStr};
 
@@ -218,9 +219,9 @@ fn generate_function_import_statement(
     );
 
     let normalized_file_name = if cfg!(windows) {
-        &complete_file_name.replace("\\", "/")
+        Cow::Owned(complete_file_name.replace("\\", "/"))
     } else {
-        complete_file_name
+        Cow::Borrowed(complete_file_name)
     };
 
     let file_name =
