@@ -23,12 +23,11 @@ export function useLazyDisposableState<T>(parentCache: ParentCache<T>): {
   const preCommitItem = useCachedPrecommitValue(parentCache, (pair) => {
     itemCleanupPairRef.current = pair;
   });
-
-  const hasCommitedRef = useHasCommittedRef();
   const [, rerender] = useState<{} | null>(null);
+  const [initialCache] = useState(parentCache);
 
   useEffect(() => {
-    if (!hasCommitedRef.current) return;
+    if (initialCache === parentCache) return;
 
     const undisposedPair = parentCache.getAndPermanentRetainIfPresent();
 

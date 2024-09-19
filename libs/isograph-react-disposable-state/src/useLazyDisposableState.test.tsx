@@ -26,12 +26,10 @@ function promiseWithResolvers() {
 
 describe('useLazyDisposableState', async () => {
   test('on cache change, it should dispose previous cache', async () => {
-    expect.assertions(2);
     const cache1 = createCache(1);
     const cache2 = createCache(2);
 
     let unmounted = promiseWithResolvers();
-
     let committed = promiseWithResolvers();
 
     function TestComponent() {
@@ -42,15 +40,12 @@ describe('useLazyDisposableState', async () => {
         setCache(cache2.cache);
 
         return () => {
-          expect(cache2.disposeItem).toHaveBeenCalled();
           unmounted.resolve();
         };
       }, []);
 
       useEffect(() => {
         if (state == 1) return;
-
-        expect(cache1.disposeItem).toHaveBeenCalled();
         committed.resolve();
       }, [state]);
 
@@ -59,7 +54,11 @@ describe('useLazyDisposableState', async () => {
 
     const root = create(<TestComponent />, { unstable_isConcurrent: true });
     await committed.promise;
+    expect(cache1.disposeItem).toHaveBeenCalled();
+    expect(cache1.cache.factory).toHaveBeenCalledOnce();
     root.unmount();
     await unmounted.promise;
+    expect(cache2.disposeItem).toHaveBeenCalled();
+    expect(cache2.cache.factory).toHaveBeenCalledOnce();
   });
 });
