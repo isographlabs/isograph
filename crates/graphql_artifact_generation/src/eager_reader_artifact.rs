@@ -213,12 +213,18 @@ fn generate_function_import_statement(
             .expect("Relative path should work");
     let extension_char_count_including_dot =
         relative_path.extension().map(|x| x.len() + 1).unwrap_or(0);
-    let complete_file_name = relative_path
-        .to_str()
-        .expect("This path should be stringifiable. This probably is indicative of a bug in Relay.")
-        .replace("\\", "/");
+    let complete_file_name = relative_path.to_str().expect(
+        "This path should be stringifiable. This probably is indicative of a bug in Relay.",
+    );
+
+    let normalized_file_name = if cfg!(windows) {
+        &complete_file_name.replace("\\", "/")
+    } else {
+        complete_file_name
+    };
+
     let file_name =
-        &complete_file_name[0..(complete_file_name.len() - extension_char_count_including_dot)];
+        &normalized_file_name[0..(normalized_file_name.len() - extension_char_count_including_dot)];
 
     ClientFieldFunctionImportStatement(format!(
         "import {{ {const_export_name} as resolver }} from '{}';",
