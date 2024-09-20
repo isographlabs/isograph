@@ -27,6 +27,16 @@ export function useLazyDisposableState<T>(
   const { state: item, setState: setItemCleanupPair } =
     useUpdatableDisposableState<T>();
 
+  function refetch(parentCache: ParentCache<Exclude<T, UnassignedState>>) {
+    const undisposedPair = parentCache.getAndPermanentRetainIfPresent();
+
+    if (undisposedPair !== null) {
+      setItemCleanupPair(undisposedPair);
+    } else {
+      setItemCleanupPair(parentCache.factory());
+    }
+  }
+
   const preCommitItem = useCachedPrecommitValue(parentCache, (pair) => {
     setItemCleanupPair(pair);
   });
@@ -36,19 +46,14 @@ export function useLazyDisposableState<T>(
   useEffect(() => {
     if (initialCache === parentCache) return;
 
-    const undisposedPair = parentCache.getAndPermanentRetainIfPresent();
-
-    if (undisposedPair !== null) {
-      setItemCleanupPair(undisposedPair);
-    } else {
-      setItemCleanupPair(parentCache.factory());
-    }
+    refetch(parentCache);
   }, [parentCache]);
 
   const returnedItem =
     preCommitItem?.state ?? (item !== UNASSIGNED_STATE ? item : null);
 
   if (returnedItem != null) {
+    // return refetch?
     return { state: returnedItem };
   }
 
