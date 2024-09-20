@@ -11,6 +11,7 @@ import {
 import { useRerenderOnChange } from './useRerenderOnChange';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import { subscribe } from '../core/cache';
+import type { ReaderAst } from '../core/reader';
 
 /**
  * Read the data from a fragment reference and subscribe to updates.
@@ -18,6 +19,7 @@ import { subscribe } from '../core/cache';
 export function useReadAndSubscribe<TReadFromStore extends Object>(
   fragmentReference: FragmentReference<TReadFromStore, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
+  readerAst: ReaderAst<TReadFromStore>,
 ): TReadFromStore {
   const environment = useIsographEnvironment();
   const [readOutDataAndRecords, setReadOutDataAndRecords] = useState(() =>
@@ -27,6 +29,7 @@ export function useReadAndSubscribe<TReadFromStore extends Object>(
     readOutDataAndRecords,
     fragmentReference,
     setReadOutDataAndRecords,
+    readerAst,
   );
   return readOutDataAndRecords.item;
 }
@@ -36,14 +39,21 @@ export function useSubscribeToMultiple<TReadFromStore extends Object>(
     records: WithEncounteredRecords<TReadFromStore>;
     callback: (updatedRecords: WithEncounteredRecords<TReadFromStore>) => void;
     fragmentReference: FragmentReference<TReadFromStore, any>;
+    readerAst: ReaderAst<TReadFromStore>;
   }>,
 ) {
   const environment = useIsographEnvironment();
   useEffect(
     () => {
       const cleanupFns = items.map(
-        ({ records, callback, fragmentReference }) => {
-          return subscribe(environment, records, fragmentReference, callback);
+        ({ records, callback, fragmentReference, readerAst }) => {
+          return subscribe(
+            environment,
+            records,
+            fragmentReference,
+            callback,
+            readerAst,
+          );
         },
       );
       return () => {

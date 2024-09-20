@@ -3,6 +3,7 @@ import { subscribe } from '../core/cache';
 import { WithEncounteredRecords } from '../core/read';
 import { FragmentReference } from '../core/FragmentReference';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
+import type { ReaderAst } from '../core/reader';
 
 // TODO add unit tests for this. Add integration tests that test
 // behavior when the encounteredRecords underneath a fragment change.
@@ -12,6 +13,7 @@ export function useRerenderOnChange<TReadFromStore extends Object>(
   setEncounteredDataAndRecords: (
     data: WithEncounteredRecords<TReadFromStore>,
   ) => void,
+  readerAst: ReaderAst<TReadFromStore>,
 ) {
   const environment = useIsographEnvironment();
   useEffect(() => {
@@ -22,6 +24,7 @@ export function useRerenderOnChange<TReadFromStore extends Object>(
       (newEncounteredDataAndRecords) => {
         setEncounteredDataAndRecords(newEncounteredDataAndRecords);
       },
+      readerAst,
     );
     // Note: this is an empty array on purpose:
     // - the fragment reference is stable for the life of the component
