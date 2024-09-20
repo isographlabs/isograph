@@ -135,13 +135,13 @@ impl ValidatedSchema {
             fetchable_types: root_types,
         } = unvalidated_schema;
 
-        let updated_fields = match validate_and_transform_fields(fields, &schema_data) {
+        let updated_fields = match validate_and_transform_server_fields(fields, &schema_data) {
             Ok(fields) => fields,
             Err(new_errors) => {
                 errors.extend(new_errors);
                 return Err(errors);
 
-                // Because fields flows into updated_resolvers, we cannot optimistically
+                // Because fields flows into updated_client_fields, we cannot optimistically
                 // continue here.
                 // TODO: figure out whether this can be worked around.
             }
@@ -226,7 +226,7 @@ fn transform_object_field_ids(unvalidated_object: SchemaObject) -> SchemaObject 
     }
 }
 
-fn validate_and_transform_fields(
+fn validate_and_transform_server_fields(
     fields: Vec<UnvalidatedSchemaSchemaField>,
     schema_data: &ServerFieldData,
 ) -> Result<Vec<ValidatedSchemaServerField>, Vec<WithLocation<ValidateSchemaError>>> {
