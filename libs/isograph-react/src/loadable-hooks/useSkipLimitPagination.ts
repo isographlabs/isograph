@@ -97,7 +97,7 @@ export function useSkipLimitPagination<
       if (fragmentReference == null) {
         throw new Error(
           'FragmentReference is unexpectedly disposed. \
-        This is indicative of a bug in Isograph.',
+          This is indicative of a bug in Isograph.',
         );
       }
 
@@ -140,7 +140,7 @@ export function useSkipLimitPagination<
         if (clonedRefCountedPointer == null) {
           throw new Error(
             'This reference counted pointer has already been disposed. \
-              This is indicative of a bug in useSkipLimitPagination.',
+            This is indicative of a bug in useSkipLimitPagination.',
           );
         }
         return clonedRefCountedPointer;
@@ -179,7 +179,7 @@ export function useSkipLimitPagination<
   if (mostRecentFragmentReference === null) {
     throw new Error(
       'FragmentReference is unexpectedly disposed. \
-        This is indicative of a bug in Isograph.',
+      This is indicative of a bug in Isograph.',
     );
   }
 
