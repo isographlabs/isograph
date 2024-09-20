@@ -51,16 +51,6 @@ function flatten<T>(arr: ReadonlyArray<ReadonlyArray<T>>): ReadonlyArray<T> {
 }
 
 /**
- * accepts a loadableField that accepts skip and limit arguments
- * and returns:
- * - a fetchMore function that, when called, triggers a network
- *   request for additional data, and
- * - the data received so far.
- *
- * This hook will suspend if any network request is in flight.
- *
- * Calling fetchMore before the hook mounts is a no-op.
- *
  * NOTE: this hook does not subscribe to changes. This is a known
  * issue. If you are running into this issue, reach out on GitHub/
  * Twitter, and we'll fix the issue.
@@ -83,6 +73,8 @@ export function useSkipLimitPagination<
 
   const environment = useIsographEnvironment();
 
+  // TODO move this out of useSkipLimitPagination, and pass environment and networkRequestOptions
+  // as parameters (or recreate networkRequestOptions)
   function readCompletedFragmentReferences(
     completedReferences: ReadonlyArray<
       ItemCleanupPair<ReferenceCountedPointer<ArrayFragmentReference<TItem>>>
@@ -95,7 +87,7 @@ export function useSkipLimitPagination<
       if (fragmentReference == null) {
         throw new Error(
           'FragmentReference is unexpectedly disposed. \
-        This is indicative of a bug in Isograph.',
+          This is indicative of a bug in Isograph.',
         );
       }
 
@@ -138,7 +130,7 @@ export function useSkipLimitPagination<
         if (clonedRefCountedPointer == null) {
           throw new Error(
             'This reference counted pointer has already been disposed. \
-              This is indicative of a bug in useSkipLimitPagination.',
+            This is indicative of a bug in useSkipLimitPagination.',
           );
         }
         return clonedRefCountedPointer;
@@ -177,7 +169,7 @@ export function useSkipLimitPagination<
   if (mostRecentFragmentReference === null) {
     throw new Error(
       'FragmentReference is unexpectedly disposed. \
-        This is indicative of a bug in Isograph.',
+      This is indicative of a bug in Isograph.',
     );
   }
 

@@ -135,13 +135,13 @@ impl ValidatedSchema {
             fetchable_types: root_types,
         } = unvalidated_schema;
 
-        let updated_fields = match validate_and_transform_fields(fields, &schema_data) {
+        let updated_fields = match validate_and_transform_server_fields(fields, &schema_data) {
             Ok(fields) => fields,
             Err(new_errors) => {
                 errors.extend(new_errors);
                 return Err(errors);
 
-                // Because fields flows into updated_resolvers, we cannot optimistically
+                // Because fields flows into updated_client_fields, we cannot optimistically
                 // continue here.
                 // TODO: figure out whether this can be worked around.
             }
@@ -226,7 +226,7 @@ fn transform_object_field_ids(unvalidated_object: SchemaObject) -> SchemaObject 
     }
 }
 
-fn validate_and_transform_fields(
+fn validate_and_transform_server_fields(
     fields: Vec<UnvalidatedSchemaSchemaField>,
     schema_data: &ServerFieldData,
 ) -> Result<Vec<ValidatedSchemaServerField>, Vec<WithLocation<ValidateSchemaError>>> {
@@ -774,40 +774,7 @@ fn validate_field_type_exists_and_is_scalar(
                 }
             }
             FieldDefinitionLocation::Client(client_field_id) => {
-                let argument_definitions = client_field_args.get(client_field_id).expect(
-                    "Expected client field to exist in map. \
-                    This is indicative of a bug in Isograph.",
-                );
-                let missing_arguments = get_missing_arguments_and_validate_argument_types(
-                    argument_definitions
-                        .iter()
-                        .map(|variable_definition| &variable_definition.item),
-                    &scalar_field_selection.arguments,
-                    false,
-                );
-
-                Ok(ScalarFieldSelection {
-                    name: scalar_field_selection.name,
-                    reader_alias: scalar_field_selection.reader_alias,
-                    unwraps: scalar_field_selection.unwraps,
-                    associated_data: ValidatedScalarFieldAssociatedData {
-                        location: FieldDefinitionLocation::Client(*client_field_id),
-                        selection_variant: match scalar_field_selection.associated_data {
-                            IsographSelectionVariant::Regular => {
-                                assert_no_missing_arguments(
-                                    missing_arguments,
-                                    scalar_field_selection.name.location,
-                                )?;
-                                ValidatedIsographSelectionVariant::Regular
-                            }
-                            IsographSelectionVariant::Loadable(l) => {
-                                ValidatedIsographSelectionVariant::Loadable((l, missing_arguments))
-                            }
-                        },
-                    },
-                    arguments: scalar_field_selection.arguments,
-                    directives: scalar_field_selection.directives,
-                })
+                validate_client_field(client_field_args, client_field_id, scalar_field_selection)
             }
         },
         None => Err(WithLocation::new(
@@ -815,6 +782,47 @@ fn validate_field_type_exists_and_is_scalar(
             scalar_field_selection.name.location,
         )),
     }
+}
+
+fn validate_client_field(
+    client_field_args: &ClientFieldArgsMap,
+    client_field_id: &ClientFieldId,
+    scalar_field_selection: UnvalidatedScalarFieldSelection,
+) -> ValidateSelectionsResult<ValidatedScalarFieldSelection> {
+    let argument_definitions = client_field_args.get(client_field_id).expect(
+        "Expected client field to exist in map. \
+                    This is indicative of a bug in Isograph.",
+    );
+    let missing_arguments = get_missing_arguments_and_validate_argument_types(
+        argument_definitions
+            .iter()
+            .map(|variable_definition| &variable_definition.item),
+        &scalar_field_selection.arguments,
+        false,
+    );
+
+    Ok(ScalarFieldSelection {
+        name: scalar_field_selection.name,
+        reader_alias: scalar_field_selection.reader_alias,
+        unwraps: scalar_field_selection.unwraps,
+        associated_data: ValidatedScalarFieldAssociatedData {
+            location: FieldDefinitionLocation::Client(*client_field_id),
+            selection_variant: match scalar_field_selection.associated_data {
+                IsographSelectionVariant::Regular => {
+                    assert_no_missing_arguments(
+                        missing_arguments,
+                        scalar_field_selection.name.location,
+                    )?;
+                    ValidatedIsographSelectionVariant::Regular
+                }
+                IsographSelectionVariant::Loadable(l) => {
+                    ValidatedIsographSelectionVariant::Loadable((l, missing_arguments))
+                }
+            },
+        },
+        arguments: scalar_field_selection.arguments,
+        directives: scalar_field_selection.directives,
+    })
 }
 
 /// Given that we selected a linked field, the field should exist on the parent,

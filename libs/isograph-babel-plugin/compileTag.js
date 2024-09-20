@@ -1,6 +1,7 @@
 'use strict';
 
 const pathModule = require('path');
+const os = require('os');
 
 function compileTag(t, path, config) {
   const callee = path.node.callee;
@@ -69,6 +70,10 @@ function compileImportStatement(t, path, type, field, artifactType, config) {
     fileToArtifactDir,
     artifactDirToArtifact,
   );
+
+  if (os.platform() === 'win32') {
+    fileToArtifact = fileToArtifact.replace(/\\/g, '/');
+  }
 
   // If we do not have to traverse upward, e.g. if the resolver is in
   // src/HomePage, and the artifact directory is src/, then fileToArtifact
