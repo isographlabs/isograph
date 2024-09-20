@@ -27,7 +27,7 @@ import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
 import { FragmentReference, Variables } from './FragmentReference';
 import { areEqualObjectsWithDeepComparison } from './areEqualWithDeepComparison';
 import { makeNetworkRequest } from './makeNetworkRequest';
-import { wrapResolvedValue } from './PromiseWrapper';
+import { getPromiseState, wrapResolvedValue } from './PromiseWrapper';
 
 const TYPENAME_FIELD_NAME = '__typename';
 
@@ -188,11 +188,23 @@ export function subscribe<TReadFromStore extends Object>(
     newEncounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
   ) => void,
 ): () => void {
+  const readerWithRefetchQueries = getPromiseState(
+    fragmentReference.readerWithRefetchQueries,
+  );
+
+  if (readerWithRefetchQueries.kind !== 'Ok') {
+    throw new Error(
+      'fragmentReference passed to subscribe should be already read with readPromise.' +
+        'This indicates a bug in isograph-react.',
+    );
+  }
+
   const fragmentSubscription: FragmentSubscription<TReadFromStore> = {
     kind: 'FragmentSubscription',
     callback,
     encounteredDataAndRecords,
     fragmentReference,
+    readerAst: readerWithRefetchQueries.value.readerArtifact.readerAst,
   };
   // @ts-expect-error
   environment.subscriptions.add(fragmentSubscription);

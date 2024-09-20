@@ -4,6 +4,7 @@ import { WithEncounteredRecords } from './read';
 import { FragmentReference, Variables } from './FragmentReference';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { IsographEntrypoint } from './entrypoint';
+import type { ReaderAst } from './reader';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -21,6 +22,7 @@ export type FragmentSubscription<TReadFromStore extends Object> = {
   /** The value read out from the previous call to readButDoNotEvaluate */
   readonly encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>;
   readonly fragmentReference: FragmentReference<TReadFromStore, any>;
+  readonly readerAst: ReaderAst<TReadFromStore>
 };
 type AnyRecordSubscription = {
   readonly kind: 'AnyRecords';
