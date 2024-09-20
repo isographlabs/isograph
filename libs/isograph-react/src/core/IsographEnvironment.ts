@@ -22,7 +22,7 @@ export type FragmentSubscription<TReadFromStore extends Object> = {
   /** The value read out from the previous call to readButDoNotEvaluate */
   readonly encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>;
   readonly fragmentReference: FragmentReference<TReadFromStore, any>;
-  readonly readerAst: ReaderAst<TReadFromStore>
+  readonly readerAst: ReaderAst<TReadFromStore>;
 };
 type AnyRecordSubscription = {
   readonly kind: 'AnyRecords';

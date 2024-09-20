@@ -37,6 +37,7 @@ export function getOrCreateCachedComponent(
         const data = useReadAndSubscribe(
           fragmentReference,
           networkRequestOptions,
+          readerWithRefetchQueries.readerArtifact.readerAst,
         );
 
         // @ts-expect-error
