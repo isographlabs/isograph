@@ -83,6 +83,8 @@ export function useSkipLimitPagination<
 
   const environment = useIsographEnvironment();
 
+  // TODO move this out of useSkipLimitPagination, and pass environment and networkRequestOptions
+  // as parameters (or recreate networkRequestOptions)
   function readCompletedFragmentReferences(
     completedReferences: ReadonlyArray<
       ItemCleanupPair<ReferenceCountedPointer<ArrayFragmentReference<TItem>>>
