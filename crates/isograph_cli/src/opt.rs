@@ -4,14 +4,14 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 pub struct Opt {
     #[command(subcommand)]
-    pub command: Option<Commands>,
+    pub command: Option<Command>,
 
     #[command(flatten)]
     pub compile: CompileCommand,
 }
 
 #[derive(Debug, Subcommand)]
-pub enum Commands {
+pub enum Command {
     Compile(CompileCommand),
     Lsp(LspCommand),
 }

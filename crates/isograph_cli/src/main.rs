@@ -5,17 +5,17 @@ use colored::Colorize;
 use isograph_compiler::{compile_and_print, handle_watch_command};
 use isograph_config::create_config;
 use isograph_lsp::lsp_process_error::LSPProcessError;
-use opt::{Commands, CompileCommand, LspCommand, Opt};
+use opt::{Command, CompileCommand, LspCommand, Opt};
 
 #[tokio::main]
 async fn main() {
     let opt = Opt::parse();
-    let command = opt.command.unwrap_or(Commands::Compile(opt.compile));
+    let command = opt.command.unwrap_or(Command::Compile(opt.compile));
     match command {
-        Commands::Compile(compile_command) => {
+        Command::Compile(compile_command) => {
             start_compiler(compile_command).await;
         }
-        Commands::Lsp(lsp_command) => {
+        Command::Lsp(lsp_command) => {
             start_language_server(lsp_command).await.unwrap();
         }
     }
