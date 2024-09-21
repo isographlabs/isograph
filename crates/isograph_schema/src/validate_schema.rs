@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use common_lang_types::{
-    IsographObjectTypeName, Location, SelectableFieldName, UnvalidatedTypeName, VariableName,
-    WithLocation, WithSpan,
+    FieldArgumentName, IsographObjectTypeName, Location, SelectableFieldName, UnvalidatedTypeName,
+    VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation};
 use intern::Lookup;
@@ -619,6 +619,9 @@ fn validate_selections_error_to_validate_schema_error(
         ValidateSelectionsError::MissingArguments { missing_arguments } => {
             ValidateSchemaError::MissingArguments { missing_arguments }
         }
+        ValidateSelectionsError::ExtraneousArgument { extra_arguments } => {
+            ValidateSchemaError::ExtraneousArgument { extra_arguments }
+        }
     })
 }
 
@@ -649,6 +652,9 @@ enum ValidateSelectionsError {
     },
     MissingArguments {
         missing_arguments: Vec<ValidatedVariableDefinition>,
+    },
+    ExtraneousArgument {
+        extra_arguments: Vec<WithLocation<SelectionFieldArgument>>,
     },
 }
 
@@ -730,7 +736,8 @@ fn validate_field_type_exists_and_is_scalar(
                         .map(|variable_definition| &variable_definition.item),
                     &scalar_field_selection.arguments,
                     false,
-                );
+                    scalar_field_selection.name.location,
+                )?;
 
                 match server_field.associated_data.inner() {
                     SelectableServerFieldId::Scalar(_) => Ok(ScalarFieldSelection {
@@ -799,7 +806,8 @@ fn validate_client_field(
             .map(|variable_definition| &variable_definition.item),
         &scalar_field_selection.arguments,
         false,
-    );
+        scalar_field_selection.name.location,
+    )?;
 
     Ok(ScalarFieldSelection {
         name: scalar_field_selection.name,
@@ -862,7 +870,8 @@ fn validate_field_type_exists_and_is_linked(
                                 .map(|variable_definition| &variable_definition.item),
                             &linked_field_selection.arguments,
                             false,
-                        );
+                            linked_field_selection.name.location,
+                        )?;
 
                         Ok(LinkedFieldSelection {
                                 name: linked_field_selection.name,
@@ -968,13 +977,55 @@ pub fn categorize_field_loadability<'a>(
     }
 }
 
-pub fn get_missing_arguments_and_validate_argument_types<'a>(
+fn validate_no_extraneous_arguments(
+    argument_definitions: &[&ValidatedVariableDefinition],
+    arguments: &[WithLocation<SelectionFieldArgument>],
+    location: Location,
+) -> ValidateSelectionsResult<()> {
+    let extra_arguments: Vec<_> = arguments
+        .iter()
+        .filter_map(|arg| {
+            let is_defined = argument_definitions
+                .iter()
+                .any(|definition| definition.name.item.lookup() == arg.item.name.item.lookup());
+
+            if !is_defined {
+                return Some(arg.clone());
+            }
+            None
+        })
+        .collect();
+
+    if !extra_arguments.is_empty() {
+        return Err(WithLocation::new(
+            ValidateSelectionsError::ExtraneousArgument { extra_arguments },
+            location,
+        ));
+    }
+    Ok(())
+}
+
+fn get_missing_arguments_and_validate_argument_types<'a>(
+    argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
+    arguments: &[WithLocation<SelectionFieldArgument>],
+    include_optional_args: bool,
+    location: Location,
+) -> ValidateSelectionsResult<Vec<ValidatedVariableDefinition>> {
+    let argument_definitions_vec: Vec<_> = argument_definitions.collect();
+    validate_no_extraneous_arguments(&argument_definitions_vec, &arguments, location)?;
+    // TODO validate argument types
+    Ok(get_missing_arguments(
+        argument_definitions_vec.into_iter(),
+        &arguments,
+        include_optional_args,
+    ))
+}
+
+pub fn get_missing_arguments<'a>(
     argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
     arguments: &[WithLocation<SelectionFieldArgument>],
     include_optional_args: bool,
 ) -> Vec<ValidatedVariableDefinition> {
-    // TODO validate argument types
-
     argument_definitions
         .filter_map(|definition| {
             if definition.default_value.is_some()
@@ -1095,5 +1146,13 @@ pub enum ValidateSchemaError {
     #[error("Error when validating iso entrypoint calls.\nMessage: {message}")]
     ErrorValidatingEntrypointDeclaration {
         message: ValidateEntrypointDeclarationError,
+    },
+
+    #[error(
+        "This field has extra arguments: {0}",
+        extra_arguments.iter().map(|arg| format!("{}", arg.item.name)).collect::<Vec<_>>().join(", ")
+    )]
+    ExtraneousArgument {
+        extra_arguments: Vec<WithLocation<SelectionFieldArgument>>,
     },
 }

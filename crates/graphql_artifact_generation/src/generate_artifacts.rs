@@ -11,7 +11,7 @@ use isograph_lang_types::{
     ServerFieldSelection,
 };
 use isograph_schema::{
-    get_missing_arguments_and_validate_argument_types, selection_map_wrapped,
+    get_missing_arguments, selection_map_wrapped,
     ClientFieldTraversalResult, ClientFieldVariant, FieldDefinitionLocation, MissingArguments,
     NameAndArguments, NormalizationKey, RequiresRefinement, SchemaObject,
     UserWrittenComponentVariant, ValidatedClientField, ValidatedIsographSelectionVariant,
@@ -481,7 +481,7 @@ fn write_param_type_from_selection(
                             ValidatedIsographSelectionVariant::Regular => inner_output_type,
                             ValidatedIsographSelectionVariant::Loadable(_) => {
                                 let missing_arguments =
-                                    get_missing_arguments_and_validate_argument_types(
+                                    get_missing_arguments(
                                         client_field.variable_definitions.iter().map(|x| &x.item),
                                         &scalar_field_selection.arguments,
                                         true,
