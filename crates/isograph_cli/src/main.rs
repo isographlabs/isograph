@@ -5,7 +5,7 @@ use isograph_compiler::{compile_and_print, handle_watch_command};
 use isograph_config::create_config;
 use isograph_lsp::lsp_process_error::LSPProcessError;
 use opt::{Command, CompileCommand, LspCommand, Opt};
-use structopt::StructOpt;
+use clap::StructOpt;
 
 #[tokio::main]
 async fn main() {

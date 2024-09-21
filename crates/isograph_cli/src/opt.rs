@@ -1,5 +1,6 @@
 use std::path::PathBuf;
-use structopt::StructOpt;
+use clap::StructOpt;
+
 #[derive(Debug, StructOpt)]
 pub struct Opt {
     #[structopt(subcommand)]

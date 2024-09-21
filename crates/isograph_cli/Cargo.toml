@@ -5,7 +5,7 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
-structopt = "0.3.26"
+clap = { version = "3", features = ["derive"] }
 thiserror = "1.0.40"
 isograph_compiler = { path = "../isograph_compiler" }
 isograph_config = { path = "../isograph_config" }
