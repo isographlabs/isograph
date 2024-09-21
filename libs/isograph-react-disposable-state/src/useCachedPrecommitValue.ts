@@ -95,7 +95,7 @@ export function useCachedPrecommitValue<T>(
     return null;
   }
 
-  // Safety: item is only safe to use (i.e. guaranteed not to have disposed)
+  // Safety: item is only safe to use (i.e. guaranteed not to have been disposed)
   // during this tick.
   const [cacheItem, item, disposeOfTemporaryRetain] =
     parentCache.getOrPopulateAndTemporaryRetain();
