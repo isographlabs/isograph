@@ -104,7 +104,7 @@ jobs:
       - name: Use Node.js 18
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 22
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
@@ -125,7 +125,7 @@ jobs:
       - name: Use Node.js 18
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 22
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
@@ -151,7 +151,7 @@ jobs:
       - name: Use Node.js 18
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 22
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
@@ -177,7 +177,7 @@ jobs:
       - name: Use Node.js 18
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 22
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
@@ -235,7 +235,7 @@ jobs:
       - name: Use Node.js 18
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 22
           cache: 'pnpm'
       - name: 'Download build folder'
         uses: actions/download-artifact@v4
@@ -268,7 +268,7 @@ jobs:
       - uses: pnpm/action-setup@v2
       - uses: actions/setup-node@v2
         with:
-          node-version: 18
+          node-version: 22
           registry-url: https://registry.npmjs.org/
           cache: 'pnpm'
       - name: Install dependencies
@@ -327,7 +327,7 @@ jobs:
       - uses: pnpm/action-setup@v2
       - uses: actions/setup-node@v2
         with:
-          node-version: 18
+          node-version: 22
           registry-url: https://registry.npmjs.org/
           cache: 'pnpm'
       - name: Install dependencies
