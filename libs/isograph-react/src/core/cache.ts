@@ -21,7 +21,7 @@ import {
   NormalizationScalarField,
   RefetchQueryNormalizationArtifactWrapper,
 } from '../core/entrypoint';
-import { ReaderLinkedField, ReaderScalarField } from './reader';
+import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
 import { Argument, ArgumentValue } from './util';
 import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
 import { FragmentReference, Variables } from './FragmentReference';
@@ -187,12 +187,14 @@ export function subscribe<TReadFromStore extends Object>(
   callback: (
     newEncounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
   ) => void,
+  readerAst: ReaderAst<TReadFromStore>,
 ): () => void {
   const fragmentSubscription: FragmentSubscription<TReadFromStore> = {
     kind: 'FragmentSubscription',
     callback,
     encounteredDataAndRecords,
     fragmentReference,
+    readerAst,
   };
   // @ts-expect-error
   environment.subscriptions.add(fragmentSubscription);

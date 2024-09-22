@@ -30,9 +30,14 @@ export function getOrCreateCachedComponent(
     byArgs[stringifiedArgs] ??
     (() => {
       function Component(additionalRuntimeProps: { [key: string]: any }) {
+        const readerWithRefetchQueries = readPromise(
+          fragmentReference.readerWithRefetchQueries,
+        );
+
         const data = useReadAndSubscribe(
           fragmentReference,
           networkRequestOptions,
+          readerWithRefetchQueries.readerArtifact.readerAst,
         );
 
         // @ts-expect-error
@@ -44,10 +49,6 @@ export function getOrCreateCachedComponent(
               fragmentReference.root,
           );
         }
-
-        const readerWithRefetchQueries = readPromise(
-          fragmentReference.readerWithRefetchQueries,
-        );
 
         return readerWithRefetchQueries.readerArtifact.resolver(
           data,

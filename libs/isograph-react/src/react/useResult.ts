@@ -43,6 +43,7 @@ export function useResult<TReadFromStore extends Object, TClientFieldValue>(
       const data = useReadAndSubscribe(
         fragmentReference,
         networkRequestOptions,
+        readerWithRefetchQueries.readerArtifact.readerAst,
       );
       return readerWithRefetchQueries.readerArtifact.resolver(data);
     }

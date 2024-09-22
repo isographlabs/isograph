@@ -1,15 +1,15 @@
 mod opt;
 
+use clap::Parser;
 use colored::Colorize;
 use isograph_compiler::{compile_and_print, handle_watch_command};
 use isograph_config::create_config;
 use isograph_lsp::lsp_process_error::LSPProcessError;
 use opt::{Command, CompileCommand, LspCommand, Opt};
-use structopt::StructOpt;
 
 #[tokio::main]
 async fn main() {
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
     let command = opt.command.unwrap_or(Command::Compile(opt.compile));
     match command {
         Command::Compile(compile_command) => {

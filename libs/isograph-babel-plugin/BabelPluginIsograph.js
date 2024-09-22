@@ -21,8 +21,8 @@ if (result) {
 }
 
 module.exports = function BabelPluginIsograph(context) {
-  const { types: t } = context;
-  if (!t) {
+  const { types } = context;
+  if (!types) {
     throw new Error(
       'BabelPluginIsograph: Expected plugin context to include "types", but got:' +
         String(context),
@@ -31,7 +31,7 @@ module.exports = function BabelPluginIsograph(context) {
 
   const visitor = {
     CallExpression(path) {
-      compileTag(t, path, IsographConfig);
+      compileTag(types, path, IsographConfig);
     },
   };
 
