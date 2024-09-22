@@ -73,13 +73,6 @@ export function areEqualObjectsWithDeepComparison(
   oldItemObject: object,
   newItemObject: object,
 ): boolean {
-  const oldKeys = Object.keys(oldItemObject);
-  const newKeys = Object.keys(newItemObject);
-
-  if (oldKeys.length !== newKeys.length) {
-    return false;
-  }
-
   for (const field of ast) {
     switch (field.kind) {
       case 'Scalar':
