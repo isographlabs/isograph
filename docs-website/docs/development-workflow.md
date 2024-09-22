@@ -75,6 +75,8 @@ yarn run iso
 cargo test
 ```
 
+(These are not run as part of CI, but we should add that!)
+
 ### Format Rust code
 
 ```sh
@@ -168,3 +170,19 @@ Every commit to `main` results in a build, which you can see in [npm](https://ww
 ## Workflow for using Isograph
 
 If you are using Isograph in a project, you may be interested in [this doc](../workflow).
+
+## Checking things that fail in CI locally
+
+You may save yourself some time by running:
+
+```sh
+pnpm sanity-check
+```
+
+This will:
+
+- format the code and run the compiler, and ensure that no files are left modified in the working directory
+- build the JS libs (which typechecks etc)
+- run tests
+
+All of these are checked as part of CI.

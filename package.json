@@ -20,7 +20,8 @@
     "format": "pnpm run format-prettier && pnpm run format-rust",
     "format-prettier": "prettier --config ./.prettier.config.js --write .",
     "format-rust": "cargo fmt",
-    "tsc": "pnpm -r tsc"
+    "tsc": "pnpm -r tsc",
+    "sanity-check": "./scripts/sanity-check.sh"
   },
   "license": "MIT",
   "repository": {
