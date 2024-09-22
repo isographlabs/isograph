@@ -115,7 +115,7 @@ pnpm format-prettier
 pnpm format # which also formats the Rust code
 ```
 
-### Run the pet demo
+## Run the pet demo
 
 ```sh
 cd demos/pet-demo
@@ -129,6 +129,24 @@ cd demos/pet-demo
 pnpm backend
 ```
 
+## VSCode extension
+
+### Starting
+
+- Open VSCode in `isograph/vscode-extension`
+- Open the "run and debug" sidebar, and click `Run and Debug`. If given a choice, select something related to "Extension development host".
+- In this new window, open `isograph/demos/pet-demo`.
+- The VSCode extension should start when you open a JS, JSX, TS or TSX file.
+
+### Restarting and seeing new changes
+
+- Run `pnpm watch-rs` to ensure that the latest binary is being built
+- Restart the "Extension development host" window to use the latest language server binary.
+
+### Logs etc
+
+You can see logs by going to `Show output channel` and selecting `Isograph` or `Isograph LSP Logs`. `Isograph` is the output of the VSCode extension. It is not very interesting. `Isograph LSP Logs` shows the output of the language server binary and the traffic. This is interesting. `eprintln`'s in your Rust code will show up here.
+
 ## How to release a new "main" version of Isograph
 
 Every commit to `main` results in a build, which you can see in [npm](https://www.npmjs.com/package/@isograph/compiler?activeTab=versions). The ones of the form `0.0.0-main-$hash` are generated from a commit to `main`.
@@ -138,3 +156,7 @@ Every commit to `main` results in a build, which you can see in [npm](https://ww
 - In all package.json files, bump the version number. Don't forget to bump the version number of imports.
 - `git add . && git commit -m 'v0.1.0' && git tag v0.1.0 && git push`
 - See [this commit releasing 0.2.0](https://github.com/isographlabs/isograph/commit/e36acab1a018e18bdae0558be08952693af3b6a8)
+
+## Workflow for using Isograph
+
+If you are using Isograph in a project, you may be interested in [this doc](../workflow).
