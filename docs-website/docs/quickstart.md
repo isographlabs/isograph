@@ -172,7 +172,7 @@ In this step, we created some context that holds the Isograph environment. The I
 :::note Why are we wrapping `Component` in a suspense boundary?
 We're wrapping the inner `<Component />` in a suspense boundary because later, we'll render `<HomePage />`. This component will suspend if data is missing. When the network request completes and the component unsuspends, React will re-render the children of the suspense boundary.
 
-When React re-renders the children of a suspense boundary, their hooks lose all state. We memoize the Isograph environment out side of the suspense boundary because, if the environment were defined within the suspense boundary, it would be recreated in an infinite loop :'( 
+When React re-renders the children of a suspense boundary, their hooks lose all state. We memoize the Isograph environment out side of the suspense boundary because, if the environment were defined within the suspense boundary, it would be recreated in an infinite loop :'(
 :::
 
 ## Create the `Root.HomePage` component
