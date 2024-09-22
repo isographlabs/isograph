@@ -20,34 +20,26 @@ export function areEqualWithDeepComparison(
     return areEqualArraysWithDeepComparison(field, oldItem, newItem);
   }
 
-  if (typeof newItem === 'object') {
-    if (typeof oldItem !== 'object') {
-      return false;
-    }
-
-    if (oldItem === null) {
-      return false;
-    }
-
-    switch (field.kind) {
-      case 'Scalar':
-        break;
-      case 'Linked':
-        return areEqualObjectsWithDeepComparison(
-          field.selections,
-          oldItem,
-          newItem,
-        );
-      default: {
-        // Ensure we have covered all variants
-        let _: never = field;
-        _;
-        throw new Error('Unexpected case.');
+  switch (field.kind) {
+    case 'Scalar':
+      return newItem === oldItem;
+    case 'Linked':
+      if (oldItem == null) {
+        return false;
       }
+
+      return areEqualObjectsWithDeepComparison(
+        field.selections,
+        oldItem,
+        newItem,
+      );
+    default: {
+      // Ensure we have covered all variants
+      let _: never = field;
+      _;
+      throw new Error('Unexpected case.');
     }
   }
-
-  return newItem === oldItem;
 }
 
 export function areEqualArraysWithDeepComparison(
