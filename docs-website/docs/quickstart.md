@@ -169,10 +169,10 @@ export default function App({ Component, pageProps }: AppProps) {
 
 In this step, we created some context that holds the Isograph environment. The Isograph environment contains the data that we have received from the network and knows how to make network requests to the GraphQL backend.
 
-:::note Why are we memoizing the Isograph environment outside of the suspense boundary?
+:::note WHY ARE WE WRAPPING `Component` IN A SUSPENSE BOUNDARY?
 We're wrapping the inner `<Component />` in a suspense boundary because later, we'll render `<HomePage />`. This component will suspend if data is missing. When the network request completes and the component unsuspends, React will re-render the children of the suspense boundary.
 
-When React re-renders the children of a suspense boundary, their hooks lose all state. So, if the environment that we stored in the `useMemo` call is defined within the suspense boundary, it will be recreated in an infinite loop :'( 
+When React re-renders the children of a suspense boundary, their hooks lose all state. We memoize the Isograph environment out side of the suspense boundary because, if the environment were defined within the suspense boundary, it would be recreated in an infinite loop :'( 
 :::
 
 ## Create the `Root.HomePage` component
