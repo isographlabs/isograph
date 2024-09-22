@@ -89,6 +89,14 @@ Many of these tests come from the libraries that we brought in from Relay, and a
 
 ## Commands related to the runtime and JavaScript
 
+### Install dependencies
+
+You can install everything by running the following from the root:
+
+```sh
+pnpm i
+```
+
 ### Build the Isograph JavaScript libraries for use in demos
 
 ```sh
