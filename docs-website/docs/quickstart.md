@@ -2,7 +2,7 @@ import DataTypeSrc from './assets/data-type.png';
 
 # Quickstart guide
 
-In this quickstart guide, we will create a new NextJS project and add Isograph to it. We will use the free and publicly available [Star Wars GraphQL API](https://studio.apollographql.com/public/star-wars-swapi/variant/current/home).
+In this quickstart guide, we will create a new NextJS project and add Isograph to it. Then we'll use the free and publicly available [Star Wars GraphQL API](https://studio.apollographql.com/public/star-wars-swapi/variant/current/home).
 
 You can view the end result of following this quickstart guide in [this repository](https://github.com/isographlabs/quickstart).
 
@@ -75,7 +75,7 @@ const nextConfig = {
 ```
 
 :::note Why is this necessary?
-See [this FAQ item](/docs/faq/#why-does-isograph-not-support-strict-mode/) for an explanation of why this is necessary.
+See [this FAQ item](/docs/faq/#why-does-isograph-not-support-strict-mode/) for an explanation.
 :::
 
 ## Create a `.babelrc.js`
@@ -117,7 +117,7 @@ The Isograph compiler can be a bit finicky, especially if you're still learning 
 
 Isograph requires some initial setup to teach it how to make API calls to your GraphQL server. The GraphQL server we will hit is running at `https://swapi-graphql.netlify.app/.netlify/functions/index`.
 
-In our case, we can do that by change our `src/pages/_app.tsx` file to look like:
+In our case, we can do that by changing our `src/pages/_app.tsx` file to look like:
 
 ```tsx
 import { useMemo, Suspense } from 'react';
@@ -167,12 +167,12 @@ export default function App({ Component, pageProps }: AppProps) {
 }
 ```
 
-In this step, we created some context that holds the Isograph environment. The Isograph environment contains the data that we have received from the network. It also knows how to make network requests ot the GraphQL backend.
+In this step, we created some context that holds the Isograph environment. The Isograph environment contains the data that we have received from the network and knows how to make network requests to the GraphQL backend.
 
-:::note Why are we wrapping `Component` in a suspense boundary?
-We're also wrapping the inner `<Component />` in a suspense boundary. This is because later, we will render `<HomePage />`. This component will suspend if data is missing due to missing data. When the network request completes and the component unsuspends, we will re-render `App` anew.
+:::note Why are we memoizing the Isograph environment outside of the suspense boundary?
+We're wrapping the inner `<Component />` in a suspense boundary because later, we'll render `<HomePage />`. This component will suspend if data is missing. When the network request completes and the component unsuspends, React will re-render the children of the suspense boundary.
 
-This will recreate the environment, meaning that we'll find that that data is missing, and re-suspend, causing an infinite loop! 😢
+When React re-renders the children of a suspense boundary, their hooks lose all state. So, if the environment that we stored in the `useMemo` call is defined within the suspense boundary, it will be recreated in an infinite loop :'( 
 :::
 
 ## Create the `Root.HomePage` component
@@ -184,7 +184,7 @@ An Isograph app will be almost entirely made up of client fields. There are two 
 - they can reference each other. In this quickstart, `Root.HomePage` will reference `Film.FilmSummary`.
 - they can return arbitrary values. In this quickstart, both fields will return React elements. A field that return a React elements is called a _client component field_.
 
-So, let's define our first field, `Root.HomePage`. Let's start by making sure that `yarn iso --watch` is running and then creating a file (e.g. `src/components/HomePage.tsx`) containing the following:
+So, let's define our first field, `Root.HomePage`, by making sure that `yarn iso --watch` is running and then creating a file (e.g. `src/components/HomePage.tsx`) containing the following:
 
 ```tsx
 import React from 'react';
