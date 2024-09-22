@@ -264,6 +264,7 @@ function callSubscriptions(
 
             if (
               !areEqualObjectsWithDeepComparison(
+                subscription.readerAst,
                 subscription.encounteredDataAndRecords.item,
                 newEncounteredDataAndRecords.item,
               )

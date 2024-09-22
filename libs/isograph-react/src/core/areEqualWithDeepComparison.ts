@@ -1,4 +1,6 @@
+import type { ReaderAst, ReaderLinkedField, ReaderScalarField } from './reader';
 export function areEqualWithDeepComparison(
+  field: ReaderScalarField | ReaderLinkedField,
   oldItem: unknown,
   newItem: unknown,
 ): boolean {
@@ -15,25 +17,33 @@ export function areEqualWithDeepComparison(
       return false;
     }
 
-    return areEqualArraysWithDeepComparison(oldItem, newItem);
+    return areEqualArraysWithDeepComparison(field, oldItem, newItem);
   }
 
-  if (typeof newItem === 'object') {
-    if (typeof oldItem !== 'object') {
-      return false;
-    }
+  switch (field.kind) {
+    case 'Scalar':
+      return newItem === oldItem;
+    case 'Linked':
+      if (oldItem == null) {
+        return false;
+      }
 
-    if (oldItem === null) {
-      return false;
+      return areEqualObjectsWithDeepComparison(
+        field.selections,
+        oldItem,
+        newItem,
+      );
+    default: {
+      // Ensure we have covered all variants
+      let _: never = field;
+      _;
+      throw new Error('Unexpected case.');
     }
-
-    return areEqualObjectsWithDeepComparison(oldItem, newItem);
   }
-
-  return newItem === oldItem;
 }
 
 export function areEqualArraysWithDeepComparison(
+  field: ReaderScalarField | ReaderLinkedField,
   oldItems: ReadonlyArray<unknown>,
   newItems: ReadonlyArray<unknown>,
 ): boolean {
@@ -42,7 +52,7 @@ export function areEqualArraysWithDeepComparison(
   }
 
   for (let i = 0; i < newItems.length; i++) {
-    if (!areEqualWithDeepComparison(oldItems[i], newItems[i])) {
+    if (!areEqualWithDeepComparison(field, oldItems[i], newItems[i])) {
       return false;
     }
   }
@@ -51,28 +61,46 @@ export function areEqualArraysWithDeepComparison(
 }
 
 export function areEqualObjectsWithDeepComparison(
+  ast: ReaderAst<object>,
   oldItemObject: object,
   newItemObject: object,
 ): boolean {
-  const oldKeys = Object.keys(oldItemObject);
-  const newKeys = Object.keys(newItemObject);
+  for (const field of ast) {
+    switch (field.kind) {
+      case 'Scalar':
+      case 'Linked':
+        const key = field.alias ?? field.fieldName;
+        // @ts-expect-error
+        const oldValue = oldItemObject[key];
+        // @ts-expect-error
+        const newValue = newItemObject[key];
+        if (!areEqualWithDeepComparison(field, oldValue, newValue)) {
+          return false;
+        }
+        break;
+      case 'Resolver': {
+        const key = field.alias;
+        // @ts-expect-error
+        const oldValue = oldItemObject[key];
+        // @ts-expect-error
+        const newValue = newItemObject[key];
 
-  if (oldKeys.length !== newKeys.length) {
-    return false;
+        if (oldValue !== newValue) {
+          return false;
+        }
+        break;
+      }
+      case 'ImperativelyLoadedField':
+      case 'LoadablySelectedField':
+        break;
+      default: {
+        // Ensure we have covered all variants
+        let _: never = field;
+        _;
+        throw new Error('Unexpected case.');
+      }
+    }
   }
 
-  for (const oldKey of oldKeys) {
-    if (!(oldKey in newItemObject)) {
-      return false;
-    }
-    // @ts-expect-error
-    const oldValue = oldItemObject[oldKey];
-    // @ts-expect-error
-    const newValue = newItemObject[oldKey];
-
-    if (!areEqualWithDeepComparison(oldValue, newValue)) {
-      return false;
-    }
-  }
   return true;
 }
