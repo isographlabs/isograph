@@ -1,17 +1,17 @@
-import React from "react";
-import { iso } from "@iso";
-import { Container, Stack } from "@mui/material";
+import React from 'react';
+import { iso } from '@iso';
+import { Container, Stack } from '@mui/material';
 import {
   FragmentReader,
   useClientSideDefer,
   useLazyReference,
-} from "@isograph/react";
+} from '@isograph/react';
 import {
   FullPageLoading,
   PetDetailDeferredRoute,
   useNavigateTo,
-} from "./routes";
-import { ErrorBoundary } from "./ErrorBoundary";
+} from './routes';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export const PetDetailDeferredRouteComponent = iso(`
   field Query.PetDetailDeferredRoute($id: ID!) @component {
@@ -39,15 +39,15 @@ export const PetDetailDeferredRouteInnerComponent = iso(`
     pet.PetCheckinsCard,
     {
       limit: 2,
-    }
+    },
   );
 
   return (
     <Container maxWidth="md">
       <h1>Pet Detail for {pet.name}</h1>
       <h3
-        onClick={() => navigateTo({ kind: "Home" })}
-        style={{ cursor: "pointer" }}
+        onClick={() => navigateTo({ kind: 'Home' })}
+        style={{ cursor: 'pointer' }}
       >
         ← Home
       </h3>
@@ -69,7 +69,7 @@ export function PetDetailDeferredRouteLoader({
 }) {
   const { fragmentReference } = useLazyReference(
     iso(`entrypoint Query.PetDetailDeferredRoute`),
-    { id: route.id }
+    { id: route.id },
   );
 
   return (
