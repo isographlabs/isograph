@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use common_lang_types::{
-    FieldArgumentName, IsographObjectTypeName, Location, SelectableFieldName, UnvalidatedTypeName,
-    VariableName, WithLocation, WithSpan,
+    IsographObjectTypeName, Location, SelectableFieldName, UnvalidatedTypeName, VariableName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation};
 use intern::Lookup;
