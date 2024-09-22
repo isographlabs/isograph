@@ -48,7 +48,7 @@ export function useCachedPrecommitValue<T>(
   // This hook is the former, i.e. re-renders if the committed item has changed.
   const [, rerender] = useState<{} | null>(null);
 
-  useEffect(() => {
+  useEffect(function didInitiallyCommit() {
     // On first commit, cacheItem may be disposed, because during the render phase,
     // we only temporarily retained the item, and the temporary retain could have
     // expired by the time of the commit.
@@ -95,7 +95,7 @@ export function useCachedPrecommitValue<T>(
     return null;
   }
 
-  // Safety: item is only safe to use (i.e. guaranteed not to have disposed)
+  // Safety: item is only safe to use (i.e. guaranteed not to have been disposed)
   // during this tick.
   const [cacheItem, item, disposeOfTemporaryRetain] =
     parentCache.getOrPopulateAndTemporaryRetain();

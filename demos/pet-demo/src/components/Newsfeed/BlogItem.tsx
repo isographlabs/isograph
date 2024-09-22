@@ -65,7 +65,7 @@ export const ImageDisplayWrapper = iso(`
     ImageDisplay @loadable(lazyLoadArtifact: true)
   }
 `)((image) => {
-  const fragmentReference = useClientSideDefer(image.ImageDisplay);
+  const { fragmentReference } = useClientSideDefer(image.ImageDisplay);
   return (
     <Suspense fallback={null}>
       <FragmentReader fragmentReference={fragmentReference} />

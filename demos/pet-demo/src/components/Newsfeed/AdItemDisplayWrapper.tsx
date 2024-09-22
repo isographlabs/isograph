@@ -10,7 +10,7 @@ export const AdItemDisplayWrapper = iso(`
   data,
   { onVisible, index }: { onVisible: (() => void) | null; index: number },
 ) => {
-  const fragmentReference = useClientSideDefer(data.AdItemDisplay);
+  const { fragmentReference } = useClientSideDefer(data.AdItemDisplay);
 
   return (
     <FragmentReader
