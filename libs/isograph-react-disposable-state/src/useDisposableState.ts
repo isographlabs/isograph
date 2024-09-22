@@ -1,7 +1,8 @@
+import { ItemCleanupPair } from '@isograph/disposable-types';
 import { useEffect, useRef } from 'react';
 import { ParentCache } from './ParentCache';
-import { ItemCleanupPair } from '@isograph/disposable-types';
-import { useCachedPrecommitValue } from './useCachedPrecommitValue';
+
+import { useCachedResponsivePrecommitValue } from './useCachedResponsivePrecommitValue';
 import {
   UNASSIGNED_STATE,
   UnassignedState,
@@ -18,9 +19,13 @@ export function useDisposableState<T = never>(
 ): UseUpdatableDisposableStateReturnValue<T> {
   const itemCleanupPairRef = useRef<ItemCleanupPair<T> | null>(null);
 
-  const preCommitItem = useCachedPrecommitValue(parentCache, (pair) => {
-    itemCleanupPairRef.current = pair;
-  });
+  const preCommitItem = useCachedResponsivePrecommitValue(
+    parentCache,
+    (pair) => {
+      itemCleanupPairRef.current?.[1]();
+      itemCleanupPairRef.current = pair;
+    },
+  );
 
   const { state: stateFromDisposableStateHook, setState } =
     useUpdatableDisposableState<T>();
@@ -68,8 +73,8 @@ export function useDisposableState<T = never>(
     (stateFromDisposableStateHook != UNASSIGNED_STATE
       ? stateFromDisposableStateHook
       : null) ??
-    itemCleanupPairRef.current?.[0] ??
-    preCommitItem?.state;
+    preCommitItem?.state ??
+    itemCleanupPairRef.current?.[0];
 
   return {
     state: state!,
