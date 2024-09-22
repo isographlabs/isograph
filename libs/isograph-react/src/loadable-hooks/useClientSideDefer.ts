@@ -6,17 +6,17 @@ import { LoadableField } from '../core/reader';
 
 export function useClientSideDefer<TResult>(
   loadableField: LoadableField<void, TResult>,
-): FragmentReference<Record<string, never>, TResult>;
+): { fragmentReference: FragmentReference<Record<string, never>, TResult> };
 
 export function useClientSideDefer<TArgs extends Object, TResult>(
   loadableField: LoadableField<TArgs, TResult>,
   args: TArgs,
-): FragmentReference<TArgs, TResult>;
+): { fragmentReference: FragmentReference<TArgs, TResult> };
 
 export function useClientSideDefer<TArgs extends Object, TResult>(
   loadableField: LoadableField<TArgs, TResult>,
   args?: TArgs,
-): FragmentReference<TArgs, TResult> {
+): { fragmentReference: FragmentReference<TArgs, TResult> } {
   // @ts-expect-error args is missing iff it has the type void
   const [id, loader] = loadableField(args);
   const environment = useIsographEnvironment();
@@ -24,5 +24,5 @@ export function useClientSideDefer<TArgs extends Object, TResult>(
 
   const fragmentReference = useLazyDisposableState(cache).state;
 
-  return fragmentReference;
+  return { fragmentReference };
 }
