@@ -40,7 +40,7 @@ fn build_iso_overload_for_client_defined_field(
     let (client_field, variant) = client_field_and_variant;
     let mut s: String = "".to_string();
     let import = format!(
-        "import {{ {}__param }} from './{}/{}/param_type';\n",
+        "import {{ type {}__param }} from './{}/{}/param_type';\n",
         client_field.type_and_field.underscore_separated(),
         client_field.type_and_field.type_name,
         client_field.type_and_field.field_name,
@@ -72,7 +72,7 @@ export function iso<T>(
 }
 
 pub(crate) fn build_iso_overload(schema: &ValidatedSchema) -> ArtifactPathAndContent {
-    let mut imports = "import type {IsographEntrypoint} from '@isograph/react';\n".to_string();
+    let mut imports = "import type { IsographEntrypoint } from '@isograph/react';\n".to_string();
     let mut content = String::from(
         "
 // This is the type given to regular client fields.
