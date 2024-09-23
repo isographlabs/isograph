@@ -1,7 +1,7 @@
 import { describe, test, vi, expect, assert } from 'vitest';
 import { ParentCache } from './ParentCache';
 import { ItemCleanupPair } from '@isograph/disposable-types';
-import { useCachedPrecommitValue } from './useCachedPrecommitValue';
+import { useCachedResponsivePrecommitValue } from './useCachedResponsivePrecommitValue';
 import React from 'react';
 import { create } from 'react-test-renderer';
 import { CacheItem, CacheItemState } from './CacheItem';
@@ -60,7 +60,7 @@ async function awaitableCreate(Component, isConcurrent) {
   return element;
 }
 
-describe('useCachedPrecommitValue', () => {
+describe('useCachedResponsivePrecommitValue', () => {
   test('on initial render, it should call getOrPopulateAndTemporaryRetain', async () => {
     const disposeItem = vi.fn();
     const factory = vi.fn(() => {
@@ -80,7 +80,7 @@ describe('useCachedPrecommitValue', () => {
       render();
       React.useEffect(componentCommits);
 
-      const data = useCachedPrecommitValue(cache, hookOnCommit);
+      const data = useCachedResponsivePrecommitValue(cache, hookOnCommit);
 
       expect(render).toBeCalledTimes(1);
       expect(componentCommits).not.toBeCalled();
@@ -117,7 +117,7 @@ describe('useCachedPrecommitValue', () => {
     function TestComponent() {
       render();
       expect(render).toHaveBeenCalledTimes(1);
-      const data = useCachedPrecommitValue(cache, hookOnCommit);
+      const data = useCachedResponsivePrecommitValue(cache, hookOnCommit);
 
       React.useEffect(() => {
         componentCommits();
@@ -155,7 +155,7 @@ describe('useCachedPrecommitValue', () => {
     function TestComponent() {
       const [, _setState] = React.useState(null);
       setState = _setState;
-      const value = useCachedPrecommitValue(cache, hookOnCommit);
+      const value = useCachedResponsivePrecommitValue(cache, hookOnCommit);
 
       if (initialRender && value !== null) {
         initialRender = false;
@@ -206,7 +206,7 @@ describe('useCachedPrecommitValue', () => {
       let renderCount = 0;
       function TestComponent() {
         render();
-        const value = useCachedPrecommitValue(cache, hookOnCommit);
+        const value = useCachedResponsivePrecommitValue(cache, hookOnCommit);
 
         expect(value).toEqual({ state: 1 });
         expect(factory).toHaveBeenCalledTimes(1);
@@ -270,7 +270,7 @@ describe('useCachedPrecommitValue', () => {
       const render = vi.fn();
       function TestComponent() {
         render();
-        const value = useCachedPrecommitValue(cache, hookOnCommit);
+        const value = useCachedResponsivePrecommitValue(cache, hookOnCommit);
 
         expect(value).toEqual({ state: factoryValue });
 
@@ -347,7 +347,7 @@ describe('useCachedPrecommitValue', () => {
       function TestComponent() {
         render();
 
-        useCachedPrecommitValue(cache, hookOnCommit);
+        useCachedResponsivePrecommitValue(cache, hookOnCommit);
 
         React.useEffect(() => {
           componentCommits();
@@ -435,7 +435,7 @@ describe('useCachedPrecommitValue', () => {
       const render = vi.fn();
       function TestComponent() {
         render();
-        useCachedPrecommitValue(cache, hookOnCommit);
+        useCachedResponsivePrecommitValue(cache, hookOnCommit);
 
         React.useEffect(() => {
           componentCommits();
@@ -528,7 +528,7 @@ describe('useCachedPrecommitValue', () => {
       function TestComponent() {
         render();
 
-        useCachedPrecommitValue(cache, hookOnCommit);
+        useCachedResponsivePrecommitValue(cache, hookOnCommit);
 
         React.useEffect(() => {
           componentCommits();

@@ -35,7 +35,7 @@ export class ParentCache<T> {
   }
 
   /**
-   * This is called from useCachedPrecommitValue, when the parent cache is populated
+   * This is called from useCachedResponsivePrecommitValue, when the parent cache is populated
    * and a previous temporary retain has been disposed. This can occur in scenarios like:
    * - temporary retain A is created by component B rendering
    * - temporary retain A expires, emptying the parent cache
