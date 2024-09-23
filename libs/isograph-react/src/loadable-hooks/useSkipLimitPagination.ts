@@ -15,7 +15,7 @@ import {
   createReferenceCountedPointer,
   ReferenceCountedPointer,
 } from '@isograph/reference-counted-pointer';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { getPromiseState, readPromise } from '../core/PromiseWrapper';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 
@@ -108,39 +108,27 @@ export function useSkipLimitPagination<
           fragmentReference.networkRequest,
           networkRequestOptions,
         );
-        const data = readButDoNotEvaluate(
-          environment,
-          fragmentReference,
-          networkRequestOptions,
-        );
 
         const readerWithRefetchQueries = readPromise(
           fragmentReference.readerWithRefetchQueries,
         );
 
-        if (!readOutDataAndRecordsRef.current[i]) {
-          readOutDataAndRecordsRef.current[i] = {
-            records: data,
-            results: readerWithRefetchQueries.readerArtifact.resolver(
-              data.item,
-              undefined,
-            ) as ReadonlyArray<any>,
-          };
-        }
-
         return {
           fragmentReference,
           readerAst: readerWithRefetchQueries.readerArtifact.readerAst,
-          records: readOutDataAndRecordsRef.current[i].records,
+          records: readOutDataAndRecords[i].records,
           callback(data) {
-            readOutDataAndRecordsRef.current[i] = {
-              records: data,
-              results: readerWithRefetchQueries.readerArtifact.resolver(
-                data.item,
-                undefined,
-              ) as ReadonlyArray<any>,
-            };
-            rerender({});
+            setReadOutDataAndRecords((current) => {
+              const next = [...current];
+              next[i] = {
+                records: data,
+                results: readerWithRefetchQueries.readerArtifact.resolver(
+                  data.item,
+                  undefined,
+                ) as ReadonlyArray<any>,
+              };
+              return next;
+            });
           },
         };
       },
@@ -186,6 +174,30 @@ export function useSkipLimitPagination<
         },
       ];
 
+      Promise.all([
+        loadedField[0].networkRequest.promise,
+        loadedField[0].readerWithRefetchQueries.promise,
+      ]).then(([_networkRequest, readerWithRefetchQueries]) => {
+        setReadOutDataAndRecords((current) => {
+          const data = readButDoNotEvaluate(
+            environment,
+            loadedField[0],
+            networkRequestOptions,
+          );
+
+          return [
+            ...current,
+            {
+              records: data,
+              results: readerWithRefetchQueries.readerArtifact.resolver(
+                data.item,
+                undefined,
+              ) as ReadonlyArray<any>,
+            },
+          ];
+        });
+      });
+
       setState(totalItemCleanupPair);
     };
 
@@ -205,14 +217,12 @@ export function useSkipLimitPagination<
       ? loadedReferences
       : loadedReferences.slice(0, loadedReferences.length - 1);
 
-  const readOutDataAndRecordsRef = useRef<
+  const [readOutDataAndRecords, setReadOutDataAndRecords] = useState<
     {
       records: WithEncounteredRecords<TItem>;
       results: ReadonlyArray<any>;
     }[]
   >([]);
-
-  const [, rerender] = useState<{}>({});
 
   useSubscribeToMultiple<TItem>(
     subscribeCompletedFragmentReferences(completedFragmentReferences),
@@ -236,7 +246,7 @@ export function useSkipLimitPagination<
   switch (networkRequestStatus.kind) {
     case 'Pending': {
       const results = flatten(
-        readOutDataAndRecordsRef.current.map((data) => data.results),
+        readOutDataAndRecords.map((data) => data.results),
       );
       return {
         kind: 'Pending',
@@ -249,7 +259,7 @@ export function useSkipLimitPagination<
     }
     case 'Ok': {
       const results = flatten(
-        readOutDataAndRecordsRef.current.map((data) => data.results),
+        readOutDataAndRecords.map((data) => data.results),
       );
       return {
         kind: 'Complete',
