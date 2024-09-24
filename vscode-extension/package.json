@@ -72,8 +72,10 @@
     "esbuild-watch": "pnpm run esbuild-base --sourcemap --watch"
   },
   "engines": {
+    "node": "22.9.0",
     "vscode": "^1.60.0"
   },
+  "packageManager": "npm@10.8.3",
   "dependencies": {
     "semver": "^7.3.7",
     "vscode-languageclient": "^9.0.1"

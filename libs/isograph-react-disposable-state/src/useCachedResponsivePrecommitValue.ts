@@ -1,15 +1,14 @@
 'use strict';
 
-import { useEffect, useState } from 'react';
-import { ParentCache } from './ParentCache';
-import { useHasCommittedRef } from './useHasCommittedRef';
 import { ItemCleanupPair } from '@isograph/disposable-types';
+import { useEffect, useRef, useState } from 'react';
+import { ParentCache } from './ParentCache';
 
 /**
- * usePrecommitValue<T>
+ * useCachedResponsivePrecommitValue<T>
  * - Takes a mutable parent cache, a factory function, and an onCommit callback.
- * - Returns T before the initial commit, and null afterward.
- * - Calls onCommit with the ItemCleanupPair during the first commit.
+ * - Returns T before commit after every parent cache change, and null afterward.
+ * - Calls onCommit with the ItemCleanupPair during commit after every parent cache change.
  * - The T from the render phase is only temporarily retained. It may have been
  *   disposed by the time of the commit. If so, this hook checks the parent cache
  *   for another T or creates one, and passes this T to onCommit.
@@ -26,17 +25,19 @@ import { ItemCleanupPair } from '@isograph/disposable-types';
  *   with a set of variables (e.g. {name: "Matthew"}), and pass in another cache
  *   (e.g. associated with {name: "James"}), which is empty, the hook will fill that
  *   new cache with the factory function.
+ * - Post-commit, passing a different parentCache will reset hook to the pre-commit
+ *   state. The cache will return T before commit, then fill the new cache with the
+ *   factory function and return null afterwards.
  *
  * Passing a different factory:
  * - Passing a different factory has no effect, except when factory is called,
- *   which is when the parent cache is being filled, or during the initial commit.
+ *   which is when the parent cache is being filled, or during commit.
  *
  * Passing a different onCommit:
- * - Passing a different onCommit has no effect, except for during the initial commit.
+ * - Passing a different onCommit has no effect, except for during commit.
  *
- * Post-commit, all parameters are ignored and the hook returns null.
  */
-export function useCachedPrecommitValue<T>(
+export function useCachedResponsivePrecommitValue<T>(
   parentCache: ParentCache<T>,
   onCommit: (pair: ItemCleanupPair<T>) => void,
 ): { state: T } | null {
@@ -47,9 +48,11 @@ export function useCachedPrecommitValue<T>(
   //
   // This hook is the former, i.e. re-renders if the committed item has changed.
   const [, rerender] = useState<{} | null>(null);
+  const lastCommittedParentCache = useRef<ParentCache<T> | null>(null);
 
   useEffect(() => {
-    // On first commit, cacheItem may be disposed, because during the render phase,
+    lastCommittedParentCache.current = parentCache;
+    // On commit, cacheItem may be disposed, because during the render phase,
     // we only temporarily retained the item, and the temporary retain could have
     // expired by the time of the commit.
     //
@@ -81,17 +84,15 @@ export function useCachedPrecommitValue<T>(
         // We did not find an item in the parent cache, create a new one.
         onCommit(parentCache.factory());
       }
-
       // TODO: Consider whether we always want to rerender if the committed item
       // was not returned during the last render, or whether some callers will
       // prefer opting out of this behavior (e.g. if every disposable item behaves
       // identically, but must be loaded.)
       rerender({});
     }
-  }, []);
+  }, [parentCache]);
 
-  const hasCommittedRef = useHasCommittedRef();
-  if (hasCommittedRef.current) {
+  if (lastCommittedParentCache.current === parentCache) {
     return null;
   }
 

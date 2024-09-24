@@ -5,7 +5,8 @@
 - From the command line:
 
 ```sh
-nvm use
+fnm install --resolve-engines
+fnm use --resolve-engines
 cd vscode-extension
 yarn
 yarn build-local

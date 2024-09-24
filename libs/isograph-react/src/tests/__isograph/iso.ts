@@ -1,7 +1,7 @@
-import type {IsographEntrypoint} from '@isograph/react';
-import { Query__meNameSuccessor__param } from './Query/meNameSuccessor/param_type';
-import { Query__meName__param } from './Query/meName/param_type';
-import { Query__nodeField__param } from './Query/nodeField/param_type';
+import type { IsographEntrypoint } from '@isograph/react';
+import { type Query__meNameSuccessor__param } from './Query/meNameSuccessor/param_type';
+import { type Query__meName__param } from './Query/meName/param_type';
+import { type Query__nodeField__param } from './Query/nodeField/param_type';
 import entrypoint_Query__meNameSuccessor from '../__isograph/Query/meNameSuccessor/entrypoint';
 import entrypoint_Query__meName from '../__isograph/Query/meName/entrypoint';
 import entrypoint_Query__nodeField from '../__isograph/Query/nodeField/entrypoint';
