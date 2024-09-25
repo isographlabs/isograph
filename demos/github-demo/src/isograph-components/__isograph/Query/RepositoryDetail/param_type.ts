@@ -2,31 +2,36 @@ import { type PullRequestConnection__PullRequestTable__output_type } from '../..
 import { type Repository__RepositoryLink__output_type } from '../../Repository/RepositoryLink/output_type';
 import { type Starrable__IsStarred__output_type } from '../../Starrable/IsStarred/output_type';
 
+import { type Variables } from '@isograph/react';
+
 export type Query__RepositoryDetail__param = {
-  /**
-Lookup a given repository by the owner and repository name.
-  */
-  repository: ({
-    IsStarred: Starrable__IsStarred__output_type,
-        /**
-The repository's name with owner.
-    */
-nameWithOwner: string,
+  data: {
     /**
-The repository parent, if this is a fork.
+Lookup a given repository by the owner and repository name.
     */
-    parent: ({
-      RepositoryLink: Repository__RepositoryLink__output_type,
+    repository: ({
+      IsStarred: Starrable__IsStarred__output_type,
             /**
 The repository's name with owner.
       */
 nameWithOwner: string,
-    } | null),
-    /**
+      /**
+The repository parent, if this is a fork.
+      */
+      parent: ({
+        RepositoryLink: Repository__RepositoryLink__output_type,
+                /**
+The repository's name with owner.
+        */
+nameWithOwner: string,
+      } | null),
+      /**
 A list of pull requests that have been opened in the repository.
-    */
-    pullRequests: {
-      PullRequestTable: PullRequestConnection__PullRequestTable__output_type,
-    },
-  } | null),
+      */
+      pullRequests: {
+        PullRequestTable: PullRequestConnection__PullRequestTable__output_type,
+      },
+    } | null),
+  },
+  parameters: Variables,
 };

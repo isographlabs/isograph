@@ -7,7 +7,7 @@ export const IsStarred = iso(`
     stargazerCount
     viewerHasStarred
   }
-`)((data) => {
+`)(({ data }) => {
   return (
     <p>
       This item has been starred {data.stargazerCount} times,{' '}
@@ -32,7 +32,7 @@ export const RepositoryDetail = iso(`
     }
   }
 `)(function RepositoryDetailComponent(
-  data,
+  { data },
   { setRoute }: { setRoute: (route: Route) => void },
 ) {
   const parent = data.repository?.parent;

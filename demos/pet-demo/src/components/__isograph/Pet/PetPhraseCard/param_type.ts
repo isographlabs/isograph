@@ -1,5 +1,10 @@
 
+import { type Variables } from '@isograph/react';
+
 export type Pet__PetPhraseCard__param = {
-  id: string,
-  favorite_phrase: (string | null),
+  data: {
+    id: string,
+    favorite_phrase: (string | null),
+  },
+  parameters: Variables,
 };

@@ -22,7 +22,7 @@ export const PetUpdater = iso(`
 
     __refetch
   }
-`)(function PetUpdaterComponent(pet) {
+`)(function PetUpdaterComponent({ data: pet }) {
   const [selected, setSelected] = useState<PetId | 'NONE'>('NONE');
   const [tagline, setTagline] = useState<string>(pet.tagline);
   // TODO the tagline can change. But we're storing a stale one in state.

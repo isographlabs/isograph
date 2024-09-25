@@ -32,7 +32,7 @@ export const RepositoryList = iso(`
     }
   }
 `)(function UserRepositoryListComponent(
-  data,
+  { data },
   { setRoute }: { setRoute: (route: Route) => void },
 ) {
   const repositories = [...data.repositories.edges].reverse();

@@ -1,6 +1,11 @@
 
+import { type Variables } from '@isograph/react';
+
 export type Query__nodeField__param = {
-  node: ({
-    id: string,
-  } | null),
+  data: {
+    node: ({
+      id: string,
+    } | null),
+  },
+  parameters: Variables,
 };

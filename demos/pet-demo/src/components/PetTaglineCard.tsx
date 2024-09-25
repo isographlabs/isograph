@@ -9,7 +9,7 @@ field Pet.PetTaglineCard @component {
   id
   tagline
 }
-`)(function PetTaglineCardComponent(pet) {
+`)(function PetTaglineCardComponent({ data: pet }) {
   const {
     fragmentReference: mutationRef,
     loadFragmentReference: loadMutation,

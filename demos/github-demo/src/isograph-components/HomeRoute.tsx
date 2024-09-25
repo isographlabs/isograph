@@ -13,7 +13,7 @@ export const HomePage = iso(`
     HomePageList
   }
 `)(function HomePageComponent(
-  data,
+  { data },
   {
     route,
     setRoute,

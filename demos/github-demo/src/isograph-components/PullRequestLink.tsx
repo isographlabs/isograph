@@ -15,7 +15,7 @@ export const PullRequestLink = iso(`
     }
   }
 `)(function PullRequestLinkComponent(
-  data,
+  { data },
   {
     setRoute,
     children,

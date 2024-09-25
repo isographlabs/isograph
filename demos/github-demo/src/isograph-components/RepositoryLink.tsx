@@ -13,7 +13,7 @@ export const RepositoryLink = iso(`
     }
   }
 `)(function RepositoryLinkComponent(
-  data,
+  { data },
   {
     setRoute,
     children,

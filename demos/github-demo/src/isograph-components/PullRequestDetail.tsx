@@ -15,7 +15,7 @@ export const PullRequestDetail = iso(`
       }
     }
   }
-`)(function PullRequestDetailComponent(data) {
+`)(function PullRequestDetailComponent({ data }) {
   const repository = data.repository;
   if (repository === null) {
     return <h1>Repository not found</h1>;

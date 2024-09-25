@@ -2,47 +2,52 @@ import { type Actor__UserLink__output_type } from '../../Actor/UserLink/output_t
 import { type PullRequest__PullRequestLink__output_type } from '../../PullRequest/PullRequestLink/output_type';
 import { type PullRequest__createdAtFormatted__output_type } from '../../PullRequest/createdAtFormatted/output_type';
 
+import { type Variables } from '@isograph/react';
+
 export type PullRequestConnection__PullRequestTable__param = {
-  /**
-A list of edges.
-  */
-  edges: (({
+  data: {
     /**
-The item at the end of the edge.
+A list of edges.
     */
-    node: ({
-            /**
-The Node ID of the PullRequest object
-      */
-id: string,
-      PullRequestLink: PullRequest__PullRequestLink__output_type,
-            /**
-Identifies the pull request number.
-      */
-number: number,
-            /**
-Identifies the pull request title.
-      */
-title: string,
+    edges: (({
       /**
-The actor who authored the comment.
+The item at the end of the edge.
       */
-      author: ({
-        UserLink: Actor__UserLink__output_type,
+      node: ({
                 /**
-The username of the actor.
+The Node ID of the PullRequest object
         */
+id: string,
+        PullRequestLink: PullRequest__PullRequestLink__output_type,
+                /**
+Identifies the pull request number.
+        */
+number: number,
+                /**
+Identifies the pull request title.
+        */
+title: string,
+        /**
+The actor who authored the comment.
+        */
+        author: ({
+          UserLink: Actor__UserLink__output_type,
+                    /**
+The username of the actor.
+          */
 login: string,
-      } | null),
-            /**
+        } | null),
+                /**
 `true` if the pull request is closed
-      */
+        */
 closed: boolean,
-            /**
+                /**
 Returns a count of how many comments this pull request has received.
-      */
+        */
 totalCommentsCount: (number | null),
-      createdAtFormatted: PullRequest__createdAtFormatted__output_type,
-    } | null),
-  } | null))[],
+        createdAtFormatted: PullRequest__createdAtFormatted__output_type,
+      } | null),
+    } | null))[],
+  },
+  parameters: Variables,
 };

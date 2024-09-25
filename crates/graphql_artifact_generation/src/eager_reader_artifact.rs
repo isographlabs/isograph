@@ -120,10 +120,12 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
         client_field.selection_set_for_parent_query(),
         parent_type,
         &mut param_type_imports,
-        0,
+        1,
         &mut loadable_field_encountered,
     );
 
+    // TODO import generated variable types
+    let variables_import_statement = "import { type Variables } from '@isograph/react';\n";
     let param_type_import_statement = param_type_imports_to_import_statement(&param_type_imports);
     let reader_param_type = format!("{}__{}__param", parent_type.name, client_field.name);
 
@@ -133,10 +135,15 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
         ""
     };
 
+    let indent = "  ";
     let param_type_content = format!(
         "{param_type_import_statement}\n\
         {loadable_field_import}\
-        export type {reader_param_type} = {client_field_parameter_type};\n",
+        {variables_import_statement}\n\
+        export type {reader_param_type} = {{\n\
+        {indent}data: {client_field_parameter_type},\n\
+        {indent}parameters: Variables,\n\
+        }};\n",
     );
     ArtifactPathAndContent {
         relative_directory: relative_directory.clone(),

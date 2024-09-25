@@ -317,7 +317,12 @@ function readData<TReadFromStore>(
                 nestedReason: data,
               };
             } else {
-              target[field.alias] = field.readerArtifact.resolver(data.data);
+              const firstParameter = {
+                data: data.data,
+                parameters: variables,
+              };
+              target[field.alias] =
+                field.readerArtifact.resolver(firstParameter);
             }
             break;
           }

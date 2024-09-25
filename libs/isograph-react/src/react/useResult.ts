@@ -45,7 +45,11 @@ export function useResult<TReadFromStore extends Object, TClientFieldValue>(
         networkRequestOptions,
         readerWithRefetchQueries.readerArtifact.readerAst,
       );
-      return readerWithRefetchQueries.readerArtifact.resolver(data);
+      const firstParameter = {
+        data: data,
+        parameters: fragmentReference.variables,
+      };
+      return readerWithRefetchQueries.readerArtifact.resolver(firstParameter);
     }
   }
 }

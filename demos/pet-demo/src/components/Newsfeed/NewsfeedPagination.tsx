@@ -7,6 +7,6 @@ export const NewsfeedPaginationComponent = iso(`
       NewsfeedAdOrBlog
     }
   }
-`)((data) => {
+`)(({ data }) => {
   return data.newsfeed;
 });
