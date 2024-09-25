@@ -985,6 +985,14 @@ fn validate_no_extraneous_arguments(
     let extra_arguments: Vec<_> = arguments
         .iter()
         .filter_map(|arg| {
+            // TODO remove this
+            // With @exposeField on Query, id field is needed because the generated
+            // query is like node(id: $id) { ... everything else }, but that
+            // id field is added in somewhere else
+            if arg.item.name.item.lookup() == "id" {
+                return None;
+            }
+
             let is_defined = argument_definitions
                 .iter()
                 .any(|definition| definition.name.item.lookup() == arg.item.name.item.lookup());
