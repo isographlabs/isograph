@@ -10,7 +10,7 @@ export const UserDetail = iso(`
     }
   }
 `)(function UserDetailComponent(
-  data,
+  { data },
   {
     setRoute,
   }: {

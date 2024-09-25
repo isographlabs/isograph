@@ -1,5 +1,10 @@
 
+import { type Variables } from '@isograph/react';
+
 export type AdItem__AdItemDisplay__param = {
-  advertiser: string,
-  message: string,
+  data: {
+    advertiser: string,
+    message: string,
+  },
+  parameters: Variables,
 };

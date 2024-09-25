@@ -15,7 +15,7 @@ export const PullRequest = iso(`
     PullRequestDetail
   }
 `)(function PullRequestComponentComponent(
-  data,
+  { data },
   {
     route,
     setRoute,

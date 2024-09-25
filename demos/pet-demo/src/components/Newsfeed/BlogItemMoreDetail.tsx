@@ -5,7 +5,7 @@ export const BlogItemMoreDetail = iso(`
   field BlogItem.BlogItemMoreDetail @component {
     moreContent
   }
-`)((blogItem) => {
+`)(({ data: blogItem }) => {
   return blogItem.moreContent
     .split('\n')
     .map((paragraph, index) => <p key={index}>{paragraph}</p>);

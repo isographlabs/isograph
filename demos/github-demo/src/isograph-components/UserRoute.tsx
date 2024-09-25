@@ -15,7 +15,7 @@ export const UserPage = iso(`
     UserDetail
   }
 `)(function UserRouteComponentComponent(
-  data,
+  { data },
   {
     route,
     setRoute,

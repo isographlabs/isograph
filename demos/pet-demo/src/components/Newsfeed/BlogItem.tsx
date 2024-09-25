@@ -24,7 +24,7 @@ export const BlogItem = iso(`
     }
   }
 `)((
-  blogItem,
+  { data: blogItem },
   { onVisible, index }: { onVisible: (() => void) | null; index: number },
 ) => {
   const isIntersectingRef = useRef(null);
@@ -64,7 +64,7 @@ export const ImageDisplayWrapper = iso(`
   field Image.ImageDisplayWrapper @component {
     ImageDisplay @loadable(lazyLoadArtifact: true)
   }
-`)((image) => {
+`)(({ data: image }) => {
   const { fragmentReference } = useClientSideDefer(image.ImageDisplay);
   return (
     <Suspense fallback={null}>

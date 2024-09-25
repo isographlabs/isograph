@@ -13,8 +13,8 @@ export const createdAtFormatted = iso(`
   field PullRequest.createdAtFormatted {
     createdAt
   }
-`)((props) => {
-  const date = new Date(props.createdAt);
+`)(({ data }) => {
+  const date = new Date(data.createdAt);
   return date.toLocaleDateString('en-us', {
     year: 'numeric',
     month: 'numeric',
@@ -41,7 +41,7 @@ export const PullRequestTable = iso(`
     }
   }
 `)(function PullRequestTableComponent(
-  data,
+  { data },
   {
     setRoute,
   }: {

@@ -6,6 +6,6 @@ export const Avatar = iso(`
     name
     avatarUrl
   }
-`)(function AvatarComponent(data) {
+`)(function AvatarComponent({ data }) {
   return <MuiAvatar alt={data.name ?? ''} src={data.avatarUrl} />;
 });

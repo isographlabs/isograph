@@ -1,4 +1,4 @@
-import type { IsographEntrypoint } from '@isograph/react';
+import type { IsographEntrypoint, ResolverFirstParameter, Variables } from '@isograph/react';
 import { type Query__meNameSuccessor__param } from './Query/meNameSuccessor/param_type';
 import { type Query__meName__param } from './Query/meName/param_type';
 import { type Query__nodeField__param } from './Query/nodeField/param_type';
@@ -10,9 +10,9 @@ import entrypoint_Query__nodeField from '../__isograph/Query/nodeField/entrypoin
 // This means that the type of the exported iso literal is exactly
 // the type of the passed-in function, which takes one parameter
 // of type TParam.
-type IdentityWithParam<TParam> = <TClientFieldReturn>(
+type IdentityWithParam<TParam extends Object> = <TClientFieldReturn, TVariables = Variables>(
   clientField: (param: TParam) => TClientFieldReturn
-) => (param: TParam) => TClientFieldReturn;
+) => (param: ResolverFirstParameter<TParam, TVariables>) => TClientFieldReturn;
 
 // This is the type given it to client fields with @component.
 // This means that the type of the exported iso literal is exactly
@@ -21,9 +21,13 @@ type IdentityWithParam<TParam> = <TClientFieldReturn>(
 //
 // TComponentProps becomes the types of the props you must pass
 // whenever the @component field is rendered.
-type IdentityWithParamComponent<TParam> = <TClientFieldReturn, TComponentProps = Record<string, never>>(
+type IdentityWithParamComponent<TParam extends Object> = <
+  TClientFieldReturn,
+  TComponentProps = Record<string, never>,
+  TVariables = Variables
+>(
   clientComponentField: (data: TParam, componentProps: TComponentProps) => TClientFieldReturn
-) => (data: TParam, componentProps: TComponentProps) => TClientFieldReturn;
+) => (data: ResolverFirstParameter<TParam, TVariables>, componentProps: TComponentProps) => TClientFieldReturn;
 
 type WhitespaceCharacter = ' ' | '\t' | '\n';
 type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`

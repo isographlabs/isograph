@@ -16,7 +16,7 @@ export const Header = iso(`
     }
   }
 `)(function HeaderComponent(
-  data,
+  { data },
   {
     route,
     setRoute,

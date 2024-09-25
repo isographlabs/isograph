@@ -1,4 +1,9 @@
 
+import { type Variables } from '@isograph/react';
+
 export type Pet__Unreachable2__param = {
-  id: string,
+  data: {
+    id: string,
+  },
+  parameters: Variables,
 };

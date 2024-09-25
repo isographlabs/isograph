@@ -11,7 +11,7 @@ export const PetSummaryCard = iso(`
     tagline
     FavoritePhraseLoader
   }
-`)(function PetSummaryCardComponent(data) {
+`)(function PetSummaryCardComponent({ data }) {
   const navigateTo = useNavigateTo();
   return (
     <Card

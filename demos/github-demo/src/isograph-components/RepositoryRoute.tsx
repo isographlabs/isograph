@@ -15,7 +15,7 @@ export const RepositoryPage = iso(`
     RepositoryDetail
   }
 `)(function RepositoryRouteComponent(
-  data,
+  { data },
   {
     route,
     setRoute,

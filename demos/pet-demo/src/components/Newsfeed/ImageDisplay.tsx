@@ -6,7 +6,7 @@ export const ImageDisplay = iso(`
   field Image.ImageDisplay @component {
     url
   }
-`)((image) => (
+`)(({ data: image }) => (
   <CardMedia
     component="img"
     image={image.url}

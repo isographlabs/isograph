@@ -7,7 +7,7 @@ field Pet.PetPhraseCard @component {
   id
   favorite_phrase
 }
-`)(function PetPhraseCardComponent(data) {
+`)(function PetPhraseCardComponent({ data }) {
   return (
     <Card
       variant="outlined"

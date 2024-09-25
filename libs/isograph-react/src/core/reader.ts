@@ -1,5 +1,5 @@
 import { Factory } from '@isograph/disposable-types';
-import { FragmentReference } from './FragmentReference';
+import { FragmentReference, Variables } from './FragmentReference';
 import {
   ComponentOrFieldName,
   DataId,
@@ -17,30 +17,43 @@ export type TopLevelReaderArtifact<
   TReadFromStore extends Object,
   TClientFieldValue,
   TComponentProps extends Record<string, never>,
+  TVariables = Variables,
 > =
-  | EagerReaderArtifact<TReadFromStore, TClientFieldValue>
-  | ComponentReaderArtifact<TReadFromStore, TComponentProps>;
+  | EagerReaderArtifact<TReadFromStore, TClientFieldValue, TVariables>
+  | ComponentReaderArtifact<TReadFromStore, TComponentProps, TVariables>;
 
 export type EagerReaderArtifact<
   TReadFromStore extends Object,
   TClientFieldValue,
+  TVariables = Variables,
 > = {
   readonly kind: 'EagerReaderArtifact';
   readonly readerAst: ReaderAst<TReadFromStore>;
-  readonly resolver: (data: TReadFromStore) => TClientFieldValue;
+  readonly resolver: (
+    data: ResolverFirstParameter<TReadFromStore, TVariables>,
+  ) => TClientFieldValue;
 };
 
 export type ComponentReaderArtifact<
   TReadFromStore extends Object,
   TComponentProps extends Record<string, unknown> = Record<string, never>,
+  TVariables = Variables,
 > = {
   readonly kind: 'ComponentReaderArtifact';
   readonly componentName: ComponentOrFieldName;
   readonly readerAst: ReaderAst<TReadFromStore>;
   readonly resolver: (
-    data: TReadFromStore,
+    data: ResolverFirstParameter<TReadFromStore, TVariables>,
     runtimeProps: TComponentProps,
   ) => React.ReactNode;
+};
+
+export type ResolverFirstParameter<
+  TReadFromStore extends Object,
+  TVariables = Variables,
+> = {
+  readonly data: TReadFromStore;
+  readonly parameters: TVariables;
 };
 
 export type RefetchReaderArtifact = {

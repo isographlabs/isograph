@@ -19,7 +19,7 @@ export const PetDetailDeferredRouteComponent = iso(`
       PetDetailDeferredRouteInnerComponent
     }
   }
-`)(function PetDetailRouteComponent(data) {
+`)(function PetDetailRouteComponent({ data }) {
   const { pet } = data;
   if (pet == null) {
     return <h1>Pet not found.</h1>;
@@ -33,7 +33,7 @@ export const PetDetailDeferredRouteInnerComponent = iso(`
     name
     PetCheckinsCard @loadable
   }
-`)((pet) => {
+`)(({ data: pet }) => {
   const navigateTo = useNavigateTo();
   const { fragmentReference: petCheckinsCard } = useClientSideDefer(
     pet.PetCheckinsCard,

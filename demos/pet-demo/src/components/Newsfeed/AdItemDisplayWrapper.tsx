@@ -7,7 +7,7 @@ export const AdItemDisplayWrapper = iso(`
     AdItemDisplay @loadable(lazyLoadArtifact: true)
   }
 `)((
-  data,
+  { data },
   { onVisible, index }: { onVisible: (() => void) | null; index: number },
 ) => {
   const { fragmentReference } = useClientSideDefer(data.AdItemDisplay);
