@@ -11,11 +11,11 @@ use isograph_lang_types::{
     ServerFieldSelection,
 };
 use isograph_schema::{
-    get_missing_arguments_and_validate_argument_types, selection_map_wrapped,
-    ClientFieldTraversalResult, ClientFieldVariant, FieldDefinitionLocation, MissingArguments,
-    NameAndArguments, NormalizationKey, RequiresRefinement, SchemaObject,
-    UserWrittenComponentVariant, ValidatedClientField, ValidatedIsographSelectionVariant,
-    ValidatedSchema, ValidatedSelection, ValidatedVariableDefinition,
+    get_missing_arguments, selection_map_wrapped, ClientFieldTraversalResult, ClientFieldVariant,
+    FieldDefinitionLocation, MissingArguments, NameAndArguments, NormalizationKey,
+    RequiresRefinement, SchemaObject, UserWrittenComponentVariant, ValidatedClientField,
+    ValidatedIsographSelectionVariant, ValidatedSchema, ValidatedSelection,
+    ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use std::path::Path;
@@ -480,12 +480,11 @@ fn write_param_type_from_selection(
                         {
                             ValidatedIsographSelectionVariant::Regular => inner_output_type,
                             ValidatedIsographSelectionVariant::Loadable(_) => {
-                                let missing_arguments =
-                                    get_missing_arguments_and_validate_argument_types(
-                                        client_field.variable_definitions.iter().map(|x| &x.item),
-                                        &scalar_field_selection.arguments,
-                                        true,
-                                    );
+                                let missing_arguments = get_missing_arguments(
+                                    client_field.variable_definitions.iter().map(|x| &x.item),
+                                    &scalar_field_selection.arguments,
+                                    true,
+                                );
 
                                 let loadable_field_argument_type = if missing_arguments.is_empty() {
                                     "void".to_string()
