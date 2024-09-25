@@ -276,7 +276,6 @@ function callSubscriptions(
                   new: newEncounteredDataAndRecords.item,
                 });
               }
-              // TODO deep compare values
               subscription.callback(newEncounteredDataAndRecords);
             } else {
               // @ts-expect-error
