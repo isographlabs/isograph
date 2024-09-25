@@ -997,7 +997,7 @@ fn validate_no_extraneous_arguments(
             // query is like node(id: $id) { ... everything else }, but that
             // id field is added in somewhere else
 
-            if arg.item.name.item.lookup() == ID.lookup() {
+            if arg.item.name.item == *ID {
                 return None;
             }
 
