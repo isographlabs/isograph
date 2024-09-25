@@ -10,19 +10,16 @@ This is a disorganized list that is outdated in many places.
 
 ## Top mid-term runtime priorities
 
-- garbage collection & retention
 - change how top-level fields are normalized (i.e. into their own object, without going through ROOT)
 - complete work on loadable fields
   - unification
   - filters
   - normalization-time operations
   - parameters
-- granular re-renders: use reader AST for comparison, and skip comparing stuff like imperatively loaded fields
 - userland impl of:
   - pagination, etc.
   - live queries
   - useQueryLoader and variants
-- clean up (unify) lazy loading code
 - extract query text and normalization AST into their own struct
 - Load normalization ASTs (etc) when a non-null network response is received. Does this require `as Foo`?
   - Basically, requires normalization time stuff
@@ -41,12 +38,10 @@ This is a disorganized list that is outdated in many places.
   - Or syntax: bar: `as Foo { ... }`? This can always be added on afterward after some thought.
 - connections and pagination
 - client links/pointers
-- `({ data, variables })`
 
 ## Top cleanup priorities
 
 - validate no unused params and no unused variables
-- useLazyReference should refetch when props change
 - subscribe to changes in pagination
 - Apparently string literals aren't allowed as parameters...
 - mutation/query bug for refetch fields... lol
