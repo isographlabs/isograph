@@ -16,7 +16,7 @@ export type FragmentReference<
     ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
   >;
   readonly root: DataId;
-  readonly variables: Variables | null;
+  readonly variables: Variables;
   readonly networkRequest: PromiseWrapper<void, any>;
 };
 
