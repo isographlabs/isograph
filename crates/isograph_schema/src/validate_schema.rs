@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 
 use common_lang_types::{
-    IsographObjectTypeName, Location, SelectableFieldName, UnvalidatedTypeName, VariableName,
-    WithLocation, WithSpan,
+    FieldArgumentName, IsographObjectTypeName, Location, SelectableFieldName, UnvalidatedTypeName,
+    VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation};
 use intern::Lookup;
@@ -22,6 +22,9 @@ use crate::{
     UnvalidatedSchemaState, UnvalidatedVariableDefinition, UseRefetchFieldRefetchStrategy,
     ValidateEntrypointDeclarationError,
 };
+
+use intern::string_key::Intern;
+use lazy_static::lazy_static;
 
 pub type ValidatedSchemaServerField = SchemaServerField<
     GraphQLTypeAnnotation<<ValidatedSchemaState as SchemaValidationState>::FieldTypeAssociatedData>,
@@ -977,6 +980,10 @@ pub fn categorize_field_loadability<'a>(
     }
 }
 
+lazy_static! {
+    static ref ID: FieldArgumentName = "id".intern().into();
+}
+
 fn validate_no_extraneous_arguments(
     argument_definitions: &[&ValidatedVariableDefinition],
     arguments: &[WithLocation<SelectionFieldArgument>],
@@ -989,7 +996,8 @@ fn validate_no_extraneous_arguments(
             // With @exposeField on Query, id field is needed because the generated
             // query is like node(id: $id) { ... everything else }, but that
             // id field is added in somewhere else
-            if arg.item.name.item.lookup() == "id" {
+
+            if arg.item.name.item.lookup() == ID.lookup() {
                 return None;
             }
 
