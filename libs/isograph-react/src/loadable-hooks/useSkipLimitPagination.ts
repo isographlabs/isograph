@@ -4,6 +4,8 @@ import { ItemCleanupPair } from '@isograph/disposable-types';
 import { FragmentReference } from '../core/FragmentReference';
 import { maybeUnwrapNetworkRequest } from '../react/useResult';
 import { readButDoNotEvaluate } from '../core/read';
+import { subscribeToAnyChange } from '../core/cache';
+import { useState } from 'react';
 import {
   UNASSIGNED_STATE,
   useUpdatableDisposableState,
@@ -105,8 +107,13 @@ export function useSkipLimitPagination<
         fragmentReference.readerWithRefetchQueries,
       );
 
+      const firstParameter = {
+        data,
+        parameters: fragmentReference.variables,
+      };
+
       return readerWithRefetchQueries.readerArtifact.resolver(
-        data.item,
+        firstParameter,
         undefined,
       ) as ReadonlyArray<any>;
     });
@@ -155,6 +162,8 @@ export function useSkipLimitPagination<
       setState(totalItemCleanupPair);
     };
 
+  const [, rerender] = useState({});
+
   const loadedReferences = state === UNASSIGNED_STATE ? [] : state;
   if (loadedReferences.length === 0) {
     return {
@@ -182,6 +191,12 @@ export function useSkipLimitPagination<
         0,
         loadedReferences.length - 1,
       );
+
+      const unsubscribe = subscribeToAnyChange(environment, () => {
+        unsubscribe();
+        rerender({});
+      });
+
       return {
         kind: 'Pending',
         pendingFragment: mostRecentFragmentReference,
