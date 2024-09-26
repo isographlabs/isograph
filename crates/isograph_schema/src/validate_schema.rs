@@ -8,9 +8,9 @@ use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation};
 use intern::Lookup;
 use isograph_lang_types::{
     ClientFieldId, IsographSelectionVariant, LinkedFieldSelection, LoadableDirectiveParameters,
-    ScalarFieldSelection, SelectableServerFieldId, Selection, SelectionFieldArgument,
-    ServerFieldId, ServerObjectId, ServerScalarId, UnvalidatedScalarFieldSelection,
-    UnvalidatedSelection, VariableDefinition,
+    NonConstantValue, ScalarFieldSelection, SelectableServerFieldId, Selection,
+    SelectionFieldArgument, ServerFieldId, ServerObjectId, ServerScalarId,
+    UnvalidatedScalarFieldSelection, UnvalidatedSelection, VariableDefinition,
 };
 use thiserror::Error;
 
@@ -440,6 +440,33 @@ fn validate_and_transform_client_fields(
     }))
 }
 
+fn validate_all_variables_are_used(
+    variable_definitions: Vec<WithSpan<UnvalidatedVariableDefinition>>,
+    used_variables: Vec<VariableName>,
+) -> ValidateSelectionsResult<()> {
+    let unused_variables: Vec<_> = variable_definitions
+        .iter()
+        .filter_map(|variable| {
+            let is_used = used_variables
+                .iter()
+                .any(|used_variable| variable.item.name.item == *used_variable);
+
+            if !is_used {
+                return Some(variable.clone());
+            }
+            None
+        })
+        .collect();
+
+    if !unused_variables.is_empty() {
+        return Err(WithLocation::new(
+            ValidateSelectionsError::UnusedVariables { unused_variables },
+            Location::generated(),
+        ));
+    }
+    Ok(())
+}
+
 fn validate_client_field_selection_set(
     schema_data: &ServerFieldData,
     unvalidated_client_field: UnvalidatedClientField,
@@ -464,6 +491,7 @@ fn validate_client_field_selection_set(
                 parent_object,
                 server_fields,
                 client_field_args,
+                unvalidated_client_field.variable_definitions,
             )
             .map_err(|err| {
                 validate_selections_error_to_validate_schema_error(
@@ -521,6 +549,7 @@ fn validate_use_refetch_field_strategy(
         parent_object,
         server_fields,
         client_field_args,
+        vec![],
     )
     .map_err(|err| {
         validate_selections_error_to_validate_schema_error(err, parent_object, client_field_name)
@@ -625,6 +654,9 @@ fn validate_selections_error_to_validate_schema_error(
         ValidateSelectionsError::ExtraneousArgument { extra_arguments } => {
             ValidateSchemaError::ExtraneousArgument { extra_arguments }
         }
+        ValidateSelectionsError::UnusedVariables { unused_variables } => {
+            ValidateSchemaError::UnusedVariables { unused_variables }
+        }
     })
 }
 
@@ -659,6 +691,9 @@ enum ValidateSelectionsError {
     ExtraneousArgument {
         extra_arguments: Vec<WithLocation<SelectionFieldArgument>>,
     },
+    UnusedVariables {
+        unused_variables: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
+    },
 }
 
 fn validate_client_field_definition_selections_exist_and_types_match(
@@ -667,11 +702,14 @@ fn validate_client_field_definition_selections_exist_and_types_match(
     parent_object: &SchemaObject,
     server_fields: &[ValidatedSchemaServerField],
     client_field_args: &ClientFieldArgsMap,
+    variable_definitions: Vec<WithSpan<UnvalidatedVariableDefinition>>,
 ) -> ValidateSelectionsResult<Vec<WithSpan<ValidatedSelection>>> {
     // Currently, we only check that each field exists and has an appropriate type, not that
     // there are no selection conflicts due to aliases or parameters.
 
-    selection_set
+    let mut used_variables: Vec<VariableName> = vec![];
+
+    let validated_selection_set = selection_set
         .into_iter()
         .map(|selection| {
             validate_client_field_definition_selection_exists_and_type_matches(
@@ -680,9 +718,14 @@ fn validate_client_field_definition_selections_exist_and_types_match(
                 schema_data,
                 server_fields,
                 client_field_args,
+                &mut used_variables,
             )
         })
-        .collect::<Result<_, _>>()
+        .collect::<Result<_, _>>();
+
+    validate_all_variables_are_used(variable_definitions, used_variables)?;
+
+    return validated_selection_set;
 }
 
 fn validate_client_field_definition_selection_exists_and_type_matches(
@@ -691,8 +734,11 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
     schema_data: &ServerFieldData,
     server_fields: &[ValidatedSchemaServerField],
     client_field_args: &ClientFieldArgsMap,
+    used_variables: &mut Vec<VariableName>,
 ) -> ValidateSelectionsResult<WithSpan<ValidatedSelection>> {
-    selection.and_then(|selection| {
+    let mut used_variables2 = vec![];
+
+    let validated_selection = selection.and_then(|selection| {
         selection.and_then(&mut |field_selection| {
             field_selection.and_then(
                 &mut |scalar_field_selection| {
@@ -702,6 +748,7 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
                         scalar_field_selection,
                         server_fields,
                         client_field_args,
+                        used_variables,
                     )
                 },
                 &mut |linked_field_selection| {
@@ -711,11 +758,16 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
                         linked_field_selection,
                         server_fields,
                         client_field_args,
+                        &mut used_variables2,
                     )
                 },
             )
         })
-    })
+    });
+
+    used_variables.append(&mut used_variables2);
+
+    return validated_selection;
 }
 
 /// Given that we selected a scalar field, the field should exist on the parent,
@@ -726,6 +778,7 @@ fn validate_field_type_exists_and_is_scalar(
     scalar_field_selection: UnvalidatedScalarFieldSelection,
     server_fields: &[ValidatedSchemaServerField],
     client_field_args: &ClientFieldArgsMap,
+    used_variables: &mut Vec<VariableName>,
 ) -> ValidateSelectionsResult<ValidatedScalarFieldSelection> {
     let scalar_field_name = scalar_field_selection.name.item.into();
     match parent_object.encountered_fields.get(&scalar_field_name) {
@@ -740,6 +793,7 @@ fn validate_field_type_exists_and_is_scalar(
                     &scalar_field_selection.arguments,
                     false,
                     scalar_field_selection.name.location,
+                    used_variables,
                 )?;
 
                 match server_field.associated_data.inner() {
@@ -783,9 +837,12 @@ fn validate_field_type_exists_and_is_scalar(
                     )),
                 }
             }
-            FieldDefinitionLocation::Client(client_field_id) => {
-                validate_client_field(client_field_args, client_field_id, scalar_field_selection)
-            }
+            FieldDefinitionLocation::Client(client_field_id) => validate_client_field(
+                client_field_args,
+                client_field_id,
+                scalar_field_selection,
+                used_variables,
+            ),
         },
         None => Err(WithLocation::new(
             ValidateSelectionsError::FieldDoesNotExist(parent_object.name, scalar_field_name),
@@ -798,6 +855,7 @@ fn validate_client_field(
     client_field_args: &ClientFieldArgsMap,
     client_field_id: &ClientFieldId,
     scalar_field_selection: UnvalidatedScalarFieldSelection,
+    used_variables: &mut Vec<VariableName>,
 ) -> ValidateSelectionsResult<ValidatedScalarFieldSelection> {
     let argument_definitions = client_field_args.get(client_field_id).expect(
         "Expected client field to exist in map. \
@@ -810,6 +868,7 @@ fn validate_client_field(
         &scalar_field_selection.arguments,
         false,
         scalar_field_selection.name.location,
+        used_variables,
     )?;
 
     Ok(ScalarFieldSelection {
@@ -844,6 +903,7 @@ fn validate_field_type_exists_and_is_linked(
     linked_field_selection: UnvalidatedLinkedFieldSelection,
     server_fields: &[ValidatedSchemaServerField],
     client_field_args: &ClientFieldArgsMap,
+    used_variables: &mut Vec<VariableName>,
 ) -> ValidateSelectionsResult<ValidatedLinkedFieldSelection> {
     let linked_field_name = linked_field_selection.name.item.into();
     match (parent_object.encountered_fields).get(&linked_field_name) {
@@ -874,6 +934,7 @@ fn validate_field_type_exists_and_is_linked(
                             &linked_field_selection.arguments,
                             false,
                             linked_field_selection.name.location,
+                            used_variables,
                         )?;
 
                         Ok(LinkedFieldSelection {
@@ -886,7 +947,8 @@ fn validate_field_type_exists_and_is_linked(
                                             object,
                                             schema_data,
                                             server_fields,
-                                            client_field_args
+                                            client_field_args,
+                                            used_variables
                                         )
                                     },
                                 ).collect::<Result<Vec<_>, _>>()?,
@@ -1021,14 +1083,38 @@ fn validate_no_extraneous_arguments(
     Ok(())
 }
 
+fn push_used_variables(
+    arguments: &[WithLocation<SelectionFieldArgument>],
+    used_variables: &mut Vec<VariableName>,
+) {
+    for argument in arguments {
+        match &argument.item.value.item {
+            NonConstantValue::Variable(variable) => {
+                used_variables.push(variable.clone());
+            }
+            NonConstantValue::Object(object) => {
+                // TODO recursion
+            }
+            NonConstantValue::List(list) => {
+                // TODO recursion
+            }
+            _ => {}
+        }
+    }
+}
+
 fn get_missing_arguments_and_validate_argument_types<'a>(
     argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
     arguments: &[WithLocation<SelectionFieldArgument>],
     include_optional_args: bool,
     location: Location,
+    used_variables: &mut Vec<VariableName>,
 ) -> ValidateSelectionsResult<Vec<ValidatedVariableDefinition>> {
     let argument_definitions_vec: Vec<_> = argument_definitions.collect();
     validate_no_extraneous_arguments(&argument_definitions_vec, &arguments, location)?;
+
+    push_used_variables(arguments, used_variables);
+
     // TODO validate argument types
     Ok(get_missing_arguments(
         argument_definitions_vec.into_iter(),
@@ -1170,5 +1256,13 @@ pub enum ValidateSchemaError {
     )]
     ExtraneousArgument {
         extra_arguments: Vec<WithLocation<SelectionFieldArgument>>,
+    },
+
+    #[error(
+        "This field has unused variables: {0}",
+        unused_variables.iter().map(|variable| format!("${}", variable.item.name)).collect::<Vec<_>>().join(", ")
+    )]
+    UnusedVariables {
+        unused_variables: Vec<WithSpan<UnvalidatedVariableDefinition>>,
     },
 }
