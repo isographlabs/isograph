@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use common_lang_types::{
     FieldArgumentName, IsographObjectTypeName, Location, SelectableFieldName, UnvalidatedTypeName,
@@ -7,10 +7,7 @@ use common_lang_types::{
 use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation};
 use intern::Lookup;
 use isograph_lang_types::{
-    ClientFieldId, IsographSelectionVariant, LinkedFieldSelection, LoadableDirectiveParameters,
-    NonConstantValue, ScalarFieldSelection, SelectableServerFieldId, Selection,
-    SelectionFieldArgument, ServerFieldId, ServerObjectId, ServerScalarId,
-    UnvalidatedScalarFieldSelection, UnvalidatedSelection, VariableDefinition,
+    ClientFieldId, IsographSelectionVariant, LinkedFieldSelection, LoadableDirectiveParameters, NonConstantValue, ScalarFieldSelection, SelectableServerFieldId, Selection, SelectionFieldArgument, ServerFieldId, ServerObjectId, ServerScalarId, UnvalidatedScalarFieldSelection, UnvalidatedSelection, VariableDefinition
 };
 use thiserror::Error;
 
@@ -442,14 +439,12 @@ fn validate_and_transform_client_fields(
 
 fn validate_all_variables_are_used(
     variable_definitions: Vec<WithSpan<UnvalidatedVariableDefinition>>,
-    used_variables: Vec<VariableName>,
+    used_variables: BTreeSet<VariableName>,
 ) -> ValidateSelectionsResult<()> {
     let unused_variables: Vec<_> = variable_definitions
         .iter()
         .filter_map(|variable| {
-            let is_used = used_variables
-                .iter()
-                .any(|used_variable| variable.item.name.item == *used_variable);
+            let is_used = used_variables.contains(&variable.item.name.item);
 
             if !is_used {
                 return Some(variable.clone());
@@ -707,7 +702,7 @@ fn validate_client_field_definition_selections_exist_and_types_match(
     // Currently, we only check that each field exists and has an appropriate type, not that
     // there are no selection conflicts due to aliases or parameters.
 
-    let mut used_variables: Vec<VariableName> = vec![];
+    let mut used_variables: BTreeSet<VariableName> = BTreeSet::new();
 
     let validated_selection_set = selection_set
         .into_iter()
@@ -734,9 +729,9 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
     schema_data: &ServerFieldData,
     server_fields: &[ValidatedSchemaServerField],
     client_field_args: &ClientFieldArgsMap,
-    used_variables: &mut Vec<VariableName>,
+    used_variables: &mut BTreeSet<VariableName>,
 ) -> ValidateSelectionsResult<WithSpan<ValidatedSelection>> {
-    let mut used_variables2 = vec![];
+    let mut used_variables2 = BTreeSet::new();
 
     let validated_selection = selection.and_then(|selection| {
         selection.and_then(&mut |field_selection| {
@@ -778,7 +773,7 @@ fn validate_field_type_exists_and_is_scalar(
     scalar_field_selection: UnvalidatedScalarFieldSelection,
     server_fields: &[ValidatedSchemaServerField],
     client_field_args: &ClientFieldArgsMap,
-    used_variables: &mut Vec<VariableName>,
+    used_variables: &mut BTreeSet<VariableName>,
 ) -> ValidateSelectionsResult<ValidatedScalarFieldSelection> {
     let scalar_field_name = scalar_field_selection.name.item.into();
     match parent_object.encountered_fields.get(&scalar_field_name) {
@@ -855,7 +850,7 @@ fn validate_client_field(
     client_field_args: &ClientFieldArgsMap,
     client_field_id: &ClientFieldId,
     scalar_field_selection: UnvalidatedScalarFieldSelection,
-    used_variables: &mut Vec<VariableName>,
+    used_variables: &mut BTreeSet<VariableName>,
 ) -> ValidateSelectionsResult<ValidatedScalarFieldSelection> {
     let argument_definitions = client_field_args.get(client_field_id).expect(
         "Expected client field to exist in map. \
@@ -903,7 +898,7 @@ fn validate_field_type_exists_and_is_linked(
     linked_field_selection: UnvalidatedLinkedFieldSelection,
     server_fields: &[ValidatedSchemaServerField],
     client_field_args: &ClientFieldArgsMap,
-    used_variables: &mut Vec<VariableName>,
+    used_variables: &mut BTreeSet<VariableName>,
 ) -> ValidateSelectionsResult<ValidatedLinkedFieldSelection> {
     let linked_field_name = linked_field_selection.name.item.into();
     match (parent_object.encountered_fields).get(&linked_field_name) {
@@ -1085,12 +1080,12 @@ fn validate_no_extraneous_arguments(
 
 fn push_used_variables(
     arguments: &[WithLocation<SelectionFieldArgument>],
-    used_variables: &mut Vec<VariableName>,
+    used_variables: &mut BTreeSet<VariableName>,
 ) {
     for argument in arguments {
         match &argument.item.value.item {
             NonConstantValue::Variable(variable) => {
-                used_variables.push(variable.clone());
+                used_variables.insert(variable.clone());
             }
             NonConstantValue::Object(object) => {
                 // TODO recursion
@@ -1108,7 +1103,7 @@ fn get_missing_arguments_and_validate_argument_types<'a>(
     arguments: &[WithLocation<SelectionFieldArgument>],
     include_optional_args: bool,
     location: Location,
-    used_variables: &mut Vec<VariableName>,
+    used_variables: &mut BTreeSet<VariableName>,
 ) -> ValidateSelectionsResult<Vec<ValidatedVariableDefinition>> {
     let argument_definitions_vec: Vec<_> = argument_definitions.collect();
     validate_no_extraneous_arguments(&argument_definitions_vec, &arguments, location)?;
