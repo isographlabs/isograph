@@ -15,7 +15,17 @@ const readerAst: ReaderAst<Query__UserPage__param> = [
   {
     kind: "Resolver",
     alias: "UserDetail",
-    arguments: null,
+    arguments: [
+      [
+        "first",
+        { kind: "Variable", name: "first" },
+      ],
+
+      [
+        "userLogin",
+        { kind: "Variable", name: "userLogin" },
+      ],
+    ],
     readerArtifact: Query__UserDetail__resolver_reader,
     usedRefetchQueries: [],
   },

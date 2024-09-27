@@ -10,9 +10,9 @@ import {
 import { Container } from '@mui/material';
 
 export const PullRequest = iso(`
-  field Query.PullRequest($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!, $last: Int!) @component {
+  field Query.PullRequest($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!) @component {
     Header
-    PullRequestDetail
+    PullRequestDetail(repositoryOwner: $repositoryOwner, repositoryName: $repositoryName, pullRequestNumber: $pullRequestNumber)
   }
 `)(function PullRequestComponentComponent(
   { data },

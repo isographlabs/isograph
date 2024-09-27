@@ -5,7 +5,7 @@ import readerResolver from './resolver_reader';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
 const queryText = 'query RepositoryPage ($repositoryName: String!, $repositoryOwner: String!, $first: Int!) {\
-  repository____name___l_null____owner___l_null: repository(name: null, owner: null) {\
+  repository____name___v_repositoryName____owner___v_repositoryOwner: repository(name: $repositoryName, owner: $repositoryOwner) {\
     id,\
     nameWithOwner,\
     parent {\
@@ -17,7 +17,7 @@ const queryText = 'query RepositoryPage ($repositoryName: String!, $repositoryOw
         login,\
       },\
     },\
-    pullRequests____last___l_null: pullRequests(last: null) {\
+    pullRequests____last___v_first: pullRequests(last: $first) {\
       edges {\
         node {\
           id,\
@@ -57,12 +57,12 @@ const normalizationAst: NormalizationAst = [
     arguments: [
       [
         "name",
-        { kind: "Literal", value: null },
+        { kind: "Variable", name: "repositoryName" },
       ],
 
       [
         "owner",
-        { kind: "Literal", value: null },
+        { kind: "Variable", name: "repositoryOwner" },
       ],
     ],
     selections: [
@@ -121,7 +121,7 @@ const normalizationAst: NormalizationAst = [
         arguments: [
           [
             "last",
-            { kind: "Literal", value: null },
+            { kind: "Variable", name: "first" },
           ],
         ],
         selections: [

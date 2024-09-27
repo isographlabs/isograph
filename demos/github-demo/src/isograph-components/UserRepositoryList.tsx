@@ -10,7 +10,7 @@ import {
 import { Route } from './GithubDemo';
 
 export const RepositoryList = iso(`
-  field User.RepositoryList @component {
+  field User.RepositoryList($first: Int) @component {
     repositories(last: 10) {
       edges {
         node {

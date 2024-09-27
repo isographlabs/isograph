@@ -11,12 +11,12 @@ const readerAst: ReaderAst<Query__PullRequestDetail__param> = [
     arguments: [
       [
         "owner",
-        { kind: "Literal", value: null },
+        { kind: "Variable", name: "repositoryOwner" },
       ],
 
       [
         "name",
-        { kind: "Literal", value: null },
+        { kind: "Variable", name: "repositoryName" },
       ],
     ],
     selections: [
@@ -27,7 +27,7 @@ const readerAst: ReaderAst<Query__PullRequestDetail__param> = [
         arguments: [
           [
             "number",
-            { kind: "Literal", value: null },
+            { kind: "Variable", name: "pullRequestNumber" },
           ],
         ],
         selections: [

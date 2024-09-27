@@ -15,7 +15,22 @@ const readerAst: ReaderAst<Query__PullRequest__param> = [
   {
     kind: "Resolver",
     alias: "PullRequestDetail",
-    arguments: null,
+    arguments: [
+      [
+        "repositoryOwner",
+        { kind: "Variable", name: "repositoryOwner" },
+      ],
+
+      [
+        "repositoryName",
+        { kind: "Variable", name: "repositoryName" },
+      ],
+
+      [
+        "pullRequestNumber",
+        { kind: "Variable", name: "pullRequestNumber" },
+      ],
+    ],
     readerArtifact: Query__PullRequestDetail__resolver_reader,
     usedRefetchQueries: [],
   },
