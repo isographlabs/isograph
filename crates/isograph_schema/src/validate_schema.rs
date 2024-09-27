@@ -721,11 +721,11 @@ fn validate_client_field_definition_selections_exist_and_types_match(
                 &mut used_variables,
             )
         })
-        .collect::<Result<_, _>>();
+        .collect::<Result<_, _>>()?;
 
     validate_all_variables_are_used(variable_definitions, used_variables)?;
 
-    return validated_selection_set;
+    return Ok(validated_selection_set);
 }
 
 fn validate_client_field_definition_selection_exists_and_type_matches(
