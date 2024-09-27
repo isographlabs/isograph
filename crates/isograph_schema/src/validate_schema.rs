@@ -7,7 +7,10 @@ use common_lang_types::{
 use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation};
 use intern::Lookup;
 use isograph_lang_types::{
-    ClientFieldId, IsographSelectionVariant, LinkedFieldSelection, LoadableDirectiveParameters, NonConstantValue, ScalarFieldSelection, SelectableServerFieldId, Selection, SelectionFieldArgument, ServerFieldId, ServerObjectId, ServerScalarId, UnvalidatedScalarFieldSelection, UnvalidatedSelection, VariableDefinition
+    ClientFieldId, IsographSelectionVariant, LinkedFieldSelection, LoadableDirectiveParameters,
+    ScalarFieldSelection, SelectableServerFieldId, Selection, SelectionFieldArgument,
+    ServerFieldId, ServerObjectId, ServerScalarId, UnvalidatedScalarFieldSelection,
+    UnvalidatedSelection, VariableDefinition,
 };
 use thiserror::Error;
 
@@ -1083,18 +1086,7 @@ fn push_used_variables(
     used_variables: &mut BTreeSet<VariableName>,
 ) {
     for argument in arguments {
-        match &argument.item.value.item {
-            NonConstantValue::Variable(variable) => {
-                used_variables.insert(variable.clone());
-            }
-            NonConstantValue::Object(object) => {
-                // TODO recursion
-            }
-            NonConstantValue::List(list) => {
-                // TODO recursion
-            }
-            _ => {}
-        }
+        used_variables.extend(argument.item.value.item.reachable_variables().iter());
     }
 }
 
