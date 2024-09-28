@@ -445,12 +445,12 @@ fn validate_all_variables_are_used(
     used_variables: BTreeSet<VariableName>,
 ) -> ValidateSelectionsResult<()> {
     let unused_variables: Vec<_> = variable_definitions
-        .iter()
+        .into_iter()
         .filter_map(|variable| {
             let is_used = used_variables.contains(&variable.item.name.item);
 
             if !is_used {
-                return Some(variable.clone());
+                return Some(variable);
             }
             None
         })
