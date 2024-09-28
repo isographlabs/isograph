@@ -3,10 +3,10 @@ import { RepoGitHubLink } from './RepoGitHubLink';
 import { Route } from './GithubDemo';
 
 export const UserDetail = iso(`
-  field Query.UserDetail @component {
+  field Query.UserDetail($userLogin: String, $first: Int) @component {
     user(login: $userLogin) {
       name
-      RepositoryList
+      RepositoryList(first: $first)
     }
   }
 `)(function UserDetailComponent(

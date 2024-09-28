@@ -12,7 +12,7 @@ import {
 export const UserPage = iso(`
   field Query.UserPage($first: Int!, $userLogin: String!) @component {
     Header
-    UserDetail
+    UserDetail(first: $first, userLogin: $userLogin)
   }
 `)(function UserRouteComponentComponent(
   { data },
