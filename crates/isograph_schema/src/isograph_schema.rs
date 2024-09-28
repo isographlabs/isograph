@@ -366,8 +366,7 @@ pub struct ValidRefinement {
 pub struct SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData> {
     pub description: Option<DescriptionValue>,
     /// The name of the server field and the location where it was defined
-    /// (i.e. for client fields, an iso literal, and for server fields, the schema
-    /// file, and for other fields, Location::Generated).
+    /// (an iso literal or Location::Generated).
     pub name: WithLocation<SelectableFieldName>,
     pub id: ServerFieldId,
     pub associated_data: TData,
