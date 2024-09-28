@@ -1,3 +1,29 @@
 [workspace]
 members = ["./crates/*"]
 resolver = "2"
+
+[workspace.package]
+version = "0.2.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+clap = { version = "4.5.18", features = ["derive"] }
+colored = "2.0.4"
+colorize = "0.1.0"
+crossbeam = "0.8"
+lazy_static = "1.4"
+log = { version = "0.4.17", features = ["kv_unstable", "kv_unstable_std"] }
+logos = "0.12"
+lsp-server = "0.7.2"
+lsp-types = "0.94.1"
+notify = "6.1.1"
+notify-debouncer-full = "0.3.1"
+pathdiff = "0.2.1"
+pretty-duration = "0.1.1"
+regex = "1.6.0"
+serde = "1.0.197"
+serde_json = "1.0.108"
+strum = { version="0.25.0", features=["derive"] }
+thiserror = "1.0.40"
+tokio = { version="1.35.0", features=["full"] }
