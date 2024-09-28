@@ -94,6 +94,7 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
     pub float_type_id: ServerScalarId,
     pub boolean_type_id: ServerScalarId,
     pub int_type_id: ServerScalarId,
+    pub null_type_id: ServerScalarId,
 
     pub fetchable_types: BTreeMap<ServerObjectId, RootOperationName>,
 }
