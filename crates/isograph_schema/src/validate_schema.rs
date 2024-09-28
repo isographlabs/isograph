@@ -138,7 +138,8 @@ impl ValidatedSchema {
             fetchable_types: root_types,
         } = unvalidated_schema;
 
-        let updated_fields = match validate_and_transform_server_fields(fields, &schema_data) {
+        let updated_server_fields = match validate_and_transform_server_fields(fields, &schema_data)
+        {
             Ok(fields) => fields,
             Err(new_errors) => {
                 errors.extend(new_errors);
@@ -153,7 +154,7 @@ impl ValidatedSchema {
         let updated_client_fields = match validate_and_transform_client_fields(
             client_fields,
             &schema_data,
-            &updated_fields,
+            &updated_server_fields,
         ) {
             Ok(client_fields) => client_fields,
             Err(new_errors) => {
@@ -163,24 +164,24 @@ impl ValidatedSchema {
         };
 
         let ServerFieldData {
-            server_objects: objects,
-            server_scalars: scalars,
+            server_objects,
+            server_scalars,
             defined_types,
         } = schema_data;
 
         if errors.is_empty() {
-            let objects = objects
+            let server_objects = server_objects
                 .into_iter()
                 .map(transform_object_field_ids)
                 .collect();
 
             Ok(Self {
-                server_fields: updated_fields,
+                server_fields: updated_server_fields,
                 client_fields: updated_client_fields,
                 entrypoints: updated_entrypoints,
                 server_field_data: ServerFieldData {
-                    server_objects: objects,
-                    server_scalars: scalars,
+                    server_objects,
+                    server_scalars,
                     defined_types,
                 },
                 id_type_id: id_type,
