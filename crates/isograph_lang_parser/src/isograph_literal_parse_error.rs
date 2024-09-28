@@ -1,6 +1,8 @@
 use common_lang_types::{FieldNameOrAlias, ScalarFieldName, WithLocation, WithSpan};
 use thiserror::Error;
 
+use crate::IsographLangTokenKind;
+
 use super::peekable_lexer::LowLevelParseError;
 
 pub(crate) type ParseResultWithLocation<T> = Result<T, WithLocation<IsographLiteralParseError>>;
@@ -64,6 +66,12 @@ pub enum IsographLiteralParseError {
 
     #[error("Expected a boolean value (true or false).")]
     ExpectedBoolean,
+
+    #[error("Expected delimited `{delimiter} or `{closing_token}`")]
+    ExpectedDelimiterOrClosingToken {
+        closing_token: IsographLangTokenKind,
+        delimiter: IsographLangTokenKind,
+    },
 }
 
 impl From<LowLevelParseError> for IsographLiteralParseError {
