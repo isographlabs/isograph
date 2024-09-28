@@ -1,12 +1,12 @@
 [package]
 name = "graphql_lang_types"
-version = "0.0.4"
-edition = "2021"
-license = "MIT"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
 intern = { path = "../../relay-crates/intern" }
 common_lang_types = { path = "../common_lang_types" }
 strum = { version="0.25.0", features=["derive"] }
-serde = "1.0.197"
-thiserror = "1.0.40"
+serde = { workspace = true }  
+thiserror = { workspace = true } 

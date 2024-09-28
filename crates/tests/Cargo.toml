@@ -1,8 +1,8 @@
 [package]
 name = "tests"
-version = "0.1.0"
-edition = "2021"
-publish = false
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -13,10 +13,10 @@ isograph_config = { path = "../isograph_config" }
 isograph_schema = { path = "../isograph_schema" }
 graphql_lang_types = { path = "../graphql_lang_types" }
 intern = { path = "../../relay-crates/intern" }
-thiserror = "1.0.40"
-lazy_static = "1.4"
-colorize = "0.1.0"
-serde = "1.0.197"
+thiserror = { workspace = true }
+lazy_static = { workspace = true }
+colorize = { workspace = true }
+serde = { workspace = true }
 
 [dev-dependencies]
 graphql_schema_parser = { path  = "../graphql_schema_parser"}
