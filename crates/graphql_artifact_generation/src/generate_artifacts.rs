@@ -3,8 +3,7 @@ use common_lang_types::{
     SelectableFieldName, Span, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLTypeAnnotation,
-    GraphQLNonNullTypeAnnotation,
+    GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -14,8 +13,8 @@ use isograph_lang_types::{
 use isograph_schema::{
     get_missing_arguments, selection_map_wrapped, ClientFieldTraversalResult, ClientFieldVariant,
     FieldDefinitionLocation, MissingArguments, NameAndArguments, NormalizationKey,
-    RequiresRefinement, SchemaObject, UserWrittenComponentVariant, ValidatedClientField,
-    ValidatedIsographSelectionVariant, ValidatedSchema, ValidatedSelection,
+    RequiresRefinement, SchemaObject, TypeAnnotation, UnionVariant, UserWrittenComponentVariant,
+    ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedSchema, ValidatedSelection,
     ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -444,16 +443,18 @@ fn write_param_type_from_selection(
                         let name_or_alias = scalar_field_selection.name_or_alias().item;
 
                         // TODO there should be a clever way to print without cloning
-                        let output_type = field.associated_data.clone().map(|output_type_id| {
-                            // TODO not just scalars, enums as well. Both should have a javascript name
-                            let scalar_id =
-                                if let SelectableServerFieldId::Scalar(scalar) = output_type_id {
+                        let output_type =
+                            field.associated_data.clone().map(&mut |output_type_id| {
+                                // TODO not just scalars, enums as well. Both should have a javascript name
+                                let scalar_id = if let SelectableServerFieldId::Scalar(scalar) =
+                                    output_type_id
+                                {
                                     scalar
                                 } else {
                                     panic!("output_type_id should be a scalar");
                                 };
-                            schema.server_field_data.scalar(scalar_id).javascript_name
-                        });
+                                schema.server_field_data.scalar(scalar_id).javascript_name
+                            });
 
                         query_type_declaration.push_str(&format!(
                             "readonly {}: {},\n",
@@ -529,7 +530,8 @@ fn write_param_type_from_selection(
                 query_type_declaration
                     .push_str(&"  ".repeat(indentation_level as usize).to_string());
                 let name_or_alias = linked_field.name_or_alias().item;
-                let type_annotation = field.associated_data.clone().map(|output_type_id| {
+
+                let type_annotation = field.associated_data.clone().map(&mut |output_type_id| {
                     let object_id = output_type_id.try_into().expect(
                         "output_type_id should be an object. \
                         This is indicative of a bug in Isograph.",
@@ -609,7 +611,9 @@ fn format_type_for_js_inner(
             format!("ReadonlyArray<{}> | null", format_type_for_js_inner(list.0))
         }
         GraphQLTypeAnnotation::NonNull(non_null) => match *non_null {
-            GraphQLNonNullTypeAnnotation::Named(named_inner_type) => named_inner_type.0.item.to_string(),
+            GraphQLNonNullTypeAnnotation::Named(named_inner_type) => {
+                named_inner_type.0.item.to_string()
+            }
             GraphQLNonNullTypeAnnotation::List(list) => {
                 format!("ReadonlyArray<{}>", format_type_for_js_inner(list.0))
             }
@@ -632,48 +636,70 @@ fn write_optional_description(
     }
 }
 
-fn print_javascript_type_declaration<T: Display>(
-    type_annotation: &GraphQLTypeAnnotation<T>,
+fn print_javascript_type_declaration<T: Display + Ord + Debug>(
+    type_annotation: &TypeAnnotation<T>,
 ) -> String {
     let mut s = String::new();
     print_javascript_type_declaration_impl(type_annotation, &mut s);
     s
 }
 
-fn print_javascript_type_declaration_impl<T: Display>(
-    type_annotation: &GraphQLTypeAnnotation<T>,
+fn print_javascript_type_declaration_impl<T: Display + Ord + Debug>(
+    type_annotation: &TypeAnnotation<T>,
     s: &mut String,
 ) {
     match &type_annotation {
-        GraphQLTypeAnnotation::Named(named) => {
-            s.push('(');
-            s.push_str(&named.item.to_string());
-            s.push_str(" | null)");
+        TypeAnnotation::Scalar(scalar) => {
+            s.push_str(&scalar.to_string());
         }
-        GraphQLTypeAnnotation::List(list) => {
-            s.push('(');
-            print_list_type_annotation(list, s);
-            s.push_str(" | null)");
-        }
-        GraphQLTypeAnnotation::NonNull(non_null) => {
-            print_non_null_type_annotation(non_null, s);
-        }
-    }
-}
+        TypeAnnotation::Union(union_type_annotation) => {
+            if union_type_annotation.variants.is_empty() {
+                panic!("Unexpected union with not enough variants.");
+            }
 
-fn print_list_type_annotation<T: Display>(list: &GraphQLListTypeAnnotation<T>, s: &mut String) {
-    s.push_str("ReadonlyArray<");
-    print_javascript_type_declaration_impl(&list.0, s);
-    s.push_str(">");
-}
+            if union_type_annotation.variants.len() > 1 || union_type_annotation.nullable {
+                s.push('(');
+                for (index, variant) in union_type_annotation.variants.iter().enumerate() {
+                    if index != 0 {
+                        s.push_str(" | ");
+                    }
 
-fn print_non_null_type_annotation<T: Display>(non_null: &GraphQLNonNullTypeAnnotation<T>, s: &mut String) {
-    match non_null {
-        GraphQLNonNullTypeAnnotation::Named(named) => {
-            s.push_str(&named.item.to_string());
+                    match variant {
+                        UnionVariant::Scalar(scalar) => {
+                            s.push_str(&scalar.to_string());
+                        }
+                        UnionVariant::Plural(type_annotation) => {
+                            s.push_str("ReadonlyArray<");
+                            print_javascript_type_declaration_impl(type_annotation, s);
+                            s.push('>');
+                        }
+                    }
+                }
+                if union_type_annotation.nullable {
+                    s.push_str(" | null");
+                }
+                s.push(')');
+            } else {
+                let variant = union_type_annotation
+                    .variants
+                    .first()
+                    .expect("Expected variant to exist");
+                match variant {
+                    UnionVariant::Scalar(scalar) => {
+                        s.push_str(&scalar.to_string());
+                    }
+                    UnionVariant::Plural(type_annotation) => {
+                        s.push_str("ReadonlyArray<");
+                        print_javascript_type_declaration_impl(type_annotation, s);
+                        s.push('>');
+                    }
+                }
+            }
         }
-        GraphQLNonNullTypeAnnotation::List(list) => {
-            print_list_type_annotation(list, s);
+        TypeAnnotation::Plural(type_annotation) => {
+            s.push_str("ReadonlyArray<");
+            print_javascript_type_declaration_impl(type_annotation, s);
+            s.push('>');
         }
     }
 }
@@ -688,7 +714,7 @@ macro_rules! derive_display {
     };
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct ClientFieldParameterType(pub String);
 derive_display!(ClientFieldParameterType);
 

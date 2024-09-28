@@ -19,6 +19,7 @@ use argument_map::*;
 pub use create_merged_selection_set::*;
 pub use expose_field_directive::*;
 pub use isograph_schema::*;
+pub use isograph_type_annotation::*;
 pub use process_client_field_declaration::*;
 pub use process_type_definition::*;
 pub use refetch_strategy::*;

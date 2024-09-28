@@ -11,7 +11,6 @@ use common_lang_types::{
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition,
     GraphQLInputObjectTypeDefinition, GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition,
-    GraphQLTypeAnnotation, GraphQLNamedTypeAnnotation,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -20,7 +19,10 @@ use isograph_lang_types::{
 };
 use lazy_static::lazy_static;
 
-use crate::{refetch_strategy::RefetchStrategy, ClientFieldVariant, NormalizationKey};
+use crate::{
+    isograph_type_annotation::TypeAnnotation, refetch_strategy::RefetchStrategy,
+    ClientFieldVariant, NormalizationKey,
+};
 
 lazy_static! {
     pub static ref ID_GRAPHQL_TYPE: GraphQLScalarTypeName = "ID".intern().into();
@@ -94,6 +96,8 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
     pub float_type_id: ServerScalarId,
     pub boolean_type_id: ServerScalarId,
     pub int_type_id: ServerScalarId,
+    // TODO restructure UnionTypeAnnotation to not have a nullable field, but to instead
+    // include null in its variants.
     pub null_type_id: ServerScalarId,
 
     pub fetchable_types: BTreeMap<ServerObjectId, RootOperationName>,
@@ -179,34 +183,27 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
 }
 
 impl<
-        TFieldAssociatedData: Clone,
-        TSchemaValidationState: SchemaValidationState<
-            ServerFieldTypeAssociatedData = GraphQLTypeAnnotation<TFieldAssociatedData>,
-        >,
+        TFieldAssociatedData: Clone + Ord + Copy + Debug,
+        TSchemaValidationState: SchemaValidationState<ServerFieldTypeAssociatedData = TypeAnnotation<TFieldAssociatedData>>,
     > Schema<TSchemaValidationState>
 {
+    // This should not be this complicated!
     /// Get a reference to a given id field by its id.
-    pub fn id_field<TIdFieldAssociatedData: TryFrom<TFieldAssociatedData> + Copy>(
+    pub fn id_field<
+        TError: Debug,
+        TIdFieldAssociatedData: TryFrom<TFieldAssociatedData, Error = TError> + Copy + Debug,
+    >(
         &self,
         id_field_id: ServerStrongIdFieldId,
-    ) -> SchemaIdField<GraphQLNamedTypeAnnotation<TIdFieldAssociatedData>> {
+    ) -> SchemaIdField<TIdFieldAssociatedData> {
         let field_id = id_field_id.into();
 
         let field = self
             .server_field(field_id)
-            .and_then(|e| match e.inner_non_null_named_type() {
-                Some(inner) => Ok(GraphQLNamedTypeAnnotation(inner.0.clone().map(|x| {
-                    let y: Result<TIdFieldAssociatedData, _> = x.try_into();
-                    match y {
-                        Ok(y) => y,
-                        Err(_) => {
-                            panic!("Conversion failed. This indicates a bug in Isograph")
-                        }
-                    }
-                }))),
-                None => Err(()),
-            })
+            .and_then(|e| e.inner_non_null().try_into())
             .expect(
+                // N.B. this expect should never be triggered. This is only because server_field
+                // does not have a .map method. TODO implement .map
                 "We had an id field, the type annotation should be named. \
                     This indicates a bug in Isograph.",
             );
@@ -395,6 +392,20 @@ impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone>
             arguments: self.arguments.clone(),
         })
     }
+
+    pub fn map<TData2, E>(
+        &self,
+        convert: impl FnOnce(&TData) -> TData2,
+    ) -> SchemaServerField<TData2, TClientFieldVariableDefinitionAssociatedData> {
+        SchemaServerField {
+            description: self.description,
+            name: self.name,
+            id: self.id,
+            associated_data: convert(&self.associated_data),
+            parent_type_id: self.parent_type_id,
+            arguments: self.arguments.clone(),
+        }
+    }
 }
 
 // TODO make SchemaServerField generic over TData, TId and TArguments, instead of just TData.
@@ -425,6 +436,7 @@ impl<TData: Copy, TClientFieldVariableDefinitionAssociatedData>
         //
         // There are no arguments now, so this will always succeed.
         //
+        // This comment is outdated:
         // Also, before this is called, we have already converted the associated_data to be valid
         // (it should go from TypeAnnotation<T> to NamedTypeAnnotation<T>) via
         // inner_non_null_named_type. We should eventually add some NewType wrapper to

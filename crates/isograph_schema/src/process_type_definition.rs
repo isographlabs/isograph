@@ -12,11 +12,11 @@ use common_lang_types::{
     WithSpan,
 };
 use graphql_lang_types::{
-    GraphQLFieldDefinition, GraphQLInputValueDefinition, GraphQLScalarTypeDefinition,
-    GraphQLTypeAnnotation, GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument,
-    GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
-    GraphQLTypeSystemExtensionOrDefinition, NameValuePair, GraphQLNamedTypeAnnotation,
-    GraphQLNonNullTypeAnnotation, RootOperationKind,
+    GraphQLFieldDefinition, GraphQLInputValueDefinition, GraphQLNamedTypeAnnotation,
+    GraphQLNonNullTypeAnnotation, GraphQLScalarTypeDefinition, GraphQLTypeAnnotation,
+    GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument, GraphQLTypeSystemExtension,
+    GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition, NameValuePair,
+    RootOperationKind,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_config::ConfigOptions;
@@ -597,13 +597,13 @@ impl FieldMapItem {
 fn get_typename_type(
     string_type_for_typename: GraphQLScalarTypeName,
 ) -> GraphQLTypeAnnotation<UnvalidatedTypeName> {
-    GraphQLTypeAnnotation::NonNull(Box::new(GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-        WithSpan::new(
+    GraphQLTypeAnnotation::NonNull(Box::new(GraphQLNonNullTypeAnnotation::Named(
+        GraphQLNamedTypeAnnotation(WithSpan::new(
             string_type_for_typename.into(),
             // TODO we probably need a generated or built-in span type
             Span::todo_generated(),
-        ),
-    ))))
+        )),
+    )))
 }
 
 struct FieldObjectIdsEtc {
