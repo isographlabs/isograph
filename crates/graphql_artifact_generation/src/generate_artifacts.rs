@@ -455,7 +455,7 @@ fn write_param_type_from_selection(
                         query_type_declaration.push_str(&format!(
                             "{}: {},\n",
                             name_or_alias,
-                            print_type_annotation(&output_type)
+                            print_javascript_type_declaration(&output_type)
                         ));
                     }
                     FieldDefinitionLocation::Client(client_field_id) => {
@@ -544,7 +544,7 @@ fn write_param_type_from_selection(
                 query_type_declaration.push_str(&format!(
                     "{}: {},\n",
                     name_or_alias,
-                    print_type_annotation(&type_annotation),
+                    print_javascript_type_declaration(&type_annotation),
                 ));
             }
         },
@@ -629,13 +629,15 @@ fn write_optional_description(
     }
 }
 
-fn print_type_annotation<T: Display>(type_annotation: &GraphQLTypeAnnotation<T>) -> String {
+fn print_javascript_type_declaration<T: Display>(
+    type_annotation: &GraphQLTypeAnnotation<T>,
+) -> String {
     let mut s = String::new();
-    print_type_annotation_impl(type_annotation, &mut s);
+    print_javascript_type_declaration_impl(type_annotation, &mut s);
     s
 }
 
-fn print_type_annotation_impl<T: Display>(
+fn print_javascript_type_declaration_impl<T: Display>(
     type_annotation: &GraphQLTypeAnnotation<T>,
     s: &mut String,
 ) {
@@ -656,7 +658,7 @@ fn print_type_annotation_impl<T: Display>(
 
 fn print_list_type_annotation<T: Display>(list: &ListTypeAnnotation<T>, s: &mut String) {
     s.push('(');
-    print_type_annotation_impl(&list.0, s);
+    print_javascript_type_declaration_impl(&list.0, s);
     s.push_str(")[]");
 }
 
