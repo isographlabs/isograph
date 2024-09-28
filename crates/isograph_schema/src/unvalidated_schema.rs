@@ -24,7 +24,7 @@ lazy_static! {
 pub struct UnvalidatedSchemaState {}
 
 impl SchemaValidationState for UnvalidatedSchemaState {
-    type FieldTypeAssociatedData = UnvalidatedTypeName;
+    type ServerFieldTypeAssociatedData = UnvalidatedTypeName;
     type ClientFieldSelectionScalarFieldAssociatedData = IsographSelectionVariant;
     type ClientFieldSelectionLinkedFieldAssociatedData = IsographSelectionVariant;
     type VariableDefinitionInnerType = UnvalidatedTypeName;
@@ -40,7 +40,7 @@ pub type UnvalidatedObjectFieldInfo = FieldDefinitionLocation<ServerFieldId, Cli
 
 pub(crate) type UnvalidatedSchemaSchemaField = SchemaServerField<
     GraphQLTypeAnnotation<
-        <UnvalidatedSchemaState as SchemaValidationState>::FieldTypeAssociatedData,
+        <UnvalidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
     >,
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
 >;

@@ -31,10 +31,10 @@ lazy_static! {
 /// validated, we will get objects that are generic over a different type
 /// that implements SchemaValidationState.
 pub trait SchemaValidationState: Debug {
-    /// A SchemaServerField contains a associated_data: TypeAnnotation<FieldTypeAssociatedData>
+    /// A SchemaServerField contains a associated_data: TypeAnnotation<ServerFieldTypeAssociatedData>
     /// - Unvalidated: UnvalidatedTypeName
     /// - Validated: DefinedTypeId
-    type FieldTypeAssociatedData: Debug;
+    type ServerFieldTypeAssociatedData: Debug;
 
     /// The associated data type of scalars in client fields' selection sets and unwraps
     /// - Unvalidated: ()
@@ -73,7 +73,7 @@ pub struct RootOperationName(pub String);
 pub struct Schema<TSchemaValidationState: SchemaValidationState> {
     pub server_fields: Vec<
         SchemaServerField<
-            GraphQLTypeAnnotation<TSchemaValidationState::FieldTypeAssociatedData>,
+            GraphQLTypeAnnotation<TSchemaValidationState::ServerFieldTypeAssociatedData>,
             TSchemaValidationState::VariableDefinitionInnerType,
         >,
     >,
@@ -158,7 +158,7 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
         &self,
         server_field_id: ServerFieldId,
     ) -> &SchemaServerField<
-        GraphQLTypeAnnotation<TSchemaValidationState::FieldTypeAssociatedData>,
+        GraphQLTypeAnnotation<TSchemaValidationState::ServerFieldTypeAssociatedData>,
         TSchemaValidationState::VariableDefinitionInnerType,
     > {
         &self.server_fields[server_field_id.as_usize()]
@@ -179,7 +179,7 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
 
 impl<
         TFieldAssociatedData: Clone,
-        TSchemaValidationState: SchemaValidationState<FieldTypeAssociatedData = TFieldAssociatedData>,
+        TSchemaValidationState: SchemaValidationState<ServerFieldTypeAssociatedData = TFieldAssociatedData>,
     > Schema<TSchemaValidationState>
 {
     /// Get a reference to a given id field by its id.
