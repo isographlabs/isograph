@@ -73,7 +73,7 @@ pub struct RootOperationName(pub String);
 pub struct Schema<TSchemaValidationState: SchemaValidationState> {
     pub server_fields: Vec<
         SchemaServerField<
-            GraphQLTypeAnnotation<TSchemaValidationState::ServerFieldTypeAssociatedData>,
+            TSchemaValidationState::ServerFieldTypeAssociatedData,
             TSchemaValidationState::VariableDefinitionInnerType,
         >,
     >,
@@ -158,7 +158,7 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
         &self,
         server_field_id: ServerFieldId,
     ) -> &SchemaServerField<
-        GraphQLTypeAnnotation<TSchemaValidationState::ServerFieldTypeAssociatedData>,
+        TSchemaValidationState::ServerFieldTypeAssociatedData,
         TSchemaValidationState::VariableDefinitionInnerType,
     > {
         &self.server_fields[server_field_id.as_usize()]
@@ -179,7 +179,9 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
 
 impl<
         TFieldAssociatedData: Clone,
-        TSchemaValidationState: SchemaValidationState<ServerFieldTypeAssociatedData = TFieldAssociatedData>,
+        TSchemaValidationState: SchemaValidationState<
+            ServerFieldTypeAssociatedData = GraphQLTypeAnnotation<TFieldAssociatedData>,
+        >,
     > Schema<TSchemaValidationState>
 {
     /// Get a reference to a given id field by its id.

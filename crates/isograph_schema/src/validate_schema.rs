@@ -27,9 +27,7 @@ use intern::string_key::Intern;
 use lazy_static::lazy_static;
 
 pub type ValidatedSchemaServerField = SchemaServerField<
-    GraphQLTypeAnnotation<
-        <ValidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
-    >,
+    <ValidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
 >;
 
@@ -93,7 +91,7 @@ pub type MissingArguments = Vec<ValidatedVariableDefinition>;
 #[derive(Debug)]
 pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
-    type ServerFieldTypeAssociatedData = SelectableServerFieldId;
+    type ServerFieldTypeAssociatedData = GraphQLTypeAnnotation<SelectableServerFieldId>;
     type ClientFieldSelectionScalarFieldAssociatedData = ValidatedScalarFieldAssociatedData;
     type ClientFieldSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
     type VariableDefinitionInnerType = SelectableServerFieldId;
