@@ -1,8 +1,8 @@
 [package]
 name = "u32_newtypes"
-version = "0.0.4"
-edition = "2021"
-license = "MIT"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

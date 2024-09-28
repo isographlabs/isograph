@@ -31,10 +31,10 @@ lazy_static! {
 /// validated, we will get objects that are generic over a different type
 /// that implements SchemaValidationState.
 pub trait SchemaValidationState: Debug {
-    /// A SchemaServerField contains a associated_data: TypeAnnotation<FieldTypeAssociatedData>
+    /// A SchemaServerField contains a associated_data: TypeAnnotation<ServerFieldTypeAssociatedData>
     /// - Unvalidated: UnvalidatedTypeName
     /// - Validated: DefinedTypeId
-    type FieldTypeAssociatedData: Debug;
+    type ServerFieldTypeAssociatedData: Debug;
 
     /// The associated data type of scalars in client fields' selection sets and unwraps
     /// - Unvalidated: ()
@@ -73,7 +73,7 @@ pub struct RootOperationName(pub String);
 pub struct Schema<TSchemaValidationState: SchemaValidationState> {
     pub server_fields: Vec<
         SchemaServerField<
-            GraphQLTypeAnnotation<TSchemaValidationState::FieldTypeAssociatedData>,
+            TSchemaValidationState::ServerFieldTypeAssociatedData,
             TSchemaValidationState::VariableDefinitionInnerType,
         >,
     >,
@@ -94,6 +94,7 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
     pub float_type_id: ServerScalarId,
     pub boolean_type_id: ServerScalarId,
     pub int_type_id: ServerScalarId,
+    pub null_type_id: ServerScalarId,
 
     pub fetchable_types: BTreeMap<ServerObjectId, RootOperationName>,
 }
@@ -158,7 +159,7 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
         &self,
         server_field_id: ServerFieldId,
     ) -> &SchemaServerField<
-        GraphQLTypeAnnotation<TSchemaValidationState::FieldTypeAssociatedData>,
+        TSchemaValidationState::ServerFieldTypeAssociatedData,
         TSchemaValidationState::VariableDefinitionInnerType,
     > {
         &self.server_fields[server_field_id.as_usize()]
@@ -179,7 +180,9 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
 
 impl<
         TFieldAssociatedData: Clone,
-        TSchemaValidationState: SchemaValidationState<FieldTypeAssociatedData = TFieldAssociatedData>,
+        TSchemaValidationState: SchemaValidationState<
+            ServerFieldTypeAssociatedData = GraphQLTypeAnnotation<TFieldAssociatedData>,
+        >,
     > Schema<TSchemaValidationState>
 {
     /// Get a reference to a given id field by its id.
@@ -366,8 +369,7 @@ pub struct ValidRefinement {
 pub struct SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData> {
     pub description: Option<DescriptionValue>,
     /// The name of the server field and the location where it was defined
-    /// (i.e. for client fields, an iso literal, and for server fields, the schema
-    /// file, and for other fields, Location::Generated).
+    /// (an iso literal or Location::Generated).
     pub name: WithLocation<SelectableFieldName>,
     pub id: ServerFieldId,
     pub associated_data: TData,

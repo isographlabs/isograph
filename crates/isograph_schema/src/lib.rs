@@ -4,6 +4,7 @@ mod argument_map;
 mod create_merged_selection_set;
 mod expose_field_directive;
 mod isograph_schema;
+mod isograph_type_annotation;
 mod process_client_field_declaration;
 mod process_type_definition;
 mod refetch_strategy;
