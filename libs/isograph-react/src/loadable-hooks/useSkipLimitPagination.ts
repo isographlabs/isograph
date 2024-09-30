@@ -33,13 +33,18 @@ type UseSkipLimitReturnValue<TArgs, TItem> =
       readonly pendingFragment: FragmentReference<any, ReadonlyArray<TItem>>;
     };
 
-type ArrayFragmentReference<TItem> = FragmentReference<
-  any,
-  ReadonlyArray<TItem>
->;
+type ArrayFragmentReference<
+  TReadFromStore extends Object,
+  TItem,
+> = FragmentReference<TReadFromStore, ReadonlyArray<TItem>>;
 
-type LoadedFragmentReferences<TItem> = ReadonlyArray<
-  ItemCleanupPair<ReferenceCountedPointer<ArrayFragmentReference<TItem>>>
+type LoadedFragmentReferences<
+  TReadFromStore extends Object,
+  TItem,
+> = ReadonlyArray<
+  ItemCleanupPair<
+    ReferenceCountedPointer<ArrayFragmentReference<TReadFromStore, TItem>>
+  >
 >;
 
 function flatten<T>(arr: ReadonlyArray<ReadonlyArray<T>>): ReadonlyArray<T> {
@@ -63,6 +68,7 @@ export function useSkipLimitPagination<
     limit: number | void | null;
   },
   TItem,
+  TReadFromStore extends Object,
 >(
   loadableField: LoadableField<TArgs, Array<TItem>>,
 ): UseSkipLimitReturnValue<TArgs, TItem> {
@@ -71,7 +77,9 @@ export function useSkipLimitPagination<
     throwOnNetworkError: true,
   };
   const { state, setState } =
-    useUpdatableDisposableState<LoadedFragmentReferences<TItem>>();
+    useUpdatableDisposableState<
+      LoadedFragmentReferences<TReadFromStore, TItem>
+    >();
 
   const environment = useIsographEnvironment();
 
@@ -79,7 +87,9 @@ export function useSkipLimitPagination<
   // as parameters (or recreate networkRequestOptions)
   function readCompletedFragmentReferences(
     completedReferences: ReadonlyArray<
-      ItemCleanupPair<ReferenceCountedPointer<ArrayFragmentReference<TItem>>>
+      ItemCleanupPair<
+        ReferenceCountedPointer<ArrayFragmentReference<TReadFromStore, TItem>>
+      >
     >,
   ) {
     // In general, this will not suspend. But it could, if there is missing data.
@@ -112,10 +122,15 @@ export function useSkipLimitPagination<
         parameters: fragmentReference.variables,
       };
 
-      return readerWithRefetchQueries.readerArtifact.resolver(
-        firstParameter,
-        undefined,
-      ) as ReadonlyArray<any>;
+      if (
+        readerWithRefetchQueries.readerArtifact.kind !== 'EagerReaderArtifact'
+      ) {
+        throw new Error(
+          `@loadable field of kind "${readerWithRefetchQueries.readerArtifact.kind}" is not supported by useSkipLimitPagination`,
+        );
+      }
+
+      return readerWithRefetchQueries.readerArtifact.resolver(firstParameter);
     });
 
     const items = flatten(results);
@@ -147,7 +162,9 @@ export function useSkipLimitPagination<
       const totalItemCleanupPair: ItemCleanupPair<
         ReadonlyArray<
           ItemCleanupPair<
-            ReferenceCountedPointer<ArrayFragmentReference<TItem>>
+            ReferenceCountedPointer<
+              ArrayFragmentReference<TReadFromStore, TItem>
+            >
           >
         >
       > = [
