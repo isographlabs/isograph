@@ -3,6 +3,12 @@
 const pathModule = require('path');
 const os = require('os');
 
+/**
+ * @typedef {import("@babel/core")} babel
+ * @param {typeof babel.types} t
+ * @param {babel.NodePath<babel.types.CallExpression>} path
+ * @param {import("cosmiconfig").Config} config
+ */
 function compileTag(t, path, config) {
   const callee = path.node.callee;
   if (t.isIdentifier(callee) && callee.name === 'iso' && path.node.arguments) {
@@ -27,12 +33,20 @@ const typeAndFieldRegex = new RegExp(
   'm',
 );
 
+/**
+ * @param {babel.NodePath<babel.types.CallExpression>} path
+ *  */
 function getTypeAndField(path) {
   if (path.node.arguments.length !== 1) {
     throw new Error(
       `BabelPluginIsograph: Iso invocation require one parameter, found ${path.node.arguments.length}`,
     );
   }
+
+  if (path.node.arguments[0].type !== 'TemplateLiteral') {
+    throw new Error("BabelPluginIsograph: Only template literals are allowed in iso fragments.");
+  }
+
   const quasis = path.node.arguments[0].quasis;
   if (quasis.length !== 1) {
     throw new Error(
@@ -43,9 +57,9 @@ function getTypeAndField(path) {
   const content = quasis[0].value.raw;
   const typeAndField = typeAndFieldRegex.exec(content);
 
-  const keyword = typeAndField[1];
-  const type = typeAndField[2];
-  const field = typeAndField[3];
+  const keyword = typeAndField?.[1];
+  const type = typeAndField?.[2];
+  const field = typeAndField?.[3];
 
   if (keyword == null || type == null || field == null) {
     throw new Error(
@@ -55,13 +69,21 @@ function getTypeAndField(path) {
   return { keyword, type, field };
 }
 
+/**
+ * @param {typeof babel.types} t
+ * @param {babel.NodePath<babel.types.CallExpression>} path
+ * @param {string} type
+ * @param {string} field
+ * @param {string} artifactType
+ * @param {import("cosmiconfig").Config} config
+ */
 function compileImportStatement(t, path, type, field, artifactType, config) {
   const filename = path.state.filename;
   const folder = pathModule.dirname(filename);
   const cwd = path.state.cwd;
   const artifactDirectory = pathModule.join(
     cwd,
-    config.artifact_directory ?? config.project_root,
+    config['artifact_directory'] ?? config['project_root'],
   );
 
   const fileToArtifactDir = pathModule.relative(folder, artifactDirectory);
@@ -85,10 +107,10 @@ function compileImportStatement(t, path, type, field, artifactType, config) {
 
   path.replaceWith(
     t.memberExpression(
-      t.CallExpression(t.Identifier('require'), [
-        t.StringLiteral(fileToArtifact),
+      t.callExpression(t.identifier('require'), [
+        t.stringLiteral(fileToArtifact),
       ]),
-      t.Identifier('default'),
+      t.identifier('default'),
     ),
   );
 }
