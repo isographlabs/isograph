@@ -203,7 +203,7 @@ jobs:
         run: cargo clippy
       - name: 'Check working directory status'
         run: './scripts/check-git-status.sh'
-  
+
   cargo_test:
     name: Run cargo test (excluding relay tests)
     runs-on: ubuntu-latest
