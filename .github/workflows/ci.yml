@@ -204,7 +204,7 @@ jobs:
       - name: 'Check working directory status'
         run: './scripts/check-git-status.sh'
 
-  cargo_test:
+  cargo-test:
     name: Run cargo test (excluding relay tests)
     runs-on: ubuntu-latest
     steps:
@@ -229,7 +229,7 @@ jobs:
         build-website,
         prettier,
         rustfmt,
-        cargo_test,
+        cargo-test,
         typecheck-demos,
       ]
     steps:
