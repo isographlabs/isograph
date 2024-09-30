@@ -3,5 +3,4 @@ declare module 'cosmiconfig' {
   export const loadJson: cosmiconfig.LoaderEntry;
 }
 
-export { };
-
+export {};

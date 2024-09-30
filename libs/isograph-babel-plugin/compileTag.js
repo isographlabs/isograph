@@ -44,7 +44,9 @@ function getTypeAndField(path) {
   }
 
   if (path.node.arguments[0].type !== 'TemplateLiteral') {
-    throw new Error("BabelPluginIsograph: Only template literals are allowed in iso fragments.");
+    throw new Error(
+      'BabelPluginIsograph: Only template literals are allowed in iso fragments.',
+    );
   }
 
   const quasis = path.node.arguments[0].quasis;

@@ -10,7 +10,7 @@ const configExplorer = cosmiconfig('isograph', {
   },
 });
 
-/** @type {import("cosmiconfig").Config} */ 
+/** @type {import("cosmiconfig").Config} */
 let IsographConfig;
 const result = configExplorer.searchSync();
 if (result) {
@@ -21,17 +21,16 @@ if (result) {
   );
 }
 
-/** @typedef {import("@babel/core")} babel*/ 
+/** @typedef {import("@babel/core")} babel*/
 
-/** 
+/**
  * @typedef {Object} Context
  * @property  {typeof babel.types} [types]
- * */ 
+ * */
 
-
-/** 
+/**
  * @param {Context} context
- * @returns {babel.PluginObj} */ 
+ * @returns {babel.PluginObj} */
 module.exports = function BabelPluginIsograph(context) {
   const { types } = context;
   if (!types) {
@@ -41,7 +40,7 @@ module.exports = function BabelPluginIsograph(context) {
     );
   }
 
-  /** @type {babel.Visitor<babel.PluginPass>} */ 
+  /** @type {babel.Visitor<babel.PluginPass>} */
   const visitor = {
     CallExpression(path) {
       compileTag(types, path, IsographConfig);
