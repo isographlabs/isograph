@@ -108,7 +108,7 @@ export function useSkipLimitPagination<
       );
 
       const firstParameter = {
-        data,
+        data: data.item,
         parameters: fragmentReference.variables,
       };
 
