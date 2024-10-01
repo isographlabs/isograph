@@ -1,4 +1,5 @@
 pnpm format && \
+  cargo clippy && \
   pnpm build-demos && \
   ./scripts/check-git-status.sh && \
   pnpm -r compile && \
