@@ -244,9 +244,7 @@ export function iso(_isographLiteralText: string):
   | IdentityWithParamComponent<any>
   | IsographEntrypoint<any, any>
 {
-  return function identity<TClientFieldReturn>(
-    clientFieldOrEntrypoint: (param: any) => TClientFieldReturn,
-  ): (param: any) => TClientFieldReturn {
-    return clientFieldOrEntrypoint;
-  };
+  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
+      'was not set up, or it failed to identify this call site. Make sure it ' +
+      'is being used verbatim as `iso`.');
 }
