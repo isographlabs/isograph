@@ -17,11 +17,6 @@ const readerAst: ReaderAst<Query__UserPage__param> = [
     alias: "UserDetail",
     arguments: [
       [
-        "first",
-        { kind: "Variable", name: "first" },
-      ],
-
-      [
         "userLogin",
         { kind: "Variable", name: "userLogin" },
       ],

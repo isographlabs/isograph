@@ -24,12 +24,7 @@ const readerAst: ReaderAst<Query__UserDetail__param> = [
       {
         kind: "Resolver",
         alias: "RepositoryList",
-        arguments: [
-          [
-            "first",
-            { kind: "Variable", name: "first" },
-          ],
-        ],
+        arguments: null,
         readerArtifact: User__RepositoryList__resolver_reader,
         usedRefetchQueries: [],
       },

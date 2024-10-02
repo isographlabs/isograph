@@ -4,7 +4,7 @@ import {Query__UserPage__output_type} from './output_type';
 import readerResolver from './resolver_reader';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
-const queryText = 'query UserPage ($first: Int!, $userLogin: String!) {\
+const queryText = 'query UserPage ($userLogin: String!) {\
   user____login___v_userLogin: user(login: $userLogin) {\
     id,\
     name,\
@@ -20,11 +20,11 @@ const queryText = 'query UserPage ($first: Int!, $userLogin: String!) {\
             id,\
             login,\
           },\
-          pullRequests____first___v_first: pullRequests(first: $first) {\
+          pullRequests {\
             totalCount,\
           },\
           stargazerCount,\
-          watchers____first___v_first: watchers(first: $first) {\
+          watchers {\
             totalCount,\
           },\
         },\
@@ -124,12 +124,7 @@ const normalizationAst: NormalizationAst = [
                   {
                     kind: "Linked",
                     fieldName: "pullRequests",
-                    arguments: [
-                      [
-                        "first",
-                        { kind: "Variable", name: "first" },
-                      ],
-                    ],
+                    arguments: null,
                     selections: [
                       {
                         kind: "Scalar",
@@ -146,12 +141,7 @@ const normalizationAst: NormalizationAst = [
                   {
                     kind: "Linked",
                     fieldName: "watchers",
-                    arguments: [
-                      [
-                        "first",
-                        { kind: "Variable", name: "first" },
-                      ],
-                    ],
+                    arguments: null,
                     selections: [
                       {
                         kind: "Scalar",
