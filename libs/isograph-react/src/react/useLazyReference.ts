@@ -13,6 +13,17 @@ export function useLazyReference<
 ): {
   fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>;
 } {
+  // @ts-expect-error
+  if (typeof window !== 'undefined' && window.__LOG) {
+    if (entrypoint?.kind !== 'Entrypoint') {
+      console.warn(
+        'useLazyReference was passed an unexpected or invalid object as the first parameter. ' +
+          'Is the babel plugin correctly configured? Received=',
+        entrypoint,
+      );
+    }
+  }
+
   const environment = useIsographEnvironment();
   const cache = getOrCreateCacheForArtifact(environment, entrypoint, variables);
 
