@@ -446,6 +446,8 @@ fn validate_and_transform_client_fields(
 fn validate_all_variables_are_used(
     variable_definitions: Vec<WithSpan<UnvalidatedVariableDefinition>>,
     used_variables: BTreeSet<VariableName>,
+    parent_type_name: IsographObjectTypeName,
+    client_field_name: SelectableFieldName,
 ) -> ValidateSelectionsResult<()> {
     let unused_variables: Vec<_> = variable_definitions
         .into_iter()
@@ -461,7 +463,11 @@ fn validate_all_variables_are_used(
 
     if !unused_variables.is_empty() {
         return Err(WithLocation::new(
-            ValidateSelectionsError::UnusedVariables { unused_variables },
+            ValidateSelectionsError::UnusedVariables {
+                unused_variables,
+                type_name: parent_type_name,
+                field_name: client_field_name,
+            },
             Location::generated(),
         ));
     }
@@ -493,6 +499,7 @@ fn validate_client_field_selection_set(
                 server_fields,
                 client_field_args,
                 unvalidated_client_field.variable_definitions,
+                unvalidated_client_field.name,
             )
             .map_err(|err| {
                 validate_selections_error_to_validate_schema_error(
@@ -551,6 +558,7 @@ fn validate_use_refetch_field_strategy(
         server_fields,
         client_field_args,
         vec![],
+        client_field_name,
     )
     .map_err(|err| {
         validate_selections_error_to_validate_schema_error(err, parent_object, client_field_name)
@@ -655,9 +663,15 @@ fn validate_selections_error_to_validate_schema_error(
         ValidateSelectionsError::ExtraneousArgument { extra_arguments } => {
             ValidateSchemaError::ExtraneousArgument { extra_arguments }
         }
-        ValidateSelectionsError::UnusedVariables { unused_variables } => {
-            ValidateSchemaError::UnusedVariables { unused_variables }
-        }
+        ValidateSelectionsError::UnusedVariables {
+            unused_variables,
+            type_name,
+            field_name,
+        } => ValidateSchemaError::UnusedVariables {
+            unused_variables,
+            type_name,
+            field_name,
+        },
     })
 }
 
@@ -694,6 +708,8 @@ enum ValidateSelectionsError {
     },
     UnusedVariables {
         unused_variables: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
+        type_name: IsographObjectTypeName,
+        field_name: SelectableFieldName,
     },
 }
 
@@ -704,6 +720,7 @@ fn validate_client_field_definition_selections_exist_and_types_match(
     server_fields: &[ValidatedSchemaServerField],
     client_field_args: &ClientFieldArgsMap,
     variable_definitions: Vec<WithSpan<UnvalidatedVariableDefinition>>,
+    client_field_name: SelectableFieldName,
 ) -> ValidateSelectionsResult<Vec<WithSpan<ValidatedSelection>>> {
     // Currently, we only check that each field exists and has an appropriate type, not that
     // there are no selection conflicts due to aliases or parameters.
@@ -724,7 +741,12 @@ fn validate_client_field_definition_selections_exist_and_types_match(
         })
         .collect::<Result<_, _>>()?;
 
-    validate_all_variables_are_used(variable_definitions, used_variables)?;
+    validate_all_variables_are_used(
+        variable_definitions,
+        used_variables,
+        parent_object.name,
+        client_field_name,
+    )?;
 
     return Ok(validated_selection_set);
 }
@@ -1249,10 +1271,12 @@ pub enum ValidateSchemaError {
     },
 
     #[error(
-        "This field has unused variables: {0}",
-        unused_variables.iter().map(|variable| format!("${}", variable.item.name)).collect::<Vec<_>>().join(", ")
+        "The field `{type_name}.{field_name}` has unused variables: {0}",
+        unused_variables.iter().map(|variable| format!("${}", variable.item.name.item)).collect::<Vec<_>>().join(", ")
     )]
     UnusedVariables {
         unused_variables: Vec<WithSpan<UnvalidatedVariableDefinition>>,
+        type_name: IsographObjectTypeName,
+        field_name: SelectableFieldName,
     },
 }
