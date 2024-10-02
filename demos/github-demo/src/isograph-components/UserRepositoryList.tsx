@@ -10,7 +10,7 @@ import {
 import { Route } from './GithubDemo';
 
 export const RepositoryList = iso(`
-  field User.RepositoryList($first: Int) @component {
+  field User.RepositoryList @component {
     repositories(last: 10) {
       edges {
         node {
@@ -20,11 +20,11 @@ export const RepositoryList = iso(`
           nameWithOwner
           description
           forkCount
-          pullRequests(first: $first) {
+          pullRequests {
             totalCount
           }
           stargazerCount
-          watchers(first: $first) {
+          watchers {
             totalCount
           }
         }

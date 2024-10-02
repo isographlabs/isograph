@@ -46,9 +46,7 @@ export function HomeRoute({
 }) {
   const { fragmentReference } = useLazyReference(
     iso(`entrypoint Query.HomePage`),
-    {
-      first: 15,
-    },
+    {},
   );
   const Component = useResult(fragmentReference, {});
   return <Component route={route} setRoute={setRoute} />;
