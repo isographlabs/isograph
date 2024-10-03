@@ -40,17 +40,17 @@ type ArrayFragmentReference<
   TItem,
 > = FragmentReference<TReadFromStore, ReadonlyArray<TItem>>;
 
+type LoadedFragmentReferences<
+  TReadFromStore extends Object,
+  TItem,
+> = ReadonlyArray<LoadedFragmentReference<TReadFromStore, TItem>>;
+
 type LoadedFragmentReference<
   TReadFromStore extends Object,
   TItem,
 > = ItemCleanupPair<
   ReferenceCountedPointer<ArrayFragmentReference<TReadFromStore, TItem>>
 >;
-
-type LoadedFragmentReferences<
-  TReadFromStore extends Object,
-  TItem,
-> = ReadonlyArray<LoadedFragmentReference<TReadFromStore, TItem>>;
 
 function flatten<T>(arr: ReadonlyArray<ReadonlyArray<T>>): ReadonlyArray<T> {
   let outArray: Array<T> = [];
@@ -215,6 +215,14 @@ export function useSkipLimitPagination<
     subscribeCompletedFragmentReferences(fragmentReferences),
   );
 
+  if (!networkRequestStatus) {
+    return {
+      kind: 'Complete',
+      fetchMore: getFetchMore(0),
+      results: [],
+    };
+  }
+
   const results = flatten(
     fragmentReferences.map((fragmentReference, i) => {
       const readerWithRefetchQueries = readPromise(
@@ -229,21 +237,13 @@ export function useSkipLimitPagination<
         );
       }
 
-      return readerWithRefetchQueries.readerArtifact.resolver({
+      const firstParameter = {
         data: readOutDataAndRecords[i].item,
         parameters: fragmentReference.variables,
-      });
+      };
+      return readerWithRefetchQueries.readerArtifact.resolver(firstParameter);
     }),
   );
-
-  if (!networkRequestStatus) {
-    return {
-      kind: 'Complete',
-      fetchMore: getFetchMore(0),
-      results: [],
-    };
-  }
-
   switch (networkRequestStatus.kind) {
     case 'Pending': {
       const unsubscribe = subscribeToAnyChange(environment, () => {
@@ -254,7 +254,7 @@ export function useSkipLimitPagination<
       return {
         kind: 'Pending',
         pendingFragment: mostRecentFragmentReference,
-        results: results,
+        results,
       };
     }
     case 'Err': {
