@@ -70,7 +70,7 @@ export function useSkipLimitPagination<
   TItem,
   TReadFromStore extends Object,
 >(
-  loadableField: LoadableField<TArgs, Array<TItem>>,
+  loadableField: LoadableField<TArgs, ReadonlyArray<TItem>>,
 ): UseSkipLimitReturnValue<TArgs, TItem> {
   const networkRequestOptions = {
     suspendIfInFlight: true,
