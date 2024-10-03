@@ -5,18 +5,18 @@ import { type Pet__set_pet_tagline__output_type } from '../../Pet/set_pet_taglin
 import { type Variables } from '@isograph/react';
 
 export type Pet__PetUpdater__param = {
-  data: {
-    set_best_friend: Pet__set_best_friend__output_type,
-    potential_new_best_friends: ReadonlyArray<{
-      id: string,
-      name: string,
+  readonly data: {
+    readonly set_best_friend: Pet__set_best_friend__output_type,
+    readonly potential_new_best_friends: ReadonlyArray<{
+      readonly id: string,
+      readonly name: string,
     }>,
-    set_pet_tagline: Pet__set_pet_tagline__output_type,
-    tagline: string,
+    readonly set_pet_tagline: Pet__set_pet_tagline__output_type,
+    readonly tagline: string,
     /**
 A refetch field for the Pet type.
     */
-    __refetch: Pet____refetch__output_type,
+    readonly __refetch: Pet____refetch__output_type,
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

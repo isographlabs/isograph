@@ -4,9 +4,9 @@ import { type Query__HomePageList__output_type } from '../../Query/HomePageList/
 import { type Variables } from '@isograph/react';
 
 export type Query__HomePage__param = {
-  data: {
-    Header: Query__Header__output_type,
-    HomePageList: Query__HomePageList__output_type,
+  readonly data: {
+    readonly Header: Query__Header__output_type,
+    readonly HomePageList: Query__HomePageList__output_type,
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

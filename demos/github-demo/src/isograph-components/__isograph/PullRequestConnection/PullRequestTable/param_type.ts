@@ -5,49 +5,49 @@ import { type PullRequest__createdAtFormatted__output_type } from '../../PullReq
 import { type Variables } from '@isograph/react';
 
 export type PullRequestConnection__PullRequestTable__param = {
-  data: {
+  readonly data: {
     /**
 A list of edges.
     */
-    edges: ReadonlyArray<({
+    readonly edges: ReadonlyArray<({
       /**
 The item at the end of the edge.
       */
-      node: ({
+      readonly node: ({
                 /**
 The Node ID of the PullRequest object
         */
-id: string,
-        PullRequestLink: PullRequest__PullRequestLink__output_type,
+readonly id: string,
+        readonly PullRequestLink: PullRequest__PullRequestLink__output_type,
                 /**
 Identifies the pull request number.
         */
-number: number,
+readonly number: number,
                 /**
 Identifies the pull request title.
         */
-title: string,
+readonly title: string,
         /**
 The actor who authored the comment.
         */
-        author: ({
-          UserLink: Actor__UserLink__output_type,
+        readonly author: ({
+          readonly UserLink: Actor__UserLink__output_type,
                     /**
 The username of the actor.
           */
-login: string,
+readonly login: string,
         } | null),
                 /**
 `true` if the pull request is closed
         */
-closed: boolean,
+readonly closed: boolean,
                 /**
 Returns a count of how many comments this pull request has received.
         */
-totalCommentsCount: (number | null),
-        createdAtFormatted: PullRequest__createdAtFormatted__output_type,
+readonly totalCommentsCount: (number | null),
+        readonly createdAtFormatted: PullRequest__createdAtFormatted__output_type,
       } | null),
     } | null)>,
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

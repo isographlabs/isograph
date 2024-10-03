@@ -4,9 +4,9 @@ import { type LoadableField } from '@isograph/react';
 import { type Variables } from '@isograph/react';
 
 export type Pet__PetDetailDeferredRouteInnerComponent__param = {
-  data: {
-    name: string,
-    PetCheckinsCard: LoadableField<{skip?: number | null | void, limit?: number | null | void}, Pet__PetCheckinsCard__output_type>,
+  readonly data: {
+    readonly name: string,
+    readonly PetCheckinsCard: LoadableField<{readonly skip?: number | null | void, readonly limit?: number | null | void}, Pet__PetCheckinsCard__output_type>,
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

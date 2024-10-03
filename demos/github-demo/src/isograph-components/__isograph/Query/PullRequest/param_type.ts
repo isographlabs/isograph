@@ -4,9 +4,9 @@ import { type Query__PullRequestDetail__output_type } from '../../Query/PullRequ
 import { type Variables } from '@isograph/react';
 
 export type Query__PullRequest__param = {
-  data: {
-    Header: Query__Header__output_type,
-    PullRequestDetail: Query__PullRequestDetail__output_type,
+  readonly data: {
+    readonly Header: Query__Header__output_type,
+    readonly PullRequestDetail: Query__PullRequestDetail__output_type,
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

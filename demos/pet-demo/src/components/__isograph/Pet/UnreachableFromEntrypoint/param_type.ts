@@ -4,10 +4,10 @@ import { type Pet__set_best_friend_do_not_use__output_type } from '../../Pet/set
 import { type Variables } from '@isograph/react';
 
 export type Pet__UnreachableFromEntrypoint__param = {
-  data: {
-    id: string,
-    Unreachable2: Pet__Unreachable2__output_type,
-    set_best_friend_do_not_use: Pet__set_best_friend_do_not_use__output_type,
+  readonly data: {
+    readonly id: string,
+    readonly Unreachable2: Pet__Unreachable2__output_type,
+    readonly set_best_friend_do_not_use: Pet__set_best_friend_do_not_use__output_type,
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

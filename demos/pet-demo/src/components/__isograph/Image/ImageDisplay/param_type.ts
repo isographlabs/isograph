@@ -2,8 +2,8 @@
 import { type Variables } from '@isograph/react';
 
 export type Image__ImageDisplay__param = {
-  data: {
-    url: string,
+  readonly data: {
+    readonly url: string,
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

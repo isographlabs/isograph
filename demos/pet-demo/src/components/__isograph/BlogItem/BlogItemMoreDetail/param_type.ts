@@ -2,8 +2,8 @@
 import { type Variables } from '@isograph/react';
 
 export type BlogItem__BlogItemMoreDetail__param = {
-  data: {
-    moreContent: string,
+  readonly data: {
+    readonly moreContent: string,
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

@@ -4,9 +4,9 @@ import { type Query__RepositoryDetail__output_type } from '../../Query/Repositor
 import { type Variables } from '@isograph/react';
 
 export type Query__RepositoryPage__param = {
-  data: {
-    Header: Query__Header__output_type,
-    RepositoryDetail: Query__RepositoryDetail__output_type,
+  readonly data: {
+    readonly Header: Query__Header__output_type,
+    readonly RepositoryDetail: Query__RepositoryDetail__output_type,
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

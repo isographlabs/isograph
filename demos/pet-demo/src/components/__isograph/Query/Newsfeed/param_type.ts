@@ -5,13 +5,13 @@ import { type LoadableField } from '@isograph/react';
 import { type Variables } from '@isograph/react';
 
 export type Query__Newsfeed__param = {
-  data: {
-    viewer: {
-      newsfeed: ReadonlyArray<{
-        NewsfeedAdOrBlog: NewsfeedItem__NewsfeedAdOrBlog__output_type,
+  readonly data: {
+    readonly viewer: {
+      readonly newsfeed: ReadonlyArray<{
+        readonly NewsfeedAdOrBlog: NewsfeedItem__NewsfeedAdOrBlog__output_type,
       }>,
-      NewsfeedPaginationComponent: LoadableField<{skip: number, limit: number}, Viewer__NewsfeedPaginationComponent__output_type>,
+      readonly NewsfeedPaginationComponent: LoadableField<{readonly skip: number, readonly limit: number}, Viewer__NewsfeedPaginationComponent__output_type>,
     },
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

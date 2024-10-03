@@ -141,8 +141,8 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
         {loadable_field_import}\
         {variables_import_statement}\n\
         export type {reader_param_type} = {{\n\
-        {indent}data: {client_field_parameter_type},\n\
-        {indent}parameters: Variables,\n\
+        {indent}readonly data: {client_field_parameter_type},\n\
+        {indent}readonly parameters: Variables,\n\
         }};\n",
     );
     ArtifactPathAndContent {

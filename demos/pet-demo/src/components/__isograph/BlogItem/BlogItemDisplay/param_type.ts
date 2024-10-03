@@ -5,14 +5,14 @@ import { type LoadableField } from '@isograph/react';
 import { type Variables } from '@isograph/react';
 
 export type BlogItem__BlogItemDisplay__param = {
-  data: {
-    author: string,
-    title: string,
-    content: string,
-    BlogItemMoreDetail: LoadableField<void, BlogItem__BlogItemMoreDetail__output_type>,
-    image: ({
-      ImageDisplayWrapper: Image__ImageDisplayWrapper__output_type,
+  readonly data: {
+    readonly author: string,
+    readonly title: string,
+    readonly content: string,
+    readonly BlogItemMoreDetail: LoadableField<void, BlogItem__BlogItemMoreDetail__output_type>,
+    readonly image: ({
+      readonly ImageDisplayWrapper: Image__ImageDisplayWrapper__output_type,
     } | null),
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

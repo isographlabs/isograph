@@ -5,33 +5,33 @@ import { type Starrable__IsStarred__output_type } from '../../Starrable/IsStarre
 import { type Variables } from '@isograph/react';
 
 export type Query__RepositoryDetail__param = {
-  data: {
+  readonly data: {
     /**
 Lookup a given repository by the owner and repository name.
     */
-    repository: ({
-      IsStarred: Starrable__IsStarred__output_type,
+    readonly repository: ({
+      readonly IsStarred: Starrable__IsStarred__output_type,
             /**
 The repository's name with owner.
       */
-nameWithOwner: string,
+readonly nameWithOwner: string,
       /**
 The repository parent, if this is a fork.
       */
-      parent: ({
-        RepositoryLink: Repository__RepositoryLink__output_type,
+      readonly parent: ({
+        readonly RepositoryLink: Repository__RepositoryLink__output_type,
                 /**
 The repository's name with owner.
         */
-nameWithOwner: string,
+readonly nameWithOwner: string,
       } | null),
       /**
 A list of pull requests that have been opened in the repository.
       */
-      pullRequests: {
-        PullRequestTable: PullRequestConnection__PullRequestTable__output_type,
+      readonly pullRequests: {
+        readonly PullRequestTable: PullRequestConnection__PullRequestTable__output_type,
       },
     } | null),
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

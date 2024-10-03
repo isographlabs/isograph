@@ -453,7 +453,7 @@ fn write_param_type_from_selection(
                         });
 
                         query_type_declaration.push_str(&format!(
-                            "{}: {},\n",
+                            "readonly {}: {},\n",
                             name_or_alias,
                             print_javascript_type_declaration(&output_type)
                         ));
@@ -502,7 +502,7 @@ fn write_param_type_from_selection(
 
                         query_type_declaration.push_str(
                             &(format!(
-                                "{}: {},\n",
+                                "readonly {}: {},\n",
                                 scalar_field_selection.name_or_alias().item,
                                 output_type
                             )),
@@ -564,7 +564,7 @@ fn get_loadable_field_type_from_missing_arguments(
         is_first = false;
         let is_optional = !matches!(arg.type_, GraphQLTypeAnnotation::NonNull(_));
         loadable_field_type.push_str(&format!(
-            "{}{}: {}",
+            "readonly {}{}: {}",
             arg.name.item,
             if is_optional { "?" } else { "" },
             format_type_for_js(schema, arg.type_.clone())

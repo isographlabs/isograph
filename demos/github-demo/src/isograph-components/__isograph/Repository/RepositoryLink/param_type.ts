@@ -2,24 +2,24 @@
 import { type Variables } from '@isograph/react';
 
 export type Repository__RepositoryLink__param = {
-  data: {
+  readonly data: {
         /**
 The Node ID of the Repository object
     */
-id: string,
+readonly id: string,
         /**
 The name of the repository.
     */
-name: string,
+readonly name: string,
     /**
 The User owner of the repository.
     */
-    owner: {
+    readonly owner: {
             /**
 The username used to login.
       */
-login: string,
+readonly login: string,
     },
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

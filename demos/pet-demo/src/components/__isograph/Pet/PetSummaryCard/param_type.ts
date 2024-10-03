@@ -3,12 +3,12 @@ import { type Pet__FavoritePhraseLoader__output_type } from '../../Pet/FavoriteP
 import { type Variables } from '@isograph/react';
 
 export type Pet__PetSummaryCard__param = {
-  data: {
-    id: string,
-    name: string,
-    picture: string,
-    tagline: string,
-    FavoritePhraseLoader: Pet__FavoritePhraseLoader__output_type,
+  readonly data: {
+    readonly id: string,
+    readonly name: string,
+    readonly picture: string,
+    readonly tagline: string,
+    readonly FavoritePhraseLoader: Pet__FavoritePhraseLoader__output_type,
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

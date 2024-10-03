@@ -3,8 +3,8 @@ import { type Query__PetDetailRouteInner__output_type } from '../../Query/PetDet
 import { type Variables } from '@isograph/react';
 
 export type Query__PetDetailRoute__param = {
-  data: {
-    PetDetailRouteInner: Query__PetDetailRouteInner__output_type,
+  readonly data: {
+    readonly PetDetailRouteInner: Query__PetDetailRouteInner__output_type,
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

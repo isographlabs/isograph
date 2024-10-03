@@ -3,65 +3,65 @@ import { type Repository__RepositoryLink__output_type } from '../../Repository/R
 import { type Variables } from '@isograph/react';
 
 export type User__RepositoryList__param = {
-  data: {
+  readonly data: {
     /**
 A list of repositories that the user owns.
     */
-    repositories: {
+    readonly repositories: {
       /**
 A list of edges.
       */
-      edges: ReadonlyArray<({
+      readonly edges: ReadonlyArray<({
         /**
 The item at the end of the edge.
         */
-        node: ({
+        readonly node: ({
                     /**
 The Node ID of the Repository object
           */
-id: string,
-          RepositoryLink: Repository__RepositoryLink__output_type,
+readonly id: string,
+          readonly RepositoryLink: Repository__RepositoryLink__output_type,
                     /**
 The name of the repository.
           */
-name: string,
+readonly name: string,
                     /**
 The repository's name with owner.
           */
-nameWithOwner: string,
+readonly nameWithOwner: string,
                     /**
 The description of the repository.
           */
-description: (string | null),
+readonly description: (string | null),
                     /**
 Returns how many forks there are of this repository in the whole network.
           */
-forkCount: number,
+readonly forkCount: number,
           /**
 A list of pull requests that have been opened in the repository.
           */
-          pullRequests: {
+          readonly pullRequests: {
                         /**
 Identifies the total count of items in the connection.
             */
-totalCount: number,
+readonly totalCount: number,
           },
                     /**
 Returns a count of how many stargazers there are on this object
           */
-stargazerCount: number,
+readonly stargazerCount: number,
           /**
 A list of users watching the repository.
           */
-          watchers: {
+          readonly watchers: {
                         /**
 Identifies the total count of items in the connection.
             */
-totalCount: number,
+readonly totalCount: number,
           },
         } | null),
       } | null)>,
     },
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

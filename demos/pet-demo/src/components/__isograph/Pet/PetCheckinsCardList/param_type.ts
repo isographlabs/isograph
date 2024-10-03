@@ -3,11 +3,11 @@ import { type Checkin__CheckinDisplay__output_type } from '../../Checkin/Checkin
 import { type Variables } from '@isograph/react';
 
 export type Pet__PetCheckinsCardList__param = {
-  data: {
-    checkins: ReadonlyArray<{
-      CheckinDisplay: Checkin__CheckinDisplay__output_type,
-      id: string,
+  readonly data: {
+    readonly checkins: ReadonlyArray<{
+      readonly CheckinDisplay: Checkin__CheckinDisplay__output_type,
+      readonly id: string,
     }>,
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

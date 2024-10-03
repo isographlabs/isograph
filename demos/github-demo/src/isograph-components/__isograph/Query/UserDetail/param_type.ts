@@ -3,17 +3,17 @@ import { type User__RepositoryList__output_type } from '../../User/RepositoryLis
 import { type Variables } from '@isograph/react';
 
 export type Query__UserDetail__param = {
-  data: {
+  readonly data: {
     /**
 Lookup a user by login.
     */
-    user: ({
+    readonly user: ({
             /**
 The user's public profile name.
       */
-name: (string | null),
-      RepositoryList: User__RepositoryList__output_type,
+readonly name: (string | null),
+      readonly RepositoryList: User__RepositoryList__output_type,
     } | null),
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

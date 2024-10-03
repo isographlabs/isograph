@@ -4,8 +4,8 @@ import { type LoadableField } from '@isograph/react';
 import { type Variables } from '@isograph/react';
 
 export type AdItem__AdItemDisplayWrapper__param = {
-  data: {
-    AdItemDisplay: LoadableField<void, AdItem__AdItemDisplay__output_type>,
+  readonly data: {
+    readonly AdItemDisplay: LoadableField<void, AdItem__AdItemDisplay__output_type>,
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

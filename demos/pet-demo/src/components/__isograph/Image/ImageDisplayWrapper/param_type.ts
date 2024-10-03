@@ -4,8 +4,8 @@ import { type LoadableField } from '@isograph/react';
 import { type Variables } from '@isograph/react';
 
 export type Image__ImageDisplayWrapper__param = {
-  data: {
-    ImageDisplay: LoadableField<void, Image__ImageDisplay__output_type>,
+  readonly data: {
+    readonly ImageDisplay: LoadableField<void, Image__ImageDisplay__output_type>,
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

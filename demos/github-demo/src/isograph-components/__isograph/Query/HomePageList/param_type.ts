@@ -4,25 +4,25 @@ import { type User____refetch__output_type } from '../../User/__refetch/output_t
 import { type Variables } from '@isograph/react';
 
 export type Query__HomePageList__param = {
-  data: {
+  readonly data: {
     /**
 The currently authenticated user.
     */
-    viewer: {
+    readonly viewer: {
             /**
 The username used to login.
       */
-login: string,
+readonly login: string,
             /**
 The user's public profile name.
       */
-name: (string | null),
-      RepositoryList: User__RepositoryList__output_type,
+readonly name: (string | null),
+      readonly RepositoryList: User__RepositoryList__output_type,
       /**
 A refetch field for the User type.
       */
-      __refetch: User____refetch__output_type,
+      readonly __refetch: User____refetch__output_type,
     },
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

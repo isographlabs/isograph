@@ -4,13 +4,13 @@ import { type BlogItem__BlogItemDisplay__output_type } from '../../BlogItem/Blog
 import { type Variables } from '@isograph/react';
 
 export type NewsfeedItem__NewsfeedAdOrBlog__param = {
-  data: {
-    adItem: ({
-      AdItemDisplayWrapper: AdItem__AdItemDisplayWrapper__output_type,
+  readonly data: {
+    readonly adItem: ({
+      readonly AdItemDisplayWrapper: AdItem__AdItemDisplayWrapper__output_type,
     } | null),
-    blogItem: ({
-      BlogItemDisplay: BlogItem__BlogItemDisplay__output_type,
+    readonly blogItem: ({
+      readonly BlogItemDisplay: BlogItem__BlogItemDisplay__output_type,
     } | null),
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

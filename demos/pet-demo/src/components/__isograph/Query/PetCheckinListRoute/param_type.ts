@@ -4,11 +4,11 @@ import { type LoadableField } from '@isograph/react';
 import { type Variables } from '@isograph/react';
 
 export type Query__PetCheckinListRoute__param = {
-  data: {
-    pet: ({
-      name: string,
-      PetCheckinsCardList: LoadableField<{skip?: number | null | void, limit?: number | null | void}, Pet__PetCheckinsCardList__output_type>,
+  readonly data: {
+    readonly pet: ({
+      readonly name: string,
+      readonly PetCheckinsCardList: LoadableField<{readonly skip?: number | null | void, readonly limit?: number | null | void}, Pet__PetCheckinsCardList__output_type>,
     } | null),
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

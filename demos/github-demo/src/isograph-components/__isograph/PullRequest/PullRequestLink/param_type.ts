@@ -2,29 +2,29 @@
 import { type Variables } from '@isograph/react';
 
 export type PullRequest__PullRequestLink__param = {
-  data: {
+  readonly data: {
         /**
 Identifies the pull request number.
     */
-number: number,
+readonly number: number,
     /**
 The repository associated with this node.
     */
-    repository: {
+    readonly repository: {
             /**
 The name of the repository.
       */
-name: string,
+readonly name: string,
       /**
 The User owner of the repository.
       */
-      owner: {
+      readonly owner: {
                 /**
 The username used to login.
         */
-login: string,
+readonly login: string,
       },
     },
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };

@@ -7,15 +7,15 @@ import { type Pet__PetTaglineCard__output_type } from '../../Pet/PetTaglineCard/
 import { type Variables } from '@isograph/react';
 
 export type Query__PetDetailRouteInner__param = {
-  data: {
-    pet: ({
-      name: string,
-      PetCheckinsCard: Pet__PetCheckinsCard__output_type,
-      PetBestFriendCard: Pet__PetBestFriendCard__output_type,
-      PetPhraseCard: Pet__PetPhraseCard__output_type,
-      PetTaglineCard: Pet__PetTaglineCard__output_type,
-      PetStatsCard: Pet__PetStatsCard__output_type,
+  readonly data: {
+    readonly pet: ({
+      readonly name: string,
+      readonly PetCheckinsCard: Pet__PetCheckinsCard__output_type,
+      readonly PetBestFriendCard: Pet__PetBestFriendCard__output_type,
+      readonly PetPhraseCard: Pet__PetPhraseCard__output_type,
+      readonly PetTaglineCard: Pet__PetTaglineCard__output_type,
+      readonly PetStatsCard: Pet__PetStatsCard__output_type,
     } | null),
   },
-  parameters: Variables,
+  readonly parameters: Variables,
 };
