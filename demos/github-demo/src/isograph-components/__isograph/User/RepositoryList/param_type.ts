@@ -11,7 +11,7 @@ A list of repositories that the user owns.
       /**
 A list of edges.
       */
-      readonly edges: ReadonlyArray<({
+      readonly edges: (ReadonlyArray<({
         /**
 The item at the end of the edge.
         */
@@ -60,7 +60,7 @@ Identifies the total count of items in the connection.
 readonly totalCount: number,
           },
         } | null),
-      } | null)>,
+      } | null)> | null),
     },
   },
   readonly parameters: Variables,

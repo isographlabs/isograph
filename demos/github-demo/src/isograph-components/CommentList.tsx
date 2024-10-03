@@ -33,7 +33,7 @@ export const CommentList = iso(`
     }
   }
 `)(function CommentListComponent({ data }) {
-  const comments = [...data.comments.edges].reverse();
+  const comments = [...(data.comments.edges ?? [])].reverse();
 
   return comments.map((commentNode) => {
     const comment = commentNode?.node;

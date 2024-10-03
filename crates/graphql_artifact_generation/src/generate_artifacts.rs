@@ -648,7 +648,9 @@ fn print_javascript_type_declaration_impl<T: Display>(
             s.push_str(" | null)");
         }
         GraphQLTypeAnnotation::List(list) => {
+            s.push('(');
             print_list_type_annotation(list, s);
+            s.push_str(" | null)");
         }
         GraphQLTypeAnnotation::NonNull(non_null) => {
             print_non_null_type_annotation(non_null, s);

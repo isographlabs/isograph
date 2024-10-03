@@ -9,7 +9,7 @@ export type PullRequestConnection__PullRequestTable__param = {
     /**
 A list of edges.
     */
-    readonly edges: ReadonlyArray<({
+    readonly edges: (ReadonlyArray<({
       /**
 The item at the end of the edge.
       */
@@ -47,7 +47,7 @@ Returns a count of how many comments this pull request has received.
 readonly totalCommentsCount: (number | null),
         readonly createdAtFormatted: PullRequest__createdAtFormatted__output_type,
       } | null),
-    } | null)>,
+    } | null)> | null),
   },
   readonly parameters: Variables,
 };

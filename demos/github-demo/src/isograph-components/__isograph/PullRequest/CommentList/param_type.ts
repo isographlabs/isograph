@@ -11,7 +11,7 @@ A list of comments associated with the pull request.
       /**
 A list of edges.
       */
-      readonly edges: ReadonlyArray<({
+      readonly edges: (ReadonlyArray<({
         /**
 The item at the end of the edge.
         */
@@ -35,7 +35,7 @@ The username of the actor.
 readonly login: string,
           } | null),
         } | null),
-      } | null)>,
+      } | null)> | null),
     },
   },
   readonly parameters: Variables,

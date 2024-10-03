@@ -35,7 +35,7 @@ export const RepositoryList = iso(`
   { data },
   { setRoute }: { setRoute: (route: Route) => void },
 ) {
-  const repositories = [...data.repositories.edges].reverse();
+  const repositories = [...(data.repositories.edges ?? [])].reverse();
   return (
     <Table>
       <TableHead>

@@ -48,7 +48,7 @@ export const PullRequestTable = iso(`
     setRoute: (route: Route) => void;
   },
 ) {
-  const reversedPullRequests = [...data.edges].reverse();
+  const reversedPullRequests = [...(data.edges ?? [])].reverse();
   return (
     <>
       <h2>Pull Requests</h2>
