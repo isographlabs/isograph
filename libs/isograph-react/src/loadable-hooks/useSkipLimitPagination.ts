@@ -85,6 +85,33 @@ export function useSkipLimitPagination<
 
   // TODO move this out of useSkipLimitPagination, and pass environment and networkRequestOptions
   // as parameters (or recreate networkRequestOptions)
+  function readCompletedFragmentReferences(
+    completedReferences: ArrayFragmentReference<TReadFromStore, TItem>[],
+  ) {
+    const results = completedReferences.map((fragmentReference, i) => {
+      const readerWithRefetchQueries = readPromise(
+        fragmentReference.readerWithRefetchQueries,
+      );
+
+      if (
+        readerWithRefetchQueries.readerArtifact.kind !== 'EagerReaderArtifact'
+      ) {
+        throw new Error(
+          `@loadable field of kind "${readerWithRefetchQueries.readerArtifact.kind}" is not supported by useSkipLimitPagination`,
+        );
+      }
+
+      const firstParameter = {
+        data: readOutDataAndRecords[i].item,
+        parameters: fragmentReference.variables,
+      };
+      return readerWithRefetchQueries.readerArtifact.resolver(firstParameter);
+    });
+
+    const items = flatten(results);
+    return items;
+  }
+
   function subscribeCompletedFragmentReferences(
     completedReferences: ArrayFragmentReference<TReadFromStore, TItem>[],
   ) {
@@ -223,27 +250,6 @@ export function useSkipLimitPagination<
     };
   }
 
-  const results = flatten(
-    fragmentReferences.map((fragmentReference, i) => {
-      const readerWithRefetchQueries = readPromise(
-        fragmentReference.readerWithRefetchQueries,
-      );
-
-      if (
-        readerWithRefetchQueries.readerArtifact.kind !== 'EagerReaderArtifact'
-      ) {
-        throw new Error(
-          `@loadable field of kind "${readerWithRefetchQueries.readerArtifact.kind}" is not supported by useSkipLimitPagination`,
-        );
-      }
-
-      const firstParameter = {
-        data: readOutDataAndRecords[i].item,
-        parameters: fragmentReference.variables,
-      };
-      return readerWithRefetchQueries.readerArtifact.resolver(firstParameter);
-    }),
-  );
   switch (networkRequestStatus.kind) {
     case 'Pending': {
       const unsubscribe = subscribeToAnyChange(environment, () => {
@@ -254,13 +260,14 @@ export function useSkipLimitPagination<
       return {
         kind: 'Pending',
         pendingFragment: mostRecentFragmentReference,
-        results,
+        results: readCompletedFragmentReferences(fragmentReferences),
       };
     }
     case 'Err': {
       throw networkRequestStatus.error;
     }
     case 'Ok': {
+      const results = readCompletedFragmentReferences(fragmentReferences);
       return {
         kind: 'Complete',
         results,
