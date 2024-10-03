@@ -9,7 +9,7 @@ export const PetDetailRouteComponent = iso(`
   field Query.PetDetailRoute($id: ID!) @component {
     PetDetailRouteInner(actualId: $id) 
   }
-`)(function PetDetailRouteComponent(data) {
+`)(function PetDetailRouteComponent({ data }) {
   return <data.PetDetailRouteInner />;
 });
 
@@ -24,7 +24,7 @@ export const PetDetailRouteInner = iso(`
       PetStatsCard
     }
   }
-`)(function PetDetailRouteComponentInner(data) {
+`)(function PetDetailRouteComponentInner({ data }) {
   const navigateTo = useNavigateTo();
   const { pet } = data;
   if (pet == null) {

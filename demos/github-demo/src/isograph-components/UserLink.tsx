@@ -9,7 +9,7 @@ export const UserLink = iso(`
     login
   }
 `)(function UserLinkComponent(
-  data,
+  { data },
   {
     setRoute,
     children,

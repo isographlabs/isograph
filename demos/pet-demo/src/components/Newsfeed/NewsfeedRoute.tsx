@@ -18,7 +18,7 @@ export const Newsfeed = iso(`
       NewsfeedPaginationComponent @loadable
     }
   }
-`)(function PetDetailRouteComponent(data) {
+`)(function PetDetailRouteComponent({ data }) {
   const viewer = data.viewer;
 
   const paginationState = useSkipLimitPagination(
@@ -82,7 +82,7 @@ export const NewsfeedAdOrBlog = iso(`
     }
   }
 `)((
-  newsfeedItem,
+  { data: newsfeedItem },
   { onVisible, index }: { onVisible: (() => void) | null; index: number },
 ) => {
   const fallback = (

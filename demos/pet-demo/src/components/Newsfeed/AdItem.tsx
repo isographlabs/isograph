@@ -12,7 +12,7 @@ export const BlogItem = iso(`
     message
   }
 `)((
-  adItem,
+  { data: adItem },
   { onVisible, index }: { onVisible: (() => void) | null; index: number },
 ) => {
   const isIntersectingRef = useRef(null);

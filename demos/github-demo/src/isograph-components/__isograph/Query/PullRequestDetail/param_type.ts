@@ -1,23 +1,28 @@
 import { type PullRequest__CommentList__output_type } from '../../PullRequest/CommentList/output_type';
 
+import { type Variables } from '@isograph/react';
+
 export type Query__PullRequestDetail__param = {
-  /**
-Lookup a given repository by the owner and repository name.
-  */
-  repository: ({
+  readonly data: {
     /**
-Returns a single pull request from the current repository by number.
+Lookup a given repository by the owner and repository name.
     */
-    pullRequest: ({
-            /**
+    readonly repository: ({
+      /**
+Returns a single pull request from the current repository by number.
+      */
+      readonly pullRequest: ({
+                /**
 Identifies the pull request title.
-      */
-title: string,
-            /**
+        */
+readonly title: string,
+                /**
 The body rendered to HTML.
-      */
-bodyHTML: string,
-      CommentList: PullRequest__CommentList__output_type,
+        */
+readonly bodyHTML: string,
+        readonly CommentList: PullRequest__CommentList__output_type,
+      } | null),
     } | null),
-  } | null),
+  },
+  readonly parameters: Variables,
 };

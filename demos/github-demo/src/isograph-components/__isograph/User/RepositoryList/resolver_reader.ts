@@ -68,12 +68,7 @@ const readerAst: ReaderAst<User__RepositoryList__param> = [
                 kind: "Linked",
                 fieldName: "pullRequests",
                 alias: null,
-                arguments: [
-                  [
-                    "first",
-                    { kind: "Literal", value: null },
-                  ],
-                ],
+                arguments: null,
                 selections: [
                   {
                     kind: "Scalar",
@@ -93,12 +88,7 @@ const readerAst: ReaderAst<User__RepositoryList__param> = [
                 kind: "Linked",
                 fieldName: "watchers",
                 alias: null,
-                arguments: [
-                  [
-                    "first",
-                    { kind: "Literal", value: null },
-                  ],
-                ],
+                arguments: null,
                 selections: [
                   {
                     kind: "Scalar",

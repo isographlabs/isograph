@@ -11,7 +11,7 @@ export const PetCheckinsCard = iso(`
       id
     }
   }
-`)(function PetCheckinsCardComponent(data) {
+`)(function PetCheckinsCardComponent({ data }) {
   return (
     <Card
       variant="outlined"
@@ -37,7 +37,7 @@ export const CheckinDisplay = iso(`
     time
     make_super
   }
-`)((checkin) => {
+`)(({ data: checkin }) => {
   const { loadField } = useImperativeExposedMutationField(checkin.make_super);
   return (
     <b>
@@ -56,6 +56,6 @@ export const PetCheckinsCardList = iso(`
       id
     }
   }
-`)(function PetCheckinsCardComponent(data) {
+`)(function PetCheckinsCardComponent({ data }) {
   return data.checkins;
 });

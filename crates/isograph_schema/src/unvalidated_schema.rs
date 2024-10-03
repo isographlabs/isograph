@@ -24,7 +24,7 @@ lazy_static! {
 pub struct UnvalidatedSchemaState {}
 
 impl SchemaValidationState for UnvalidatedSchemaState {
-    type FieldTypeAssociatedData = UnvalidatedTypeName;
+    type ServerFieldTypeAssociatedData = GraphQLTypeAnnotation<UnvalidatedTypeName>;
     type ClientFieldSelectionScalarFieldAssociatedData = IsographSelectionVariant;
     type ClientFieldSelectionLinkedFieldAssociatedData = IsographSelectionVariant;
     type VariableDefinitionInnerType = UnvalidatedTypeName;
@@ -39,9 +39,7 @@ pub type UnvalidatedSchema = Schema<UnvalidatedSchemaState>;
 pub type UnvalidatedObjectFieldInfo = FieldDefinitionLocation<ServerFieldId, ClientFieldId>;
 
 pub(crate) type UnvalidatedSchemaSchemaField = SchemaServerField<
-    GraphQLTypeAnnotation<
-        <UnvalidatedSchemaState as SchemaValidationState>::FieldTypeAssociatedData,
-    >,
+    <UnvalidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
 >;
 
@@ -110,6 +108,15 @@ impl UnvalidatedSchema {
             "Int",
             "number".intern().into(),
         );
+        let null_type_id = add_schema_defined_scalar_type(
+            &mut scalars,
+            &mut defined_types,
+            // The Null type should never be printed, at least for GraphQL.
+            // TODO we should make this an Option and emit an error (or less
+            // ideally, panic) if this is printed.
+            "NullDoesNotExistIfThisIsPrintedThisIsABug",
+            "number".intern().into(),
+        );
 
         Self {
             server_fields: fields,
@@ -126,6 +133,7 @@ impl UnvalidatedSchema {
             int_type_id,
             float_type_id,
             boolean_type_id,
+            null_type_id,
 
             fetchable_types: BTreeMap::new(),
         }

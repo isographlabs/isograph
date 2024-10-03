@@ -12,7 +12,7 @@ export const HomeRoute = iso(`
       PetSummaryCard
     }
   }
-`)(function HomeRouteComponent(data) {
+`)(function HomeRouteComponent({ data }) {
   return (
     <Container maxWidth="md">
       <h1>Robert&apos;s Pet List 3000</h1>

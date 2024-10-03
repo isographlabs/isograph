@@ -15,6 +15,9 @@
     "url": "git+https://github.com/isographlabs/isograph.git",
     "directory": "libs/isograph-babel-plugin"
   },
+  "scripts": {
+    "tsc": "tsc"
+  },
   "dependencies": {
     "babel-plugin-macros": "^2.0.0",
     "cosmiconfig": "^5.0.5",
@@ -22,6 +25,9 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
+    "@babel/types": "^7.25.6",
+    "@types/babel__core": "^7.20.5",
+    "@types/cosmiconfig": "^5.0.3",
     "prettier": "2.8.8",
     "prettier-plugin-hermes-parser": "0.16.0"
   },

@@ -1,13 +1,13 @@
 [package]
 name = "graphql_schema_parser"
-version = "0.0.4"
-edition = "2021"
-license = "MIT"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
 graphql-syntax = { path = "../../relay-crates/graphql-syntax" }
 intern = { path = "../../relay-crates/intern" }
 graphql_lang_types = { path = "../graphql_lang_types" }
 common_lang_types = { path = "../common_lang_types" }
-logos = "0.12"
-thiserror = "1.0.40"
+logos = { workspace = true } 
+thiserror = { workspace = true }

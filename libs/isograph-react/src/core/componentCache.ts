@@ -50,8 +50,13 @@ export function getOrCreateCachedComponent(
           );
         }
 
-        return readerWithRefetchQueries.readerArtifact.resolver(
+        const firstParameter = {
           data,
+          parameters: fragmentReference.variables,
+        };
+
+        return readerWithRefetchQueries.readerArtifact.resolver(
+          firstParameter,
           additionalRuntimeProps,
         );
       }

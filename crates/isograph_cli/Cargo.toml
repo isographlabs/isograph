@@ -1,19 +1,19 @@
 [package]
 name = "isograph_cli"
-version = "0.0.4"
-edition = "2021"
-license = "MIT"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
-clap = { version = "4.5.18", features = ["derive"] }
-thiserror = "1.0.40"
 isograph_compiler = { path = "../isograph_compiler" }
 isograph_config = { path = "../isograph_config" }
 isograph_lsp= { path = "../isograph_lsp"}
-colored = "2.0.4"
-lazy_static = "1.4"
-regex = "1.6.0"
-notify = "6.1.1"
-tokio = { version="1.35.0", features=["full"] }
-notify-debouncer-full = "0.3.1"
-pretty-duration = "0.1.1"
+colored = { workspace = true }
+clap = { workspace = true }
+thiserror = { workspace = true }
+lazy_static = { workspace = true }
+regex = { workspace = true }
+notify = { workspace = true }
+tokio = { workspace = true }
+notify-debouncer-full = { workspace = true }
+pretty-duration = { workspace = true }

@@ -29,13 +29,12 @@ pub fn on_semantic_token_full_request(
         partial_result_params: _,
     } = params;
 
-    let file_text = state.text_for(&text_document.uri).expect(
-        format!(
+    let file_text = state.text_for(&text_document.uri).unwrap_or_else(|| {
+        panic!(
             "Retrieving semantic tokens for document {}, which has not been opened before.",
             text_document.uri
         )
-        .as_str(),
-    );
+    });
     let literal_extractions = extract_iso_literals_from_file_content(file_text);
     let mut semantic_tokens = vec![];
 
@@ -81,7 +80,7 @@ pub fn on_semantic_token_full_request(
             semantic_tokens.extend(new_tokens);
             let additional_index =
                 get_index_from_diff(&file_text[index_of_last_token..], token_diff);
-            index_of_last_token = index_of_last_token + additional_index;
+            index_of_last_token += additional_index;
         }
     }
     let result = SemanticTokensResult::Tokens(SemanticTokens {

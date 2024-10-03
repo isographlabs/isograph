@@ -1,34 +1,34 @@
-import type {IsographEntrypoint} from '@isograph/react';
-import { AdItem__AdItemDisplayWrapper__param } from './AdItem/AdItemDisplayWrapper/param_type';
-import { AdItem__AdItemDisplay__param } from './AdItem/AdItemDisplay/param_type';
-import { BlogItem__BlogItemDisplay__param } from './BlogItem/BlogItemDisplay/param_type';
-import { BlogItem__BlogItemMoreDetail__param } from './BlogItem/BlogItemMoreDetail/param_type';
-import { Checkin__CheckinDisplay__param } from './Checkin/CheckinDisplay/param_type';
-import { Image__ImageDisplayWrapper__param } from './Image/ImageDisplayWrapper/param_type';
-import { Image__ImageDisplay__param } from './Image/ImageDisplay/param_type';
-import { Mutation__SetTagline__param } from './Mutation/SetTagline/param_type';
-import { NewsfeedItem__NewsfeedAdOrBlog__param } from './NewsfeedItem/NewsfeedAdOrBlog/param_type';
-import { Pet__FavoritePhraseLoader__param } from './Pet/FavoritePhraseLoader/param_type';
-import { Pet__PetBestFriendCard__param } from './Pet/PetBestFriendCard/param_type';
-import { Pet__PetCheckinsCardList__param } from './Pet/PetCheckinsCardList/param_type';
-import { Pet__PetCheckinsCard__param } from './Pet/PetCheckinsCard/param_type';
-import { Pet__PetDetailDeferredRouteInnerComponent__param } from './Pet/PetDetailDeferredRouteInnerComponent/param_type';
-import { Pet__PetPhraseCard__param } from './Pet/PetPhraseCard/param_type';
-import { Pet__PetStatsCard__param } from './Pet/PetStatsCard/param_type';
-import { Pet__PetSummaryCard__param } from './Pet/PetSummaryCard/param_type';
-import { Pet__PetTaglineCard__param } from './Pet/PetTaglineCard/param_type';
-import { Pet__PetUpdater__param } from './Pet/PetUpdater/param_type';
-import { Pet__Unreachable2__param } from './Pet/Unreachable2/param_type';
-import { Pet__UnreachableFromEntrypoint__param } from './Pet/UnreachableFromEntrypoint/param_type';
-import { Query__HomeRoute__param } from './Query/HomeRoute/param_type';
-import { Query__Newsfeed__param } from './Query/Newsfeed/param_type';
-import { Query__PetByName__param } from './Query/PetByName/param_type';
-import { Query__PetCheckinListRoute__param } from './Query/PetCheckinListRoute/param_type';
-import { Query__PetDetailDeferredRoute__param } from './Query/PetDetailDeferredRoute/param_type';
-import { Query__PetDetailRouteInner__param } from './Query/PetDetailRouteInner/param_type';
-import { Query__PetDetailRoute__param } from './Query/PetDetailRoute/param_type';
-import { Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/param_type';
-import { Viewer__NewsfeedPaginationComponent__param } from './Viewer/NewsfeedPaginationComponent/param_type';
+import type { IsographEntrypoint, ResolverFirstParameter, Variables } from '@isograph/react';
+import { type AdItem__AdItemDisplayWrapper__param } from './AdItem/AdItemDisplayWrapper/param_type';
+import { type AdItem__AdItemDisplay__param } from './AdItem/AdItemDisplay/param_type';
+import { type BlogItem__BlogItemDisplay__param } from './BlogItem/BlogItemDisplay/param_type';
+import { type BlogItem__BlogItemMoreDetail__param } from './BlogItem/BlogItemMoreDetail/param_type';
+import { type Checkin__CheckinDisplay__param } from './Checkin/CheckinDisplay/param_type';
+import { type Image__ImageDisplayWrapper__param } from './Image/ImageDisplayWrapper/param_type';
+import { type Image__ImageDisplay__param } from './Image/ImageDisplay/param_type';
+import { type Mutation__SetTagline__param } from './Mutation/SetTagline/param_type';
+import { type NewsfeedItem__NewsfeedAdOrBlog__param } from './NewsfeedItem/NewsfeedAdOrBlog/param_type';
+import { type Pet__FavoritePhraseLoader__param } from './Pet/FavoritePhraseLoader/param_type';
+import { type Pet__PetBestFriendCard__param } from './Pet/PetBestFriendCard/param_type';
+import { type Pet__PetCheckinsCardList__param } from './Pet/PetCheckinsCardList/param_type';
+import { type Pet__PetCheckinsCard__param } from './Pet/PetCheckinsCard/param_type';
+import { type Pet__PetDetailDeferredRouteInnerComponent__param } from './Pet/PetDetailDeferredRouteInnerComponent/param_type';
+import { type Pet__PetPhraseCard__param } from './Pet/PetPhraseCard/param_type';
+import { type Pet__PetStatsCard__param } from './Pet/PetStatsCard/param_type';
+import { type Pet__PetSummaryCard__param } from './Pet/PetSummaryCard/param_type';
+import { type Pet__PetTaglineCard__param } from './Pet/PetTaglineCard/param_type';
+import { type Pet__PetUpdater__param } from './Pet/PetUpdater/param_type';
+import { type Pet__Unreachable2__param } from './Pet/Unreachable2/param_type';
+import { type Pet__UnreachableFromEntrypoint__param } from './Pet/UnreachableFromEntrypoint/param_type';
+import { type Query__HomeRoute__param } from './Query/HomeRoute/param_type';
+import { type Query__Newsfeed__param } from './Query/Newsfeed/param_type';
+import { type Query__PetByName__param } from './Query/PetByName/param_type';
+import { type Query__PetCheckinListRoute__param } from './Query/PetCheckinListRoute/param_type';
+import { type Query__PetDetailDeferredRoute__param } from './Query/PetDetailDeferredRoute/param_type';
+import { type Query__PetDetailRouteInner__param } from './Query/PetDetailRouteInner/param_type';
+import { type Query__PetDetailRoute__param } from './Query/PetDetailRoute/param_type';
+import { type Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/param_type';
+import { type Viewer__NewsfeedPaginationComponent__param } from './Viewer/NewsfeedPaginationComponent/param_type';
 import entrypoint_Mutation__SetTagline from '../__isograph/Mutation/SetTagline/entrypoint';
 import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint';
 import entrypoint_Query__Newsfeed from '../__isograph/Query/Newsfeed/entrypoint';
@@ -42,9 +42,9 @@ import entrypoint_Query__PetFavoritePhrase from '../__isograph/Query/PetFavorite
 // This means that the type of the exported iso literal is exactly
 // the type of the passed-in function, which takes one parameter
 // of type TParam.
-type IdentityWithParam<TParam> = <TClientFieldReturn>(
+type IdentityWithParam<TParam extends Object> = <TClientFieldReturn, TVariables = Variables>(
   clientField: (param: TParam) => TClientFieldReturn
-) => (param: TParam) => TClientFieldReturn;
+) => (param: ResolverFirstParameter<TParam, TVariables>) => TClientFieldReturn;
 
 // This is the type given it to client fields with @component.
 // This means that the type of the exported iso literal is exactly
@@ -53,9 +53,13 @@ type IdentityWithParam<TParam> = <TClientFieldReturn>(
 //
 // TComponentProps becomes the types of the props you must pass
 // whenever the @component field is rendered.
-type IdentityWithParamComponent<TParam> = <TClientFieldReturn, TComponentProps = Record<string, never>>(
+type IdentityWithParamComponent<TParam extends Object> = <
+  TClientFieldReturn,
+  TComponentProps = Record<string, never>,
+  TVariables = Variables
+>(
   clientComponentField: (data: TParam, componentProps: TComponentProps) => TClientFieldReturn
-) => (data: TParam, componentProps: TComponentProps) => TClientFieldReturn;
+) => (data: ResolverFirstParameter<TParam, TVariables>, componentProps: TComponentProps) => TClientFieldReturn;
 
 type WhitespaceCharacter = ' ' | '\t' | '\n';
 type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
@@ -240,9 +244,7 @@ export function iso(_isographLiteralText: string):
   | IdentityWithParamComponent<any>
   | IsographEntrypoint<any, any>
 {
-  return function identity<TClientFieldReturn>(
-    clientFieldOrEntrypoint: (param: any) => TClientFieldReturn,
-  ): (param: any) => TClientFieldReturn {
-    return clientFieldOrEntrypoint;
-  };
+  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
+      'was not set up, or it failed to identify this call site. Make sure it ' +
+      'is being used verbatim as `iso`.');
 }

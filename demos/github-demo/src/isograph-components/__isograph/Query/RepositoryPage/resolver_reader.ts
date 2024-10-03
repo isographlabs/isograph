@@ -15,7 +15,22 @@ const readerAst: ReaderAst<Query__RepositoryPage__param> = [
   {
     kind: "Resolver",
     alias: "RepositoryDetail",
-    arguments: null,
+    arguments: [
+      [
+        "repositoryName",
+        { kind: "Variable", name: "repositoryName" },
+      ],
+
+      [
+        "repositoryOwner",
+        { kind: "Variable", name: "repositoryOwner" },
+      ],
+
+      [
+        "first",
+        { kind: "Variable", name: "first" },
+      ],
+    ],
     readerArtifact: Query__RepositoryDetail__resolver_reader,
     usedRefetchQueries: [],
   },

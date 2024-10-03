@@ -16,7 +16,7 @@ export const PetDetailDeferredRouteComponent = iso(`
       PetCheckinsCardList @loadable(lazyLoadArtifact: true)
     }
   }
-`)(function PetDetailRouteComponent(data) {
+`)(function PetDetailRouteComponent({ data }) {
   const { pet } = data;
   const navigateTo = useNavigateTo();
 

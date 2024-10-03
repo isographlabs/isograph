@@ -11,7 +11,7 @@ const readerAst: ReaderAst<Query__UserDetail__param> = [
     arguments: [
       [
         "login",
-        { kind: "Literal", value: null },
+        { kind: "Variable", name: "userLogin" },
       ],
     ],
     selections: [

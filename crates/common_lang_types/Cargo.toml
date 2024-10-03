@@ -1,11 +1,11 @@
 [package]
 name = "common_lang_types"
-version = "0.0.4"
-edition = "2021"
-license = "MIT"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 intern = { path = "../../relay-crates/intern" }
 string_key_newtype = { path = "../string_key_newtype" }
-serde = "1.0.197"
+serde = { workspace = true } 

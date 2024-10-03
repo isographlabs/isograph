@@ -1,5 +1,10 @@
 
+import { type Variables } from '@isograph/react';
+
 export type Pet__PetTaglineCard__param = {
-  id: string,
-  tagline: string,
+  readonly data: {
+    readonly id: string,
+    readonly tagline: string,
+  },
+  readonly parameters: Variables,
 };

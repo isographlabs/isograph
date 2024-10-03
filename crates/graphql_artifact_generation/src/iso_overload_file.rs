@@ -40,7 +40,7 @@ fn build_iso_overload_for_client_defined_field(
     let (client_field, variant) = client_field_and_variant;
     let mut s: String = "".to_string();
     let import = format!(
-        "import {{ {}__param }} from './{}/{}/param_type';\n",
+        "import {{ type {}__param }} from './{}/{}/param_type';\n",
         client_field.type_and_field.underscore_separated(),
         client_field.type_and_field.type_name,
         client_field.type_and_field.field_name,
@@ -72,16 +72,18 @@ export function iso<T>(
 }
 
 pub(crate) fn build_iso_overload(schema: &ValidatedSchema) -> ArtifactPathAndContent {
-    let mut imports = "import type {IsographEntrypoint} from '@isograph/react';\n".to_string();
+    let mut imports =
+        "import type { IsographEntrypoint, ResolverFirstParameter, Variables } from '@isograph/react';\n"
+            .to_string();
     let mut content = String::from(
         "
 // This is the type given to regular client fields.
 // This means that the type of the exported iso literal is exactly
 // the type of the passed-in function, which takes one parameter
 // of type TParam.
-type IdentityWithParam<TParam> = <TClientFieldReturn>(
+type IdentityWithParam<TParam extends Object> = <TClientFieldReturn, TVariables = Variables>(
   clientField: (param: TParam) => TClientFieldReturn
-) => (param: TParam) => TClientFieldReturn;
+) => (param: ResolverFirstParameter<TParam, TVariables>) => TClientFieldReturn;
 
 // This is the type given it to client fields with @component.
 // This means that the type of the exported iso literal is exactly
@@ -90,9 +92,13 @@ type IdentityWithParam<TParam> = <TClientFieldReturn>(
 //
 // TComponentProps becomes the types of the props you must pass
 // whenever the @component field is rendered.
-type IdentityWithParamComponent<TParam> = <TClientFieldReturn, TComponentProps = Record<string, never>>(
+type IdentityWithParamComponent<TParam extends Object> = <
+  TClientFieldReturn,
+  TComponentProps = Record<string, never>,
+  TVariables = Variables
+>(
   clientComponentField: (data: TParam, componentProps: TComponentProps) => TClientFieldReturn
-) => (data: TParam, componentProps: TComponentProps) => TClientFieldReturn;
+) => (data: ResolverFirstParameter<TParam, TVariables>, componentProps: TComponentProps) => TClientFieldReturn;
 
 type WhitespaceCharacter = ' ' | '\\t' | '\\n';
 type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
@@ -144,11 +150,9 @@ export function iso(_isographLiteralText: string):
   | IdentityWithParamComponent<any>
   | IsographEntrypoint<any, any>
 {
-  return function identity<TClientFieldReturn>(
-    clientFieldOrEntrypoint: (param: any) => TClientFieldReturn,
-  ): (param: any) => TClientFieldReturn {
-    return clientFieldOrEntrypoint;
-  };
+  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
+      'was not set up, or it failed to identify this call site. Make sure it ' +
+      'is being used verbatim as `iso`.');
 }",
     );
     imports.push_str(&content);

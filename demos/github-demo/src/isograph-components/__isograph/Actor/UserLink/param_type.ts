@@ -1,7 +1,12 @@
 
+import { type Variables } from '@isograph/react';
+
 export type Actor__UserLink__param = {
-    /**
+  readonly data: {
+        /**
 The username of the actor.
-  */
-login: string,
+    */
+readonly login: string,
+  },
+  readonly parameters: Variables,
 };

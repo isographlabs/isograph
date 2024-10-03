@@ -1,37 +1,42 @@
 import { type IssueComment__formattedCommentCreationDate__output_type } from '../../IssueComment/formattedCommentCreationDate/output_type';
 
+import { type Variables } from '@isograph/react';
+
 export type PullRequest__CommentList__param = {
-  /**
-A list of comments associated with the pull request.
-  */
-  comments: {
+  readonly data: {
     /**
-A list of edges.
+A list of comments associated with the pull request.
     */
-    edges: (({
+    readonly comments: {
       /**
-The item at the end of the edge.
+A list of edges.
       */
-      node: ({
-                /**
-The Node ID of the IssueComment object
-        */
-id: string,
-                /**
-The body rendered to text.
-        */
-bodyText: string,
-        formattedCommentCreationDate: IssueComment__formattedCommentCreationDate__output_type,
+      readonly edges: (ReadonlyArray<({
         /**
-The actor who authored the comment.
+The item at the end of the edge.
         */
-        author: ({
+        readonly node: ({
                     /**
-The username of the actor.
+The Node ID of the IssueComment object
           */
-login: string,
+readonly id: string,
+                    /**
+The body rendered to text.
+          */
+readonly bodyText: string,
+          readonly formattedCommentCreationDate: IssueComment__formattedCommentCreationDate__output_type,
+          /**
+The actor who authored the comment.
+          */
+          readonly author: ({
+                        /**
+The username of the actor.
+            */
+readonly login: string,
+          } | null),
         } | null),
-      } | null),
-    } | null))[],
+      } | null)> | null),
+    },
   },
+  readonly parameters: Variables,
 };

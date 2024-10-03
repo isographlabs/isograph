@@ -17,7 +17,7 @@ export const PetStatsCard = iso(`
       refetch_pet_stats(id: $id)
     }
   }
-`)(function PetStatsCardComponent(pet) {
+`)(function PetStatsCardComponent({ data: pet }) {
   return (
     <Card
       variant="outlined"

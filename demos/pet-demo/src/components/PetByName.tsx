@@ -9,7 +9,7 @@ export const PetByNameRouteComponent = iso(`
       PetDetailDeferredRouteInnerComponent
     }
   }
-`)(function (data) {
+`)(function ({ data }) {
   const { pet } = data;
   if (pet == null) {
     return <h1>Pet not found.</h1>;

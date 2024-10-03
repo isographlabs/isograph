@@ -12,17 +12,22 @@ There are three major places to make changes to Isograph:
 
 ### node and `pnpm`
 
-Isograph currently uses node version 22, and `pnpm@8.15.3`.
+The node.js and pnpm versions used by isograph are specified in fields `engines.node` and `packageManager` respectively in the `package.json` file.
 
-In order to ensure you are using the correct versions of these, you should install `nvm` and run:
+In order to ensure you are using the correct versions of these you should install `fnm` for your respective operating system by following [this](https://github.com/Schniz/fnm?tab=readme-ov-file#installation) guide. Optionally, configure fnm for your shell by following [this](https://github.com/Schniz/fnm?tab=readme-ov-file#shell-setup) guide.
 
+Now check out into the root directory of isograph project and run the following commands one by one:
+
+```bash
+fnm install --resolve-engines
+fnm use --resolve-engines
+# This makes sure that corepack treats npm the same way as other node package managers. More information at this link: https://github.com/nodejs/corepack?tab=readme-ov-file#corepack-enable--name
+corepack enable npm
+corepack enable
+corepack install
 ```
-# in the isograph root folder
-nvm use
-npm i -g pnpm@8.15.3
-```
 
-(There is probably a way to not install `pnpm` globally, and we should figure that out!)
+These commands will install the appropriate node.js and pnpm version used by isograph and configure them for your shell session.
 
 ### Rust
 
@@ -74,6 +79,8 @@ yarn run iso
 ```sh
 cargo test
 ```
+
+(These are not run as part of CI, but we should add that!)
 
 ### Format Rust code
 
@@ -168,3 +175,19 @@ Every commit to `main` results in a build, which you can see in [npm](https://ww
 ## Workflow for using Isograph
 
 If you are using Isograph in a project, you may be interested in [this doc](../workflow).
+
+## Checking things that fail in CI locally
+
+You may save yourself some time by running:
+
+```sh
+pnpm sanity-check
+```
+
+This will:
+
+- format the code and run the compiler, and ensure that no files are left modified in the working directory
+- build the JS libs (which typechecks etc)
+- run tests
+
+All of these are checked as part of CI.

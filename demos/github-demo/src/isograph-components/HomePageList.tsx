@@ -13,7 +13,7 @@ export const HomePageList = iso(`
     }
   }
 `)(function HomePageListComponent(
-  data,
+  { data },
   {
     setRoute,
   }: {
@@ -22,7 +22,7 @@ export const HomePageList = iso(`
 ) {
   return (
     <>
-      <RepoGitHubLink filePath="demos/github-demo/src/isograph-components/HomePage.tsx">
+      <RepoGitHubLink filePath="demos/github-demo/src/isograph-components/HomePageList.tsx">
         Home Page List Component
       </RepoGitHubLink>
       <h1>

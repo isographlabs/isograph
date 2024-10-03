@@ -4,7 +4,9 @@ use common_lang_types::{
     IsographObjectTypeName, LinkedFieldName, Location, QueryOperationName, ScalarFieldName,
     SelectableFieldName, Span, VariableName, WithLocation, WithSpan,
 };
-use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation};
+use graphql_lang_types::{
+    GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
+};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, IsographSelectionVariant, NonConstantValue,
@@ -1085,8 +1087,8 @@ fn get_aliased_mutation_field_name(
 pub fn id_arguments() -> Vec<UnvalidatedVariableDefinition> {
     vec![VariableDefinition {
         name: WithLocation::new("id".intern().into(), Location::generated()),
-        type_: GraphQLTypeAnnotation::NonNull(Box::new(NonNullTypeAnnotation::Named(
-            NamedTypeAnnotation(WithSpan::new("ID".intern().into(), Span::todo_generated())),
+        type_: GraphQLTypeAnnotation::NonNull(Box::new(GraphQLNonNullTypeAnnotation::Named(
+            GraphQLNamedTypeAnnotation(WithSpan::new("ID".intern().into(), Span::todo_generated())),
         ))),
         default_value: None,
     }]

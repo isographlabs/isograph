@@ -5,7 +5,8 @@ use common_lang_types::{
     WithSpan,
 };
 use graphql_lang_types::{
-    GraphQLTypeAnnotation, ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
+    GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
+    GraphQLTypeAnnotation,
 };
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
@@ -250,21 +251,38 @@ fn parse_delimited_list<'a, TResult>(
     tokens: &mut PeekableLexer<'a>,
     parse_item: impl Fn(&mut PeekableLexer<'a>) -> ParseResultWithSpan<TResult> + 'a,
     delimiter: IsographLangTokenKind,
+    closing_token: IsographLangTokenKind,
 ) -> ParseResultWithSpan<Vec<TResult>> {
     let mut items = vec![];
-    items.push(parse_item(tokens)?);
-    while tokens.parse_token_of_kind(delimiter).is_ok() {
-        // Note: this is not ideal. parse_item can consume items off of the token stream, so
-        // if it (for example) parsed a closing parentheses *then* errored, we would be in
-        // an invalid state. In practice, this isn't an issue, but we should clean up the
-        // code to not do this.
-        let result = parse_item(tokens);
-        if let Ok(result) = result {
-            items.push(result);
-        } else {
+
+    // Handle empty list case
+    if tokens.parse_token_of_kind(closing_token).is_ok() {
+        return Ok(items);
+    }
+
+    loop {
+        items.push(parse_item(tokens)?);
+
+        if tokens.parse_token_of_kind(closing_token).is_ok() {
+            break;
+        }
+
+        if tokens.parse_token_of_kind(delimiter).is_err() {
+            return Err(WithSpan::new(
+                IsographLiteralParseError::ExpectedDelimiterOrClosingToken {
+                    closing_token,
+                    delimiter,
+                },
+                tokens.peek().span,
+            ));
+        }
+
+        // Check if the next token is the closing token (allows for trailing delimiter)
+        if tokens.parse_token_of_kind(closing_token).is_ok() {
             break;
         }
     }
+
     Ok(items)
 }
 
@@ -398,10 +416,9 @@ fn parse_optional_arguments(
             tokens,
             move |tokens| parse_argument(tokens, text_source),
             IsographLangTokenKind::Comma,
+            IsographLangTokenKind::CloseParen,
         )?;
-        tokens
-            .parse_token_of_kind(IsographLangTokenKind::CloseParen)
-            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+
         Ok(arguments)
     } else {
         Ok(vec![])
@@ -485,10 +502,9 @@ fn parse_variable_definitions(
             tokens,
             move |item| parse_variable_definition(item, text_source),
             IsographLangTokenKind::Comma,
+            IsographLangTokenKind::CloseParen,
         )?;
-        tokens
-            .parse_token_of_kind(IsographLangTokenKind::CloseParen)
-            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+
         Ok(variable_definitions)
     } else {
         Ok(vec![])
@@ -563,10 +579,12 @@ fn parse_type_annotation(
                 .is_ok();
             if is_non_null {
                 Ok(GraphQLTypeAnnotation::NonNull(Box::new(
-                    NonNullTypeAnnotation::Named(NamedTypeAnnotation(type_)),
+                    GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(type_)),
                 )))
             } else {
-                Ok(GraphQLTypeAnnotation::Named(NamedTypeAnnotation(type_)))
+                Ok(GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
+                    type_,
+                )))
             }
         })?;
 
@@ -586,12 +604,14 @@ fn parse_type_annotation(
 
             if is_non_null {
                 Ok(GraphQLTypeAnnotation::NonNull(Box::new(
-                    NonNullTypeAnnotation::List(ListTypeAnnotation(inner_type_annotation)),
+                    GraphQLNonNullTypeAnnotation::List(GraphQLListTypeAnnotation(
+                        inner_type_annotation,
+                    )),
                 )))
             } else {
-                Ok(GraphQLTypeAnnotation::List(Box::new(ListTypeAnnotation(
-                    inner_type_annotation,
-                ))))
+                Ok(GraphQLTypeAnnotation::List(Box::new(
+                    GraphQLListTypeAnnotation(inner_type_annotation),
+                )))
             }
         })?;
 

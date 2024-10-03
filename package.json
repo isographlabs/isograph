@@ -20,7 +20,8 @@
     "format": "pnpm run format-prettier && pnpm run format-rust",
     "format-prettier": "prettier --config ./.prettier.config.js --write .",
     "format-rust": "cargo fmt",
-    "tsc": "pnpm -r tsc"
+    "tsc": "pnpm -r tsc",
+    "sanity-check": "./scripts/sanity-check.sh"
   },
   "license": "MIT",
   "repository": {
@@ -30,5 +31,8 @@
   "dependencies": {
     "react-twitter-embed": "^4.0.4"
   },
-  "packageManager": "pnpm@8.15.3"
+  "engines": {
+    "node": "22.9.0"
+  },
+  "packageManager": "pnpm@9.11.0"
 }

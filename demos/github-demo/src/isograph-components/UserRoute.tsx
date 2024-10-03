@@ -10,12 +10,12 @@ import {
 } from './GithubDemo';
 
 export const UserPage = iso(`
-  field Query.UserPage($first: Int!, $userLogin: String!) @component {
+  field Query.UserPage($userLogin: String!) @component {
     Header
-    UserDetail
+    UserDetail(userLogin: $userLogin)
   }
 `)(function UserRouteComponentComponent(
-  data,
+  { data },
   {
     route,
     setRoute,

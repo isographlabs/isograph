@@ -9,6 +9,7 @@
 **/.env.local
 **/.next/**
 **/next-env.d.ts
+**/*.d.ts
 
 # the built binary is downloaded into this folder during CI
 artifacts

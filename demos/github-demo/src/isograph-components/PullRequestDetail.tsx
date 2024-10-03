@@ -6,7 +6,7 @@ import { Card, CardContent } from '@mui/material';
 import { RepoGitHubLink } from './RepoGitHubLink';
 
 export const PullRequestDetail = iso(`
-  field Query.PullRequestDetail @component {
+  field Query.PullRequestDetail($repositoryOwner: String, $repositoryName: String, $pullRequestNumber: Int) @component {
     repository(owner: $repositoryOwner, name: $repositoryName) {
       pullRequest(number: $pullRequestNumber) {
         title
@@ -15,7 +15,7 @@ export const PullRequestDetail = iso(`
       }
     }
   }
-`)(function PullRequestDetailComponent(data) {
+`)(function PullRequestDetailComponent({ data }) {
   const repository = data.repository;
   if (repository === null) {
     return <h1>Repository not found</h1>;

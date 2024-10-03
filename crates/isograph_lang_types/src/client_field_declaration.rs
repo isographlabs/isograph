@@ -336,6 +336,18 @@ impl NonConstantValue {
     pub fn reachable_variables(&self) -> Vec<VariableName> {
         match self {
             NonConstantValue::Variable(name) => vec![*name],
+            NonConstantValue::Object(object) => {
+                return object
+                    .iter()
+                    .flat_map(|pair| pair.value.item.reachable_variables())
+                    .collect();
+            }
+            NonConstantValue::List(list) => {
+                return list
+                    .iter()
+                    .flat_map(|element| element.item.reachable_variables())
+                    .collect();
+            }
             _ => vec![],
         }
     }

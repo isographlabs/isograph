@@ -7,7 +7,7 @@ export const IsStarred = iso(`
     stargazerCount
     viewerHasStarred
   }
-`)((data) => {
+`)(({ data }) => {
   return (
     <p>
       This item has been starred {data.stargazerCount} times,{' '}
@@ -17,7 +17,7 @@ export const IsStarred = iso(`
 });
 
 export const RepositoryDetail = iso(`
-  field Query.RepositoryDetail @component {
+  field Query.RepositoryDetail($first: Int, $repositoryName: String, $repositoryOwner: String) @component {
     repository(name: $repositoryName, owner: $repositoryOwner) {
       IsStarred
       nameWithOwner
@@ -32,7 +32,7 @@ export const RepositoryDetail = iso(`
     }
   }
 `)(function RepositoryDetailComponent(
-  data,
+  { data },
   { setRoute }: { setRoute: (route: Route) => void },
 ) {
   const parent = data.repository?.parent;

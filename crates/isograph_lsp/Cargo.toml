@@ -1,7 +1,8 @@
 [package]
 name = "isograph_lsp"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
 common_lang_types = { path = "../common_lang_types"}
@@ -10,10 +11,10 @@ isograph_compiler = { path = "../isograph_compiler"}
 isograph_lang_parser = { path = "../isograph_lang_parser"}
 isograph_lang_types = { path = "../isograph_lang_types"}
 isograph_config = { path = "../isograph_config"}
-log = { version = "0.4.17", features = ["kv_unstable", "kv_unstable_std"] }
-lsp-server = "0.7.2"
-lsp-types = "0.94.1"
-serde = { version = "1.0.185", features = ["derive", "rc"] }
-serde_json = { version = "1.0.100", features = ["float_roundtrip", "unbounded_depth"] }
-crossbeam = "0.8"
-tokio = { version = "1.37.0", features = ["full", "test-util", "tracing"] }
+log = { workspace = true, features = ["kv_unstable", "kv_unstable_std"] }
+lsp-server = { workspace = true }
+lsp-types = { workspace = true }
+serde = { workspace = true, features = ["derive", "rc"] }
+serde_json = { workspace = true, features = ["float_roundtrip", "unbounded_depth"] }
+crossbeam = { workspace = true }
+tokio = { workspace = true, features = ["full", "test-util", "tracing"] }

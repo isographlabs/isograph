@@ -1,6 +1,11 @@
 
+import { type Variables } from '@isograph/react';
+
 export type Query__meName__param = {
-  me: {
-    name: string,
+  readonly data: {
+    readonly me: {
+      readonly name: string,
+    },
   },
+  readonly parameters: Variables,
 };

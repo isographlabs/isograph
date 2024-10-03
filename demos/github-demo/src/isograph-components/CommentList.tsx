@@ -8,8 +8,8 @@ export const formattedCommentCreationDate = iso(`
   field IssueComment.formattedCommentCreationDate {
     createdAt
   }
-`)((props) => {
-  const date = new Date(props.createdAt);
+`)(({ data }) => {
+  const date = new Date(data.createdAt);
   return date.toLocaleDateString('en-us', {
     year: 'numeric',
     month: 'numeric',
@@ -32,8 +32,8 @@ export const CommentList = iso(`
       }
     }
   }
-`)(function CommentListComponent(data) {
-  const comments = [...data.comments.edges].reverse();
+`)(function CommentListComponent({ data }) {
+  const comments = [...(data.comments.edges ?? [])].reverse();
 
   return comments.map((commentNode) => {
     const comment = commentNode?.node;

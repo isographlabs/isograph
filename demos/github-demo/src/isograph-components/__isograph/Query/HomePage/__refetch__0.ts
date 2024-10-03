@@ -19,11 +19,11 @@ const queryText = 'query User__refetch ($id: ID!) {\
               id,\
               login,\
             },\
-            pullRequests____first___l_null: pullRequests(first: null) {\
+            pullRequests {\
               totalCount,\
             },\
             stargazerCount,\
-            watchers____first___l_null: watchers(first: null) {\
+            watchers {\
               totalCount,\
             },\
           },\
@@ -138,12 +138,7 @@ const normalizationAst: NormalizationAst = [
                       {
                         kind: "Linked",
                         fieldName: "pullRequests",
-                        arguments: [
-                          [
-                            "first",
-                            { kind: "Literal", value: null },
-                          ],
-                        ],
+                        arguments: null,
                         selections: [
                           {
                             kind: "Scalar",
@@ -160,12 +155,7 @@ const normalizationAst: NormalizationAst = [
                       {
                         kind: "Linked",
                         fieldName: "watchers",
-                        arguments: [
-                          [
-                            "first",
-                            { kind: "Literal", value: null },
-                          ],
-                        ],
+                        arguments: null,
                         selections: [
                           {
                             kind: "Scalar",

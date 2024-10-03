@@ -13,12 +13,12 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
     arguments: [
       [
         "name",
-        { kind: "Literal", value: null },
+        { kind: "Variable", name: "repositoryName" },
       ],
 
       [
         "owner",
-        { kind: "Literal", value: null },
+        { kind: "Variable", name: "repositoryOwner" },
       ],
     ],
     selections: [
@@ -63,7 +63,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
         arguments: [
           [
             "last",
-            { kind: "Literal", value: null },
+            { kind: "Variable", name: "first" },
           ],
         ],
         selections: [

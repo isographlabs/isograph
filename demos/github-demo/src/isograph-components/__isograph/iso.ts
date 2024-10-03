@@ -1,23 +1,23 @@
-import type {IsographEntrypoint} from '@isograph/react';
-import { Actor__UserLink__param } from './Actor/UserLink/param_type';
-import { IssueComment__formattedCommentCreationDate__param } from './IssueComment/formattedCommentCreationDate/param_type';
-import { PullRequest__CommentList__param } from './PullRequest/CommentList/param_type';
-import { PullRequest__PullRequestLink__param } from './PullRequest/PullRequestLink/param_type';
-import { PullRequest__createdAtFormatted__param } from './PullRequest/createdAtFormatted/param_type';
-import { PullRequestConnection__PullRequestTable__param } from './PullRequestConnection/PullRequestTable/param_type';
-import { Query__Header__param } from './Query/Header/param_type';
-import { Query__HomePageList__param } from './Query/HomePageList/param_type';
-import { Query__HomePage__param } from './Query/HomePage/param_type';
-import { Query__PullRequestDetail__param } from './Query/PullRequestDetail/param_type';
-import { Query__PullRequest__param } from './Query/PullRequest/param_type';
-import { Query__RepositoryDetail__param } from './Query/RepositoryDetail/param_type';
-import { Query__RepositoryPage__param } from './Query/RepositoryPage/param_type';
-import { Query__UserDetail__param } from './Query/UserDetail/param_type';
-import { Query__UserPage__param } from './Query/UserPage/param_type';
-import { Repository__RepositoryLink__param } from './Repository/RepositoryLink/param_type';
-import { Starrable__IsStarred__param } from './Starrable/IsStarred/param_type';
-import { User__Avatar__param } from './User/Avatar/param_type';
-import { User__RepositoryList__param } from './User/RepositoryList/param_type';
+import type { IsographEntrypoint, ResolverFirstParameter, Variables } from '@isograph/react';
+import { type Actor__UserLink__param } from './Actor/UserLink/param_type';
+import { type IssueComment__formattedCommentCreationDate__param } from './IssueComment/formattedCommentCreationDate/param_type';
+import { type PullRequest__CommentList__param } from './PullRequest/CommentList/param_type';
+import { type PullRequest__PullRequestLink__param } from './PullRequest/PullRequestLink/param_type';
+import { type PullRequest__createdAtFormatted__param } from './PullRequest/createdAtFormatted/param_type';
+import { type PullRequestConnection__PullRequestTable__param } from './PullRequestConnection/PullRequestTable/param_type';
+import { type Query__Header__param } from './Query/Header/param_type';
+import { type Query__HomePageList__param } from './Query/HomePageList/param_type';
+import { type Query__HomePage__param } from './Query/HomePage/param_type';
+import { type Query__PullRequestDetail__param } from './Query/PullRequestDetail/param_type';
+import { type Query__PullRequest__param } from './Query/PullRequest/param_type';
+import { type Query__RepositoryDetail__param } from './Query/RepositoryDetail/param_type';
+import { type Query__RepositoryPage__param } from './Query/RepositoryPage/param_type';
+import { type Query__UserDetail__param } from './Query/UserDetail/param_type';
+import { type Query__UserPage__param } from './Query/UserPage/param_type';
+import { type Repository__RepositoryLink__param } from './Repository/RepositoryLink/param_type';
+import { type Starrable__IsStarred__param } from './Starrable/IsStarred/param_type';
+import { type User__Avatar__param } from './User/Avatar/param_type';
+import { type User__RepositoryList__param } from './User/RepositoryList/param_type';
 import entrypoint_Query__HomePage from '../__isograph/Query/HomePage/entrypoint';
 import entrypoint_Query__PullRequest from '../__isograph/Query/PullRequest/entrypoint';
 import entrypoint_Query__RepositoryPage from '../__isograph/Query/RepositoryPage/entrypoint';
@@ -27,9 +27,9 @@ import entrypoint_Query__UserPage from '../__isograph/Query/UserPage/entrypoint'
 // This means that the type of the exported iso literal is exactly
 // the type of the passed-in function, which takes one parameter
 // of type TParam.
-type IdentityWithParam<TParam> = <TClientFieldReturn>(
+type IdentityWithParam<TParam extends Object> = <TClientFieldReturn, TVariables = Variables>(
   clientField: (param: TParam) => TClientFieldReturn
-) => (param: TParam) => TClientFieldReturn;
+) => (param: ResolverFirstParameter<TParam, TVariables>) => TClientFieldReturn;
 
 // This is the type given it to client fields with @component.
 // This means that the type of the exported iso literal is exactly
@@ -38,9 +38,13 @@ type IdentityWithParam<TParam> = <TClientFieldReturn>(
 //
 // TComponentProps becomes the types of the props you must pass
 // whenever the @component field is rendered.
-type IdentityWithParamComponent<TParam> = <TClientFieldReturn, TComponentProps = Record<string, never>>(
+type IdentityWithParamComponent<TParam extends Object> = <
+  TClientFieldReturn,
+  TComponentProps = Record<string, never>,
+  TVariables = Variables
+>(
   clientComponentField: (data: TParam, componentProps: TComponentProps) => TClientFieldReturn
-) => (data: TParam, componentProps: TComponentProps) => TClientFieldReturn;
+) => (data: ResolverFirstParameter<TParam, TVariables>, componentProps: TComponentProps) => TClientFieldReturn;
 
 type WhitespaceCharacter = ' ' | '\t' | '\n';
 type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
@@ -165,9 +169,7 @@ export function iso(_isographLiteralText: string):
   | IdentityWithParamComponent<any>
   | IsographEntrypoint<any, any>
 {
-  return function identity<TClientFieldReturn>(
-    clientFieldOrEntrypoint: (param: any) => TClientFieldReturn,
-  ): (param: any) => TClientFieldReturn {
-    return clientFieldOrEntrypoint;
-  };
+  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
+      'was not set up, or it failed to identify this call site. Make sure it ' +
+      'is being used verbatim as `iso`.');
 }

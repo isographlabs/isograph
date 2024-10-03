@@ -25,7 +25,7 @@ import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
 import { Argument, ArgumentValue } from './util';
 import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
 import { FragmentReference, Variables } from './FragmentReference';
-import { areEqualObjectsWithDeepComparison } from './areEqualWithDeepComparison';
+import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
 import { makeNetworkRequest } from './makeNetworkRequest';
 import { wrapResolvedValue } from './PromiseWrapper';
 
@@ -262,12 +262,12 @@ function callSubscriptions(
               },
             );
 
-            if (
-              !areEqualObjectsWithDeepComparison(
-                subscription.encounteredDataAndRecords.item,
-                newEncounteredDataAndRecords.item,
-              )
-            ) {
+            const mergedItem = mergeObjectsUsingReaderAst(
+              subscription.readerAst,
+              subscription.encounteredDataAndRecords.item,
+              newEncounteredDataAndRecords.item,
+            );
+            if (mergedItem !== subscription.encounteredDataAndRecords.item) {
               // @ts-expect-error
               if (typeof window !== 'undefined' && window.__LOG) {
                 console.log('Deep equality - No', {
@@ -276,7 +276,6 @@ function callSubscriptions(
                   new: newEncounteredDataAndRecords.item,
                 });
               }
-              // TODO deep compare values
               subscription.callback(newEncounteredDataAndRecords);
             } else {
               // @ts-expect-error

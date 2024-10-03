@@ -4,8 +4,8 @@ import {Query__UserPage__output_type} from './output_type';
 import readerResolver from './resolver_reader';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
-const queryText = 'query UserPage ($first: Int!, $userLogin: String!) {\
-  user____login___l_null: user(login: null) {\
+const queryText = 'query UserPage ($userLogin: String!) {\
+  user____login___v_userLogin: user(login: $userLogin) {\
     id,\
     name,\
     repositories____last___l_10: repositories(last: 10) {\
@@ -20,11 +20,11 @@ const queryText = 'query UserPage ($first: Int!, $userLogin: String!) {\
             id,\
             login,\
           },\
-          pullRequests____first___l_null: pullRequests(first: null) {\
+          pullRequests {\
             totalCount,\
           },\
           stargazerCount,\
-          watchers____first___l_null: watchers(first: null) {\
+          watchers {\
             totalCount,\
           },\
         },\
@@ -45,7 +45,7 @@ const normalizationAst: NormalizationAst = [
     arguments: [
       [
         "login",
-        { kind: "Literal", value: null },
+        { kind: "Variable", name: "userLogin" },
       ],
     ],
     selections: [
@@ -124,12 +124,7 @@ const normalizationAst: NormalizationAst = [
                   {
                     kind: "Linked",
                     fieldName: "pullRequests",
-                    arguments: [
-                      [
-                        "first",
-                        { kind: "Literal", value: null },
-                      ],
-                    ],
+                    arguments: null,
                     selections: [
                       {
                         kind: "Scalar",
@@ -146,12 +141,7 @@ const normalizationAst: NormalizationAst = [
                   {
                     kind: "Linked",
                     fieldName: "watchers",
-                    arguments: [
-                      [
-                        "first",
-                        { kind: "Literal", value: null },
-                      ],
-                    ],
+                    arguments: null,
                     selections: [
                       {
                         kind: "Scalar",

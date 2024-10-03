@@ -20,11 +20,11 @@ export const RepositoryList = iso(`
           nameWithOwner
           description
           forkCount
-          pullRequests(first: $first) {
+          pullRequests {
             totalCount
           }
           stargazerCount
-          watchers(first: $first) {
+          watchers {
             totalCount
           }
         }
@@ -32,10 +32,10 @@ export const RepositoryList = iso(`
     }
   }
 `)(function UserRepositoryListComponent(
-  data,
+  { data },
   { setRoute }: { setRoute: (route: Route) => void },
 ) {
-  const repositories = [...data.repositories.edges].reverse();
+  const repositories = [...(data.repositories.edges ?? [])].reverse();
   return (
     <Table>
       <TableHead>
