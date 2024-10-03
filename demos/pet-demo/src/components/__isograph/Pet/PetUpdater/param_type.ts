@@ -7,10 +7,10 @@ import { type Variables } from '@isograph/react';
 export type Pet__PetUpdater__param = {
   data: {
     set_best_friend: Pet__set_best_friend__output_type,
-    potential_new_best_friends: ({
+    potential_new_best_friends: ReadonlyArray<{
       id: string,
       name: string,
-    })[],
+    }>,
     set_pet_tagline: Pet__set_pet_tagline__output_type,
     tagline: string,
     /**

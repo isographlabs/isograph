@@ -4,9 +4,9 @@ import { type Variables } from '@isograph/react';
 
 export type Viewer__NewsfeedPaginationComponent__param = {
   data: {
-    newsfeed: ({
+    newsfeed: ReadonlyArray<{
       NewsfeedAdOrBlog: NewsfeedItem__NewsfeedAdOrBlog__output_type,
-    })[],
+    }>,
   },
   parameters: Variables,
 };

@@ -657,9 +657,9 @@ fn print_javascript_type_declaration_impl<T: Display>(
 }
 
 fn print_list_type_annotation<T: Display>(list: &ListTypeAnnotation<T>, s: &mut String) {
-    s.push('(');
+    s.push_str("ReadonlyArray<");
     print_javascript_type_declaration_impl(&list.0, s);
-    s.push_str(")[]");
+    s.push_str(">");
 }
 
 fn print_non_null_type_annotation<T: Display>(non_null: &NonNullTypeAnnotation<T>, s: &mut String) {
