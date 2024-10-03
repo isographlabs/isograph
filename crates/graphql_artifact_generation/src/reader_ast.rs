@@ -157,7 +157,7 @@ fn scalar_client_defined_field_ast_node(
                 indentation_level,
                 scalar_field_selection,
                 &client_field_variable_context,
-                &loadable_directive_parameters,
+                loadable_directive_parameters,
             )
         }
         Some(Loadability::ImperativelyLoadedField(_)) => imperatively_loaded_variant_ast_node(

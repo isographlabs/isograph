@@ -751,7 +751,7 @@ fn validate_client_field_definition_selections_exist_and_types_match(
         client_field_name,
     )?;
 
-    return Ok(validated_selection_set);
+    Ok(validated_selection_set)
 }
 
 fn validate_client_field_definition_selection_exists_and_type_matches(
@@ -793,7 +793,7 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
 
     used_variables.append(&mut used_variables2);
 
-    return validated_selection;
+    validated_selection
 }
 
 /// Given that we selected a scalar field, the field should exist on the parent,
@@ -1126,14 +1126,14 @@ fn get_missing_arguments_and_validate_argument_types<'a>(
     used_variables: &mut BTreeSet<VariableName>,
 ) -> ValidateSelectionsResult<Vec<ValidatedVariableDefinition>> {
     let argument_definitions_vec: Vec<_> = argument_definitions.collect();
-    validate_no_extraneous_arguments(&argument_definitions_vec, &arguments, location)?;
+    validate_no_extraneous_arguments(&argument_definitions_vec, arguments, location)?;
 
     push_used_variables(arguments, used_variables);
 
     // TODO validate argument types
     Ok(get_missing_arguments(
         argument_definitions_vec.into_iter(),
-        &arguments,
+        arguments,
         include_optional_args,
     ))
 }

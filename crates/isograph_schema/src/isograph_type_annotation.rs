@@ -29,13 +29,13 @@ impl<TInner: Ord + Copy + Debug> TypeAnnotation<TInner> {
                 )))
             }
             GraphQLTypeAnnotation::NonNull(non_null_type_annotation) => {
-                TypeAnnotation::from_non_null_type_annotation(non_null_type_annotation)
+                TypeAnnotation::from_non_null_type_annotation(*non_null_type_annotation)
             }
         }
     }
 
-    pub fn from_non_null_type_annotation(other: Box<GraphQLNonNullTypeAnnotation<TInner>>) -> Self {
-        match *other {
+    pub fn from_non_null_type_annotation(other: GraphQLNonNullTypeAnnotation<TInner>) -> Self {
+        match other {
             GraphQLNonNullTypeAnnotation::Named(named_type_annotation) => {
                 TypeAnnotation::Scalar(named_type_annotation.0.item)
             }
@@ -115,7 +115,7 @@ impl<TInner: Ord + Copy + Debug> UnionTypeAnnotation<TInner> {
     }
 
     pub fn inner(&self) -> TInner {
-        for item in self.variants.iter() {
+        if let Some(item) = self.variants.first() {
             match item {
                 UnionVariant::Scalar(s) => return *s,
                 UnionVariant::Plural(type_annotation) => return type_annotation.inner_non_null(),
