@@ -542,7 +542,7 @@ fn write_param_type_from_selection(
                     )
                 });
                 query_type_declaration.push_str(&format!(
-                    "{}: {},\n",
+                    "readonly {}: {},\n",
                     name_or_alias,
                     print_javascript_type_declaration(&type_annotation),
                 ));
