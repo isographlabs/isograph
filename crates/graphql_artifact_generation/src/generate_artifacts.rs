@@ -3,7 +3,8 @@ use common_lang_types::{
     SelectableFieldName, Span, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    GraphQLTypeAnnotation, ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
+    GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
+    GraphQLTypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -148,10 +149,12 @@ pub fn get_artifact_path_and_content(
                     let id_var = ValidatedVariableDefinition {
                         name: WithLocation::new("id".intern().into(), Location::Generated),
                         type_: GraphQLTypeAnnotation::NonNull(Box::new(
-                            NonNullTypeAnnotation::Named(NamedTypeAnnotation(WithSpan::new(
-                                SelectableServerFieldId::Scalar(schema.id_type_id),
-                                Span::todo_generated(),
-                            ))),
+                            GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
+                                WithSpan::new(
+                                    SelectableServerFieldId::Scalar(schema.id_type_id),
+                                    Span::todo_generated(),
+                                ),
+                            )),
                         )),
                         default_value: None,
                     };
@@ -606,8 +609,10 @@ fn format_type_for_js_inner(
             format!("ReadonlyArray<{}> | null", format_type_for_js_inner(list.0))
         }
         GraphQLTypeAnnotation::NonNull(non_null) => match *non_null {
-            NonNullTypeAnnotation::Named(named_inner_type) => named_inner_type.0.item.to_string(),
-            NonNullTypeAnnotation::List(list) => {
+            GraphQLNonNullTypeAnnotation::Named(named_inner_type) => {
+                named_inner_type.0.item.to_string()
+            }
+            GraphQLNonNullTypeAnnotation::List(list) => {
                 format!("ReadonlyArray<{}>", format_type_for_js_inner(list.0))
             }
         },
@@ -658,18 +663,21 @@ fn print_javascript_type_declaration_impl<T: Display>(
     }
 }
 
-fn print_list_type_annotation<T: Display>(list: &ListTypeAnnotation<T>, s: &mut String) {
+fn print_list_type_annotation<T: Display>(list: &GraphQLListTypeAnnotation<T>, s: &mut String) {
     s.push_str("ReadonlyArray<");
     print_javascript_type_declaration_impl(&list.0, s);
     s.push_str(">");
 }
 
-fn print_non_null_type_annotation<T: Display>(non_null: &NonNullTypeAnnotation<T>, s: &mut String) {
+fn print_non_null_type_annotation<T: Display>(
+    non_null: &GraphQLNonNullTypeAnnotation<T>,
+    s: &mut String,
+) {
     match non_null {
-        NonNullTypeAnnotation::Named(named) => {
+        GraphQLNonNullTypeAnnotation::Named(named) => {
             s.push_str(&named.item.to_string());
         }
-        NonNullTypeAnnotation::List(list) => {
+        GraphQLNonNullTypeAnnotation::List(list) => {
             print_list_type_annotation(list, s);
         }
     }

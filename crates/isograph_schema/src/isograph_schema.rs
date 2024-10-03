@@ -10,8 +10,8 @@ use common_lang_types::{
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition,
-    GraphQLInputObjectTypeDefinition, GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition,
-    GraphQLTypeAnnotation, NamedTypeAnnotation,
+    GraphQLInputObjectTypeDefinition, GraphQLInterfaceTypeDefinition, GraphQLNamedTypeAnnotation,
+    GraphQLObjectTypeDefinition, GraphQLTypeAnnotation,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -189,13 +189,13 @@ impl<
     pub fn id_field<TIdFieldAssociatedData: TryFrom<TFieldAssociatedData> + Copy>(
         &self,
         id_field_id: ServerStrongIdFieldId,
-    ) -> SchemaIdField<NamedTypeAnnotation<TIdFieldAssociatedData>> {
+    ) -> SchemaIdField<GraphQLNamedTypeAnnotation<TIdFieldAssociatedData>> {
         let field_id = id_field_id.into();
 
         let field = self
             .server_field(field_id)
             .and_then(|e| match e.inner_non_null_named_type() {
-                Some(inner) => Ok(NamedTypeAnnotation(inner.0.clone().map(|x| {
+                Some(inner) => Ok(GraphQLNamedTypeAnnotation(inner.0.clone().map(|x| {
                     let y: Result<TIdFieldAssociatedData, _> = x.try_into();
                     match y {
                         Ok(y) => y,

@@ -4,7 +4,7 @@ use common_lang_types::{
     FieldArgumentName, IsographObjectTypeName, Location, SelectableFieldName, UnvalidatedTypeName,
     VariableName, WithLocation, WithSpan,
 };
-use graphql_lang_types::{GraphQLTypeAnnotation, NamedTypeAnnotation};
+use graphql_lang_types::{GraphQLNamedTypeAnnotation, GraphQLTypeAnnotation};
 use intern::Lookup;
 use isograph_lang_types::{
     ClientFieldId, IsographSelectionVariant, LinkedFieldSelection, LoadableDirectiveParameters,
@@ -59,7 +59,7 @@ pub type ValidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
 /// The validated defined field that shows up in the TScalarField generic.
 pub type ValidatedFieldDefinitionLocation = FieldDefinitionLocation<ServerFieldId, ClientFieldId>;
 
-pub type ValidatedSchemaIdField = SchemaIdField<NamedTypeAnnotation<ServerScalarId>>;
+pub type ValidatedSchemaIdField = SchemaIdField<GraphQLNamedTypeAnnotation<ServerScalarId>>;
 
 #[derive(Debug)]
 pub struct ValidatedLinkedFieldAssociatedData {

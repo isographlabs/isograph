@@ -5,7 +5,8 @@ use common_lang_types::{
     WithSpan,
 };
 use graphql_lang_types::{
-    GraphQLTypeAnnotation, ListTypeAnnotation, NamedTypeAnnotation, NonNullTypeAnnotation,
+    GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
+    GraphQLTypeAnnotation,
 };
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
@@ -578,10 +579,12 @@ fn parse_type_annotation(
                 .is_ok();
             if is_non_null {
                 Ok(GraphQLTypeAnnotation::NonNull(Box::new(
-                    NonNullTypeAnnotation::Named(NamedTypeAnnotation(type_)),
+                    GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(type_)),
                 )))
             } else {
-                Ok(GraphQLTypeAnnotation::Named(NamedTypeAnnotation(type_)))
+                Ok(GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
+                    type_,
+                )))
             }
         })?;
 
@@ -601,12 +604,14 @@ fn parse_type_annotation(
 
             if is_non_null {
                 Ok(GraphQLTypeAnnotation::NonNull(Box::new(
-                    NonNullTypeAnnotation::List(ListTypeAnnotation(inner_type_annotation)),
+                    GraphQLNonNullTypeAnnotation::List(GraphQLListTypeAnnotation(
+                        inner_type_annotation,
+                    )),
                 )))
             } else {
-                Ok(GraphQLTypeAnnotation::List(Box::new(ListTypeAnnotation(
-                    inner_type_annotation,
-                ))))
+                Ok(GraphQLTypeAnnotation::List(Box::new(
+                    GraphQLListTypeAnnotation(inner_type_annotation),
+                )))
             }
         })?;
 

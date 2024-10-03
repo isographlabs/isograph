@@ -3,7 +3,7 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::WithSpan;
-use graphql_lang_types::{GraphQLTypeAnnotation, NonNullTypeAnnotation};
+use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
 /// This is annoying! We should find a better way to model lists.
 /// This gets us closer to a good solution, so it's fine.
@@ -41,14 +41,14 @@ impl<TInner: Ord + Copy> TypeAnnotation<WithSpan<TInner>> {
     }
 
     pub fn from_non_null_type_annotation(
-        other: Box<NonNullTypeAnnotation<TInner>>,
+        other: Box<GraphQLNonNullTypeAnnotation<TInner>>,
         null: WithSpan<TInner>,
     ) -> Self {
         match *other {
-            NonNullTypeAnnotation::Named(named_type_annotation) => {
+            GraphQLNonNullTypeAnnotation::Named(named_type_annotation) => {
                 TypeAnnotation::Scalar(named_type_annotation.0)
             }
-            NonNullTypeAnnotation::List(list_type_annotation) => {
+            GraphQLNonNullTypeAnnotation::List(list_type_annotation) => {
                 let inner =
                     TypeAnnotation::from_graphql_type_annotation(list_type_annotation.0, null);
                 TypeAnnotation::Plural(Box::new(inner))
