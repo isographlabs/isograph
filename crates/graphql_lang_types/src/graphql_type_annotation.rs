@@ -118,16 +118,11 @@ impl<TValue> GraphQLNonNullTypeAnnotation<TValue> {
             GraphQLNonNullTypeAnnotation::Named(named) => GraphQLNonNullTypeAnnotation::Named(
                 GraphQLNamedTypeAnnotation(WithSpan::new(f(named.0.item), named.0.span)),
             ),
-            GraphQLNonNullTypeAnnotation::List(list) => {
-                GraphQLNonNullTypeAnnotation::List(list.map(f))
-            }
+            GraphQLNonNullTypeAnnotation::List(list) => GraphQLNonNullTypeAnnotation::List(list.map(f)),
         }
     }
 
-    pub fn and_then<F, TNewValue, E>(
-        self,
-        f: F,
-    ) -> Result<GraphQLNonNullTypeAnnotation<TNewValue>, E>
+    pub fn and_then<F, TNewValue, E>(self, f: F) -> Result<GraphQLNonNullTypeAnnotation<TNewValue>, E>
     where
         F: FnOnce(TValue) -> Result<TNewValue, E>,
     {
@@ -135,9 +130,7 @@ impl<TValue> GraphQLNonNullTypeAnnotation<TValue> {
             GraphQLNonNullTypeAnnotation::Named(named) => GraphQLNonNullTypeAnnotation::Named(
                 GraphQLNamedTypeAnnotation(WithSpan::new(f(named.0.item)?, named.0.span)),
             ),
-            GraphQLNonNullTypeAnnotation::List(list) => {
-                GraphQLNonNullTypeAnnotation::List(list.and_then(f)?)
-            }
+            GraphQLNonNullTypeAnnotation::List(list) => GraphQLNonNullTypeAnnotation::List(list.and_then(f)?),
         })
     }
 }

@@ -14,12 +14,11 @@ use graphql_lang_types::{
     DirectiveLocation, GraphQLConstantValue, GraphQLDirective, GraphQLDirectiveDefinition,
     GraphQLEnumDefinition, GraphQLEnumValueDefinition, GraphQLFieldDefinition,
     GraphQLInputObjectTypeDefinition, GraphQLInputValueDefinition, GraphQLInterfaceTypeDefinition,
-    GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
     GraphQLObjectTypeDefinition, GraphQLObjectTypeExtension, GraphQLScalarTypeDefinition,
     GraphQLSchemaDefinition, GraphQLTypeAnnotation, GraphQLTypeSystemDefinition,
     GraphQLTypeSystemDocument, GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
-    GraphQLTypeSystemExtensionOrDefinition, GraphQLUnionTypeDefinition, NameValuePair,
-    RootOperationKind,
+    GraphQLTypeSystemExtensionOrDefinition, GraphQLUnionTypeDefinition, GraphQLListTypeAnnotation,
+    NameValuePair, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, RootOperationKind,
 };
 
 use crate::ParseResult;
@@ -913,9 +912,7 @@ fn parse_type_annotation<T: From<StringKey>>(
                     GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(type_)),
                 )))
             } else {
-                Ok(GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                    type_,
-                )))
+                Ok(GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(type_)))
             }
         })?;
 
@@ -933,14 +930,12 @@ fn parse_type_annotation<T: From<StringKey>>(
 
             if is_non_null {
                 Ok(GraphQLTypeAnnotation::NonNull(Box::new(
-                    GraphQLNonNullTypeAnnotation::List(GraphQLListTypeAnnotation(
-                        inner_type_annotation,
-                    )),
+                    GraphQLNonNullTypeAnnotation::List(GraphQLListTypeAnnotation(inner_type_annotation)),
                 )))
             } else {
-                Ok(GraphQLTypeAnnotation::List(Box::new(
-                    GraphQLListTypeAnnotation(inner_type_annotation),
-                )))
+                Ok(GraphQLTypeAnnotation::List(Box::new(GraphQLListTypeAnnotation(
+                    inner_type_annotation,
+                ))))
             }
         })?;
 

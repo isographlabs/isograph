@@ -4,7 +4,7 @@ use common_lang_types::{
     FieldArgumentName, IsographObjectTypeName, Location, SelectableFieldName, UnvalidatedTypeName,
     VariableName, WithLocation, WithSpan,
 };
-use graphql_lang_types::{GraphQLNamedTypeAnnotation, GraphQLTypeAnnotation};
+use graphql_lang_types::{GraphQLTypeAnnotation, GraphQLNamedTypeAnnotation};
 use intern::Lookup;
 use isograph_lang_types::{
     ClientFieldId, IsographSelectionVariant, LinkedFieldSelection, LoadableDirectiveParameters,

@@ -3,8 +3,8 @@ use common_lang_types::{
     SelectableFieldName, Span, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
-    GraphQLTypeAnnotation,
+    GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLTypeAnnotation,
+    GraphQLNonNullTypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -609,9 +609,7 @@ fn format_type_for_js_inner(
             format!("ReadonlyArray<{}> | null", format_type_for_js_inner(list.0))
         }
         GraphQLTypeAnnotation::NonNull(non_null) => match *non_null {
-            GraphQLNonNullTypeAnnotation::Named(named_inner_type) => {
-                named_inner_type.0.item.to_string()
-            }
+            GraphQLNonNullTypeAnnotation::Named(named_inner_type) => named_inner_type.0.item.to_string(),
             GraphQLNonNullTypeAnnotation::List(list) => {
                 format!("ReadonlyArray<{}>", format_type_for_js_inner(list.0))
             }
@@ -669,10 +667,7 @@ fn print_list_type_annotation<T: Display>(list: &GraphQLListTypeAnnotation<T>, s
     s.push_str(">");
 }
 
-fn print_non_null_type_annotation<T: Display>(
-    non_null: &GraphQLNonNullTypeAnnotation<T>,
-    s: &mut String,
-) {
+fn print_non_null_type_annotation<T: Display>(non_null: &GraphQLNonNullTypeAnnotation<T>, s: &mut String) {
     match non_null {
         GraphQLNonNullTypeAnnotation::Named(named) => {
             s.push_str(&named.item.to_string());

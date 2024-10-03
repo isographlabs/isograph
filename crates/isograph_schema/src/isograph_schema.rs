@@ -10,8 +10,8 @@ use common_lang_types::{
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition,
-    GraphQLInputObjectTypeDefinition, GraphQLInterfaceTypeDefinition, GraphQLNamedTypeAnnotation,
-    GraphQLObjectTypeDefinition, GraphQLTypeAnnotation,
+    GraphQLInputObjectTypeDefinition, GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition,
+    GraphQLTypeAnnotation, GraphQLNamedTypeAnnotation,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
