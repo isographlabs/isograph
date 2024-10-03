@@ -93,6 +93,11 @@ export function useSkipLimitPagination<
         fragmentReference.readerWithRefetchQueries,
       );
 
+      const firstParameter = {
+        data: readOutDataAndRecords[i].item,
+        parameters: fragmentReference.variables,
+      };
+
       if (
         readerWithRefetchQueries.readerArtifact.kind !== 'EagerReaderArtifact'
       ) {
@@ -101,10 +106,6 @@ export function useSkipLimitPagination<
         );
       }
 
-      const firstParameter = {
-        data: readOutDataAndRecords[i].item,
-        parameters: fragmentReference.variables,
-      };
       return readerWithRefetchQueries.readerArtifact.resolver(firstParameter);
     });
 
