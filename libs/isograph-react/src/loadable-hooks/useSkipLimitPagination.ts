@@ -1,13 +1,4 @@
-import { LoadableField, type ReaderAst } from '../core/reader';
-import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { ItemCleanupPair } from '@isograph/disposable-types';
-import { FragmentReference } from '../core/FragmentReference';
-import { maybeUnwrapNetworkRequest } from '../react/useResult';
-import {
-  readButDoNotEvaluate,
-  type WithEncounteredRecords,
-} from '../core/read';
-import { subscribeToAnyChange } from '../core/cache';
 import {
   UNASSIGNED_STATE,
   useUpdatableDisposableState,
@@ -17,8 +8,14 @@ import {
   ReferenceCountedPointer,
 } from '@isograph/reference-counted-pointer';
 import { useState } from 'react';
+import { subscribeToAnyChange } from '../core/cache';
+import { FragmentReference } from '../core/FragmentReference';
 import { getPromiseState, readPromise } from '../core/PromiseWrapper';
+import { type WithEncounteredRecords } from '../core/read';
+import { LoadableField, type ReaderAst } from '../core/reader';
+import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
+import { maybeUnwrapNetworkRequest } from '../react/useResult';
 
 type SkipOrLimit = 'skip' | 'limit';
 type OmitSkipLimit<TArgs> = keyof Omit<TArgs, SkipOrLimit> extends never
@@ -88,32 +85,22 @@ export function useSkipLimitPagination<
   // TODO move this out of useSkipLimitPagination, and pass environment and networkRequestOptions
   // as parameters (or recreate networkRequestOptions)
   function subscribeCompletedFragmentReferences(
-    completedReferences: ReadonlyArray<
-      ItemCleanupPair<
-        ReferenceCountedPointer<ArrayFragmentReference<TReadFromStore, TItem>>
-      >
-    >,
+    completedReferences: ArrayFragmentReference<TReadFromStore, TItem>[],
   ) {
     // In general, this will not suspend. But it could, if there is missing data.
     // A better version of this hook would not do any reading here.
     const results = completedReferences.map(
       (
-        [pointer],
+        fragmentReference,
         i,
       ): {
-        records: WithEncounteredRecords<TItem>;
-        callback: (updatedRecords: WithEncounteredRecords<TItem>) => void;
-        fragmentReference: FragmentReference<TReadFromStore, TItem>;
+        records: WithEncounteredRecords<TReadFromStore>;
+        callback: (
+          updatedRecords: WithEncounteredRecords<TReadFromStore>,
+        ) => void;
+        fragmentReference: ArrayFragmentReference<TReadFromStore, TItem>;
         readerAst: ReaderAst<TItem>;
       } => {
-        const fragmentReference = pointer.getItemIfNotDisposed();
-        if (fragmentReference == null) {
-          throw new Error(
-            'FragmentReference is unexpectedly disposed. \
-          This is indicative of a bug in Isograph.',
-          );
-        }
-
         maybeUnwrapNetworkRequest(
           fragmentReference.networkRequest,
           networkRequestOptions,
@@ -126,17 +113,11 @@ export function useSkipLimitPagination<
         return {
           fragmentReference,
           readerAst: readerWithRefetchQueries.readerArtifact.readerAst,
-          records: readOutDataAndRecords[i].records,
+          records: readOutDataAndRecords[i],
           callback(data) {
             setReadOutDataAndRecords((current) => {
               const next = [...current];
-              next[i] = {
-                records: data,
-                results: readerWithRefetchQueries.readerArtifact.resolver(
-                  data.item,
-                  undefined,
-                ) as ReadonlyArray<any>,
-              };
+              next[i] = data;
               return next;
             });
           },
@@ -201,7 +182,7 @@ export function useSkipLimitPagination<
   if (mostRecentItem && mostRecentFragmentReference === null) {
     throw new Error(
       'FragmentReference is unexpectedly disposed. \
-        This is indicative of a bug in Isograph.',
+      This is indicative of a bug in Isograph.',
     );
   }
 
@@ -215,14 +196,43 @@ export function useSkipLimitPagination<
       : loadedReferences.slice(0, loadedReferences.length - 1);
 
   const [readOutDataAndRecords, setReadOutDataAndRecords] = useState<
-    {
-      records: WithEncounteredRecords<TItem>;
-      results: ReadonlyArray<any>;
-    }[]
+    WithEncounteredRecords<TReadFromStore>[]
   >([]);
 
-  useSubscribeToMultiple<TItem>(
-    subscribeCompletedFragmentReferences(completedFragmentReferences),
+  const fragmentReferences = completedFragmentReferences.map(([pointer]) => {
+    const fragmentReference = pointer.getItemIfNotDisposed();
+    if (fragmentReference == null) {
+      throw new Error(
+        'FragmentReference is unexpectedly disposed. \
+        This is indicative of a bug in Isograph.',
+      );
+    }
+    return fragmentReference;
+  });
+
+  useSubscribeToMultiple<TReadFromStore>(
+    subscribeCompletedFragmentReferences(fragmentReferences),
+  );
+
+  const results = flatten(
+    fragmentReferences.map((fragmentReference, i) => {
+      const readerWithRefetchQueries = readPromise(
+        fragmentReference.readerWithRefetchQueries,
+      );
+
+      if (
+        readerWithRefetchQueries.readerArtifact.kind !== 'EagerReaderArtifact'
+      ) {
+        throw new Error(
+          `@loadable field of kind "${readerWithRefetchQueries.readerArtifact.kind}" is not supported by useSkipLimitPagination`,
+        );
+      }
+
+      return readerWithRefetchQueries.readerArtifact.resolver({
+        data: readOutDataAndRecords[i].item,
+        parameters: fragmentReference.variables,
+      });
+    }),
   );
 
   if (!networkRequestStatus) {
@@ -235,10 +245,6 @@ export function useSkipLimitPagination<
 
   switch (networkRequestStatus.kind) {
     case 'Pending': {
-      const results = flatten(
-        readOutDataAndRecords.map((data) => data.results),
-      );
-
       const unsubscribe = subscribeToAnyChange(environment, () => {
         unsubscribe();
         rerender({});
@@ -254,9 +260,6 @@ export function useSkipLimitPagination<
       throw networkRequestStatus.error;
     }
     case 'Ok': {
-      const results = flatten(
-        readOutDataAndRecords.map((data) => data.results),
-      );
       return {
         kind: 'Complete',
         results,
