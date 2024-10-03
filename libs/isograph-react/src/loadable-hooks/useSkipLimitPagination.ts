@@ -219,28 +219,30 @@ export function useSkipLimitPagination<
     mostRecentFragmentReference &&
     getPromiseState(mostRecentFragmentReference.networkRequest);
 
-  const completedFragmentReferences =
+  const slicedFragmentReferences =
     networkRequestStatus?.kind === 'Ok'
       ? loadedReferences
       : loadedReferences.slice(0, loadedReferences.length - 1);
+
+  const completedFragmentReferences = slicedFragmentReferences.map(
+    ([pointer]) => {
+      const fragmentReference = pointer.getItemIfNotDisposed();
+      if (fragmentReference == null) {
+        throw new Error(
+          'FragmentReference is unexpectedly disposed. \
+            This is indicative of a bug in Isograph.',
+        );
+      }
+      return fragmentReference;
+    },
+  );
 
   const [readOutDataAndRecords, setReadOutDataAndRecords] = useState<
     WithEncounteredRecords<TReadFromStore>[]
   >([]);
 
-  const fragmentReferences = completedFragmentReferences.map(([pointer]) => {
-    const fragmentReference = pointer.getItemIfNotDisposed();
-    if (fragmentReference == null) {
-      throw new Error(
-        'FragmentReference is unexpectedly disposed. \
-        This is indicative of a bug in Isograph.',
-      );
-    }
-    return fragmentReference;
-  });
-
   useSubscribeToMultiple<TReadFromStore>(
-    subscribeCompletedFragmentReferences(fragmentReferences),
+    subscribeCompletedFragmentReferences(completedFragmentReferences),
   );
 
   if (!networkRequestStatus) {
@@ -261,14 +263,16 @@ export function useSkipLimitPagination<
       return {
         kind: 'Pending',
         pendingFragment: mostRecentFragmentReference,
-        results: readCompletedFragmentReferences(fragmentReferences),
+        results: readCompletedFragmentReferences(completedFragmentReferences),
       };
     }
     case 'Err': {
       throw networkRequestStatus.error;
     }
     case 'Ok': {
-      const results = readCompletedFragmentReferences(fragmentReferences);
+      const results = readCompletedFragmentReferences(
+        completedFragmentReferences,
+      );
       return {
         kind: 'Complete',
         results,
