@@ -60,7 +60,7 @@ impl<T> WithDuration<T> {
 pub fn compile_and_print(config: &CompilerConfig) -> Result<CompilationStats, BatchCompileError> {
     eprintln!("{}", "Starting to compile.".cyan());
 
-    let result = handle_compile_command(config);
+    let result = WithDuration::new(|| handle_compile_command(config));
     let elapsed_time = result.elapsed_time;
 
     match result.item {
@@ -92,89 +92,86 @@ pub fn compile_and_print(config: &CompilerConfig) -> Result<CompilationStats, Ba
 
 pub(crate) fn handle_compile_command(
     config: &CompilerConfig,
-) -> WithDuration<Result<CompilationStats, BatchCompileError>> {
-    WithDuration::new(|| {
-        let type_system_document = read_and_parse_graphql_schema(config)?;
+) -> Result<CompilationStats, BatchCompileError> {
+    let type_system_document = read_and_parse_graphql_schema(config)?;
 
-        let type_extension_documents = read_and_parse_graphql_schema_extension(config)?;
+    let type_extension_documents = read_and_parse_graphql_schema_extension(config)?;
 
-        let mut schema = UnvalidatedSchema::new();
+    let mut schema = UnvalidatedSchema::new();
 
-        let original_outcome =
-            schema.process_graphql_type_system_document(type_system_document, config.options)?;
+    let original_outcome =
+        schema.process_graphql_type_system_document(type_system_document, config.options)?;
 
-        // TODO validate here! We should not allow a situation in which a base schema is invalid,
-        // but is made valid by the presence of schema extensions.
+    // TODO validate here! We should not allow a situation in which a base schema is invalid,
+    // but is made valid by the presence of schema extensions.
 
-        for extension_document in type_extension_documents {
-            let _extension_outcome = schema
-                .process_graphql_type_extension_document(extension_document, config.options)?;
-            // TODO extend the process_graphql_outcome.type_refinement_map and the one
-            // from the extensions? Does that even make sense?
-            // TODO validate that we didn't define any new root types (as they are ignored)
-        }
+    for extension_document in type_extension_documents {
+        let _extension_outcome =
+            schema.process_graphql_type_extension_document(extension_document, config.options)?;
+        // TODO extend the process_graphql_outcome.type_refinement_map and the one
+        // from the extensions? Does that even make sense?
+        // TODO validate that we didn't define any new root types (as they are ignored)
+    }
 
-        // TODO the (simplified?) validation pipeline should be:
-        //
-        // Validation state: fully unvalidated
-        // - process schema and validate
-        // - process schema extension and validate
-        // Validation state: all types have been defined
-        // - add mutation, refetch fields, etc. and fields to subtypes
-        // - and client fields defined in iso field literals, but don't validate
-        // Validation state: all fields have been defined
-        // - validate fields with selection sets
-        // Validation state: fully validated
+    // TODO the (simplified?) validation pipeline should be:
+    //
+    // Validation state: fully unvalidated
+    // - process schema and validate
+    // - process schema extension and validate
+    // Validation state: all types have been defined
+    // - add mutation, refetch fields, etc. and fields to subtypes
+    // - and client fields defined in iso field literals, but don't validate
+    // Validation state: all fields have been defined
+    // - validate fields with selection sets
+    // Validation state: fully validated
 
-        let fetchable_types: Vec<_> = schema.fetchable_types.keys().copied().collect();
-        for fetchable_object_id in fetchable_types.into_iter() {
-            schema.add_exposed_fields_to_parent_object_types(fetchable_object_id)?;
-        }
+    let fetchable_types: Vec<_> = schema.fetchable_types.keys().copied().collect();
+    for fetchable_object_id in fetchable_types.into_iter() {
+        schema.add_exposed_fields_to_parent_object_types(fetchable_object_id)?;
+    }
 
-        let canonicalized_root_path = get_canonicalized_root_path(config)?;
+    let canonicalized_root_path = get_canonicalized_root_path(config)?;
 
-        // TODO return an iterator
-        let project_files = read_files_in_folder(&canonicalized_root_path)?;
+    // TODO return an iterator
+    let project_files = read_files_in_folder(&canonicalized_root_path)?;
 
-        let (client_field_declarations, parsed_entrypoints) =
-            extract_iso_literals(project_files, canonicalized_root_path)
-                .map_err(BatchCompileError::from)?;
-        let client_field_count = client_field_declarations.len();
-        let entrypoint_count = parsed_entrypoints.len();
+    let (client_field_declarations, parsed_entrypoints) =
+        extract_iso_literals(project_files, canonicalized_root_path)
+            .map_err(BatchCompileError::from)?;
+    let client_field_count = client_field_declarations.len();
+    let entrypoint_count = parsed_entrypoints.len();
 
-        let client_field_declarations =
-            validate_isograph_field_directives(client_field_declarations)?;
+    let client_field_declarations = validate_isograph_field_directives(client_field_declarations)?;
 
-        process_client_fields_and_entrypoints(
-            &mut schema,
-            client_field_declarations,
-            parsed_entrypoints,
-        )?;
+    process_client_fields_and_entrypoints(
+        &mut schema,
+        client_field_declarations,
+        parsed_entrypoints,
+    )?;
 
-        schema.add_fields_to_subtypes(
-            &original_outcome
-                .type_refinement_maps
-                .supertype_to_subtype_map,
-        )?;
+    schema.add_fields_to_subtypes(
+        &original_outcome
+            .type_refinement_maps
+            .supertype_to_subtype_map,
+    )?;
 
-        add_refetch_fields_to_objects(&mut schema)?;
+    add_refetch_fields_to_objects(&mut schema)?;
 
-        let validated_schema = Schema::validate_and_construct(schema)?;
+    let validated_schema = Schema::validate_and_construct(schema)?;
 
-        let paths_and_content = get_artifact_path_and_content(
-            &validated_schema,
-            &config.project_root,
-            &config.artifact_directory,
-        );
+    let paths_and_content = get_artifact_path_and_content(
+        &validated_schema,
+        &config.project_root,
+        &config.artifact_directory,
+    );
 
-        let total_artifacts_written =
-            write_to_disk(paths_and_content.into_iter(), &config.artifact_directory)?;
+    let total_artifacts_written =
+        write_to_disk(paths_and_content.into_iter(), &config.artifact_directory)?;
 
-        Ok(CompilationStats {
-            client_field_count,
-            entrypoint_count,
-            total_artifacts_written,
-        })
+    Ok(CompilationStats {
+        client_field_count,
+        entrypoint_count,
+        total_artifacts_written,
     })
 }
 
