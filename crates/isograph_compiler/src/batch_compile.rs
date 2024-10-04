@@ -131,11 +131,11 @@ pub fn compile_and_print(config: &CompilerConfig) -> Result<CompilationStats, Ba
 pub(crate) fn handle_compile_command(
     config: &CompilerConfig,
 ) -> Result<CompilationStats, BatchCompileError> {
-    let mut schema = UnvalidatedSchema::new();
+    let mut unvalidated_schema = UnvalidatedSchema::new();
 
-    let original_outcome = process_graphql_schema_and_extensions(config, &mut schema)?;
+    let original_outcome = process_graphql_schema_and_extensions(config, &mut unvalidated_schema)?;
 
-    process_exposed_fields(&mut schema)?;
+    process_exposed_fields(&mut unvalidated_schema)?;
 
     let (client_field_declarations, entrypoint_declarations) =
         read_project_files_and_extract_iso_literals(config)?;
@@ -143,18 +143,18 @@ pub(crate) fn handle_compile_command(
     let client_field_count = client_field_declarations.len();
     let entrypoint_count = entrypoint_declarations.len();
 
-    add_client_fields_to_schema(&mut schema, client_field_declarations)?;
-    add_entrypoints_to_schema(&mut schema, entrypoint_declarations);
+    add_client_fields_to_schema(&mut unvalidated_schema, client_field_declarations)?;
+    add_entrypoints_to_schema(&mut unvalidated_schema, entrypoint_declarations);
 
-    schema.add_fields_to_subtypes(
+    unvalidated_schema.add_fields_to_subtypes(
         &original_outcome
             .type_refinement_maps
             .supertype_to_subtype_map,
     )?;
 
-    add_refetch_fields_to_objects(&mut schema)?;
+    add_refetch_fields_to_objects(&mut unvalidated_schema)?;
 
-    let validated_schema = Schema::validate_and_construct(schema)?;
+    let validated_schema = Schema::validate_and_construct(unvalidated_schema)?;
 
     // Note: we calculate all of the artifact paths and contents first, so that writing to
     // disk can be as fast as possible and we minimize the chance that changes to the file
@@ -199,7 +199,9 @@ fn read_project_files_and_extract_iso_literals(
     Ok((client_field_declarations, parsed_entrypoints))
 }
 
-/// Here, we are processing
+/// Here, we are processing exposeAs fields. Note that we only process these
+/// directives on root objects (Query, Mutation, Subscription) and we should
+/// validate that no other types have exposeAs directives.
 fn process_exposed_fields(
     schema: &mut Schema<isograph_schema::UnvalidatedSchemaState>,
 ) -> Result<(), BatchCompileError> {
@@ -282,13 +284,13 @@ fn read_and_parse_graphql_schema(
 
 fn add_client_fields_to_schema(
     schema: &mut UnvalidatedSchema,
-    client_fields: Vec<(
+    client_field_declarations: Vec<(
         WithSpan<ClientFieldDeclarationWithValidatedDirectives>,
         TextSource,
     )>,
 ) -> Result<(), Vec<WithLocation<ProcessClientFieldDeclarationError>>> {
     let mut errors = vec![];
-    for (client_field_declaration, text_source) in client_fields {
+    for (client_field_declaration, text_source) in client_field_declarations {
         if let Err(e) =
             schema.process_client_field_declaration(client_field_declaration, text_source)
         {
