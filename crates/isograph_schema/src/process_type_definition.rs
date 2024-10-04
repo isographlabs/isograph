@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{hash_map::Entry, BTreeMap, HashMap};
 
 use crate::{
     EncounteredRootTypes, FieldDefinitionLocation, IsographObjectTypeDefinition,
@@ -608,8 +608,8 @@ fn get_typename_type(
 
 struct FieldObjectIdsEtc {
     unvalidated_schema_fields: Vec<UnvalidatedSchemaSchemaField>,
-    // TODO this should be HashMap<_, WithLocation<_>> or something
-    encountered_fields: HashMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
+    // TODO this should be BTreeMap<_, WithLocation<_>> or something
+    encountered_fields: BTreeMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
     // TODO this should not be a ServerFieldId, but a special type
     id_field: Option<ServerStrongIdFieldId>,
 }
@@ -627,7 +627,7 @@ fn get_field_objects_ids_and_names(
     options: ConfigOptions,
 ) -> ProcessTypeDefinitionResult<FieldObjectIdsEtc> {
     let new_field_count = new_fields.len();
-    let mut encountered_fields = HashMap::with_capacity(new_field_count);
+    let mut encountered_fields = BTreeMap::new();
     let mut unvalidated_fields = Vec::with_capacity(new_field_count);
     let mut server_field_ids = Vec::with_capacity(new_field_count + 1); // +1 for the typename
     let mut id_field = None;
