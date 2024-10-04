@@ -1,4 +1,4 @@
-import { LoadableField } from '../core/reader';
+import { LoadableField, type ReaderAst } from '../core/reader';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { ItemCleanupPair } from '@isograph/disposable-types';
 import { FragmentReference } from '../core/FragmentReference';
@@ -15,6 +15,8 @@ import {
   ReferenceCountedPointer,
 } from '@isograph/reference-counted-pointer';
 import { getPromiseState, readPromise } from '../core/PromiseWrapper';
+import { type WithEncounteredRecords } from '../core/read';
+import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 
 type SkipOrLimit = 'skip' | 'limit';
 type OmitSkipLimit<TArgs> = keyof Omit<TArgs, SkipOrLimit> extends never
@@ -41,10 +43,13 @@ type ArrayFragmentReference<
 type LoadedFragmentReferences<
   TReadFromStore extends Object,
   TItem,
-> = ReadonlyArray<
-  ItemCleanupPair<
-    ReferenceCountedPointer<ArrayFragmentReference<TReadFromStore, TItem>>
-  >
+> = ReadonlyArray<LoadedFragmentReference<TReadFromStore, TItem>>;
+
+type LoadedFragmentReference<
+  TReadFromStore extends Object,
+  TItem,
+> = ItemCleanupPair<
+  ReferenceCountedPointer<ArrayFragmentReference<TReadFromStore, TItem>>
 >;
 
 function flatten<T>(arr: ReadonlyArray<ReadonlyArray<T>>): ReadonlyArray<T> {
@@ -57,11 +62,6 @@ function flatten<T>(arr: ReadonlyArray<ReadonlyArray<T>>): ReadonlyArray<T> {
   return outArray;
 }
 
-/**
- * NOTE: this hook does not subscribe to changes. This is a known
- * issue. If you are running into this issue, reach out on GitHub/
- * Twitter, and we'll fix the issue.
- */
 export function useSkipLimitPagination<
   TArgs extends {
     skip: number | void | null;
@@ -86,39 +86,15 @@ export function useSkipLimitPagination<
   // TODO move this out of useSkipLimitPagination, and pass environment and networkRequestOptions
   // as parameters (or recreate networkRequestOptions)
   function readCompletedFragmentReferences(
-    completedReferences: ReadonlyArray<
-      ItemCleanupPair<
-        ReferenceCountedPointer<ArrayFragmentReference<TReadFromStore, TItem>>
-      >
-    >,
+    completedReferences: ArrayFragmentReference<TReadFromStore, TItem>[],
   ) {
-    // In general, this will not suspend. But it could, if there is missing data.
-    // A better version of this hook would not do any reading here.
-    const results = completedReferences.map(([pointer]) => {
-      const fragmentReference = pointer.getItemIfNotDisposed();
-      if (fragmentReference == null) {
-        throw new Error(
-          'FragmentReference is unexpectedly disposed. \
-          This is indicative of a bug in Isograph.',
-        );
-      }
-
-      maybeUnwrapNetworkRequest(
-        fragmentReference.networkRequest,
-        networkRequestOptions,
-      );
-      const data = readButDoNotEvaluate(
-        environment,
-        fragmentReference,
-        networkRequestOptions,
-      );
-
+    const results = completedReferences.map((fragmentReference, i) => {
       const readerWithRefetchQueries = readPromise(
         fragmentReference.readerWithRefetchQueries,
       );
 
       const firstParameter = {
-        data: data.item,
+        data: readOutDataAndRecords[i].item,
         parameters: fragmentReference.variables,
       };
 
@@ -135,6 +111,42 @@ export function useSkipLimitPagination<
 
     const items = flatten(results);
     return items;
+  }
+
+  function subscribeCompletedFragmentReferences(
+    completedReferences: ArrayFragmentReference<TReadFromStore, TItem>[],
+  ) {
+    return completedReferences.map(
+      (
+        fragmentReference,
+        i,
+      ): {
+        records: WithEncounteredRecords<TReadFromStore>;
+        callback: (
+          updatedRecords: WithEncounteredRecords<TReadFromStore>,
+        ) => void;
+        fragmentReference: ArrayFragmentReference<TReadFromStore, TItem>;
+        readerAst: ReaderAst<TItem>;
+      } => {
+        maybeUnwrapNetworkRequest(
+          fragmentReference.networkRequest,
+          networkRequestOptions,
+        );
+
+        const readerWithRefetchQueries = readPromise(
+          fragmentReference.readerWithRefetchQueries,
+        );
+
+        return {
+          fragmentReference,
+          readerAst: readerWithRefetchQueries.readerArtifact.readerAst,
+          records: readOutDataAndRecords[i],
+          callback(_data) {
+            rerender({});
+          },
+        };
+      },
+    );
   }
 
   const getFetchMore =
@@ -182,7 +194,55 @@ export function useSkipLimitPagination<
   const [, rerender] = useState({});
 
   const loadedReferences = state === UNASSIGNED_STATE ? [] : state;
-  if (loadedReferences.length === 0) {
+
+  const mostRecentItem: LoadedFragmentReference<TReadFromStore, TItem> | null =
+    loadedReferences[loadedReferences.length - 1];
+  const mostRecentFragmentReference =
+    mostRecentItem?.[0].getItemIfNotDisposed();
+
+  if (mostRecentItem && mostRecentFragmentReference === null) {
+    throw new Error(
+      'FragmentReference is unexpectedly disposed. \
+      This is indicative of a bug in Isograph.',
+    );
+  }
+
+  const networkRequestStatus =
+    mostRecentFragmentReference &&
+    getPromiseState(mostRecentFragmentReference.networkRequest);
+
+  const slicedFragmentReferences =
+    networkRequestStatus?.kind === 'Ok'
+      ? loadedReferences
+      : loadedReferences.slice(0, loadedReferences.length - 1);
+
+  const completedFragmentReferences = slicedFragmentReferences.map(
+    ([pointer]) => {
+      const fragmentReference = pointer.getItemIfNotDisposed();
+      if (fragmentReference == null) {
+        throw new Error(
+          'FragmentReference is unexpectedly disposed. \
+            This is indicative of a bug in Isograph.',
+        );
+      }
+      return fragmentReference;
+    },
+  );
+
+  const readOutDataAndRecords = completedFragmentReferences.map(
+    (fragmentReference) =>
+      readButDoNotEvaluate(
+        environment,
+        fragmentReference,
+        networkRequestOptions,
+      ),
+  );
+
+  useSubscribeToMultiple<TReadFromStore>(
+    subscribeCompletedFragmentReferences(completedFragmentReferences),
+  );
+
+  if (!networkRequestStatus) {
     return {
       kind: 'Complete',
       fetchMore: getFetchMore(0),
@@ -190,25 +250,8 @@ export function useSkipLimitPagination<
     };
   }
 
-  const mostRecentItem = loadedReferences[loadedReferences.length - 1];
-  const mostRecentFragmentReference = mostRecentItem[0].getItemIfNotDisposed();
-  if (mostRecentFragmentReference === null) {
-    throw new Error(
-      'FragmentReference is unexpectedly disposed. \
-      This is indicative of a bug in Isograph.',
-    );
-  }
-
-  const networkRequestStatus = getPromiseState(
-    mostRecentFragmentReference.networkRequest,
-  );
   switch (networkRequestStatus.kind) {
     case 'Pending': {
-      const completedFragmentReferences = loadedReferences.slice(
-        0,
-        loadedReferences.length - 1,
-      );
-
       const unsubscribe = subscribeToAnyChange(environment, () => {
         unsubscribe();
         rerender({});
@@ -224,7 +267,9 @@ export function useSkipLimitPagination<
       throw networkRequestStatus.error;
     }
     case 'Ok': {
-      const results = readCompletedFragmentReferences(loadedReferences);
+      const results = readCompletedFragmentReferences(
+        completedFragmentReferences,
+      );
       return {
         kind: 'Complete',
         results,
