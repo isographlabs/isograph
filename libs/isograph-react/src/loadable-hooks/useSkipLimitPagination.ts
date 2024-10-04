@@ -116,9 +116,7 @@ export function useSkipLimitPagination<
   function subscribeCompletedFragmentReferences(
     completedReferences: ArrayFragmentReference<TReadFromStore, TItem>[],
   ) {
-    // In general, this will not suspend. But it could, if there is missing data.
-    // A better version of this hook would not do any reading here.
-    const results = completedReferences.map(
+    return completedReferences.map(
       (
         fragmentReference,
         i,
@@ -143,18 +141,12 @@ export function useSkipLimitPagination<
           fragmentReference,
           readerAst: readerWithRefetchQueries.readerArtifact.readerAst,
           records: readOutDataAndRecords[i],
-          callback(data) {
-            setReadOutDataAndRecords((current) => {
-              const next = [...current];
-              next[i] = data;
-              return next;
-            });
+          callback(_data) {
+            rerender({});
           },
         };
       },
     );
-
-    return results;
   }
 
   const getFetchMore =
@@ -237,9 +229,14 @@ export function useSkipLimitPagination<
     },
   );
 
-  const [readOutDataAndRecords, setReadOutDataAndRecords] = useState<
-    WithEncounteredRecords<TReadFromStore>[]
-  >([]);
+  const readOutDataAndRecords = completedFragmentReferences.map(
+    (fragmentReference) =>
+      readButDoNotEvaluate(
+        environment,
+        fragmentReference,
+        networkRequestOptions,
+      ),
+  );
 
   useSubscribeToMultiple<TReadFromStore>(
     subscribeCompletedFragmentReferences(completedFragmentReferences),
