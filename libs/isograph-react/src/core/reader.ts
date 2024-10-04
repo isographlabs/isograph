@@ -14,7 +14,7 @@ import {
 import { Arguments } from './util';
 
 export type TopLevelReaderArtifact<
-  TReadFromStore extends Object,
+  TReadFromStore extends object,
   TClientFieldValue,
   TComponentProps extends Record<string, never>,
   TVariables = Variables,
@@ -23,7 +23,7 @@ export type TopLevelReaderArtifact<
   | ComponentReaderArtifact<TReadFromStore, TComponentProps, TVariables>;
 
 export type EagerReaderArtifact<
-  TReadFromStore extends Object,
+  TReadFromStore extends object,
   TClientFieldValue,
   TVariables = Variables,
 > = {
@@ -35,7 +35,7 @@ export type EagerReaderArtifact<
 };
 
 export type ComponentReaderArtifact<
-  TReadFromStore extends Object,
+  TReadFromStore extends object,
   TComponentProps extends Record<string, unknown> = Record<string, never>,
   TVariables = Variables,
 > = {
@@ -49,7 +49,7 @@ export type ComponentReaderArtifact<
 };
 
 export type ResolverFirstParameter<
-  TReadFromStore extends Object,
+  TReadFromStore extends object,
   TVariables = Variables,
 > = {
   readonly data: TReadFromStore;

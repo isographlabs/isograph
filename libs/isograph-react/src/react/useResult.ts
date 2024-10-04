@@ -12,7 +12,7 @@ import {
   readPromise,
 } from '../core/PromiseWrapper';
 
-export function useResult<TReadFromStore extends Object, TClientFieldValue>(
+export function useResult<TReadFromStore extends object, TClientFieldValue>(
   fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>,
   partialNetworkRequestOptions?: Partial<NetworkRequestReaderOptions> | void,
 ): TClientFieldValue {

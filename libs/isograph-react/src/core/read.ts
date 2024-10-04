@@ -29,7 +29,7 @@ export type WithEncounteredRecords<T> = {
   readonly item: T;
 };
 
-export function readButDoNotEvaluate<TReadFromStore extends Object>(
+export function readButDoNotEvaluate<TReadFromStore extends object>(
   environment: IsographEnvironment,
   fragmentReference: FragmentReference<TReadFromStore, unknown>,
   networkRequestOptions: NetworkRequestReaderOptions,

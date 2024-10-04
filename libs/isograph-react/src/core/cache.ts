@@ -32,7 +32,7 @@ import { wrapResolvedValue } from './PromiseWrapper';
 const TYPENAME_FIELD_NAME = '__typename';
 
 export function getOrCreateItemInSuspenseCache<
-  TReadFromStore extends Object,
+  TReadFromStore extends object,
   TClientFieldValue,
 >(
   environment: IsographEnvironment,
@@ -77,7 +77,7 @@ export function stableCopy<T>(value: T): T {
 }
 
 export function getOrCreateCacheForArtifact<
-  TReadFromStore extends Object,
+  TReadFromStore extends object,
   TClientFieldValue,
 >(
   environment: IsographEnvironment,
@@ -180,7 +180,7 @@ export function subscribeToAnyChange(
 }
 
 // TODO we should re-read and call callback if the value has changed
-export function subscribe<TReadFromStore extends Object>(
+export function subscribe<TReadFromStore extends object>(
   environment: IsographEnvironment,
   encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
   fragmentReference: FragmentReference<TReadFromStore, any>,

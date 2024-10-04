@@ -36,17 +36,17 @@ type UseSkipLimitReturnValue<TArgs, TItem> =
     };
 
 type ArrayFragmentReference<
-  TReadFromStore extends Object,
+  TReadFromStore extends object,
   TItem,
 > = FragmentReference<TReadFromStore, ReadonlyArray<TItem>>;
 
 type LoadedFragmentReferences<
-  TReadFromStore extends Object,
+  TReadFromStore extends object,
   TItem,
 > = ReadonlyArray<LoadedFragmentReference<TReadFromStore, TItem>>;
 
 type LoadedFragmentReference<
-  TReadFromStore extends Object,
+  TReadFromStore extends object,
   TItem,
 > = ItemCleanupPair<
   ReferenceCountedPointer<ArrayFragmentReference<TReadFromStore, TItem>>
@@ -68,7 +68,7 @@ export function useSkipLimitPagination<
     limit: number | void | null;
   },
   TItem,
-  TReadFromStore extends Object,
+  TReadFromStore extends object,
 >(
   loadableField: LoadableField<TArgs, ReadonlyArray<TItem>>,
 ): UseSkipLimitReturnValue<TArgs, TItem> {

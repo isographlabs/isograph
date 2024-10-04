@@ -10,7 +10,7 @@ import entrypoint_Query__nodeField from '../__isograph/Query/nodeField/entrypoin
 // This means that the type of the exported iso literal is exactly
 // the type of the passed-in function, which takes one parameter
 // of type TParam.
-type IdentityWithParam<TParam extends Object> = <TClientFieldReturn, TVariables = Variables>(
+type IdentityWithParam<TParam extends object> = <TClientFieldReturn, TVariables = Variables>(
   clientField: (param: TParam) => TClientFieldReturn
 ) => (param: ResolverFirstParameter<TParam, TVariables>) => TClientFieldReturn;
 
@@ -21,7 +21,7 @@ type IdentityWithParam<TParam extends Object> = <TClientFieldReturn, TVariables 
 //
 // TComponentProps becomes the types of the props you must pass
 // whenever the @component field is rendered.
-type IdentityWithParamComponent<TParam extends Object> = <
+type IdentityWithParamComponent<TParam extends object> = <
   TClientFieldReturn,
   TComponentProps = Record<string, never>,
   TVariables = Variables

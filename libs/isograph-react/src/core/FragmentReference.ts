@@ -8,7 +8,7 @@ export type VariableValue = string | number | boolean | null | object;
 export type Variables = { readonly [index: string]: VariableValue };
 
 export type FragmentReference<
-  TReadFromStore extends Object,
+  TReadFromStore extends object,
   TClientFieldValue,
 > = {
   readonly kind: 'FragmentReference';

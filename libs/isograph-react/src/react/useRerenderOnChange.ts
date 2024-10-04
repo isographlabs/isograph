@@ -7,7 +7,7 @@ import type { ReaderAst } from '../core/reader';
 
 // TODO add unit tests for this. Add integration tests that test
 // behavior when the encounteredRecords underneath a fragment change.
-export function useRerenderOnChange<TReadFromStore extends Object>(
+export function useRerenderOnChange<TReadFromStore extends object>(
   encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
   fragmentReference: FragmentReference<any, any>,
   setEncounteredDataAndRecords: (

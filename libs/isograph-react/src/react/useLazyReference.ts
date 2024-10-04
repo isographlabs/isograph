@@ -5,7 +5,7 @@ import { getOrCreateCacheForArtifact } from '../core/cache';
 import { useLazyDisposableState } from '@isograph/react-disposable-state';
 
 export function useLazyReference<
-  TReadFromStore extends Object,
+  TReadFromStore extends object,
   TClientFieldValue,
 >(
   entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,

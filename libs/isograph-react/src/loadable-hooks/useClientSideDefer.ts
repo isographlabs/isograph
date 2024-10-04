@@ -8,12 +8,12 @@ export function useClientSideDefer<TResult>(
   loadableField: LoadableField<void, TResult>,
 ): { fragmentReference: FragmentReference<Record<string, never>, TResult> };
 
-export function useClientSideDefer<TArgs extends Object, TResult>(
+export function useClientSideDefer<TArgs extends object, TResult>(
   loadableField: LoadableField<TArgs, TResult>,
   args: TArgs,
 ): { fragmentReference: FragmentReference<TArgs, TResult> };
 
-export function useClientSideDefer<TArgs extends Object, TResult>(
+export function useClientSideDefer<TArgs extends object, TResult>(
   loadableField: LoadableField<TArgs, TResult>,
   args?: TArgs,
 ): { fragmentReference: FragmentReference<TArgs, TResult> } {
