@@ -1,8 +1,4 @@
-use std::{
-    path::PathBuf,
-    str::Utf8Error,
-    time::{Duration, Instant},
-};
+use std::{path::PathBuf, str::Utf8Error};
 
 use colored::Colorize;
 use common_lang_types::{
@@ -21,7 +17,8 @@ use isograph_lang_types::{
     EntrypointTypeAndField,
 };
 use isograph_schema::{
-    ProcessClientFieldDeclarationError, Schema, UnvalidatedSchema, ValidateSchemaError,
+    ProcessClientFieldDeclarationError, ProcessGraphQLDocumentOutcome, Schema, UnvalidatedSchema,
+    ValidateSchemaError,
 };
 use pretty_duration::pretty_duration;
 use thiserror::Error;
@@ -33,28 +30,14 @@ use crate::{
     },
     refetch_fields::add_refetch_fields_to_objects,
     schema::read_schema_file,
-    write_artifacts::{write_to_disk, GenerateArtifactsError},
+    with_duration::WithDuration,
+    write_artifacts::{write_artifacts_to_disk, GenerateArtifactsError},
 };
 
 pub struct CompilationStats {
     pub client_field_count: usize,
     pub entrypoint_count: usize,
     pub total_artifacts_written: usize,
-}
-pub struct WithDuration<T> {
-    pub elapsed_time: Duration,
-    pub item: T,
-}
-
-impl<T> WithDuration<T> {
-    pub fn new(calculate: impl FnOnce() -> T) -> WithDuration<T> {
-        let start = Instant::now();
-        let item = calculate();
-        WithDuration {
-            elapsed_time: start.elapsed(),
-            item,
-        }
-    }
 }
 
 pub fn compile_and_print(config: &CompilerConfig) -> Result<CompilationStats, BatchCompileError> {
@@ -90,64 +73,78 @@ pub fn compile_and_print(config: &CompilerConfig) -> Result<CompilationStats, Ba
     }
 }
 
+/// This the "workhorse" command of batch compilation. It is currently run in a loop
+/// in watch mode.
+///
+/// ## Overall plan
+///
+/// When the compiler runs in batch mode, we must do the following things. This
+/// description is a bit simplified.
+///
+/// - Read and parse things:
+///   - Read and parse the GraphQL schema
+///   - Read and parse the Isograph literals
+/// - Combine everything into an UnvalidatedSchema.
+/// - Turn the UnvalidatedSchema into a ValidatedSchema
+///   - Note: at this point, we do most of the validations, like ensuring that
+///     all selected fields exist and are of the correct types, parameters are
+///     passed when needed, etc.
+/// - Generate an in-memory representation of all of the generated files
+///   (called artifacts). This step should not fail. It should panic if any
+///   invariant is violated, or represent that invariant in the type system.
+/// - Delete and recreate the artifacts on disk.
+///
+/// ## Additional things we do
+///
+/// In addition to the things we do above, we also do some specific things like:
+///
+/// - if a client field is defined on an interface, add it to each concrete
+///   type. So, if User implements Actor, you can define Actor.NameDisplay, and
+///   select User.NameDisplay
+/// - create fields from exposeAs directives
+///
+/// These are less "core" to the overall mission, and thus invite the question
+/// of whether they belong in this function, or at all.
+///
+/// ## Sequentially written vs Salsa architecture
+///
+/// Isograph is currently written in a fairly sequential fashion, e.g.:
+///
+/// ```rust
+/// let result_1 = step_1()?;
+/// let result_2 = step_2()?;
+/// step_3(result_1, result_2)?;
+/// ```
+///
+/// Where each step is completed before the next one starts. This has advantages:
+/// namely, it is easy to read. But, we most likely want to report all the errors
+/// we can (i.e. from both step_1 and step_2), rather than just the first error
+/// encountered (i.e. just step_1).
+///
+/// In the long term, we want to describe everything as a tree, e.g.
+/// `step_3 -> [step_1, step_2]`, and this will "naturally" parallelize everything.
+/// This is also necessary to adopt a Rust Analyzer-like (Salsa) architecture, which is
+/// important for language server performance. In a Salsa architecture, we invalidate
+/// leaves (e.g. a given file changed), and invalidate everything that depends on that
+/// leaf. Then, when we need a result (e.g. the errors to show on a given file), we
+/// re-evaluate (or re-use the cached value) of everything from that result on down.
 pub(crate) fn handle_compile_command(
     config: &CompilerConfig,
 ) -> Result<CompilationStats, BatchCompileError> {
-    let type_system_document = read_and_parse_graphql_schema(config)?;
-
-    let type_extension_documents = read_and_parse_graphql_schema_extension(config)?;
-
     let mut schema = UnvalidatedSchema::new();
 
-    let original_outcome =
-        schema.process_graphql_type_system_document(type_system_document, config.options)?;
+    let original_outcome = process_graphql_schema_and_extensions(config, &mut schema)?;
 
-    // TODO validate here! We should not allow a situation in which a base schema is invalid,
-    // but is made valid by the presence of schema extensions.
+    process_exposed_fields(&mut schema)?;
 
-    for extension_document in type_extension_documents {
-        let _extension_outcome =
-            schema.process_graphql_type_extension_document(extension_document, config.options)?;
-        // TODO extend the process_graphql_outcome.type_refinement_map and the one
-        // from the extensions? Does that even make sense?
-        // TODO validate that we didn't define any new root types (as they are ignored)
-    }
+    let (client_field_declarations, entrypoint_declarations) =
+        read_project_files_and_extract_iso_literals(config)?;
 
-    // TODO the (simplified?) validation pipeline should be:
-    //
-    // Validation state: fully unvalidated
-    // - process schema and validate
-    // - process schema extension and validate
-    // Validation state: all types have been defined
-    // - add mutation, refetch fields, etc. and fields to subtypes
-    // - and client fields defined in iso field literals, but don't validate
-    // Validation state: all fields have been defined
-    // - validate fields with selection sets
-    // Validation state: fully validated
-
-    let fetchable_types: Vec<_> = schema.fetchable_types.keys().copied().collect();
-    for fetchable_object_id in fetchable_types.into_iter() {
-        schema.add_exposed_fields_to_parent_object_types(fetchable_object_id)?;
-    }
-
-    let canonicalized_root_path = get_canonicalized_root_path(config)?;
-
-    // TODO return an iterator
-    let project_files = read_files_in_folder(&canonicalized_root_path)?;
-
-    let (client_field_declarations, parsed_entrypoints) =
-        extract_iso_literals(project_files, canonicalized_root_path)
-            .map_err(BatchCompileError::from)?;
     let client_field_count = client_field_declarations.len();
-    let entrypoint_count = parsed_entrypoints.len();
+    let entrypoint_count = entrypoint_declarations.len();
 
-    let client_field_declarations = validate_isograph_field_directives(client_field_declarations)?;
-
-    process_client_fields_and_entrypoints(
-        &mut schema,
-        client_field_declarations,
-        parsed_entrypoints,
-    )?;
+    add_client_fields_to_schema(&mut schema, client_field_declarations)?;
+    add_entrypoints_to_schema(&mut schema, entrypoint_declarations);
 
     schema.add_fields_to_subtypes(
         &original_outcome
@@ -159,20 +156,75 @@ pub(crate) fn handle_compile_command(
 
     let validated_schema = Schema::validate_and_construct(schema)?;
 
-    let paths_and_content = get_artifact_path_and_content(
+    // Note: we calculate all of the artifact paths and contents first, so that writing to
+    // disk can be as fast as possible and we minimize the chance that changes to the file
+    // system occur while we're writing and we get unpredictable results.
+    let paths_and_contents = get_artifact_path_and_content(
         &validated_schema,
         &config.project_root,
         &config.artifact_directory,
     );
 
     let total_artifacts_written =
-        write_to_disk(paths_and_content.into_iter(), &config.artifact_directory)?;
+        write_artifacts_to_disk(paths_and_contents, &config.artifact_directory)?;
 
     Ok(CompilationStats {
         client_field_count,
         entrypoint_count,
         total_artifacts_written,
     })
+}
+
+fn read_project_files_and_extract_iso_literals(
+    config: &CompilerConfig,
+) -> Result<
+    (
+        Vec<(
+            WithSpan<ClientFieldDeclarationWithValidatedDirectives>,
+            TextSource,
+        )>,
+        Vec<(WithSpan<EntrypointTypeAndField>, TextSource)>,
+    ),
+    BatchCompileError,
+> {
+    let canonicalized_root_path = get_canonicalized_root_path(config)?;
+    let project_files = read_files_in_folder(&canonicalized_root_path)?;
+    let (client_field_declarations, parsed_entrypoints) =
+        extract_iso_literals(project_files, canonicalized_root_path)
+            .map_err(BatchCompileError::from)?;
+
+    // Validate @loadable
+    let client_field_declarations = validate_isograph_field_directives(client_field_declarations)?;
+
+    Ok((client_field_declarations, parsed_entrypoints))
+}
+
+/// Here, we are processing
+fn process_exposed_fields(
+    schema: &mut Schema<isograph_schema::UnvalidatedSchemaState>,
+) -> Result<(), BatchCompileError> {
+    let fetchable_types: Vec<_> = schema.fetchable_types.keys().copied().collect();
+    Ok(for fetchable_object_id in fetchable_types.into_iter() {
+        schema.add_exposed_fields_to_parent_object_types(fetchable_object_id)?;
+    })
+}
+
+fn process_graphql_schema_and_extensions(
+    config: &CompilerConfig,
+    schema: &mut UnvalidatedSchema,
+) -> Result<ProcessGraphQLDocumentOutcome, BatchCompileError> {
+    let type_system_document = read_and_parse_graphql_schema(config)?;
+    let type_extension_documents = read_and_parse_graphql_schema_extension(config)?;
+    let original_outcome =
+        schema.process_graphql_type_system_document(type_system_document, config.options)?;
+    for extension_document in type_extension_documents {
+        let _extension_outcome =
+            schema.process_graphql_type_extension_document(extension_document, config.options)?;
+        // TODO extend the process_graphql_outcome.type_refinement_map and the one
+        // from the extensions? Does that even make sense?
+        // TODO validate that we didn't define any new root types (as they are ignored)
+    }
+    Ok(original_outcome)
 }
 
 fn get_canonicalized_root_path(config: &CompilerConfig) -> Result<PathBuf, BatchCompileError> {
@@ -228,13 +280,12 @@ fn read_and_parse_graphql_schema(
     Ok(type_system_document)
 }
 
-fn process_client_fields_and_entrypoints(
+fn add_client_fields_to_schema(
     schema: &mut UnvalidatedSchema,
     client_fields: Vec<(
         WithSpan<ClientFieldDeclarationWithValidatedDirectives>,
         TextSource,
     )>,
-    entrypoint_declarations: Vec<(WithSpan<EntrypointTypeAndField>, TextSource)>,
 ) -> Result<(), Vec<WithLocation<ProcessClientFieldDeclarationError>>> {
     let mut errors = vec![];
     for (client_field_declaration, text_source) in client_fields {
@@ -244,16 +295,22 @@ fn process_client_fields_and_entrypoints(
             errors.push(e);
         }
     }
-    for (entrypoint_declaration, text_source) in entrypoint_declarations {
-        schema
-            .entrypoints
-            .push((text_source, entrypoint_declaration))
-    }
 
     if errors.is_empty() {
         Ok(())
     } else {
         Err(errors)
+    }
+}
+
+fn add_entrypoints_to_schema(
+    schema: &mut Schema<isograph_schema::UnvalidatedSchemaState>,
+    entrypoint_declarations: Vec<(WithSpan<EntrypointTypeAndField>, TextSource)>,
+) {
+    for (entrypoint_declaration, text_source) in entrypoint_declarations {
+        schema
+            .entrypoints
+            .push((text_source, entrypoint_declaration))
     }
 }
 

@@ -4,6 +4,7 @@ mod isograph_literals;
 mod refetch_fields;
 mod schema;
 pub mod watch;
+mod with_duration;
 mod write_artifacts;
 
 pub use batch_compile::compile_and_print;

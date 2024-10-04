@@ -7,8 +7,8 @@ use std::{
 use common_lang_types::ArtifactPathAndContent;
 use thiserror::Error;
 
-pub(crate) fn write_to_disk(
-    paths_and_contents: impl Iterator<Item = ArtifactPathAndContent>,
+pub(crate) fn write_artifacts_to_disk(
+    paths_and_contents: impl IntoIterator<Item = ArtifactPathAndContent>,
     artifact_directory: &PathBuf,
 ) -> Result<usize, GenerateArtifactsError> {
     if artifact_directory.exists() {

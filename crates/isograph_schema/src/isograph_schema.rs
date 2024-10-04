@@ -100,6 +100,7 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
     // include null in its variants.
     pub null_type_id: ServerScalarId,
 
+    /// These are root types like Query, Mutation, Subscription
     pub fetchable_types: BTreeMap<ServerObjectId, RootOperationName>,
 }
 
