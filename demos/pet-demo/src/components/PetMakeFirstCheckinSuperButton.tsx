@@ -6,6 +6,10 @@ export const FirstCheckinMakeSuperButton = iso(`
   field Pet.FirstCheckinMakeSuperButton @component {
     checkins(skip: 0, limit: 1) {
       make_super
+      # location is unused in this component, but we need to select it
+      # because we need it to show up in the refetch query response, so
+      # that it can update the rendered CheckinDisplay
+      location
     }
   }
 `)(({ data }) => {

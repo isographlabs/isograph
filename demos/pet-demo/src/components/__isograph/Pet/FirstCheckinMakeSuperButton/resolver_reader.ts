@@ -27,6 +27,12 @@ const readerAst: ReaderAst<Pet__FirstCheckinMakeSuperButton__param> = [
         refetchQuery: 0,
         name: "make_super",
       },
+      {
+        kind: "Scalar",
+        fieldName: "location",
+        alias: null,
+        arguments: null,
+      },
     ],
   },
 ];

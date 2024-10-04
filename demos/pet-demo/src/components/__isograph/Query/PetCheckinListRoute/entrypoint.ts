@@ -12,6 +12,7 @@ const queryText = 'query PetCheckinListRoute ($id: ID!) {\
     id,\
     checkins____skip___l_0____limit___l_1: checkins(skip: 0, limit: 1) {\
       id,\
+      location,\
     },\
     name,\
   },\
@@ -51,6 +52,11 @@ const normalizationAst: NormalizationAst = [
           {
             kind: "Scalar",
             fieldName: "id",
+            arguments: null,
+          },
+          {
+            kind: "Scalar",
+            fieldName: "location",
             arguments: null,
           },
         ],
