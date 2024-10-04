@@ -12,6 +12,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 export const PetDetailDeferredRouteComponent = iso(`
   field Query.PetCheckinListRoute($id: ID!) @component {
     pet(id: $id) {
+      FirstCheckinMakeSuperButton
       name
       PetCheckinsCardList @loadable(lazyLoadArtifact: true)
     }
@@ -35,6 +36,7 @@ export const PetDetailDeferredRouteComponent = iso(`
     <Container maxWidth="md">
       <Stack direction="column" spacing={4}>
         <h1>{pet.name} Checkins List</h1>
+        <pet.FirstCheckinMakeSuperButton />
         <h3
           onClick={() => navigateTo({ kind: 'Home' })}
           style={{ cursor: 'pointer' }}

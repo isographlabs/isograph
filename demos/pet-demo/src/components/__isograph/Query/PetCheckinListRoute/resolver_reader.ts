@@ -1,6 +1,7 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Query__PetCheckinListRoute__param } from './param_type';
 import { PetDetailDeferredRouteComponent as resolver } from '../../../PetCheckinListRoute';
+import Pet__FirstCheckinMakeSuperButton__resolver_reader from '../../Pet/FirstCheckinMakeSuperButton/resolver_reader';
 
 const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
   {
@@ -14,6 +15,13 @@ const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
       ],
     ],
     selections: [
+      {
+        kind: "Resolver",
+        alias: "FirstCheckinMakeSuperButton",
+        arguments: null,
+        readerArtifact: Pet__FirstCheckinMakeSuperButton__resolver_reader,
+        usedRefetchQueries: [0, ],
+      },
       {
         kind: "Scalar",
         fieldName: "name",
