@@ -1,4 +1,4 @@
-use std::collections::hash_map::Entry;
+use std::collections::btree_map::Entry;
 
 use intern::string_key::Intern;
 use isograph_lang_types::ServerObjectId;

@@ -351,7 +351,7 @@ pub struct SchemaObject {
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
     pub encountered_fields:
-        HashMap<SelectableFieldName, FieldDefinitionLocation<ServerFieldId, ClientFieldId>>,
+        BTreeMap<SelectableFieldName, FieldDefinitionLocation<ServerFieldId, ClientFieldId>>,
 }
 
 /// In GraphQL, ValidRefinement's are essentially the concrete types that an interface or
