@@ -14,7 +14,9 @@ type ComponentCache = {
   };
 };
 
-export type FragmentSubscription<TReadFromStore extends object> = {
+export type FragmentSubscription<
+  TReadFromStore extends { parameters: object; data: object },
+> = {
   readonly kind: 'FragmentSubscription';
   readonly callback: (
     newEncounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
@@ -29,7 +31,9 @@ type AnyRecordSubscription = {
   readonly callback: () => void;
 };
 
-type Subscription = FragmentSubscription<Object> | AnyRecordSubscription;
+type Subscription =
+  | FragmentSubscription<{ parameters: object; data: object }>
+  | AnyRecordSubscription;
 type Subscriptions = Set<Subscription>;
 // Should this be a map?
 type CacheMap<T> = { [index: string]: ParentCache<T> };

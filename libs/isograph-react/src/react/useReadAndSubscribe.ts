@@ -16,7 +16,9 @@ import type { ReaderAst } from '../core/reader';
 /**
  * Read the data from a fragment reference and subscribe to updates.
  */
-export function useReadAndSubscribe<TReadFromStore extends object>(
+export function useReadAndSubscribe<
+  TReadFromStore extends { parameters: object; data: object },
+>(
   fragmentReference: FragmentReference<TReadFromStore, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
   readerAst: ReaderAst<TReadFromStore>,
@@ -34,7 +36,9 @@ export function useReadAndSubscribe<TReadFromStore extends object>(
   return readOutDataAndRecords.item;
 }
 
-export function useSubscribeToMultiple<TReadFromStore extends object>(
+export function useSubscribeToMultiple<
+  TReadFromStore extends { parameters: object; data: object },
+>(
   items: ReadonlyArray<{
     records: WithEncounteredRecords<TReadFromStore>;
     callback: (updatedRecords: WithEncounteredRecords<TReadFromStore>) => void;

@@ -2,7 +2,7 @@ import { TopLevelReaderArtifact } from './reader';
 import { Arguments } from './util';
 
 export type ReaderWithRefetchQueries<
-  TReadFromStore extends object,
+  TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
 > = {
   readonly kind: 'ReaderWithRefetchQueries';
@@ -17,7 +17,7 @@ export type ReaderWithRefetchQueries<
 
 // This type should be treated as an opaque type.
 export type IsographEntrypoint<
-  TReadFromStore extends object,
+  TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
 > = {
   readonly kind: 'Entrypoint';
@@ -30,7 +30,7 @@ export type IsographEntrypoint<
 };
 
 export type IsographEntrypointLoader<
-  TReadFromStore extends object,
+  TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
 > = {
   readonly kind: 'EntrypointLoader';
@@ -79,7 +79,7 @@ export type RefetchQueryNormalizationArtifactWrapper = {
 };
 
 export function assertIsEntrypoint<
-  TReadFromStore extends object,
+  TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
 >(
   value:

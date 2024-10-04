@@ -12,7 +12,7 @@ import { wrapResolvedValue } from '../core/PromiseWrapper';
 // TODO rename this to useImperativelyLoadedEntrypoint
 
 export function useImperativeReference<
-  TReadFromStore extends object,
+  TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
 >(
   entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
