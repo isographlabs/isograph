@@ -110,7 +110,7 @@ pub fn compile_and_print(config: &CompilerConfig) -> Result<CompilationStats, Ba
 ///
 /// Isograph is currently written in a fairly sequential fashion, e.g.:
 ///
-/// ```rust
+/// ```no_run
 /// let result_1 = step_1()?;
 /// let result_2 = step_2()?;
 /// step_3(result_1, result_2)?;
