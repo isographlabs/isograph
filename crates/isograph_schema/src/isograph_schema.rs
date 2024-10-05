@@ -375,6 +375,8 @@ pub struct SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData
     // pub directives: Vec<Directive<ConstantValue>>,
     pub arguments:
         Vec<WithLocation<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
+    // TODO remove this. This is indicative of poor modeling.
+    pub is_discriminator: bool,
 }
 
 impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone>
@@ -391,6 +393,7 @@ impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone>
             associated_data: convert(&self.associated_data)?,
             parent_type_id: self.parent_type_id,
             arguments: self.arguments.clone(),
+            is_discriminator: self.is_discriminator,
         })
     }
 
@@ -405,6 +408,7 @@ impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone>
             associated_data: convert(&self.associated_data),
             parent_type_id: self.parent_type_id,
             arguments: self.arguments.clone(),
+            is_discriminator: self.is_discriminator,
         }
     }
 }
@@ -597,6 +601,7 @@ impl<T, VariableDefinitionInnerType> SchemaServerField<T, VariableDefinitionInne
             associated_data,
             parent_type_id,
             arguments,
+            is_discriminator,
         } = self;
         (
             SchemaServerField {
@@ -606,6 +611,7 @@ impl<T, VariableDefinitionInnerType> SchemaServerField<T, VariableDefinitionInne
                 associated_data: (),
                 parent_type_id,
                 arguments,
+                is_discriminator,
             },
             associated_data,
         )
