@@ -266,8 +266,8 @@ function callSubscriptions(
 
             const mergedItem = mergeObjectsUsingReaderAst(
               subscription.readerAst,
-              subscription.encounteredDataAndRecords.item,
-              newEncounteredDataAndRecords.item,
+              subscription.encounteredDataAndRecords.item.data,
+              newEncounteredDataAndRecords.item.data,
             );
             if (mergedItem !== subscription.encounteredDataAndRecords.item) {
               // @ts-expect-error
