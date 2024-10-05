@@ -25,9 +25,13 @@ import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
 import { Argument, ArgumentValue } from './util';
 import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
 import { FragmentReference, Variables } from './FragmentReference';
-import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
+import {
+  areEqualObjectsWithDeepComparison,
+  mergeObjectsUsingReaderAst,
+} from './areEqualWithDeepComparison';
 import { makeNetworkRequest } from './makeNetworkRequest';
 import { wrapResolvedValue } from './PromiseWrapper';
+
 const TYPENAME_FIELD_NAME = '__typename';
 
 export function getOrCreateItemInSuspenseCache<
@@ -269,7 +273,11 @@ function callSubscriptions(
               newEncounteredDataAndRecords.item.data,
             );
             if (
-              mergedItem !== subscription.encounteredDataAndRecords.item.data
+              mergedItem !== subscription.encounteredDataAndRecords.item.data ||
+              !areEqualObjectsWithDeepComparison(
+                subscription.encounteredDataAndRecords.item.parameters,
+                newEncounteredDataAndRecords.item.parameters,
+              )
             ) {
               // @ts-expect-error
               if (typeof window !== 'undefined' && window.__LOG) {
