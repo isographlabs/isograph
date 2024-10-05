@@ -4,16 +4,6 @@ import {
   ParentCache,
 } from '@isograph/react-disposable-state';
 import {
-  DataId,
-  ROOT_ID,
-  StoreRecord,
-  Link,
-  type IsographEnvironment,
-  DataTypeValue,
-  getLink,
-  FragmentSubscription,
-} from './IsographEnvironment';
-import {
   IsographEntrypoint,
   NormalizationAst,
   NormalizationInlineFragment,
@@ -21,13 +11,23 @@ import {
   NormalizationScalarField,
   RefetchQueryNormalizationArtifactWrapper,
 } from '../core/entrypoint';
-import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
-import { Argument, ArgumentValue } from './util';
-import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
-import { FragmentReference, Variables } from './FragmentReference';
 import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
+import { FragmentReference, Variables } from './FragmentReference';
+import {
+  DataId,
+  DataTypeValue,
+  FragmentSubscription,
+  Link,
+  ROOT_ID,
+  StoreRecord,
+  getLink,
+  type IsographEnvironment,
+} from './IsographEnvironment';
 import { makeNetworkRequest } from './makeNetworkRequest';
 import { wrapResolvedValue } from './PromiseWrapper';
+import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
+import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
+import { Argument, ArgumentValue } from './util';
 
 const TYPENAME_FIELD_NAME = '__typename';
 
@@ -269,7 +269,9 @@ function callSubscriptions(
               subscription.encounteredDataAndRecords.item.data,
               newEncounteredDataAndRecords.item.data,
             );
-            if (mergedItem !== subscription.encounteredDataAndRecords.item) {
+            if (
+              mergedItem !== subscription.encounteredDataAndRecords.item.data
+            ) {
               // @ts-expect-error
               if (typeof window !== 'undefined' && window.__LOG) {
                 console.log('Deep equality - No', {
