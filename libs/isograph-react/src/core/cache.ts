@@ -4,6 +4,16 @@ import {
   ParentCache,
 } from '@isograph/react-disposable-state';
 import {
+  DataId,
+  ROOT_ID,
+  StoreRecord,
+  Link,
+  type IsographEnvironment,
+  DataTypeValue,
+  getLink,
+  FragmentSubscription,
+} from './IsographEnvironment';
+import {
   IsographEntrypoint,
   NormalizationAst,
   NormalizationInlineFragment,
@@ -11,24 +21,13 @@ import {
   NormalizationScalarField,
   RefetchQueryNormalizationArtifactWrapper,
 } from '../core/entrypoint';
-import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
-import { FragmentReference, Variables } from './FragmentReference';
-import {
-  DataId,
-  DataTypeValue,
-  FragmentSubscription,
-  Link,
-  ROOT_ID,
-  StoreRecord,
-  getLink,
-  type IsographEnvironment,
-} from './IsographEnvironment';
-import { makeNetworkRequest } from './makeNetworkRequest';
-import { wrapResolvedValue } from './PromiseWrapper';
-import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
 import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
 import { Argument, ArgumentValue } from './util';
-
+import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
+import { FragmentReference, Variables } from './FragmentReference';
+import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
+import { makeNetworkRequest } from './makeNetworkRequest';
+import { wrapResolvedValue } from './PromiseWrapper';
 const TYPENAME_FIELD_NAME = '__typename';
 
 export function getOrCreateItemInSuspenseCache<
