@@ -664,6 +664,7 @@ fn get_field_objects_ids_and_names(
                         .into_iter()
                         .map(graphql_input_value_definition_to_variable_definition)
                         .collect::<Result<Vec<_>, _>>()?,
+                    is_discriminator: false,
                 });
                 server_field_ids.push(next_server_field_id);
             }
@@ -695,6 +696,7 @@ fn get_field_objects_ids_and_names(
         associated_data: typename_type.clone(),
         parent_type_id,
         arguments: vec![],
+        is_discriminator: true,
     });
 
     if encountered_fields

@@ -349,6 +349,7 @@ fn validate_and_transform_field(
                 associated_data: field_type,
                 parent_type_id: empty_field.parent_type_id,
                 arguments: valid_arguments,
+                is_discriminator: empty_field.is_discriminator,
             });
         }
     }
