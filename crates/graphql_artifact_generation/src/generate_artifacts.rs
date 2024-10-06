@@ -8,7 +8,7 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection,
-    ServerFieldSelection,
+    ServerFieldSelection, VariableDefinition,
 };
 use isograph_schema::{
     get_missing_arguments, selection_map_wrapped, ClientFieldTraversalResult, ClientFieldVariant,
@@ -26,9 +26,10 @@ use std::{
 };
 
 use crate::entrypoint_artifact::generate_entrypoint_artifacts_with_client_field_traversal_result;
+use crate::format_parameter_type::format_parameter_type;
 use crate::{
     eager_reader_artifact::{
-        generate_eager_reader_artifact, generate_eager_reader_output_type_artifact,
+        generate_eager_reader_artifacts, generate_eager_reader_output_type_artifact,
         generate_eager_reader_param_type_artifact,
     },
     entrypoint_artifact::generate_entrypoint_artifacts,
@@ -43,6 +44,7 @@ lazy_static! {
     pub static ref RESOLVER_READER: ArtifactFileType = "resolver_reader".intern().into();
     pub static ref REFETCH_READER: ArtifactFileType = "refetch_reader".intern().into();
     pub static ref RESOLVER_PARAM_TYPE: ArtifactFileType = "param_type".intern().into();
+    pub static ref RESOLVER_PARAMETERS_TYPE: ArtifactFileType = "parameters_type".intern().into();
     pub static ref RESOLVER_OUTPUT_TYPE: ArtifactFileType = "output_type".intern().into();
     pub static ref ENTRYPOINT: ArtifactFileType = "entrypoint".intern().into();
     pub static ref ISO_TS: ArtifactFileType = "iso".intern().into();
@@ -102,7 +104,7 @@ pub fn get_artifact_path_and_content(
         // Generate reader ASTs for all encountered client fields, which may be reader or refetch reader
         match &encountered_client_field.variant {
             ClientFieldVariant::UserWritten(info) => {
-                path_and_contents.push(generate_eager_reader_artifact(
+                path_and_contents.extend(generate_eager_reader_artifacts(
                     schema,
                     encountered_client_field,
                     project_root,
@@ -424,8 +426,6 @@ fn write_param_type_from_selection(
             ServerFieldSelection::ScalarField(scalar_field_selection) => {
                 match scalar_field_selection.associated_data.location {
                     FieldDefinitionLocation::Server(_server_field) => {
-                        query_type_declaration
-                            .push_str(&"  ".repeat(indentation_level as usize).to_string());
                         let parent_field = parent_type
                             .encountered_fields
                             .get(&scalar_field_selection.name.item.into())
@@ -457,7 +457,8 @@ fn write_param_type_from_selection(
                             });
 
                         query_type_declaration.push_str(&format!(
-                            "readonly {}: {},\n",
+                            "{}readonly {}: {},\n",
+                            "  ".repeat(indentation_level as usize),
                             name_or_alias,
                             print_javascript_type_declaration(&output_type)
                         ));
@@ -619,6 +620,25 @@ fn format_type_for_js_inner(
             }
         },
     }
+}
+
+pub(crate) fn generate_parameters<'a>(
+    schema: &ValidatedSchema,
+    argument_definitions: impl Iterator<Item = &'a VariableDefinition<SelectableServerFieldId>>,
+) -> String {
+    let mut s = "{\n".to_string();
+    let indent = "  ";
+    for arg in argument_definitions {
+        let is_optional = !matches!(arg.type_, GraphQLTypeAnnotation::NonNull(_));
+        s.push_str(&format!(
+            "{indent}readonly {}{}: {},\n",
+            arg.name.item,
+            if is_optional { "?" } else { "" },
+            format_parameter_type(schema, arg.type_.clone(), 1)
+        ));
+    }
+    s.push_str("};");
+    s
 }
 
 fn write_optional_description(

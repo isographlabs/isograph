@@ -48,11 +48,11 @@ export function useResult<
         networkRequestOptions,
         readerWithRefetchQueries.readerArtifact.readerAst,
       );
-      const firstParameter = {
+      const param = {
         data: data,
         parameters: fragmentReference.variables,
       };
-      return readerWithRefetchQueries.readerArtifact.resolver(firstParameter);
+      return readerWithRefetchQueries.readerArtifact.resolver(param);
     }
   }
 }

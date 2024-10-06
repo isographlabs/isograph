@@ -1,7 +1,5 @@
 import { type PetStats__refetch_pet_stats__output_type } from '../../PetStats/refetch_pet_stats/output_type';
 
-import { type Variables } from '@isograph/react';
-
 export type Pet__PetStatsCard__param = {
   readonly data: {
     readonly id: string,
@@ -17,5 +15,5 @@ export type Pet__PetStatsCard__param = {
       readonly refetch_pet_stats: PetStats__refetch_pet_stats__output_type,
     } | null),
   },
-  readonly parameters: Variables,
+  readonly parameters: Record<string, never>,
 };

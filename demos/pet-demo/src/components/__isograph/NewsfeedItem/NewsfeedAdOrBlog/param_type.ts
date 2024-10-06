@@ -1,8 +1,6 @@
 import { type AdItem__AdItemDisplayWrapper__output_type } from '../../AdItem/AdItemDisplayWrapper/output_type';
 import { type BlogItem__BlogItemDisplay__output_type } from '../../BlogItem/BlogItemDisplay/output_type';
 
-import { type Variables } from '@isograph/react';
-
 export type NewsfeedItem__NewsfeedAdOrBlog__param = {
   readonly data: {
     readonly adItem: ({
@@ -12,5 +10,5 @@ export type NewsfeedItem__NewsfeedAdOrBlog__param = {
       readonly BlogItemDisplay: BlogItem__BlogItemDisplay__output_type,
     } | null),
   },
-  readonly parameters: Variables,
+  readonly parameters: Record<string, never>,
 };

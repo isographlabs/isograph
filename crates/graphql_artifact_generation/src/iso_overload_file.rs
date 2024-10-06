@@ -72,18 +72,16 @@ export function iso<T>(
 }
 
 pub(crate) fn build_iso_overload(schema: &ValidatedSchema) -> ArtifactPathAndContent {
-    let mut imports =
-        "import type { IsographEntrypoint, ResolverFirstParameter, Variables } from '@isograph/react';\n"
-            .to_string();
+    let mut imports = "import type { IsographEntrypoint } from '@isograph/react';\n".to_string();
     let mut content = String::from(
         "
 // This is the type given to regular client fields.
 // This means that the type of the exported iso literal is exactly
 // the type of the passed-in function, which takes one parameter
 // of type TParam.
-type IdentityWithParam<TParam extends object> = <TClientFieldReturn, TVariables = Variables>(
+type IdentityWithParam<TParam extends object> = <TClientFieldReturn>(
   clientField: (param: TParam) => TClientFieldReturn
-) => (param: ResolverFirstParameter<TParam, TVariables>) => TClientFieldReturn;
+) => (param: TParam) => TClientFieldReturn;
 
 // This is the type given it to client fields with @component.
 // This means that the type of the exported iso literal is exactly
@@ -95,10 +93,9 @@ type IdentityWithParam<TParam extends object> = <TClientFieldReturn, TVariables 
 type IdentityWithParamComponent<TParam extends object> = <
   TClientFieldReturn,
   TComponentProps = Record<string, never>,
-  TVariables = Variables
 >(
   clientComponentField: (data: TParam, componentProps: TComponentProps) => TClientFieldReturn
-) => (data: ResolverFirstParameter<TParam, TVariables>, componentProps: TComponentProps) => TClientFieldReturn;
+) => (data: TParam, componentProps: TComponentProps) => TClientFieldReturn;
 
 type WhitespaceCharacter = ' ' | '\\t' | '\\n';
 type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`

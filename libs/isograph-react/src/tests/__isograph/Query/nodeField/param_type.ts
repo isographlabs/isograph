@@ -1,5 +1,4 @@
-
-import { type Variables } from '@isograph/react';
+import type { Query__nodeField__parameters } from './parameters_type';
 
 export type Query__nodeField__param = {
   readonly data: {
@@ -7,5 +6,5 @@ export type Query__nodeField__param = {
       readonly id: string,
     } | null),
   },
-  readonly parameters: Variables,
+  readonly parameters: Query__nodeField__parameters,
 };
