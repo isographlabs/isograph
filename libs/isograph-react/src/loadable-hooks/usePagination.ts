@@ -56,12 +56,12 @@ type LoadedFragmentReference<
 
 function flatten<TItem>(
   arr: ReadonlyArray<Connection<TItem>>,
-): Connection<TItem> {
-  return arr.reduce(
+): NonNullConnection<TItem> {
+  return arr.reduce<NonNullConnection<TItem>>(
     (acc, connection) => ({
       ...acc,
       ...connection,
-      edges: acc.edges.concat(connection.edges),
+      edges: acc.edges.concat(connection.edges ?? []),
     }),
     {
       edges: [],
@@ -74,13 +74,18 @@ function flatten<TItem>(
 }
 
 type PageInfo = {
-  hasNextPage: boolean;
-  endCursor: string | null | undefined;
+  readonly hasNextPage: boolean;
+  readonly endCursor: string | null;
 };
 
 type Connection<T> = {
-  edges: ReadonlyArray<T>;
-  pageInfo: PageInfo;
+  readonly edges: ReadonlyArray<T> | null;
+  readonly pageInfo: PageInfo;
+};
+
+type NonNullConnection<T> = {
+  readonly edges: ReadonlyArray<T>;
+  readonly pageInfo: PageInfo;
 };
 
 export function usePagination<

@@ -33,7 +33,6 @@ export const RepositoryList = iso(`
         disabled={!(pagination.kind === 'Complete' && pagination.hasNextPage)}
         onClick={() =>
           pagination.kind === 'Complete' &&
-          pagination.hasNextPage &&
           pagination.fetchMore(undefined, 10)
         }
       >
