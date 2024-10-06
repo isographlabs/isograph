@@ -17,6 +17,7 @@ import { type Query__UserPage__param } from './Query/UserPage/param_type';
 import { type Repository__RepositoryLink__param } from './Repository/RepositoryLink/param_type';
 import { type Starrable__IsStarred__param } from './Starrable/IsStarred/param_type';
 import { type User__Avatar__param } from './User/Avatar/param_type';
+import { type User__RepositoryConnection__param } from './User/RepositoryConnection/param_type';
 import { type User__RepositoryList__param } from './User/RepositoryList/param_type';
 import entrypoint_Query__HomePage from '../__isograph/Query/HomePage/entrypoint';
 import entrypoint_Query__PullRequest from '../__isograph/Query/PullRequest/entrypoint';
@@ -143,6 +144,10 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field User.Avatar', T>
 ): IdentityWithParamComponent<User__Avatar__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field User.RepositoryConnection', T>
+): IdentityWithParam<User__RepositoryConnection__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field User.RepositoryList', T>
