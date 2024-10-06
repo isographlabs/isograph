@@ -4,7 +4,7 @@ import {User__RepositoryConnection__output_type} from './output_type';
 import readerResolver from './resolver_reader';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
-const queryText = 'mutation RepositoryConnection ($first: Int, $after: String, $id: ID!) {\
+const queryText = 'query RepositoryConnection ($first: Int, $after: String, $id: ID!) {\
   node____id___v_id: node(id: $id) {\
     ... on User {\
       __typename,\
