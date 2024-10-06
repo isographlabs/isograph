@@ -20,10 +20,27 @@ import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 import { maybeUnwrapNetworkRequest } from '../react/useResult';
 
-type SkipOrLimit = 'skip' | 'limit';
+type SkipOrLimit = 'first' | 'after';
 type OmitSkipLimit<TArgs> = keyof Omit<TArgs, SkipOrLimit> extends never
   ? void | Record<string, never>
   : Omit<TArgs, SkipOrLimit>;
+
+type UsePaginationReturnValue<
+  TReadFromStore extends { parameters: object; data: object },
+  TItem,
+  TArgs,
+> =
+  | {
+      kind: 'Pending';
+      pendingFragment: FragmentReference<TReadFromStore, ReadonlyArray<TItem>>;
+      results: ReadonlyArray<TItem>;
+    }
+  | {
+      kind: 'Complete';
+      fetchMore: (args: OmitSkipLimit<TArgs>, first: number) => void;
+      results: ReadonlyArray<TItem>;
+      hasNextPage: boolean;
+    };
 
 type LoadedFragmentReferences<
   TReadFromStore extends { parameters: object; data: object },
@@ -37,20 +54,24 @@ type LoadedFragmentReference<
   ReferenceCountedPointer<FragmentReference<TReadFromStore, TItem>>
 >;
 
-function flatten<TConnection extends Connection<any>>(
-  arr: ReadonlyArray<TConnection>,
-): TConnection {
-  return arr.reduce((acc, connection) => ({
-    ...acc,
-    ...connection,
-    edges: acc.edges.concat(connection.edges),
-  }));
+function flatten<TItem>(
+  arr: ReadonlyArray<Connection<TItem>>,
+): Connection<TItem> {
+  return arr.reduce(
+    (acc, connection) => ({
+      ...acc,
+      ...connection,
+      edges: acc.edges.concat(connection.edges),
+    }),
+    {
+      edges: [],
+      pageInfo: {
+        hasNextPage: true,
+        endCursor: null,
+      },
+    },
+  );
 }
-
-type Edge<T> = {
-  node: T;
-  cursor: string;
-};
 
 type PageInfo = {
   hasNextPage: boolean;
@@ -58,7 +79,7 @@ type PageInfo = {
 };
 
 type Connection<T> = {
-  edges: Edge<T>[];
+  edges: ReadonlyArray<T>;
   pageInfo: PageInfo;
 };
 
@@ -67,16 +88,18 @@ export function usePagination<
     first: number | void | null;
     after: string | void | null;
   },
-  TConnection extends Connection<any>,
+  TItem,
   TReadFromStore extends { parameters: object; data: object },
->(loadableField: LoadableField<TArgs, TConnection>) {
+>(
+  loadableField: LoadableField<TArgs, Connection<TItem>>,
+): UsePaginationReturnValue<TReadFromStore, TItem, TArgs> {
   const networkRequestOptions = {
     suspendIfInFlight: true,
     throwOnNetworkError: true,
   };
   const { state, setState } =
     useUpdatableDisposableState<
-      LoadedFragmentReferences<TReadFromStore, TConnection>
+      LoadedFragmentReferences<TReadFromStore, Connection<TItem>>
     >();
 
   const environment = useIsographEnvironment();
@@ -84,7 +107,7 @@ export function usePagination<
   // TODO move this out of useSkipLimitPagination, and pass environment and networkRequestOptions
   // as parameters (or recreate networkRequestOptions)
   function readCompletedFragmentReferences(
-    completedReferences: FragmentReference<TReadFromStore, TConnection>[],
+    completedReferences: FragmentReference<TReadFromStore, Connection<TItem>>[],
   ) {
     const results = completedReferences.map((fragmentReference, i) => {
       const readerWithRefetchQueries = readPromise(
@@ -112,7 +135,7 @@ export function usePagination<
   }
 
   function subscribeCompletedFragmentReferences(
-    completedReferences: FragmentReference<TReadFromStore, TConnection>[],
+    completedReferences: FragmentReference<TReadFromStore, Connection<TItem>>[],
   ) {
     return completedReferences.map(
       (
@@ -123,8 +146,8 @@ export function usePagination<
         callback: (
           updatedRecords: WithEncounteredRecords<TReadFromStore>,
         ) => void;
-        fragmentReference: FragmentReference<TReadFromStore, TConnection>;
-        readerAst: ReaderAst<TConnection>;
+        fragmentReference: FragmentReference<TReadFromStore, Connection<TItem>>;
+        readerAst: ReaderAst<Connection<TItem>>;
       } => {
         maybeUnwrapNetworkRequest(
           fragmentReference.networkRequest,
@@ -173,7 +196,7 @@ export function usePagination<
         ReadonlyArray<
           ItemCleanupPair<
             ReferenceCountedPointer<
-              FragmentReference<TReadFromStore, TConnection>
+              FragmentReference<TReadFromStore, Connection<TItem>>
             >
           >
         >
@@ -195,7 +218,7 @@ export function usePagination<
 
   const mostRecentItem: LoadedFragmentReference<
     TReadFromStore,
-    TConnection
+    Connection<TItem>
   > | null = loadedReferences[loadedReferences.length - 1];
   const mostRecentFragmentReference =
     mostRecentItem?.[0].getItemIfNotDisposed();
@@ -247,6 +270,7 @@ export function usePagination<
       kind: 'Complete',
       fetchMore: getFetchMore(null),
       results: [],
+      hasNextPage: true,
     };
   }
 
@@ -257,9 +281,13 @@ export function usePagination<
         rerender({});
       });
 
+      const results = readCompletedFragmentReferences(
+        completedFragmentReferences,
+      );
       return {
-        ...readCompletedFragmentReferences(completedFragmentReferences),
+        results: results.edges,
         kind: 'Pending',
+        //@ts-expect-error map Connection<TItem> to ReadonlyArray<TItem>
         pendingFragment: mostRecentFragmentReference,
       };
     }
@@ -272,7 +300,8 @@ export function usePagination<
       );
 
       return {
-        ...results,
+        results: results.edges,
+        hasNextPage: results.pageInfo.hasNextPage,
         kind: 'Complete',
         fetchMore: getFetchMore(results.pageInfo.endCursor),
       };
