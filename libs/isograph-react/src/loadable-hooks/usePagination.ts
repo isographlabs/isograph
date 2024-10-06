@@ -20,10 +20,10 @@ import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 import { maybeUnwrapNetworkRequest } from '../react/useResult';
 
-type SkipOrLimit = 'first' | 'after';
-type OmitSkipLimit<TArgs> = keyof Omit<TArgs, SkipOrLimit> extends never
+type FirstOrAfter = 'first' | 'after';
+type OmitFirstAfter<TArgs> = keyof Omit<TArgs, FirstOrAfter> extends never
   ? void | Record<string, never>
-  : Omit<TArgs, SkipOrLimit>;
+  : Omit<TArgs, FirstOrAfter>;
 
 type UsePaginationReturnValue<
   TReadFromStore extends { parameters: object; data: object },
@@ -37,7 +37,7 @@ type UsePaginationReturnValue<
     }
   | {
       kind: 'Complete';
-      fetchMore: (args: OmitSkipLimit<TArgs>, first: number) => void;
+      fetchMore: (args: OmitFirstAfter<TArgs>, first: number) => void;
       results: ReadonlyArray<TItem>;
       hasNextPage: boolean;
     };
@@ -172,7 +172,7 @@ export function usePagination<
 
   const getFetchMore =
     (after: string | null | undefined) =>
-    (args: OmitSkipLimit<TArgs>, first: number): void => {
+    (args: OmitFirstAfter<TArgs>, first: number): void => {
       // @ts-expect-error
       const loadedField = loadableField({
         ...args,
