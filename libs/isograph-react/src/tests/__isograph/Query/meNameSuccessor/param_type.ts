@@ -1,6 +1,4 @@
 
-import { type Variables } from '@isograph/react';
-
 export type Query__meNameSuccessor__param = {
   readonly data: {
     readonly me: {
@@ -12,5 +10,5 @@ export type Query__meNameSuccessor__param = {
       } | null),
     },
   },
-  readonly parameters: Variables,
+  readonly parameters: Record<string, never>,
 };

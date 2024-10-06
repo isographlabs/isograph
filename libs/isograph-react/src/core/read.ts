@@ -5,7 +5,12 @@ import {
   IsographEntrypoint,
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
-import { FragmentReference, Variables } from './FragmentReference';
+import {
+  FragmentReference,
+  Variables,
+  ExtractData,
+  ExtractParameters,
+} from './FragmentReference';
 import {
   assertLink,
   DataId,
@@ -26,7 +31,7 @@ import { Arguments } from './util';
 
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: Set<DataId>;
-  readonly item: T;
+  readonly item: ExtractData<T>;
 };
 
 export function readButDoNotEvaluate<
@@ -88,7 +93,7 @@ export function readButDoNotEvaluate<
 type ReadDataResult<TReadFromStore> =
   | {
       readonly kind: 'Success';
-      readonly data: TReadFromStore;
+      readonly data: ExtractData<TReadFromStore>;
       readonly encounteredRecords: Set<DataId>;
     }
   | {
@@ -101,7 +106,7 @@ function readData<TReadFromStore>(
   environment: IsographEnvironment,
   ast: ReaderAst<TReadFromStore>,
   root: DataId,
-  variables: Variables,
+  variables: ExtractParameters<TReadFromStore>,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,

@@ -7,6 +7,18 @@ export type VariableValue = string | number | boolean | null | object;
 
 export type Variables = { readonly [index: string]: VariableValue };
 
+export type ExtractData<T> = T extends {
+  data: infer D extends object;
+}
+  ? D
+  : never;
+
+export type ExtractParameters<T> = T extends {
+  parameters: infer P extends Variables;
+}
+  ? P
+  : Variables;
+
 export type FragmentReference<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
@@ -16,7 +28,7 @@ export type FragmentReference<
     ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
   >;
   readonly root: DataId;
-  readonly variables: Variables;
+  readonly variables: ExtractParameters<TReadFromStore>;
   readonly networkRequest: PromiseWrapper<void, any>;
 };
 
