@@ -51,3 +51,18 @@ pub(crate) fn param_type_imports_to_import_statement(
     }
     output
 }
+
+pub(crate) fn param_type_imports_to_import_param_statement(
+    param_type_imports: &ParamTypeImports,
+) -> String {
+    let mut output = String::new();
+    for type_and_field in param_type_imports.iter() {
+        output.push_str(&format!(
+            "import {{ type {}__param }} from '../../{}/{}/param_type';\n",
+            type_and_field.underscore_separated(),
+            type_and_field.type_name,
+            type_and_field.field_name,
+        ));
+    }
+    output
+}
