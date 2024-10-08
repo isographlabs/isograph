@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   FragmentReference,
   stableIdForFragmentReference,
+  ExtractData,
 } from '../core/FragmentReference';
 import {
   NetworkRequestReaderOptions,
@@ -22,7 +23,7 @@ export function useReadAndSubscribe<
   fragmentReference: FragmentReference<TReadFromStore, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
   readerAst: ReaderAst<TReadFromStore>,
-): TReadFromStore {
+): ExtractData<TReadFromStore> {
   const environment = useIsographEnvironment();
   const [readOutDataAndRecords, setReadOutDataAndRecords] = useState(() =>
     readButDoNotEvaluate(environment, fragmentReference, networkRequestOptions),

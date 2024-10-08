@@ -1,7 +1,5 @@
 import { type IssueComment__formattedCommentCreationDate__output_type } from '../../IssueComment/formattedCommentCreationDate/output_type';
 
-import { type Variables } from '@isograph/react';
-
 export type PullRequest__CommentList__param = {
   readonly data: {
     /**
@@ -16,27 +14,27 @@ A list of edges.
 The item at the end of the edge.
         */
         readonly node: ({
-                    /**
+          /**
 The Node ID of the IssueComment object
           */
-readonly id: string,
-                    /**
+          readonly id: string,
+          /**
 The body rendered to text.
           */
-readonly bodyText: string,
+          readonly bodyText: string,
           readonly formattedCommentCreationDate: IssueComment__formattedCommentCreationDate__output_type,
           /**
 The actor who authored the comment.
           */
           readonly author: ({
-                        /**
+            /**
 The username of the actor.
             */
-readonly login: string,
+            readonly login: string,
           } | null),
         } | null),
       } | null)> | null),
     },
   },
-  readonly parameters: Variables,
+  readonly parameters: Record<string, never>,
 };

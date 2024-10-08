@@ -1,7 +1,5 @@
 import { type Pet__PetUpdater__output_type } from '../../Pet/PetUpdater/output_type';
 
-import { type Variables } from '@isograph/react';
-
 export type Pet__PetBestFriendCard__param = {
   readonly data: {
     readonly id: string,
@@ -20,5 +18,5 @@ You can update the best friend and the tagline.
       },
     } | null),
   },
-  readonly parameters: Variables,
+  readonly parameters: Record<string, never>,
 };
