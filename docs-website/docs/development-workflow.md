@@ -12,11 +12,11 @@ There are three major places to make changes to Isograph:
 
 ### node and `pnpm`
 
-The node.js and pnpm versions used by isograph are specified in fields `engines.node` and `packageManager` respectively in the `package.json` file.
+The node.js and pnpm versions used by Isograph are specified in fields `engines.node` and `packageManager` respectively in the `package.json` file.
 
 In order to ensure you are using the correct versions of these you should install `fnm` for your respective operating system by following [this](https://github.com/Schniz/fnm?tab=readme-ov-file#installation) guide. Optionally, configure fnm for your shell by following [this](https://github.com/Schniz/fnm?tab=readme-ov-file#shell-setup) guide.
 
-Now check out into the root directory of isograph project and run the following commands one by one:
+Now, navigate to root directory of your Isograph repository and run the following commands one by one:
 
 ```bash
 fnm install --resolve-engines
@@ -31,7 +31,7 @@ These commands will install the appropriate node.js and pnpm version used by iso
 
 ### Rust
 
-I am currently using `rustc 1.81.0 (eeb90cda1 2024-09-04)`. Rust is fairly stable and we don't rely on anything crazy, so it should be fairly safe to keep your `rustc` up-to-date.
+Isograph currently uses `rustc 1.81.0 (eeb90cda1 2024-09-04)`. Rust is fairly stable and we don't rely on anything crazy, so it should be safe to keep your `rustc` up-to-date.
 
 You should also install `cargo watch` via `cargo install cargo-watch`.
 
@@ -53,7 +53,7 @@ If you are using the locally-built compiler from another folder, you should be a
 
 ### Running the compiler for a specific demo
 
-We also have scripts defined in the `package.json` that make using the compiler easier for the demos. For example:
+We also have scripts defined in the `package.json` that make using the compiler easier for the demos:
 
 ```sh
 # from the root
