@@ -27,7 +27,7 @@ corepack enable
 corepack install
 ```
 
-These commands will install the appropriate node.js and pnpm version used by isograph and configure them for your shell session.
+These commands will install the appropriate node.js and pnpm version used by Isograph and configure them for your shell session.
 
 ### Rust
 
@@ -158,7 +158,7 @@ pnpm backend
 - Run `pnpm watch-rs` to ensure that the latest binary is being built
 - Restart the "Extension development host" window to use the latest language server binary.
 
-### Logs etc
+### Logs etc.
 
 You can see logs by going to `Show output channel` and selecting `Isograph` or `Isograph LSP Logs`. `Isograph` is the output of the VSCode extension. It is not very interesting. `Isograph LSP Logs` shows the output of the language server binary and the traffic. This is interesting. `eprintln`'s in your Rust code will show up here.
 
