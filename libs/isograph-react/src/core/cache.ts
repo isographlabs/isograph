@@ -29,7 +29,10 @@ import {
   Variables,
   ExtractParameters,
 } from './FragmentReference';
-import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
+import {
+  areEqualObjectsWithDeepComparison,
+  mergeObjectsUsingReaderAst,
+} from './areEqualWithDeepComparison';
 import { makeNetworkRequest } from './makeNetworkRequest';
 import { wrapResolvedValue } from './PromiseWrapper';
 
@@ -268,10 +271,16 @@ function callSubscriptions(
 
             const mergedItem = mergeObjectsUsingReaderAst(
               subscription.readerAst,
-              subscription.encounteredDataAndRecords.item,
-              newEncounteredDataAndRecords.item,
+              subscription.encounteredDataAndRecords.item.data,
+              newEncounteredDataAndRecords.item.data,
             );
-            if (mergedItem !== subscription.encounteredDataAndRecords.item) {
+            if (
+              mergedItem !== subscription.encounteredDataAndRecords.item.data ||
+              !areEqualObjectsWithDeepComparison(
+                subscription.encounteredDataAndRecords.item.parameters,
+                newEncounteredDataAndRecords.item.parameters,
+              )
+            ) {
               // @ts-expect-error
               if (typeof window !== 'undefined' && window.__LOG) {
                 console.log('Deep equality - No', {
