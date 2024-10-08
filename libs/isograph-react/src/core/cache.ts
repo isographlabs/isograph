@@ -24,7 +24,11 @@ import {
 import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
 import { Argument, ArgumentValue } from './util';
 import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
-import { FragmentReference, Variables } from './FragmentReference';
+import {
+  FragmentReference,
+  Variables,
+  ExtractParameters,
+} from './FragmentReference';
 import {
   areEqualObjectsWithDeepComparison,
   mergeObjectsUsingReaderAst,
@@ -85,7 +89,7 @@ export function getOrCreateCacheForArtifact<
 >(
   environment: IsographEnvironment,
   entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
-  variables: Variables,
+  variables: ExtractParameters<TReadFromStore>,
 ): ParentCache<FragmentReference<TReadFromStore, TClientFieldValue>> {
   const cacheKey = entrypoint.queryText + JSON.stringify(stableCopy(variables));
   const factory = () => {
@@ -201,9 +205,7 @@ export function subscribe<
     fragmentReference,
     readerAst,
   };
-  // @ts-expect-error
   environment.subscriptions.add(fragmentSubscription);
-  // @ts-expect-error
   return () => environment.subscriptions.delete(fragmentSubscription);
 }
 

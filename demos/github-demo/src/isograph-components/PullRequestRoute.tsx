@@ -49,7 +49,6 @@ export function PullRequestRoute({
       pullRequestNumber: route.pullRequestNumber,
       repositoryName: route.repositoryName,
       repositoryOwner: route.repositoryOwner,
-      last: 20,
     },
   );
 

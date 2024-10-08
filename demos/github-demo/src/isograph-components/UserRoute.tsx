@@ -47,7 +47,6 @@ export function UserRoute({
     iso(`entrypoint Query.UserPage`),
     {
       userLogin: route.userLogin,
-      first: 20,
     },
   );
   const Component = useResult(fragmentReference, {});

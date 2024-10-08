@@ -1,5 +1,4 @@
-
-import { type Variables } from '@isograph/react';
+import type { Mutation__SetTagline__parameters } from './parameters_type';
 
 export type Mutation__SetTagline__param = {
   readonly data: {
@@ -9,5 +8,5 @@ export type Mutation__SetTagline__param = {
       },
     },
   },
-  readonly parameters: Variables,
+  readonly parameters: Mutation__SetTagline__parameters,
 };
