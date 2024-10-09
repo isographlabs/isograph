@@ -5,6 +5,7 @@ import { FragmentReference, Variables } from './FragmentReference';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { IsographEntrypoint } from './entrypoint';
 import type { ReaderAst } from './reader';
+import type { GetDataId } from './cache';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -39,6 +40,7 @@ type Subscriptions = Set<Subscription>;
 type CacheMap<T> = { [index: string]: ParentCache<T> };
 
 export type IsographEnvironment = {
+  readonly getDataId?: GetDataId;
   readonly store: IsographStore;
   readonly networkFunction: IsographNetworkFunction;
   readonly missingFieldHandler: MissingFieldHandler | null;
@@ -109,6 +111,7 @@ export function createIsographEnvironment(
   store: IsographStore,
   networkFunction: IsographNetworkFunction,
   missingFieldHandler?: MissingFieldHandler,
+  getDataId?: GetDataId,
 ): IsographEnvironment {
   return {
     store,
@@ -121,6 +124,7 @@ export function createIsographEnvironment(
     retainedQueries: new Set(),
     gcBuffer: [],
     gcBufferSize: DEFAULT_GC_BUFFER_SIZE,
+    getDataId,
   };
 }
 

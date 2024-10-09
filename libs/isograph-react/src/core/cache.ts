@@ -131,6 +131,11 @@ type NetworkResponseObject = {
   id?: DataId;
 };
 
+export type GetDataId = (
+  dataToNormalize: NetworkResponseObject,
+  typeName: string,
+) => null | DataId;
+
 export function normalizeData(
   environment: IsographEnvironment,
   normalizationAst: NormalizationAst,
@@ -547,6 +552,7 @@ function normalizeNetworkResponseObject(
     astNode,
     variables,
     index,
+    environment.getDataId,
   );
 
   const newStoreRecord = environment.store[newStoreRecordId] ?? {};
@@ -693,18 +699,28 @@ function getNetworkResponseKey(
 export const FIRST_SPLIT_KEY = '____';
 export const SECOND_SPLIT_KEY = '___';
 
+function defaultGetDataId(
+  dataToNormalize: NetworkResponseObject,
+): string | null {
+  return dataToNormalize.id ?? null;
+}
+
 // Returns a key to look up an item in the store
 function getDataIdOfNetworkResponse(
   parentRecordId: DataId,
   dataToNormalize: NetworkResponseObject,
-  astNode: NormalizationLinkedField | NormalizationScalarField,
+  astNode: NormalizationLinkedField,
   variables: Variables,
   index: number | null,
+  getDataId?: GetDataId,
 ): DataId {
   // Check whether the dataToNormalize has an id field. If so, that is the key.
   // If not, we construct an id from the parentRecordId and the field parameters.
 
-  const dataId = dataToNormalize.id;
+  const dataId = (getDataId ?? defaultGetDataId)(
+    dataToNormalize,
+    astNode.concreteType,
+  );
   if (dataId != null) {
     return dataId;
   }
