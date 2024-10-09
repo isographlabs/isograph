@@ -1,5 +1,4 @@
-
-import { type Variables } from '@isograph/react';
+import type { Query__PetFavoritePhrase__parameters } from './parameters_type';
 
 export type Query__PetFavoritePhrase__param = {
   readonly data: {
@@ -8,5 +7,5 @@ export type Query__PetFavoritePhrase__param = {
       readonly favorite_phrase: (string | null),
     } | null),
   },
-  readonly parameters: Variables,
+  readonly parameters: Query__PetFavoritePhrase__parameters,
 };

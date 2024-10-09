@@ -169,6 +169,7 @@ export function useSkipLimitPagination<
         }
         return clonedRefCountedPointer;
       });
+      // @ts-expect-error
       clonedPointers.push(newPointer);
 
       const totalItemCleanupPair: ItemCleanupPair<

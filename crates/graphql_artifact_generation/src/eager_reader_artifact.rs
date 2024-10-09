@@ -8,11 +8,12 @@ use std::borrow::Cow;
 use std::path::Path;
 use std::{collections::BTreeSet, path::PathBuf, str::FromStr};
 
+use crate::generate_artifacts::generate_parameters;
 use crate::{
     generate_artifacts::{
         generate_client_field_parameter_type, generate_output_type, generate_path,
-        ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE,
-        RESOLVER_READER,
+        ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAMETERS_TYPE,
+        RESOLVER_PARAM_TYPE, RESOLVER_READER,
     },
     import_statements::{
         param_type_imports_to_import_statement, reader_imports_to_import_statement,
@@ -20,14 +21,14 @@ use crate::{
     reader_ast::generate_reader_ast,
 };
 
-pub(crate) fn generate_eager_reader_artifact(
+pub(crate) fn generate_eager_reader_artifacts(
     schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
     project_root: &Path,
     artifact_directory: &Path,
     info: UserWrittenClientFieldInfo,
     refetched_paths: &RefetchedPathsMap,
-) -> ArtifactPathAndContent {
+) -> Vec<ArtifactPathAndContent> {
     let user_written_component_variant = info.user_written_component_variant;
     let parent_type = schema
         .server_field_data
@@ -97,11 +98,27 @@ pub(crate) fn generate_eager_reader_artifact(
         )
     };
 
-    ArtifactPathAndContent {
+    let mut path_and_contents = vec![ArtifactPathAndContent {
         relative_directory: relative_directory.clone(),
         file_name_prefix: *RESOLVER_READER,
         file_content: reader_content,
+    }];
+
+    if !client_field.variable_definitions.is_empty() {
+        let reader_parameters_type =
+            format!("{}__{}__parameters", parent_type.name, client_field.name);
+        let parameters = client_field.variable_definitions.iter().map(|x| &x.item);
+        let parameters_types = generate_parameters(schema, parameters);
+        let parameters_content =
+            format!("export type {reader_parameters_type} = {parameters_types}\n");
+        path_and_contents.push(ArtifactPathAndContent {
+            relative_directory,
+            file_name_prefix: *RESOLVER_PARAMETERS_TYPE,
+            file_content: parameters_content,
+        });
     }
+
+    path_and_contents
 }
 
 pub(crate) fn generate_eager_reader_param_type_artifact(
@@ -124,8 +141,6 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
         &mut loadable_field_encountered,
     );
 
-    // TODO import generated variable types
-    let variables_import_statement = "import { type Variables } from '@isograph/react';\n";
     let param_type_import_statement = param_type_imports_to_import_statement(&param_type_imports);
     let reader_param_type = format!("{}__{}__param", parent_type.name, client_field.name);
 
@@ -135,14 +150,25 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
         ""
     };
 
+    let (parameters_import, parameters_type) = if !client_field.variable_definitions.is_empty() {
+        let reader_parameters_type =
+            format!("{}__{}__parameters", parent_type.name, client_field.name);
+        (
+            format!("import type {{ {reader_parameters_type} }} from './parameters_type';\n"),
+            reader_parameters_type,
+        )
+    } else {
+        ("".to_string(), "Record<string, never>".to_string())
+    };
+
     let indent = "  ";
     let param_type_content = format!(
-        "{param_type_import_statement}\n\
+        "{param_type_import_statement}\
         {loadable_field_import}\
-        {variables_import_statement}\n\
+        {parameters_import}\n\
         export type {reader_param_type} = {{\n\
         {indent}readonly data: {client_field_parameter_type},\n\
-        {indent}readonly parameters: Variables,\n\
+        {indent}readonly parameters: {parameters_type},\n\
         }};\n",
     );
     ArtifactPathAndContent {

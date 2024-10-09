@@ -1,5 +1,9 @@
 import { Factory } from '@isograph/disposable-types';
-import { FragmentReference, Variables } from './FragmentReference';
+import {
+  FragmentReference,
+  ExtractParameters,
+  ExtractData,
+} from './FragmentReference';
 import {
   ComponentOrFieldName,
   DataId,
@@ -17,43 +21,39 @@ export type TopLevelReaderArtifact<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
   TComponentProps extends Record<string, never>,
-  TVariables = Variables,
 > =
-  | EagerReaderArtifact<TReadFromStore, TClientFieldValue, TVariables>
-  | ComponentReaderArtifact<TReadFromStore, TComponentProps, TVariables>;
+  | EagerReaderArtifact<TReadFromStore, TClientFieldValue>
+  | ComponentReaderArtifact<TReadFromStore, TComponentProps>;
 
 export type EagerReaderArtifact<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
-  TVariables = Variables,
 > = {
   readonly kind: 'EagerReaderArtifact';
   readonly readerAst: ReaderAst<TReadFromStore>;
   readonly resolver: (
-    data: ResolverFirstParameter<TReadFromStore, TVariables>,
+    data: ResolverFirstParameter<TReadFromStore>,
   ) => TClientFieldValue;
 };
 
 export type ComponentReaderArtifact<
   TReadFromStore extends { parameters: object; data: object },
   TComponentProps extends Record<string, unknown> = Record<string, never>,
-  TVariables = Variables,
 > = {
   readonly kind: 'ComponentReaderArtifact';
   readonly componentName: ComponentOrFieldName;
   readonly readerAst: ReaderAst<TReadFromStore>;
   readonly resolver: (
-    data: ResolverFirstParameter<TReadFromStore, TVariables>,
+    data: ResolverFirstParameter<TReadFromStore>,
     runtimeProps: TComponentProps,
   ) => React.ReactNode;
 };
 
 export type ResolverFirstParameter<
-  TReadFromStore extends object,
-  TVariables = Variables,
+  TReadFromStore extends { data: object; parameters: object },
 > = {
-  readonly data: TReadFromStore;
-  readonly parameters: TVariables;
+  data: ExtractData<TReadFromStore>;
+  parameters: ExtractParameters<TReadFromStore>;
 };
 
 export type RefetchReaderArtifact = {
