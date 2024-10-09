@@ -287,14 +287,14 @@ fn get_all_errors_or_all_ok<T, E>(
 }
 
 fn get_all_errors_or_tuple_ok<T1, T2, E>(
-    a: Result<T1, Vec<E>>,
-    b: Result<T2, Vec<E>>,
+    a: Result<T1, impl IntoIterator<Item = E>>,
+    b: Result<T2, impl IntoIterator<Item = E>>,
 ) -> Result<(T1, T2), Vec<E>> {
     match (a, b) {
         (Ok(v1), Ok(v2)) => Ok((v1, v2)),
         (Err(e1), Err(e2)) => Err(e1.into_iter().chain(e2.into_iter()).collect()),
-        (_, Err(e)) => Err(e),
-        (Err(e), _) => Err(e),
+        (_, Err(e)) => Err(e.into_iter().collect()),
+        (Err(e), _) => Err(e.into_iter().collect()),
     }
 }
 
@@ -519,15 +519,13 @@ fn validate_client_field_selection_set(
                 unvalidated_client_field.name,
             )
             .map_err(|errs| {
-                errs.into_iter()
-                    .map(|err| {
-                        validate_selections_error_to_validate_schema_error(
-                            err,
-                            parent_object,
-                            unvalidated_client_field.name,
-                        )
-                    })
-                    .collect::<Vec<_>>()
+                errs.into_iter().map(|err| {
+                    validate_selections_error_to_validate_schema_error(
+                        err,
+                        parent_object,
+                        unvalidated_client_field.name,
+                    )
+                })
             })
         })
         .transpose();
