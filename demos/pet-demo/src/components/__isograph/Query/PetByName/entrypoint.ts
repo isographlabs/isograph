@@ -21,6 +21,7 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "name" },
       ],
     ],
+    concreteType: "Pet",
     selections: [
       {
         kind: "Scalar",

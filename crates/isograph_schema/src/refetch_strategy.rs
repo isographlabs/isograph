@@ -1,7 +1,8 @@
 use std::{collections::BTreeSet, fmt::Debug};
 
 use common_lang_types::{
-    LinkedFieldName, Location, QueryOperationName, Span, VariableName, WithLocation, WithSpan,
+    IsographObjectTypeName, LinkedFieldName, Location, QueryOperationName, Span, VariableName,
+    WithLocation, WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -72,6 +73,7 @@ pub fn generate_refetch_field_strategy<
     top_level_arguments: Vec<ArgumentKeyAndValue>,
     refine_to_type: RequiresRefinement,
     subfield: Option<LinkedFieldName>,
+    concrete_type: IsographObjectTypeName,
 ) -> UseRefetchFieldRefetchStrategy<
     TClientFieldSelectionScalarFieldAssociatedData,
     TClientFieldSelectionLinkedFieldAssociatedData,
@@ -84,6 +86,7 @@ pub fn generate_refetch_field_strategy<
             top_level_arguments,
             refine_to_type,
             subfield,
+            concrete_type,
         }),
         refetch_query_name,
     }
@@ -128,6 +131,7 @@ struct GenerateRefetchQueryImpl {
     top_level_field_name: LinkedFieldName,
     top_level_arguments: Vec<ArgumentKeyAndValue>,
     refine_to_type: RequiresRefinement,
+    concrete_type: IsographObjectTypeName,
     subfield: Option<LinkedFieldName>,
 }
 
@@ -143,6 +147,7 @@ impl GenerateRefetchQueryFn for GenerateRefetchQueryImpl {
             self.top_level_arguments.clone(),
             self.subfield,
             self.refine_to_type,
+            self.concrete_type,
         );
 
         // TODO this seems like a bunch of extra work, and we shouldn't need to do it

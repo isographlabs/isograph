@@ -110,6 +110,7 @@ impl MergedScalarFieldSelection {
 pub struct MergedLinkedFieldSelection {
     // TODO no location
     pub name: LinkedFieldName,
+    pub concrete_type: IsographObjectTypeName,
     pub selection_map: MergedSelectionMap,
     pub arguments: Vec<ArgumentKeyAndValue>,
 }
@@ -302,6 +303,7 @@ fn transform_and_merge_child_selection_map_into_parent_map(
                     }
                     MergedServerSelection::LinkedField(linked_field_selection) => {
                         MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
+                            concrete_type: linked_field_selection.concrete_type,
                             name: linked_field_selection.name,
                             selection_map: transform_child_map_with_parent_context(
                                 &linked_field_selection.selection_map,
@@ -547,6 +549,7 @@ fn process_imperatively_loaded_field(
             .as_ref()
             .map(|x| x.primary_field_name.lookup().intern().into()),
         requires_refinement,
+        refetch_field_parent_type.name,
     );
 
     let root_parent_object = schema
@@ -739,6 +742,9 @@ fn merge_validated_selections_into_selection_map(
                         let linked_field =
                             parent_map.entry(normalization_key).or_insert_with(|| {
                                 MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
+                                    concrete_type: linked_field_selection
+                                        .associated_data
+                                        .concrete_type,
                                     name: linked_field_selection.name.item,
                                     selection_map: BTreeMap::new(),
                                     arguments: transform_arguments_with_child_context(
@@ -989,14 +995,15 @@ pub fn selection_map_wrapped(
     top_level_field_arguments: Vec<ArgumentKeyAndValue>,
     // TODO support arguments and vectors of subfields
     subfield: Option<LinkedFieldName>,
-    type_to_refine_to: RequiresRefinement,
+    requires_refinement: RequiresRefinement,
+    concrete_type: IsographObjectTypeName,
 ) -> MergedSelectionMap {
     // We are proceeding inside out, i.e. creating
     // `mutation_name { subfield { ...on Type { existing_selection_set }}}`
     // first by creating the inline fragment, then subfield, etc.
 
     // Should we wrap the selection set in a type to refine to?
-    let selection_set_with_inline_fragment = match type_to_refine_to {
+    let selection_set_with_inline_fragment = match requires_refinement {
         RequiresRefinement::Yes(type_to_refine_to) => {
             maybe_add_typename_selection(&mut inner_selection_map);
             let mut map = BTreeMap::new();
@@ -1021,6 +1028,7 @@ pub fn selection_map_wrapped(
                     arguments: vec![],
                 }),
                 MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
+                    concrete_type,
                     name: subfield,
                     selection_map: selection_set_with_inline_fragment,
                     arguments: vec![],
@@ -1038,6 +1046,7 @@ pub fn selection_map_wrapped(
             arguments: top_level_field_arguments.clone(),
         }),
         MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
+            concrete_type,
             name: top_level_field,
             selection_map: selection_set_with_subfield,
             arguments: top_level_field_arguments,

@@ -276,6 +276,11 @@ impl UnvalidatedSchema {
                         // for this.
                         RequiresRefinement::No,
                         Some(primary_field_name),
+                        // This is blatantly incorrect - at this point, we don't know whether
+                        // type is concrete, since the same field is copied from the abstract
+                        // type to the concrete type. So, when we do that, we need to account
+                        // for this.
+                        maybe_abstract_parent_type_name.lookup().intern().into(),
                     ),
                 )),
             };

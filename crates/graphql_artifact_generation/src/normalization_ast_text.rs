@@ -48,6 +48,7 @@ fn generate_normalization_ast_node(
                 name,
                 selection_map,
                 arguments,
+                concrete_type,
                 ..
             } = linked_field;
             let indent = "  ".repeat(indentation_level as usize);
@@ -66,6 +67,7 @@ fn generate_normalization_ast_node(
                 {indent_2}kind: \"Linked\",\n\
                 {indent_2}fieldName: \"{name}\",\n\
                 {indent_2}arguments: {serialized_arguments},\n\
+                {indent_2}concreteType: \"{concrete_type}\",\n\
                 {indent_2}selections: {selections},\n\
                 {indent}}},\n"
             )

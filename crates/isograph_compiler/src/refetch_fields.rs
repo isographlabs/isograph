@@ -82,6 +82,7 @@ fn add_refetch_field_to_object(
                         id_top_level_arguments(),
                         RequiresRefinement::Yes(object.name),
                         None,
+                        object.name,
                     ))
                 }),
             });
