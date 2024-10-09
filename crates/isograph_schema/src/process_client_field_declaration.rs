@@ -110,7 +110,7 @@ impl UnvalidatedSchema {
                     *NODE_FIELD_NAME,
                     id_top_level_arguments(),
                     RequiresRefinement::Yes(object.name),
-                    None,
+                    None
                 ))
             }),
         });
