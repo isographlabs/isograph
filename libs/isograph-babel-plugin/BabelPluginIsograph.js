@@ -9,12 +9,11 @@ const configExplorer = cosmiconfig('isograph', {
     '.json': cosmiconfig.loadJson,
   },
 });
-
-/** @type {import("cosmiconfig").Config} */
+/** @type {NonNullable<import("cosmiconfig").CosmiconfigResult>} */
 let IsographConfig;
 const result = configExplorer.searchSync();
 if (result) {
-  IsographConfig = result.config;
+  IsographConfig = result;
 } else {
   throw new Error(
     'No config found. Do you have a isograph.config.json file somewhere?',
