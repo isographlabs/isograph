@@ -1,5 +1,5 @@
 import { CleanupFn } from '@isograph/isograph-disposable-types/dist';
-import { getParentRecordKey, onNextChange } from './cache';
+import { getParentRecordKey, onNextChange, type EncounteredIds } from './cache';
 import { getOrCreateCachedComponent } from './componentCache';
 import {
   IsographEntrypoint,
@@ -17,6 +17,7 @@ import {
   defaultMissingFieldHandler,
   getOrLoadIsographArtifact,
   IsographEnvironment,
+  type TypeName,
 } from './IsographEnvironment';
 import { makeNetworkRequest } from './makeNetworkRequest';
 import {
@@ -30,7 +31,7 @@ import { ReaderAst } from './reader';
 import { Arguments } from './util';
 
 export type WithEncounteredRecords<T> = {
-  readonly encounteredRecords: Set<DataId>;
+  readonly encounteredRecords: EncounteredIds;
   readonly item: ExtractData<T>;
 };
 
@@ -41,7 +42,7 @@ export function readButDoNotEvaluate<
   fragmentReference: FragmentReference<TReadFromStore, unknown>,
   networkRequestOptions: NetworkRequestReaderOptions,
 ): WithEncounteredRecords<TReadFromStore> {
-  const mutableEncounteredRecords = new Set<DataId>();
+  const mutableEncounteredRecords: EncounteredIds = {};
 
   const readerWithRefetchQueries = readPromise(
     fragmentReference.readerWithRefetchQueries,
@@ -56,6 +57,7 @@ export function readButDoNotEvaluate<
     fragmentReference.networkRequest,
     networkRequestOptions,
     mutableEncounteredRecords,
+    readerWithRefetchQueries.readerArtifact.concreteType,
   );
   // @ts-expect-error
   if (typeof window !== 'undefined' && window.__LOG) {
@@ -94,7 +96,7 @@ type ReadDataResult<TReadFromStore> =
   | {
       readonly kind: 'Success';
       readonly data: ExtractData<TReadFromStore>;
-      readonly encounteredRecords: Set<DataId>;
+      readonly encounteredRecords: EncounteredIds;
     }
   | {
       readonly kind: 'MissingData';
@@ -110,14 +112,15 @@ function readData<TReadFromStore>(
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
-  mutableEncounteredRecords: Set<DataId>,
+  mutableEncounteredRecords: EncounteredIds,
+  typeName: TypeName,
 ): ReadDataResult<TReadFromStore> {
-  mutableEncounteredRecords.add(root);
-  let storeRecord = environment.store[root];
+  (mutableEncounteredRecords[typeName] ??= new Set()).add(root);
+  let storeRecord = environment.store[typeName]?.[root];
   if (storeRecord === undefined) {
     return {
       kind: 'MissingData',
-      reason: 'No record for root ' + root,
+      reason: 'No record for root ' + root + ' and concrete type ' + typeName,
     };
   }
 
@@ -178,6 +181,7 @@ function readData<TReadFromStore>(
               networkRequest,
               networkRequestOptions,
               mutableEncounteredRecords,
+              field.concreteType,
             );
             if (result.kind === 'MissingData') {
               return {
@@ -237,6 +241,7 @@ function readData<TReadFromStore>(
           networkRequest,
           networkRequestOptions,
           mutableEncounteredRecords,
+          field.concreteType,
         );
         if (data.kind === 'MissingData') {
           return {
@@ -263,6 +268,7 @@ function readData<TReadFromStore>(
           networkRequest,
           networkRequestOptions,
           mutableEncounteredRecords,
+          typeName,
         );
         if (data.kind === 'MissingData') {
           return {
@@ -316,6 +322,7 @@ function readData<TReadFromStore>(
               networkRequest,
               networkRequestOptions,
               mutableEncounteredRecords,
+              typeName,
             );
             if (data.kind === 'MissingData') {
               return {
@@ -371,6 +378,7 @@ function readData<TReadFromStore>(
           networkRequest,
           networkRequestOptions,
           mutableEncounteredRecords,
+          typeName,
         );
         if (refetchReaderParams.kind === 'MissingData') {
           return {

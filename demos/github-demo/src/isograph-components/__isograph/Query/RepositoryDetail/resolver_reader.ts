@@ -21,6 +21,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
         { kind: "Variable", name: "repositoryOwner" },
       ],
     ],
+    concreteType: "Repository",
     selections: [
       {
         kind: "Resolver",
@@ -40,6 +41,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
         fieldName: "parent",
         alias: null,
         arguments: null,
+        concreteType: "Repository",
         selections: [
           {
             kind: "Resolver",
@@ -66,6 +68,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
             { kind: "Variable", name: "first" },
           ],
         ],
+        concreteType: "PullRequestConnection",
         selections: [
           {
             kind: "Resolver",
@@ -88,6 +91,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.RepositoryDetail",
   resolver,
   readerAst,
+  concreteType: "Query",
 };
 
 export default artifact;

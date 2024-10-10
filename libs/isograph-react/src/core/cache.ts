@@ -12,6 +12,7 @@ import {
   DataTypeValue,
   getLink,
   FragmentSubscription,
+  type TypeName,
 } from './IsographEnvironment';
 import {
   IsographEntrypoint,
@@ -137,8 +138,8 @@ export function normalizeData(
   networkResponse: NetworkResponseObject,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
-): Set<DataId> {
-  const encounteredIds = new Set<DataId>();
+): EncounteredIds {
+  const encounteredIds: EncounteredIds = {};
 
   // @ts-expect-error
   if (typeof window !== 'undefined' && window.__LOG) {
@@ -153,9 +154,9 @@ export function normalizeData(
     environment,
     normalizationAst,
     networkResponse,
-    environment.store.__ROOT,
-    ROOT_ID,
-    variables as any,
+    environment.store.Query.__ROOT,
+    { id: ROOT_ID, concreteType: 'Query' },
+    variables,
     nestedRefetchQueries,
     encounteredIds,
   );
@@ -230,7 +231,7 @@ function withErrorHandling<T>(f: (t: T) => void): (t: T) => void {
 
 function callSubscriptions(
   environment: IsographEnvironment,
-  recordsEncounteredWhenNormalizing: Set<DataId>,
+  recordsEncounteredWhenNormalizing: EncounteredIds,
 ) {
   environment.subscriptions.forEach(
     withErrorHandling((subscription) => {
@@ -307,13 +308,22 @@ function callSubscriptions(
   );
 }
 
-function hasOverlappingIds(set1: Set<DataId>, set2: Set<DataId>): boolean {
-  for (const id of set1) {
-    if (set2.has(id)) {
-      return true;
+function hasOverlappingIds(
+  set1: EncounteredIds,
+  set2: EncounteredIds,
+): boolean {
+  for (const typeName in set1) {
+    for (const id of set1[typeName]) {
+      if (set2[typeName]?.has(id)) {
+        return true;
+      }
     }
   }
   return false;
+}
+
+export interface EncounteredIds {
+  [typeName: TypeName]: Set<DataId>;
 }
 
 /**
@@ -324,10 +334,10 @@ function normalizeDataIntoRecord(
   normalizationAst: NormalizationAst,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
-  targetParentRecordId: DataId,
+  targetParentRecordId: ParentRecordId,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
-  mutableEncounteredIds: Set<DataId>,
+  mutableEncounteredIds: EncounteredIds,
 ): RecordHasBeenUpdated {
   let recordHasBeenUpdated = false;
   for (const normalizationNode of normalizationAst) {
@@ -382,7 +392,8 @@ function normalizeDataIntoRecord(
     }
   }
   if (recordHasBeenUpdated) {
-    mutableEncounteredIds.add(targetParentRecordId);
+    (mutableEncounteredIds[targetParentRecordId.concreteType] ??=
+      new Set()).add(targetParentRecordId.id);
   }
   return recordHasBeenUpdated;
 }
@@ -418,10 +429,10 @@ function normalizeLinkedField(
   astNode: NormalizationLinkedField,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
-  targetParentRecordId: DataId,
+  targetParentRecordId: ParentRecordId,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
-  mutableEncounteredIds: Set<DataId>,
+  mutableEncounteredIds: EncounteredIds,
 ): RecordHasBeenUpdated {
   const networkResponseKey = getNetworkResponseKey(astNode);
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
@@ -487,10 +498,10 @@ function normalizeInlineFragment(
   astNode: NormalizationInlineFragment,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
-  targetParentRecordId: DataId,
+  targetParentRecordId: ParentRecordId,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
-  mutableEncounteredIds: Set<DataId>,
+  mutableEncounteredIds: EncounteredIds,
 ): RecordHasBeenUpdated {
   const typeToRefineTo = astNode.type;
   if (networkResponseParentRecord[TYPENAME_FIELD_NAME] === typeToRefineTo) {
@@ -535,11 +546,11 @@ function normalizeNetworkResponseObject(
   environment: IsographEnvironment,
   astNode: NormalizationLinkedField,
   networkResponseData: NetworkResponseObject,
-  targetParentRecordId: string,
+  targetParentRecordId: ParentRecordId,
   variables: Variables,
   index: number | null,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
-  mutableEncounteredIds: Set<DataId>,
+  mutableEncounteredIds: EncounteredIds,
 ): DataId /* The id of the modified or newly created item */ {
   const newStoreRecordId = getDataIdOfNetworkResponse(
     targetParentRecordId,
@@ -549,15 +560,18 @@ function normalizeNetworkResponseObject(
     index,
   );
 
-  const newStoreRecord = environment.store[newStoreRecordId] ?? {};
-  environment.store[newStoreRecordId] = newStoreRecord;
+  const newStoreRecord =
+    environment.store[astNode.concreteType]?.[newStoreRecordId] ?? {};
+
+  (environment.store[astNode.concreteType] ??= {})[newStoreRecordId] =
+    newStoreRecord;
 
   normalizeDataIntoRecord(
     environment,
     astNode.selections,
     networkResponseData,
     newStoreRecord,
-    newStoreRecordId,
+    { id: newStoreRecordId, concreteType: astNode.concreteType },
     variables,
     nestedRefetchQueries,
     mutableEncounteredIds,
@@ -693,11 +707,16 @@ function getNetworkResponseKey(
 export const FIRST_SPLIT_KEY = '____';
 export const SECOND_SPLIT_KEY = '___';
 
+interface ParentRecordId {
+  concreteType: TypeName;
+  id: DataId;
+}
+
 // Returns a key to look up an item in the store
 function getDataIdOfNetworkResponse(
-  parentRecordId: DataId,
+  parentRecordId: ParentRecordId,
   dataToNormalize: NetworkResponseObject,
-  astNode: NormalizationLinkedField | NormalizationScalarField,
+  astNode: NormalizationLinkedField,
   variables: Variables,
   index: number | null,
 ): DataId {
@@ -709,7 +728,7 @@ function getDataIdOfNetworkResponse(
     return dataId;
   }
 
-  let storeKey = `${parentRecordId}.${astNode.fieldName}`;
+  let storeKey = `${parentRecordId.concreteType}:${parentRecordId.id}.${astNode.fieldName}`;
   if (index != null) {
     storeKey += `.${index}`;
   }

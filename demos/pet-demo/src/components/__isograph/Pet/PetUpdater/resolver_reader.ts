@@ -18,6 +18,7 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
     fieldName: "potential_new_best_friends",
     alias: null,
     arguments: null,
+    concreteType: "Pet",
     selections: [
       {
         kind: "Scalar",
@@ -63,6 +64,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Pet.PetUpdater",
   resolver,
   readerAst,
+  concreteType: "Pet",
 };
 
 export default artifact;

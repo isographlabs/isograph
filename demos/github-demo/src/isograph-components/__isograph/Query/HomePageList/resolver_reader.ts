@@ -10,6 +10,7 @@ const readerAst: ReaderAst<Query__HomePageList__param> = [
     fieldName: "viewer",
     alias: null,
     arguments: null,
+    concreteType: "User",
     selections: [
       {
         kind: "Scalar",
@@ -49,6 +50,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.HomePageList",
   resolver,
   readerAst,
+  concreteType: "Query",
 };
 
 export default artifact;

@@ -44,6 +44,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.RepositoryPage",
   resolver,
   readerAst,
+  concreteType: "Query",
 };
 
 export default artifact;

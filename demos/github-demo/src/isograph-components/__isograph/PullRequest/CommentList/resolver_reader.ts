@@ -14,18 +14,21 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
         { kind: "Literal", value: null },
       ],
     ],
+    concreteType: "IssueCommentConnection",
     selections: [
       {
         kind: "Linked",
         fieldName: "edges",
         alias: null,
         arguments: null,
+        concreteType: "IssueCommentEdge",
         selections: [
           {
             kind: "Linked",
             fieldName: "node",
             alias: null,
             arguments: null,
+            concreteType: "IssueComment",
             selections: [
               {
                 kind: "Scalar",
@@ -51,6 +54,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
                 fieldName: "author",
                 alias: null,
                 arguments: null,
+                concreteType: "Actor",
                 selections: [
                   {
                     kind: "Scalar",
@@ -76,6 +80,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "PullRequest.CommentList",
   resolver,
   readerAst,
+  concreteType: "PullRequest",
 };
 
 export default artifact;

@@ -23,6 +23,7 @@ const normalizationAst: NormalizationAst = [
     kind: "Linked",
     fieldName: "me",
     arguments: null,
+    concreteType: "Economist",
     selections: [
       {
         kind: "Scalar",
@@ -38,6 +39,7 @@ const normalizationAst: NormalizationAst = [
         kind: "Linked",
         fieldName: "successor",
         arguments: null,
+        concreteType: "Economist",
         selections: [
           {
             kind: "Scalar",
@@ -48,6 +50,7 @@ const normalizationAst: NormalizationAst = [
             kind: "Linked",
             fieldName: "successor",
             arguments: null,
+            concreteType: "Economist",
             selections: [
               {
                 kind: "Scalar",

@@ -19,6 +19,7 @@ const artifact: EagerReaderArtifact<
   kind: "EagerReaderArtifact",
   resolver,
   readerAst,
+  concreteType: "PullRequest",
 };
 
 export default artifact;

@@ -31,6 +31,7 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "id" },
       ],
     ],
+    concreteType: "Pet",
     selections: [
       {
         kind: "InlineFragment",
@@ -60,6 +61,7 @@ const normalizationAst: NormalizationAst = [
                 { kind: "Variable", name: "limit" },
               ],
             ],
+            concreteType: "Checkin",
             selections: [
               {
                 kind: "Scalar",

@@ -25,6 +25,7 @@ const readerAst: ReaderAst<Pet__PetCheckinsCard__param> = [
         { kind: "Variable", name: "limit" },
       ],
     ],
+    concreteType: "Checkin",
     selections: [
       {
         kind: "Resolver",
@@ -51,6 +52,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Pet.PetCheckinsCard",
   resolver,
   readerAst,
+  concreteType: "Pet",
 };
 
 export default artifact;

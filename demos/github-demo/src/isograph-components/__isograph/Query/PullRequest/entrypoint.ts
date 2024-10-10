@@ -47,6 +47,7 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "repositoryName" },
       ],
     ],
+    concreteType: "Repository",
     selections: [
       {
         kind: "Scalar",
@@ -62,6 +63,7 @@ const normalizationAst: NormalizationAst = [
             { kind: "Variable", name: "pullRequestNumber" },
           ],
         ],
+        concreteType: "PullRequest",
         selections: [
           {
             kind: "Scalar",
@@ -82,16 +84,19 @@ const normalizationAst: NormalizationAst = [
                 { kind: "Literal", value: null },
               ],
             ],
+            concreteType: "IssueCommentConnection",
             selections: [
               {
                 kind: "Linked",
                 fieldName: "edges",
                 arguments: null,
+                concreteType: "IssueCommentEdge",
                 selections: [
                   {
                     kind: "Linked",
                     fieldName: "node",
                     arguments: null,
+                    concreteType: "IssueComment",
                     selections: [
                       {
                         kind: "Scalar",
@@ -102,6 +107,7 @@ const normalizationAst: NormalizationAst = [
                         kind: "Linked",
                         fieldName: "author",
                         arguments: null,
+                        concreteType: "Actor",
                         selections: [
                           {
                             kind: "Scalar",
@@ -139,6 +145,7 @@ const normalizationAst: NormalizationAst = [
     kind: "Linked",
     fieldName: "viewer",
     arguments: null,
+    concreteType: "User",
     selections: [
       {
         kind: "Scalar",

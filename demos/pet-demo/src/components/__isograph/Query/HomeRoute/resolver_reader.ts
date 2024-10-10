@@ -9,6 +9,7 @@ const readerAst: ReaderAst<Query__HomeRoute__param> = [
     fieldName: "pets",
     alias: null,
     arguments: null,
+    concreteType: "Pet",
     selections: [
       {
         kind: "Scalar",
@@ -35,6 +36,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.HomeRoute",
   resolver,
   readerAst,
+  concreteType: "Query",
 };
 
 export default artifact;

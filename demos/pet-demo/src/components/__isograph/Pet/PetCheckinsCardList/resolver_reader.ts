@@ -20,6 +20,7 @@ const readerAst: ReaderAst<Pet__PetCheckinsCardList__param> = [
         { kind: "Variable", name: "limit" },
       ],
     ],
+    concreteType: "Checkin",
     selections: [
       {
         kind: "Resolver",
@@ -45,6 +46,7 @@ const artifact: EagerReaderArtifact<
   kind: "EagerReaderArtifact",
   resolver,
   readerAst,
+  concreteType: "Pet",
 };
 
 export default artifact;

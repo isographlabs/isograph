@@ -43,6 +43,7 @@ const normalizationAst: NormalizationAst = [
     kind: "Linked",
     fieldName: "viewer",
     arguments: null,
+    concreteType: "User",
     selections: [
       {
         kind: "Scalar",
@@ -73,16 +74,19 @@ const normalizationAst: NormalizationAst = [
             { kind: "Literal", value: 10 },
           ],
         ],
+        concreteType: "RepositoryConnection",
         selections: [
           {
             kind: "Linked",
             fieldName: "edges",
             arguments: null,
+            concreteType: "RepositoryEdge",
             selections: [
               {
                 kind: "Linked",
                 fieldName: "node",
                 arguments: null,
+                concreteType: "Repository",
                 selections: [
                   {
                     kind: "Scalar",
@@ -113,6 +117,7 @@ const normalizationAst: NormalizationAst = [
                     kind: "Linked",
                     fieldName: "owner",
                     arguments: null,
+                    concreteType: "RepositoryOwner",
                     selections: [
                       {
                         kind: "Scalar",
@@ -130,6 +135,7 @@ const normalizationAst: NormalizationAst = [
                     kind: "Linked",
                     fieldName: "pullRequests",
                     arguments: null,
+                    concreteType: "PullRequestConnection",
                     selections: [
                       {
                         kind: "Scalar",
@@ -147,6 +153,7 @@ const normalizationAst: NormalizationAst = [
                     kind: "Linked",
                     fieldName: "watchers",
                     arguments: null,
+                    concreteType: "UserConnection",
                     selections: [
                       {
                         kind: "Scalar",

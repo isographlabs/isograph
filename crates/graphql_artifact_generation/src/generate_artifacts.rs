@@ -146,6 +146,7 @@ pub fn get_artifact_path_and_content(
                         vec![id_arg.clone()],
                         None,
                         RequiresRefinement::Yes(type_to_refine_to),
+                        type_to_refine_to,
                     );
                     let id_var = ValidatedVariableDefinition {
                         name: WithLocation::new("id".intern().into(), Location::Generated),

@@ -95,13 +95,18 @@ export type StoreRecord = {
   readonly id?: DataId;
 };
 
+export type TypeName = string;
 export type DataId = string;
 
 export const ROOT_ID: DataId & '__ROOT' = '__ROOT';
 
 export type IsographStore = {
-  [index: DataId]: StoreRecord | null;
-  readonly __ROOT: StoreRecord;
+  [index: TypeName]: {
+    [index: DataId]: StoreRecord | null;
+  } | null;
+  readonly Query: {
+    readonly __ROOT: StoreRecord;
+  };
 };
 
 const DEFAULT_GC_BUFFER_SIZE = 10;
@@ -126,7 +131,9 @@ export function createIsographEnvironment(
 
 export function createIsographStore(): IsographStore {
   return {
-    [ROOT_ID]: {},
+    Query: {
+      [ROOT_ID]: {},
+    },
   };
 }
 

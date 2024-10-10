@@ -19,6 +19,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Image.ImageDisplay",
   resolver,
   readerAst,
+  concreteType: "Image",
 };
 
 export default artifact;

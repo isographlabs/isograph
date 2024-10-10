@@ -22,11 +22,13 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "id" },
       ],
     ],
+    concreteType: "PetStats",
     selections: [
       {
         kind: "Linked",
         fieldName: "stats",
         arguments: null,
+        concreteType: "PetStats",
         selections: [
           {
             kind: "Scalar",

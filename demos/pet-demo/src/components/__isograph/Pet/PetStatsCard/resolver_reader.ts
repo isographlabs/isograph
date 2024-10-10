@@ -27,6 +27,7 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
     fieldName: "stats",
     alias: null,
     arguments: null,
+    concreteType: "PetStats",
     selections: [
       {
         kind: "Scalar",
@@ -83,6 +84,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Pet.PetStatsCard",
   resolver,
   readerAst,
+  concreteType: "Pet",
 };
 
 export default artifact;

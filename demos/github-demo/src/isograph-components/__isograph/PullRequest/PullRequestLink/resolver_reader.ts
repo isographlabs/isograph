@@ -14,6 +14,7 @@ const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
     fieldName: "repository",
     alias: null,
     arguments: null,
+    concreteType: "Repository",
     selections: [
       {
         kind: "Scalar",
@@ -26,6 +27,7 @@ const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
         fieldName: "owner",
         alias: null,
         arguments: null,
+        concreteType: "RepositoryOwner",
         selections: [
           {
             kind: "Scalar",
@@ -47,6 +49,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "PullRequest.PullRequestLink",
   resolver,
   readerAst,
+  concreteType: "PullRequest",
 };
 
 export default artifact;

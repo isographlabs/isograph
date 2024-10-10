@@ -9,6 +9,7 @@ const readerAst: ReaderAst<Query__meName__param> = [
     fieldName: "me",
     alias: null,
     arguments: null,
+    concreteType: "Economist",
     selections: [
       {
         kind: "Scalar",
@@ -27,6 +28,7 @@ const artifact: EagerReaderArtifact<
   kind: "EagerReaderArtifact",
   resolver,
   readerAst,
+  concreteType: "Query",
 };
 
 export default artifact;

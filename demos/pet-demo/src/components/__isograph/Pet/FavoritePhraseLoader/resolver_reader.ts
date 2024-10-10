@@ -19,6 +19,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Pet.FavoritePhraseLoader",
   resolver,
   readerAst,
+  concreteType: "Pet",
 };
 
 export default artifact;

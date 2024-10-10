@@ -9,6 +9,7 @@ const readerAst: ReaderAst<Query__meNameSuccessor__param> = [
     fieldName: "me",
     alias: null,
     arguments: null,
+    concreteType: "Economist",
     selections: [
       {
         kind: "Scalar",
@@ -21,12 +22,14 @@ const readerAst: ReaderAst<Query__meNameSuccessor__param> = [
         fieldName: "successor",
         alias: null,
         arguments: null,
+        concreteType: "Economist",
         selections: [
           {
             kind: "Linked",
             fieldName: "successor",
             alias: null,
             arguments: null,
+            concreteType: "Economist",
             selections: [
               {
                 kind: "Scalar",
@@ -49,6 +52,7 @@ const artifact: EagerReaderArtifact<
   kind: "EagerReaderArtifact",
   resolver,
   readerAst,
+  concreteType: "Query",
 };
 
 export default artifact;
