@@ -25,6 +25,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "AdItem.AdItemDisplay",
   resolver,
   readerAst,
+  concreteType: "AdItem",
 };
 
 export default artifact;

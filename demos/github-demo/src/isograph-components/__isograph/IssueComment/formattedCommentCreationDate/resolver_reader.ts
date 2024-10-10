@@ -19,6 +19,7 @@ const artifact: EagerReaderArtifact<
   kind: "EagerReaderArtifact",
   resolver,
   readerAst,
+  concreteType: "IssueComment",
 };
 
 export default artifact;

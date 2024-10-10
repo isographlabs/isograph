@@ -133,8 +133,6 @@ export type ReaderLoadableField = {
   readonly entrypoint:
     | IsographEntrypoint<any, any>
     | IsographEntrypointLoader<any, any>;
-
-  readonly concreteType: TypeName;
 };
 
 type StableId = string;

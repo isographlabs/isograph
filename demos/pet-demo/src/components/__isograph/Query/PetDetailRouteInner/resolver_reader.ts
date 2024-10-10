@@ -18,6 +18,7 @@ const readerAst: ReaderAst<Query__PetDetailRouteInner__param> = [
         { kind: "Variable", name: "actualId" },
       ],
     ],
+    concreteType: "Pet",
     selections: [
       {
         kind: "Scalar",
@@ -72,6 +73,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.PetDetailRouteInner",
   resolver,
   readerAst,
+  concreteType: "Query",
 };
 
 export default artifact;

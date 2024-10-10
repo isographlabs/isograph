@@ -19,6 +19,7 @@ const readerAst: ReaderAst<Pet__FirstCheckinMakeSuperButton__param> = [
         { kind: "Literal", value: 1 },
       ],
     ],
+    concreteType: "Checkin",
     selections: [
       {
         kind: "ImperativelyLoadedField",
@@ -45,6 +46,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Pet.FirstCheckinMakeSuperButton",
   resolver,
   readerAst,
+  concreteType: "Pet",
 };
 
 export default artifact;

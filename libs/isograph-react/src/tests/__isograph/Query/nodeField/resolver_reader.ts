@@ -14,6 +14,7 @@ const readerAst: ReaderAst<Query__nodeField__param> = [
         { kind: "Variable", name: "id" },
       ],
     ],
+    concreteType: "Node",
     selections: [
       {
         kind: "Scalar",
@@ -32,6 +33,7 @@ const artifact: EagerReaderArtifact<
   kind: "EagerReaderArtifact",
   resolver,
   readerAst,
+  concreteType: "Query",
 };
 
 export default artifact;

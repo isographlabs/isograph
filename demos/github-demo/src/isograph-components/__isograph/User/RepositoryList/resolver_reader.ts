@@ -14,18 +14,21 @@ const readerAst: ReaderAst<User__RepositoryList__param> = [
         { kind: "Literal", value: 10 },
       ],
     ],
+    concreteType: "RepositoryConnection",
     selections: [
       {
         kind: "Linked",
         fieldName: "edges",
         alias: null,
         arguments: null,
+        concreteType: "RepositoryEdge",
         selections: [
           {
             kind: "Linked",
             fieldName: "node",
             alias: null,
             arguments: null,
+            concreteType: "Repository",
             selections: [
               {
                 kind: "Scalar",
@@ -69,6 +72,7 @@ const readerAst: ReaderAst<User__RepositoryList__param> = [
                 fieldName: "pullRequests",
                 alias: null,
                 arguments: null,
+                concreteType: "PullRequestConnection",
                 selections: [
                   {
                     kind: "Scalar",
@@ -89,6 +93,7 @@ const readerAst: ReaderAst<User__RepositoryList__param> = [
                 fieldName: "watchers",
                 alias: null,
                 arguments: null,
+                concreteType: "UserConnection",
                 selections: [
                   {
                     kind: "Scalar",
@@ -114,6 +119,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "User.RepositoryList",
   resolver,
   readerAst,
+  concreteType: "User",
 };
 
 export default artifact;

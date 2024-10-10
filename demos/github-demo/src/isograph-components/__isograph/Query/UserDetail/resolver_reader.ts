@@ -14,6 +14,7 @@ const readerAst: ReaderAst<Query__UserDetail__param> = [
         { kind: "Variable", name: "userLogin" },
       ],
     ],
+    concreteType: "User",
     selections: [
       {
         kind: "Scalar",
@@ -40,6 +41,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.UserDetail",
   resolver,
   readerAst,
+  concreteType: "Query",
 };
 
 export default artifact;

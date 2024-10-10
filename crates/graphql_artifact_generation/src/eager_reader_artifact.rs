@@ -29,6 +29,7 @@ pub(crate) fn generate_eager_reader_artifacts(
     info: UserWrittenClientFieldInfo,
     refetched_paths: &RefetchedPathsMap,
 ) -> Vec<ArtifactPathAndContent> {
+    let concrete_type = client_field.type_and_field.type_name;
     let user_written_component_variant = info.user_written_component_variant;
     let parent_type = schema
         .server_field_data
@@ -70,9 +71,10 @@ pub(crate) fn generate_eager_reader_artifacts(
             {}kind: \"EagerReaderArtifact\",\n\
             {}resolver,\n\
             {}readerAst,\n\
+            {}concreteType: \"{concrete_type}\",\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ",
+            "  ", "  ", "  ", "  ", "  ", "  ",
         )
     } else {
         let component_name = format!("{}.{}", parent_type.name, client_field.name);
@@ -92,9 +94,10 @@ pub(crate) fn generate_eager_reader_artifacts(
             {}componentName: \"{component_name}\",\n\
             {}resolver,\n\
             {}readerAst,\n\
+            {}concreteType: \"{concrete_type}\",\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ",
+            "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     };
 

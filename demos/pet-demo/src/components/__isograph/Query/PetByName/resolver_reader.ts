@@ -14,6 +14,7 @@ const readerAst: ReaderAst<Query__PetByName__param> = [
         { kind: "Variable", name: "name" },
       ],
     ],
+    concreteType: "Pet",
     selections: [
       {
         kind: "Resolver",
@@ -34,6 +35,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.PetByName",
   resolver,
   readerAst,
+  concreteType: "Query",
 };
 
 export default artifact;

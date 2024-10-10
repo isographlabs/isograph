@@ -20,7 +20,7 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "id" },
       ],
     ],
-    concreteType: "Economist",
+    concreteType: "Node",
     selections: [
       {
         kind: "Scalar",

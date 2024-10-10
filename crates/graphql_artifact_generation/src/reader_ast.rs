@@ -100,6 +100,7 @@ fn linked_field_ast_node(
     initial_variable_context: &VariableContext,
 ) -> String {
     let name = linked_field.name.item;
+    let concrete_type = linked_field.associated_data.concrete_type;
     let alias = linked_field
         .reader_alias
         .map(|x| format!("\"{}\"", x.item))
@@ -123,6 +124,7 @@ fn linked_field_ast_node(
         {indent_2}fieldName: \"{name}\",\n\
         {indent_2}alias: {alias},\n\
         {indent_2}arguments: {arguments},\n\
+        {indent_2}concreteType: \"{concrete_type}\",\n\
         {indent_2}selections: {inner_reader_ast},\n\
         {indent_1}}},\n",
     )

@@ -14,6 +14,7 @@ const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
         { kind: "Variable", name: "id" },
       ],
     ],
+    concreteType: "Pet",
     selections: [
       {
         kind: "Resolver",
@@ -59,6 +60,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.PetCheckinListRoute",
   resolver,
   readerAst,
+  concreteType: "Query",
 };
 
 export default artifact;

@@ -156,7 +156,7 @@ export function normalizeData(
     networkResponse,
     environment.store.Query.__ROOT,
     { id: ROOT_ID, concreteType: 'Query' },
-    variables as any,
+    variables,
     nestedRefetchQueries,
     encounteredIds,
   );
@@ -314,7 +314,7 @@ function hasOverlappingIds(
 ): boolean {
   for (const typeName in set1) {
     for (const id of set1[typeName]) {
-      if (set2[typeName].has(id)) {
+      if (set2[typeName]?.has(id)) {
         return true;
       }
     }

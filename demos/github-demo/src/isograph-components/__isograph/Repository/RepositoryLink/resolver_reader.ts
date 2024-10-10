@@ -20,6 +20,7 @@ const readerAst: ReaderAst<Repository__RepositoryLink__param> = [
     fieldName: "owner",
     alias: null,
     arguments: null,
+    concreteType: "RepositoryOwner",
     selections: [
       {
         kind: "Scalar",
@@ -39,6 +40,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Repository.RepositoryLink",
   resolver,
   readerAst,
+  concreteType: "Repository",
 };
 
 export default artifact;

@@ -13,6 +13,7 @@ const readerAst: ReaderAst<Query__PetFavoritePhrase__param> = [
         { kind: "Variable", name: "id" },
       ],
     ],
+    concreteType: "Pet",
     selections: [
       {
         kind: "Scalar",
@@ -38,6 +39,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.PetFavoritePhrase",
   resolver,
   readerAst,
+  concreteType: "Query",
 };
 
 export default artifact;

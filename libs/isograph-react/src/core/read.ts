@@ -115,12 +115,12 @@ function readData<TReadFromStore>(
   mutableEncounteredRecords: EncounteredIds,
   typeName: TypeName,
 ): ReadDataResult<TReadFromStore> {
-  (mutableEncounteredRecords['Query'] ??= new Set()).add(root);
+  (mutableEncounteredRecords[typeName] ??= new Set()).add(root);
   let storeRecord = environment.store[typeName]?.[root];
   if (storeRecord === undefined) {
     return {
       kind: 'MissingData',
-      reason: 'No record for root ' + root,
+      reason: 'No record for root ' + root + ' and concrete type ' + typeName,
     };
   }
 
@@ -268,7 +268,7 @@ function readData<TReadFromStore>(
           networkRequest,
           networkRequestOptions,
           mutableEncounteredRecords,
-          'Query',
+          typeName,
         );
         if (data.kind === 'MissingData') {
           return {
@@ -322,7 +322,7 @@ function readData<TReadFromStore>(
               networkRequest,
               networkRequestOptions,
               mutableEncounteredRecords,
-              field.readerArtifact.concreteType,
+              typeName,
             );
             if (data.kind === 'MissingData') {
               return {
@@ -378,7 +378,7 @@ function readData<TReadFromStore>(
           networkRequest,
           networkRequestOptions,
           mutableEncounteredRecords,
-          field.concreteType,
+          typeName,
         );
         if (refetchReaderParams.kind === 'MissingData') {
           return {
