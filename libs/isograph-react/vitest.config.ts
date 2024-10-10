@@ -11,6 +11,10 @@ export default defineProject({
         plugins: [require('../isograph-babel-plugin/BabelPluginIsograph')],
       },
     }),
-    commonjs(),
+    commonjs({
+      advanced: {
+        importRules: 'merge',
+      },
+    }),
   ],
 });
