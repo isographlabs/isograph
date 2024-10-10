@@ -1,7 +1,7 @@
 type Query {
   me: Economist!
   you: Economist!
-  node(id: ID!): Node
+  node(id: ID!): Economist
 }
 
 type Economist implements Node {
