@@ -26,7 +26,6 @@ import { type Query__Newsfeed__param } from './Query/Newsfeed/param_type';
 import { type Query__PetByName__param } from './Query/PetByName/param_type';
 import { type Query__PetCheckinListRoute__param } from './Query/PetCheckinListRoute/param_type';
 import { type Query__PetDetailDeferredRoute__param } from './Query/PetDetailDeferredRoute/param_type';
-import { type Query__PetDetailRouteInner__param } from './Query/PetDetailRouteInner/param_type';
 import { type Query__PetDetailRoute__param } from './Query/PetDetailRoute/param_type';
 import { type Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/param_type';
 import { type Viewer__NewsfeedPaginationComponent__param } from './Viewer/NewsfeedPaginationComponent/param_type';
@@ -194,10 +193,6 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.PetDetailDeferredRoute', T>
 ): IdentityWithParamComponent<Query__PetDetailDeferredRoute__param>;
-
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'field Query.PetDetailRouteInner', T>
-): IdentityWithParamComponent<Query__PetDetailRouteInner__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.PetDetailRoute', T>
