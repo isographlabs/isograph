@@ -22,7 +22,9 @@
     "format-prettier": "prettier --config ./.prettier.config.js --write .",
     "format-rust": "cargo fmt",
     "tsc": "pnpm -r tsc",
-    "test": "vitest",
+    "test": "vitest run",
+    "test-watch": "vitest",
+    "coverage": "vitest run --coverage",
     "sanity-check": "./scripts/sanity-check.sh"
   },
   "license": "MIT",
