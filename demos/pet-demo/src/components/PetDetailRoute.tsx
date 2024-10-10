@@ -1,9 +1,9 @@
-import React from "react";
-import { iso } from "@iso";
-import { Container, Stack } from "@mui/material";
-import { FragmentReader, useLazyReference } from "@isograph/react";
-import { FullPageLoading, PetDetailRoute, useNavigateTo } from "./routes";
-import { ErrorBoundary } from "./ErrorBoundary";
+import React from 'react';
+import { iso } from '@iso';
+import { Container, Stack } from '@mui/material';
+import { FragmentReader, useLazyReference } from '@isograph/react';
+import { FullPageLoading, PetDetailRoute, useNavigateTo } from './routes';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export const PetDetailRouteComponent = iso(`
   field Query.PetDetailRoute($id: ID!) @component {
@@ -26,8 +26,8 @@ export const PetDetailRouteComponent = iso(`
     <Container maxWidth="md">
       <h1>Pet Detail for {pet.name}</h1>
       <h3
-        onClick={() => navigateTo({ kind: "Home" })}
-        style={{ cursor: "pointer" }}
+        onClick={() => navigateTo({ kind: 'Home' })}
+        style={{ cursor: 'pointer' }}
       >
         ← Home
       </h3>
@@ -52,7 +52,7 @@ export const PetDetailRouteComponent = iso(`
 export function PetDetailRouteLoader({ route }: { route: PetDetailRoute }) {
   const { fragmentReference } = useLazyReference(
     iso(`entrypoint Query.PetDetailRoute`),
-    { id: route.id }
+    { id: route.id },
   );
 
   return (
