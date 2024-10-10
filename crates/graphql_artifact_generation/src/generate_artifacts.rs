@@ -34,7 +34,7 @@ use crate::{
     },
     entrypoint_artifact::generate_entrypoint_artifacts,
     import_statements::ParamTypeImports,
-    iso_overload_file::build_iso_overload,
+    iso_overload_file::build_iso_overload_artifact,
     refetch_reader_artifact::{
         generate_refetch_output_type_artifact, generate_refetch_reader_artifact,
     },
@@ -259,7 +259,7 @@ pub fn get_artifact_path_and_content(
         path_and_contents.push(path_and_content);
     }
 
-    path_and_contents.push(build_iso_overload(schema));
+    path_and_contents.push(build_iso_overload_artifact(schema));
 
     path_and_contents
 }

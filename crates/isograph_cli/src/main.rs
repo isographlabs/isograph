@@ -4,7 +4,6 @@ use clap::Parser;
 use colored::Colorize;
 use isograph_compiler::{compile_and_print, handle_watch_command};
 use isograph_config::create_config;
-use isograph_lsp::lsp_process_error::LSPProcessError;
 use opt::{Command, CompileCommand, LspCommand, Opt};
 
 #[tokio::main]
@@ -16,7 +15,7 @@ async fn main() {
             start_compiler(compile_command).await;
         }
         Command::Lsp(lsp_command) => {
-            start_language_server(lsp_command).await.unwrap();
+            start_language_server(lsp_command).await;
         }
     }
 }
@@ -56,13 +55,20 @@ async fn start_compiler(compile_command: CompileCommand) {
         std::process::exit(1);
     }
 }
-async fn start_language_server(lsp_command: LspCommand) -> Result<(), LSPProcessError> {
+
+async fn start_language_server(lsp_command: LspCommand) {
     let config = create_config(
         lsp_command
             .config
             .unwrap_or("./isograph.config.json".into()),
     );
     eprintln!("Starting language server");
-    isograph_lsp::start_language_server(config).await?;
-    Ok(())
+    if let Err(_e) = isograph_lsp::start_language_server(config).await {
+        eprintln!(
+            "{}",
+            "Error encountered when running language server.".bright_red(),
+            // TODO derive Error and print e
+        );
+        std::process::exit(1);
+    }
 }
