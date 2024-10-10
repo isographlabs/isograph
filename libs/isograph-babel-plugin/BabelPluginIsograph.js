@@ -10,12 +10,8 @@ const configExplorer = cosmiconfig('isograph', {
   },
 });
 
-/** @type {import("cosmiconfig").Config} */
-let IsographConfig;
-const result = configExplorer.searchSync();
-if (result) {
-  IsographConfig = result.config;
-} else {
+let IsographConfig = configExplorer.searchSync();
+if (!IsographConfig) {
   throw new Error(
     'No config found. Do you have a isograph.config.json file somewhere?',
   );
