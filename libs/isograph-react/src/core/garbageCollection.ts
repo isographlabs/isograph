@@ -56,7 +56,7 @@ export function garbageCollectEnvironment(environment: IsographEnvironment) {
     const dataById = environment.store[typeName];
     if (dataById == null) continue;
 
-    // delete all objects 
+    // delete all objects
     if (!retainedIds[typeName]) {
       delete environment.store[typeName];
       continue;
