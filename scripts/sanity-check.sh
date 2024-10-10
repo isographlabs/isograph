@@ -3,7 +3,7 @@ pnpm format && \
   pnpm build-demos && \
   ./scripts/check-git-status.sh && \
   pnpm -r compile && \
-  pnpm -r test
+  pnpm test run
 if [ $? -eq 0 ]; then
     echo OK
 else

@@ -3,7 +3,8 @@
   "devDependencies": {
     "gulp": "4.0.2",
     "prettier": "^3.2.4",
-    "typescript": "^5.0.3"
+    "typescript": "^5.0.3",
+    "vitest": "^2.1.2"
   },
   "scripts": {
     "watch-rs": "cargo watch -x build -d 0.1 -w ./crates/",
@@ -21,6 +22,7 @@
     "format-prettier": "prettier --config ./.prettier.config.js --write .",
     "format-rust": "cargo fmt",
     "tsc": "pnpm -r tsc",
+    "test": "vitest",
     "sanity-check": "./scripts/sanity-check.sh"
   },
   "license": "MIT",
