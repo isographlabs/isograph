@@ -6,6 +6,7 @@ import {
   ROOT_ID,
   StoreRecord,
   assertLink,
+  type TypeName,
 } from './IsographEnvironment';
 import { getParentRecordKey } from './cache';
 import { NormalizationAst } from './entrypoint';
@@ -42,7 +43,7 @@ export function retainQuery(
 }
 
 export function garbageCollectEnvironment(environment: IsographEnvironment) {
-  const retainedIds = new Set<DataId>([ROOT_ID]);
+  const retainedIds: RetainedIds = { Query: new Set<DataId>([ROOT_ID]) };
 
   for (const query of environment.retainedQueries) {
     recordReachableIds(environment.store, query, retainedIds);
@@ -51,21 +52,40 @@ export function garbageCollectEnvironment(environment: IsographEnvironment) {
     recordReachableIds(environment.store, query, retainedIds);
   }
 
-  for (const dataId in environment.store) {
-    if (!retainedIds.has(dataId)) {
-      delete environment.store[dataId];
+  for (const typeName in environment.store) {
+    const dataById = environment.store[typeName];
+    if (dataById == null) continue;
+
+    // delete all objects 
+    if (!retainedIds[typeName]) {
+      delete environment.store[typeName];
+      continue;
+    }
+
+    for (const dataId in dataById) {
+      if (!retainedIds[typeName].has(dataId)) {
+        delete dataById[dataId];
+      }
+    }
+
+    if (Object.keys(dataById).length === 0) {
+      delete environment.store[typeName];
     }
   }
+}
+
+interface RetainedIds {
+  [typeName: TypeName]: Set<DataId>;
 }
 
 function recordReachableIds(
   store: IsographStore,
   retainedQuery: RetainedQuery,
-  mutableRetainedIds: Set<DataId>,
+  mutableRetainedIds: RetainedIds,
 ) {
   recordReachableIdsFromRecord(
     store,
-    store[ROOT_ID],
+    store['Query'][ROOT_ID],
     mutableRetainedIds,
     retainedQuery.normalizationAst,
     retainedQuery.variables,
@@ -75,7 +95,7 @@ function recordReachableIds(
 function recordReachableIdsFromRecord(
   store: IsographStore,
   currentRecord: StoreRecord,
-  mutableRetainedIds: Set<DataId>,
+  mutableRetainedIds: RetainedIds,
   selections: NormalizationAst,
   variables: Variables | null,
 ) {
@@ -101,9 +121,11 @@ function recordReachableIdsFromRecord(
         }
 
         for (const nextRecordId of ids) {
-          const nextRecord = store[nextRecordId];
+          const nextRecord = store[selection.concreteType]?.[nextRecordId];
           if (nextRecord != null) {
-            mutableRetainedIds.add(nextRecordId);
+            (mutableRetainedIds[selection.concreteType] ??= new Set()).add(
+              nextRecordId,
+            );
             recordReachableIdsFromRecord(
               store,
               nextRecord,

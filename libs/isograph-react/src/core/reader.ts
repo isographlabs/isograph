@@ -8,6 +8,7 @@ import {
   ComponentOrFieldName,
   DataId,
   IsographEnvironment,
+  type TypeName,
 } from './IsographEnvironment';
 import {
   IsographEntrypoint,
@@ -34,6 +35,7 @@ export type EagerReaderArtifact<
   readonly resolver: (
     data: ResolverFirstParameter<TReadFromStore>,
   ) => TClientFieldValue;
+  readonly concreteType: TypeName;
 };
 
 export type ComponentReaderArtifact<
@@ -47,6 +49,7 @@ export type ComponentReaderArtifact<
     data: ResolverFirstParameter<TReadFromStore>,
     runtimeProps: TComponentProps,
   ) => React.ReactNode;
+  readonly concreteType: TypeName;
 };
 
 export type ResolverFirstParameter<
@@ -95,6 +98,7 @@ export type ReaderLinkedField = {
   readonly alias: string | null;
   readonly selections: ReaderAst<unknown>;
   readonly arguments: Arguments | null;
+  readonly concreteType: TypeName;
 };
 
 export type ReaderNonLoadableResolverField = {
@@ -129,6 +133,8 @@ export type ReaderLoadableField = {
   readonly entrypoint:
     | IsographEntrypoint<any, any>
     | IsographEntrypointLoader<any, any>;
+
+  readonly concreteType: TypeName;
 };
 
 type StableId = string;

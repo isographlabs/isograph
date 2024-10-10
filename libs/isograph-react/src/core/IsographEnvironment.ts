@@ -5,7 +5,6 @@ import { FragmentReference, Variables } from './FragmentReference';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { IsographEntrypoint } from './entrypoint';
 import type { ReaderAst } from './reader';
-import type { GetDataId } from './cache';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -40,7 +39,6 @@ type Subscriptions = Set<Subscription>;
 type CacheMap<T> = { [index: string]: ParentCache<T> };
 
 export type IsographEnvironment = {
-  readonly getDataId?: GetDataId;
   readonly store: IsographStore;
   readonly networkFunction: IsographNetworkFunction;
   readonly missingFieldHandler: MissingFieldHandler | null;
@@ -97,13 +95,18 @@ export type StoreRecord = {
   readonly id?: DataId;
 };
 
+export type TypeName = string;
 export type DataId = string;
 
 export const ROOT_ID: DataId & '__ROOT' = '__ROOT';
 
 export type IsographStore = {
-  [index: DataId]: StoreRecord | null;
-  readonly __ROOT: StoreRecord;
+  [index: TypeName]: {
+    [index: DataId]: StoreRecord | null;
+  } | null;
+  readonly Query: {
+    readonly __ROOT: StoreRecord;
+  };
 };
 
 const DEFAULT_GC_BUFFER_SIZE = 10;
@@ -111,7 +114,6 @@ export function createIsographEnvironment(
   store: IsographStore,
   networkFunction: IsographNetworkFunction,
   missingFieldHandler?: MissingFieldHandler,
-  getDataId?: GetDataId,
 ): IsographEnvironment {
   return {
     store,
@@ -124,13 +126,14 @@ export function createIsographEnvironment(
     retainedQueries: new Set(),
     gcBuffer: [],
     gcBufferSize: DEFAULT_GC_BUFFER_SIZE,
-    getDataId,
   };
 }
 
 export function createIsographStore(): IsographStore {
   return {
-    [ROOT_ID]: {},
+    Query: {
+      [ROOT_ID]: {},
+    },
   };
 }
 
