@@ -1,21 +1,13 @@
-import React from 'react';
-import { iso } from '@iso';
-import { Container, Stack } from '@mui/material';
-import { FragmentReader, useLazyReference } from '@isograph/react';
-import { FullPageLoading, PetDetailRoute, useNavigateTo } from './routes';
-import { ErrorBoundary } from './ErrorBoundary';
+import React from "react";
+import { iso } from "@iso";
+import { Container, Stack } from "@mui/material";
+import { FragmentReader, useLazyReference } from "@isograph/react";
+import { FullPageLoading, PetDetailRoute, useNavigateTo } from "./routes";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 export const PetDetailRouteComponent = iso(`
   field Query.PetDetailRoute($id: ID!) @component {
-    PetDetailRouteInner(actualId: $id) 
-  }
-`)(function PetDetailRouteComponent({ data }) {
-  return <data.PetDetailRouteInner />;
-});
-
-export const PetDetailRouteInner = iso(`
-  field Query.PetDetailRouteInner($actualId: ID!) @component {
-    pet(id: $actualId) {
+    pet(id: $id) {
       name
       PetCheckinsCard
       PetBestFriendCard
@@ -24,7 +16,7 @@ export const PetDetailRouteInner = iso(`
       PetStatsCard
     }
   }
-`)(function PetDetailRouteComponentInner({ data }) {
+`)(function PetDetailRouteComponent({ data }) {
   const navigateTo = useNavigateTo();
   const { pet } = data;
   if (pet == null) {
@@ -34,8 +26,8 @@ export const PetDetailRouteInner = iso(`
     <Container maxWidth="md">
       <h1>Pet Detail for {pet.name}</h1>
       <h3
-        onClick={() => navigateTo({ kind: 'Home' })}
-        style={{ cursor: 'pointer' }}
+        onClick={() => navigateTo({ kind: "Home" })}
+        style={{ cursor: "pointer" }}
       >
         ← Home
       </h3>
@@ -60,7 +52,7 @@ export const PetDetailRouteInner = iso(`
 export function PetDetailRouteLoader({ route }: { route: PetDetailRoute }) {
   const { fragmentReference } = useLazyReference(
     iso(`entrypoint Query.PetDetailRoute`),
-    { id: route.id },
+    { id: route.id }
   );
 
   return (
