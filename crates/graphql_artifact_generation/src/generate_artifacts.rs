@@ -11,10 +11,10 @@ use isograph_lang_types::{
     ServerFieldSelection, VariableDefinition,
 };
 use isograph_schema::{
-    get_missing_arguments, selection_map_wrapped, ClientFieldTraversalResult, ClientFieldVariant,
-    FieldDefinitionLocation, MissingArguments, NameAndArguments, NormalizationKey,
-    RequiresRefinement, SchemaObject, TypeAnnotation, UnionVariant, UserWrittenComponentVariant,
-    ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedSchema, ValidatedSelection,
+    get_provided_arguments, selection_map_wrapped, ClientFieldTraversalResult, ClientFieldVariant,
+    FieldDefinitionLocation, NameAndArguments, NormalizationKey, RequiresRefinement, SchemaObject,
+    TypeAnnotation, UnionVariant, UserWrittenComponentVariant, ValidatedClientField,
+    ValidatedIsographSelectionVariant, ValidatedSchema, ValidatedSelection,
     ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -391,8 +391,8 @@ pub(crate) fn generate_client_field_parameter_type(
     selection_map: &[WithSpan<ValidatedSelection>],
     parent_type: &SchemaObject,
     nested_client_field_imports: &mut ParamTypeImports,
+    loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
-    loadable_field_encountered: &mut bool,
 ) -> ClientFieldParameterType {
     // TODO use unwraps
     let mut client_field_parameter_type = "{\n".to_string();
@@ -403,8 +403,8 @@ pub(crate) fn generate_client_field_parameter_type(
             selection,
             parent_type,
             nested_client_field_imports,
+            loadable_fields,
             indentation_level + 1,
-            loadable_field_encountered,
         );
     }
     client_field_parameter_type.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
@@ -418,8 +418,8 @@ fn write_param_type_from_selection(
     selection: &WithSpan<ValidatedSelection>,
     parent_type: &SchemaObject,
     nested_client_field_imports: &mut ParamTypeImports,
+    loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
-    loadable_field_encountered: &mut bool,
 ) {
     match &selection.item {
         Selection::ServerField(field) => match field {
@@ -479,31 +479,40 @@ fn write_param_type_from_selection(
                             client_field.type_and_field.underscore_separated()
                         );
 
-                        let output_type = match scalar_field_selection
-                            .associated_data
-                            .selection_variant
-                        {
-                            ValidatedIsographSelectionVariant::Regular => inner_output_type,
-                            ValidatedIsographSelectionVariant::Loadable(_) => {
-                                let missing_arguments = get_missing_arguments(
-                                    client_field.variable_definitions.iter().map(|x| &x.item),
-                                    &scalar_field_selection.arguments,
-                                    true,
-                                );
+                        let output_type =
+                            match scalar_field_selection.associated_data.selection_variant {
+                                ValidatedIsographSelectionVariant::Regular => inner_output_type,
+                                ValidatedIsographSelectionVariant::Loadable(_) => {
+                                    loadable_fields.insert(client_field.type_and_field);
+                                    let provided_arguments = get_provided_arguments(
+                                        client_field.variable_definitions.iter().map(|x| &x.item),
+                                        &scalar_field_selection.arguments,
+                                    );
 
-                                let loadable_field_argument_type = if missing_arguments.is_empty() {
-                                    "void".to_string()
-                                } else {
-                                    get_loadable_field_type_from_missing_arguments(
-                                        schema,
-                                        missing_arguments,
+                                    let indent = "  ".repeat((indentation_level + 1) as usize);
+                                    let provided_args_type = if provided_arguments.is_empty() {
+                                        "".to_string()
+                                    } else {
+                                        format!(
+                                            ",\n{indent}{}",
+                                            get_loadable_field_type_from_arguments(
+                                                schema,
+                                                provided_arguments
+                                            )
+                                        )
+                                    };
+
+                                    format!(
+                                        "LoadableField<\n\
+                                    {indent}{}__param,\n\
+                                    {indent}{inner_output_type}\
+                                    {provided_args_type}\n\
+                                    {}>",
+                                        client_field.type_and_field.underscore_separated(),
+                                        "  ".repeat(indentation_level as usize),
                                     )
-                                };
-
-                                *loadable_field_encountered = true;
-                                format!("LoadableField<{loadable_field_argument_type}, {inner_output_type}>")
-                            }
-                        };
+                                }
+                            };
 
                         query_type_declaration.push_str(
                             &(format!(
@@ -543,8 +552,8 @@ fn write_param_type_from_selection(
                         &linked_field.selection_set,
                         object,
                         nested_client_field_imports,
+                        loadable_fields,
                         indentation_level,
-                        loadable_field_encountered,
                     )
                 });
                 query_type_declaration.push_str(&format!(
@@ -557,13 +566,13 @@ fn write_param_type_from_selection(
     }
 }
 
-fn get_loadable_field_type_from_missing_arguments(
+fn get_loadable_field_type_from_arguments(
     schema: &ValidatedSchema,
-    missing_arguments: MissingArguments,
+    arguments: Vec<ValidatedVariableDefinition>,
 ) -> String {
     let mut loadable_field_type = "{".to_string();
     let mut is_first = true;
-    for arg in missing_arguments.iter() {
+    for arg in arguments.iter() {
         if !is_first {
             loadable_field_type.push_str(", ");
         }

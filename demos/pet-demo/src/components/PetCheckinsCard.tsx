@@ -50,7 +50,7 @@ export const CheckinDisplay = iso(`
 });
 
 export const PetCheckinsCardList = iso(`
-  field Pet.PetCheckinsCardList($skip: Int, $limit: Int) {
+  field Pet.PetCheckinsCardList($skip: Int!, $limit: Int!) {
     checkins(skip: $skip, limit: $limit) {
       CheckinDisplay
       id

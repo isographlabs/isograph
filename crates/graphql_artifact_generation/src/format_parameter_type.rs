@@ -51,7 +51,7 @@ fn format_server_field_type(
                 .iter()
                 .filter(|x| matches!(
                     x.1,
-                    FieldDefinitionLocation::Server(server_field_id) if schema.server_field(*server_field_id).is_discriminator == false),
+                    FieldDefinitionLocation::Server(server_field_id) if !schema.server_field(*server_field_id).is_discriminator),
                 )
             {
                 let field_type =
