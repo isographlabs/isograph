@@ -8,5 +8,5 @@
     "lib": ["es2017", "DOM"]
   },
   "include": ["./**/*.ts", "./**/*.tsx"],
-  "exclude": ["./src/tests/**/*", "./vite.config.ts"]
+  "exclude": ["./src/tests/**/*", "./vitest.config.ts"]
 }

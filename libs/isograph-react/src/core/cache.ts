@@ -184,6 +184,20 @@ export function subscribeToAnyChange(
   return () => environment.subscriptions.delete(subscription);
 }
 
+export function subscribeToAnyChangesToRecord(
+  environment: IsographEnvironment,
+  recordId: DataId,
+  callback: () => void,
+): () => void {
+  const subscription = {
+    kind: 'AnyChangesToRecord',
+    recordId,
+    callback,
+  } as const;
+  environment.subscriptions.add(subscription);
+  return () => environment.subscriptions.delete(subscription);
+}
+
 // TODO we should re-read and call callback if the value has changed
 export function subscribe<
   TReadFromStore extends { parameters: object; data: object },
@@ -207,12 +221,19 @@ export function subscribe<
   return () => environment.subscriptions.delete(fragmentSubscription);
 }
 
-export function onNextChange(environment: IsographEnvironment): Promise<void> {
+export function onNextChangeToRecord(
+  environment: IsographEnvironment,
+  recordId: DataId,
+): Promise<void> {
   return new Promise((resolve) => {
-    const unsubscribe = subscribeToAnyChange(environment, () => {
-      unsubscribe();
-      resolve();
-    });
+    const unsubscribe = subscribeToAnyChangesToRecord(
+      environment,
+      recordId,
+      () => {
+        unsubscribe();
+        resolve();
+      },
+    );
   });
 }
 
@@ -295,7 +316,14 @@ function callSubscriptions(
           return;
         }
         case 'AnyRecords': {
-          return subscription.callback();
+          subscription.callback();
+          return;
+        }
+        case 'AnyChangesToRecord': {
+          if (recordsEncounteredWhenNormalizing.has(subscription.recordId)) {
+            subscription.callback();
+          }
+          return;
         }
         default: {
           // Ensure we have covered all variants

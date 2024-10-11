@@ -26,6 +26,13 @@ export type FragmentSubscription<
   readonly fragmentReference: FragmentReference<TReadFromStore, any>;
   readonly readerAst: ReaderAst<TReadFromStore>;
 };
+
+type AnyChangesToRecordSubscription = {
+  readonly kind: 'AnyChangesToRecord';
+  readonly callback: () => void;
+  readonly recordId: DataId;
+};
+
 type AnyRecordSubscription = {
   readonly kind: 'AnyRecords';
   readonly callback: () => void;
@@ -33,6 +40,7 @@ type AnyRecordSubscription = {
 
 type Subscription =
   | FragmentSubscription<{ parameters: object; data: object }>
+  | AnyChangesToRecordSubscription
   | AnyRecordSubscription;
 type Subscriptions = Set<Subscription>;
 // Should this be a map?

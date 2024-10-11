@@ -287,6 +287,18 @@ fn get_all_errors_or_all_ok<T, E>(
     }
 }
 
+fn get_all_errors_or_tuple_ok<T1, T2, E>(
+    a: Result<T1, impl IntoIterator<Item = E>>,
+    b: Result<T2, impl IntoIterator<Item = E>>,
+) -> Result<(T1, T2), Vec<E>> {
+    match (a, b) {
+        (Ok(v1), Ok(v2)) => Ok((v1, v2)),
+        (Err(e1), Err(e2)) => Err(e1.into_iter().chain(e2.into_iter()).collect()),
+        (_, Err(e)) => Err(e.into_iter().collect()),
+        (Err(e), _) => Err(e.into_iter().collect()),
+    }
+}
+
 fn get_all_errors_or_all_ok_iter<T, E>(
     items: impl Iterator<Item = Result<T, impl Iterator<Item = E>>>,
 ) -> Result<Vec<T>, Vec<E>> {
@@ -438,13 +450,14 @@ fn validate_and_transform_client_fields(
         },
     ))?;
 
-    get_all_errors_or_all_ok(client_fields.into_iter().map(|client_field| {
+    get_all_errors_or_all_ok_iter(client_fields.into_iter().map(|client_field| {
         validate_client_field_selection_set(
             schema_data,
             client_field,
             server_fields,
             &client_field_args,
         )
+        .map_err(|err| err.into_iter())
     }))
 }
 
@@ -484,7 +497,7 @@ fn validate_client_field_selection_set(
     unvalidated_client_field: UnvalidatedClientField,
     server_fields: &[ValidatedSchemaServerField],
     client_field_args: &ClientFieldArgsMap,
-) -> ValidateSchemaResult<ValidatedClientField> {
+) -> Result<ValidatedClientField, Vec<WithLocation<ValidateSchemaError>>> {
     let variable_definitions = client_field_args
         .get(&unvalidated_client_field.id)
         .expect(
@@ -494,7 +507,7 @@ fn validate_client_field_selection_set(
         .clone();
 
     let parent_object = schema_data.object(unvalidated_client_field.parent_object_id);
-    let selection_set = unvalidated_client_field
+    let selection_set_result = unvalidated_client_field
         .reader_selection_set
         .map(|selection_set| {
             validate_client_field_definition_selections_exist_and_types_match(
@@ -506,15 +519,38 @@ fn validate_client_field_selection_set(
                 unvalidated_client_field.variable_definitions,
                 unvalidated_client_field.name,
             )
-            .map_err(|err| {
-                validate_selections_error_to_validate_schema_error(
-                    err,
-                    parent_object,
-                    unvalidated_client_field.name,
-                )
+            .map_err(|errs| {
+                errs.into_iter().map(|err| {
+                    validate_selections_error_to_validate_schema_error(
+                        err,
+                        parent_object,
+                        unvalidated_client_field.name,
+                    )
+                })
             })
         })
-        .transpose()?;
+        .transpose();
+
+    let refetch_strategy_result = unvalidated_client_field
+        .refetch_strategy
+        .map(|refetch_strategy| match refetch_strategy {
+            RefetchStrategy::UseRefetchField(use_refetch_field_strategy) => {
+                Ok::<_, Vec<WithLocation<ValidateSchemaError>>>(RefetchStrategy::UseRefetchField(
+                    validate_use_refetch_field_strategy(
+                        schema_data,
+                        use_refetch_field_strategy,
+                        server_fields,
+                        parent_object,
+                        unvalidated_client_field.name,
+                        client_field_args,
+                    )?,
+                ))
+            }
+        })
+        .transpose();
+
+    let (selection_set, refetch_strategy) =
+        get_all_errors_or_tuple_ok(selection_set_result, refetch_strategy_result)?;
 
     Ok(ClientField {
         description: unvalidated_client_field.description,
@@ -526,23 +562,7 @@ fn validate_client_field_selection_set(
         variable_definitions,
         type_and_field: unvalidated_client_field.type_and_field,
         parent_object_id: unvalidated_client_field.parent_object_id,
-        refetch_strategy: unvalidated_client_field
-            .refetch_strategy
-            .map(|refetch_strategy| match refetch_strategy {
-                RefetchStrategy::UseRefetchField(use_refetch_field_strategy) => {
-                    Ok::<_, WithLocation<ValidateSchemaError>>(RefetchStrategy::UseRefetchField(
-                        validate_use_refetch_field_strategy(
-                            schema_data,
-                            use_refetch_field_strategy,
-                            server_fields,
-                            parent_object,
-                            unvalidated_client_field.name,
-                            client_field_args,
-                        )?,
-                    ))
-                }
-            })
-            .transpose()?,
+        refetch_strategy,
     })
 }
 
@@ -555,7 +575,7 @@ fn validate_use_refetch_field_strategy(
     parent_object: &SchemaObject,
     client_field_name: SelectableFieldName,
     client_field_args: &ClientFieldArgsMap,
-) -> ValidateSchemaResult<ValidatedRefetchFieldStrategy> {
+) -> Result<ValidatedRefetchFieldStrategy, Vec<WithLocation<ValidateSchemaError>>> {
     let refetch_selection_set = validate_client_field_definition_selections_exist_and_types_match(
         schema_data,
         use_refetch_field_strategy.refetch_selection_set,
@@ -565,8 +585,16 @@ fn validate_use_refetch_field_strategy(
         vec![],
         client_field_name,
     )
-    .map_err(|err| {
-        validate_selections_error_to_validate_schema_error(err, parent_object, client_field_name)
+    .map_err(|errs| {
+        errs.into_iter()
+            .map(|err| {
+                validate_selections_error_to_validate_schema_error(
+                    err,
+                    parent_object,
+                    client_field_name,
+                )
+            })
+            .collect::<Vec<_>>()
     })?;
 
     Ok(ValidatedRefetchFieldStrategy {
@@ -726,15 +754,14 @@ fn validate_client_field_definition_selections_exist_and_types_match(
     client_field_args: &ClientFieldArgsMap,
     variable_definitions: Vec<WithSpan<UnvalidatedVariableDefinition>>,
     client_field_name: SelectableFieldName,
-) -> ValidateSelectionsResult<Vec<WithSpan<ValidatedSelection>>> {
+) -> Result<Vec<WithSpan<ValidatedSelection>>, Vec<WithLocation<ValidateSelectionsError>>> {
     // Currently, we only check that each field exists and has an appropriate type, not that
     // there are no selection conflicts due to aliases or parameters.
 
     let mut used_variables: BTreeSet<VariableName> = BTreeSet::new();
 
-    let validated_selection_set = selection_set
-        .into_iter()
-        .map(|selection| {
+    let validated_selection_set_result =
+        get_all_errors_or_all_ok(selection_set.into_iter().map(|selection| {
             validate_client_field_definition_selection_exists_and_type_matches(
                 selection,
                 parent_object,
@@ -743,14 +770,17 @@ fn validate_client_field_definition_selections_exist_and_types_match(
                 client_field_args,
                 &mut used_variables,
             )
-        })
-        .collect::<Result<_, _>>()?;
+        }));
 
-    validate_all_variables_are_used(
-        variable_definitions,
-        used_variables,
-        parent_object.name,
-        client_field_name,
+    let (validated_selection_set, _) = get_all_errors_or_tuple_ok(
+        validated_selection_set_result,
+        validate_all_variables_are_used(
+            variable_definitions,
+            used_variables,
+            parent_object.name,
+            client_field_name,
+        )
+        .map_err(|err| vec![err]),
     )?;
 
     Ok(validated_selection_set)
@@ -1128,10 +1158,10 @@ fn get_missing_arguments_and_validate_argument_types<'a>(
     location: Location,
     used_variables: &mut BTreeSet<VariableName>,
 ) -> ValidateSelectionsResult<Vec<ValidatedVariableDefinition>> {
+    push_used_variables(arguments, used_variables);
+
     let argument_definitions_vec: Vec<_> = argument_definitions.collect();
     validate_no_extraneous_arguments(&argument_definitions_vec, arguments, location)?;
-
-    push_used_variables(arguments, used_variables);
 
     // TODO validate argument types
     Ok(get_missing_arguments(

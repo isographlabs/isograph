@@ -1,15 +1,15 @@
 import { CleanupFn } from '@isograph/isograph-disposable-types/dist';
-import { getParentRecordKey, onNextChange, type EncounteredIds } from './cache';
+import { getParentRecordKey, onNextChangeToRecord, type EncounteredIds } from './cache';
 import { getOrCreateCachedComponent } from './componentCache';
 import {
   IsographEntrypoint,
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
 import {
-  FragmentReference,
-  Variables,
   ExtractData,
   ExtractParameters,
+  FragmentReference,
+  Variables,
 } from './FragmentReference';
 import {
   assertLink,
@@ -79,11 +79,11 @@ export function readButDoNotEvaluate<
     ) {
       // TODO assert that the network request state is not Err
       throw new Promise((resolve, reject) => {
-        onNextChange(environment).then(resolve);
+        onNextChangeToRecord(environment, response.recordId).then(resolve);
         fragmentReference.networkRequest.promise.catch(reject);
       });
     }
-    throw onNextChange(environment);
+    throw onNextChangeToRecord(environment, response.recordId);
   } else {
     return {
       encounteredRecords: mutableEncounteredRecords,
@@ -102,6 +102,7 @@ type ReadDataResult<TReadFromStore> =
       readonly kind: 'MissingData';
       readonly reason: string;
       readonly nestedReason?: ReadDataResult<unknown>;
+      readonly recordId: DataId;
     };
 
 function readData<TReadFromStore>(
@@ -121,6 +122,7 @@ function readData<TReadFromStore>(
     return {
       kind: 'MissingData',
       reason: 'No record for root ' + root + ' and concrete type ' + typeName,
+      recordId: root,
     };
   }
 
@@ -145,6 +147,7 @@ function readData<TReadFromStore>(
           return {
             kind: 'MissingData',
             reason: 'No value for ' + storeRecordName + ' on root ' + root,
+            recordId: root,
           };
         }
         target[field.alias ?? field.fieldName] = value;
@@ -167,6 +170,7 @@ function readData<TReadFromStore>(
                   root +
                   '. Link is ' +
                   JSON.stringify(item),
+                recordId: root,
               };
             } else if (link === null) {
               results.push(null);
@@ -194,6 +198,7 @@ function readData<TReadFromStore>(
                   '. Link is ' +
                   JSON.stringify(item),
                 nestedReason: result,
+                recordId: result.recordId,
               };
             }
             results.push(result.data);
@@ -223,6 +228,7 @@ function readData<TReadFromStore>(
                 root +
                 '. Link is ' +
                 JSON.stringify(value),
+              recordId: root,
             };
           } else {
             link = altLink;
@@ -248,6 +254,7 @@ function readData<TReadFromStore>(
             kind: 'MissingData',
             reason: 'Missing data for ' + storeRecordName + ' on root ' + root,
             nestedReason: data,
+            recordId: data.recordId,
           };
         }
         target[field.alias ?? field.fieldName] = data.data;
@@ -275,6 +282,7 @@ function readData<TReadFromStore>(
             kind: 'MissingData',
             reason: 'Missing data for ' + field.alias + ' on root ' + root,
             nestedReason: data,
+            recordId: data.recordId,
           };
         } else {
           const refetchQueryIndex = field.refetchQuery;
@@ -329,6 +337,7 @@ function readData<TReadFromStore>(
                 kind: 'MissingData',
                 reason: 'Missing data for ' + field.alias + ' on root ' + root,
                 nestedReason: data,
+                recordId: data.recordId,
               };
             } else {
               const firstParameter = {
@@ -385,6 +394,7 @@ function readData<TReadFromStore>(
             kind: 'MissingData',
             reason: 'Missing data for ' + field.alias + ' on root ' + root,
             nestedReason: refetchReaderParams,
+            recordId: refetchReaderParams.recordId,
           };
         } else {
           target[field.alias] = (args: any) => {
