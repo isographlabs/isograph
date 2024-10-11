@@ -1,5 +1,9 @@
 import { CleanupFn } from '@isograph/isograph-disposable-types/dist';
-import { getParentRecordKey, onNextChangeToRecord, type EncounteredIds } from './cache';
+import {
+  getParentRecordKey,
+  onNextChangeToRecord,
+  type EncounteredIds,
+} from './cache';
 import { getOrCreateCachedComponent } from './componentCache';
 import {
   IsographEntrypoint,
@@ -79,11 +83,19 @@ export function readButDoNotEvaluate<
     ) {
       // TODO assert that the network request state is not Err
       throw new Promise((resolve, reject) => {
-        onNextChangeToRecord(environment, response.recordId).then(resolve);
+        onNextChangeToRecord(
+          environment,
+          response.recordId,
+          response.typeName,
+        ).then(resolve);
         fragmentReference.networkRequest.promise.catch(reject);
       });
     }
-    throw onNextChangeToRecord(environment, response.recordId);
+    throw onNextChangeToRecord(
+      environment,
+      response.recordId,
+      response.typeName,
+    );
   } else {
     return {
       encounteredRecords: mutableEncounteredRecords,
@@ -103,6 +115,7 @@ type ReadDataResult<TReadFromStore> =
       readonly reason: string;
       readonly nestedReason?: ReadDataResult<unknown>;
       readonly recordId: DataId;
+      readonly typeName: TypeName;
     };
 
 function readData<TReadFromStore>(
@@ -123,6 +136,7 @@ function readData<TReadFromStore>(
       kind: 'MissingData',
       reason: 'No record for root ' + root + ' and concrete type ' + typeName,
       recordId: root,
+      typeName,
     };
   }
 
@@ -148,6 +162,7 @@ function readData<TReadFromStore>(
             kind: 'MissingData',
             reason: 'No value for ' + storeRecordName + ' on root ' + root,
             recordId: root,
+            typeName,
           };
         }
         target[field.alias ?? field.fieldName] = value;
@@ -171,6 +186,7 @@ function readData<TReadFromStore>(
                   '. Link is ' +
                   JSON.stringify(item),
                 recordId: root,
+                typeName,
               };
             } else if (link === null) {
               results.push(null);
@@ -199,6 +215,7 @@ function readData<TReadFromStore>(
                   JSON.stringify(item),
                 nestedReason: result,
                 recordId: result.recordId,
+                typeName: result.typeName,
               };
             }
             results.push(result.data);
@@ -229,6 +246,7 @@ function readData<TReadFromStore>(
                 '. Link is ' +
                 JSON.stringify(value),
               recordId: root,
+              typeName,
             };
           } else {
             link = altLink;
@@ -255,6 +273,7 @@ function readData<TReadFromStore>(
             reason: 'Missing data for ' + storeRecordName + ' on root ' + root,
             nestedReason: data,
             recordId: data.recordId,
+            typeName: data.typeName,
           };
         }
         target[field.alias ?? field.fieldName] = data.data;
@@ -283,6 +302,7 @@ function readData<TReadFromStore>(
             reason: 'Missing data for ' + field.alias + ' on root ' + root,
             nestedReason: data,
             recordId: data.recordId,
+            typeName: data.typeName,
           };
         } else {
           const refetchQueryIndex = field.refetchQuery;
@@ -338,6 +358,7 @@ function readData<TReadFromStore>(
                 reason: 'Missing data for ' + field.alias + ' on root ' + root,
                 nestedReason: data,
                 recordId: data.recordId,
+                typeName: data.typeName,
               };
             } else {
               const firstParameter = {
@@ -395,6 +416,7 @@ function readData<TReadFromStore>(
             reason: 'Missing data for ' + field.alias + ' on root ' + root,
             nestedReason: refetchReaderParams,
             recordId: refetchReaderParams.recordId,
+            typeName: refetchReaderParams.typeName,
           };
         } else {
           target[field.alias] = (args: any) => {

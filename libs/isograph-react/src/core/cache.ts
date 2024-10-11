@@ -187,11 +187,13 @@ export function subscribeToAnyChange(
 export function subscribeToAnyChangesToRecord(
   environment: IsographEnvironment,
   recordId: DataId,
+  typeName: TypeName,
   callback: () => void,
 ): () => void {
   const subscription = {
     kind: 'AnyChangesToRecord',
     recordId,
+    typeName,
     callback,
   } as const;
   environment.subscriptions.add(subscription);
@@ -224,11 +226,13 @@ export function subscribe<
 export function onNextChangeToRecord(
   environment: IsographEnvironment,
   recordId: DataId,
+  typeName: TypeName,
 ): Promise<void> {
   return new Promise((resolve) => {
     const unsubscribe = subscribeToAnyChangesToRecord(
       environment,
       recordId,
+      typeName,
       () => {
         unsubscribe();
         resolve();
@@ -320,7 +324,11 @@ function callSubscriptions(
           return;
         }
         case 'AnyChangesToRecord': {
-          if (recordsEncounteredWhenNormalizing.has(subscription.recordId)) {
+          if (
+            recordsEncounteredWhenNormalizing[subscription.typeName]?.has(
+              subscription.recordId,
+            )
+          ) {
             subscription.callback();
           }
           return;

@@ -31,6 +31,7 @@ type AnyChangesToRecordSubscription = {
   readonly kind: 'AnyChangesToRecord';
   readonly callback: () => void;
   readonly recordId: DataId;
+  readonly typeName: TypeName;
 };
 
 type AnyRecordSubscription = {
