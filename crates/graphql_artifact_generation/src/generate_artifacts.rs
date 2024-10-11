@@ -504,10 +504,10 @@ fn write_param_type_from_selection(
 
                                     format!(
                                         "LoadableField<\n\
-                                    {indent}{}__param,\n\
-                                    {indent}{inner_output_type}\
-                                    {provided_args_type}\n\
-                                    {}>",
+                                        {indent}{}__param,\n\
+                                        {indent}{inner_output_type}\
+                                        {provided_args_type}\n\
+                                        {}>",
                                         client_field.type_and_field.underscore_separated(),
                                         "  ".repeat(indentation_level as usize),
                                     )
