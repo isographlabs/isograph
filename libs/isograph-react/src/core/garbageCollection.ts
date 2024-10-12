@@ -123,9 +123,8 @@ function recordReachableIdsFromRecord(
         for (const nextRecordId of ids) {
           const nextRecord = store[selection.concreteType]?.[nextRecordId];
           if (nextRecord != null) {
-            (mutableRetainedIds[selection.concreteType] ??= new Set()).add(
-              nextRecordId,
-            );
+            mutableRetainedIds[selection.concreteType] ??= new Set();
+            mutableRetainedIds[selection.concreteType].add(nextRecordId);
             recordReachableIdsFromRecord(
               store,
               nextRecord,

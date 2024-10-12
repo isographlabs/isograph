@@ -599,8 +599,8 @@ function normalizeNetworkResponseObject(
   const newStoreRecord =
     environment.store[astNode.concreteType]?.[newStoreRecordId] ?? {};
 
-  (environment.store[astNode.concreteType] ??= {})[newStoreRecordId] =
-    newStoreRecord;
+  environment.store[astNode.concreteType] ??= {};
+  environment.store[astNode.concreteType]![newStoreRecordId] = newStoreRecord;
 
   normalizeDataIntoRecord(
     environment,

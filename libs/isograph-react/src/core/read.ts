@@ -129,7 +129,8 @@ function readData<TReadFromStore>(
   mutableEncounteredRecords: EncounteredIds,
   typeName: TypeName,
 ): ReadDataResult<TReadFromStore> {
-  (mutableEncounteredRecords[typeName] ??= new Set()).add(root);
+  mutableEncounteredRecords[typeName] ??= new Set();
+  mutableEncounteredRecords[typeName].add(root);
   let storeRecord = environment.store[typeName]?.[root];
   if (storeRecord === undefined) {
     return {
