@@ -349,8 +349,13 @@ function hasOverlappingIds(
   set2: EncounteredIds,
 ): boolean {
   for (const typeName in set1) {
+    const set2Ids = set2[typeName];
+    if (!set2Ids) {
+      continue;
+    }
+
     for (const id of set1[typeName]) {
-      if (set2[typeName]?.has(id)) {
+      if (set2Ids.has(id)) {
         return true;
       }
     }

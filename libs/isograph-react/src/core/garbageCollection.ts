@@ -55,15 +55,16 @@ export function garbageCollectEnvironment(environment: IsographEnvironment) {
   for (const typeName in environment.store) {
     const dataById = environment.store[typeName];
     if (dataById == null) continue;
+    const retainedTypeIds = retainedIds[typeName];
 
     // delete all objects
-    if (!retainedIds[typeName]) {
+    if (!retainedTypeIds) {
       delete environment.store[typeName];
       continue;
     }
 
     for (const dataId in dataById) {
-      if (!retainedIds[typeName].has(dataId)) {
+      if (!retainedTypeIds.has(dataId)) {
         delete dataById[dataId];
       }
     }
@@ -120,8 +121,14 @@ function recordReachableIdsFromRecord(
           }
         }
 
+        const typeStore = store[selection.concreteType];
+        
+        if (!typeStore) {
+          continue;
+        }
+
         for (const nextRecordId of ids) {
-          const nextRecord = store[selection.concreteType]?.[nextRecordId];
+          const nextRecord = typeStore[nextRecordId];
           if (nextRecord != null) {
             mutableRetainedIds[selection.concreteType] ??= new Set();
             mutableRetainedIds[selection.concreteType].add(nextRecordId);
