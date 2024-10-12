@@ -14,6 +14,8 @@ import { NormalizationAst } from './entrypoint';
 export type RetainedQuery = {
   readonly normalizationAst: NormalizationAst;
   readonly variables: {};
+  readonly typeName: TypeName;
+  readonly root: DataId;
 };
 
 type DidUnretainSomeQuery = boolean;
@@ -84,13 +86,15 @@ function recordReachableIds(
   retainedQuery: RetainedQuery,
   mutableRetainedIds: RetainedIds,
 ) {
-  recordReachableIdsFromRecord(
-    store,
-    store['Query'][ROOT_ID],
-    mutableRetainedIds,
-    retainedQuery.normalizationAst,
-    retainedQuery.variables,
-  );
+  const record = store[retainedQuery.typeName]?.[retainedQuery.root];
+  if (record)
+    recordReachableIdsFromRecord(
+      store,
+      record,
+      mutableRetainedIds,
+      retainedQuery.normalizationAst,
+      retainedQuery.variables,
+    );
 }
 
 function recordReachableIdsFromRecord(
@@ -122,7 +126,7 @@ function recordReachableIdsFromRecord(
         }
 
         const typeStore = store[selection.concreteType];
-        
+
         if (!typeStore) {
           continue;
         }

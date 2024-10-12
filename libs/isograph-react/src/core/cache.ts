@@ -138,6 +138,8 @@ export function normalizeData(
   networkResponse: NetworkResponseObject,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
+  root: DataId,
+  typeName: TypeName,
 ): EncounteredIds {
   const encounteredIds: EncounteredIds = {};
 
@@ -150,12 +152,16 @@ export function normalizeData(
       variables,
     );
   }
+
+  environment.store[typeName] ??= {};
+  environment.store[typeName]![root] ??= {};
+
   normalizeDataIntoRecord(
     environment,
     normalizationAst,
     networkResponse,
-    environment.store.Query.__ROOT,
-    { id: ROOT_ID, concreteType: 'Query' },
+    environment.store[typeName]![root]!,
+    { id: root, concreteType: typeName },
     variables,
     nestedRefetchQueries,
     encounteredIds,
@@ -433,8 +439,10 @@ function normalizeDataIntoRecord(
     }
   }
   if (recordHasBeenUpdated) {
-    (mutableEncounteredIds[targetParentRecordId.concreteType] ??=
-      new Set()).add(targetParentRecordId.id);
+    mutableEncounteredIds[targetParentRecordId.concreteType] ??= new Set();
+    mutableEncounteredIds[targetParentRecordId.concreteType].add(
+      targetParentRecordId.id,
+    );
   }
   return recordHasBeenUpdated;
 }

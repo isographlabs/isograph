@@ -7,6 +7,7 @@ import {
 import {
   garbageCollectEnvironment,
   retainQuery,
+  type RetainedQuery,
 } from '../core/garbageCollection';
 import { iso } from './__isograph/iso';
 import { nodeFieldRetainedQuery } from './nodeQuery';
@@ -53,9 +54,11 @@ export const meNameField = iso(`
 `)(() => {});
 import { meNameSuccessorRetainedQuery } from './meNameSuccessor';
 const meNameEntrypoint = iso(`entrypoint Query.meName`);
-const meNameRetainedQuery = {
+const meNameRetainedQuery: RetainedQuery = {
   normalizationAst: meNameEntrypoint.normalizationAst,
   variables: {},
+  root: ROOT_ID,
+  typeName: 'Query',
 };
 
 describe('garbage collection', () => {
