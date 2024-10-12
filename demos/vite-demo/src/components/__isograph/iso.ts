@@ -1,13 +1,13 @@
-import type {IsographEntrypoint} from '@isograph/react';
-import { Pokemon__Pokemon__param } from './Pokemon/Pokemon/param_type';
-import { Query__HomePage__param } from './Query/HomePage/param_type';
+import type { IsographEntrypoint } from '@isograph/react';
+import { type Pokemon__Pokemon__param } from './Pokemon/Pokemon/param_type';
+import { type Query__HomePage__param } from './Query/HomePage/param_type';
 import entrypoint_Query__HomePage from '../__isograph/Query/HomePage/entrypoint';
 
 // This is the type given to regular client fields.
 // This means that the type of the exported iso literal is exactly
 // the type of the passed-in function, which takes one parameter
 // of type TParam.
-type IdentityWithParam<TParam> = <TClientFieldReturn>(
+type IdentityWithParam<TParam extends object> = <TClientFieldReturn>(
   clientField: (param: TParam) => TClientFieldReturn
 ) => (param: TParam) => TClientFieldReturn;
 
@@ -18,7 +18,10 @@ type IdentityWithParam<TParam> = <TClientFieldReturn>(
 //
 // TComponentProps becomes the types of the props you must pass
 // whenever the @component field is rendered.
-type IdentityWithParamComponent<TParam> = <TClientFieldReturn, TComponentProps = Record<string, never>>(
+type IdentityWithParamComponent<TParam extends object> = <
+  TClientFieldReturn,
+  TComponentProps = Record<string, never>,
+>(
   clientComponentField: (data: TParam, componentProps: TComponentProps) => TClientFieldReturn
 ) => (data: TParam, componentProps: TComponentProps) => TClientFieldReturn;
 
@@ -65,9 +68,7 @@ export function iso(_isographLiteralText: string):
   | IdentityWithParamComponent<any>
   | IsographEntrypoint<any, any>
 {
-  return function identity<TClientFieldReturn>(
-    clientFieldOrEntrypoint: (param: any) => TClientFieldReturn,
-  ): (param: any) => TClientFieldReturn {
-    return clientFieldOrEntrypoint;
-  };
+  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
+      'was not set up, or it failed to identify this call site. Make sure it ' +
+      'is being used verbatim as `iso`.');
 }

@@ -5,18 +5,21 @@ This template provides a minimal setup to get Isograph working in Vite with HMR.
 ## Getting started
 
 Install dependencies:
+
 ```bash
-npm install
+pnpm install
 ```
 
-Start the Isograph compiler:
+From the root of the project, start the Isograph compiler:
+
 ```bash
-npm run iso
+pnpm run watch-vite-demo
 ```
 
-Start the Vite server:
+From the `demos/vite-demo`, start the Vite server:
+
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 ## How to Configure
@@ -24,6 +27,7 @@ npm run dev
 The Vite configuration is slightly different from the NextJS configuration found on the [Quickstart](https://isograph.dev/docs/quickstart/) guide.
 
 Review the following files to see the proper configuration you'll need to match to get a Vite project working with Isograph after running the Vite [Getting Started](https://vite.dev/guide/#scaffolding-your-first-vite-project) steps:
+
 1. `vite.config.ts`
 2. `.babelrc.json`
 3. `tsconfig.app.json`

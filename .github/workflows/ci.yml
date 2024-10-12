@@ -71,6 +71,7 @@ jobs:
         target:
           - folder: github-demo
           - folder: pet-demo
+          - folder: vite-demo
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -98,6 +99,7 @@ jobs:
         target:
           - folder: github-demo
           - folder: pet-demo
+          - folder: vite-demo
     steps:
       - uses: actions/checkout@v2
       - uses: pnpm/action-setup@v2

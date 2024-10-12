@@ -3,7 +3,9 @@ Indicates exactly one field must be supplied and this field must not be `null`.
 """
 directive @oneOf on INPUT_OBJECT
 
-"""The supported abilities"""
+"""
+The supported abilities
+"""
 enum AbilitiesEnum {
   adaptability
   aerilate
@@ -321,7 +323,9 @@ enum AbilitiesEnum {
   zerotohero
 }
 
-"""The supported Pokémon"""
+"""
+The supported Pokémon
+"""
 enum PokemonEnum {
   pokestarsmeargle
   pokestarufo
@@ -1748,7 +1752,9 @@ enum PokemonEnum {
   pecharunt
 }
 
-"""The supported items"""
+"""
+The supported items
+"""
 enum ItemsEnum {
   abilityshield
   abomasite
@@ -2516,7 +2522,9 @@ enum ItemsEnum {
   zygardecube
 }
 
-"""The supported moves"""
+"""
+The supported moves
+"""
 enum MovesEnum {
   absorb
   accelerock
@@ -3472,7 +3480,9 @@ enum MovesEnum {
   zippyzap
 }
 
-"""The types in Pokémon"""
+"""
+The types in Pokémon
+"""
 enum TypesEnum {
   bug
   dark
@@ -3524,15 +3534,23 @@ enum IsNonStandard {
   Gigantamax
 }
 
-"""A single Pokémon ability entry"""
+"""
+A single Pokémon ability entry
+"""
 type Ability {
-  """The key of the ability as stored in the API"""
+  """
+  The key of the ability as stored in the API
+  """
   key: AbilitiesEnum!
 
-  """Bulbapedia page for an ability"""
+  """
+  Bulbapedia page for an ability
+  """
   bulbapediaPage: String!
 
-  """The long description for an ability"""
+  """
+  The long description for an ability
+  """
   desc: String
 
   """
@@ -3540,10 +3558,14 @@ type Ability {
   """
   isFieldAbility: String
 
-  """Whether an ability is non-standard, and if it is why"""
+  """
+  Whether an ability is non-standard, and if it is why
+  """
   isNonstandard: String
 
-  """The name for an ability"""
+  """
+  The name for an ability
+  """
   name: String!
 
   """
@@ -3553,22 +3575,34 @@ type Ability {
   """
   pokemonThatHaveThisAbility: [Pokemon]!
 
-  """Serebii page for an ability"""
+  """
+  Serebii page for an ability
+  """
   serebiiPage: String!
 
-  """The short description for an ability"""
+  """
+  The short description for an ability
+  """
   shortDesc: String!
 
-  """Smogon page for an ability"""
+  """
+  Smogon page for an ability
+  """
   smogonPage: String!
 }
 
-"""A Pokémon's entry"""
+"""
+A Pokémon's entry
+"""
 type Pokemon {
-  """The key of the Pokémon as stored in the API"""
+  """
+  The key of the Pokémon as stored in the API
+  """
   key: PokemonEnum!
 
-  """The abilities for a Pokémon"""
+  """
+  The abilities for a Pokémon
+  """
   abilities: Abilities!
 
   """
@@ -3576,28 +3610,44 @@ type Pokemon {
   """
   backSprite: String!
 
-  """Base form if this entry describes an alternate form"""
+  """
+  Base form if this entry describes an alternate form
+  """
   baseForme: String
 
-  """Base species if this entry describes a special form"""
+  """
+  Base species if this entry describes a special form
+  """
   baseSpecies: String
 
-  """Base stats for a Pokémon"""
+  """
+  Base stats for a Pokémon
+  """
   baseStats: Stats!
 
-  """The total of all base stats for a Pokémon"""
+  """
+  The total of all base stats for a Pokémon
+  """
   baseStatsTotal: Int!
 
-  """Bulbapedia page for a Pokémon"""
+  """
+  Bulbapedia page for a Pokémon
+  """
   bulbapediaPage: String!
 
-  """The catch rate data for a Pokémon"""
+  """
+  The catch rate data for a Pokémon
+  """
   catchRate: CatchRate
 
-  """The classification of a Pokémon as listed in the Pokedex"""
+  """
+  The classification of a Pokémon as listed in the Pokedex
+  """
   classification: String
 
-  """The respelling of the name of the Pokémon"""
+  """
+  The respelling of the name of the Pokémon
+  """
   respelling: String
 
   """
@@ -3605,7 +3655,9 @@ type Pokemon {
   """
   ipa: String
 
-  """The colour of a Pokémon as listed in the Pokedex"""
+  """
+  The colour of a Pokémon as listed in the Pokedex
+  """
   color: String!
 
   """
@@ -3613,61 +3665,99 @@ type Pokemon {
   """
   cosmeticFormes: [String!]
 
-  """An URL to an mp3 file of the Pokémon's cry."""
+  """
+  An URL to an mp3 file of the Pokémon's cry.
+  """
   cry: String
 
-  """The egg groups a Pokémon is in"""
+  """
+  The egg groups a Pokémon is in
+  """
   eggGroups: [String!]
 
-  """The evolution level, or special method, for a Pokémon"""
+  """
+  The evolution level, or special method, for a Pokémon
+  """
   evolutionLevel: String
 
-  """The evolutions for a Pokémon, if any"""
+  """
+  The evolutions for a Pokémon, if any
+  """
   evolutions: [Pokemon!]
 
-  """EV yields for a Pokémon"""
+  """
+  EV yields for a Pokémon
+  """
   evYields: EvYields!
 
-  """The flavor texts for a Pokémon"""
+  """
+  The flavor texts for a Pokémon
+  """
   flavorTexts: [Flavor!]!
 
-  """The form identifier of a Pokémon"""
+  """
+  The form identifier of a Pokémon
+  """
   forme: String
 
-  """The single letter identifier of the form"""
+  """
+  The single letter identifier of the form
+  """
   formeLetter: String
 
-  """The gender data for a Pokémon"""
+  """
+  The gender data for a Pokémon
+  """
   gender: Gender!
 
-  """The height of a Pokémon in meters"""
+  """
+  The height of a Pokémon in meters
+  """
   height: Float!
 
-  """Whether the egg of a Pokémon is obtainable"""
+  """
+  Whether the egg of a Pokémon is obtainable
+  """
   isEggObtainable: Boolean!
 
-  """The levelling rate of a Pokémon"""
+  """
+  The levelling rate of a Pokémon
+  """
   levellingRate: String
 
-  """The maximum number of steps required for the egg of a Pokémon to hatch"""
+  """
+  The maximum number of steps required for the egg of a Pokémon to hatch
+  """
   maximumHatchTime: Int
 
-  """The minimum number of steps required for the egg of a Pokémon to hatch"""
+  """
+  The minimum number of steps required for the egg of a Pokémon to hatch
+  """
   minimumHatchTime: Int
 
-  """The dex number for a Pokémon"""
+  """
+  The dex number for a Pokémon
+  """
   num: Int!
 
-  """The learnset for this pokemon"""
+  """
+  The learnset for this pokemon
+  """
   learnsets: GenerationalPokemonLearnset
 
-  """Any other forms for a Pokémon"""
+  """
+  Any other forms for a Pokémon
+  """
   otherFormes: [String!]
 
-  """The preevolutions for a Pokémon, if any"""
+  """
+  The preevolutions for a Pokémon, if any
+  """
   preevolutions: [Pokemon!]
 
-  """Serebii page for a Pokémon"""
+  """
+  Serebii page for a Pokémon
+  """
   serebiiPage: String!
 
   """
@@ -3680,13 +3770,19 @@ type Pokemon {
   """
   shinySprite: String!
 
-  """Smogon page for a Pokémon"""
+  """
+  Smogon page for a Pokémon
+  """
   smogonPage: String!
 
-  """The smogon tier a Pokémon falls under"""
+  """
+  The smogon tier a Pokémon falls under
+  """
   smogonTier: String!
 
-  """The species name for a Pokémon"""
+  """
+  The species name for a Pokémon
+  """
   species: String!
 
   """
@@ -3694,10 +3790,14 @@ type Pokemon {
   """
   sprite: String!
 
-  """The types for a Pokémon"""
+  """
+  The types for a Pokémon
+  """
   types: [PokemonType!]!
 
-  """The weight of a Pokémon in kilograms"""
+  """
+  The weight of a Pokémon in kilograms
+  """
   weight: Float!
 
   """
@@ -3711,52 +3811,84 @@ type Pokemon {
   legendary: Boolean!
 }
 
-"""The type of a Pokémon and that types matchup"""
+"""
+The type of a Pokémon and that types matchup
+"""
 type PokemonType {
-  """The name of the typ"""
+  """
+  The name of the typ
+  """
   name: String!
 
-  """The type matchup for this type"""
+  """
+  The type matchup for this type
+  """
   matchup: TypeMatchup!
 }
 
-"""A Pokémon's abilities entry"""
+"""
+A Pokémon's abilities entry
+"""
 type Abilities {
-  """The first ability of a Pokémon"""
+  """
+  The first ability of a Pokémon
+  """
   first: Ability!
 
-  """The hidden ability of a Pokémon"""
+  """
+  The hidden ability of a Pokémon
+  """
   hidden: Ability
 
-  """The second ability of a Pokémon"""
+  """
+  The second ability of a Pokémon
+  """
   second: Ability
 
-  """The special ability of a Pokémon"""
+  """
+  The special ability of a Pokémon
+  """
   special: Ability
 }
 
-"""A Pokémon's stats"""
+"""
+A Pokémon's stats
+"""
 type Stats {
-  """The base attack stat of a Pokémon"""
+  """
+  The base attack stat of a Pokémon
+  """
   attack: Int!
 
-  """The base defense stat of a Pokémon"""
+  """
+  The base defense stat of a Pokémon
+  """
   defense: Int!
 
-  """The base HP stat of a pokémon"""
+  """
+  The base HP stat of a pokémon
+  """
   hp: Int!
 
-  """The base special attack stat of a Pokémon"""
+  """
+  The base special attack stat of a Pokémon
+  """
   specialattack: Int!
 
-  """The base special defense stat of a Pokémon"""
+  """
+  The base special defense stat of a Pokémon
+  """
   specialdefense: Int!
 
-  """The base speed stat of a Pokémon"""
+  """
+  The base speed stat of a Pokémon
+  """
   speed: Int!
 }
 
-"""A Pokémon catch rate entry"""
+"""
+A Pokémon catch rate entry
+"""
 type CatchRate {
   """
   The base catch rate for a Pokémon that will be used to calculate the final catch rate
@@ -3769,110 +3901,180 @@ type CatchRate {
   percentageWithOrdinaryPokeballAtFullHealth: String!
 }
 
-"""A Pokémon's EV yields"""
+"""
+A Pokémon's EV yields
+"""
 type EvYields {
-  """The attack EV yield of a Pokémon"""
+  """
+  The attack EV yield of a Pokémon
+  """
   attack: Int!
 
-  """The defense EV yield of a Pokémon"""
+  """
+  The defense EV yield of a Pokémon
+  """
   defense: Int!
 
-  """The HP EV yield of a pokémon"""
+  """
+  The HP EV yield of a pokémon
+  """
   hp: Int!
 
-  """The special attack EV yield of a Pokémon"""
+  """
+  The special attack EV yield of a Pokémon
+  """
   specialattack: Int!
 
-  """The special defense EV yield of a Pokémon"""
+  """
+  The special defense EV yield of a Pokémon
+  """
   specialdefense: Int!
 
-  """The speed EV yield of a Pokémon"""
+  """
+  The speed EV yield of a Pokémon
+  """
   speed: Int!
 }
 
-"""A flavor text entry for a Pokémon"""
+"""
+A flavor text entry for a Pokémon
+"""
 type Flavor {
-  """The flavor text for this entry"""
+  """
+  The flavor text for this entry
+  """
   flavor: String!
 
-  """The name of the game this flavor text is from"""
+  """
+  The name of the game this flavor text is from
+  """
   game: String!
 }
 
-"""A Pokémon gender ratio entry"""
+"""
+A Pokémon gender ratio entry
+"""
 type Gender {
-  """The percentage for female occurrences"""
+  """
+  The percentage for female occurrences
+  """
   female: String!
 
-  """The percentage of male occurrences"""
+  """
+  The percentage of male occurrences
+  """
   male: String!
 }
 
-"""A single item entry"""
+"""
+A single item entry
+"""
 type Item {
-  """The key of the item as stored in the API"""
+  """
+  The key of the item as stored in the API
+  """
   key: ItemsEnum!
 
-  """Bulbapedia page for an item"""
+  """
+  Bulbapedia page for an item
+  """
   bulbapediaPage: String!
 
-  """The long description for an item"""
+  """
+  The long description for an item
+  """
   desc: String!
 
-  """The generation in which this item was introduced"""
+  """
+  The generation in which this item was introduced
+  """
   generationIntroduced: Int!
 
-  """Whether an item is non-standard, and if it is why"""
+  """
+  Whether an item is non-standard, and if it is why
+  """
   isNonstandard: String
 
-  """The name for an item"""
+  """
+  The name for an item
+  """
   name: String!
 
-  """Serebii page for an item"""
+  """
+  Serebii page for an item
+  """
   serebiiPage: String!
 
-  """The long description for an item"""
+  """
+  The long description for an item
+  """
   shortDesc: String
 
-  """Smogon page for an item"""
+  """
+  Smogon page for an item
+  """
   smogonPage: String
 
-  """The sprite for an item"""
+  """
+  The sprite for an item
+  """
   sprite: String!
 }
 
-"""The learnset for each Pokémon split by generation"""
+"""
+The learnset for each Pokémon split by generation
+"""
 type GenerationalPokemonLearnset {
-  """The learnset of this Pokémon in Generation 8"""
+  """
+  The learnset of this Pokémon in Generation 8
+  """
   generation8: PokemonLearnset!
 
-  """The learnset of this Pokémon in Generation 7"""
+  """
+  The learnset of this Pokémon in Generation 7
+  """
   generation7: PokemonLearnset!
 
-  """The learnset of this Pokémon in Generation 6"""
+  """
+  The learnset of this Pokémon in Generation 6
+  """
   generation6: PokemonLearnset!
 
-  """The learnset of this Pokémon in Generation 5"""
+  """
+  The learnset of this Pokémon in Generation 5
+  """
   generation5: PokemonLearnset!
 
-  """The learnset of this Pokémon in Generation 4"""
+  """
+  The learnset of this Pokémon in Generation 4
+  """
   generation4: PokemonLearnset!
 
-  """The learnset of this Pokémon in Generation 3"""
+  """
+  The learnset of this Pokémon in Generation 3
+  """
   generation3: PokemonLearnset!
 }
 
 type PokemonLearnset {
-  """The moves that are exclusively learned in the Unova Dream World"""
+  """
+  The moves that are exclusively learned in the Unova Dream World
+  """
   dreamworldMoves: [LearnsetMove!]
 
-  """The moves that can be passed as egg moves"""
+  """
+  The moves that can be passed as egg moves
+  """
   eggMoves: [LearnsetMove!]
 
-  """The moves that are exclusive to event variants of the Pokémon"""
+  """
+  The moves that are exclusive to event variants of the Pokémon
+  """
   eventMoves: [LearnsetMove!]
 
-  """The moves that can be learned through levelling up"""
+  """
+  The moves that can be learned through levelling up
+  """
   levelUpMoves: [LearnsetLevelUpMove!]
 
   """
@@ -3880,27 +4082,39 @@ type PokemonLearnset {
   """
   tmMoves: [LearnsetMove!]
 
-  """The moves that can be learned from a move tutor"""
+  """
+  The moves that can be learned from a move tutor
+  """
   tutorMoves: [LearnsetMove!]
 
-  """The moves that can be learned through virtual console transfer"""
+  """
+  The moves that can be learned through virtual console transfer
+  """
   virtualTransferMoves: [LearnsetMove!]
 }
 
-"""A learnset entry"""
+"""
+A learnset entry
+"""
 type Learnset {
   """
   The back sprite for a Pokémon. For most Pokémon this will be the animated gif, with some exceptions that were older-gen exclusive
   """
   backSprite: String!
 
-  """The PokéDex colour for the Pokémon"""
+  """
+  The PokéDex colour for the Pokémon
+  """
   color: String!
 
-  """The key of the Pokémon as stored in the API"""
+  """
+  The key of the Pokémon as stored in the API
+  """
   pokemonKey: PokemonEnum!
 
-  """The dex number for a Pokémon"""
+  """
+  The dex number for a Pokémon
+  """
   num: Int!
 
   """
@@ -3913,7 +4127,9 @@ type Learnset {
   """
   shinySprite: String!
 
-  """The species name for a Pokémon"""
+  """
+  The species name for a Pokémon
+  """
   species: String!
 
   """
@@ -3921,16 +4137,24 @@ type Learnset {
   """
   sprite: String!
 
-  """The moves that are exclusively learned in the Unova Dream World"""
+  """
+  The moves that are exclusively learned in the Unova Dream World
+  """
   dreamworldMoves: [LearnsetMove!]
 
-  """The moves that can be passed as egg moves"""
+  """
+  The moves that can be passed as egg moves
+  """
   eggMoves: [LearnsetMove!]
 
-  """The moves that are exclusive to event variants of the Pokémon"""
+  """
+  The moves that are exclusive to event variants of the Pokémon
+  """
   eventMoves: [LearnsetMove!]
 
-  """The moves that can be learned through levelling up"""
+  """
+  The moves that can be learned through levelling up
+  """
   levelUpMoves: [LearnsetLevelUpMove!]
 
   """
@@ -3938,55 +4162,89 @@ type Learnset {
   """
   tmMoves: [LearnsetMove!]
 
-  """The moves that can be learned from a move tutor"""
+  """
+  The moves that can be learned from a move tutor
+  """
   tutorMoves: [LearnsetMove!]
 
-  """The moves that can be learned through virtual console transfer"""
+  """
+  The moves that can be learned through virtual console transfer
+  """
   virtualTransferMoves: [LearnsetMove!]
 }
 
-"""A learnset move entry"""
+"""
+A learnset move entry
+"""
 type LearnsetMove {
-  """The generation in which this pokémon learned the move this way"""
+  """
+  The generation in which this pokémon learned the move this way
+  """
   generation: Int!
 
-  """The move"""
+  """
+  The move
+  """
   move: Move!
 }
 
-"""A learnset level up move entry"""
+"""
+A learnset level up move entry
+"""
 type LearnsetLevelUpMove {
-  """The generation in which this pokémon learned the move this way"""
+  """
+  The generation in which this pokémon learned the move this way
+  """
   generation: Int!
 
-  """The move"""
+  """
+  The move
+  """
   move: Move!
 
-  """The level at which the move is learned"""
+  """
+  The level at which the move is learned
+  """
   level: Int!
 }
 
-"""A single Pokémon move entry"""
+"""
+A single Pokémon move entry
+"""
 type Move {
-  """The key of the move as stored in the API"""
+  """
+  The key of the move as stored in the API
+  """
   key: MovesEnum!
 
-  """The accuracy for a move"""
+  """
+  The accuracy for a move
+  """
   accuracy: Int!
 
-  """The base power for a move"""
+  """
+  The base power for a move
+  """
   basePower: String!
 
-  """Bulbapedia page for a move"""
+  """
+  Bulbapedia page for a move
+  """
   bulbapediaPage: String!
 
-  """The category for a move"""
+  """
+  The category for a move
+  """
   category: String!
 
-  """The contest type for a move"""
+  """
+  The contest type for a move
+  """
   contestType: String
 
-  """The long description for a move"""
+  """
+  The long description for a move
+  """
   desc: String
 
   """
@@ -3999,7 +4257,9 @@ type Move {
   """
   isGMax: String
 
-  """Whether a move is non-standard, and if it is why"""
+  """
+  Whether a move is non-standard, and if it is why
+  """
   isNonstandard: String
 
   """
@@ -4007,104 +4267,158 @@ type Move {
   """
   isZ: String
 
-  """The power this move will have when used with its Max Move equivalent"""
+  """
+  The power this move will have when used with its Max Move equivalent
+  """
   maxMovePower: Int
 
-  """The name for a move"""
+  """
+  The name for a move
+  """
   name: String!
 
-  """The power points for a move"""
+  """
+  The power points for a move
+  """
   pp: Int!
 
-  """The priority for a move"""
+  """
+  The priority for a move
+  """
   priority: Int!
 
-  """Serebii page for a move"""
+  """
+  Serebii page for a move
+  """
   serebiiPage: String!
 
-  """The short description for a move"""
+  """
+  The short description for a move
+  """
   shortDesc: String!
 
-  """Smogon page for a move"""
+  """
+  Smogon page for a move
+  """
   smogonPage: String!
 
-  """The target for a move"""
+  """
+  The target for a move
+  """
   target: String!
 
-  """The type for a move"""
+  """
+  The type for a move
+  """
   type: String!
 
-  """The power this move will have when used with its Z-move equivalent"""
+  """
+  The power this move will have when used with its Z-move equivalent
+  """
   zMovePower: Int!
 }
 
-"""The type matchups for any one or two given types"""
+"""
+The type matchups for any one or two given types
+"""
 type TypeMatchup {
-  """The type matchups when attacking"""
+  """
+  The type matchups when attacking
+  """
   attacking: TypeEffectiveness!
 
-  """The type matchups when defending"""
+  """
+  The type matchups when defending
+  """
   defending: TypeEffectiveness!
 }
 
-"""A type matchup entry"""
+"""
+A type matchup entry
+"""
 type TypeEffectiveness {
-  """The types with 4x effectiveness"""
+  """
+  The types with 4x effectiveness
+  """
   doubleEffectiveTypes: [String!]!
 
-  """The types with 0.25x effectiveness"""
+  """
+  The types with 0.25x effectiveness
+  """
   doubleResistedTypes: [String!]!
 
-  """The types with 2x effectiveness"""
+  """
+  The types with 2x effectiveness
+  """
   effectiveTypes: [String!]!
 
-  """The types with 0x effectiveness"""
+  """
+  The types with 0x effectiveness
+  """
   effectlessTypes: [String!]!
 
-  """The types with 1x effectiveness"""
+  """
+  The types with 1x effectiveness
+  """
   normalTypes: [String!]!
 
-  """The types with 0.5x effectiveness"""
+  """
+  The types with 0.5x effectiveness
+  """
   resistedTypes: [String!]!
 }
 
 type Query {
-  """Gets the details on a Pokémon ability, using the ability name"""
+  """
+  Gets the details on a Pokémon ability, using the ability name
+  """
   getAbility(
-    """The ability to look up"""
+    """
+    The ability to look up
+    """
     ability: AbilitiesEnum!
   ): Ability!
 
   """
   Gets details on a Pokémon ability, using a fuzzy search on name
-  
+
   This can be used to find multiple results based on the query
-  
+
   You can provide `take` to limit the amount of abilities to return (default: 1), set the offset of where to start with `offset`, and reverse the entire array with `reverse`.
   """
   getFuzzyAbility(
-    """Sets the offset where to start"""
+    """
+    Sets the offset where to start
+    """
     offset: Int = 0
 
-    """Return only this many results, starting from the offset"""
+    """
+    Return only this many results, starting from the offset
+    """
     take: Int = 1
 
-    """Reverses the dataset before paginating"""
+    """
+    Reverses the dataset before paginating
+    """
     reverse: Boolean = false
 
-    """The ability to fuzzily search"""
+    """
+    The ability to fuzzily search
+    """
     ability: String!
   ): [Ability!]!
 
   """
   Gets details on a single Pokémon based on National Pokédex number
-  
+
   You can provide `takeFlavorTexts` to limit the amount of flavour texts to return, set the offset of where to start with `offsetFlavorTexts`, and reverse the entire array with `reverseFlavorTexts`.
-  
+
   **Reversal is applied before pagination!**
   """
   getPokemonByDexNumber(
-    """Sets the offset for flavor texts from where to start."""
+    """
+    Sets the offset for flavor texts from where to start.
+    """
     offsetFlavorTexts: Int = 0
 
     """
@@ -4126,13 +4440,15 @@ type Query {
 
   """
   Gets details on a single Pokémon based on species name
-  
+
   You can provide `takeFlavorTexts` to limit the amount of flavour texts to return, set the offset of where to start with `offsetFlavorTexts`, and reverse the entire array with `reverseFlavorTexts`.
-  
+
   **Reversal is applied before pagination!**
   """
   getPokemon(
-    """Sets the offset for flavor texts from where to start."""
+    """
+    Sets the offset for flavor texts from where to start.
+    """
     offsetFlavorTexts: Int = 0
 
     """
@@ -4145,33 +4461,45 @@ type Query {
     """
     reverseFlavorTexts: Boolean = true
 
-    """The Pokémon to look up"""
+    """
+    The Pokémon to look up
+    """
     pokemon: PokemonEnum!
   ): Pokemon!
 
   """
   Gets details on one or more Pokémon based on species name
-  
+
   You can provide `take` to limit the amount of Pokémon to return (default: 1), set the offset of where to start with `offset`, and reverse the entire array with `reverse`.
-  
+
   You can provide `takeFlavorTexts` to limit the amount of flavour texts to return, set the offset of where to start with `offsetFlavorTexts`, and reverse the entire array with `reverseFlavorTexts`.
-  
+
   **Reversal is applied before pagination!**
   """
   getFuzzyPokemon(
-    """Sets the offset where to start"""
+    """
+    Sets the offset where to start
+    """
     offset: Int = 0
 
-    """Return only this many results, starting from the offset"""
+    """
+    Return only this many results, starting from the offset
+    """
     take: Int = 1
 
-    """Reverses the dataset before paginating"""
+    """
+    Reverses the dataset before paginating
+    """
     reverse: Boolean = false
 
-    """The Pokémon to fuzzily search"""
+    """
+    The Pokémon to fuzzily search
+    """
     pokemon: String!
 
-    """Sets the offset for flavor texts from where to start."""
+    """
+    Sets the offset for flavor texts from where to start.
+    """
     offsetFlavorTexts: Int = 0
 
     """
@@ -4187,30 +4515,38 @@ type Query {
 
   """
   Returns a list of all the known Pokémon.
-  
+
   For every Pokémon all the data on each requested field is returned.
-  
+
   **_NOTE:_ To skip all CAP Pokémon, PokéStar Pokémon, Missingno, and 'M (00) provide an `offset` of 89**
-  
+
   You can provide `take` to limit the amount of Pokémon to return (default: 1), set the offset of where to start with `offset`, and reverse the entire array with `reverse`.
-  
+
   You can provide `takeFlavorTexts` to limit the amount of flavour texts to return, set the offset of where to start with `offsetFlavorTexts`, and reverse the entire array with `reverseFlavorTexts`.
-  
+
   While the API will currently not rate limit the usage of this query, it may do so in the future.
-  
+
   It is advisable to cache responses of this query.
   """
   getAllPokemon(
-    """Sets the offset where to start"""
+    """
+    Sets the offset where to start
+    """
     offset: Int = 0
 
-    """Return only this many results, starting from the offset"""
+    """
+    Return only this many results, starting from the offset
+    """
     take: Int = 1423
 
-    """Reverses the dataset before paginating"""
+    """
+    Reverses the dataset before paginating
+    """
     reverse: Boolean = false
 
-    """Sets the offset for flavor texts from where to start."""
+    """
+    Sets the offset for flavor texts from where to start.
+    """
     offsetFlavorTexts: Int = 0
 
     """
@@ -4224,104 +4560,146 @@ type Query {
     reverseFlavorTexts: Boolean = true
   ): [Pokemon!]!
 
-  """Gets the details on a Pokémon item, using the item name"""
+  """
+  Gets the details on a Pokémon item, using the item name
+  """
   getItem(
-    """The item to look up"""
+    """
+    The item to look up
+    """
     item: ItemsEnum!
   ): Item!
 
   """
   Gets details on a Pokémon item, using a fuzzy search on name
-  
+
   This can be used to find multiple results based on the query
-  
+
   By default only 1 result is returned. You can provide the arguments `take`, `offset`, and `reverse` to modify this behaviour.
   """
   getFuzzyItem(
-    """Sets the offset where to start"""
+    """
+    Sets the offset where to start
+    """
     offset: Int = 0
 
-    """Return only this many results, starting from the offset"""
+    """
+    Return only this many results, starting from the offset
+    """
     take: Int = 1
 
-    """Reverses the dataset before paginating"""
+    """
+    Reverses the dataset before paginating
+    """
     reverse: Boolean = false
 
-    """The item to fuzzily search"""
+    """
+    The item to fuzzily search
+    """
     item: String!
   ): [Item!]!
 
   """
   Gets the learnsets for a given Pokémon and move.
-  
+
   Multiple moves are possible by putting them in an array: `[move1, move2]`.
-  
+
   You can also apply a generation filter (only results for the given generation will be returned) with the generation argument
   """
   getLearnset(
-    """The generation filter to apply"""
+    """
+    The generation filter to apply
+    """
     generation: Int
 
-    """The moves to match against the Pokémon"""
+    """
+    The moves to match against the Pokémon
+    """
     moves: [MovesEnum!]!
 
-    """The Pokémon for which to get the learnset"""
+    """
+    The Pokémon for which to get the learnset
+    """
     pokemon: PokemonEnum!
   ): Learnset!
 
   """
   Gets the learnset for a given Pokémon and move.
-  
+
   A fuzzy search is performed to find a matching Pokémon and move
-  
+
   Multiple moves are possible by putting them in an array: `[move1, move2]`.
-  
+
   You can also apply a generation filter (only results for the given generation will be returned) with the generation argument
   """
   getFuzzyLearnset(
-    """The generation filter to apply"""
+    """
+    The generation filter to apply
+    """
     generation: Int
 
-    """The moves to match against the Pokémon"""
+    """
+    The moves to match against the Pokémon
+    """
     moves: [String!]!
 
-    """The Pokémon for which to get the learnset"""
+    """
+    The Pokémon for which to get the learnset
+    """
     pokemon: String!
   ): Learnset!
 
-  """Gets the details on a Pokémon move, using the move name"""
+  """
+  Gets the details on a Pokémon move, using the move name
+  """
   getMove(
-    """The move to look up"""
+    """
+    The move to look up
+    """
     move: MovesEnum!
   ): Move!
 
   """
   Gets details on a Pokémon move, using a fuzzy search on name
-  
+
   This can be used to find multiple results based on the query
-  
+
   By default only 1 result is returned. You can provide the arguments `take`, "offset", and "reverse" to modify this behaviour.
   """
   getFuzzyMove(
-    """Sets the offset where to start"""
+    """
+    Sets the offset where to start
+    """
     offset: Int = 0
 
-    """Return only this many results, starting from the offset"""
+    """
+    Return only this many results, starting from the offset
+    """
     take: Int = 1
 
-    """Reverses the dataset before paginating"""
+    """
+    Reverses the dataset before paginating
+    """
     reverse: Boolean = false
 
-    """The move to fuzzily search"""
+    """
+    The move to fuzzily search
+    """
     move: String!
   ): [Move!]!
 
-  """Gets the type matchup data for the given type or types"""
+  """
+  Gets the type matchup data for the given type or types
+  """
   getTypeMatchup(
-    """The primary type to check"""
+    """
+    The primary type to check
+    """
     primaryType: TypesEnum!
 
-    """The secondary type to check"""
+    """
+    The secondary type to check
+    """
     secondaryType: TypesEnum
   ): TypeMatchup!
 }

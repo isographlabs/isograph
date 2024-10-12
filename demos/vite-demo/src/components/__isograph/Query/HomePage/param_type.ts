@@ -1,7 +1,8 @@
 import { type Pokemon__Pokemon__output_type } from '../../Pokemon/Pokemon/output_type';
 
 export type Query__HomePage__param = {
-  /**
+  readonly data: {
+    /**
 Returns a list of all the known Pokémon.
 
 For every Pokémon all the data on each requested field is returned.
@@ -15,16 +16,18 @@ You can provide `takeFlavorTexts` to limit the amount of flavour texts to return
 While the API will currently not rate limit the usage of this query, it may do so in the future.
 
 It is advisable to cache responses of this query.
-  */
-  getAllPokemon: ({
-        /**
+    */
+    readonly getAllPokemon: ReadonlyArray<{
+      /**
 The key of the Pokémon as stored in the API
-    */
-key: string,
-        /**
+      */
+      readonly key: string,
+      /**
 The form identifier of a Pokémon
-    */
-forme: (string | null),
-    Pokemon: Pokemon__Pokemon__output_type,
-  })[],
+      */
+      readonly forme: (string | null),
+      readonly Pokemon: Pokemon__Pokemon__output_type,
+    }>,
+  },
+  readonly parameters: Record<string, never>,
 };

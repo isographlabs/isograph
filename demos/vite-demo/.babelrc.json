@@ -1,4 +1,4 @@
 {
   "presets": ["@babel/preset-typescript"],
-  "plugins": ["@isograph"]
+  "plugins": ["../../libs/isograph-babel-plugin/BabelPluginIsograph"]
 }

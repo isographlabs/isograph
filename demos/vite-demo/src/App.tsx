@@ -6,17 +6,17 @@ import {
 } from '@isograph/react';
 import HomePageRoute from './components/HomePageRoute';
 
-function makeNetworkRequest<T>(queryText: string, variables: unknown): Promise<T> {
-  const promise = fetch(
-    'https://graphqlpokemon.favware.tech/v8',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ query: queryText, variables }),
+function makeNetworkRequest<T>(
+  queryText: string,
+  variables: unknown,
+): Promise<T> {
+  const promise = fetch('https://graphqlpokemon.favware.tech/v8', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
     },
-  ).then(async (response) => {
+    body: JSON.stringify({ query: queryText, variables }),
+  }).then(async (response) => {
     const json = await response.json();
 
     if (response.ok) {

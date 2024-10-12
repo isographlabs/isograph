@@ -7,19 +7,17 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "iso": "iso --watch"
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@isograph/react": "^0.2.0",
+    "@isograph/react": "*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@babel/preset-typescript": "^7.24.7",
     "@eslint/js": "^9.11.1",
-    "@isograph/babel-plugin": "^0.2.0",
-    "@isograph/compiler": "^0.2.0",
+    "@isograph/compiler": "*",
     "@types/node": "^22.7.5",
     "@types/react": "18.2.21",
     "@types/react-dom": "18.2.7",

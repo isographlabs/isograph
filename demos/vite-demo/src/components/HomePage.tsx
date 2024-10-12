@@ -12,20 +12,24 @@ export const HomePage = iso(`
     }
   }
 `)(function HomePageComponent(data) {
-    return (
-        <div style={{
-            display: 'flex',
-            gap: '10px',
-            flexWrap: 'wrap',
-            backgroundColor: '#e3350d',
-            color: '#000000',
-            padding: '10px',
-        }}>
-            {data.getAllPokemon?.filter(({ forme }) => !forme).map((pokemon) => (
-                <Fragment key={pokemon.key}>
-                    <pokemon.Pokemon />
-                </Fragment>)
-            )}
-        </div>
-    );   
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: '10px',
+        flexWrap: 'wrap',
+        backgroundColor: '#e3350d',
+        color: '#000000',
+        padding: '10px',
+      }}
+    >
+      {data.getAllPokemon
+        ?.filter(({ forme }) => !forme)
+        .map((pokemon) => (
+          <Fragment key={pokemon.key}>
+            <pokemon.Pokemon />
+          </Fragment>
+        ))}
+    </div>
+  );
 });
