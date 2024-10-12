@@ -6,6 +6,12 @@ In this quickstart guide, we will create a new NextJS project and add Isograph t
 
 You can view the end result of following this quickstart guide in [this repository](https://github.com/isographlabs/quickstart).
 
+:::tip
+
+If you want an example using [Vite](https://vite.dev) rather than NextJS, check out the [Vite Pokemon demo](https://github.com/isographlabs/isograph/tree/main/demos/vite-demo) to review the configuration needed for Vite.
+
+:::
+
 ## Install NextJS
 
 In a newly-created empty directory, run:
