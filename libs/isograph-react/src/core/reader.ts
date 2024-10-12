@@ -145,6 +145,10 @@ type StableId = string;
 /// Passing TArgs to the LoadableField should be cheap and do no "actual" work,
 /// except to stringify the args or whatnot. Calling the factory can be
 /// expensive. For example, doing so will probably trigger a network request.
-export type LoadableField<TArgs, TResult> = (
-  args: TArgs,
-) => [StableId, Factory<FragmentReference<any, TResult>>];
+export type LoadableField<
+  TReadFromStore extends { data: object; parameters: object },
+  TResult,
+  TProvidedArgs extends object = object,
+> = (
+  args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs> | void,
+) => [StableId, Factory<FragmentReference<TReadFromStore, TResult>>];

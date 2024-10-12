@@ -23,7 +23,11 @@ type OmitSkipLimit<TArgs> = keyof Omit<TArgs, SkipOrLimit> extends never
   ? void | Record<string, never>
   : Omit<TArgs, SkipOrLimit>;
 
-type UseSkipLimitReturnValue<TArgs, TItem> =
+type UseSkipLimitReturnValue<
+  TReadFromStore extends { data: object; parameters: object },
+  TArgs,
+  TItem,
+> =
   | {
       readonly kind: 'Complete';
       readonly fetchMore: (args: OmitSkipLimit<TArgs>, count: number) => void;
@@ -32,7 +36,10 @@ type UseSkipLimitReturnValue<TArgs, TItem> =
   | {
       readonly kind: 'Pending';
       readonly results: ReadonlyArray<TItem>;
-      readonly pendingFragment: FragmentReference<any, ReadonlyArray<TItem>>;
+      readonly pendingFragment: FragmentReference<
+        TReadFromStore,
+        ReadonlyArray<TItem>
+      >;
     };
 
 type ArrayFragmentReference<
@@ -68,10 +75,10 @@ export function useSkipLimitPagination<
     limit: number | void | null;
   },
   TItem,
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends { parameters: TArgs; data: object },
 >(
-  loadableField: LoadableField<TArgs, ReadonlyArray<TItem>>,
-): UseSkipLimitReturnValue<TArgs, TItem> {
+  loadableField: LoadableField<TReadFromStore, ReadonlyArray<TItem>>,
+): UseSkipLimitReturnValue<TReadFromStore, TArgs, TItem> {
   const networkRequestOptions = {
     suspendIfInFlight: true,
     throwOnNetworkError: true,
@@ -169,7 +176,6 @@ export function useSkipLimitPagination<
         }
         return clonedRefCountedPointer;
       });
-      // @ts-expect-error
       clonedPointers.push(newPointer);
 
       const totalItemCleanupPair: ItemCleanupPair<

@@ -1197,6 +1197,25 @@ pub fn get_missing_arguments<'a>(
         .collect()
 }
 
+pub fn get_provided_arguments<'a>(
+    argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
+    arguments: &[WithLocation<SelectionFieldArgument>],
+) -> Vec<ValidatedVariableDefinition> {
+    argument_definitions
+        .filter_map(|definition| {
+            let user_has_supplied_argument = arguments
+                .iter()
+                // TODO do not call .lookup
+                .any(|arg| definition.name.item.lookup() == arg.item.name.item.lookup());
+            if user_has_supplied_argument {
+                Some(definition.clone())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 type ValidateSchemaResult<T> = Result<T, WithLocation<ValidateSchemaError>>;
 
 #[derive(Debug, Error)]
