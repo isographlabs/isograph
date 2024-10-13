@@ -7,7 +7,7 @@ const os = require('os');
  * @typedef {import("@babel/core")} babel
  * @param {typeof babel.types} t
  * @param {babel.NodePath<babel.types.CallExpression>} path
- * @param {import("cosmiconfig").Config} config
+ * @param {NonNullable<import("cosmiconfig").CosmiconfigResult>} config
  */
 function compileTag(t, path, config) {
   const callee = path.node.callee;
@@ -85,15 +85,15 @@ function getTypeAndField(path) {
  * @param {string} type
  * @param {string} field
  * @param {string} artifactType
- * @param {import("cosmiconfig").Config} config
+ * @param {NonNullable<import("cosmiconfig").CosmiconfigResult>} config
  */
 function compileImportStatement(t, path, type, field, artifactType, config) {
   const filename = path.state.filename;
   const folder = pathModule.dirname(filename);
-  const cwd = path.state.cwd;
+  const cwd = pathModule.dirname(config.filepath);
   const artifactDirectory = pathModule.join(
     cwd,
-    config['artifact_directory'] ?? config['project_root'],
+    config.config['artifact_directory'] ?? config.config['project_root'],
   );
 
   const fileToArtifactDir = pathModule.relative(folder, artifactDirectory);

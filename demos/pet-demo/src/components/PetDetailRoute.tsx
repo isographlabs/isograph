@@ -7,15 +7,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 
 export const PetDetailRouteComponent = iso(`
   field Query.PetDetailRoute($id: ID!) @component {
-    PetDetailRouteInner(actualId: $id) 
-  }
-`)(function PetDetailRouteComponent({ data }) {
-  return <data.PetDetailRouteInner />;
-});
-
-export const PetDetailRouteInner = iso(`
-  field Query.PetDetailRouteInner($actualId: ID!) @component {
-    pet(id: $actualId) {
+    pet(id: $id) {
       name
       PetCheckinsCard
       PetBestFriendCard
@@ -24,7 +16,7 @@ export const PetDetailRouteInner = iso(`
       PetStatsCard
     }
   }
-`)(function PetDetailRouteComponentInner({ data }) {
+`)(function PetDetailRouteComponent({ data }) {
   const navigateTo = useNavigateTo();
   const { pet } = data;
   if (pet == null) {

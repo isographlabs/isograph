@@ -9,6 +9,7 @@ use std::path::Path;
 use std::{collections::BTreeSet, path::PathBuf, str::FromStr};
 
 use crate::generate_artifacts::generate_parameters;
+use crate::import_statements::param_type_imports_to_import_param_statement;
 use crate::{
     generate_artifacts::{
         generate_client_field_parameter_type, generate_output_type, generate_path,
@@ -131,23 +132,27 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
     let relative_directory = generate_path(parent_type.name, client_field.name);
 
     let mut param_type_imports = BTreeSet::new();
-    let mut loadable_field_encountered = false;
+    let mut loadable_fields = BTreeSet::new();
     let client_field_parameter_type = generate_client_field_parameter_type(
         schema,
         client_field.selection_set_for_parent_query(),
         parent_type,
         &mut param_type_imports,
+        &mut loadable_fields,
         1,
-        &mut loadable_field_encountered,
     );
 
     let param_type_import_statement = param_type_imports_to_import_statement(&param_type_imports);
     let reader_param_type = format!("{}__{}__param", parent_type.name, client_field.name);
 
-    let loadable_field_import = if loadable_field_encountered {
-        "import { type LoadableField } from '@isograph/react';\n"
+    let loadable_field_imports = if !loadable_fields.is_empty() {
+        let param_imports = param_type_imports_to_import_param_statement(&loadable_fields);
+        format!(
+            "import {{ type LoadableField }} from '@isograph/react';\n\
+            {param_imports}"
+        )
     } else {
-        ""
+        "".to_string()
     };
 
     let (parameters_import, parameters_type) = if !client_field.variable_definitions.is_empty() {
@@ -164,7 +169,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
     let indent = "  ";
     let param_type_content = format!(
         "{param_type_import_statement}\
-        {loadable_field_import}\
+        {loadable_field_imports}\
         {parameters_import}\n\
         export type {reader_param_type} = {{\n\
         {indent}readonly data: {client_field_parameter_type},\n\

@@ -137,7 +137,7 @@ jobs:
         #
         # This can be overcome, if necessary, e.g. if "@isograph/react" was a
         # parameter passed to the CLI.
-        run: pnpm -r test
+        run: pnpm test
 
   build-website:
     name: Build website
