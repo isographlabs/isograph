@@ -769,6 +769,11 @@ function getDataIdOfNetworkResponse(
   variables: Variables,
   index: number | null,
 ): DataId {
+  // If we are dealing with nested Query, use __ROOT as id
+  if (astNode.concreteType === parentRecordId.concreteType) {
+    return parentRecordId.id;
+  }
+
   // Check whether the dataToNormalize has an id field. If so, that is the key.
   // If not, we construct an id from the parentRecordId and the field parameters.
 
