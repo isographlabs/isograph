@@ -54,23 +54,14 @@ type LoadedFragmentReference<
   ReferenceCountedPointer<FragmentReference<TReadFromStore, TItem>>
 >;
 
-function flatten<TItem>(
-  arr: ReadonlyArray<Connection<TItem>>,
-): NonNullConnection<TItem> {
-  return arr.reduce<NonNullConnection<TItem>>(
-    (acc, connection) => ({
-      ...acc,
-      ...connection,
-      edges: acc.edges.concat(connection.edges ?? []),
-    }),
-    {
-      edges: [],
-      pageInfo: {
-        hasNextPage: true,
-        endCursor: null,
-      },
-    },
-  );
+function flatten<T>(arr: ReadonlyArray<ReadonlyArray<T>>): ReadonlyArray<T> {
+  let outArray: Array<T> = [];
+  for (const subarr of arr) {
+    for (const item of subarr) {
+      outArray.push(item);
+    }
+  }
+  return outArray;
 }
 
 type PageInfo = {
@@ -113,7 +104,7 @@ export function usePagination<
   // as parameters (or recreate networkRequestOptions)
   function readCompletedFragmentReferences(
     completedReferences: FragmentReference<TReadFromStore, Connection<TItem>>[],
-  ) {
+  ): NonNullConnection<TItem> {
     const results = completedReferences.map((fragmentReference, i) => {
       const readerWithRefetchQueries = readPromise(
         fragmentReference.readerWithRefetchQueries,
@@ -135,8 +126,15 @@ export function usePagination<
       return readerWithRefetchQueries.readerArtifact.resolver(firstParameter);
     });
 
-    const items = flatten(results);
-    return items;
+    const items = flatten(results.map((result) => result.edges ?? []));
+
+    return {
+      edges: items,
+      pageInfo: results[results.length - 1]?.pageInfo ?? {
+        endCursor: null,
+        hasNextPage: true,
+      },
+    };
   }
 
   function subscribeCompletedFragmentReferences(
