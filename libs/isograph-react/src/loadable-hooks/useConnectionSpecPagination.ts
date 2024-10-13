@@ -28,7 +28,6 @@ type OmitFirstAfter<TArgs> = keyof Omit<TArgs, FirstOrAfter> extends never
 type UsePaginationReturnValue<
   TReadFromStore extends { parameters: object; data: object },
   TItem,
-  TArgs,
 > =
   | {
       kind: 'Pending';
@@ -37,7 +36,10 @@ type UsePaginationReturnValue<
     }
   | {
       kind: 'Complete';
-      fetchMore: (args: OmitFirstAfter<TArgs>, first: number) => void;
+      fetchMore: (
+        args: OmitFirstAfter<TReadFromStore['parameters']>,
+        first: number,
+      ) => void;
       results: ReadonlyArray<TItem>;
       hasNextPage: boolean;
     };
@@ -80,15 +82,17 @@ type NonNullConnection<T> = {
 };
 
 export function useConnectionSpecPagination<
-  TArgs extends {
-    first: number | void | null;
-    after: string | void | null;
+  TReadFromStore extends {
+    parameters: {
+      first: number | void | null;
+      after: string | void | null;
+    };
+    data: object;
   },
   TItem,
-  TReadFromStore extends { parameters: object; data: object },
 >(
-  loadableField: LoadableField<TArgs, Connection<TItem>>,
-): UsePaginationReturnValue<TReadFromStore, TItem, TArgs> {
+  loadableField: LoadableField<TReadFromStore, Connection<TItem>>,
+): UsePaginationReturnValue<TReadFromStore, TItem> {
   const networkRequestOptions = {
     suspendIfInFlight: true,
     throwOnNetworkError: true,
@@ -175,7 +179,10 @@ export function useConnectionSpecPagination<
 
   const getFetchMore =
     (after: string | null | undefined) =>
-    (args: OmitFirstAfter<TArgs>, first: number): void => {
+    (
+      args: OmitFirstAfter<TReadFromStore['parameters']>,
+      first: number,
+    ): void => {
       // @ts-expect-error
       const loadedField = loadableField({
         ...args,
