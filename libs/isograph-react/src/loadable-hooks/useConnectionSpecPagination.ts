@@ -84,8 +84,8 @@ type NonNullConnection<T> = {
 export function useConnectionSpecPagination<
   TReadFromStore extends {
     parameters: {
-      first: number | void | null;
-      after: string | void | null;
+      readonly first?: number | void | null;
+      readonly after?: string | void | null;
     };
     data: object;
   },
