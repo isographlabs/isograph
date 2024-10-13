@@ -1,6 +1,6 @@
 import { iso } from '@iso';
 
-import { usePagination } from '@isograph/react';
+import { useConnectionSpecPagination } from '@isograph/react';
 import {
   Button,
   Table,
@@ -23,7 +23,7 @@ export const RepositoryList = iso(`
     children,
   }: { children?: ReactNode; setRoute: (route: Route) => void },
 ) {
-  const pagination = usePagination(data.RepositoryConnection);
+  const pagination = useConnectionSpecPagination(data.RepositoryConnection);
   const repositories = [...pagination.results].reverse();
   return (
     <>

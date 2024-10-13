@@ -79,7 +79,7 @@ type NonNullConnection<T> = {
   readonly pageInfo: PageInfo;
 };
 
-export function usePagination<
+export function useConnectionSpecPagination<
   TArgs extends {
     first: number | void | null;
     after: string | void | null;

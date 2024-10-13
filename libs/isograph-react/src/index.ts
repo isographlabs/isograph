@@ -86,5 +86,5 @@ export { useRerenderOnChange } from './react/useRerenderOnChange';
 export { useClientSideDefer } from './loadable-hooks/useClientSideDefer';
 export { useImperativeExposedMutationField } from './loadable-hooks/useImperativeExposedMutationField';
 export { useSkipLimitPagination } from './loadable-hooks/useSkipLimitPagination';
-export { usePagination } from './loadable-hooks/usePagination';
+export { useConnectionSpecPagination } from './loadable-hooks/useConnectionSpecPagination';
 export { useImperativeLoadableField } from './loadable-hooks/useImperativeLoadableField';
