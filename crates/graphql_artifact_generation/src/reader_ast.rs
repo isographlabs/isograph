@@ -361,6 +361,8 @@ fn loadably_selected_field_ast_node(
         reader_imports.insert(import);
     }
 
+    let concrete_type = client_field.type_and_field.type_name;
+
     format!(
         "{indent_1}{{\n\
         {indent_2}kind: \"LoadablySelectedField\",\n\
@@ -369,6 +371,7 @@ fn loadably_selected_field_ast_node(
         {indent_2}queryArguments: {arguments},\n\
         {indent_2}refetchReaderAst: {reader_ast},\n\
         {indent_2}entrypoint: {entrypoint_text},\n\
+        {indent_2}concreteType: \"{concrete_type}\",\n\
         {indent_1}}},\n"
     )
 }

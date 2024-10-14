@@ -16,9 +16,16 @@ export function getOrCreateCachedComponent(
   // time.
   const cachedComponentsById = environment.componentCache;
 
-  cachedComponentsById[fragmentReference.root] =
-    cachedComponentsById[fragmentReference.root] ?? {};
-  const componentsByName = cachedComponentsById[fragmentReference.root];
+  cachedComponentsById[
+    fragmentReference.root.__typename + ':' + fragmentReference.root.__link
+  ] =
+    cachedComponentsById[
+      fragmentReference.root.__typename + ':' + fragmentReference.root.__link
+    ] ?? {};
+  const componentsByName =
+    cachedComponentsById[
+      fragmentReference.root.__typename + ':' + fragmentReference.root.__link
+    ];
 
   componentsByName[componentName] = componentsByName[componentName] ?? {};
   const byArgs = componentsByName[componentName];

@@ -59,7 +59,7 @@ export type NormalizationLinkedField = {
   readonly fieldName: string;
   readonly arguments: Arguments | null;
   readonly selections: NormalizationAst;
-  readonly concreteType: TypeName;
+  readonly concreteType: TypeName | null;
 };
 
 export type NormalizationInlineFragment = {

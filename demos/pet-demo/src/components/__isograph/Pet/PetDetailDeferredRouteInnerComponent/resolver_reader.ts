@@ -24,6 +24,7 @@ const readerAst: ReaderAst<Pet__PetDetailDeferredRouteInnerComponent__param> = [
       },
     ],
     entrypoint: Pet__PetCheckinsCard__entrypoint,
+    concreteType: "Pet",
   },
 ];
 

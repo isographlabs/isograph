@@ -1,13 +1,13 @@
 import { Factory } from '@isograph/disposable-types';
 import {
-  FragmentReference,
-  ExtractParameters,
   ExtractData,
+  ExtractParameters,
+  FragmentReference,
 } from './FragmentReference';
 import {
   ComponentOrFieldName,
-  DataId,
   IsographEnvironment,
+  type Link,
   type TypeName,
 } from './IsographEnvironment';
 import {
@@ -69,7 +69,7 @@ export type RefetchReaderArtifact = {
     variables: any,
     // TODO type this better
     filteredVariables: any,
-    rootId: DataId,
+    rootId: Link,
     readerArtifact: TopLevelReaderArtifact<any, any, any> | null,
     // TODO type this better
     nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
@@ -98,7 +98,7 @@ export type ReaderLinkedField = {
   readonly alias: string | null;
   readonly selections: ReaderAst<unknown>;
   readonly arguments: Arguments | null;
-  readonly concreteType: TypeName;
+  readonly concreteType: TypeName | null;
 };
 
 export type ReaderNonLoadableResolverField = {
@@ -133,6 +133,8 @@ export type ReaderLoadableField = {
   readonly entrypoint:
     | IsographEntrypoint<any, any>
     | IsographEntrypointLoader<any, any>;
+
+  readonly concreteType: TypeName | null;
 };
 
 type StableId = string;

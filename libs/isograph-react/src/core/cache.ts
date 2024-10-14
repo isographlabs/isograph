@@ -107,7 +107,7 @@ export function getOrCreateCacheForArtifact<
           nestedRefetchQueries:
             entrypoint.readerWithRefetchQueries.nestedRefetchQueries,
         }),
-        root: ROOT_ID,
+        root: { __link: ROOT_ID, __typename: entrypoint.concreteType },
         variables,
         networkRequest: networkRequest,
       },
@@ -130,6 +130,7 @@ type NetworkResponseObject = {
   // undefined should not *actually* be present in the network response.
   [index: string]: undefined | NetworkResponseValue;
   id?: DataId;
+  __typename?: TypeName;
 };
 
 export function normalizeData(
@@ -138,8 +139,7 @@ export function normalizeData(
   networkResponse: NetworkResponseObject,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
-  root: DataId,
-  typeName: TypeName,
+  root: ParentRecordId,
 ): EncounteredIds {
   const encounteredIds: EncounteredIds = {};
 
@@ -153,18 +153,19 @@ export function normalizeData(
     );
   }
 
-  environment.store[typeName] ??= {};
-  environment.store[typeName]![root] ??= {};
+  environment.store[root.concreteType] ??= {};
+  environment.store[root.concreteType]![root.id] ??= {};
 
   normalizeDataIntoRecord(
     environment,
     normalizationAst,
     networkResponse,
-    environment.store[typeName]![root]!,
-    { id: root, concreteType: typeName },
+    environment.store[root.concreteType]![root.id]!,
+    root,
     variables,
     nestedRefetchQueries,
     encounteredIds,
+    root,
   );
   // @ts-expect-error
   if (typeof window !== 'undefined' && window.__LOG) {
@@ -385,6 +386,7 @@ function normalizeDataIntoRecord(
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: EncounteredIds,
+  root: ParentRecordId,
 ): RecordHasBeenUpdated {
   let recordHasBeenUpdated = false;
   for (const normalizationNode of normalizationAst) {
@@ -410,6 +412,7 @@ function normalizeDataIntoRecord(
           variables,
           nestedRefetchQueries,
           mutableEncounteredIds,
+          root,
         );
         recordHasBeenUpdated =
           recordHasBeenUpdated || linkedFieldResultedInChange;
@@ -425,6 +428,7 @@ function normalizeDataIntoRecord(
           variables,
           nestedRefetchQueries,
           mutableEncounteredIds,
+          root,
         );
         recordHasBeenUpdated =
           recordHasBeenUpdated || inlineFragmentResultedInChange;
@@ -482,6 +486,7 @@ function normalizeLinkedField(
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: EncounteredIds,
+  root: ParentRecordId,
 ): RecordHasBeenUpdated {
   const networkResponseKey = getNetworkResponseKey(astNode);
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
@@ -513,9 +518,21 @@ function normalizeLinkedField(
         i,
         nestedRefetchQueries,
         mutableEncounteredIds,
+        root,
       );
 
-      dataIds.push({ __link: newStoreRecordId });
+      const __typename =
+        astNode.concreteType ?? networkResponseObject.__typename;
+      if (!__typename) {
+        throw new Error(
+          'Unexpected missing __typename in network response when normalizing a linked field.' +
+            'This is indicative of bug in Isograph.',
+        );
+      }
+      dataIds.push({
+        __link: newStoreRecordId,
+        ...(!astNode.concreteType && { __typename }),
+      });
     }
     targetParentRecord[parentRecordKey] = dataIds;
     return !dataIdsAreTheSame(existingValue, dataIds);
@@ -529,13 +546,25 @@ function normalizeLinkedField(
       null,
       nestedRefetchQueries,
       mutableEncounteredIds,
+      root,
     );
+
+    let __typename = astNode.concreteType ?? networkResponseData.__typename;
+
+    if (!__typename) {
+      throw new Error(
+        'Unexpected missing __typename in network response when normalizing a linked field.' +
+          'This is indicative of bug in Isograph.',
+      );
+    }
 
     targetParentRecord[parentRecordKey] = {
       __link: newStoreRecordId,
+      ...(!astNode.concreteType && { __typename }),
     };
+
     const link = getLink(existingValue);
-    return link?.__link !== newStoreRecordId;
+    return link?.__link !== newStoreRecordId || link.__typename !== __typename;
   }
 }
 
@@ -551,6 +580,7 @@ function normalizeInlineFragment(
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: EncounteredIds,
+  root: ParentRecordId,
 ): RecordHasBeenUpdated {
   const typeToRefineTo = astNode.type;
   if (networkResponseParentRecord[TYPENAME_FIELD_NAME] === typeToRefineTo) {
@@ -563,6 +593,7 @@ function normalizeInlineFragment(
       variables,
       nestedRefetchQueries,
       mutableEncounteredIds,
+      root,
     );
     return hasBeenModified;
   }
@@ -580,7 +611,10 @@ function dataIdsAreTheSame(
     for (let i = 0; i < newDataIds.length; i++) {
       const maybeLink = getLink(existingValue[i]);
       if (maybeLink !== null) {
-        if (newDataIds[i].__link !== maybeLink.__link) {
+        if (
+          newDataIds[i].__link !== maybeLink.__link ||
+          newDataIds[i].__typename !== maybeLink.__typename
+        ) {
           return false;
         }
       }
@@ -600,6 +634,7 @@ function normalizeNetworkResponseObject(
   index: number | null,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: EncounteredIds,
+  root: ParentRecordId,
 ): DataId /* The id of the modified or newly created item */ {
   const newStoreRecordId = getDataIdOfNetworkResponse(
     targetParentRecordId,
@@ -607,23 +642,33 @@ function normalizeNetworkResponseObject(
     astNode,
     variables,
     index,
+    root,
   );
+  const __typename = astNode.concreteType ?? networkResponseData.__typename;
+
+  if (!__typename) {
+    throw new Error(
+      'Unexpected missing __typename in network response object.' +
+        'This is indicative of bug in Isograph.',
+    );
+  }
 
   const newStoreRecord =
-    environment.store[astNode.concreteType]?.[newStoreRecordId] ?? {};
+    environment.store[__typename]?.[newStoreRecordId] ?? {};
 
-  environment.store[astNode.concreteType] ??= {};
-  environment.store[astNode.concreteType]![newStoreRecordId] = newStoreRecord;
+  environment.store[__typename] ??= {};
+  environment.store[__typename]![newStoreRecordId] = newStoreRecord;
 
   normalizeDataIntoRecord(
     environment,
     astNode.selections,
     networkResponseData,
     newStoreRecord,
-    { id: newStoreRecordId, concreteType: astNode.concreteType },
+    { id: newStoreRecordId, concreteType: __typename },
     variables,
     nestedRefetchQueries,
     mutableEncounteredIds,
+    root,
   );
 
   return newStoreRecordId;
@@ -768,10 +813,11 @@ function getDataIdOfNetworkResponse(
   astNode: NormalizationLinkedField,
   variables: Variables,
   index: number | null,
+  root: ParentRecordId,
 ): DataId {
   // If we are dealing with nested Query, use __ROOT as id
-  if (astNode.concreteType === parentRecordId.concreteType) {
-    return parentRecordId.id;
+  if (astNode.concreteType === root.concreteType) {
+    return root.id;
   }
 
   // Check whether the dataToNormalize has an id field. If so, that is the key.

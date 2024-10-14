@@ -2,6 +2,7 @@ type Query {
   me: Economist!
   you: Economist!
   node(id: ID!): Economist
+  query: Query!
 }
 
 type Economist implements Node {

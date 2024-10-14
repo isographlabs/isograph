@@ -6,6 +6,7 @@ import {
   ROOT_ID,
   StoreRecord,
   assertLink,
+  type Link,
   type TypeName,
 } from './IsographEnvironment';
 import { getParentRecordKey } from './cache';
@@ -110,32 +111,46 @@ function recordReachableIdsFromRecord(
         const linkKey = getParentRecordKey(selection, variables ?? {});
         const linkedFieldOrFields = currentRecord[linkKey];
 
-        const ids = [];
+        const links: Link[] = [];
         if (Array.isArray(linkedFieldOrFields)) {
           for (const maybeLink of linkedFieldOrFields) {
             const link = assertLink(maybeLink);
             if (link != null) {
-              ids.push(link.__link);
+              links.push(link);
             }
           }
         } else {
           const link = assertLink(linkedFieldOrFields);
           if (link != null) {
-            ids.push(link.__link);
+            links.push(link);
           }
         }
 
-        const typeStore = store[selection.concreteType];
+        let typeStore = selection.concreteType && store[selection.concreteType];
 
-        if (!typeStore) {
+        if (!typeStore && selection.concreteType) {
           continue;
         }
 
-        for (const nextRecordId of ids) {
-          const nextRecord = typeStore[nextRecordId];
+        for (const nextRecordLink of links) {
+          let __typename = selection.concreteType ?? nextRecordLink.__typename;
+          if (!__typename) {
+            throw new Error(
+              'Unexpected missing __typename in Link when garbage collecting.' +
+                'This is indicative of bug in Isograph.',
+            );
+          }
+
+          const resolvedTypeStore = typeStore ?? store[__typename];
+
+          if (!resolvedTypeStore) {
+            continue;
+          }
+
+          const nextRecord = resolvedTypeStore[nextRecordLink.__link];
           if (nextRecord != null) {
-            mutableRetainedIds[selection.concreteType] ??= new Set();
-            mutableRetainedIds[selection.concreteType].add(nextRecordId);
+            mutableRetainedIds[__typename] ??= new Set();
+            mutableRetainedIds[__typename].add(nextRecordLink.__link);
             recordReachableIdsFromRecord(
               store,
               nextRecord,

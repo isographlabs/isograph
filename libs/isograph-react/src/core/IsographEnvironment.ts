@@ -68,7 +68,7 @@ export type IsographEnvironment = {
 
 export type MissingFieldHandler = (
   storeRecord: StoreRecord,
-  root: DataId,
+  root: NonNullLink,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
   variables: Variables | null,
@@ -81,6 +81,12 @@ export type IsographNetworkFunction = (
 
 export type Link = {
   readonly __link: DataId;
+  readonly __typename?: TypeName;
+};
+
+export type NonNullLink = {
+  readonly __link: DataId;
+  readonly __typename: TypeName;
 };
 
 export type DataTypeValue =
@@ -148,7 +154,7 @@ export function createIsographStore(): IsographStore {
 
 export function defaultMissingFieldHandler(
   _storeRecord: StoreRecord,
-  _root: DataId,
+  _root: NonNullLink,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
   variables: Variables | null,
@@ -182,10 +188,10 @@ export function getLink(maybeLink: DataTypeValue): Link | null {
   if (
     maybeLink != null &&
     typeof maybeLink === 'object' &&
-    // @ts-expect-error this is safe
+    '__link' in maybeLink &&
     maybeLink.__link != null
   ) {
-    return maybeLink as any;
+    return maybeLink;
   }
   return null;
 }

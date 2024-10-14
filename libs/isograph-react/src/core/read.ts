@@ -21,6 +21,7 @@ import {
   defaultMissingFieldHandler,
   getOrLoadIsographArtifact,
   IsographEnvironment,
+  type NonNullLink,
   type TypeName,
 } from './IsographEnvironment';
 import { makeNetworkRequest } from './makeNetworkRequest';
@@ -61,7 +62,6 @@ export function readButDoNotEvaluate<
     fragmentReference.networkRequest,
     networkRequestOptions,
     mutableEncounteredRecords,
-    readerWithRefetchQueries.readerArtifact.concreteType,
   );
   // @ts-expect-error
   if (typeof window !== 'undefined' && window.__LOG) {
@@ -121,23 +121,23 @@ type ReadDataResult<TReadFromStore> =
 function readData<TReadFromStore>(
   environment: IsographEnvironment,
   ast: ReaderAst<TReadFromStore>,
-  root: DataId,
+  root: NonNullLink,
   variables: ExtractParameters<TReadFromStore>,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableEncounteredRecords: EncounteredIds,
-  typeName: TypeName,
 ): ReadDataResult<TReadFromStore> {
-  mutableEncounteredRecords[typeName] ??= new Set();
-  mutableEncounteredRecords[typeName].add(root);
-  let storeRecord = environment.store[typeName]?.[root];
+  mutableEncounteredRecords[root.__typename] ??= new Set();
+  mutableEncounteredRecords[root.__typename].add(root.__link);
+  let storeRecord = environment.store[root.__typename]?.[root.__link];
   if (storeRecord === undefined) {
     return {
       kind: 'MissingData',
-      reason: 'No record for root ' + root + ' and concrete type ' + typeName,
-      recordId: root,
-      typeName,
+      reason:
+        'No record for root ' + root + ' and concrete type ' + root.__typename,
+      recordId: root.__link,
+      typeName: root.__typename,
     };
   }
 
@@ -161,9 +161,10 @@ function readData<TReadFromStore>(
         if (value === undefined) {
           return {
             kind: 'MissingData',
-            reason: 'No value for ' + storeRecordName + ' on root ' + root,
-            recordId: root,
-            typeName,
+            reason:
+              'No value for ' + storeRecordName + ' on root ' + root.__link,
+            recordId: root.__link,
+            typeName: root.__typename,
           };
         }
         target[field.alias ?? field.fieldName] = value;
@@ -186,23 +187,37 @@ function readData<TReadFromStore>(
                   root +
                   '. Link is ' +
                   JSON.stringify(item),
-                recordId: root,
-                typeName,
+                recordId: root.__link,
+                typeName: root.__typename,
               };
             } else if (link === null) {
               results.push(null);
               continue;
             }
+            const __typename = field.concreteType ?? link.__typename;
+            if (!__typename) {
+              throw new Error(
+                'No __typename for ' +
+                  storeRecordName +
+                  ' on root ' +
+                  root +
+                  '. Link is ' +
+                  JSON.stringify(item) +
+                  'This is indicative of bug in Isograph.',
+              );
+            }
             const result = readData(
               environment,
               field.selections,
-              link.__link,
+              {
+                __link: link.__link,
+                __typename: __typename,
+              },
               variables,
               nestedRefetchQueries,
               networkRequest,
               networkRequestOptions,
               mutableEncounteredRecords,
-              field.concreteType,
             );
             if (result.kind === 'MissingData') {
               return {
@@ -236,19 +251,30 @@ function readData<TReadFromStore>(
             field.arguments,
             variables,
           );
+
+          const missingData = {
+            kind: 'MissingData',
+            reason:
+              'No link for ' +
+              storeRecordName +
+              ' on root ' +
+              root +
+              '. Link is ' +
+              JSON.stringify(value),
+            recordId: root.__link,
+            typeName: root.__typename,
+          } as const;
+
           if (altLink === undefined) {
-            return {
-              kind: 'MissingData',
-              reason:
-                'No link for ' +
-                storeRecordName +
-                ' on root ' +
-                root +
-                '. Link is ' +
-                JSON.stringify(value),
-              recordId: root,
-              typeName,
-            };
+            return missingData;
+          } else if (!field.concreteType && !altLink.__typename) {
+            console.warn(
+              'Missing __typename for abstract type in link returned by missingFieldHandler. ' +
+                'Unable to resolve data for field. This indicates an issue with the missingFieldHandler implementation.' +
+                'To fix ensure the missingFieldHandler returns a link with a valid __typename for abstract types.',
+              missingData,
+            );
+            return missingData;
           } else {
             link = altLink;
           }
@@ -256,7 +282,20 @@ function readData<TReadFromStore>(
           target[field.alias ?? field.fieldName] = null;
           break;
         }
-        const targetId = link.__link;
+
+        const __typename = field.concreteType ?? link.__typename;
+        if (!__typename) {
+          throw new Error(
+            'No __typename for ' +
+              storeRecordName +
+              ' on root ' +
+              root +
+              '. Link is ' +
+              JSON.stringify(value) +
+              'This is indicative of bug in Isograph.',
+          );
+        }
+        const targetId = { __link: link.__link, __typename };
         const data = readData(
           environment,
           field.selections,
@@ -266,7 +305,6 @@ function readData<TReadFromStore>(
           networkRequest,
           networkRequestOptions,
           mutableEncounteredRecords,
-          field.concreteType,
         );
         if (data.kind === 'MissingData') {
           return {
@@ -295,7 +333,6 @@ function readData<TReadFromStore>(
           networkRequest,
           networkRequestOptions,
           mutableEncounteredRecords,
-          typeName,
         );
         if (data.kind === 'MissingData') {
           return {
@@ -351,7 +388,6 @@ function readData<TReadFromStore>(
               networkRequest,
               networkRequestOptions,
               mutableEncounteredRecords,
-              typeName,
             );
             if (data.kind === 'MissingData') {
               return {
@@ -409,7 +445,6 @@ function readData<TReadFromStore>(
           networkRequest,
           networkRequestOptions,
           mutableEncounteredRecords,
-          typeName,
         );
         if (refetchReaderParams.kind === 'MissingData') {
           return {
@@ -424,6 +459,7 @@ function readData<TReadFromStore>(
             // TODO we should use the reader AST for this
             const includeReadOutData = (variables: any, readOutData: any) => {
               variables.id = readOutData.id;
+              variables.__typename = readOutData.__typename;
               return variables;
             };
             const localVariables = includeReadOutData(
@@ -451,6 +487,16 @@ function readData<TReadFromStore>(
                   const [networkRequest, disposeNetworkRequest] =
                     makeNetworkRequest(environment, entrypoint, localVariables);
 
+                  const __typename =
+                    field.concreteType ?? localVariables.__typename;
+
+                  if (!__typename) {
+                    throw new Error(
+                      `No __typename found for LoadablySelectedField "${field.name}". ` +
+                        `This is indicative of bug in Isograph.`,
+                    );
+                  }
+
                   const fragmentReference: FragmentReference<any, any> = {
                     kind: 'FragmentReference',
                     readerWithRefetchQueries: wrapResolvedValue({
@@ -463,7 +509,10 @@ function readData<TReadFromStore>(
                     } as const),
 
                     // TODO localVariables is not guaranteed to have an id field
-                    root: localVariables.id,
+                    root: {
+                      __link: localVariables.id,
+                      __typename: __typename,
+                    },
                     variables: localVariables,
                     networkRequest,
                   };
@@ -525,6 +574,16 @@ function readData<TReadFromStore>(
                         (entrypoint) => entrypoint.readerWithRefetchQueries,
                       );
 
+                    const __typename =
+                      field.concreteType ?? localVariables.__typename;
+
+                    if (!__typename) {
+                      throw new Error(
+                        `No __typename found for LoadablySelectedField "${field.name}". ` +
+                          `This is indicative of bug in Isograph.`,
+                      );
+                    }
+
                     const fragmentReference: FragmentReference<any, any> = {
                       kind: 'FragmentReference',
                       readerWithRefetchQueries: wrapPromise(
@@ -532,7 +591,10 @@ function readData<TReadFromStore>(
                       ),
 
                       // TODO localVariables is not guaranteed to have an id field
-                      root: localVariables.id,
+                      root: {
+                        __link: localVariables.id,
+                        __typename: __typename,
+                      },
                       variables: localVariables,
                       networkRequest,
                     };
@@ -656,7 +718,7 @@ export function getNetworkRequestOptionsWithDefaults(
 // TODO call stableStringifyArgs on the variable values, as well.
 // This doesn't matter for now, since we are just using primitive values
 // in the demo.
-function stableStringifyArgs(args: Object) {
+function stableStringifyArgs(args: object) {
   const keys = Object.keys(args);
   keys.sort();
   let s = '';
