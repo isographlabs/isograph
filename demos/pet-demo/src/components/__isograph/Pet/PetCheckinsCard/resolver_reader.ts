@@ -52,7 +52,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "Pet.PetCheckinsCard",
   resolver,
   readerAst,
-  concreteType: "Pet",
 };
 
 export default artifact;

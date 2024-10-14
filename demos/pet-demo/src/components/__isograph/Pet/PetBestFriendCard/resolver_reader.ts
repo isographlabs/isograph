@@ -69,7 +69,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "Pet.PetBestFriendCard",
   resolver,
   readerAst,
-  concreteType: "Pet",
 };
 
 export default artifact;

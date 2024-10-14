@@ -91,7 +91,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.RepositoryDetail",
   resolver,
   readerAst,
-  concreteType: "Query",
 };
 
 export default artifact;

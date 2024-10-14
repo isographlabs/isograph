@@ -73,7 +73,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.PetDetailRoute",
   resolver,
   readerAst,
-  concreteType: "Query",
 };
 
 export default artifact;

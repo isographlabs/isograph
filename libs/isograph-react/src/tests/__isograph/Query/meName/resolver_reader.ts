@@ -28,7 +28,6 @@ const artifact: EagerReaderArtifact<
   kind: "EagerReaderArtifact",
   resolver,
   readerAst,
-  concreteType: "Query",
 };
 
 export default artifact;

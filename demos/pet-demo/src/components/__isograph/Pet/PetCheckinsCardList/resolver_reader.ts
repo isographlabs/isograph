@@ -46,7 +46,6 @@ const artifact: EagerReaderArtifact<
   kind: "EagerReaderArtifact",
   resolver,
   readerAst,
-  concreteType: "Pet",
 };
 
 export default artifact;

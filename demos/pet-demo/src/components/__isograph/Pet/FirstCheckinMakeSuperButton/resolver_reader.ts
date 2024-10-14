@@ -46,7 +46,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "Pet.FirstCheckinMakeSuperButton",
   resolver,
   readerAst,
-  concreteType: "Pet",
 };
 
 export default artifact;

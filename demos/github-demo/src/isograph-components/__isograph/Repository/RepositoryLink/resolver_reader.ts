@@ -40,7 +40,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "Repository.RepositoryLink",
   resolver,
   readerAst,
-  concreteType: "Repository",
 };
 
 export default artifact;

@@ -35,7 +35,6 @@ export type EagerReaderArtifact<
   readonly resolver: (
     data: ResolverFirstParameter<TReadFromStore>,
   ) => TClientFieldValue;
-  readonly concreteType: TypeName;
 };
 
 export type ComponentReaderArtifact<
@@ -49,7 +48,6 @@ export type ComponentReaderArtifact<
     data: ResolverFirstParameter<TReadFromStore>,
     runtimeProps: TComponentProps,
   ) => React.ReactNode;
-  readonly concreteType: TypeName;
 };
 
 export type ResolverFirstParameter<

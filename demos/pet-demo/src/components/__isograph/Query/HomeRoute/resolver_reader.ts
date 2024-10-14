@@ -36,7 +36,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.HomeRoute",
   resolver,
   readerAst,
-  concreteType: "Query",
 };
 
 export default artifact;

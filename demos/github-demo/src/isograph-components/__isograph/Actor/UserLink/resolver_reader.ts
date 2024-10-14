@@ -19,7 +19,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "Actor.UserLink",
   resolver,
   readerAst,
-  concreteType: "Actor",
 };
 
 export default artifact;

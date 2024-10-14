@@ -50,7 +50,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.HomePageList",
   resolver,
   readerAst,
-  concreteType: "Query",
 };
 
 export default artifact;

@@ -33,7 +33,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "AdItem.AdItemDisplayWrapper",
   resolver,
   readerAst,
-  concreteType: "AdItem",
 };
 
 export default artifact;

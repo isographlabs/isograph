@@ -33,7 +33,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "Checkin.CheckinDisplay",
   resolver,
   readerAst,
-  concreteType: "Checkin",
 };
 
 export default artifact;

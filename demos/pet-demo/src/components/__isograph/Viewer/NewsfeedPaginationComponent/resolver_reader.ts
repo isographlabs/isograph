@@ -45,7 +45,6 @@ const artifact: EagerReaderArtifact<
   kind: "EagerReaderArtifact",
   resolver,
   readerAst,
-  concreteType: "Viewer",
 };
 
 export default artifact;

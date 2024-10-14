@@ -25,7 +25,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "Pet.PetTaglineCard",
   resolver,
   readerAst,
-  concreteType: "Pet",
 };
 
 export default artifact;

@@ -29,7 +29,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.HomePage",
   resolver,
   readerAst,
-  concreteType: "Query",
 };
 
 export default artifact;

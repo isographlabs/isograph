@@ -119,7 +119,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "User.RepositoryList",
   resolver,
   readerAst,
-  concreteType: "User",
 };
 
 export default artifact;

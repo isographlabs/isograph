@@ -61,7 +61,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.PetCheckinListRoute",
   resolver,
   readerAst,
-  concreteType: "Query",
 };
 
 export default artifact;

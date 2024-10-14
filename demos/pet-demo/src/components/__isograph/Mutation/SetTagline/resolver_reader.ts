@@ -42,7 +42,6 @@ const artifact: EagerReaderArtifact<
   kind: "EagerReaderArtifact",
   resolver,
   readerAst,
-  concreteType: "Mutation",
 };
 
 export default artifact;

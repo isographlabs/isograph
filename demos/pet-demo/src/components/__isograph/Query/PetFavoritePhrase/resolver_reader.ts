@@ -39,7 +39,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.PetFavoritePhrase",
   resolver,
   readerAst,
-  concreteType: "Query",
 };
 
 export default artifact;

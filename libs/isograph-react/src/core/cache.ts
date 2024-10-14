@@ -140,6 +140,7 @@ export function normalizeData(
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   root: ParentRecordId,
+  queryType: ParentRecordId,
 ): EncounteredIds {
   const encounteredIds: EncounteredIds = {};
 
@@ -165,7 +166,7 @@ export function normalizeData(
     variables,
     nestedRefetchQueries,
     encounteredIds,
-    root,
+    queryType,
   );
   // @ts-expect-error
   if (typeof window !== 'undefined' && window.__LOG) {
@@ -386,7 +387,7 @@ function normalizeDataIntoRecord(
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: EncounteredIds,
-  root: ParentRecordId,
+  queryType: ParentRecordId,
 ): RecordHasBeenUpdated {
   let recordHasBeenUpdated = false;
   for (const normalizationNode of normalizationAst) {
@@ -412,7 +413,7 @@ function normalizeDataIntoRecord(
           variables,
           nestedRefetchQueries,
           mutableEncounteredIds,
-          root,
+          queryType,
         );
         recordHasBeenUpdated =
           recordHasBeenUpdated || linkedFieldResultedInChange;
@@ -428,7 +429,7 @@ function normalizeDataIntoRecord(
           variables,
           nestedRefetchQueries,
           mutableEncounteredIds,
-          root,
+          queryType,
         );
         recordHasBeenUpdated =
           recordHasBeenUpdated || inlineFragmentResultedInChange;
@@ -634,7 +635,7 @@ function normalizeNetworkResponseObject(
   index: number | null,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: EncounteredIds,
-  root: ParentRecordId,
+  queryType: ParentRecordId,
 ): DataId /* The id of the modified or newly created item */ {
   const newStoreRecordId = getDataIdOfNetworkResponse(
     targetParentRecordId,
@@ -642,7 +643,7 @@ function normalizeNetworkResponseObject(
     astNode,
     variables,
     index,
-    root,
+    queryType,
   );
   const __typename = astNode.concreteType ?? networkResponseData.__typename;
 
@@ -668,7 +669,7 @@ function normalizeNetworkResponseObject(
     variables,
     nestedRefetchQueries,
     mutableEncounteredIds,
-    root,
+    queryType,
   );
 
   return newStoreRecordId;

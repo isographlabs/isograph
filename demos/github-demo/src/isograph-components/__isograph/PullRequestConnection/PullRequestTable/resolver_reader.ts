@@ -100,7 +100,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "PullRequestConnection.PullRequestTable",
   resolver,
   readerAst,
-  concreteType: "PullRequestConnection",
 };
 
 export default artifact;

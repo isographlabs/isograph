@@ -19,7 +19,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "BlogItem.BlogItemMoreDetail",
   resolver,
   readerAst,
-  concreteType: "BlogItem",
 };
 
 export default artifact;

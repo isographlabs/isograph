@@ -35,7 +35,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.PetDetailDeferredRoute",
   resolver,
   readerAst,
-  concreteType: "Query",
 };
 
 export default artifact;

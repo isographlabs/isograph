@@ -36,7 +36,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.Header",
   resolver,
   readerAst,
-  concreteType: "Query",
 };
 
 export default artifact;

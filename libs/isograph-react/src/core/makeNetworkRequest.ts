@@ -52,6 +52,7 @@ export function makeNetworkRequest(
             ? artifact.readerWithRefetchQueries.nestedRefetchQueries
             : [],
           { id: ROOT_ID, concreteType: artifact.concreteType },
+          { id: ROOT_ID, concreteType: artifact.queryType },
         );
         const retainedQuery: RetainedQuery = {
           normalizationAst: artifact.normalizationAst,

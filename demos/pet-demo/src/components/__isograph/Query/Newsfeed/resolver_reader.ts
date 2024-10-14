@@ -66,7 +66,6 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.Newsfeed",
   resolver,
   readerAst,
-  concreteType: "Query",
 };
 
 export default artifact;

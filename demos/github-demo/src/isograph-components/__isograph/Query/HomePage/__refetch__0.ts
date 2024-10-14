@@ -186,6 +186,7 @@ const artifact: RefetchQueryNormalizationArtifact = {
   kind: "RefetchQuery",
   queryText,
   concreteType: "Query",
+  queryType: "Query",
   normalizationAst,
 };
 

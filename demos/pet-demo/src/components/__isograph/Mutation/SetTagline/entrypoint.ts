@@ -54,6 +54,7 @@ const artifact: IsographEntrypoint<
   queryText,
   normalizationAst,
   concreteType: "Mutation",
+  queryType: "Query",
   readerWithRefetchQueries: {
     kind: "ReaderWithRefetchQueries",
     nestedRefetchQueries,
