@@ -111,7 +111,7 @@ impl UnvalidatedSchema {
                     id_top_level_arguments(),
                     RequiresRefinement::Yes(object.name),
                     None,
-                    object.name,
+                    Some(object.name),
                 ))
             }),
         });

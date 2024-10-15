@@ -37,26 +37,29 @@ describe('normalizeData', () => {
       environment,
       entrypoint.normalizationAst,
       {
-        query: { node____id___v_id: { id: 1 } },
+        query: { node____id___v_id: { __typename: 'Economist', id: 1 } },
       },
       { id: '1' },
       entrypoint.readerWithRefetchQueries.nestedRefetchQueries,
       { id: ROOT_ID, concreteType: entrypoint.concreteType },
+      { id: ROOT_ID, concreteType: entrypoint.queryType },
     );
 
     expect(store).toStrictEqual({
       Economist: {
         '1': {
+          __typename: 'Economist',
           id: 1,
         },
       },
       Query: {
-        __ROOT: {
+        [ROOT_ID]: {
           node____id___1: {
+            __typename: 'Economist',
             __link: 1,
           },
           query: {
-            __link: '__ROOT',
+            __link: ROOT_ID,
           },
         },
       },
@@ -69,16 +72,18 @@ describe('readData', () => {
     const store: IsographStore = {
       Economist: {
         '1': {
+          __typename: 'Economist',
           id: 1,
         },
       },
       Query: {
-        __ROOT: {
+        [ROOT_ID]: {
           node____id___1: {
+            __typename: 'Economist',
             __link: 1,
           },
           query: {
-            __link: '__ROOT',
+            __link: ROOT_ID,
           },
         },
       },
@@ -100,7 +105,7 @@ describe('readData', () => {
     expect(data).toStrictEqual({
       encounteredRecords: {
         Economist: new Set([1]),
-        Query: new Set(['__ROOT']),
+        Query: new Set([ROOT_ID]),
       },
       item: {
         query: {

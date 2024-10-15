@@ -13,6 +13,7 @@ const queryText = 'query RepositoryPage ($repositoryName: String!, $repositoryOw
       name,\
       nameWithOwner,\
       owner {\
+        __typename,\
         id,\
         login,\
       },\
@@ -22,6 +23,7 @@ const queryText = 'query RepositoryPage ($repositoryName: String!, $repositoryOw
         node {\
           id,\
           author {\
+            __typename,\
             login,\
           },\
           closed,\
@@ -31,6 +33,7 @@ const queryText = 'query RepositoryPage ($repositoryName: String!, $repositoryOw
             id,\
             name,\
             owner {\
+              __typename,\
               id,\
               login,\
             },\
@@ -102,8 +105,13 @@ const normalizationAst: NormalizationAst = [
             kind: "Linked",
             fieldName: "owner",
             arguments: null,
-            concreteType: "RepositoryOwner",
+            concreteType: null,
             selections: [
+              {
+                kind: "Scalar",
+                fieldName: "__typename",
+                arguments: null,
+              },
               {
                 kind: "Scalar",
                 fieldName: "id",
@@ -150,8 +158,13 @@ const normalizationAst: NormalizationAst = [
                     kind: "Linked",
                     fieldName: "author",
                     arguments: null,
-                    concreteType: "Actor",
+                    concreteType: null,
                     selections: [
+                      {
+                        kind: "Scalar",
+                        fieldName: "__typename",
+                        arguments: null,
+                      },
                       {
                         kind: "Scalar",
                         fieldName: "login",
@@ -194,8 +207,13 @@ const normalizationAst: NormalizationAst = [
                         kind: "Linked",
                         fieldName: "owner",
                         arguments: null,
-                        concreteType: "RepositoryOwner",
+                        concreteType: null,
                         selections: [
+                          {
+                            kind: "Scalar",
+                            fieldName: "__typename",
+                            arguments: null,
+                          },
                           {
                             kind: "Scalar",
                             fieldName: "id",

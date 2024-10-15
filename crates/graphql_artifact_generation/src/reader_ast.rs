@@ -100,7 +100,11 @@ fn linked_field_ast_node(
     initial_variable_context: &VariableContext,
 ) -> String {
     let name = linked_field.name.item;
-    let concrete_type = linked_field.associated_data.concrete_type;
+    let concrete_type = linked_field
+        .associated_data
+        .concrete_type
+        .map(|name| format!("\"{}\"", name))
+        .unwrap_or("null".to_string());
     let alias = linked_field
         .reader_alias
         .map(|x| format!("\"{}\"", x.item))
@@ -124,7 +128,7 @@ fn linked_field_ast_node(
         {indent_2}fieldName: \"{name}\",\n\
         {indent_2}alias: {alias},\n\
         {indent_2}arguments: {arguments},\n\
-        {indent_2}concreteType: \"{concrete_type}\",\n\
+        {indent_2}concreteType: {concrete_type},\n\
         {indent_2}selections: {inner_reader_ast},\n\
         {indent_1}}},\n",
     )
@@ -361,7 +365,12 @@ fn loadably_selected_field_ast_node(
         reader_imports.insert(import);
     }
 
-    let concrete_type = client_field.type_and_field.type_name;
+    let concrete_type = schema
+        .server_field_data
+        .object(client_field.parent_object_id)
+        .concrete_type
+        .map(|name| format!("\"{}\"", name))
+        .unwrap_or("null".to_string());
 
     format!(
         "{indent_1}{{\n\
@@ -371,7 +380,7 @@ fn loadably_selected_field_ast_node(
         {indent_2}queryArguments: {arguments},\n\
         {indent_2}refetchReaderAst: {reader_ast},\n\
         {indent_2}entrypoint: {entrypoint_text},\n\
-        {indent_2}concreteType: \"{concrete_type}\",\n\
+        {indent_2}concreteType: {concrete_type},\n\
         {indent_1}}},\n"
     )
 }

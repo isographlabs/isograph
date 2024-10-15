@@ -15,6 +15,7 @@ const queryText = 'query PullRequest ($repositoryOwner: String!, $repositoryName
           node {\
             id,\
             author {\
+              __typename,\
               login,\
             },\
             bodyText,\
@@ -107,8 +108,13 @@ const normalizationAst: NormalizationAst = [
                         kind: "Linked",
                         fieldName: "author",
                         arguments: null,
-                        concreteType: "Actor",
+                        concreteType: null,
                         selections: [
+                          {
+                            kind: "Scalar",
+                            fieldName: "__typename",
+                            arguments: null,
+                          },
                           {
                             kind: "Scalar",
                             fieldName: "login",

@@ -50,7 +50,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
             fieldName: "author",
             alias: null,
             arguments: null,
-            concreteType: "Actor",
+            concreteType: null,
             selections: [
               {
                 kind: "Resolver",

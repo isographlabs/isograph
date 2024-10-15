@@ -21,7 +21,7 @@ const readerAst: ReaderAst<Query__subquery__param> = [
             { kind: "Variable", name: "id" },
           ],
         ],
-        concreteType: "Economist",
+        concreteType: null,
         selections: [
           {
             kind: "Scalar",

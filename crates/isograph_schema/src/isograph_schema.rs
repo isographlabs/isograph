@@ -367,6 +367,7 @@ pub struct SchemaObject {
     pub id_field: Option<ServerStrongIdFieldId>,
     pub encountered_fields:
         BTreeMap<SelectableFieldName, FieldDefinitionLocation<ServerFieldId, ClientFieldId>>,
+    pub concrete_type: Option<IsographObjectTypeName>,
 }
 
 /// In GraphQL, ValidRefinement's are essentially the concrete types that an interface or

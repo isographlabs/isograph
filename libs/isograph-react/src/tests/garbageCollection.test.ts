@@ -19,6 +19,7 @@ const getDefaultStore = (): IsographStore => ({
       you: { __link: '1' },
       node____id___0: {
         __link: '0',
+        __typename: 'Economist',
       },
     },
   },

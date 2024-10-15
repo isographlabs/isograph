@@ -64,7 +64,7 @@ pub type ValidatedSchemaIdField = SchemaIdField<ServerScalarId>;
 
 #[derive(Debug)]
 pub struct ValidatedLinkedFieldAssociatedData {
-    pub concrete_type: IsographObjectTypeName,
+    pub concrete_type: Option<IsographObjectTypeName>,
     pub parent_object_id: ServerObjectId,
     // N.B. we don't actually support loadable linked fields
     pub selection_variant: ValidatedIsographSelectionVariant,
@@ -209,6 +209,7 @@ fn transform_object_field_ids(unvalidated_object: SchemaObject) -> SchemaObject 
         encountered_fields: unvalidated_encountered_fields,
         id_field,
         directives,
+        concrete_type,
     } = unvalidated_object;
 
     let validated_encountered_fields = unvalidated_encountered_fields
@@ -231,6 +232,7 @@ fn transform_object_field_ids(unvalidated_object: SchemaObject) -> SchemaObject 
         encountered_fields: validated_encountered_fields,
         id_field,
         directives,
+        concrete_type,
     }
 }
 
@@ -1012,7 +1014,7 @@ fn validate_field_type_exists_and_is_linked(
                                 ).collect::<Result<Vec<_>, _>>()?,
                                 unwraps: linked_field_selection.unwraps,
                                 associated_data: ValidatedLinkedFieldAssociatedData {
-                                    concrete_type: object.name,
+                                    concrete_type: object.concrete_type,
                                     parent_object_id: object_id,
                                     selection_variant: match linked_field_selection.associated_data {
                                         IsographSelectionVariant::Regular => {

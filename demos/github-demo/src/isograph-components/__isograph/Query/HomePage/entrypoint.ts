@@ -22,6 +22,7 @@ const queryText = 'query HomePage  {\
           name,\
           nameWithOwner,\
           owner {\
+            __typename,\
             id,\
             login,\
           },\
@@ -117,8 +118,13 @@ const normalizationAst: NormalizationAst = [
                     kind: "Linked",
                     fieldName: "owner",
                     arguments: null,
-                    concreteType: "RepositoryOwner",
+                    concreteType: null,
                     selections: [
+                      {
+                        kind: "Scalar",
+                        fieldName: "__typename",
+                        arguments: null,
+                      },
                       {
                         kind: "Scalar",
                         fieldName: "id",

@@ -1,7 +1,7 @@
 type Query {
   me: Economist!
   you: Economist!
-  node(id: ID!): Economist
+  node(id: ID!): Node
   query: Query!
 }
 

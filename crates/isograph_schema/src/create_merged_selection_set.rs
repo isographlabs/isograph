@@ -110,7 +110,7 @@ impl MergedScalarFieldSelection {
 pub struct MergedLinkedFieldSelection {
     // TODO no location
     pub name: LinkedFieldName,
-    pub concrete_type: IsographObjectTypeName,
+    pub concrete_type: Option<IsographObjectTypeName>,
     pub selection_map: MergedSelectionMap,
     pub arguments: Vec<ArgumentKeyAndValue>,
 }
@@ -550,7 +550,7 @@ fn process_imperatively_loaded_field(
             .as_ref()
             .map(|x| x.primary_field_name.lookup().intern().into()),
         requires_refinement,
-        refetch_field_parent_type.name,
+        Some(refetch_field_parent_type.name),
     );
 
     let root_parent_object = schema
@@ -956,6 +956,9 @@ fn select_typename_and_id_fields_in_merged_selection(
     parent_type: &SchemaObject,
 ) {
     // TODO add __typename field or whatnot
+    if let None = parent_type.concrete_type {
+        maybe_add_typename_selection(merged_selection_map)
+    };
 
     let id_field: Option<ValidatedSchemaIdField> = parent_type
         .id_field
@@ -998,7 +1001,7 @@ pub fn selection_map_wrapped(
     // TODO support arguments and vectors of subfields
     subfield: Option<LinkedFieldName>,
     requires_refinement: RequiresRefinement,
-    concrete_type: IsographObjectTypeName,
+    concrete_type: Option<IsographObjectTypeName>,
 ) -> MergedSelectionMap {
     // We are proceeding inside out, i.e. creating
     // `mutation_name { subfield { ...on Type { existing_selection_set }}}`

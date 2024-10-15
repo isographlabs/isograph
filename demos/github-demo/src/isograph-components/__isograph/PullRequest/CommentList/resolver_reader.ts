@@ -54,7 +54,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
                 fieldName: "author",
                 alias: null,
                 arguments: null,
-                concreteType: "Actor",
+                concreteType: null,
                 selections: [
                   {
                     kind: "Scalar",

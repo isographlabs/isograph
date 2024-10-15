@@ -73,7 +73,7 @@ pub fn generate_refetch_field_strategy<
     top_level_arguments: Vec<ArgumentKeyAndValue>,
     refine_to_type: RequiresRefinement,
     subfield: Option<LinkedFieldName>,
-    concrete_type: IsographObjectTypeName,
+    concrete_type: Option<IsographObjectTypeName>,
 ) -> UseRefetchFieldRefetchStrategy<
     TClientFieldSelectionScalarFieldAssociatedData,
     TClientFieldSelectionLinkedFieldAssociatedData,
@@ -131,7 +131,7 @@ struct GenerateRefetchQueryImpl {
     top_level_field_name: LinkedFieldName,
     top_level_arguments: Vec<ArgumentKeyAndValue>,
     refine_to_type: RequiresRefinement,
-    concrete_type: IsographObjectTypeName,
+    concrete_type: Option<IsographObjectTypeName>,
     subfield: Option<LinkedFieldName>,
 }
 

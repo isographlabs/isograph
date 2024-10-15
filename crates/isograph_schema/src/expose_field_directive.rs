@@ -280,7 +280,7 @@ impl UnvalidatedSchema {
                         // type is concrete, since the same field is copied from the abstract
                         // type to the concrete type. So, when we do that, we need to account
                         // for this.
-                        maybe_abstract_parent_type_name.lookup().intern().into(),
+                        Some(maybe_abstract_parent_type_name.lookup().intern().into()),
                     ),
                 )),
             };
