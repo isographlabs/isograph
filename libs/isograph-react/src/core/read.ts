@@ -2,6 +2,7 @@ import { CleanupFn } from '@isograph/isograph-disposable-types/dist';
 import {
   getParentRecordKey,
   onNextChangeToRecord,
+  TYPENAME_FIELD_NAME,
   type EncounteredIds,
 } from './cache';
 import { getOrCreateCachedComponent } from './componentCache';
@@ -184,7 +185,7 @@ function readData<TReadFromStore>(
                   'No link for ' +
                   storeRecordName +
                   ' on root ' +
-                  root +
+                  root.__link +
                   '. Link is ' +
                   JSON.stringify(item),
                 recordId: root.__link,
@@ -200,7 +201,7 @@ function readData<TReadFromStore>(
                 'No __typename for ' +
                   storeRecordName +
                   ' on root ' +
-                  root +
+                  root.__link +
                   '. Link is ' +
                   JSON.stringify(item) +
                   'This is indicative of bug in Isograph.',
@@ -226,7 +227,7 @@ function readData<TReadFromStore>(
                   'Missing data for ' +
                   storeRecordName +
                   ' on root ' +
-                  root +
+                  root.__link +
                   '. Link is ' +
                   JSON.stringify(item),
                 nestedReason: result,
@@ -258,7 +259,7 @@ function readData<TReadFromStore>(
               'No link for ' +
               storeRecordName +
               ' on root ' +
-              root +
+              root.__link +
               '. Link is ' +
               JSON.stringify(value),
             recordId: root.__link,
@@ -289,13 +290,16 @@ function readData<TReadFromStore>(
             'No __typename for ' +
               storeRecordName +
               ' on root ' +
-              root +
+              root.__link +
               '. Link is ' +
               JSON.stringify(value) +
               'This is indicative of bug in Isograph.',
           );
         }
-        const targetId = { __link: link.__link, __typename };
+        const targetId: NonNullLink = {
+          __link: link.__link,
+          __typename: __typename,
+        };
         const data = readData(
           environment,
           field.selections,
@@ -309,7 +313,8 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return {
             kind: 'MissingData',
-            reason: 'Missing data for ' + storeRecordName + ' on root ' + root,
+            reason:
+              'Missing data for ' + storeRecordName + ' on root ' + root.__link,
             nestedReason: data,
             recordId: data.recordId,
             typeName: data.typeName,
@@ -337,7 +342,8 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return {
             kind: 'MissingData',
-            reason: 'Missing data for ' + field.alias + ' on root ' + root,
+            reason:
+              'Missing data for ' + field.alias + ' on root ' + root.__link,
             nestedReason: data,
             recordId: data.recordId,
             typeName: data.typeName,
@@ -392,7 +398,8 @@ function readData<TReadFromStore>(
             if (data.kind === 'MissingData') {
               return {
                 kind: 'MissingData',
-                reason: 'Missing data for ' + field.alias + ' on root ' + root,
+                reason:
+                  'Missing data for ' + field.alias + ' on root ' + root.__link,
                 nestedReason: data,
                 recordId: data.recordId,
                 typeName: data.typeName,
@@ -449,7 +456,8 @@ function readData<TReadFromStore>(
         if (refetchReaderParams.kind === 'MissingData') {
           return {
             kind: 'MissingData',
-            reason: 'Missing data for ' + field.alias + ' on root ' + root,
+            reason:
+              'Missing data for ' + field.alias + ' on root ' + root.__link,
             nestedReason: refetchReaderParams,
             recordId: refetchReaderParams.recordId,
             typeName: refetchReaderParams.typeName,
@@ -459,7 +467,7 @@ function readData<TReadFromStore>(
             // TODO we should use the reader AST for this
             const includeReadOutData = (variables: any, readOutData: any) => {
               variables.id = readOutData.id;
-              variables.__typename = readOutData.__typename;
+              variables[TYPENAME_FIELD_NAME] = readOutData[TYPENAME_FIELD_NAME];
               return variables;
             };
             const localVariables = includeReadOutData(
@@ -474,7 +482,9 @@ function readData<TReadFromStore>(
 
             return [
               // Stable id
-              root +
+              root.__typename +
+                ':' +
+                root.__link +
                 '/' +
                 field.name +
                 '/' +
@@ -488,7 +498,7 @@ function readData<TReadFromStore>(
                     makeNetworkRequest(environment, entrypoint, localVariables);
 
                   const __typename =
-                    field.concreteType ?? localVariables.__typename;
+                    field.concreteType ?? localVariables[TYPENAME_FIELD_NAME];
 
                   if (!__typename) {
                     throw new Error(
@@ -575,7 +585,7 @@ function readData<TReadFromStore>(
                       );
 
                     const __typename =
-                      field.concreteType ?? localVariables.__typename;
+                      field.concreteType ?? localVariables[TYPENAME_FIELD_NAME];
 
                     if (!__typename) {
                       throw new Error(

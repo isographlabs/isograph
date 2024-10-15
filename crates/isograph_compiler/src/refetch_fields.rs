@@ -60,6 +60,7 @@ fn add_refetch_field_to_object(
                         client_field_scalar_selection_name: *REFETCH_FIELD_NAME,
                         top_level_schema_field_name: *NODE_FIELD_NAME,
                         top_level_schema_field_arguments: id_arguments(),
+                        top_level_schema_field_concrete_type: object.concrete_type,
 
                         primary_field_info: None,
 
@@ -80,9 +81,10 @@ fn add_refetch_field_to_object(
                         format!("refetch__{}", object.name).intern().into(),
                         *NODE_FIELD_NAME,
                         id_top_level_arguments(),
+                        object.concrete_type,
                         RequiresRefinement::Yes(object.name),
                         None,
-                        Some(object.name),
+                        None,
                     ))
                 }),
             });

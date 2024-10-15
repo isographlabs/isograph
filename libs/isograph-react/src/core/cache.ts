@@ -34,7 +34,7 @@ import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
 import { makeNetworkRequest } from './makeNetworkRequest';
 import { wrapResolvedValue } from './PromiseWrapper';
 
-const TYPENAME_FIELD_NAME = '__typename';
+export const TYPENAME_FIELD_NAME = '__typename';
 
 export function getOrCreateItemInSuspenseCache<
   TReadFromStore extends { parameters: object; data: object },
@@ -523,7 +523,7 @@ function normalizeLinkedField(
       );
 
       const __typename =
-        astNode.concreteType ?? networkResponseObject.__typename;
+        astNode.concreteType ?? networkResponseObject[TYPENAME_FIELD_NAME];
       if (!__typename) {
         throw new Error(
           'Unexpected missing __typename in network response when normalizing a linked field.' +
@@ -532,7 +532,7 @@ function normalizeLinkedField(
       }
       dataIds.push({
         __link: newStoreRecordId,
-        ...(!astNode.concreteType && { __typename }),
+        ...(!astNode.concreteType && { __typename: __typename }),
       });
     }
     targetParentRecord[parentRecordKey] = dataIds;
@@ -550,7 +550,8 @@ function normalizeLinkedField(
       root,
     );
 
-    let __typename = astNode.concreteType ?? networkResponseData.__typename;
+    let __typename =
+      astNode.concreteType ?? networkResponseData[TYPENAME_FIELD_NAME];
 
     if (!__typename) {
       throw new Error(
@@ -561,7 +562,7 @@ function normalizeLinkedField(
 
     targetParentRecord[parentRecordKey] = {
       __link: newStoreRecordId,
-      ...(!astNode.concreteType && { __typename }),
+      ...(!astNode.concreteType && { __typename: __typename }),
     };
 
     const link = getLink(existingValue);
@@ -645,7 +646,8 @@ function normalizeNetworkResponseObject(
     index,
     queryType,
   );
-  const __typename = astNode.concreteType ?? networkResponseData.__typename;
+  const __typename =
+    astNode.concreteType ?? networkResponseData[TYPENAME_FIELD_NAME];
 
   if (!__typename) {
     throw new Error(

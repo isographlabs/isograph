@@ -52,7 +52,7 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "new_best_friend_id" },
       ],
     ],
-    concreteType: "Pet",
+    concreteType: "SetBestFriendResponse",
     selections: [
       {
         kind: "Linked",

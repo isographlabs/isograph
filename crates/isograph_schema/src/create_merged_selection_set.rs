@@ -492,6 +492,7 @@ fn process_imperatively_loaded_field(
         client_field_scalar_selection_name,
         top_level_schema_field_name,
         top_level_schema_field_arguments,
+        top_level_schema_field_concrete_type,
         primary_field_info,
         root_object_id,
     } = variant;
@@ -546,11 +547,14 @@ fn process_imperatively_loaded_field(
                 }
             })
             .collect(),
+        top_level_schema_field_concrete_type,
         primary_field_info
             .as_ref()
             .map(|x| x.primary_field_name.lookup().intern().into()),
+        primary_field_info
+            .as_ref()
+            .and_then(|x| x.primary_field_concrete_type),
         requires_refinement,
-        Some(refetch_field_parent_type.name),
     );
 
     let root_parent_object = schema
@@ -998,10 +1002,11 @@ pub fn selection_map_wrapped(
     mut inner_selection_map: MergedSelectionMap,
     top_level_field: LinkedFieldName,
     top_level_field_arguments: Vec<ArgumentKeyAndValue>,
+    top_level_field_concrete_type: Option<IsographObjectTypeName>,
     // TODO support arguments and vectors of subfields
     subfield: Option<LinkedFieldName>,
+    subfield_concrete_type: Option<IsographObjectTypeName>,
     requires_refinement: RequiresRefinement,
-    concrete_type: Option<IsographObjectTypeName>,
 ) -> MergedSelectionMap {
     // We are proceeding inside out, i.e. creating
     // `mutation_name { subfield { ...on Type { existing_selection_set }}}`
@@ -1033,10 +1038,10 @@ pub fn selection_map_wrapped(
                     arguments: vec![],
                 }),
                 MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
-                    concrete_type,
                     name: subfield,
                     selection_map: selection_set_with_inline_fragment,
                     arguments: vec![],
+                    concrete_type: subfield_concrete_type,
                 }),
             );
             map
@@ -1051,10 +1056,10 @@ pub fn selection_map_wrapped(
             arguments: top_level_field_arguments.clone(),
         }),
         MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
-            concrete_type,
             name: top_level_field,
             selection_map: selection_set_with_subfield,
             arguments: top_level_field_arguments,
+            concrete_type: top_level_field_concrete_type,
         }),
     );
 

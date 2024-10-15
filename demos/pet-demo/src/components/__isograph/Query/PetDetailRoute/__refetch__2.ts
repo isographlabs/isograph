@@ -47,7 +47,7 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "input" },
       ],
     ],
-    concreteType: "Pet",
+    concreteType: "SetPetTaglineResponse",
     selections: [
       {
         kind: "Linked",

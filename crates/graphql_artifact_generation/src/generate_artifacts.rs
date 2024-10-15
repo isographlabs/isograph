@@ -130,8 +130,7 @@ pub fn get_artifact_path_and_content(
 
                     let type_to_refine_to = schema
                         .server_field_data
-                        .object(encountered_client_field.parent_object_id)
-                        .name;
+                        .object(encountered_client_field.parent_object_id);
 
                     if schema
                         .fetchable_types
@@ -144,9 +143,10 @@ pub fn get_artifact_path_and_content(
                         merged_selection_map.clone(),
                         "node".intern().into(),
                         vec![id_arg.clone()],
+                        type_to_refine_to.concrete_type,
                         None,
-                        RequiresRefinement::Yes(type_to_refine_to),
-                        Some(type_to_refine_to),
+                        None,
+                        RequiresRefinement::Yes(type_to_refine_to.name),
                     );
                     let id_var = ValidatedVariableDefinition {
                         name: WithLocation::new("id".intern().into(), Location::Generated),
@@ -170,9 +170,10 @@ pub fn get_artifact_path_and_content(
                         .refetch_paths
                         .into_iter()
                         .map(|(mut key, value)| {
-                            key.0
-                                .linked_fields
-                                .insert(0, NormalizationKey::InlineFragment(type_to_refine_to));
+                            key.0.linked_fields.insert(
+                                0,
+                                NormalizationKey::InlineFragment(type_to_refine_to.name),
+                            );
                             key.0.linked_fields.insert(
                                 0,
                                 NormalizationKey::ServerField(NameAndArguments {

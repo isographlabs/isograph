@@ -109,9 +109,10 @@ impl UnvalidatedSchema {
                     format!("refetch__{}", object.name).intern().into(),
                     *NODE_FIELD_NAME,
                     id_top_level_arguments(),
+                    object.concrete_type,
                     RequiresRefinement::Yes(object.name),
                     None,
-                    Some(object.name),
+                    None,
                 ))
             }),
         });
@@ -153,6 +154,7 @@ pub enum ProcessClientFieldDeclarationError {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PrimaryFieldInfo {
     pub primary_field_name: LinkedFieldName,
+    pub primary_field_concrete_type: Option<IsographObjectTypeName>,
     /// If this is abstract, we add a fragment spread
     pub primary_field_return_type_object_id: ServerObjectId,
     pub primary_field_field_map: Vec<FieldMapItem>,
@@ -166,6 +168,7 @@ pub struct ImperativelyLoadedFieldVariant {
     /// The arguments we must pass to the top level schema field, e.g. id: ID!
     /// for node(id: $id)
     pub top_level_schema_field_arguments: Vec<UnvalidatedVariableDefinition>,
+    pub top_level_schema_field_concrete_type: Option<IsographObjectTypeName>,
 
     /// If we need to select a sub-field, this is Some(...). We should model
     /// this differently, this is very awkward!

@@ -53,7 +53,9 @@ export function getOrCreateCachedComponent(
             'Component re-rendered: ' +
               componentName +
               ' ' +
-              fragmentReference.root,
+              fragmentReference.root.__typename +
+              ' ' +
+              fragmentReference.root.__link,
           );
         }
 

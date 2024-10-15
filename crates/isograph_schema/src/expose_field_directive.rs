@@ -225,6 +225,13 @@ impl UnvalidatedSchema {
                     }
                 })
                 .collect();
+
+            let top_level_schema_field_concrete_type = payload_object.concrete_type;
+            let primary_field_concrete_type = self
+                .server_field_data
+                .object(maybe_abstract_parent_object_id)
+                .concrete_type;
+
             let mutation_client_field = ClientField {
                 description,
                 // set_pet_best_friend
@@ -244,11 +251,12 @@ impl UnvalidatedSchema {
                             .into_iter()
                             .map(|x| x.item)
                             .collect::<Vec<_>>(),
-
+                        top_level_schema_field_concrete_type,
                         primary_field_info: Some(PrimaryFieldInfo {
                             primary_field_name,
                             primary_field_return_type_object_id: maybe_abstract_parent_object_id,
                             primary_field_field_map: field_map.to_vec(),
+                            primary_field_concrete_type,
                         }),
 
                         root_object_id: parent_object_id,
@@ -270,17 +278,14 @@ impl UnvalidatedSchema {
                         format!("Mutation__{}", primary_field_name).intern().into(),
                         top_level_schema_field_name,
                         top_level_arguments,
+                        top_level_schema_field_concrete_type,
                         // This is blatantly incorrect - at this point, we don't know whether
                         // we require refinement, since the same field is copied from the abstract
                         // type to the concrete type. So, when we do that, we need to account
                         // for this.
                         RequiresRefinement::No,
                         Some(primary_field_name),
-                        // This is blatantly incorrect - at this point, we don't know whether
-                        // type is concrete, since the same field is copied from the abstract
-                        // type to the concrete type. So, when we do that, we need to account
-                        // for this.
-                        Some(maybe_abstract_parent_type_name.lookup().intern().into()),
+                        primary_field_concrete_type,
                     ),
                 )),
             };
