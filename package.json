@@ -19,7 +19,7 @@
     "build-isograph-react-demo": "./target/debug/isograph_cli --config ./libs/isograph-react/isograph.config.json",
     "watch-libs": "cargo watch -s 'pnpm -r compile' -d 0.1 -w ./libs",
     "format": "pnpm run format-prettier && pnpm run format-rust",
-    "format-prettier": "prettier --config ./.prettier.config.js --write .",
+    "format-prettier": "prettier --config ./.prettierrc.json --write .",
     "format-rust": "cargo fmt",
     "tsc": "pnpm -r tsc",
     "test": "vitest run",
