@@ -1047,25 +1047,15 @@ pub fn selection_map_wrapped(
     top_level_selection_set
 }
 
-fn is_typename_selection(selection: &MergedServerSelection) -> bool {
-    if let MergedServerSelection::ScalarField(s) = &selection {
-        s.name == *TYPENAME_FIELD_NAME
-    } else {
-        false
-    }
-}
-
 fn maybe_add_typename_selection(selections: &mut MergedSelectionMap) {
-    let has_typename = selections.values().any(is_typename_selection);
-    if !has_typename {
-        selections.insert(
-            NormalizationKey::Discriminator,
-            MergedServerSelection::ScalarField(MergedScalarFieldSelection {
-                name: *TYPENAME_FIELD_NAME,
-                arguments: vec![],
-            }),
-        );
-    }
+    // If a discriminator exists, this is a no-op
+    selections.insert(
+        NormalizationKey::Discriminator,
+        MergedServerSelection::ScalarField(MergedScalarFieldSelection {
+            name: *TYPENAME_FIELD_NAME,
+            arguments: vec![],
+        }),
+    );
 }
 
 fn get_aliased_mutation_field_name(
