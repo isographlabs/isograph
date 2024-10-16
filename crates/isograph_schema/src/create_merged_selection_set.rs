@@ -1058,7 +1058,6 @@ fn is_typename_selection(selection: &MergedServerSelection) -> bool {
 fn maybe_add_typename_selection(selections: &mut MergedSelectionMap) {
     let has_typename = selections.values().any(is_typename_selection);
     if !has_typename {
-        // This should be first, so this a huge bummer
         selections.insert(
             NormalizationKey::Discriminator,
             MergedServerSelection::ScalarField(MergedScalarFieldSelection {
