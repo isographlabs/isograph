@@ -6,6 +6,7 @@ const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
 const queryText = 'query nodeField ($id: ID!) {\
   node____id___v_id: node(id: $id) {\
+    __typename,\
     id,\
   },\
 }';
@@ -21,6 +22,11 @@ const normalizationAst: NormalizationAst = [
       ],
     ],
     selections: [
+      {
+        kind: "Scalar",
+        fieldName: "__typename",
+        arguments: null,
+      },
       {
         kind: "Scalar",
         fieldName: "id",

@@ -947,7 +947,9 @@ fn select_typename_and_id_fields_in_merged_selection(
     merged_selection_map: &mut MergedSelectionMap,
     parent_type: &SchemaObject,
 ) {
-    // TODO add __typename field or whatnot
+    if parent_type.concrete_type.is_none() {
+        maybe_add_typename_selection(merged_selection_map)
+    };
 
     let id_field: Option<ValidatedSchemaIdField> = parent_type
         .id_field
@@ -1047,26 +1049,15 @@ pub fn selection_map_wrapped(
     top_level_selection_set
 }
 
-fn is_typename_selection(selection: &MergedServerSelection) -> bool {
-    if let MergedServerSelection::ScalarField(s) = &selection {
-        s.name == *TYPENAME_FIELD_NAME
-    } else {
-        false
-    }
-}
-
 fn maybe_add_typename_selection(selections: &mut MergedSelectionMap) {
-    let has_typename = selections.values().any(is_typename_selection);
-    if !has_typename {
-        // This should be first, so this a huge bummer
-        selections.insert(
-            NormalizationKey::Discriminator,
-            MergedServerSelection::ScalarField(MergedScalarFieldSelection {
-                name: *TYPENAME_FIELD_NAME,
-                arguments: vec![],
-            }),
-        );
-    }
+    // If a discriminator exists, this is a no-op
+    selections.insert(
+        NormalizationKey::Discriminator,
+        MergedServerSelection::ScalarField(MergedScalarFieldSelection {
+            name: *TYPENAME_FIELD_NAME,
+            arguments: vec![],
+        }),
+    );
 }
 
 fn get_aliased_mutation_field_name(

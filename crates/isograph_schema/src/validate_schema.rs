@@ -9,18 +9,17 @@ use intern::Lookup;
 use isograph_lang_types::{
     ClientFieldId, IsographSelectionVariant, LinkedFieldSelection, LoadableDirectiveParameters,
     ScalarFieldSelection, SelectableServerFieldId, Selection, SelectionFieldArgument,
-    ServerFieldId, ServerObjectId, ServerScalarId, UnvalidatedScalarFieldSelection,
+    ServerFieldId, ServerObjectId, ServerScalarId, TypeAnnotation, UnvalidatedScalarFieldSelection,
     UnvalidatedSelection, VariableDefinition,
 };
 use thiserror::Error;
 
 use crate::{
-    isograph_type_annotation::TypeAnnotation, ClientField, ClientFieldVariant,
-    FieldDefinitionLocation, ImperativelyLoadedFieldVariant, RefetchStrategy, Schema,
-    SchemaIdField, SchemaObject, SchemaServerField, SchemaValidationState, ServerFieldData,
-    UnvalidatedClientField, UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
-    UnvalidatedSchema, UnvalidatedSchemaSchemaField, UnvalidatedSchemaState,
-    UnvalidatedVariableDefinition, UseRefetchFieldRefetchStrategy,
+    ClientField, ClientFieldVariant, FieldDefinitionLocation, ImperativelyLoadedFieldVariant,
+    RefetchStrategy, Schema, SchemaIdField, SchemaObject, SchemaServerField, SchemaValidationState,
+    ServerFieldData, UnvalidatedClientField, UnvalidatedLinkedFieldSelection,
+    UnvalidatedRefetchFieldStrategy, UnvalidatedSchema, UnvalidatedSchemaSchemaField,
+    UnvalidatedSchemaState, UnvalidatedVariableDefinition, UseRefetchFieldRefetchStrategy,
     ValidateEntrypointDeclarationError,
 };
 
@@ -208,6 +207,7 @@ fn transform_object_field_ids(unvalidated_object: SchemaObject) -> SchemaObject 
         encountered_fields: unvalidated_encountered_fields,
         id_field,
         directives,
+        concrete_type,
     } = unvalidated_object;
 
     let validated_encountered_fields = unvalidated_encountered_fields
@@ -230,6 +230,7 @@ fn transform_object_field_ids(unvalidated_object: SchemaObject) -> SchemaObject 
         encountered_fields: validated_encountered_fields,
         id_field,
         directives,
+        concrete_type,
     }
 }
 
@@ -1190,6 +1191,25 @@ pub fn get_missing_arguments<'a>(
                 None
             } else {
                 Some(definition.clone())
+            }
+        })
+        .collect()
+}
+
+pub fn get_provided_arguments<'a>(
+    argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
+    arguments: &[WithLocation<SelectionFieldArgument>],
+) -> Vec<ValidatedVariableDefinition> {
+    argument_definitions
+        .filter_map(|definition| {
+            let user_has_supplied_argument = arguments
+                .iter()
+                // TODO do not call .lookup
+                .any(|arg| definition.name.item.lookup() == arg.item.name.item.lookup());
+            if user_has_supplied_argument {
+                Some(definition.clone())
+            } else {
+                None
             }
         })
         .collect()

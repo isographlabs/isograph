@@ -1,8 +1,10 @@
 use common_lang_types::SelectableFieldName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
-use isograph_lang_types::{ClientFieldId, SelectableServerFieldId, ServerFieldId};
-use isograph_schema::{FieldDefinitionLocation, TypeAnnotation, UnionVariant, ValidatedSchema};
+use isograph_lang_types::{
+    ClientFieldId, SelectableServerFieldId, ServerFieldId, TypeAnnotation, UnionVariant,
+};
+use isograph_schema::{FieldDefinitionLocation, ValidatedSchema};
 
 pub(crate) fn format_parameter_type(
     schema: &ValidatedSchema,
@@ -51,7 +53,7 @@ fn format_server_field_type(
                 .iter()
                 .filter(|x| matches!(
                     x.1,
-                    FieldDefinitionLocation::Server(server_field_id) if schema.server_field(*server_field_id).is_discriminator == false),
+                    FieldDefinitionLocation::Server(server_field_id) if !schema.server_field(*server_field_id).is_discriminator),
                 )
             {
                 let field_type =

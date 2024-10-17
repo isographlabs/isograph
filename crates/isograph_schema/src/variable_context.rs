@@ -1,5 +1,5 @@
 use intern::Lookup;
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
 use common_lang_types::{SelectableFieldName, VariableName, WithLocation, WithSpan};
 use isograph_lang_types::{
@@ -89,7 +89,7 @@ impl VariableContext {
 impl<
         TClientFieldSelectionScalarFieldAssociatedData,
         TClientFieldSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData,
+        TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
     >
     ClientField<
         TClientFieldSelectionScalarFieldAssociatedData,
