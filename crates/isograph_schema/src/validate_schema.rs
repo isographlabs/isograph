@@ -9,18 +9,17 @@ use intern::Lookup;
 use isograph_lang_types::{
     ClientFieldId, IsographSelectionVariant, LinkedFieldSelection, LoadableDirectiveParameters,
     ScalarFieldSelection, SelectableServerFieldId, Selection, SelectionFieldArgument,
-    ServerFieldId, ServerObjectId, ServerScalarId, UnvalidatedScalarFieldSelection,
+    ServerFieldId, ServerObjectId, ServerScalarId, TypeAnnotation, UnvalidatedScalarFieldSelection,
     UnvalidatedSelection, VariableDefinition,
 };
 use thiserror::Error;
 
 use crate::{
-    isograph_type_annotation::TypeAnnotation, ClientField, ClientFieldVariant,
-    FieldDefinitionLocation, ImperativelyLoadedFieldVariant, RefetchStrategy, Schema,
-    SchemaIdField, SchemaObject, SchemaServerField, SchemaValidationState, ServerFieldData,
-    UnvalidatedClientField, UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
-    UnvalidatedSchema, UnvalidatedSchemaSchemaField, UnvalidatedSchemaState,
-    UnvalidatedVariableDefinition, UseRefetchFieldRefetchStrategy,
+    ClientField, ClientFieldVariant, FieldDefinitionLocation, ImperativelyLoadedFieldVariant,
+    RefetchStrategy, Schema, SchemaIdField, SchemaObject, SchemaServerField, SchemaValidationState,
+    ServerFieldData, UnvalidatedClientField, UnvalidatedLinkedFieldSelection,
+    UnvalidatedRefetchFieldStrategy, UnvalidatedSchema, UnvalidatedSchemaSchemaField,
+    UnvalidatedSchemaState, UnvalidatedVariableDefinition, UseRefetchFieldRefetchStrategy,
     ValidateEntrypointDeclarationError,
 };
 

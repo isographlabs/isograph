@@ -150,19 +150,14 @@ impl<'source> PeekableLexer<'source> {
         }
     }
 
-    pub fn with_span<T>(&mut self, do_stuff: impl FnOnce(&mut Self) -> T) -> WithSpan<T> {
+    pub fn with_span<T, E>(
+        &mut self,
+        do_stuff: impl FnOnce(&mut Self) -> Result<T, E>,
+    ) -> Result<WithSpan<T>, E> {
         let start = self.current.span.start;
-        let result = do_stuff(self);
+        let result = do_stuff(self)?;
         let end = self.end_index_of_last_parsed_token;
-
-        // Note: if do_stuff didn't actually parse anything, e.g. if it
-        // attempted to parse and bailed, then end < start. Hence, we
-        // return the larger (end, start) for end.
-        //
-        // Maybe this can be encoded in the type system?
-        let end = std::cmp::max(end, start);
-
-        WithSpan::new(result, Span::new(start, end))
+        Ok(WithSpan::new(result, Span::new(start, end)))
     }
 }
 

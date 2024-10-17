@@ -81,7 +81,6 @@ fn parse_iso_entrypoint_declaration(
                 dot: dot.map(|_| ()),
             })
         })
-        .transpose()
         .map_err(|with_span: WithSpan<_>| with_span.to_with_location(text_source))?;
 
     if let Some(span) = tokens.remaining_token_span() {
@@ -127,58 +126,56 @@ fn parse_client_field_declaration_inner(
     text_source: TextSource,
     field_keyword_span: Span,
 ) -> ParseResultWithSpan<WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>> {
-    tokens
-        .with_span(|tokens| {
-            let parent_type = tokens
-                .parse_string_key_type(IsographLangTokenKind::Identifier)
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+    tokens.with_span(|tokens| {
+        let parent_type = tokens
+            .parse_string_key_type(IsographLangTokenKind::Identifier)
+            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-            let dot = tokens
-                .parse_token_of_kind(IsographLangTokenKind::Period)
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+        let dot = tokens
+            .parse_token_of_kind(IsographLangTokenKind::Period)
+            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-            let client_field_name: WithSpan<ScalarFieldName> = tokens
-                .parse_string_key_type(IsographLangTokenKind::Identifier)
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+        let client_field_name: WithSpan<ScalarFieldName> = tokens
+            .parse_string_key_type(IsographLangTokenKind::Identifier)
+            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-            let variable_definitions = parse_variable_definitions(tokens, text_source)?;
+        let variable_definitions = parse_variable_definitions(tokens, text_source)?;
 
-            let directives = parse_directives(tokens, text_source)?;
+        let directives = parse_directives(tokens, text_source)?;
 
-            let description = parse_optional_description(tokens);
+        let description = parse_optional_description(tokens);
 
-            let (selection_set, unwraps) = parse_selection_set_and_unwraps(tokens, text_source)?;
+        let (selection_set, unwraps) = parse_selection_set_and_unwraps(tokens, text_source)?;
 
-            let const_export_name = const_export_name.ok_or_else(|| {
-                WithSpan::new(
-                    IsographLiteralParseError::ExpectedLiteralToBeExported {
-                        suggested_const_export_name: client_field_name.item,
-                    },
-                    Span::todo_generated(),
-                )
-            })?;
+        let const_export_name = const_export_name.ok_or_else(|| {
+            WithSpan::new(
+                IsographLiteralParseError::ExpectedLiteralToBeExported {
+                    suggested_const_export_name: client_field_name.item,
+                },
+                Span::todo_generated(),
+            )
+        })?;
 
-            // --------------------
-            // TODO: use directives to:
-            // - ensure only component exists
-            // - it ends up in the reader AST
-            // --------------------
+        // --------------------
+        // TODO: use directives to:
+        // - ensure only component exists
+        // - it ends up in the reader AST
+        // --------------------
 
-            Ok(ClientFieldDeclaration {
-                parent_type,
-                client_field_name,
-                description,
-                selection_set,
-                unwraps,
-                definition_path: definition_file_path,
-                directives,
-                const_export_name: const_export_name.intern().into(),
-                variable_definitions,
-                field_keyword: WithSpan::new((), field_keyword_span),
-                dot: dot.map(|_| ()),
-            })
+        Ok(ClientFieldDeclaration {
+            parent_type,
+            client_field_name,
+            description,
+            selection_set,
+            unwraps,
+            definition_path: definition_file_path,
+            directives,
+            const_export_name: const_export_name.intern().into(),
+            variable_definitions,
+            field_keyword: WithSpan::new((), field_keyword_span),
+            dot: dot.map(|_| ()),
         })
-        .transpose()
+    })
 }
 
 // Note: for now, top-level selection sets are required
@@ -305,53 +302,51 @@ fn parse_selection(
     tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
 ) -> ParseResultWithSpan<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>> {
-    tokens
-        .with_span(|tokens| {
-            let (field_name, alias) = parse_optional_alias_and_field_name(tokens)?;
-            let field_name = field_name.to_with_location(text_source);
-            let alias = alias.map(|alias| alias.to_with_location(text_source));
+    tokens.with_span(|tokens| {
+        let (field_name, alias) = parse_optional_alias_and_field_name(tokens)?;
+        let field_name = field_name.to_with_location(text_source);
+        let alias = alias.map(|alias| alias.to_with_location(text_source));
 
-            // TODO distinguish field groups
-            let arguments = parse_optional_arguments(tokens, text_source)?;
+        // TODO distinguish field groups
+        let arguments = parse_optional_arguments(tokens, text_source)?;
 
-            // If we encounter a selection set, we are parsing a linked field. Otherwise, a scalar field.
-            let selection_set = parse_optional_selection_set(tokens, text_source)?;
+        // If we encounter a selection set, we are parsing a linked field. Otherwise, a scalar field.
+        let selection_set = parse_optional_selection_set(tokens, text_source)?;
 
-            let unwraps = parse_unwraps(tokens);
+        let unwraps = parse_unwraps(tokens);
 
-            let directives = parse_directives(tokens, text_source)?;
+        let directives = parse_directives(tokens, text_source)?;
 
-            // commas are required
-            parse_comma_line_break_or_curly(tokens)?;
+        // commas are required
+        parse_comma_line_break_or_curly(tokens)?;
 
-            let selection = match selection_set {
-                Some(selection_set) => Selection::ServerField(ServerFieldSelection::LinkedField(
-                    LinkedFieldSelection {
-                        name: field_name.map(|string_key| string_key.into()),
-                        reader_alias: alias
-                            .map(|with_span| with_span.map(|string_key| string_key.into())),
-                        associated_data: (),
-                        selection_set,
-                        unwraps,
-                        arguments,
-                        directives,
-                    },
-                )),
-                None => Selection::ServerField(ServerFieldSelection::ScalarField(
-                    ScalarFieldSelection {
-                        name: field_name.map(|string_key| string_key.into()),
-                        reader_alias: alias
-                            .map(|with_span| with_span.map(|string_key| string_key.into())),
-                        associated_data: (),
-                        unwraps,
-                        arguments,
-                        directives,
-                    },
-                )),
-            };
-            Ok(selection)
-        })
-        .transpose()
+        let selection = match selection_set {
+            Some(selection_set) => {
+                Selection::ServerField(ServerFieldSelection::LinkedField(LinkedFieldSelection {
+                    name: field_name.map(|string_key| string_key.into()),
+                    reader_alias: alias
+                        .map(|with_span| with_span.map(|string_key| string_key.into())),
+                    associated_data: (),
+                    selection_set,
+                    unwraps,
+                    arguments,
+                    directives,
+                }))
+            }
+            None => {
+                Selection::ServerField(ServerFieldSelection::ScalarField(ScalarFieldSelection {
+                    name: field_name.map(|string_key| string_key.into()),
+                    reader_alias: alias
+                        .map(|with_span| with_span.map(|string_key| string_key.into())),
+                    associated_data: (),
+                    unwraps,
+                    arguments,
+                    directives,
+                }))
+            }
+        };
+        Ok(selection)
+    })
 }
 
 fn parse_optional_alias_and_field_name(
@@ -429,18 +424,16 @@ fn parse_argument(
     tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
 ) -> ParseResultWithSpan<WithLocation<SelectionFieldArgument>> {
-    let argument = tokens
-        .with_span(|tokens| {
-            let name = tokens
-                .parse_string_key_type(IsographLangTokenKind::Identifier)
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
-            tokens
-                .parse_token_of_kind(IsographLangTokenKind::Colon)
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
-            let value = parse_non_constant_value(tokens)?;
-            Ok::<_, WithSpan<IsographLiteralParseError>>(SelectionFieldArgument { name, value })
-        })
-        .transpose()?;
+    let argument = tokens.with_span(|tokens| {
+        let name = tokens
+            .parse_string_key_type(IsographLangTokenKind::Identifier)
+            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+        tokens
+            .parse_token_of_kind(IsographLangTokenKind::Colon)
+            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+        let value = parse_non_constant_value(tokens)?;
+        Ok::<_, WithSpan<IsographLiteralParseError>>(SelectionFieldArgument { name, value })
+    })?;
     Ok(argument.to_with_location(text_source))
 }
 
@@ -515,29 +508,27 @@ fn parse_variable_definition(
     tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
 ) -> ParseResultWithSpan<WithSpan<VariableDefinition<UnvalidatedTypeName>>> {
-    let variable_definition = tokens
-        .with_span(|tokens| {
-            let _dollar = tokens
-                .parse_token_of_kind(IsographLangTokenKind::Dollar)
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
-            let name = tokens
-                .parse_string_key_type(IsographLangTokenKind::Identifier)
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?
-                .to_with_location(text_source);
-            tokens
-                .parse_token_of_kind(IsographLangTokenKind::Colon)
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
-            let type_ = parse_type_annotation(tokens)?;
+    let variable_definition = tokens.with_span(|tokens| {
+        let _dollar = tokens
+            .parse_token_of_kind(IsographLangTokenKind::Dollar)
+            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+        let name = tokens
+            .parse_string_key_type(IsographLangTokenKind::Identifier)
+            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?
+            .to_with_location(text_source);
+        tokens
+            .parse_token_of_kind(IsographLangTokenKind::Colon)
+            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+        let type_ = parse_type_annotation(tokens)?;
 
-            let default_value = parse_optional_default_value(tokens, text_source)?;
+        let default_value = parse_optional_default_value(tokens, text_source)?;
 
-            Ok::<_, WithSpan<IsographLiteralParseError>>(VariableDefinition {
-                name,
-                type_,
-                default_value,
-            })
+        Ok::<_, WithSpan<IsographLiteralParseError>>(VariableDefinition {
+            name,
+            type_,
+            default_value,
         })
-        .transpose()?;
+    })?;
     Ok(variable_definition)
 }
 

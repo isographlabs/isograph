@@ -110,12 +110,6 @@ impl<T> WithSpan<T> {
     }
 }
 
-impl<T, E> WithSpan<Result<T, E>> {
-    pub fn transpose(self) -> Result<WithSpan<T>, E> {
-        Ok(WithSpan::new(self.item?, self.span))
-    }
-}
-
 impl<T: fmt::Display> fmt::Display for WithSpan<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.item.fmt(f)
