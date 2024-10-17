@@ -31,7 +31,7 @@ type UsePaginationReturnValue<
 > =
   | {
       kind: 'Pending';
-      pendingFragment: FragmentReference<TReadFromStore, ReadonlyArray<TItem>>;
+      pendingFragment: FragmentReference<TReadFromStore, Connection<TItem>>;
       results: ReadonlyArray<TItem>;
     }
   | {
@@ -297,7 +297,6 @@ export function useConnectionSpecPagination<
       return {
         results: results.edges,
         kind: 'Pending',
-        //@ts-expect-error map Connection<TItem> to ReadonlyArray<TItem>
         pendingFragment: mostRecentFragmentReference,
       };
     }
