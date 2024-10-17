@@ -113,6 +113,20 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
             .expect("Expected query to be found")
             .0
     }
+
+    pub fn query_root_operation_name(&self) -> Option<&RootOperationName> {
+        self.fetchable_types
+            .iter()
+            .find(|(_, root_operation_name)| root_operation_name.0 == "query")
+            .map(|(_, root_operation_name)| root_operation_name)
+    }
+
+    pub fn mutation_root_operation_name(&self) -> Option<&RootOperationName> {
+        self.fetchable_types
+            .iter()
+            .find(|(_, root_operation_name)| root_operation_name.0 == "mutation")
+            .map(|(_, root_operation_name)| root_operation_name)
+    }
 }
 
 /// Distinguishes between server-defined fields and locally-defined fields.
