@@ -519,7 +519,9 @@ fn parse_variable_definition(
         tokens
             .parse_token_of_kind(IsographLangTokenKind::Colon)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
-        let type_ = parse_type_annotation(tokens)?;
+        let type_ = isograph_lang_types::TypeAnnotation::from_graphql_type_annotation(
+            parse_graphql_type_annotation(tokens)?,
+        );
 
         let default_value = parse_optional_default_value(tokens, text_source)?;
 
@@ -556,7 +558,8 @@ fn parse_optional_default_value(
     }
 }
 
-fn parse_type_annotation(
+// TODO consider changing the syntax here to parse Isograph type annotations directly
+fn parse_graphql_type_annotation(
     tokens: &mut PeekableLexer,
 ) -> ParseResultWithSpan<GraphQLTypeAnnotation<UnvalidatedTypeName>> {
     from_control_flow(|| {
@@ -585,7 +588,7 @@ fn parse_type_annotation(
                 .parse_token_of_kind(IsographLangTokenKind::OpenBracket)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-            let inner_type_annotation = parse_type_annotation(tokens)?;
+            let inner_type_annotation = parse_graphql_type_annotation(tokens)?;
             tokens
                 .parse_token_of_kind(IsographLangTokenKind::CloseBracket)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use common_lang_types::{
     IsographObjectTypeName, Location, SelectableFieldName, StringLiteralValue, VariableName,
@@ -6,7 +6,7 @@ use common_lang_types::{
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::{string_key::Intern, Lookup};
-use isograph_lang_types::{SelectableServerFieldId, ServerFieldId};
+use isograph_lang_types::{SelectableServerFieldId, ServerFieldId, TypeAnnotation};
 
 use crate::{
     FieldDefinitionLocation, FieldMapItem, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
@@ -147,12 +147,12 @@ enum PotentiallyModifiedArgument {
 /// or modified (indicating that a new object should be created
 /// for them to point to.) Scalar fields cannot be modified,
 /// only deleted.
-#[derive(Debug)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub(crate) struct ModifiedObject {
-    field_map: HashMap<SelectableFieldName, PotentiallyModifiedField>,
+    field_map: BTreeMap<SelectableFieldName, PotentiallyModifiedField>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub(crate) enum PotentiallyModifiedField {
     Unmodified(ServerFieldId),
     // This is exercised in the case of 3+ segments, e.g. input.foo.id.
@@ -173,7 +173,7 @@ impl PotentiallyModifiedField {
 
 /// A modified field's type must be an object. A scalar field that
 /// is modified is just removed.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct ModifiedField {
     #[allow(dead_code)]
     modified_object: ModifiedObject,
@@ -182,7 +182,7 @@ pub(crate) struct ModifiedField {
 #[derive(Debug)]
 struct ModifiedArgument {
     name: WithLocation<VariableName>,
-    object: GraphQLTypeAnnotation<ModifiedObject>,
+    object: TypeAnnotation<ModifiedObject>,
 }
 
 impl ModifiedArgument {
@@ -200,7 +200,7 @@ impl ModifiedArgument {
     ) -> Self {
         // TODO I think we have validated that the item exists already.
         // But we should double check that, and return an error if necessary
-        let object = unmodified.type_.clone().map(|input_type_name| {
+        let object = unmodified.type_.clone().map(&mut |input_type_name| {
             let defined_type_id = *schema
                 .server_field_data
                 .defined_types

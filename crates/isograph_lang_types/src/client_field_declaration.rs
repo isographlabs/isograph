@@ -6,10 +6,10 @@ use common_lang_types::{
     SelectableFieldName, StringLiteralValue, UnvalidatedTypeName, ValueKeyName, VariableName,
     WithLocation, WithSpan,
 };
-use graphql_lang_types::{FloatValue, GraphQLTypeAnnotation, NameValuePair};
+use graphql_lang_types::{FloatValue, NameValuePair};
 use serde::Deserialize;
 
-use crate::IsographFieldDirective;
+use crate::{IsographFieldDirective, TypeAnnotation};
 
 pub type UnvalidatedSelectionWithUnvalidatedDirectives = Selection<(), ()>;
 
@@ -493,7 +493,7 @@ impl ConstantValue {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct VariableDefinition<TValue: Ord + Debug> {
     pub name: WithLocation<VariableName>,
-    pub type_: GraphQLTypeAnnotation<TValue>,
+    pub type_: TypeAnnotation<TValue>,
     pub default_value: Option<WithLocation<ConstantValue>>,
 }
 
