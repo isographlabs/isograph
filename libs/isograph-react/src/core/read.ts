@@ -271,7 +271,7 @@ function readData<TReadFromStore>(
           } else if (!field.concreteType && !altLink.__typename) {
             console.warn(
               'Missing __typename for abstract type in link returned by missingFieldHandler. ' +
-                'Unable to resolve data for field. This indicates an issue with the missingFieldHandler implementation.' +
+                'Unable to resolve data for field. This indicates an issue with the missingFieldHandler implementation. ' +
                 'To fix ensure the missingFieldHandler returns a link with a valid __typename for abstract types.',
               missingData,
             );

@@ -526,7 +526,7 @@ function normalizeLinkedField(
         astNode.concreteType ?? networkResponseObject[TYPENAME_FIELD_NAME];
       if (!__typename) {
         throw new Error(
-          'Unexpected missing __typename in network response when normalizing a linked field.' +
+          'Unexpected missing __typename in network response when normalizing a linked field. ' +
             'This is indicative of bug in Isograph.',
         );
       }
@@ -555,7 +555,7 @@ function normalizeLinkedField(
 
     if (!__typename) {
       throw new Error(
-        'Unexpected missing __typename in network response when normalizing a linked field.' +
+        'Unexpected missing __typename in network response when normalizing a linked field. ' +
           'This is indicative of bug in Isograph.',
       );
     }
@@ -651,7 +651,7 @@ function normalizeNetworkResponseObject(
 
   if (!__typename) {
     throw new Error(
-      'Unexpected missing __typename in network response object.' +
+      'Unexpected missing __typename in network response object. ' +
         'This is indicative of bug in Isograph.',
     );
   }

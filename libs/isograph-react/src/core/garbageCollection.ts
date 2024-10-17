@@ -136,7 +136,7 @@ function recordReachableIdsFromRecord(
           let __typename = selection.concreteType ?? nextRecordLink.__typename;
           if (!__typename) {
             throw new Error(
-              'Unexpected missing __typename in Link when garbage collecting.' +
+              'Unexpected missing __typename in Link when garbage collecting. ' +
                 'This is indicative of bug in Isograph.',
             );
           }
