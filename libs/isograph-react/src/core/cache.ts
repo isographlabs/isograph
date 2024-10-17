@@ -142,7 +142,7 @@ export function normalizeData(
   root: ParentRecordId,
   queryType: ParentRecordId,
 ): EncounteredIds {
-  const encounteredIds: EncounteredIds = {};
+  const encounteredIds: EncounteredIds = new Map();
 
   // @ts-expect-error
   if (typeof window !== 'undefined' && window.__LOG) {
@@ -333,9 +333,9 @@ function callSubscriptions(
         }
         case 'AnyChangesToRecord': {
           if (
-            recordsEncounteredWhenNormalizing[subscription.typeName]?.has(
-              subscription.recordId,
-            )
+            recordsEncounteredWhenNormalizing
+              .get(subscription.typeName)
+              ?.has(subscription.recordId)
           ) {
             subscription.callback();
           }
@@ -353,28 +353,32 @@ function callSubscriptions(
 }
 
 function hasOverlappingIds(
-  set1: EncounteredIds,
-  set2: EncounteredIds,
+  ids1: EncounteredIds,
+  ids2: EncounteredIds,
 ): boolean {
-  for (const typeName in set1) {
-    const set2Ids = set2[typeName];
-    if (!set2Ids) {
+  for (const [typeName, set1] of ids1.entries()) {
+    const set2 = ids2.get(typeName);
+    if (!set2) {
       continue;
     }
 
-    for (const id of set1[typeName]) {
-      if (set2Ids.has(id)) {
-        return true;
-      }
+    if (isDisjointFrom(set1, set2)) {
+      return true;
     }
   }
   return false;
 }
 
-export interface EncounteredIds {
-  [typeName: TypeName]: Set<DataId>;
+function isDisjointFrom<T>(set1: Set<T>, set2: Set<T>): boolean {
+  for (const id of set1) {
+    if (set2.has(id)) {
+      return true;
+    }
+  }
+  return false;
 }
 
+export type EncounteredIds = Map<TypeName, Set<DataId>>;
 /**
  * Mutate targetParentRecord according to the normalizationAst and networkResponseParentRecord.
  */
@@ -444,12 +448,24 @@ function normalizeDataIntoRecord(
     }
   }
   if (recordHasBeenUpdated) {
-    const encounteredRecordsIds = (mutableEncounteredIds[
-      targetParentRecordId.concreteType
-    ] ??= new Set());
+    let encounteredRecordsIds = insertIfNotExists(
+      mutableEncounteredIds,
+      targetParentRecordId.concreteType,
+      new Set(),
+    );
+
     encounteredRecordsIds.add(targetParentRecordId.id);
   }
   return recordHasBeenUpdated;
+}
+
+export function insertIfNotExists<K, V>(map: Map<K, V>, key: K, value: V) {
+  let result = map.get(key);
+  if (result === undefined) {
+    result = value;
+    map.set(key, value);
+  }
+  return result;
 }
 
 type RecordHasBeenUpdated = boolean;

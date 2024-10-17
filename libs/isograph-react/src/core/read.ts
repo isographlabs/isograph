@@ -1,6 +1,7 @@
 import { CleanupFn } from '@isograph/isograph-disposable-types/dist';
 import {
   getParentRecordKey,
+  insertIfNotExists,
   onNextChangeToRecord,
   TYPENAME_FIELD_NAME,
   type EncounteredIds,
@@ -48,7 +49,7 @@ export function readButDoNotEvaluate<
   fragmentReference: FragmentReference<TReadFromStore, unknown>,
   networkRequestOptions: NetworkRequestReaderOptions,
 ): WithEncounteredRecords<TReadFromStore> {
-  const mutableEncounteredRecords: EncounteredIds = {};
+  const mutableEncounteredRecords: EncounteredIds = new Map();
 
   const readerWithRefetchQueries = readPromise(
     fragmentReference.readerWithRefetchQueries,
@@ -129,8 +130,11 @@ function readData<TReadFromStore>(
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableEncounteredRecords: EncounteredIds,
 ): ReadDataResult<TReadFromStore> {
-  const encounteredIds = (mutableEncounteredRecords[root.__typename] ??=
-    new Set());
+  const encounteredIds = insertIfNotExists(
+    mutableEncounteredRecords,
+    root.__typename,
+    new Set(),
+  );
   encounteredIds.add(root.__link);
   let storeRecord = environment.store[root.__typename]?.[root.__link];
   if (storeRecord === undefined) {
