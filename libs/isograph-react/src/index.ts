@@ -21,6 +21,7 @@ export {
   type IsographNetworkFunction,
   type IsographStore,
   type Link,
+  type NonNullLink,
   type StoreRecord,
   createIsographEnvironment,
   createIsographStore,

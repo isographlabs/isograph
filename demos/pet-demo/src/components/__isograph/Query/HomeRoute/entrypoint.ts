@@ -18,6 +18,7 @@ const normalizationAst: NormalizationAst = [
     kind: "Linked",
     fieldName: "pets",
     arguments: null,
+    concreteType: "Pet",
     selections: [
       {
         kind: "Scalar",
@@ -49,6 +50,8 @@ const artifact: IsographEntrypoint<
   kind: "Entrypoint",
   queryText,
   normalizationAst,
+  concreteType: "Query",
+  queryType: "Query",
   readerWithRefetchQueries: {
     kind: "ReaderWithRefetchQueries",
     nestedRefetchQueries,

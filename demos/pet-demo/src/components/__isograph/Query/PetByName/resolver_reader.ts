@@ -14,6 +14,7 @@ const readerAst: ReaderAst<Query__PetByName__param> = [
         { kind: "Variable", name: "name" },
       ],
     ],
+    concreteType: "Pet",
     selections: [
       {
         kind: "Resolver",

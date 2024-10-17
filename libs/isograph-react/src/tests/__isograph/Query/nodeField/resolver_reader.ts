@@ -14,6 +14,7 @@ const readerAst: ReaderAst<Query__nodeField__param> = [
         { kind: "Variable", name: "id" },
       ],
     ],
+    concreteType: null,
     selections: [
       {
         kind: "Scalar",

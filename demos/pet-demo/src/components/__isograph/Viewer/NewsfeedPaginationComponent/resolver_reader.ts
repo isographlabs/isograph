@@ -25,6 +25,7 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
         { kind: "Literal", value: 5 },
       ],
     ],
+    concreteType: "NewsfeedItem",
     selections: [
       {
         kind: "Resolver",

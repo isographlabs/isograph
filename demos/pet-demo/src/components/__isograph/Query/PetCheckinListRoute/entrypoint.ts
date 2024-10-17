@@ -28,6 +28,7 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "id" },
       ],
     ],
+    concreteType: "Pet",
     selections: [
       {
         kind: "Scalar",
@@ -48,6 +49,7 @@ const normalizationAst: NormalizationAst = [
             { kind: "Literal", value: 1 },
           ],
         ],
+        concreteType: "Checkin",
         selections: [
           {
             kind: "Scalar",
@@ -76,6 +78,8 @@ const artifact: IsographEntrypoint<
   kind: "Entrypoint",
   queryText,
   normalizationAst,
+  concreteType: "Query",
+  queryType: "Query",
   readerWithRefetchQueries: {
     kind: "ReaderWithRefetchQueries",
     nestedRefetchQueries,

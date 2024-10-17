@@ -31,6 +31,7 @@ type AnyChangesToRecordSubscription = {
   readonly kind: 'AnyChangesToRecord';
   readonly callback: () => void;
   readonly recordId: DataId;
+  readonly typeName: TypeName;
 };
 
 type AnyRecordSubscription = {
@@ -67,7 +68,7 @@ export type IsographEnvironment = {
 
 export type MissingFieldHandler = (
   storeRecord: StoreRecord,
-  root: DataId,
+  root: NonNullLink,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
   variables: Variables | null,
@@ -80,6 +81,12 @@ export type IsographNetworkFunction = (
 
 export type Link = {
   readonly __link: DataId;
+  readonly __typename?: TypeName;
+};
+
+export type NonNullLink = {
+  readonly __link: DataId;
+  readonly __typename: TypeName;
 };
 
 export type DataTypeValue =
@@ -103,13 +110,18 @@ export type StoreRecord = {
   readonly id?: DataId;
 };
 
+export type TypeName = string;
 export type DataId = string;
 
 export const ROOT_ID: DataId & '__ROOT' = '__ROOT';
 
 export type IsographStore = {
-  [index: DataId]: StoreRecord | null;
-  readonly __ROOT: StoreRecord;
+  [index: TypeName]: {
+    [index: DataId]: StoreRecord | null;
+  } | null;
+  readonly Query: {
+    readonly __ROOT: StoreRecord;
+  };
 };
 
 const DEFAULT_GC_BUFFER_SIZE = 10;
@@ -134,13 +146,15 @@ export function createIsographEnvironment(
 
 export function createIsographStore(): IsographStore {
   return {
-    [ROOT_ID]: {},
+    Query: {
+      [ROOT_ID]: {},
+    },
   };
 }
 
 export function defaultMissingFieldHandler(
   _storeRecord: StoreRecord,
-  _root: DataId,
+  _root: NonNullLink,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
   variables: Variables | null,
@@ -174,10 +188,10 @@ export function getLink(maybeLink: DataTypeValue): Link | null {
   if (
     maybeLink != null &&
     typeof maybeLink === 'object' &&
-    // @ts-expect-error this is safe
+    '__link' in maybeLink &&
     maybeLink.__link != null
   ) {
-    return maybeLink as any;
+    return maybeLink;
   }
   return null;
 }

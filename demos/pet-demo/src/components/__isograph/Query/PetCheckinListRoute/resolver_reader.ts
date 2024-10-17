@@ -14,6 +14,7 @@ const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
         { kind: "Variable", name: "id" },
       ],
     ],
+    concreteType: "Pet",
     selections: [
       {
         kind: "Resolver",
@@ -46,6 +47,7 @@ const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
           typeAndField: "Pet__PetCheckinsCardList",
           loader: () => import("../../Pet/PetCheckinsCardList/entrypoint").then(module => module.default),
         },
+        concreteType: "Pet",
       },
     ],
   },

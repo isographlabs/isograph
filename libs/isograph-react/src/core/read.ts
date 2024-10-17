@@ -1,15 +1,21 @@
 import { CleanupFn } from '@isograph/isograph-disposable-types/dist';
-import { getParentRecordKey, onNextChangeToRecord } from './cache';
+import {
+  getParentRecordKey,
+  insertIfNotExists,
+  onNextChangeToRecord,
+  TYPENAME_FIELD_NAME,
+  type EncounteredIds,
+} from './cache';
 import { getOrCreateCachedComponent } from './componentCache';
 import {
   IsographEntrypoint,
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
 import {
-  FragmentReference,
-  Variables,
   ExtractData,
   ExtractParameters,
+  FragmentReference,
+  Variables,
 } from './FragmentReference';
 import {
   assertLink,
@@ -17,6 +23,8 @@ import {
   defaultMissingFieldHandler,
   getOrLoadIsographArtifact,
   IsographEnvironment,
+  type NonNullLink,
+  type TypeName,
 } from './IsographEnvironment';
 import { makeNetworkRequest } from './makeNetworkRequest';
 import {
@@ -30,7 +38,7 @@ import { ReaderAst } from './reader';
 import { Arguments } from './util';
 
 export type WithEncounteredRecords<T> = {
-  readonly encounteredRecords: Set<DataId>;
+  readonly encounteredRecords: EncounteredIds;
   readonly item: ExtractData<T>;
 };
 
@@ -41,7 +49,7 @@ export function readButDoNotEvaluate<
   fragmentReference: FragmentReference<TReadFromStore, unknown>,
   networkRequestOptions: NetworkRequestReaderOptions,
 ): WithEncounteredRecords<TReadFromStore> {
-  const mutableEncounteredRecords = new Set<DataId>();
+  const mutableEncounteredRecords: EncounteredIds = new Map();
 
   const readerWithRefetchQueries = readPromise(
     fragmentReference.readerWithRefetchQueries,
@@ -77,11 +85,19 @@ export function readButDoNotEvaluate<
     ) {
       // TODO assert that the network request state is not Err
       throw new Promise((resolve, reject) => {
-        onNextChangeToRecord(environment, response.recordId).then(resolve);
+        onNextChangeToRecord(
+          environment,
+          response.recordId,
+          response.typeName,
+        ).then(resolve);
         fragmentReference.networkRequest.promise.catch(reject);
       });
     }
-    throw onNextChangeToRecord(environment, response.recordId);
+    throw onNextChangeToRecord(
+      environment,
+      response.recordId,
+      response.typeName,
+    );
   } else {
     return {
       encounteredRecords: mutableEncounteredRecords,
@@ -94,32 +110,40 @@ type ReadDataResult<TReadFromStore> =
   | {
       readonly kind: 'Success';
       readonly data: ExtractData<TReadFromStore>;
-      readonly encounteredRecords: Set<DataId>;
+      readonly encounteredRecords: EncounteredIds;
     }
   | {
       readonly kind: 'MissingData';
       readonly reason: string;
       readonly nestedReason?: ReadDataResult<unknown>;
       readonly recordId: DataId;
+      readonly typeName: TypeName;
     };
 
 function readData<TReadFromStore>(
   environment: IsographEnvironment,
   ast: ReaderAst<TReadFromStore>,
-  root: DataId,
+  root: NonNullLink,
   variables: ExtractParameters<TReadFromStore>,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
-  mutableEncounteredRecords: Set<DataId>,
+  mutableEncounteredRecords: EncounteredIds,
 ): ReadDataResult<TReadFromStore> {
-  mutableEncounteredRecords.add(root);
-  let storeRecord = environment.store[root];
+  const encounteredIds = insertIfNotExists(
+    mutableEncounteredRecords,
+    root.__typename,
+    new Set(),
+  );
+  encounteredIds.add(root.__link);
+  let storeRecord = environment.store[root.__typename]?.[root.__link];
   if (storeRecord === undefined) {
     return {
       kind: 'MissingData',
-      reason: 'No record for root ' + root,
-      recordId: root,
+      reason:
+        'No record for root ' + root + ' and concrete type ' + root.__typename,
+      recordId: root.__link,
+      typeName: root.__typename,
     };
   }
 
@@ -143,8 +167,10 @@ function readData<TReadFromStore>(
         if (value === undefined) {
           return {
             kind: 'MissingData',
-            reason: 'No value for ' + storeRecordName + ' on root ' + root,
-            recordId: root,
+            reason:
+              'No value for ' + storeRecordName + ' on root ' + root.__link,
+            recordId: root.__link,
+            typeName: root.__typename,
           };
         }
         target[field.alias ?? field.fieldName] = value;
@@ -164,19 +190,35 @@ function readData<TReadFromStore>(
                   'No link for ' +
                   storeRecordName +
                   ' on root ' +
-                  root +
+                  root.__link +
                   '. Link is ' +
                   JSON.stringify(item),
-                recordId: root,
+                recordId: root.__link,
+                typeName: root.__typename,
               };
             } else if (link === null) {
               results.push(null);
               continue;
             }
+            const __typename = field.concreteType ?? link.__typename;
+            if (!__typename) {
+              throw new Error(
+                'No __typename for ' +
+                  storeRecordName +
+                  ' on root ' +
+                  root.__link +
+                  '. Link is ' +
+                  JSON.stringify(item) +
+                  'This is indicative of bug in Isograph.',
+              );
+            }
             const result = readData(
               environment,
               field.selections,
-              link.__link,
+              {
+                __link: link.__link,
+                __typename: __typename,
+              },
               variables,
               nestedRefetchQueries,
               networkRequest,
@@ -190,11 +232,12 @@ function readData<TReadFromStore>(
                   'Missing data for ' +
                   storeRecordName +
                   ' on root ' +
-                  root +
+                  root.__link +
                   '. Link is ' +
                   JSON.stringify(item),
                 nestedReason: result,
                 recordId: result.recordId,
+                typeName: result.typeName,
               };
             }
             results.push(result.data);
@@ -214,18 +257,30 @@ function readData<TReadFromStore>(
             field.arguments,
             variables,
           );
+
+          const missingData = {
+            kind: 'MissingData',
+            reason:
+              'No link for ' +
+              storeRecordName +
+              ' on root ' +
+              root.__link +
+              '. Link is ' +
+              JSON.stringify(value),
+            recordId: root.__link,
+            typeName: root.__typename,
+          } as const;
+
           if (altLink === undefined) {
-            return {
-              kind: 'MissingData',
-              reason:
-                'No link for ' +
-                storeRecordName +
-                ' on root ' +
-                root +
-                '. Link is ' +
-                JSON.stringify(value),
-              recordId: root,
-            };
+            return missingData;
+          } else if (!field.concreteType && !altLink.__typename) {
+            console.warn(
+              'Missing __typename for abstract type in link returned by missingFieldHandler. ' +
+                'Unable to resolve data for field. This indicates an issue with the missingFieldHandler implementation. ' +
+                'To fix ensure the missingFieldHandler returns a link with a valid __typename for abstract types.',
+              missingData,
+            );
+            return missingData;
           } else {
             link = altLink;
           }
@@ -233,7 +288,23 @@ function readData<TReadFromStore>(
           target[field.alias ?? field.fieldName] = null;
           break;
         }
-        const targetId = link.__link;
+
+        const __typename = field.concreteType ?? link.__typename;
+        if (!__typename) {
+          throw new Error(
+            'No __typename for ' +
+              storeRecordName +
+              ' on root ' +
+              root.__link +
+              '. Link is ' +
+              JSON.stringify(value) +
+              'This is indicative of bug in Isograph.',
+          );
+        }
+        const targetId: NonNullLink = {
+          __link: link.__link,
+          __typename: __typename,
+        };
         const data = readData(
           environment,
           field.selections,
@@ -247,9 +318,11 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return {
             kind: 'MissingData',
-            reason: 'Missing data for ' + storeRecordName + ' on root ' + root,
+            reason:
+              'Missing data for ' + storeRecordName + ' on root ' + root.__link,
             nestedReason: data,
             recordId: data.recordId,
+            typeName: data.typeName,
           };
         }
         target[field.alias ?? field.fieldName] = data.data;
@@ -274,9 +347,11 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return {
             kind: 'MissingData',
-            reason: 'Missing data for ' + field.alias + ' on root ' + root,
+            reason:
+              'Missing data for ' + field.alias + ' on root ' + root.__link,
             nestedReason: data,
             recordId: data.recordId,
+            typeName: data.typeName,
           };
         } else {
           const refetchQueryIndex = field.refetchQuery;
@@ -328,9 +403,11 @@ function readData<TReadFromStore>(
             if (data.kind === 'MissingData') {
               return {
                 kind: 'MissingData',
-                reason: 'Missing data for ' + field.alias + ' on root ' + root,
+                reason:
+                  'Missing data for ' + field.alias + ' on root ' + root.__link,
                 nestedReason: data,
                 recordId: data.recordId,
+                typeName: data.typeName,
               };
             } else {
               const firstParameter = {
@@ -384,15 +461,18 @@ function readData<TReadFromStore>(
         if (refetchReaderParams.kind === 'MissingData') {
           return {
             kind: 'MissingData',
-            reason: 'Missing data for ' + field.alias + ' on root ' + root,
+            reason:
+              'Missing data for ' + field.alias + ' on root ' + root.__link,
             nestedReason: refetchReaderParams,
             recordId: refetchReaderParams.recordId,
+            typeName: refetchReaderParams.typeName,
           };
         } else {
           target[field.alias] = (args: any) => {
             // TODO we should use the reader AST for this
             const includeReadOutData = (variables: any, readOutData: any) => {
               variables.id = readOutData.id;
+              variables[TYPENAME_FIELD_NAME] = readOutData[TYPENAME_FIELD_NAME];
               return variables;
             };
             const localVariables = includeReadOutData(
@@ -407,7 +487,9 @@ function readData<TReadFromStore>(
 
             return [
               // Stable id
-              root +
+              root.__typename +
+                ':' +
+                root.__link +
                 '/' +
                 field.name +
                 '/' +
@@ -419,6 +501,16 @@ function readData<TReadFromStore>(
                 ): [FragmentReference<any, any>, CleanupFn] => {
                   const [networkRequest, disposeNetworkRequest] =
                     makeNetworkRequest(environment, entrypoint, localVariables);
+
+                  const __typename =
+                    field.concreteType ?? localVariables[TYPENAME_FIELD_NAME];
+
+                  if (!__typename) {
+                    throw new Error(
+                      `No __typename found for LoadablySelectedField "${field.name}". ` +
+                        `This is indicative of bug in Isograph.`,
+                    );
+                  }
 
                   const fragmentReference: FragmentReference<any, any> = {
                     kind: 'FragmentReference',
@@ -432,7 +524,10 @@ function readData<TReadFromStore>(
                     } as const),
 
                     // TODO localVariables is not guaranteed to have an id field
-                    root: localVariables.id,
+                    root: {
+                      __link: localVariables.id,
+                      __typename: __typename,
+                    },
                     variables: localVariables,
                     networkRequest,
                   };
@@ -494,6 +589,16 @@ function readData<TReadFromStore>(
                         (entrypoint) => entrypoint.readerWithRefetchQueries,
                       );
 
+                    const __typename =
+                      field.concreteType ?? localVariables[TYPENAME_FIELD_NAME];
+
+                    if (!__typename) {
+                      throw new Error(
+                        `No __typename found for LoadablySelectedField "${field.name}". ` +
+                          `This is indicative of bug in Isograph.`,
+                      );
+                    }
+
                     const fragmentReference: FragmentReference<any, any> = {
                       kind: 'FragmentReference',
                       readerWithRefetchQueries: wrapPromise(
@@ -501,7 +606,10 @@ function readData<TReadFromStore>(
                       ),
 
                       // TODO localVariables is not guaranteed to have an id field
-                      root: localVariables.id,
+                      root: {
+                        __link: localVariables.id,
+                        __typename: __typename,
+                      },
                       variables: localVariables,
                       networkRequest,
                     };
@@ -625,7 +733,7 @@ export function getNetworkRequestOptionsWithDefaults(
 // TODO call stableStringifyArgs on the variable values, as well.
 // This doesn't matter for now, since we are just using primitive values
 // in the demo.
-function stableStringifyArgs(args: Object) {
+function stableStringifyArgs(args: object) {
   const keys = Object.keys(args);
   keys.sort();
   let s = '';

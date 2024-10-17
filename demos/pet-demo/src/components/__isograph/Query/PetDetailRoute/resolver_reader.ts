@@ -18,6 +18,7 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
         { kind: "Variable", name: "id" },
       ],
     ],
+    concreteType: "Pet",
     selections: [
       {
         kind: "Scalar",

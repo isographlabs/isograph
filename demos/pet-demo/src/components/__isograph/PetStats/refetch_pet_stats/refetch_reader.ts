@@ -3,14 +3,14 @@ const includeReadOutData = (variables: any, readOutData: any) => {
   return variables;
 };
 
-import { makeNetworkRequest, wrapResolvedValue, type IsographEnvironment, type DataId, type TopLevelReaderArtifact, type FragmentReference, type RefetchQueryNormalizationArtifactWrapper } from '@isograph/react';
+import { makeNetworkRequest, wrapResolvedValue, type IsographEnvironment, type NonNullLink, type TopLevelReaderArtifact, type FragmentReference, type RefetchQueryNormalizationArtifactWrapper } from '@isograph/react';
 import { type ItemCleanupPair } from '@isograph/react-disposable-state';
 const resolver = (
   environment: IsographEnvironment,
   artifact: RefetchQueryNormalizationArtifact,
   readOutData: any,
   filteredVariables: any,
-  rootId: DataId,
+  rootId: NonNullLink,
   // TODO type this
   readerArtifact: TopLevelReaderArtifact<any, any, any>,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
