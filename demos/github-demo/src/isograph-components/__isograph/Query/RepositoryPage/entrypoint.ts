@@ -13,6 +13,7 @@ const queryText = 'query RepositoryPage ($repositoryName: String!, $repositoryOw
       name,\
       nameWithOwner,\
       owner {\
+        __typename,\
         id,\
         login,\
       },\
@@ -22,6 +23,7 @@ const queryText = 'query RepositoryPage ($repositoryName: String!, $repositoryOw
         node {\
           id,\
           author {\
+            __typename,\
             login,\
           },\
           closed,\
@@ -31,6 +33,7 @@ const queryText = 'query RepositoryPage ($repositoryName: String!, $repositoryOw
             id,\
             name,\
             owner {\
+              __typename,\
               id,\
               login,\
             },\
@@ -103,6 +106,11 @@ const normalizationAst: NormalizationAst = [
             selections: [
               {
                 kind: "Scalar",
+                fieldName: "__typename",
+                arguments: null,
+              },
+              {
+                kind: "Scalar",
                 fieldName: "id",
                 arguments: null,
               },
@@ -147,6 +155,11 @@ const normalizationAst: NormalizationAst = [
                     selections: [
                       {
                         kind: "Scalar",
+                        fieldName: "__typename",
+                        arguments: null,
+                      },
+                      {
+                        kind: "Scalar",
                         fieldName: "login",
                         arguments: null,
                       },
@@ -187,6 +200,11 @@ const normalizationAst: NormalizationAst = [
                         fieldName: "owner",
                         arguments: null,
                         selections: [
+                          {
+                            kind: "Scalar",
+                            fieldName: "__typename",
+                            arguments: null,
+                          },
                           {
                             kind: "Scalar",
                             fieldName: "id",

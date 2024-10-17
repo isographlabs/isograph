@@ -87,14 +87,15 @@ impl UnvalidatedSchema {
             } = with_location;
             match type_system_definition {
                 GraphQLTypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
+                    let concrete_type = Some(object_type_definition.name.item.into());
                     let object_type_definition = object_type_definition.into();
-
                     let outcome = self.process_object_type_definition(
                         object_type_definition,
                         &mut supertype_to_subtype_map,
                         &mut subtype_to_supertype_map,
                         true,
                         options,
+                        concrete_type,
                     )?;
                     if let Some(encountered_root_kind) = outcome.encountered_root_kind {
                         encountered_root_types
@@ -112,18 +113,22 @@ impl UnvalidatedSchema {
                         &mut subtype_to_supertype_map,
                         true,
                         options,
+                        None,
                     )?;
                     // N.B. we assume that Mutation will be an object, not an interface
                 }
                 GraphQLTypeSystemDefinition::InputObjectTypeDefinition(
                     input_object_type_definition,
                 ) => {
+                    let concrete_type = Some(input_object_type_definition.name.item.into());
                     self.process_object_type_definition(
                         input_object_type_definition.into(),
                         &mut supertype_to_subtype_map,
                         &mut subtype_to_supertype_map,
                         false,
                         options,
+                        // Shouldn't really matter what we pass here
+                        concrete_type,
                     )?;
                 }
                 GraphQLTypeSystemDefinition::DirectiveDefinition(_) => {
@@ -152,6 +157,7 @@ impl UnvalidatedSchema {
                         &mut subtype_to_supertype_map,
                         true,
                         options,
+                        None,
                     )?;
                 }
                 GraphQLTypeSystemDefinition::SchemaDefinition(schema_definition) => {
@@ -378,6 +384,7 @@ impl UnvalidatedSchema {
         // TODO this smells! We should probably pass Option<ServerIdFieldId>
         may_have_id_field: bool,
         options: ConfigOptions,
+        concrete_type: Option<IsographObjectTypeName>,
     ) -> ProcessTypeDefinitionResult<ProcessObjectTypeDefinitionOutcome> {
         let &mut Schema {
             server_fields: ref mut schema_fields,
@@ -424,6 +431,7 @@ impl UnvalidatedSchema {
                     encountered_fields,
                     id_field,
                     directives: object_type_definition.directives,
+                    concrete_type,
                 });
 
                 schema_fields.extend(unvalidated_schema_fields);
