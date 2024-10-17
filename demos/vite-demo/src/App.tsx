@@ -35,7 +35,7 @@ export default function App() {
   );
   return (
     <IsographEnvironmentProvider environment={environment}>
-      <Suspense fallback={<div>Loading...</div>}>
+      <Suspense fallback={<div>Loading Pokemon...</div>}>
         <HomePageRoute />
       </Suspense>
     </IsographEnvironmentProvider>

@@ -23,4 +23,7 @@ export default defineConfig({
       '@iso/*': path.resolve(__dirname, './src/components/__isograph/*'),
     },
   },
+  optimizeDeps: {
+    include: ['@isograph/react'],
+  },
 });
