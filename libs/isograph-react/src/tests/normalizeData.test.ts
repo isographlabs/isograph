@@ -37,7 +37,7 @@ describe('normalizeData', () => {
       environment,
       entrypoint.normalizationAst,
       {
-        query: { node____id___v_id: { __typename: 'Economist', id: 1 } },
+        query: { node____id___v_id: { __typename: 'Economist', id: '1' } },
       },
       { id: '1' },
       entrypoint.readerWithRefetchQueries.nestedRefetchQueries,
@@ -49,14 +49,14 @@ describe('normalizeData', () => {
       Economist: {
         '1': {
           __typename: 'Economist',
-          id: 1,
+          id: '1',
         },
       },
       Query: {
         [ROOT_ID]: {
           node____id___1: {
             __typename: 'Economist',
-            __link: 1,
+            __link: '1',
           },
           query: {
             __link: ROOT_ID,
@@ -73,14 +73,14 @@ describe('readData', () => {
       Economist: {
         '1': {
           __typename: 'Economist',
-          id: 1,
+          id: '1',
         },
       },
       Query: {
         [ROOT_ID]: {
           node____id___1: {
             __typename: 'Economist',
-            __link: 1,
+            __link: '1',
           },
           query: {
             __link: ROOT_ID,
@@ -103,14 +103,14 @@ describe('readData', () => {
     });
 
     expect(data).toStrictEqual({
-      encounteredRecords: {
-        Economist: new Set([1]),
-        Query: new Set([ROOT_ID]),
-      },
+      encounteredRecords: new Map([
+        ['Economist', new Set(['1'])],
+        ['Query', new Set([ROOT_ID])],
+      ]),
       item: {
         query: {
           node: {
-            id: 1 as unknown as string,
+            id: '1',
           },
         },
       },

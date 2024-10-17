@@ -111,7 +111,7 @@ export type StoreRecord = {
 };
 
 export type TypeName = string;
-export type DataId = string | number;
+export type DataId = string;
 
 export const ROOT_ID: DataId & '__ROOT' = '__ROOT';
 
