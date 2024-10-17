@@ -208,7 +208,7 @@ fn transform_object_field_ids(unvalidated_object: SchemaObject) -> SchemaObject 
         encountered_fields: unvalidated_encountered_fields,
         id_field,
         directives,
-        concrete_type
+        concrete_type,
     } = unvalidated_object;
 
     let validated_encountered_fields = unvalidated_encountered_fields
@@ -231,7 +231,7 @@ fn transform_object_field_ids(unvalidated_object: SchemaObject) -> SchemaObject 
         encountered_fields: validated_encountered_fields,
         id_field,
         directives,
-        concrete_type
+        concrete_type,
     }
 }
 
