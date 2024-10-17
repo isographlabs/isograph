@@ -149,8 +149,8 @@ function recordReachableIdsFromRecord(
 
           const nextRecord = resolvedTypeStore[nextRecordLink.__link];
           if (nextRecord != null) {
-            mutableRetainedIds[__typename] ??= new Set();
-            mutableRetainedIds[__typename].add(nextRecordLink.__link);
+            const retainedRecordsIds = mutableRetainedIds[__typename] ??= new Set();
+            retainedRecordsIds.add(nextRecordLink.__link);
             recordReachableIdsFromRecord(
               store,
               nextRecord,

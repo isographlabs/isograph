@@ -129,8 +129,9 @@ function readData<TReadFromStore>(
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableEncounteredRecords: EncounteredIds,
 ): ReadDataResult<TReadFromStore> {
-  mutableEncounteredRecords[root.__typename] ??= new Set();
-  mutableEncounteredRecords[root.__typename].add(root.__link);
+  const encounteredIds = (mutableEncounteredRecords[root.__typename] ??=
+    new Set());
+  encounteredIds.add(root.__link);
   let storeRecord = environment.store[root.__typename]?.[root.__link];
   if (storeRecord === undefined) {
     return {

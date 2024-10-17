@@ -154,14 +154,14 @@ export function normalizeData(
     );
   }
 
-  environment.store[root.concreteType] ??= {};
-  environment.store[root.concreteType]![root.id] ??= {};
+  const recordsById = (environment.store[root.concreteType] ??= {});
+  const newStoreRecord = (recordsById[root.id] ??= {});
 
   normalizeDataIntoRecord(
     environment,
     normalizationAst,
     networkResponse,
-    environment.store[root.concreteType]![root.id]!,
+    newStoreRecord,
     root,
     variables,
     nestedRefetchQueries,
@@ -444,10 +444,10 @@ function normalizeDataIntoRecord(
     }
   }
   if (recordHasBeenUpdated) {
-    mutableEncounteredIds[targetParentRecordId.concreteType] ??= new Set();
-    mutableEncounteredIds[targetParentRecordId.concreteType].add(
-      targetParentRecordId.id,
-    );
+    const encounteredRecordsIds = (mutableEncounteredIds[
+      targetParentRecordId.concreteType
+    ] ??= new Set());
+    encounteredRecordsIds.add(targetParentRecordId.id);
   }
   return recordHasBeenUpdated;
 }
@@ -656,11 +656,8 @@ function normalizeNetworkResponseObject(
     );
   }
 
-  const newStoreRecord =
-    environment.store[__typename]?.[newStoreRecordId] ?? {};
-
-  environment.store[__typename] ??= {};
-  environment.store[__typename]![newStoreRecordId] = newStoreRecord;
+  const recordsById = (environment.store[__typename] ??= {});
+  const newStoreRecord = (recordsById[newStoreRecordId] ??= {});
 
   normalizeDataIntoRecord(
     environment,
