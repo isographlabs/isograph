@@ -15,14 +15,12 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, SelectableServerFieldId, Selection, ServerFieldId,
-    ServerObjectId, ServerScalarId, ServerStrongIdFieldId, Unwrap, VariableDefinition,
+    ServerObjectId, ServerScalarId, ServerStrongIdFieldId, TypeAnnotation, Unwrap,
+    VariableDefinition,
 };
 use lazy_static::lazy_static;
 
-use crate::{
-    isograph_type_annotation::TypeAnnotation, refetch_strategy::RefetchStrategy,
-    ClientFieldVariant, NormalizationKey,
-};
+use crate::{refetch_strategy::RefetchStrategy, ClientFieldVariant, NormalizationKey};
 
 lazy_static! {
     pub static ref ID_GRAPHQL_TYPE: GraphQLScalarTypeName = "ID".intern().into();

@@ -1,8 +1,10 @@
 use common_lang_types::SelectableFieldName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
-use isograph_lang_types::{ClientFieldId, SelectableServerFieldId, ServerFieldId};
-use isograph_schema::{FieldDefinitionLocation, TypeAnnotation, UnionVariant, ValidatedSchema};
+use isograph_lang_types::{
+    ClientFieldId, SelectableServerFieldId, ServerFieldId, TypeAnnotation, UnionVariant,
+};
+use isograph_schema::{FieldDefinitionLocation, ValidatedSchema};
 
 pub(crate) fn format_parameter_type(
     schema: &ValidatedSchema,

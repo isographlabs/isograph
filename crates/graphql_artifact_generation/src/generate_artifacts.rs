@@ -8,14 +8,13 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection,
-    ServerFieldSelection, VariableDefinition,
+    ServerFieldSelection, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
     get_provided_arguments, selection_map_wrapped, ClientFieldTraversalResult, ClientFieldVariant,
     FieldDefinitionLocation, NameAndArguments, NormalizationKey, RequiresRefinement, SchemaObject,
-    TypeAnnotation, UnionVariant, UserWrittenComponentVariant, ValidatedClientField,
-    ValidatedIsographSelectionVariant, ValidatedSchema, ValidatedSelection,
-    ValidatedVariableDefinition,
+    UserWrittenComponentVariant, ValidatedClientField, ValidatedIsographSelectionVariant,
+    ValidatedSchema, ValidatedSelection, ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use std::path::Path;
