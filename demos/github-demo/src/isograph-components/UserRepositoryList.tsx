@@ -9,7 +9,6 @@ import {
   TableHead,
   TableRow,
 } from '@mui/material';
-import type { ReactNode } from 'react';
 import { Route } from './GithubDemo';
 
 export const RepositoryList = iso(`
@@ -18,29 +17,12 @@ export const RepositoryList = iso(`
   }
 `)(function UserRepositoryListComponent(
   { data },
-  {
-    setRoute,
-    children,
-  }: { children?: ReactNode; setRoute: (route: Route) => void },
+  { setRoute }: { setRoute: (route: Route) => void },
 ) {
   const pagination = useConnectionSpecPagination(data.RepositoryConnection);
-  const repositories = [...pagination.results].reverse();
+  const repositories = pagination.results;
   return (
     <>
-      <Button
-        variant="contained"
-        style={{ marginInlineEnd: '1rem' }}
-        disabled={!(pagination.kind === 'Complete' && pagination.hasNextPage)}
-        onClick={() =>
-          pagination.kind === 'Complete' && pagination.fetchMore(undefined, 10)
-        }
-      >
-        {pagination.kind === 'Complete' && !pagination.hasNextPage
-          ? 'All fetched'
-          : 'Fetch more'}
-      </Button>
-
-      {children}
       <Table>
         <TableHead>
           <TableRow>
@@ -71,6 +53,28 @@ export const RepositoryList = iso(`
               </TableRow>
             );
           })}
+          <TableRow>
+            <TableCell>
+              <Button
+                variant="contained"
+                disabled={
+                  !(pagination.kind === 'Complete' && pagination.hasNextPage)
+                }
+                onClick={() =>
+                  pagination.kind === 'Complete' &&
+                  pagination.fetchMore(undefined, 10)
+                }
+              >
+                {pagination.kind === 'Complete' && !pagination.hasNextPage
+                  ? 'All fetched'
+                  : 'Fetch more'}
+              </Button>
+            </TableCell>
+            <TableCell></TableCell>
+            <TableCell></TableCell>
+            <TableCell></TableCell>
+            <TableCell></TableCell>
+          </TableRow>
         </TableBody>
       </Table>
     </>
@@ -79,10 +83,10 @@ export const RepositoryList = iso(`
 
 export const RepositoryConnection = iso(`
   field User.RepositoryConnection($first: Int, $after: String) {
-    repositories(last: $first, before: $after) {
+    repositories(first: $first, after: $after) {
       pageInfo {
-        hasNextPage: hasPreviousPage
-        endCursor: startCursor
+        hasNextPage
+        endCursor
       }
       edges {
         node {

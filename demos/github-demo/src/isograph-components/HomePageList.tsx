@@ -28,11 +28,10 @@ export const HomePageList = iso(`
       <h1>
         {data.viewer.name}&apos;s ({data.viewer.login}) repository stats
       </h1>
-      <data.viewer.RepositoryList setRoute={setRoute}>
-        <Button onClick={() => data.viewer.__refetch()[1]()}>
-          Refetch viewer
-        </Button>
-      </data.viewer.RepositoryList>
+      <Button onClick={() => data.viewer.__refetch()[1]()} variant="contained">
+        Refetch viewer
+      </Button>
+      <data.viewer.RepositoryList setRoute={setRoute} />
     </>
   );
 });
