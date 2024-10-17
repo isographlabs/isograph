@@ -50,7 +50,7 @@ pub trait SchemaValidationState: Debug {
     /// The associated data type of client fields' variable definitions
     /// - Unvalidated: UnvalidatedTypeName
     /// - Validated: FieldDefinition
-    type VariableDefinitionInnerType: Debug + Clone;
+    type VariableDefinitionInnerType: Debug + Clone + Ord;
 
     /// What we store in entrypoints
     /// - Unvalidated: (TextSource, WithSpan<ObjectTypeAndField>)
@@ -356,7 +356,7 @@ pub struct SchemaObject {
 }
 
 #[derive(Debug, Clone)]
-pub struct SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData> {
+pub struct SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData: Ord + Debug> {
     pub description: Option<DescriptionValue>,
     /// The name of the server field and the location where it was defined
     /// (an iso literal or Location::Generated).
@@ -371,7 +371,7 @@ pub struct SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData
     pub is_discriminator: bool,
 }
 
-impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone>
+impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug>
     SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData>
 {
     pub fn and_then<TData2, E>(
@@ -417,7 +417,7 @@ pub struct SchemaIdField<TData> {
     // pub directives: Vec<Directive<ConstantValue>>,
 }
 
-impl<TData: Copy, TClientFieldVariableDefinitionAssociatedData>
+impl<TData: Copy, TClientFieldVariableDefinitionAssociatedData: Ord + Debug>
     TryFrom<SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData>>
     for SchemaIdField<TData>
 {
@@ -480,7 +480,7 @@ impl ObjectTypeAndFieldName {
 pub struct ClientField<
     TClientFieldSelectionScalarFieldAssociatedData,
     TClientFieldSelectionLinkedFieldAssociatedData,
-    TClientFieldVariableDefinitionAssociatedData,
+    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
 > {
     pub description: Option<DescriptionValue>,
     // TODO make this a ClientFieldName that can be converted into a SelectableFieldName
@@ -528,7 +528,7 @@ pub struct ClientField<
 impl<
         TClientFieldSelectionScalarFieldAssociatedData,
         TClientFieldSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData,
+        TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
     >
     ClientField<
         TClientFieldSelectionScalarFieldAssociatedData,
@@ -583,7 +583,9 @@ impl NameAndArguments {
     }
 }
 
-impl<T, VariableDefinitionInnerType> SchemaServerField<T, VariableDefinitionInnerType> {
+impl<T, VariableDefinitionInnerType: Ord + Debug>
+    SchemaServerField<T, VariableDefinitionInnerType>
+{
     // TODO probably unnecessary, and can be replaced with .map and .transpose
     pub fn split(self) -> (SchemaServerField<(), VariableDefinitionInnerType>, T) {
         let Self {
