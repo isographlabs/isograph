@@ -947,7 +947,6 @@ fn select_typename_and_id_fields_in_merged_selection(
     merged_selection_map: &mut MergedSelectionMap,
     parent_type: &SchemaObject,
 ) {
-    // TODO add __typename field or whatnot
     if parent_type.concrete_type.is_none() {
         maybe_add_typename_selection(merged_selection_map)
     };
