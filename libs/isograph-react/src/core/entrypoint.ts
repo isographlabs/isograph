@@ -1,3 +1,4 @@
+import type { TypeName } from './IsographEnvironment';
 import { TopLevelReaderArtifact } from './reader';
 import { Arguments } from './util';
 
@@ -27,6 +28,8 @@ export type IsographEntrypoint<
     TReadFromStore,
     TClientFieldValue
   >;
+  readonly concreteType: TypeName;
+  readonly queryType: TypeName;
 };
 
 export type IsographEntrypointLoader<
@@ -57,6 +60,7 @@ export type NormalizationLinkedField = {
   readonly fieldName: string;
   readonly arguments: Arguments | null;
   readonly selections: NormalizationAst;
+  readonly concreteType: TypeName | null;
 };
 
 export type NormalizationInlineFragment = {
@@ -70,6 +74,8 @@ export type RefetchQueryNormalizationArtifact = {
   readonly kind: 'RefetchQuery';
   readonly queryText: string;
   readonly normalizationAst: NormalizationAst;
+  readonly concreteType: TypeName;
+  readonly queryType: TypeName;
 };
 
 // TODO rename

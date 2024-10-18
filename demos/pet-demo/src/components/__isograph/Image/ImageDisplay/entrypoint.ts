@@ -24,6 +24,7 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "id" },
       ],
     ],
+    concreteType: "Image",
     selections: [
       {
         kind: "InlineFragment",
@@ -56,6 +57,8 @@ const artifact: IsographEntrypoint<
   kind: "Entrypoint",
   queryText,
   normalizationAst,
+  concreteType: "Query",
+  queryType: "Query",
   readerWithRefetchQueries: {
     kind: "ReaderWithRefetchQueries",
     nestedRefetchQueries,

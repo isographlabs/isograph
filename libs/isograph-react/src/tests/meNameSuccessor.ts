@@ -1,3 +1,5 @@
+import type { RetainedQuery } from '../core/garbageCollection';
+import { ROOT_ID } from '../core/IsographEnvironment';
 import { iso } from './__isograph/iso';
 
 export const meNameField = iso(`
@@ -13,7 +15,9 @@ export const meNameField = iso(`
   }
 `)(() => {});
 const meNameSuccessorEntrypoint = iso(`entrypoint Query.meNameSuccessor`);
-export const meNameSuccessorRetainedQuery = {
+export const meNameSuccessorRetainedQuery: RetainedQuery = {
   normalizationAst: meNameSuccessorEntrypoint.normalizationAst,
   variables: {},
+  root: ROOT_ID,
+  typeName: 'Query',
 };

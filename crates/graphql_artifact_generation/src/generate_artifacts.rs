@@ -14,7 +14,7 @@ use isograph_schema::{
     get_provided_arguments, selection_map_wrapped, ClientFieldTraversalResult, ClientFieldVariant,
     FieldDefinitionLocation, NameAndArguments, NormalizationKey, RequiresRefinement, SchemaObject,
     UserWrittenComponentVariant, ValidatedClientField, ValidatedIsographSelectionVariant,
-    ValidatedSchema, ValidatedSelection, ValidatedVariableDefinition,
+    ValidatedSchema, ValidatedSelection, ValidatedVariableDefinition, NODE_FIELD_NAME,
 };
 use lazy_static::lazy_static;
 use std::path::Path;
@@ -129,8 +129,7 @@ pub fn get_artifact_path_and_content(
 
                     let type_to_refine_to = schema
                         .server_field_data
-                        .object(encountered_client_field.parent_object_id)
-                        .name;
+                        .object(encountered_client_field.parent_object_id);
 
                     if schema
                         .fetchable_types
@@ -141,10 +140,12 @@ pub fn get_artifact_path_and_content(
 
                     let wrapped_map = selection_map_wrapped(
                         merged_selection_map.clone(),
-                        "node".intern().into(),
+                        *NODE_FIELD_NAME,
                         vec![id_arg.clone()],
+                        type_to_refine_to.concrete_type,
                         None,
-                        RequiresRefinement::Yes(type_to_refine_to),
+                        None,
+                        RequiresRefinement::Yes(type_to_refine_to.name),
                     );
                     let id_var = ValidatedVariableDefinition {
                         name: WithLocation::new("id".intern().into(), Location::Generated),
@@ -168,9 +169,10 @@ pub fn get_artifact_path_and_content(
                         .refetch_paths
                         .into_iter()
                         .map(|(mut key, value)| {
-                            key.0
-                                .linked_fields
-                                .insert(0, NormalizationKey::InlineFragment(type_to_refine_to));
+                            key.0.linked_fields.insert(
+                                0,
+                                NormalizationKey::InlineFragment(type_to_refine_to.name),
+                            );
                             key.0.linked_fields.insert(
                                 0,
                                 NormalizationKey::ServerField(NameAndArguments {
@@ -190,7 +192,7 @@ pub fn get_artifact_path_and_content(
                             &traversal_state,
                             &global_client_field_map,
                             variable_definitions_iter,
-                            &schema.query_root_operation_name(),
+                            &schema.find_query(),
                         ),
                     );
                 }
