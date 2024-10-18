@@ -19,7 +19,6 @@ const readerAst: ReaderAst<Query__PullRequestDetail__param> = [
         { kind: "Variable", name: "repositoryName" },
       ],
     ],
-    concreteType: "Repository",
     selections: [
       {
         kind: "Linked",
@@ -31,7 +30,6 @@ const readerAst: ReaderAst<Query__PullRequestDetail__param> = [
             { kind: "Variable", name: "pullRequestNumber" },
           ],
         ],
-        concreteType: "PullRequest",
         selections: [
           {
             kind: "Scalar",

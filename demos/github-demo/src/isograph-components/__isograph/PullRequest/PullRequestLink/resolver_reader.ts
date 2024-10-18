@@ -14,7 +14,6 @@ const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
     fieldName: "repository",
     alias: null,
     arguments: null,
-    concreteType: "Repository",
     selections: [
       {
         kind: "Scalar",
@@ -27,7 +26,6 @@ const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
         fieldName: "owner",
         alias: null,
         arguments: null,
-        concreteType: null,
         selections: [
           {
             kind: "Scalar",

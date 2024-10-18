@@ -21,7 +21,6 @@ const readerAst: ReaderAst<AdItem__AdItemDisplayWrapper__param> = [
       typeAndField: "AdItem__AdItemDisplay",
       loader: () => import("../../AdItem/AdItemDisplay/entrypoint").then(module => module.default),
     },
-    concreteType: "AdItem",
   },
 ];
 

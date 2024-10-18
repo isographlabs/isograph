@@ -9,7 +9,6 @@ const readerAst: ReaderAst<Query__Header__param> = [
     fieldName: "viewer",
     alias: null,
     arguments: null,
-    concreteType: "User",
     selections: [
       {
         kind: "Scalar",

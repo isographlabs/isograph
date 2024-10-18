@@ -14,14 +14,12 @@ const readerAst: ReaderAst<Mutation__SetTagline__param> = [
         { kind: "Variable", name: "input" },
       ],
     ],
-    concreteType: "SetPetTaglineResponse",
     selections: [
       {
         kind: "Linked",
         fieldName: "pet",
         alias: null,
         arguments: null,
-        concreteType: "Pet",
         selections: [
           {
             kind: "Scalar",

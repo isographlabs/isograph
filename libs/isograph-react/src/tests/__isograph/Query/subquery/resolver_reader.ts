@@ -9,7 +9,6 @@ const readerAst: ReaderAst<Query__subquery__param> = [
     fieldName: "query",
     alias: null,
     arguments: null,
-    concreteType: "Query",
     selections: [
       {
         kind: "Linked",
@@ -21,7 +20,6 @@ const readerAst: ReaderAst<Query__subquery__param> = [
             { kind: "Variable", name: "id" },
           ],
         ],
-        concreteType: null,
         selections: [
           {
             kind: "Scalar",

@@ -10,7 +10,6 @@ const readerAst: ReaderAst<Query__Newsfeed__param> = [
     fieldName: "viewer",
     alias: null,
     arguments: null,
-    concreteType: "Viewer",
     selections: [
       {
         kind: "Linked",
@@ -27,7 +26,6 @@ const readerAst: ReaderAst<Query__Newsfeed__param> = [
             { kind: "Literal", value: 6 },
           ],
         ],
-        concreteType: "NewsfeedItem",
         selections: [
           {
             kind: "Resolver",
@@ -52,7 +50,6 @@ const readerAst: ReaderAst<Query__Newsfeed__param> = [
           },
         ],
         entrypoint: Viewer__NewsfeedPaginationComponent__entrypoint,
-        concreteType: "Viewer",
       },
     ],
   },

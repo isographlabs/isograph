@@ -21,7 +21,6 @@ const readerAst: ReaderAst<Image__ImageDisplayWrapper__param> = [
       typeAndField: "Image__ImageDisplay",
       loader: () => import("../../Image/ImageDisplay/entrypoint").then(module => module.default),
     },
-    concreteType: "Image",
   },
 ];
 

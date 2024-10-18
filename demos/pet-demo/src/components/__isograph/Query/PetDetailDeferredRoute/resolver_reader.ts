@@ -14,7 +14,6 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
         { kind: "Variable", name: "id" },
       ],
     ],
-    concreteType: "Pet",
     selections: [
       {
         kind: "Resolver",

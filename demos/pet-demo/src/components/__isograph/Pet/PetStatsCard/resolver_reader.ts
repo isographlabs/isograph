@@ -27,7 +27,6 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
     fieldName: "stats",
     alias: null,
     arguments: null,
-    concreteType: "PetStats",
     selections: [
       {
         kind: "Scalar",

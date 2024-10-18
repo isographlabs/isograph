@@ -9,7 +9,6 @@ const readerAst: ReaderAst<Query__meName__param> = [
     fieldName: "me",
     alias: null,
     arguments: null,
-    concreteType: "Economist",
     selections: [
       {
         kind: "Scalar",

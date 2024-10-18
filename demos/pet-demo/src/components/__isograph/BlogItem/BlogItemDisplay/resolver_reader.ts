@@ -40,14 +40,12 @@ const readerAst: ReaderAst<BlogItem__BlogItemDisplay__param> = [
       typeAndField: "BlogItem__BlogItemMoreDetail",
       loader: () => import("../../BlogItem/BlogItemMoreDetail/entrypoint").then(module => module.default),
     },
-    concreteType: "BlogItem",
   },
   {
     kind: "Linked",
     fieldName: "image",
     alias: null,
     arguments: null,
-    concreteType: "Image",
     selections: [
       {
         kind: "Resolver",
