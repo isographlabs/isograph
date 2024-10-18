@@ -192,6 +192,7 @@ pub fn get_artifact_path_and_content(
                             &traversal_state,
                             &global_client_field_map,
                             variable_definitions_iter,
+                            &schema.query_root_operation_name(),
                             &schema.find_query_id(),
                         ),
                     );

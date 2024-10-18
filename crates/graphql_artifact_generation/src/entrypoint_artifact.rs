@@ -9,7 +9,7 @@ use isograph_schema::{
     create_merged_selection_map_for_client_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
     get_reachable_variables, ClientFieldToCompletedMergeTraversalStateMap,
-    ClientFieldTraversalResult, MergedSelectionMap, RootRefetchedPath,
+    ClientFieldTraversalResult, MergedSelectionMap, RootOperationName, RootRefetchedPath,
     ScalarClientFieldTraversalState, SchemaObject, ValidatedClientField, ValidatedSchema,
     ValidatedVariableDefinition,
 };
@@ -65,6 +65,7 @@ pub(crate) fn generate_entrypoint_artifacts(
             .variable_definitions
             .iter()
             .map(|variable_definition| &variable_definition.item),
+        &schema.mutation_root_operation_name(),
         &schema.find_mutation_id(),
     )
 }
@@ -76,6 +77,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
     traversal_state: &ScalarClientFieldTraversalState,
     global_client_field_map: &ClientFieldToCompletedMergeTraversalStateMap,
     variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
+    default_root_operation_name: &Option<&RootOperationName>,
     default_concrete_type: &Option<&ServerObjectId>,
 ) -> Vec<ArtifactPathAndContent> {
     let query_name = entrypoint.name.into();
@@ -87,12 +89,14 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
         .fetchable_types
         .get(&entrypoint.parent_object_id)
         .unwrap_or_else(|| {
-            schema
-                .fetchable_types
-                .iter()
-                .next()
-                .expect("Expected at least one fetchable type to exist")
-                .1
+            default_root_operation_name.unwrap_or_else(|| {
+                schema
+                    .fetchable_types
+                    .iter()
+                    .next()
+                    .expect("Expected at least one fetchable type to exist")
+                    .1
+            })
         });
 
     let parent_object = schema.server_field_data.object(entrypoint.parent_object_id);

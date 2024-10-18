@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use common_lang_types::{
     ConstExportName, DescriptionValue, EnumLiteralValue, FieldArgumentName, FieldNameOrAlias,
     FilePath, HasName, LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName,
@@ -489,14 +491,14 @@ impl ConstantValue {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub struct VariableDefinition<TValue> {
+pub struct VariableDefinition<TValue: Ord + Debug> {
     pub name: WithLocation<VariableName>,
     pub type_: GraphQLTypeAnnotation<TValue>,
     pub default_value: Option<WithLocation<ConstantValue>>,
 }
 
-impl<TValue> VariableDefinition<TValue> {
-    pub fn map<TNewValue>(
+impl<TValue: Ord + Debug> VariableDefinition<TValue> {
+    pub fn map<TNewValue: Ord + Debug>(
         self,
         map: &mut impl FnMut(TValue) -> TNewValue,
     ) -> VariableDefinition<TNewValue> {
@@ -507,7 +509,7 @@ impl<TValue> VariableDefinition<TValue> {
         }
     }
 
-    pub fn and_then<TNewValue, E>(
+    pub fn and_then<TNewValue: Ord + Debug, E>(
         self,
         map: &mut impl FnMut(TValue) -> Result<TNewValue, E>,
     ) -> Result<VariableDefinition<TNewValue>, E> {
