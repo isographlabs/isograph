@@ -8,7 +8,6 @@ import {
   ComponentOrFieldName,
   IsographEnvironment,
   type Link,
-  type TypeName,
 } from './IsographEnvironment';
 import {
   IsographEntrypoint,
