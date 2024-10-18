@@ -1,5 +1,5 @@
 use crate::IsographLangTokenKind;
-use common_lang_types::{EmbeddedLocation, Location, Span, TextSource, WithLocation, WithSpan};
+use common_lang_types::{Span, WithSpan};
 use intern::string_key::{Intern, StringKey};
 use logos::Logos;
 use thiserror::Error;
@@ -11,11 +11,11 @@ pub(crate) struct PeekableLexer<'source> {
     /// the byte offset of the *end* of the previous token
     end_index_of_last_parsed_token: u32,
     offset: u32,
-    text_source: TextSource,
+    errors: Vec<WithSpan<LowLevelParseError>>,
 }
 
 impl<'source> PeekableLexer<'source> {
-    pub fn new(source: &'source str, text_source: TextSource) -> Self {
+    pub fn new(source: &'source str) -> Self {
         // To enable fast lookahead the parser needs to store at least the 'kind' (IsographLangTokenKind)
         // of the next token: the simplest option is to store the full current token, but
         // the Parser requires an initial value. Rather than incur runtime/code overhead
@@ -31,7 +31,7 @@ impl<'source> PeekableLexer<'source> {
             source,
             end_index_of_last_parsed_token: 0,
             offset: 0,
-            text_source,
+            errors: Vec::new(),
         };
 
         // Advance to the first real token before doing any work
@@ -51,26 +51,10 @@ impl<'source> PeekableLexer<'source> {
                 .next()
                 .unwrap_or(IsographLangTokenKind::EndOfFile);
             match kind {
-                IsographLangTokenKind::Error => {
-                    // HACK we print out the location here, but we should return
-                    // the error. In particular, we can show multiple such errors
-                    // if they occur in different iso literals.
-                    let span = self.lexer_span();
-                    // TODO propagate? continue?
-                    panic!(
-                        "Encountered an error. \
-                        This can occur if you commented out an iso literal, \
-                        or if an iso literal contains \
-                        an invalid token. \n{}",
-                        WithLocation::new(
-                            "",
-                            Location::Embedded(EmbeddedLocation {
-                                text_source: self.text_source,
-                                span
-                            })
-                        )
-                    )
-                }
+                IsographLangTokenKind::Error => self.errors.push(WithSpan::new(
+                    LowLevelParseError::ParseUnexpectedTokenKindError,
+                    self.lexer_span(),
+                )),
                 _ => {
                     self.end_index_of_last_parsed_token = self.current.span.end;
                     let span = self.lexer_span();
@@ -101,6 +85,14 @@ impl<'source> PeekableLexer<'source> {
 
     pub fn reached_eof(&self) -> bool {
         self.current.item == IsographLangTokenKind::EndOfFile
+    }
+
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
+    }
+
+    pub fn errors(self) -> Vec<WithSpan<LowLevelParseError>> {
+        self.errors
     }
 
     /// A &str for the source of the given span
@@ -214,4 +206,7 @@ pub enum LowLevelParseError {
         expected_identifier: &'static str,
         found_text: String,
     },
+
+    #[error("Unexpected token.")]
+    ParseUnexpectedTokenKindError,
 }

@@ -75,6 +75,9 @@ pub enum IsographLangTokenKind {
     // Comments
     // #[regex("#[^\n\r]*")]
     // SingleLineComment,
+    #[regex("//")]
+    ErrWrongSingleLineComment,
+
     // Whitespace
     #[token(",")]
     Comma,
@@ -182,6 +185,9 @@ impl fmt::Display for IsographLangTokenKind {
             }
             IsographLangTokenKind::ErrorNumberLiteralTrailingInvalid => {
                 "unsupported number (int or float) literal"
+            }
+            IsographLangTokenKind::ErrWrongSingleLineComment => {
+                "unsupported single line comment (use '#' instead)"
             }
             IsographLangTokenKind::Comma => "comma (',')",
             IsographLangTokenKind::Colon => "colon (':')",
