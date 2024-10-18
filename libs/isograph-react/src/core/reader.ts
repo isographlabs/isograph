@@ -96,7 +96,6 @@ export type ReaderLinkedField = {
   readonly alias: string | null;
   readonly selections: ReaderAst<unknown>;
   readonly arguments: Arguments | null;
-  readonly concreteType: TypeName | null;
 };
 
 export type ReaderNonLoadableResolverField = {
@@ -131,8 +130,6 @@ export type ReaderLoadableField = {
   readonly entrypoint:
     | IsographEntrypoint<any, any>
     | IsographEntrypointLoader<any, any>;
-
-  readonly concreteType: TypeName | null;
 };
 
 type StableId = string;
