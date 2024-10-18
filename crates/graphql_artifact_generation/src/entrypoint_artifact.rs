@@ -65,8 +65,7 @@ pub(crate) fn generate_entrypoint_artifacts(
             .variable_definitions
             .iter()
             .map(|variable_definition| &variable_definition.item),
-        &schema.mutation_root_operation_name(),
-        &schema.find_mutation_id(),
+        &schema.find_mutation(),
     )
 }
 
@@ -77,8 +76,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
     traversal_state: &ScalarClientFieldTraversalState,
     global_client_field_map: &ClientFieldToCompletedMergeTraversalStateMap,
     variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
-    default_root_operation_name: &Option<&RootOperationName>,
-    default_concrete_type: &Option<&ServerObjectId>,
+    default_root_operation: &Option<(&ServerObjectId, &RootOperationName)>,
 ) -> Vec<ArtifactPathAndContent> {
     let query_name = entrypoint.name.into();
     // TODO when we do not call generate_entrypoint_artifact extraneously,
@@ -89,14 +87,16 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
         .fetchable_types
         .get(&entrypoint.parent_object_id)
         .unwrap_or_else(|| {
-            default_root_operation_name.unwrap_or_else(|| {
-                schema
-                    .fetchable_types
-                    .iter()
-                    .next()
-                    .expect("Expected at least one fetchable type to exist")
-                    .1
-            })
+            default_root_operation
+                .map(|(_, operation_name)| operation_name)
+                .unwrap_or_else(|| {
+                    schema
+                        .fetchable_types
+                        .iter()
+                        .next()
+                        .expect("Expected at least one fetchable type to exist")
+                        .1
+                })
         });
 
     let parent_object = schema.server_field_data.object(entrypoint.parent_object_id);
@@ -150,14 +150,16 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
         {
             entrypoint.parent_object_id
         } else {
-            *default_concrete_type.unwrap_or_else(|| {
-                schema
-                    .fetchable_types
-                    .iter()
-                    .next()
-                    .expect("Expected at least one fetchable type to exist")
-                    .0
-            })
+            *default_root_operation
+                .map(|(operation_id, _)| operation_id)
+                .unwrap_or_else(|| {
+                    schema
+                        .fetchable_types
+                        .iter()
+                        .next()
+                        .expect("Expected at least one fetchable type to exist")
+                        .0
+                })
         },
     );
 

@@ -114,32 +114,16 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
             .0
     }
 
-    pub fn query_root_operation_name(&self) -> Option<&RootOperationName> {
-        self.fetchable_types
-            .iter()
-            .find(|(_, root_operation_name)| root_operation_name.0 == "query")
-            .map(|(_, root_operation_name)| root_operation_name)
-    }
-
-    pub fn mutation_root_operation_name(&self) -> Option<&RootOperationName> {
+    pub fn find_mutation(&self) -> Option<(&ServerObjectId, &RootOperationName)> {
         self.fetchable_types
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "mutation")
-            .map(|(_, root_operation_name)| root_operation_name)
     }
 
-    pub fn find_mutation_id(&self) -> Option<&ServerObjectId> {
-        self.fetchable_types
-            .iter()
-            .find(|(_, root_operation_name)| root_operation_name.0 == "mutation")
-            .map(|(object_id, _)| object_id)
-    }
-
-    pub fn find_query_id(&self) -> Option<&ServerObjectId> {
+    pub fn find_query(&self) -> Option<(&ServerObjectId, &RootOperationName)> {
         self.fetchable_types
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "query")
-            .map(|(object_id, _)| object_id)
     }
 }
 
