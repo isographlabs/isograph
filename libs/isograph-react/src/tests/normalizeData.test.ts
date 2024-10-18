@@ -60,6 +60,7 @@ describe('normalizeData', () => {
           },
           query: {
             __link: ROOT_ID,
+            __typename: 'Query',
           },
         },
       },
@@ -84,6 +85,7 @@ describe('readData', () => {
           },
           query: {
             __link: ROOT_ID,
+            __typename: 'Query',
           },
         },
       },

@@ -548,7 +548,7 @@ function normalizeLinkedField(
       }
       dataIds.push({
         __link: newStoreRecordId,
-        ...(!astNode.concreteType && { __typename: __typename }),
+        __typename,
       });
     }
     targetParentRecord[parentRecordKey] = dataIds;
@@ -578,7 +578,7 @@ function normalizeLinkedField(
 
     targetParentRecord[parentRecordKey] = {
       __link: newStoreRecordId,
-      ...(!astNode.concreteType && { __typename: __typename }),
+      __typename,
     };
 
     const link = getLink(existingValue);

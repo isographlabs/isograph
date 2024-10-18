@@ -1,12 +1,10 @@
 import {
-  DataId,
-  Link,
   StoreRecord,
   defaultMissingFieldHandler,
   IsographEnvironmentProvider,
   createIsographEnvironment,
   createIsographStore,
-  type NonNullLink,
+  type Link,
 } from '@isograph/react';
 import { useMemo } from 'react';
 import type { AppProps } from 'next/app';
@@ -33,7 +31,7 @@ function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
 }
 const missingFieldHandler = (
   storeRecord: StoreRecord,
-  root: NonNullLink,
+  root: Link,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
   variables: { [index: string]: any } | null,
@@ -65,7 +63,7 @@ const missingFieldHandler = (
       variables?.id != null &&
       root.__link === '__ROOT'
     ) {
-      return { __link: variables.id };
+      return { __link: variables.id, __typename: 'Pet' };
     }
   } else {
     return val;

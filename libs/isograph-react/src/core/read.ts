@@ -3,7 +3,6 @@ import {
   getParentRecordKey,
   insertIfNotExists,
   onNextChangeToRecord,
-  TYPENAME_FIELD_NAME,
   type EncounteredIds,
 } from './cache';
 import { getOrCreateCachedComponent } from './componentCache';
@@ -23,7 +22,7 @@ import {
   defaultMissingFieldHandler,
   getOrLoadIsographArtifact,
   IsographEnvironment,
-  type NonNullLink,
+  type Link,
   type TypeName,
 } from './IsographEnvironment';
 import { makeNetworkRequest } from './makeNetworkRequest';
@@ -123,7 +122,7 @@ type ReadDataResult<TReadFromStore> =
 function readData<TReadFromStore>(
   environment: IsographEnvironment,
   ast: ReaderAst<TReadFromStore>,
-  root: NonNullLink,
+  root: Link,
   variables: ExtractParameters<TReadFromStore>,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   networkRequest: PromiseWrapper<void, any>,
@@ -141,7 +140,10 @@ function readData<TReadFromStore>(
     return {
       kind: 'MissingData',
       reason:
-        'No record for root ' + root + ' and concrete type ' + root.__typename,
+        'No record for root ' +
+        root.__link +
+        ' and concrete type ' +
+        root.__typename,
       recordId: root.__link,
       typeName: root.__typename,
     };
@@ -200,25 +202,11 @@ function readData<TReadFromStore>(
               results.push(null);
               continue;
             }
-            const __typename = field.concreteType ?? link.__typename;
-            if (!__typename) {
-              throw new Error(
-                'No __typename for ' +
-                  storeRecordName +
-                  ' on root ' +
-                  root.__link +
-                  '. Link is ' +
-                  JSON.stringify(item) +
-                  'This is indicative of bug in Isograph.',
-              );
-            }
+
             const result = readData(
               environment,
               field.selections,
-              {
-                __link: link.__link,
-                __typename: __typename,
-              },
+              link,
               variables,
               nestedRefetchQueries,
               networkRequest,
@@ -258,29 +246,19 @@ function readData<TReadFromStore>(
             variables,
           );
 
-          const missingData = {
-            kind: 'MissingData',
-            reason:
-              'No link for ' +
-              storeRecordName +
-              ' on root ' +
-              root.__link +
-              '. Link is ' +
-              JSON.stringify(value),
-            recordId: root.__link,
-            typeName: root.__typename,
-          } as const;
-
           if (altLink === undefined) {
-            return missingData;
-          } else if (!field.concreteType && !altLink.__typename) {
-            console.warn(
-              'Missing __typename for abstract type in link returned by missingFieldHandler. ' +
-                'Unable to resolve data for field. This indicates an issue with the missingFieldHandler implementation. ' +
-                'To fix ensure the missingFieldHandler returns a link with a valid __typename for abstract types.',
-              missingData,
-            );
-            return missingData;
+            return {
+              kind: 'MissingData',
+              reason:
+                'No link for ' +
+                storeRecordName +
+                ' on root ' +
+                root.__link +
+                '. Link is ' +
+                JSON.stringify(value),
+              recordId: root.__link,
+              typeName: root.__typename,
+            };
           } else {
             link = altLink;
           }
@@ -289,22 +267,7 @@ function readData<TReadFromStore>(
           break;
         }
 
-        const __typename = field.concreteType ?? link.__typename;
-        if (!__typename) {
-          throw new Error(
-            'No __typename for ' +
-              storeRecordName +
-              ' on root ' +
-              root.__link +
-              '. Link is ' +
-              JSON.stringify(value) +
-              'This is indicative of bug in Isograph.',
-          );
-        }
-        const targetId: NonNullLink = {
-          __link: link.__link,
-          __typename: __typename,
-        };
+        const targetId: Link = link;
         const data = readData(
           environment,
           field.selections,
@@ -472,7 +435,6 @@ function readData<TReadFromStore>(
             // TODO we should use the reader AST for this
             const includeReadOutData = (variables: any, readOutData: any) => {
               variables.id = readOutData.id;
-              variables[TYPENAME_FIELD_NAME] = readOutData[TYPENAME_FIELD_NAME];
               return variables;
             };
             const localVariables = includeReadOutData(
@@ -502,16 +464,6 @@ function readData<TReadFromStore>(
                   const [networkRequest, disposeNetworkRequest] =
                     makeNetworkRequest(environment, entrypoint, localVariables);
 
-                  const __typename =
-                    field.concreteType ?? localVariables[TYPENAME_FIELD_NAME];
-
-                  if (!__typename) {
-                    throw new Error(
-                      `No __typename found for LoadablySelectedField "${field.name}". ` +
-                        `This is indicative of bug in Isograph.`,
-                    );
-                  }
-
                   const fragmentReference: FragmentReference<any, any> = {
                     kind: 'FragmentReference',
                     readerWithRefetchQueries: wrapResolvedValue({
@@ -524,10 +476,7 @@ function readData<TReadFromStore>(
                     } as const),
 
                     // TODO localVariables is not guaranteed to have an id field
-                    root: {
-                      __link: localVariables.id,
-                      __typename: __typename,
-                    },
+                    root,
                     variables: localVariables,
                     networkRequest,
                   };
@@ -589,16 +538,6 @@ function readData<TReadFromStore>(
                         (entrypoint) => entrypoint.readerWithRefetchQueries,
                       );
 
-                    const __typename =
-                      field.concreteType ?? localVariables[TYPENAME_FIELD_NAME];
-
-                    if (!__typename) {
-                      throw new Error(
-                        `No __typename found for LoadablySelectedField "${field.name}". ` +
-                          `This is indicative of bug in Isograph.`,
-                      );
-                    }
-
                     const fragmentReference: FragmentReference<any, any> = {
                       kind: 'FragmentReference',
                       readerWithRefetchQueries: wrapPromise(
@@ -606,10 +545,7 @@ function readData<TReadFromStore>(
                       ),
 
                       // TODO localVariables is not guaranteed to have an id field
-                      root: {
-                        __link: localVariables.id,
-                        __typename: __typename,
-                      },
+                      root,
                       variables: localVariables,
                       networkRequest,
                     };

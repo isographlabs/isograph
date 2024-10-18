@@ -68,7 +68,7 @@ export type IsographEnvironment = {
 
 export type MissingFieldHandler = (
   storeRecord: StoreRecord,
-  root: NonNullLink,
+  root: Link,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
   variables: Variables | null,
@@ -80,11 +80,6 @@ export type IsographNetworkFunction = (
 ) => Promise<any>;
 
 export type Link = {
-  readonly __link: DataId;
-  readonly __typename?: TypeName;
-};
-
-export type NonNullLink = {
   readonly __link: DataId;
   readonly __typename: TypeName;
 };
@@ -154,7 +149,7 @@ export function createIsographStore(): IsographStore {
 
 export function defaultMissingFieldHandler(
   _storeRecord: StoreRecord,
-  _root: NonNullLink,
+  _root: Link,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
   variables: Variables | null,
@@ -164,9 +159,8 @@ export function defaultMissingFieldHandler(
     const value = variables?.[variable];
 
     // TODO can we handle explicit nulls here too? Probably, after wrapping in objects
-    if (value != null) {
-      // @ts-expect-error
-      return { __link: value };
+    if (typeof value === 'string') {
+      return { __link: value, __typename: 'Pet' };
     }
   }
 }
@@ -189,7 +183,9 @@ export function getLink(maybeLink: DataTypeValue): Link | null {
     maybeLink != null &&
     typeof maybeLink === 'object' &&
     '__link' in maybeLink &&
-    maybeLink.__link != null
+    maybeLink.__link != null &&
+    '__typename' in maybeLink &&
+    maybeLink.__typename != null
   ) {
     return maybeLink;
   }

@@ -15,8 +15,8 @@ import { nodeFieldRetainedQuery } from './nodeQuery';
 const getDefaultStore = (): IsographStore => ({
   Query: {
     [ROOT_ID]: {
-      me: { __link: '0' },
-      you: { __link: '1' },
+      me: { __link: '0', __typename: 'Economist' },
+      you: { __link: '1', __typename: 'Economist' },
       node____id___0: {
         __link: '0',
         __typename: 'Economist',
@@ -28,20 +28,20 @@ const getDefaultStore = (): IsographStore => ({
       __typename: 'Economist',
       id: '0',
       name: 'Jeremy Bentham',
-      successor: { __link: '1' },
+      successor: { __link: '1', __typename: 'Economist' },
     },
     1: {
       __typename: 'Economist',
       id: '1',
       name: 'John Stuart Mill',
-      predecessor: { __link: '0' },
-      successor: { __link: '2' },
+      predecessor: { __link: '0', __typename: 'Economist' },
+      successor: { __link: '2', __typename: 'Economist' },
     },
     2: {
       __typename: 'Economist',
       id: '2',
       name: 'Henry Sidgwick',
-      predecessor: { __link: '1' },
+      predecessor: { __link: '1', __typename: 'Economist' },
     },
   },
 });

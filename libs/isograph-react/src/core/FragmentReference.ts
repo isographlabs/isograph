@@ -1,4 +1,4 @@
-import { type NonNullLink } from './IsographEnvironment';
+import { type Link } from './IsographEnvironment';
 import { ReaderWithRefetchQueries } from '../core/entrypoint';
 import { PromiseWrapper } from './PromiseWrapper';
 
@@ -27,7 +27,7 @@ export type FragmentReference<
   readonly readerWithRefetchQueries: PromiseWrapper<
     ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
   >;
-  readonly root: NonNullLink;
+  readonly root: Link;
   readonly variables: ExtractParameters<TReadFromStore>;
   readonly networkRequest: PromiseWrapper<void, any>;
 };
