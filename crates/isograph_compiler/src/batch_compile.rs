@@ -357,7 +357,7 @@ fn extract_iso_literals(
                         entrypoint_declarations_and_text_sources.push((decl, text_source))
                     }
                 },
-                Err(e) => isograph_literal_parse_errors.push(e),
+                Err(e) => isograph_literal_parse_errors.extend(e),
             }
         }
     }
@@ -376,7 +376,8 @@ fn process_iso_literal_extraction(
     iso_literal_extraction: IsoLiteralExtraction<'_>,
     file_name: SourceFileName,
     interned_file_path: FilePath,
-) -> Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>> {
+) -> Result<(IsoLiteralExtractionResult, TextSource), Vec<WithLocation<IsographLiteralParseError>>>
+{
     let IsoLiteralExtraction {
         iso_literal_text,
         iso_literal_start_index,
@@ -396,7 +397,8 @@ fn process_iso_literal_extraction(
         return Err(WithLocation::new(
             IsographLiteralParseError::ExpectedParenthesesAroundIsoLiteral,
             Location::new(text_source, Span::todo_generated()),
-        ));
+        )
+        .into());
     }
 
     // TODO return errors if any occurred, otherwise Ok
@@ -416,7 +418,8 @@ fn process_iso_literal_extraction(
             return Err(WithLocation::new(
                 IsographLiteralParseError::ExpectedAssociatedJsFunction,
                 Location::new(text_source, Span::todo_generated()),
-            ));
+            )
+            .into());
         }
     }
 
