@@ -917,7 +917,7 @@ fn validate_client_field(
 ) -> ValidateSelectionsResult<ValidatedScalarFieldSelection> {
     let argument_definitions = client_field_args.get(client_field_id).expect(
         "Expected client field to exist in map. \
-                    This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
     );
     let missing_arguments = get_missing_arguments_and_validate_argument_types(
         argument_definitions
