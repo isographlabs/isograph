@@ -1,4 +1,5 @@
 import { type IssueComment__formattedCommentCreationDate__output_type } from '../../IssueComment/formattedCommentCreationDate/output_type';
+import type { PullRequest__CommentList__parameters } from './parameters_type';
 
 export type PullRequest__CommentList__param = {
   readonly data: {
@@ -36,5 +37,5 @@ The username of the actor.
       } | null)> | null),
     },
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: PullRequest__CommentList__parameters,
 };

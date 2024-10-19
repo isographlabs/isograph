@@ -11,7 +11,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
     arguments: [
       [
         "last",
-        { kind: "Literal", value: null },
+        { kind: "Variable", name: "last" },
       ],
     ],
     selections: [

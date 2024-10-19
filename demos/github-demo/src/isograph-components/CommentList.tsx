@@ -18,7 +18,7 @@ export const formattedCommentCreationDate = iso(`
 });
 
 export const CommentList = iso(`
-  field PullRequest.CommentList @component {
+  field PullRequest.CommentList($last: Int!) @component {
     comments(last: $last) {
       edges {
         node {
