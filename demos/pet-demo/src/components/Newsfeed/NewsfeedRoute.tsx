@@ -29,7 +29,7 @@ export const Newsfeed = iso(`
 
   const loadMore = () => {
     if (paginationState.kind === 'Complete') {
-      paginationState.fetchMore({}, 4);
+      paginationState.fetchMore(4);
     }
   };
 
