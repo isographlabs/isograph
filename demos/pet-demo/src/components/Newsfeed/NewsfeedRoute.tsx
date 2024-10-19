@@ -23,6 +23,7 @@ export const Newsfeed = iso(`
 
   const paginationState = useSkipLimitPagination(
     viewer.NewsfeedPaginationComponent,
+    { skip: viewer.newsfeed.length },
   );
 
   const newsfeedItems = viewer.newsfeed.concat(paginationState.results);
