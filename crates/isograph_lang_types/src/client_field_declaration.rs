@@ -286,7 +286,7 @@ pub enum Unwrap {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct SelectionFieldArgument {
     pub name: WithSpan<FieldArgumentName>,
-    pub value: WithSpan<NonConstantValue>,
+    pub value: WithLocation<NonConstantValue>,
 }
 
 impl SelectionFieldArgument {
