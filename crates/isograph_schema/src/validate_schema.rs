@@ -7,10 +7,10 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
 use isograph_lang_types::{
-    ClientFieldId, IsographSelectionVariant, LinkedFieldSelection, LoadableDirectiveParameters,
-    ScalarFieldSelection, SelectableServerFieldId, Selection, SelectionFieldArgument,
-    ServerFieldId, ServerObjectId, ServerScalarId, TypeAnnotation, UnvalidatedScalarFieldSelection,
-    UnvalidatedSelection, VariableDefinition,
+    reachable_variables, ClientFieldId, IsographSelectionVariant, LinkedFieldSelection,
+    LoadableDirectiveParameters, ScalarFieldSelection, SelectableServerFieldId, Selection,
+    SelectionFieldArgument, ServerFieldId, ServerObjectId, ServerScalarId, TypeAnnotation,
+    UnvalidatedScalarFieldSelection, UnvalidatedSelection, VariableDefinition,
 };
 use thiserror::Error;
 
@@ -1147,7 +1147,11 @@ fn push_used_variables(
     used_variables: &mut UsedVariables,
 ) {
     for argument in arguments {
-        used_variables.extend(argument.item.value.item.reachable_variables().iter());
+        used_variables.extend(
+            reachable_variables(&argument.item.value)
+                .iter()
+                .map(|x| x.item),
+        );
     }
 }
 

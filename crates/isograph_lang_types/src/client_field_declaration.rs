@@ -334,26 +334,30 @@ pub enum NonConstantValue {
     Object(Vec<NameValuePair<ValueKeyName, NonConstantValue>>),
 }
 
-impl NonConstantValue {
-    pub fn reachable_variables(&self) -> Vec<VariableName> {
-        match self {
-            NonConstantValue::Variable(name) => vec![*name],
-            NonConstantValue::Object(object) => {
-                return object
-                    .iter()
-                    .flat_map(|pair| pair.value.item.reachable_variables())
-                    .collect();
-            }
-            NonConstantValue::List(list) => {
-                return list
-                    .iter()
-                    .flat_map(|element| element.item.reachable_variables())
-                    .collect();
-            }
-            _ => vec![],
+pub fn reachable_variables(
+    non_constant_value: &WithLocation<NonConstantValue>,
+) -> Vec<WithLocation<VariableName>> {
+    match &non_constant_value.item {
+        NonConstantValue::Variable(name) => {
+            vec![WithLocation::new(*name, non_constant_value.location)]
         }
+        NonConstantValue::Object(object) => {
+            return object
+                .iter()
+                .flat_map(|pair| reachable_variables(&pair.value))
+                .collect();
+        }
+        NonConstantValue::List(list) => {
+            return list
+                .iter()
+                .flat_map(|element| reachable_variables(&element))
+                .collect();
+        }
+        _ => vec![],
     }
+}
 
+impl NonConstantValue {
     pub fn to_alias_str_chunk(&self) -> String {
         match self {
             NonConstantValue::Variable(name) => format!("v_{}", name),
