@@ -59,7 +59,7 @@ export function readButDoNotEvaluate<
   );
   // @ts-expect-error
   if (typeof window !== 'undefined' && window.__LOG) {
-    console.log('done reading', { response });
+    console.log('done reading: ' + response.kind, { response });
   }
   if (response.kind === 'MissingData') {
     // There are two cases here that we care about:
@@ -92,16 +92,16 @@ export function readButDoNotEvaluate<
 
 type ReadDataResult<TReadFromStore> =
   | {
-      readonly kind: 'Success';
-      readonly data: ExtractData<TReadFromStore>;
-      readonly encounteredRecords: Set<DataId>;
-    }
+    readonly kind: 'Success';
+    readonly data: ExtractData<TReadFromStore>;
+    readonly encounteredRecords: Set<DataId>;
+  }
   | {
-      readonly kind: 'MissingData';
-      readonly reason: string;
-      readonly nestedReason?: ReadDataResult<unknown>;
-      readonly recordId: DataId;
-    };
+    readonly kind: 'MissingData';
+    readonly reason: string;
+    readonly nestedReason?: ReadDataResult<unknown>;
+    readonly recordId: DataId;
+  };
 
 function readData<TReadFromStore>(
   environment: IsographEnvironment,
@@ -408,10 +408,10 @@ function readData<TReadFromStore>(
             return [
               // Stable id
               root +
-                '/' +
-                field.name +
-                '/' +
-                stableStringifyArgs(localVariables),
+              '/' +
+              field.name +
+              '/' +
+              stableStringifyArgs(localVariables),
               // Fetcher
               () => {
                 const fragmentReferenceAndDisposeFromEntrypoint = (
@@ -460,12 +460,12 @@ function readData<TReadFromStore>(
 
                     let entrypointLoaderState:
                       | {
-                          kind: 'EntrypointNotLoaded';
-                        }
+                        kind: 'EntrypointNotLoaded';
+                      }
                       | {
-                          kind: 'NetworkRequestStarted';
-                          disposeNetworkRequest: CleanupFn;
-                        }
+                        kind: 'NetworkRequestStarted';
+                        disposeNetworkRequest: CleanupFn;
+                      }
                       | { kind: 'Disposed' } = { kind: 'EntrypointNotLoaded' };
 
                     const networkRequest = wrapPromise(
