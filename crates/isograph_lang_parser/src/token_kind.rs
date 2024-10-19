@@ -75,7 +75,7 @@ pub enum IsographLangTokenKind {
     // Comments
     // #[regex("#[^\n\r]*")]
     // SingleLineComment,
-    #[regex("//")]
+    #[token("//")]
     ErrWrongSingleLineComment,
 
     // Whitespace
