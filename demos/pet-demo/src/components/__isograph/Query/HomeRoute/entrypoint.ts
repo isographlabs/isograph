@@ -18,6 +18,7 @@ const normalizationAst: NormalizationAst = [
     kind: "Linked",
     fieldName: "pets",
     arguments: null,
+    concreteType: "Pet",
     selections: [
       {
         kind: "Scalar",

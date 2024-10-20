@@ -61,6 +61,7 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "id" },
       ],
     ],
+    concreteType: "Pet",
     selections: [
       {
         kind: "Scalar",
@@ -76,11 +77,13 @@ const normalizationAst: NormalizationAst = [
         kind: "Linked",
         fieldName: "best_friend_relationship",
         arguments: null,
+        concreteType: "BestFriendRelationship",
         selections: [
           {
             kind: "Linked",
             fieldName: "best_friend",
             arguments: null,
+            concreteType: "Pet",
             selections: [
               {
                 kind: "Scalar",
@@ -120,6 +123,7 @@ const normalizationAst: NormalizationAst = [
             { kind: "Literal", value: null },
           ],
         ],
+        concreteType: "Checkin",
         selections: [
           {
             kind: "Scalar",
@@ -157,6 +161,7 @@ const normalizationAst: NormalizationAst = [
         kind: "Linked",
         fieldName: "potential_new_best_friends",
         arguments: null,
+        concreteType: "Pet",
         selections: [
           {
             kind: "Scalar",
@@ -174,6 +179,7 @@ const normalizationAst: NormalizationAst = [
         kind: "Linked",
         fieldName: "stats",
         arguments: null,
+        concreteType: "PetStats",
         selections: [
           {
             kind: "Scalar",
