@@ -46,7 +46,12 @@ const readerAst: ReaderAst<Query__PullRequestDetail__param> = [
           {
             kind: "Resolver",
             alias: "CommentList",
-            arguments: null,
+            arguments: [
+              [
+                "last",
+                { kind: "Literal", value: 10 },
+              ],
+            ],
             readerArtifact: PullRequest__CommentList__resolver_reader,
             usedRefetchQueries: [],
           },

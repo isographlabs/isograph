@@ -4,7 +4,7 @@ The framework for teams that move fast — without breaking things.
 
 - Make sure to check out the [quickstart guide](../quickstart/)!
 - Watch the [talk at GraphQL Conf](https://www.youtube.com/watch?v=gO65JJRqjuc).
-- Join the [Discord](https://discord.gg/rjDDwvZR).
+- Join the [Discord](https://discord.gg/qcHUxb6deQ).
 - [Follow the official Twitter account](https://twitter.com/isographlabs).
 
 ## About Isograph: Fetching data and app structure
@@ -142,7 +142,7 @@ There's a lot more. These docs are threadbare.
 
 - See the sample apps in [`./demos`](https://github.com/isographlabs/isograph/tree/main/demos).
 - Watch the [talk at GraphQL Conf](https://www.youtube.com/watch?v=gO65JJRqjuc).
-- Join the [Discord](https://discord.gg/rjDDwvZR).
+- Join the [Discord](https://discord.gg/qcHUxb6deQ).
 - [Follow the official Twitter account](https://twitter.com/isographlabs)
 
 ## Other, older resources

@@ -66,7 +66,7 @@ export function readButDoNotEvaluate<
   );
   // @ts-expect-error
   if (typeof window !== 'undefined' && window.__LOG) {
-    console.log('done reading', { response });
+    console.log('done reading: ' + response.kind, { response });
   }
   if (response.kind === 'MissingData') {
     // There are two cases here that we care about:
@@ -357,7 +357,7 @@ function readData<TReadFromStore>(
               environment,
               field.readerArtifact.readerAst,
               root,
-              variables,
+              generateChildVariableMap(variables, field.arguments),
               resolverRefetchQueries,
               networkRequest,
               networkRequestOptions,

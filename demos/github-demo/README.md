@@ -10,7 +10,7 @@ In order to run this demo locally:
 NEXT_PUBLIC_GITHUB_TOKEN=$SOME_TOKEN
 ```
 
-Where `$SOME_TOKEN` is a personal access token. It only needs read access.
+Where `$SOME_TOKEN` is a personal access token. It only needs read access (i.e. the `public_repo` scope). You can create one in [Settings -> Developer Settings -> Personal Access Tokens -> Tokens (Classic)](https://github.com/settings/tokens).
 
 Then, run the following from the root of the repository:
 

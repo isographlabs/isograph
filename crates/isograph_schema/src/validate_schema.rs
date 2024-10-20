@@ -7,10 +7,10 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
 use isograph_lang_types::{
-    ClientFieldId, IsographSelectionVariant, LinkedFieldSelection, LoadableDirectiveParameters,
-    ScalarFieldSelection, SelectableServerFieldId, Selection, SelectionFieldArgument,
-    ServerFieldId, ServerObjectId, ServerScalarId, TypeAnnotation, UnvalidatedScalarFieldSelection,
-    UnvalidatedSelection, VariableDefinition,
+    reachable_variables, ClientFieldId, IsographSelectionVariant, LinkedFieldSelection,
+    LoadableDirectiveParameters, ScalarFieldSelection, SelectableServerFieldId, Selection,
+    SelectionFieldArgument, ServerFieldId, ServerObjectId, ServerScalarId, TypeAnnotation,
+    UnvalidatedScalarFieldSelection, UnvalidatedSelection, VariableDefinition,
 };
 use thiserror::Error;
 
@@ -88,6 +88,7 @@ pub enum ValidatedIsographSelectionVariant {
 }
 
 pub type MissingArguments = Vec<ValidatedVariableDefinition>;
+type UsedVariables = BTreeSet<VariableName>;
 
 #[derive(Debug)]
 pub struct ValidatedSchemaState {}
@@ -464,7 +465,7 @@ fn validate_and_transform_client_fields(
 
 fn validate_all_variables_are_used(
     variable_definitions: Vec<WithSpan<UnvalidatedVariableDefinition>>,
-    used_variables: BTreeSet<VariableName>,
+    used_variables: UsedVariables,
     parent_type_name: IsographObjectTypeName,
     client_field_name: SelectableFieldName,
 ) -> ValidateSelectionsResult<()> {
@@ -706,6 +707,9 @@ fn validate_selections_error_to_validate_schema_error(
             type_name,
             field_name,
         },
+        ValidateSelectionsError::UsedUndefinedVariable { undefined_variable } => {
+            ValidateSchemaError::UsedUndefinedVariable { undefined_variable }
+        }
     })
 }
 
@@ -745,6 +749,9 @@ enum ValidateSelectionsError {
         type_name: IsographObjectTypeName,
         field_name: SelectableFieldName,
     },
+    UsedUndefinedVariable {
+        undefined_variable: VariableName,
+    },
 }
 
 fn validate_client_field_definition_selections_exist_and_types_match(
@@ -759,7 +766,7 @@ fn validate_client_field_definition_selections_exist_and_types_match(
     // Currently, we only check that each field exists and has an appropriate type, not that
     // there are no selection conflicts due to aliases or parameters.
 
-    let mut used_variables: BTreeSet<VariableName> = BTreeSet::new();
+    let mut used_variables = BTreeSet::new();
 
     let validated_selection_set_result =
         get_all_errors_or_all_ok(selection_set.into_iter().map(|selection| {
@@ -770,6 +777,7 @@ fn validate_client_field_definition_selections_exist_and_types_match(
                 server_fields,
                 client_field_args,
                 &mut used_variables,
+                &variable_definitions,
             )
         }));
 
@@ -793,7 +801,8 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
     schema_data: &ServerFieldData,
     server_fields: &[ValidatedSchemaServerField],
     client_field_args: &ClientFieldArgsMap,
-    used_variables: &mut BTreeSet<VariableName>,
+    used_variables: &mut UsedVariables,
+    variable_definitions: &[WithSpan<UnvalidatedVariableDefinition>],
 ) -> ValidateSelectionsResult<WithSpan<ValidatedSelection>> {
     let mut used_variables2 = BTreeSet::new();
 
@@ -808,6 +817,7 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
                         server_fields,
                         client_field_args,
                         used_variables,
+                        variable_definitions,
                     )
                 },
                 &mut |linked_field_selection| {
@@ -818,6 +828,7 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
                         server_fields,
                         client_field_args,
                         &mut used_variables2,
+                        variable_definitions,
                     )
                 },
             )
@@ -837,7 +848,8 @@ fn validate_field_type_exists_and_is_scalar(
     scalar_field_selection: UnvalidatedScalarFieldSelection,
     server_fields: &[ValidatedSchemaServerField],
     client_field_args: &ClientFieldArgsMap,
-    used_variables: &mut BTreeSet<VariableName>,
+    used_variables: &mut UsedVariables,
+    variable_definitions: &[WithSpan<UnvalidatedVariableDefinition>],
 ) -> ValidateSelectionsResult<ValidatedScalarFieldSelection> {
     let scalar_field_name = scalar_field_selection.name.item.into();
     match parent_object.encountered_fields.get(&scalar_field_name) {
@@ -853,6 +865,7 @@ fn validate_field_type_exists_and_is_scalar(
                     false,
                     scalar_field_selection.name.location,
                     used_variables,
+                    variable_definitions,
                 )?;
 
                 match server_field.associated_data.inner_non_null() {
@@ -901,6 +914,7 @@ fn validate_field_type_exists_and_is_scalar(
                 client_field_id,
                 scalar_field_selection,
                 used_variables,
+                variable_definitions,
             ),
         },
         None => Err(WithLocation::new(
@@ -914,11 +928,12 @@ fn validate_client_field(
     client_field_args: &ClientFieldArgsMap,
     client_field_id: &ClientFieldId,
     scalar_field_selection: UnvalidatedScalarFieldSelection,
-    used_variables: &mut BTreeSet<VariableName>,
+    used_variables: &mut UsedVariables,
+    variable_definitions: &[WithSpan<UnvalidatedVariableDefinition>],
 ) -> ValidateSelectionsResult<ValidatedScalarFieldSelection> {
     let argument_definitions = client_field_args.get(client_field_id).expect(
         "Expected client field to exist in map. \
-                    This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
     );
     let missing_arguments = get_missing_arguments_and_validate_argument_types(
         argument_definitions
@@ -928,6 +943,7 @@ fn validate_client_field(
         false,
         scalar_field_selection.name.location,
         used_variables,
+        variable_definitions,
     )?;
 
     Ok(ScalarFieldSelection {
@@ -962,7 +978,8 @@ fn validate_field_type_exists_and_is_linked(
     linked_field_selection: UnvalidatedLinkedFieldSelection,
     server_fields: &[ValidatedSchemaServerField],
     client_field_args: &ClientFieldArgsMap,
-    used_variables: &mut BTreeSet<VariableName>,
+    used_variables: &mut UsedVariables,
+    variable_definitions: &[WithSpan<UnvalidatedVariableDefinition>],
 ) -> ValidateSelectionsResult<ValidatedLinkedFieldSelection> {
     let linked_field_name = linked_field_selection.name.item.into();
     match (parent_object.encountered_fields).get(&linked_field_name) {
@@ -994,6 +1011,7 @@ fn validate_field_type_exists_and_is_linked(
                             false,
                             linked_field_selection.name.location,
                             used_variables,
+                            variable_definitions,
                         )?;
 
                         Ok(LinkedFieldSelection {
@@ -1007,7 +1025,8 @@ fn validate_field_type_exists_and_is_linked(
                                             schema_data,
                                             server_fields,
                                             client_field_args,
-                                            used_variables
+                                            used_variables,
+                                            variable_definitions
                                         )
                                     },
                                 ).collect::<Result<Vec<_>, _>>()?,
@@ -1143,13 +1162,33 @@ fn validate_no_extraneous_arguments(
     Ok(())
 }
 
-fn push_used_variables(
+fn validate_no_undefined_variables_and_get_reachable_variables(
     arguments: &[WithLocation<SelectionFieldArgument>],
-    used_variables: &mut BTreeSet<VariableName>,
-) {
+    variable_definitions: &[WithSpan<VariableDefinition<UnvalidatedTypeName>>],
+) -> ValidateSelectionsResult<Vec<WithLocation<VariableName>>> {
+    let mut all_reachable_variables = vec![];
     for argument in arguments {
-        used_variables.extend(argument.item.value.item.reachable_variables().iter());
+        let reachable_variables = reachable_variables(&argument.item.value);
+        for reachable_variable in reachable_variables.iter() {
+            if variable_definitions
+                .iter()
+                .find(|variable_definition| {
+                    variable_definition.item.name.item == reachable_variable.item
+                })
+                .is_none()
+            {
+                return Err(WithLocation::new(
+                    ValidateSelectionsError::UsedUndefinedVariable {
+                        undefined_variable: reachable_variable.item,
+                    },
+                    argument.location,
+                ));
+            }
+        }
+        all_reachable_variables.extend(reachable_variables);
     }
+
+    return Ok(all_reachable_variables);
 }
 
 fn get_missing_arguments_and_validate_argument_types<'a>(
@@ -1157,9 +1196,14 @@ fn get_missing_arguments_and_validate_argument_types<'a>(
     arguments: &[WithLocation<SelectionFieldArgument>],
     include_optional_args: bool,
     location: Location,
-    used_variables: &mut BTreeSet<VariableName>,
+    used_variables: &mut UsedVariables,
+    variable_definitions: &[WithSpan<UnvalidatedVariableDefinition>],
 ) -> ValidateSelectionsResult<Vec<ValidatedVariableDefinition>> {
-    push_used_variables(arguments, used_variables);
+    let reachable_variables = validate_no_undefined_variables_and_get_reachable_variables(
+        arguments,
+        variable_definitions,
+    )?;
+    used_variables.extend(reachable_variables.iter().map(|x| x.item));
 
     let argument_definitions_vec: Vec<_> = argument_definitions.collect();
     validate_no_extraneous_arguments(&argument_definitions_vec, arguments, location)?;
@@ -1335,4 +1379,7 @@ pub enum ValidateSchemaError {
         type_name: IsographObjectTypeName,
         field_name: SelectableFieldName,
     },
+
+    #[error("This variable is not defined: ${undefined_variable}")]
+    UsedUndefinedVariable { undefined_variable: VariableName },
 }

@@ -6,7 +6,7 @@ Isograph makes it easy to build robust, performant, data-driven apps.
 
 - Read the [docs](https://isograph.dev/docs/introduction/), especially the [quickstart guide](https://isograph.dev/docs/quickstart/).
 - Watch the [talk at GraphQL Conf 2024](https://www.youtube.com/watch?v=sf8ac2NtwPY) (and from [2023](https://www.youtube.com/watch?v=gO65JJRqjuc)).
-- Join the [Discord](https://discord.gg/rjDDwvZR).
+- Join the [Discord](https://discord.gg/qcHUxb6deQ).
 - [Follow the official Twitter account](https://twitter.com/isographlabs).
 
 ## What is Isograph?
@@ -33,7 +33,7 @@ export const Avatar = iso(`
   field User.Avatar @component {
     avatar_url
   }
-`)(function AvatarComponent(data) {
+`)(function AvatarComponent({ data }) {
   return <CircleImage image={data.avatar_url} />;
 });
 ```
@@ -49,7 +49,7 @@ export const UserProfileButton = iso(`
     id
     name
   }
-`)(function UserProfileButtonComponent(data) {
+`)(function UserProfileButtonComponent({ data }) {
   return (
     <Button onClick={() => navigateToUserProfile(data.id)}>
       {data.name}
@@ -118,7 +118,7 @@ export const UserDetailPage = iso(`
     name
     CreditCardInfo @loadable
   }
-`)((data) => {
+`)(({ data }) => {
   const CreditCardInfo = useClientSideDefer(data.CreditCardInfo);
 
   return (
@@ -180,7 +180,7 @@ export const UpdateUserNameButton = iso(`
   field User.UpdateUserNameButton {
     set_user_name
   }
-`)((data) => {
+`)(({ data }) => {
   return (
     <div
       onClick={() => data.set_user_name({ input: { new_name: 'Maybe' } })[1]()}
@@ -201,7 +201,7 @@ There's a lot more. These docs are threadbare.
 
 - See the sample apps in [`./demos`](./demos/).
 - Watch the [talk at GraphQL Conf](https://www.youtube.com/watch?v=gO65JJRqjuc).
-- Join the [Discord](https://discord.gg/rjDDwvZR).
+- Join the [Discord](https://discord.gg/qcHUxb6deQ).
 - [Follow the official Twitter account](https://twitter.com/isographlabs)
 
 ## Other, older resources

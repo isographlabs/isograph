@@ -13,7 +13,7 @@ export const PetDetailRouteComponent = iso(`
       PetBestFriendCard
       PetPhraseCard
       PetTaglineCard
-      PetStatsCard
+      PetStatsCard(id: $id)
     }
   }
 `)(function PetDetailRouteComponent({ data }) {

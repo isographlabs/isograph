@@ -6,6 +6,12 @@ In this quickstart guide, we will create a new NextJS project and add Isograph t
 
 You can view the end result of following this quickstart guide in [this repository](https://github.com/isographlabs/quickstart).
 
+:::tip
+
+If you want an example using [Vite](https://vite.dev) rather than NextJS, check out the [Vite Pokemon demo](https://github.com/isographlabs/isograph/tree/main/demos/vite-demo) to review the configuration needed for Vite.
+
+:::
+
 ## Install NextJS
 
 In a newly-created empty directory, run:
@@ -192,7 +198,7 @@ import { iso } from '@iso';
 
 export const HomePage = iso(`
   field Root.HomePage @component {}
-`)(function HomePageComponent(data) {
+`)(function HomePageComponent({ data }) {
   return 'Hello from the home page!';
 });
 ```
@@ -216,7 +222,7 @@ export const HomePage = iso(`
       }
     }
   }
-`)(function HomePageComponent(data) {
+`)(function HomePageComponent({ data }) {
   return 'Hello from the home page!';
 });
 ```
@@ -265,7 +271,7 @@ export const HomePage = iso(`
       }
     }
   }
-`)(function HomePageComponent(data) {
+`)(function HomePageComponent({ data }) {
   const films = useMemo(
     () =>
       toSorted(data.allFilms?.films ?? [], (film1, film2) => {
@@ -378,7 +384,7 @@ export const EpisodeTitle = iso(`
     title
     episodeID
   }
-`)(function EpisodeTitleComponent(data) {
+`)(function EpisodeTitleComponent({ data }) {
   return (
     <h2>
       Episode {data.episodeID}: {data.title}
@@ -413,7 +419,7 @@ export const HomePage = iso(`
       }
     }
   }
-`)(function HomePageComponent(data) {
+`)(function HomePageComponent({ data }) {
   const films = useMemo(
     () =>
       toSorted(data.allFilms?.films ?? [], (film1, film2) => {
@@ -446,4 +452,4 @@ Congratulations! You just built your first Isograph app.
 
 Want more? Try extracting the sorted list of films into its own client field (no need to use `@component` for this one.) Use hooks in your components (they work!) Check out the [magic mutation fields](/docs/expose-field-directives/) documentation to learn about how Isograph lets you update your data.
 
-Or, [join the Discord](https://discord.gg/rjDDwvZR)!
+Or, [join the Discord](https://discord.gg/qcHUxb6deQ)!

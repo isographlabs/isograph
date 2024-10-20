@@ -10,7 +10,7 @@ const queryText = 'query PullRequest ($repositoryOwner: String!, $repositoryName
     pullRequest____number___v_pullRequestNumber: pullRequest(number: $pullRequestNumber) {\
       id,\
       bodyHTML,\
-      comments____last___l_null: comments(last: null) {\
+      comments____last___l_10: comments(last: 10) {\
         edges {\
           node {\
             id,\
@@ -82,7 +82,7 @@ const normalizationAst: NormalizationAst = [
             arguments: [
               [
                 "last",
-                { kind: "Literal", value: null },
+                { kind: "Literal", value: 10 },
               ],
             ],
             concreteType: "IssueCommentConnection",

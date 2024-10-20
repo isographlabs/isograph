@@ -3,7 +3,7 @@ import { iso } from '@iso';
 import { Button, Card, CardContent } from '@mui/material';
 
 export const PetStatsCard = iso(`
-  field Pet.PetStatsCard @component {
+  field Pet.PetStatsCard($id: ID!) @component {
     id
     nickname
     age

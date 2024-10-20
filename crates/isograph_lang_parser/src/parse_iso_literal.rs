@@ -431,7 +431,7 @@ fn parse_argument(
         tokens
             .parse_token_of_kind(IsographLangTokenKind::Colon)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
-        let value = parse_non_constant_value(tokens)?;
+        let value = parse_non_constant_value(tokens)?.to_with_location(text_source);
         Ok::<_, WithSpan<IsographLiteralParseError>>(SelectionFieldArgument { name, value })
     })?;
     Ok(argument.to_with_location(text_source))

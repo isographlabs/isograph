@@ -18,7 +18,7 @@ export const PetRefetcherButtonComponent = iso(`
     name
     __refetch
   }
-`)((data) => {
+`)(({ data }) => {
   return (
     <Button onClick={() => data.__refetch()[1]()}>Refetch {data.name}</Button>
   );

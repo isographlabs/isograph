@@ -1,4 +1,5 @@
 import { type PetStats__refetch_pet_stats__output_type } from '../../PetStats/refetch_pet_stats/output_type';
+import type { Pet__PetStatsCard__parameters } from './parameters_type';
 
 export type Pet__PetStatsCard__param = {
   readonly data: {
@@ -15,5 +16,5 @@ export type Pet__PetStatsCard__param = {
       readonly refetch_pet_stats: PetStats__refetch_pet_stats__output_type,
     } | null),
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Pet__PetStatsCard__parameters,
 };
