@@ -21,6 +21,7 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "id" },
       ],
     ],
+    concreteType: "User",
     selections: [
       {
         kind: "InlineFragment",
@@ -59,6 +60,8 @@ const normalizationAst: NormalizationAst = [
 const artifact: RefetchQueryNormalizationArtifact = {
   kind: "RefetchQuery",
   queryText,
+  concreteType: "Query",
+  queryType: "Query",
   normalizationAst,
 };
 

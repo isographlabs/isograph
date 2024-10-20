@@ -22,11 +22,13 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "id" },
       ],
     ],
+    concreteType: "Pet",
     selections: [
       {
         kind: "Linked",
         fieldName: "stats",
         arguments: null,
+        concreteType: "PetStats",
         selections: [
           {
             kind: "Scalar",
@@ -66,6 +68,8 @@ const normalizationAst: NormalizationAst = [
 const artifact: RefetchQueryNormalizationArtifact = {
   kind: "RefetchQuery",
   queryText,
+  concreteType: "Query",
+  queryType: "Query",
   normalizationAst,
 };
 

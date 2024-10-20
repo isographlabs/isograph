@@ -1,8 +1,10 @@
 use std::collections::BTreeSet;
 
-use common_lang_types::{ArtifactPathAndContent, QueryOperationName, VariableName};
+use common_lang_types::{
+    ArtifactPathAndContent, IsographObjectTypeName, QueryOperationName, VariableName,
+};
 use intern::{string_key::Intern, Lookup};
-use isograph_lang_types::{ClientFieldId, IsographSelectionVariant};
+use isograph_lang_types::{ClientFieldId, IsographSelectionVariant, ServerObjectId};
 use isograph_schema::{
     create_merged_selection_map_for_client_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
@@ -29,6 +31,8 @@ struct EntrypointArtifactInfo<'schema> {
     query_text: QueryText,
     normalization_ast_text: NormalizationAstText,
     refetch_query_artifact_import: RefetchQueryArtifactImport,
+    concrete_type: IsographObjectTypeName,
+    query_type: IsographObjectTypeName,
 }
 
 pub(crate) fn generate_entrypoint_artifacts(
@@ -61,7 +65,7 @@ pub(crate) fn generate_entrypoint_artifacts(
             .variable_definitions
             .iter()
             .map(|variable_definition| &variable_definition.item),
-        &schema.mutation_root_operation_name(),
+        &schema.find_mutation(),
     )
 }
 
@@ -72,7 +76,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
     traversal_state: &ScalarClientFieldTraversalState,
     global_client_field_map: &ClientFieldToCompletedMergeTraversalStateMap,
     variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
-    default_root_operation_name: &Option<&RootOperationName>,
+    default_root_operation: &Option<(&ServerObjectId, &RootOperationName)>,
 ) -> Vec<ArtifactPathAndContent> {
     let query_name = entrypoint.name.into();
     // TODO when we do not call generate_entrypoint_artifact extraneously,
@@ -83,14 +87,16 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
         .fetchable_types
         .get(&entrypoint.parent_object_id)
         .unwrap_or_else(|| {
-            default_root_operation_name.unwrap_or_else(|| {
-                schema
-                    .fetchable_types
-                    .iter()
-                    .next()
-                    .expect("Expected at least one fetchable type to exist")
-                    .1
-            })
+            default_root_operation
+                .map(|(_, operation_name)| operation_name)
+                .unwrap_or_else(|| {
+                    schema
+                        .fetchable_types
+                        .iter()
+                        .next()
+                        .expect("Expected at least one fetchable type to exist")
+                        .1
+                })
         });
 
     let parent_object = schema.server_field_data.object(entrypoint.parent_object_id);
@@ -137,12 +143,36 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
     let normalization_ast_text =
         generate_normalization_ast_text(schema, merged_selection_map.values(), 0);
 
+    let concrete_type = schema.server_field_data.object(
+        if schema
+            .fetchable_types
+            .contains_key(&entrypoint.parent_object_id)
+        {
+            entrypoint.parent_object_id
+        } else {
+            *default_root_operation
+                .map(|(operation_id, _)| operation_id)
+                .unwrap_or_else(|| {
+                    schema
+                        .fetchable_types
+                        .iter()
+                        .next()
+                        .expect("Expected at least one fetchable type to exist")
+                        .0
+                })
+        },
+    );
+
+    let query_type = schema.server_field_data.object(schema.query_id()).name;
+
     let mut paths_and_contents = vec![EntrypointArtifactInfo {
         query_text,
         query_name,
         parent_type: parent_object,
         normalization_ast_text,
         refetch_query_artifact_import,
+        concrete_type: concrete_type.name,
+        query_type,
     }
     .path_and_content()];
 
@@ -237,6 +267,8 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             refetch_query_artifact_import,
             query_name,
             parent_type,
+            concrete_type,
+            query_type,
         } = self;
         let entrypoint_params_typename = format!("{}__{}__param", parent_type.name, query_name);
         let entrypoint_output_type_name =
@@ -261,6 +293,8 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             {}kind: \"Entrypoint\",\n\
             {}queryText,\n\
             {}normalizationAst,\n\
+            {}concreteType: \"{concrete_type}\",\n\
+            {}queryType: \"{query_type}\",\n\
             {}readerWithRefetchQueries: {{\n\
             {}  kind: \"ReaderWithRefetchQueries\",\n\
             {}  nestedRefetchQueries,\n\
@@ -268,7 +302,7 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             {}}},\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  "
+            "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  "
         )
     }
 }

@@ -23,11 +23,13 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "input" },
       ],
     ],
+    concreteType: "SetPetTaglineResponse",
     selections: [
       {
         kind: "Linked",
         fieldName: "pet",
         arguments: null,
+        concreteType: "Pet",
         selections: [
           {
             kind: "Scalar",
@@ -51,6 +53,8 @@ const artifact: IsographEntrypoint<
   kind: "Entrypoint",
   queryText,
   normalizationAst,
+  concreteType: "Mutation",
+  queryType: "Query",
   readerWithRefetchQueries: {
     kind: "ReaderWithRefetchQueries",
     nestedRefetchQueries,

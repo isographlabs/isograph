@@ -52,11 +52,13 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "new_best_friend_id" },
       ],
     ],
+    concreteType: "SetBestFriendResponse",
     selections: [
       {
         kind: "Linked",
         fieldName: "pet",
         arguments: null,
+        concreteType: "Pet",
         selections: [
           {
             kind: "Scalar",
@@ -72,11 +74,13 @@ const normalizationAst: NormalizationAst = [
             kind: "Linked",
             fieldName: "best_friend_relationship",
             arguments: null,
+            concreteType: "BestFriendRelationship",
             selections: [
               {
                 kind: "Linked",
                 fieldName: "best_friend",
                 arguments: null,
+                concreteType: "Pet",
                 selections: [
                   {
                     kind: "Scalar",
@@ -116,6 +120,7 @@ const normalizationAst: NormalizationAst = [
                 { kind: "Literal", value: null },
               ],
             ],
+            concreteType: "Checkin",
             selections: [
               {
                 kind: "Scalar",
@@ -153,6 +158,7 @@ const normalizationAst: NormalizationAst = [
             kind: "Linked",
             fieldName: "potential_new_best_friends",
             arguments: null,
+            concreteType: "Pet",
             selections: [
               {
                 kind: "Scalar",
@@ -170,6 +176,7 @@ const normalizationAst: NormalizationAst = [
             kind: "Linked",
             fieldName: "stats",
             arguments: null,
+            concreteType: "PetStats",
             selections: [
               {
                 kind: "Scalar",
@@ -216,6 +223,8 @@ const normalizationAst: NormalizationAst = [
 const artifact: RefetchQueryNormalizationArtifact = {
   kind: "RefetchQuery",
   queryText,
+  concreteType: "Mutation",
+  queryType: "Query",
   normalizationAst,
 };
 
