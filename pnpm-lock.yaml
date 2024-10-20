@@ -7,10 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      react-twitter-embed:
-        specifier: ^4.0.4
-        version: 4.0.4(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
     devDependencies:
       gulp:
         specifier: 4.0.2
@@ -273,6 +269,9 @@ importers:
       react-dom:
         specifier: ^18.0.0
         version: 18.2.0(react@18.2.0)
+      react-twitter-embed:
+        specifier: ^4.0.4
+        version: 4.0.4(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
     devDependencies:
       '@docusaurus/module-type-aliases':
         specifier: 3.0.1

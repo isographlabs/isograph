@@ -34,9 +34,6 @@
     "type": "git",
     "url": "git+https://github.com/isographlabs/isograph.git"
   },
-  "dependencies": {
-    "react-twitter-embed": "^4.0.4"
-  },
   "engines": {
     "node": "22.9.0"
   },
