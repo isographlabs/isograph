@@ -31,19 +31,47 @@ pub fn parse_iso_literal(
     definition_file_path: FilePath,
     const_export_name: Option<&str>,
     text_source: TextSource,
-) -> Result<IsoLiteralExtractionResult, WithLocation<IsographLiteralParseError>> {
-    let mut tokens = PeekableLexer::new(iso_literal_text, text_source);
+) -> Result<IsoLiteralExtractionResult, Vec<WithLocation<IsographLiteralParseError>>> {
+    let mut tokens = PeekableLexer::new(iso_literal_text);
+    let result = parse_iso_literal_inner(
+        &mut tokens,
+        definition_file_path,
+        const_export_name,
+        text_source,
+    );
+    if tokens.has_errors() {
+        let mut errors = tokens
+            .errors()
+            .into_iter()
+            .map(|with_span| with_span.map(IsographLiteralParseError::from))
+            .map(|err| err.to_with_location(text_source))
+            .collect::<Vec<_>>();
+        if let Err(error) = result {
+            errors.push(error);
+        }
+        Err(errors)
+    } else {
+        result.map_err(|err| err.into())
+    }
+}
+
+fn parse_iso_literal_inner(
+    tokens: &mut PeekableLexer<'_>,
+    definition_file_path: FilePath,
+    const_export_name: Option<&str>,
+    text_source: TextSource,
+) -> ParseResultWithLocation<IsoLiteralExtractionResult> {
     let discriminator = tokens
         .parse_source_of_kind(IsographLangTokenKind::Identifier)
         .map_err(|with_span| with_span.map(IsographLiteralParseError::from))
         .map_err(|err| err.to_with_location(text_source))?;
     match discriminator.item {
         "entrypoint" => Ok(IsoLiteralExtractionResult::EntrypointDeclaration(
-            parse_iso_entrypoint_declaration(&mut tokens, text_source, discriminator.span)?,
+            parse_iso_entrypoint_declaration(tokens, text_source, discriminator.span)?,
         )),
         "field" => Ok(IsoLiteralExtractionResult::ClientFieldDeclaration(
             parse_iso_client_field_declaration(
-                &mut tokens,
+                tokens,
                 definition_file_path,
                 const_export_name,
                 text_source,
@@ -636,21 +664,12 @@ fn from_control_flow<T, E>(control_flow: impl FnOnce() -> ControlFlow<T, E>) -> 
 
 #[cfg(test)]
 mod test {
-    use common_lang_types::TextSource;
-    use intern::string_key::Intern;
-
     use crate::{IsographLangTokenKind, PeekableLexer};
 
     #[test]
     fn parse_literal_tests() {
         let source = "\"Description\" Query.foo { bar, baz, }";
-        let mut lexer = PeekableLexer::new(
-            source,
-            TextSource {
-                path: "path".intern().into(),
-                span: None,
-            },
-        );
+        let mut lexer = PeekableLexer::new(source);
 
         loop {
             let token = lexer.parse_token();

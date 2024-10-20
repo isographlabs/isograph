@@ -106,6 +106,12 @@ impl<T: Error> Error for WithLocation<T> {
     }
 }
 
+impl<T: Error> From<WithLocation<T>> for Vec<WithLocation<T>> {
+    fn from(value: WithLocation<T>) -> Self {
+        vec![value]
+    }
+}
+
 impl<T: fmt::Display> fmt::Display for WithLocation<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}\n{}", self.item, self.location)
