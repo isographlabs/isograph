@@ -198,7 +198,7 @@ import { iso } from '@iso';
 
 export const HomePage = iso(`
   field Root.HomePage @component {}
-`)(function HomePageComponent(data) {
+`)(function HomePageComponent({ data }) {
   return 'Hello from the home page!';
 });
 ```
@@ -222,7 +222,7 @@ export const HomePage = iso(`
       }
     }
   }
-`)(function HomePageComponent(data) {
+`)(function HomePageComponent({ data }) {
   return 'Hello from the home page!';
 });
 ```
@@ -271,7 +271,7 @@ export const HomePage = iso(`
       }
     }
   }
-`)(function HomePageComponent(data) {
+`)(function HomePageComponent({ data }) {
   const films = useMemo(
     () =>
       toSorted(data.allFilms?.films ?? [], (film1, film2) => {
@@ -384,7 +384,7 @@ export const EpisodeTitle = iso(`
     title
     episodeID
   }
-`)(function EpisodeTitleComponent(data) {
+`)(function EpisodeTitleComponent({ data }) {
   return (
     <h2>
       Episode {data.episodeID}: {data.title}
@@ -419,7 +419,7 @@ export const HomePage = iso(`
       }
     }
   }
-`)(function HomePageComponent(data) {
+`)(function HomePageComponent({ data }) {
   const films = useMemo(
     () =>
       toSorted(data.allFilms?.films ?? [], (film1, film2) => {
