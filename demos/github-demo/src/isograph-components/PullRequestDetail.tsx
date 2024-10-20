@@ -11,7 +11,7 @@ export const PullRequestDetail = iso(`
       pullRequest(number: $pullRequestNumber) {
         title
         bodyHTML
-        CommentList
+        CommentList(last: 10)
       }
     }
   }

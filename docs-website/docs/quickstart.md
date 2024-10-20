@@ -446,4 +446,4 @@ Congratulations! You just built your first Isograph app.
 
 Want more? Try extracting the sorted list of films into its own client field (no need to use `@component` for this one.) Use hooks in your components (they work!) Check out the [magic mutation fields](/docs/expose-field-directives/) documentation to learn about how Isograph lets you update your data.
 
-Or, [join the Discord](https://discord.gg/rjDDwvZR)!
+Or, [join the Discord](https://discord.gg/qcHUxb6deQ)!

@@ -82,7 +82,7 @@ const config: Config = {
         },
         { to: '/blog', label: 'Blog', position: 'left' },
         {
-          href: 'https://discord.gg/rjDDwvZR',
+          href: 'https://discord.gg/qcHUxb6deQ',
           label: 'Discord',
           position: 'right',
         },
@@ -114,7 +114,7 @@ const config: Config = {
           items: [
             {
               label: 'Discord',
-              href: 'https://discord.gg/rjDDwvZR',
+              href: 'https://discord.gg/qcHUxb6deQ',
             },
             {
               label: 'Twitter',
