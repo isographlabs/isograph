@@ -30,8 +30,5 @@
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "typescript": "5.0.4"
-  },
-  "devDependencies": {
-    "@types/react-no-ssr": "^1.1.3"
   }
 }
