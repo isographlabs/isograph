@@ -37,6 +37,10 @@ Since watch mode is a simple wrapper around batch mode, the rest of this documen
 
 ## Crates
 
+:::note
+This list is likely not up-to-date, consult [this](https://github.com/isographlabs/isograph/tree/main/crates) for an accurate summary.
+:::
+
 The Isograph compiler contains the following crates. The most important ones are marked with a 🟢:
 
 - `common_lang_types`
@@ -56,15 +60,15 @@ The Isograph compiler contains the following crates. The most important ones are
 The Isograph schema (`struct Schema`) is represented by an object that contains:
 
 - a vector of available server fields
-- a vector of available resolvers
-- a vector of available objects
+- a vector of available client fields
+- a vector of available object types
 - a vector of available scalar types
 - a map going from names to object or scalar types. This ensures that every type name is unique.
 
 Each object contains:
 
 - a vector of available server field ids
-- a vector of available resolver field ids
+- a vector of available client field ids
 - an optional id field
 - a map of field names to a generic type (in the fully validated schema, this is a map from field names to an enum containing a scalar ID or an object ID.)
 

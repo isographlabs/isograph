@@ -8,8 +8,8 @@ This document is intentionally short, because much of the runtime is incomplete 
 
 Currently, there are two things you must to do to use Isograph:
 
-- set up a network function by calling `setNetwork`
-- call `subscribe(() => setState({}))`, in order to make some root component re-render whenever anything in the store changes. This is obviously bad for performance.
+- create an environment, which important contains a network function that knows how to hit your GraphQL endpoint
+- put that in an `IsographEnvironmentProvider`
 
 :::note
 You should also see [the quickstart guide](../../quickstart) for more one-time setup, e.g. changes to the `babelrc.js`.
@@ -21,22 +21,20 @@ In order to make a network request and read the results, the following occurs:
 
 - the developer calls ``const {fragmentReference} = useLazyReference(iso(`entrypoint Query.HomePage`));``. This will make the network request when that component renders.
   - The babel plugin changes the `iso` entrypoint call to a `require` call that imports the generated `Query/HomePage/entrypoint.ts` file.
-- The developer calls `const HomePage = useResult(fragmentReference);`. This will attempt to read the `Query.HomePage` resolver. This may suspend. In particular, if there isn't enough data in the store to read all of the data required by the `HomePage` resolver, the call to `read` will suspend.
-  - It is a good practice to pass the `fragmentReference` to a child component, which is wrapped in a `<Suspense>` boundary. This isn't required for `useLazyReference` to work correctly, but it does eliminate some edge cases (namely, if the network response takes too long to come back), and does make refetching on error easier.
+- The developer calls `const HomePage = useResult(fragmentReference);` (or calls `<FragmentReader fragmentReference={fragmentReference} />`. `FragmentReader` is just a wrapper around `useResult`). This will attempt to read the `Query.HomePage` resolver. This will suspend if there isn't enough data in the store to read all of the data required by the `HomePage` resolver, as is the case when the network request is initially in flight.
+  - It is a best practice to pass the `fragmentReference` to a child component, which is wrapped in a `<Suspense>` boundary, or to wrap the `<FragmentReader />` in a suspense boundary. This isn't required for `useLazyReference` to work correctly, but it does eliminate some edge cases (namely, if the network response takes too long to come back), and does make refetching on error easier.
   - In the future, there will be other APIs, akin to Relay's `loadQuery` and `useQueryLoader`. These have not been implemented. The `@isograph/react-disposable-state` library contains their building blocks.
-- The network response completes, and the normalization AST (part of the `Query/HomePage/entrypoint.ts` file) is used to write the data to the [global store](#store).
-- The subscribe callback is triggered, causing the component tree to re-render.
-- On second render, the `read(fragmentReference)` call is re-evaluated. This time, there is enough data to read the fields required by `HomePage`, so the `HomePage` resolver function is called. Assuming it is a react component (i.e. the resolver was declared with `@component`), we can then render the component as follows: `<HomePage {...additionaProps} />`.
+  - `useResult` and `FragmentReader` take additional parameters and network request options, not documented here.
+- The call `useResult` will suspend on the network request.
+- The network request completes, and the normalization AST (part of the `Query/HomePage/entrypoint.ts` file) is used to write the data to the [global store](#store).
+- This will cause React to retry rendering the `FragmentReader` (actually, everything underneath the nearest `Suspense` boundary).
+- On second render, the `useResult` call is re-evaluated. This time, there is enough data to read the fields required by `HomePage`, so the `HomePage` resolver function is called. Assuming it is a react component (i.e. the resolver was declared with `@component`), we can then render the component as follows: `<HomePage {...additionaProps} />`.
 - When `<HomePage />` renders, it may itself have selected other components (e.g. `Header` or `Avatar`). The data for these was likely provided by initial network request, so they will not suspend, and the whole tree will render.
   - In the future, when Isograph supports `@defer` or `@stream`, child resolvers may suspend at this point. If data in the Isograph store changes, child resolvers may also suspend.
 
 ## Store
 
-The Isograph store is a global map from strong IDs or "relative IDs" to fields. It should not be global! But it is, for now.
-
-:::warning
-For NextJS, we need to clear the store on every request, since it otherwise would be shared across requests (including for different users).
-:::
+The Isograph store is a map IDs or "relative IDs" to records. It is contained in the Isograph environment. It will soon be a map from typename -> ID, in order to relax the requirement that IDs must be globally unique.
 
 ## Fetching and entrypoints
 
