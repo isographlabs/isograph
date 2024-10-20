@@ -1,0 +1,4 @@
+{
+  "presets": ["@babel/preset-typescript"],
+  "plugins": ["../../libs/isograph-babel-plugin/BabelPluginIsograph"]
+}
