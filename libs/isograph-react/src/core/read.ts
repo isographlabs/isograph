@@ -17,6 +17,7 @@ import {
   defaultMissingFieldHandler,
   getOrLoadIsographArtifact,
   IsographEnvironment,
+  type Link,
 } from './IsographEnvironment';
 import { makeNetworkRequest } from './makeNetworkRequest';
 import {
@@ -100,25 +101,25 @@ type ReadDataResult<TReadFromStore> =
       readonly kind: 'MissingData';
       readonly reason: string;
       readonly nestedReason?: ReadDataResult<unknown>;
-      readonly recordId: DataId;
+      readonly recordId: Link;
     };
 
 function readData<TReadFromStore>(
   environment: IsographEnvironment,
   ast: ReaderAst<TReadFromStore>,
-  root: DataId,
+  root: Link,
   variables: ExtractParameters<TReadFromStore>,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableEncounteredRecords: Set<DataId>,
 ): ReadDataResult<TReadFromStore> {
-  mutableEncounteredRecords.add(root);
-  let storeRecord = environment.store[root];
+  mutableEncounteredRecords.add(root.__link);
+  let storeRecord = environment.store[root.__link];
   if (storeRecord === undefined) {
     return {
       kind: 'MissingData',
-      reason: 'No record for root ' + root,
+      reason: 'No record for root ' + root.__link,
       recordId: root,
     };
   }
@@ -143,7 +144,8 @@ function readData<TReadFromStore>(
         if (value === undefined) {
           return {
             kind: 'MissingData',
-            reason: 'No value for ' + storeRecordName + ' on root ' + root,
+            reason:
+              'No value for ' + storeRecordName + ' on root ' + root.__link,
             recordId: root,
           };
         }
@@ -164,7 +166,7 @@ function readData<TReadFromStore>(
                   'No link for ' +
                   storeRecordName +
                   ' on root ' +
-                  root +
+                  root.__link +
                   '. Link is ' +
                   JSON.stringify(item),
                 recordId: root,
@@ -176,7 +178,7 @@ function readData<TReadFromStore>(
             const result = readData(
               environment,
               field.selections,
-              link.__link,
+              link,
               variables,
               nestedRefetchQueries,
               networkRequest,
@@ -190,7 +192,7 @@ function readData<TReadFromStore>(
                   'Missing data for ' +
                   storeRecordName +
                   ' on root ' +
-                  root +
+                  root.__link +
                   '. Link is ' +
                   JSON.stringify(item),
                 nestedReason: result,
@@ -221,7 +223,7 @@ function readData<TReadFromStore>(
                 'No link for ' +
                 storeRecordName +
                 ' on root ' +
-                root +
+                root.__link +
                 '. Link is ' +
                 JSON.stringify(value),
               recordId: root,
@@ -233,7 +235,7 @@ function readData<TReadFromStore>(
           target[field.alias ?? field.fieldName] = null;
           break;
         }
-        const targetId = link.__link;
+        const targetId = link;
         const data = readData(
           environment,
           field.selections,
@@ -247,7 +249,8 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return {
             kind: 'MissingData',
-            reason: 'Missing data for ' + storeRecordName + ' on root ' + root,
+            reason:
+              'Missing data for ' + storeRecordName + ' on root ' + root.__link,
             nestedReason: data,
             recordId: data.recordId,
           };
@@ -274,7 +277,8 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return {
             kind: 'MissingData',
-            reason: 'Missing data for ' + field.alias + ' on root ' + root,
+            reason:
+              'Missing data for ' + field.alias + ' on root ' + root.__link,
             nestedReason: data,
             recordId: data.recordId,
           };
@@ -291,7 +295,7 @@ function readData<TReadFromStore>(
           // use the resolver reader AST to get the resolver parameters.
           target[field.alias] = (args: any) => [
             // Stable id
-            root + '__' + field.name,
+            root.__link + '__' + field.name,
             // Fetcher
             field.refetchReaderArtifact.resolver(
               environment,
@@ -328,7 +332,8 @@ function readData<TReadFromStore>(
             if (data.kind === 'MissingData') {
               return {
                 kind: 'MissingData',
-                reason: 'Missing data for ' + field.alias + ' on root ' + root,
+                reason:
+                  'Missing data for ' + field.alias + ' on root ' + root.__link,
                 nestedReason: data,
                 recordId: data.recordId,
               };
@@ -384,7 +389,8 @@ function readData<TReadFromStore>(
         if (refetchReaderParams.kind === 'MissingData') {
           return {
             kind: 'MissingData',
-            reason: 'Missing data for ' + field.alias + ' on root ' + root,
+            reason:
+              'Missing data for ' + field.alias + ' on root ' + root.__link,
             nestedReason: refetchReaderParams,
             recordId: refetchReaderParams.recordId,
           };
@@ -407,7 +413,7 @@ function readData<TReadFromStore>(
 
             return [
               // Stable id
-              root +
+              root.__link +
                 '/' +
                 field.name +
                 '/' +
@@ -432,7 +438,7 @@ function readData<TReadFromStore>(
                     } as const),
 
                     // TODO localVariables is not guaranteed to have an id field
-                    root: localVariables.id,
+                    root: { __link: localVariables.id },
                     variables: localVariables,
                     networkRequest,
                   };
@@ -501,7 +507,7 @@ function readData<TReadFromStore>(
                       ),
 
                       // TODO localVariables is not guaranteed to have an id field
-                      root: localVariables.id,
+                      root: { __link: localVariables.id },
                       variables: localVariables,
                       networkRequest,
                     };

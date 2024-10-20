@@ -30,7 +30,7 @@ export type FragmentSubscription<
 type AnyChangesToRecordSubscription = {
   readonly kind: 'AnyChangesToRecord';
   readonly callback: () => void;
-  readonly recordId: DataId;
+  readonly recordId: Link;
 };
 
 type AnyRecordSubscription = {
@@ -67,7 +67,7 @@ export type IsographEnvironment = {
 
 export type MissingFieldHandler = (
   storeRecord: StoreRecord,
-  root: DataId,
+  root: Link,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
   variables: Variables | null,
@@ -140,7 +140,7 @@ export function createIsographStore(): IsographStore {
 
 export function defaultMissingFieldHandler(
   _storeRecord: StoreRecord,
-  _root: DataId,
+  _root: Link,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
   variables: Variables | null,

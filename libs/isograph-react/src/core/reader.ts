@@ -6,8 +6,8 @@ import {
 } from './FragmentReference';
 import {
   ComponentOrFieldName,
-  DataId,
   IsographEnvironment,
+  type Link,
 } from './IsographEnvironment';
 import {
   IsographEntrypoint,
@@ -66,7 +66,7 @@ export type RefetchReaderArtifact = {
     variables: any,
     // TODO type this better
     filteredVariables: any,
-    rootId: DataId,
+    rootId: Link,
     readerArtifact: TopLevelReaderArtifact<any, any, any> | null,
     // TODO type this better
     nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],

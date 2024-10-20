@@ -106,7 +106,7 @@ export function getOrCreateCacheForArtifact<
           nestedRefetchQueries:
             entrypoint.readerWithRefetchQueries.nestedRefetchQueries,
         }),
-        root: ROOT_ID,
+        root: { __link: ROOT_ID },
         variables,
         networkRequest: networkRequest,
       },
@@ -154,7 +154,7 @@ export function normalizeData(
     normalizationAst,
     networkResponse,
     environment.store.__ROOT,
-    ROOT_ID,
+    { __link: ROOT_ID },
     variables as any,
     nestedRefetchQueries,
     encounteredIds,
@@ -185,7 +185,7 @@ export function subscribeToAnyChange(
 
 export function subscribeToAnyChangesToRecord(
   environment: IsographEnvironment,
-  recordId: DataId,
+  recordId: Link,
   callback: () => void,
 ): () => void {
   const subscription = {
@@ -222,7 +222,7 @@ export function subscribe<
 
 export function onNextChangeToRecord(
   environment: IsographEnvironment,
-  recordId: DataId,
+  recordId: Link,
 ): Promise<void> {
   return new Promise((resolve) => {
     const unsubscribe = subscribeToAnyChangesToRecord(
@@ -319,7 +319,9 @@ function callSubscriptions(
           return;
         }
         case 'AnyChangesToRecord': {
-          if (recordsEncounteredWhenNormalizing.has(subscription.recordId)) {
+          if (
+            recordsEncounteredWhenNormalizing.has(subscription.recordId.__link)
+          ) {
             subscription.callback();
           }
           return;
@@ -352,7 +354,7 @@ function normalizeDataIntoRecord(
   normalizationAst: NormalizationAst,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
-  targetParentRecordId: DataId,
+  targetParentRecordId: Link,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: Set<DataId>,
@@ -410,7 +412,7 @@ function normalizeDataIntoRecord(
     }
   }
   if (recordHasBeenUpdated) {
-    mutableEncounteredIds.add(targetParentRecordId);
+    mutableEncounteredIds.add(targetParentRecordId.__link);
   }
   return recordHasBeenUpdated;
 }
@@ -446,7 +448,7 @@ function normalizeLinkedField(
   astNode: NormalizationLinkedField,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
-  targetParentRecordId: DataId,
+  targetParentRecordId: Link,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: Set<DataId>,
@@ -515,7 +517,7 @@ function normalizeInlineFragment(
   astNode: NormalizationInlineFragment,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
-  targetParentRecordId: DataId,
+  targetParentRecordId: Link,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: Set<DataId>,
@@ -563,7 +565,7 @@ function normalizeNetworkResponseObject(
   environment: IsographEnvironment,
   astNode: NormalizationLinkedField,
   networkResponseData: NetworkResponseObject,
-  targetParentRecordId: string,
+  targetParentRecordId: Link,
   variables: Variables,
   index: number | null,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
@@ -585,7 +587,7 @@ function normalizeNetworkResponseObject(
     astNode.selections,
     networkResponseData,
     newStoreRecord,
-    newStoreRecordId,
+    { __link: newStoreRecordId },
     variables,
     nestedRefetchQueries,
     mutableEncounteredIds,
@@ -723,7 +725,7 @@ export const SECOND_SPLIT_KEY = '___';
 
 // Returns a key to look up an item in the store
 function getDataIdOfNetworkResponse(
-  parentRecordId: DataId,
+  parentrecordId: Link,
   dataToNormalize: NetworkResponseObject,
   astNode: NormalizationLinkedField | NormalizationScalarField,
   variables: Variables,
@@ -737,7 +739,7 @@ function getDataIdOfNetworkResponse(
     return dataId;
   }
 
-  let storeKey = `${parentRecordId}.${astNode.fieldName}`;
+  let storeKey = `${parentrecordId.__link}.${astNode.fieldName}`;
   if (index != null) {
     storeKey += `.${index}`;
   }
