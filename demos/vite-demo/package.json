@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "tsc": "tsc"
+    "tsc": "tsc --showConfig"
   },
   "dependencies": {
     "@isograph/react": "*",
