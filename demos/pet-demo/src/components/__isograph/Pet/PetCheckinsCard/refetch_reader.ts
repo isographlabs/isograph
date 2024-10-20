@@ -1,17 +1,17 @@
-import type { RefetchReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact } from '@isograph/react';
+import type { ReaderAst, RefetchQueryNormalizationArtifact, RefetchReaderArtifact } from '@isograph/react';
 const includeReadOutData = (variables: any, readOutData: any) => {
   variables.id = readOutData.id;
   return variables;
 };
 
-import { makeNetworkRequest, wrapResolvedValue, type IsographEnvironment, type FragmentReference, type RefetchQueryNormalizationArtifactWrapper, type Link, type TopLevelReaderArtifact } from '@isograph/react';
+import { makeNetworkRequest, wrapResolvedValue, type FragmentReference, type IsographEnvironment, type Link, type RefetchQueryNormalizationArtifactWrapper, type TopLevelReaderArtifact } from '@isograph/react';
 import { type ItemCleanupPair } from '@isograph/react-disposable-state';
 const resolver = (
   environment: IsographEnvironment,
   artifact: RefetchQueryNormalizationArtifact,
   readOutData: any,
   filteredVariables: any,
-  rootId: Link,
+  rootLink: Link,
   // TODO type this
   readerArtifact: TopLevelReaderArtifact<any, any, any> | null,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
@@ -26,7 +26,7 @@ const resolver = (
       readerArtifact,
       nestedRefetchQueries,
     } as const),
-    root: rootId,
+    root: rootLink,
     variables,
     networkRequest,
   } as const;

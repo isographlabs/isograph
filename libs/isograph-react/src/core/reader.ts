@@ -1,8 +1,8 @@
 import { Factory } from '@isograph/disposable-types';
 import {
-  FragmentReference,
-  ExtractParameters,
   ExtractData,
+  ExtractParameters,
+  FragmentReference,
 } from './FragmentReference';
 import {
   ComponentOrFieldName,
@@ -66,7 +66,7 @@ export type RefetchReaderArtifact = {
     variables: any,
     // TODO type this better
     filteredVariables: any,
-    rootId: Link,
+    rootLink: Link,
     readerArtifact: TopLevelReaderArtifact<any, any, any> | null,
     // TODO type this better
     nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
