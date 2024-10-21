@@ -11,15 +11,15 @@
   "dependencies": {
     "@isograph/react-disposable-state": "*",
     "@types/node": "18.16.3",
-    "@types/react": "18.2.0",
-    "@types/react-dom": "18.2.1",
+    "@types/react": "18.3.1",
+    "@types/react-dom": "18.3.1",
     "eslint": "8.39.0",
     "eslint-config-next": "13.3.2",
     "next": "13.3.2",
-    "react": "18.2.0",
-    "react-dom": "18.2.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
     "react-no-ssr": "^1.1.0",
-    "typescript": "5.0.4"
+    "typescript": "5.6.3"
   },
   "devDependencies": {
     "@types/react-no-ssr": "^1.1.3"
