@@ -1,9 +1,9 @@
-import { stableCopy } from './cache';
-import { IsographEnvironment } from './IsographEnvironment';
-import { FragmentReference } from './FragmentReference';
 import { useReadAndSubscribe } from '../react/useReadAndSubscribe';
-import { NetworkRequestReaderOptions } from './read';
+import { stableCopy } from './cache';
+import { FragmentReference } from './FragmentReference';
+import { IsographEnvironment } from './IsographEnvironment';
 import { readPromise } from './PromiseWrapper';
+import { NetworkRequestReaderOptions } from './read';
 
 export function getOrCreateCachedComponent(
   environment: IsographEnvironment,
@@ -16,9 +16,9 @@ export function getOrCreateCachedComponent(
   // time.
   const cachedComponentsById = environment.componentCache;
 
-  cachedComponentsById[fragmentReference.root] =
-    cachedComponentsById[fragmentReference.root] ?? {};
-  const componentsByName = cachedComponentsById[fragmentReference.root];
+  const recordLink = fragmentReference.root.__link;
+
+  const componentsByName = (cachedComponentsById[recordLink] ??= {});
 
   componentsByName[componentName] = componentsByName[componentName] ?? {};
   const byArgs = componentsByName[componentName];

@@ -121,7 +121,7 @@ fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctio
         "{include_read_out_data}\n\
         import {{ makeNetworkRequest, wrapResolvedValue, type IsographEnvironment, \
         type FragmentReference, type RefetchQueryNormalizationArtifactWrapper, \
-        type DataId, type TopLevelReaderArtifact }} \
+        type Link, type TopLevelReaderArtifact }} \
         from '@isograph/react';\n\
         import {{ type ItemCleanupPair }} from '@isograph/react-disposable-state';\n\
         const resolver = (\n\
@@ -129,7 +129,7 @@ fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctio
         {indent}artifact: RefetchQueryNormalizationArtifact,\n\
         {indent}readOutData: any,\n\
         {indent}filteredVariables: any,\n\
-        {indent}rootId: DataId,\n\
+        {indent}rootLink: Link,\n\
         {indent}// TODO type this\n\
         {indent}readerArtifact: TopLevelReaderArtifact<any, any, any> | null,\n\
         {indent}nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],\n\
@@ -144,7 +144,7 @@ fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctio
         {indent}    readerArtifact,\n\
         {indent}    nestedRefetchQueries,\n\
         {indent}  }} as const),\n\
-        {indent}  root: rootId,\n\
+        {indent}  root: rootLink,\n\
         {indent}  variables,\n\
         {indent}  networkRequest,\n\
         {indent}}} as const;\n\
@@ -162,7 +162,7 @@ fn generate_function_import_statement_for_mutation_reader(
     ClientFieldFunctionImportStatement(format!(
         "{include_read_out_data}\n\
         import {{ makeNetworkRequest, wrapResolvedValue, type IsographEnvironment, \
-        type DataId, type TopLevelReaderArtifact, \
+        type Link, type TopLevelReaderArtifact, \
         type FragmentReference, \
         type RefetchQueryNormalizationArtifactWrapper \
         }} from '@isograph/react';\n\
@@ -172,7 +172,7 @@ fn generate_function_import_statement_for_mutation_reader(
         {indent}artifact: RefetchQueryNormalizationArtifact,\n\
         {indent}readOutData: any,\n\
         {indent}filteredVariables: any,\n\
-        {indent}rootId: DataId,\n\
+        {indent}rootLink: Link,\n\
         {indent}// TODO type this\n\
         {indent}readerArtifact: TopLevelReaderArtifact<any, any, any>,\n\
         {indent}nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],\n\
@@ -187,7 +187,7 @@ fn generate_function_import_statement_for_mutation_reader(
         {indent}    readerArtifact,\n\
         {indent}    nestedRefetchQueries,\n\
         {indent}  }} as const),\n\
-        {indent}  root: rootId,\n\
+        {indent}  root: rootLink,\n\
         {indent}  variables,\n\
         {indent}  networkRequest,\n\
         {indent}}} as const;\n\
