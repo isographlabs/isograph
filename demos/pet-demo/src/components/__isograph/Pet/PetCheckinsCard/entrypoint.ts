@@ -31,7 +31,7 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "id" },
       ],
     ],
-    concreteType: "Pet",
+    concreteType: null,
     selections: [
       {
         kind: "InlineFragment",

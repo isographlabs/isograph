@@ -109,7 +109,7 @@ impl UnvalidatedSchema {
                     format!("refetch__{}", object.name).intern().into(),
                     *NODE_FIELD_NAME,
                     id_top_level_arguments(),
-                    object.concrete_type,
+                    None,
                     RequiresRefinement::Yes(object.name),
                     None,
                     None,
