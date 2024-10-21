@@ -71,6 +71,7 @@ jobs:
         target:
           - folder: github-demo
           - folder: pet-demo
+          - folder: vite-demo
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -98,6 +99,7 @@ jobs:
         target:
           - folder: github-demo
           - folder: pet-demo
+          - folder: vite-demo
     steps:
       - uses: actions/checkout@v2
       - uses: pnpm/action-setup@v2
@@ -372,6 +374,11 @@ jobs:
         with:
           name: isograph_cli-macos-arm64
           path: libs/isograph-compiler/artifacts/macos-arm64
+      - name: Download artifact isograph_cli-bin-win-x64
+        uses: actions/download-artifact@v4
+        with:
+          name: isograph_cli-bin-win-x64
+          path: libs/isograph-compiler/artifacts/win-x64
       - name: Mark binaries as executable
         run: |
           chmod +x libs/isograph-compiler/artifacts/linux-x64/isograph_cli

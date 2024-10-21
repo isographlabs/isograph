@@ -24,7 +24,7 @@ export const ANYTHING = iso(`
     # selections go here, such as
     title
   }
-`)((data) => {
+`)(({ data }) => {
   // Return JSX from here:
   return <h1>{data.title}</h1>;
 });
@@ -37,7 +37,7 @@ export const AGAIN_ANYTHING = iso(`
   field TYPE_NAME.PARENT_FIELD_NAME @component {
     CHILD_FIELD_NAME
   }
-`)((data) => {
+`)(({ data }) => {
   // now, you can directly render the child field, e.g.
   return <data.CHILD_FIELD_NAME />;
 });
@@ -66,7 +66,7 @@ export const AGAIN_ANYTHING = iso(`
   field TYPE_NAME.PARENT_FIELD_NAME @component {
     CHILD_FIELD_NAME
   }
-`)((data) => {
+`)(({ data }) => {
   // now, you can directly render the child field, e.g.
   return (
     <data.CHILD_FIELD_NAME
@@ -96,7 +96,7 @@ export const SomeComponent = iso(`
     ImportantField
     LessImportantField @loadable
   }
-`)((data) => {
+`)(({ data }) => {
   const fragmentReference = useClientSideDefer(data.LessImportantField);
 
   return (
@@ -151,7 +151,7 @@ export const SomeComponent = iso(`
   field PARENT_TYPE.SomeComponent @component {
     reExposedMutationField
   }
-`)((data) => {
+`)(({ data }) => {
   const { loadField, fragmentReference } = useImperativeExposedMutationField(
     data.reExposedMutationField
   )

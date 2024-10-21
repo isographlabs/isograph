@@ -1,5 +1,9 @@
 # Refetching
 
+:::note
+The `__refetch` fields described in this document will eventually be combined with `@loadable` fields, and this documentation will become outdated.
+:::
+
 ## Refetch fields
 
 If an object has an `id: ID!` field, Isograph will generate a `__refetch` field on each selection of that type. If you select that field, Isograph will generate a query for all of the fields selected on that object in the (merged) parent query.
@@ -18,7 +22,7 @@ export const PetRefetcherButtonComponent = iso(`
     name
     __refetch
   }
-`)((data) => {
+`)(({ data }) => {
   return (
     <Button onClick={() => data.__refetch()[1]()}>Refetch {data.name}</Button>
   );

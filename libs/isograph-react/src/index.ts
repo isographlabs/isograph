@@ -82,6 +82,7 @@ export {
 } from './react/useReadAndSubscribe';
 export { useLazyReference } from './react/useLazyReference';
 export { useRerenderOnChange } from './react/useRerenderOnChange';
+export { RenderAfterCommit__DO_NOT_USE } from './react/RenderAfterCommit__DO_NOT_USE';
 
 export { useClientSideDefer } from './loadable-hooks/useClientSideDefer';
 export { useImperativeExposedMutationField } from './loadable-hooks/useImperativeExposedMutationField';

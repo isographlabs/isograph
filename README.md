@@ -33,7 +33,7 @@ export const Avatar = iso(`
   field User.Avatar @component {
     avatar_url
   }
-`)(function AvatarComponent(data) {
+`)(function AvatarComponent({ data }) {
   return <CircleImage image={data.avatar_url} />;
 });
 ```
@@ -49,7 +49,7 @@ export const UserProfileButton = iso(`
     id
     name
   }
-`)(function UserProfileButtonComponent(data) {
+`)(function UserProfileButtonComponent({ data }) {
   return (
     <Button onClick={() => navigateToUserProfile(data.id)}>
       {data.name}
@@ -118,7 +118,7 @@ export const UserDetailPage = iso(`
     name
     CreditCardInfo @loadable
   }
-`)((data) => {
+`)(({ data }) => {
   const CreditCardInfo = useClientSideDefer(data.CreditCardInfo);
 
   return (
@@ -180,7 +180,7 @@ export const UpdateUserNameButton = iso(`
   field User.UpdateUserNameButton {
     set_user_name
   }
-`)((data) => {
+`)(({ data }) => {
   return (
     <div
       onClick={() => data.set_user_name({ input: { new_name: 'Maybe' } })[1]()}

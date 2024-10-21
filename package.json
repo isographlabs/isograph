@@ -3,7 +3,7 @@
   "devDependencies": {
     "gulp": "4.0.2",
     "prettier": "^3.2.4",
-    "typescript": "^5.0.3",
+    "typescript": "5.6.3",
     "vitest": "^2.1.2"
   },
   "scripts": {
@@ -13,10 +13,12 @@
     "watch-pet-demo": "./target/debug/isograph_cli --config ./demos/pet-demo/isograph.config.json --watch",
     "watch-github-demo": "./target/debug/isograph_cli --config ./demos/github-demo/isograph.config.json --watch",
     "watch-isograph-react-demo": "./target/debug/isograph_cli --config ./libs/isograph-react/src/tests/isograph.config.json --watch",
-    "build-demos": "pnpm run build-github-demo && pnpm run build-pet-demo && pnpm run build-isograph-react-demo",
+    "watch-vite-demo": "./target/debug/isograph_cli --config ./demos/vite-demo/isograph.config.json --watch",
+    "build-demos": "pnpm run build-github-demo && pnpm run build-pet-demo && pnpm run build-isograph-react-demo && pnpm run build-vite-demo",
     "build-github-demo": "./target/debug/isograph_cli --config ./demos/github-demo/isograph.config.json",
     "build-pet-demo": "./target/debug/isograph_cli --config ./demos/pet-demo/isograph.config.json",
     "build-isograph-react-demo": "./target/debug/isograph_cli --config ./libs/isograph-react/isograph.config.json",
+    "build-vite-demo": "./target/debug/isograph_cli --config ./demos/vite-demo/isograph.config.json",
     "watch-libs": "cargo watch -s 'pnpm -r compile' -d 0.1 -w ./libs",
     "format": "pnpm run format-prettier && pnpm run format-rust",
     "format-prettier": "prettier --config ./.prettierrc.json --write .",
@@ -31,9 +33,6 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/isographlabs/isograph.git"
-  },
-  "dependencies": {
-    "react-twitter-embed": "^4.0.4"
   },
   "engines": {
     "node": "22.9.0"

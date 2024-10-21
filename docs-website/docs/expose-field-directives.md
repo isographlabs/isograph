@@ -86,7 +86,7 @@ You might use it as follows:
 // Note: if you inline this function into the iso literal, you will not have to
 // annotate the type of props. If it is defined separately, TypeScript will probably
 // complain that it doesn't know what the type of data is.
-function PetTaglineInputComponent(data) {
+function PetTaglineInputComponent({ data }) {
   const [tagline, setTagline] = useState<string>(data.tagline);
 
   const updateTagline = () => data.set_tagline({ input: { tagline } });
