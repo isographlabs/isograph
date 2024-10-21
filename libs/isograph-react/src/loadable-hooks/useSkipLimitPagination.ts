@@ -18,28 +18,6 @@ import { getPromiseState, readPromise } from '../core/PromiseWrapper';
 import { type WithEncounteredRecords } from '../core/read';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 
-type Limit = 'limit';
-type Skip = 'skip';
-
-type MakeSkipOptional<TArgs> = {
-  [K in Extract<keyof TArgs, Skip>]?: TArgs[K] | undefined;
-} & {
-  [K in Exclude<keyof TArgs, Skip>]: TArgs[K];
-};
-
-type Prettify<T> = {
-  readonly [K in keyof T]: T[K];
-} & {};
-
-// if none of the keys are required initialArgs will be optional
-type MakeOptionalArgs<TArgs> = {} extends TArgs
-  ? [initialArgs?: TArgs]
-  : [initialArgs: TArgs];
-
-type UseSkipLimitPaginationArgs<TArgs> = MakeOptionalArgs<
-  Prettify<MakeSkipOptional<Omit<TArgs, Limit>>>
->;
-
 type UseSkipLimitReturnValue<
   TReadFromStore extends { data: object; parameters: object },
   TItem,
@@ -85,20 +63,23 @@ function flatten<T>(arr: ReadonlyArray<ReadonlyArray<T>>): ReadonlyArray<T> {
   return outArray;
 }
 
-export function useSkipLimitPagination<
-  TReadFromStore extends {
-    parameters: {
-      readonly skip: number | void | null;
-      readonly limit: number | void | null;
-    };
-    data: object;
-  },
-  TItem,
->(
-  loadableField: LoadableField<TReadFromStore, ReadonlyArray<TItem>>,
-  ...[initialArgs]: UseSkipLimitPaginationArgs<TReadFromStore['parameters']>
-): UseSkipLimitReturnValue<TReadFromStore, TItem> {
-  const [args] = useState(initialArgs);
+interface TUseSkipLimitReadFromStore<TData> {
+  readonly parameters: {
+    readonly skip: number | void | null;
+    readonly limit: number | void | null;
+  };
+  readonly data: TData;
+}
+
+export function useSkipLimitPagination<TData extends object, TItem>(
+  loadableField: LoadableField<
+    TUseSkipLimitReadFromStore<TData>,
+    ReadonlyArray<TItem>
+  >,
+  initialArgs?: { readonly skip?: number | void | null },
+): UseSkipLimitReturnValue<TUseSkipLimitReadFromStore<TData>, TItem> {
+  type TReadFromStore = TUseSkipLimitReadFromStore<TData>;
+
   const networkRequestOptions = {
     suspendIfInFlight: true,
     throwOnNetworkError: true,
@@ -179,9 +160,7 @@ export function useSkipLimitPagination<
   const getFetchMore =
     (loadedSoFar: number) =>
     (count: number): void => {
-      // @ts-expect-error
       const loadedField = loadableField({
-        ...args,
         skip: loadedSoFar,
         limit: count,
       })[1]();
@@ -272,7 +251,7 @@ export function useSkipLimitPagination<
   if (!networkRequestStatus) {
     return {
       kind: 'Complete',
-      fetchMore: getFetchMore(args?.skip ?? 0),
+      fetchMore: getFetchMore(initialArgs?.skip ?? 0),
       results: [],
     };
   }
@@ -336,10 +315,4 @@ function tsTests() {
   >;
   // @ts-expect-error
   useSkipLimitPagination(advancedLoadable);
-  // @ts-expect-error
-  useSkipLimitPagination(advancedLoadable, {});
-  // @ts-expect-error
-  useSkipLimitPagination(advancedLoadable, { skip: 10 });
-  useSkipLimitPagination(advancedLoadable, { search: 'foo' });
-  useSkipLimitPagination(advancedLoadable, { skip: 10, search: 'foo' });
 }

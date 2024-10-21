@@ -20,28 +20,6 @@ import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 import { maybeUnwrapNetworkRequest } from '../react/useResult';
 
-type First = 'first';
-type After = 'after';
-
-type MakeAfterOptional<TArgs> = {
-  [K in Extract<keyof TArgs, After>]?: TArgs[K] | undefined;
-} & {
-  [K in Exclude<keyof TArgs, After>]: TArgs[K];
-};
-
-type Prettify<T> = {
-  readonly [K in keyof T]: T[K];
-} & {};
-
-// if none of the keys are required initialArgs will be optional
-type MakeOptionalArgs<TArgs> = {} extends TArgs
-  ? [initialArgs?: TArgs]
-  : [initialArgs: TArgs];
-
-type UseConnectionSpecArgs<TArgs> = MakeOptionalArgs<
-  Prettify<MakeAfterOptional<Omit<TArgs, First>>>
->;
-
 type UsePaginationReturnValue<
   TReadFromStore extends { parameters: object; data: object },
   TItem,
@@ -53,7 +31,7 @@ type UsePaginationReturnValue<
     }
   | {
       kind: 'Complete';
-      fetchMore: (first: number) => void;
+      fetchMore: (count: number) => void;
       results: ReadonlyArray<TItem>;
       hasNextPage: boolean;
     };
@@ -95,20 +73,25 @@ type NonNullConnection<T> = {
   readonly pageInfo: PageInfo;
 };
 
-export function useConnectionSpecPagination<
-  TReadFromStore extends {
-    parameters: {
-      readonly first?: number | void | null;
-      readonly after?: string | void | null;
-    };
-    data: object;
+interface TUseConnectionSpecReadFromStore<TData> {
+  readonly parameters: {
+    readonly first?: number | void | null;
+    readonly after?: string | void | null;
+  };
+  readonly data: TData;
+}
+
+export function useConnectionSpecPagination<TData extends object, TItem>(
+  loadableField: LoadableField<
+    TUseConnectionSpecReadFromStore<TData>,
+    Connection<TItem>
+  >,
+  initialArgs?: {
+    after?: string | void | null;
   },
-  TItem,
->(
-  loadableField: LoadableField<TReadFromStore, Connection<TItem>>,
-  ...[initialArgs]: UseConnectionSpecArgs<TReadFromStore['parameters']>
-): UsePaginationReturnValue<TReadFromStore, TItem> {
-  const [args] = useState(initialArgs);
+): UsePaginationReturnValue<TUseConnectionSpecReadFromStore<TData>, TItem> {
+  type TReadFromStore = TUseConnectionSpecReadFromStore<TData>;
+
   const networkRequestOptions = {
     suspendIfInFlight: true,
     throwOnNetworkError: true,
@@ -195,12 +178,10 @@ export function useConnectionSpecPagination<
 
   const getFetchMore =
     (after: string | null | undefined) =>
-    (first: number): void => {
-      // @ts-expect-error
+    (count: number): void => {
       const loadedField = loadableField({
-        ...args,
         after: after,
-        first: first,
+        first: count,
       })[1]();
       const newPointer = createReferenceCountedPointer(loadedField);
       const clonedPointers = loadedReferences.map(([refCountedPointer]) => {
@@ -291,7 +272,7 @@ export function useConnectionSpecPagination<
   if (!networkRequestStatus) {
     return {
       kind: 'Complete',
-      fetchMore: getFetchMore(args?.after ?? null),
+      fetchMore: getFetchMore(initialArgs?.after ?? null),
       results: [],
       hasNextPage: true,
     };
