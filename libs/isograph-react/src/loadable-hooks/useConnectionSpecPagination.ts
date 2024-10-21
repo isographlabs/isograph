@@ -73,25 +73,27 @@ type NonNullConnection<T> = {
   readonly pageInfo: PageInfo;
 };
 
-interface TUseConnectionSpecReadFromStore<TData> {
-  readonly parameters: {
-    readonly first?: number | void | null;
-    readonly after?: string | void | null;
-  };
-  readonly data: TData;
-}
+type UseConnectionSpecPaginationArgs = {
+  first: number;
+  after: string | null;
+};
 
-export function useConnectionSpecPagination<TData extends object, TItem>(
+export function useConnectionSpecPagination<
+  TReadFromStore extends {
+    parameters: UseConnectionSpecPaginationArgs;
+    data: object;
+  },
+  TItem,
+>(
   loadableField: LoadableField<
-    TUseConnectionSpecReadFromStore<TData>,
-    Connection<TItem>
+    TReadFromStore,
+    Connection<TItem>,
+    UseConnectionSpecPaginationArgs
   >,
   initialArgs?: {
     after?: string | void | null;
   },
-): UsePaginationReturnValue<TUseConnectionSpecReadFromStore<TData>, TItem> {
-  type TReadFromStore = TUseConnectionSpecReadFromStore<TData>;
-
+): UsePaginationReturnValue<TReadFromStore, TItem> {
   const networkRequestOptions = {
     suspendIfInFlight: true,
     throwOnNetworkError: true,
@@ -177,7 +179,7 @@ export function useConnectionSpecPagination<TData extends object, TItem>(
   }
 
   const getFetchMore =
-    (after: string | null | undefined) =>
+    (after: string | null) =>
     (count: number): void => {
       const loadedField = loadableField({
         after: after,

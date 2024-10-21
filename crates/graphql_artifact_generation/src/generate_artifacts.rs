@@ -479,40 +479,43 @@ fn write_param_type_from_selection(
                             client_field.type_and_field.underscore_separated()
                         );
 
-                        let output_type =
-                            match scalar_field_selection.associated_data.selection_variant {
-                                ValidatedIsographSelectionVariant::Regular => inner_output_type,
-                                ValidatedIsographSelectionVariant::Loadable(_) => {
-                                    loadable_fields.insert(client_field.type_and_field);
-                                    let provided_arguments = get_provided_arguments(
-                                        client_field.variable_definitions.iter().map(|x| &x.item),
-                                        &scalar_field_selection.arguments,
-                                    );
+                        let output_type = match scalar_field_selection
+                            .associated_data
+                            .selection_variant
+                        {
+                            ValidatedIsographSelectionVariant::Regular => inner_output_type,
+                            ValidatedIsographSelectionVariant::Loadable(_) => {
+                                loadable_fields.insert(client_field.type_and_field);
+                                let provided_arguments = get_provided_arguments(
+                                    client_field.variable_definitions.iter().map(|x| &x.item),
+                                    &scalar_field_selection.arguments,
+                                );
 
-                                    let indent = "  ".repeat((indentation_level + 1) as usize);
-                                    let provided_args_type = if provided_arguments.is_empty() {
-                                        "".to_string()
-                                    } else {
-                                        format!(
-                                            ",\n{indent}{}",
-                                            get_loadable_field_type_from_arguments(
-                                                schema,
-                                                provided_arguments
-                                            )
-                                        )
-                                    };
-
+                                let indent = "  ".repeat((indentation_level + 1) as usize);
+                                let provided_args_type = if provided_arguments.is_empty() {
+                                    "".to_string()
+                                } else {
                                     format!(
-                                        "LoadableField<\n\
+                                        ",\n{indent}Omit<ExtractParameters<{}__param>, keyof {}>",
+                                        client_field.type_and_field.underscore_separated(),
+                                        get_loadable_field_type_from_arguments(
+                                            schema,
+                                            provided_arguments
+                                        )
+                                    )
+                                };
+
+                                format!(
+                                    "LoadableField<\n\
                                         {indent}{}__param,\n\
                                         {indent}{inner_output_type}\
                                         {provided_args_type}\n\
                                         {}>",
-                                        client_field.type_and_field.underscore_separated(),
-                                        "  ".repeat(indentation_level as usize),
-                                    )
-                                }
-                            };
+                                    client_field.type_and_field.underscore_separated(),
+                                    "  ".repeat(indentation_level as usize),
+                                )
+                            }
+                        };
 
                         query_type_declaration.push_str(
                             &(format!(

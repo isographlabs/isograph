@@ -148,7 +148,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
     let loadable_field_imports = if !loadable_fields.is_empty() {
         let param_imports = param_type_imports_to_import_param_statement(&loadable_fields);
         format!(
-            "import {{ type LoadableField }} from '@isograph/react';\n\
+            "import {{ type LoadableField, type ExtractParameters }} from '@isograph/react';\n\
             {param_imports}"
         )
     } else {

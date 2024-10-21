@@ -1,11 +1,4 @@
-import { LoadableField, type ReaderAst } from '../core/reader';
-import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { ItemCleanupPair } from '@isograph/disposable-types';
-import { FragmentReference } from '../core/FragmentReference';
-import { maybeUnwrapNetworkRequest } from '../react/useResult';
-import { readButDoNotEvaluate } from '../core/read';
-import { subscribeToAnyChange } from '../core/cache';
-import { useState } from 'react';
 import {
   UNASSIGNED_STATE,
   useUpdatableDisposableState,
@@ -14,9 +7,18 @@ import {
   createReferenceCountedPointer,
   ReferenceCountedPointer,
 } from '@isograph/reference-counted-pointer';
+import { useState } from 'react';
+import { subscribeToAnyChange } from '../core/cache';
+import { FragmentReference } from '../core/FragmentReference';
 import { getPromiseState, readPromise } from '../core/PromiseWrapper';
-import { type WithEncounteredRecords } from '../core/read';
+import {
+  readButDoNotEvaluate,
+  type WithEncounteredRecords,
+} from '../core/read';
+import { LoadableField, type ReaderAst } from '../core/reader';
+import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
+import { maybeUnwrapNetworkRequest } from '../react/useResult';
 
 type UseSkipLimitReturnValue<
   TReadFromStore extends { data: object; parameters: object },
@@ -63,23 +65,27 @@ function flatten<T>(arr: ReadonlyArray<ReadonlyArray<T>>): ReadonlyArray<T> {
   return outArray;
 }
 
-interface TUseSkipLimitReadFromStore<TData> {
-  readonly parameters: {
-    readonly skip: number | void | null;
-    readonly limit: number | void | null;
-  };
-  readonly data: TData;
-}
+type UseSkipLimitPaginationArgs = {
+  skip: number;
+  limit: number;
+};
 
-export function useSkipLimitPagination<TData extends object, TItem>(
+export function useSkipLimitPagination<
+  TItem,
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+  },
+>(
   loadableField: LoadableField<
-    TUseSkipLimitReadFromStore<TData>,
-    ReadonlyArray<TItem>
+    TReadFromStore,
+    ReadonlyArray<TItem>,
+    UseSkipLimitPaginationArgs
   >,
-  initialArgs?: { readonly skip?: number | void | null },
-): UseSkipLimitReturnValue<TUseSkipLimitReadFromStore<TData>, TItem> {
-  type TReadFromStore = TUseSkipLimitReadFromStore<TData>;
-
+  initialArgs?: {
+    skip?: number | void | null;
+  },
+): UseSkipLimitReturnValue<TReadFromStore, TItem> {
   const networkRequestOptions = {
     suspendIfInFlight: true,
     throwOnNetworkError: true,
@@ -287,13 +293,16 @@ export function useSkipLimitPagination<TData extends object, TItem>(
 
 // @ts-ignore
 function tsTests() {
+  type Parameters = {
+    readonly search: string;
+    readonly skip: number;
+    readonly limit: number;
+  };
+
   let basicLoadable!: LoadableField<
     {
       readonly data: object;
-      readonly parameters: {
-        readonly skip: number;
-        readonly limit: number;
-      };
+      readonly parameters: Omit<Parameters, 'search'>;
     },
     object[]
   >;
@@ -302,17 +311,24 @@ function tsTests() {
   useSkipLimitPagination(basicLoadable, {});
   useSkipLimitPagination(basicLoadable, { skip: 10 });
 
-  let advancedLoadable!: LoadableField<
+  let unprovidedSearchLoadable!: LoadableField<
     {
       readonly data: object;
-      readonly parameters: {
-        readonly search: string;
-        readonly skip: number;
-        readonly limit: number;
-      };
+      readonly parameters: Parameters;
     },
     object[]
   >;
   // @ts-expect-error
-  useSkipLimitPagination(advancedLoadable);
+  useSkipLimitPagination(unprovidedSearchLoadable);
+
+  let providedSearchLoadable!: LoadableField<
+    {
+      readonly data: object;
+      readonly parameters: Parameters;
+    },
+    object[],
+    Omit<Parameters, 'search'>
+  >;
+
+  useSkipLimitPagination(providedSearchLoadable);
 }
