@@ -30,6 +30,7 @@ const normalizationAst: NormalizationAst = [
         { kind: "Literal", value: 93 },
       ],
     ],
+    concreteType: "Pokemon",
     selections: [
       {
         kind: "Scalar",

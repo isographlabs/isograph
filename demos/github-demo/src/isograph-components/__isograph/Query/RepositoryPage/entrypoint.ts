@@ -68,6 +68,7 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "repositoryOwner" },
       ],
     ],
+    concreteType: "Repository",
     selections: [
       {
         kind: "Scalar",
@@ -83,6 +84,7 @@ const normalizationAst: NormalizationAst = [
         kind: "Linked",
         fieldName: "parent",
         arguments: null,
+        concreteType: "Repository",
         selections: [
           {
             kind: "Scalar",
@@ -103,6 +105,7 @@ const normalizationAst: NormalizationAst = [
             kind: "Linked",
             fieldName: "owner",
             arguments: null,
+            concreteType: null,
             selections: [
               {
                 kind: "Scalar",
@@ -132,16 +135,19 @@ const normalizationAst: NormalizationAst = [
             { kind: "Variable", name: "first" },
           ],
         ],
+        concreteType: "PullRequestConnection",
         selections: [
           {
             kind: "Linked",
             fieldName: "edges",
             arguments: null,
+            concreteType: "PullRequestEdge",
             selections: [
               {
                 kind: "Linked",
                 fieldName: "node",
                 arguments: null,
+                concreteType: "PullRequest",
                 selections: [
                   {
                     kind: "Scalar",
@@ -152,6 +158,7 @@ const normalizationAst: NormalizationAst = [
                     kind: "Linked",
                     fieldName: "author",
                     arguments: null,
+                    concreteType: null,
                     selections: [
                       {
                         kind: "Scalar",
@@ -184,6 +191,7 @@ const normalizationAst: NormalizationAst = [
                     kind: "Linked",
                     fieldName: "repository",
                     arguments: null,
+                    concreteType: "Repository",
                     selections: [
                       {
                         kind: "Scalar",
@@ -199,6 +207,7 @@ const normalizationAst: NormalizationAst = [
                         kind: "Linked",
                         fieldName: "owner",
                         arguments: null,
+                        concreteType: null,
                         selections: [
                           {
                             kind: "Scalar",
@@ -251,6 +260,7 @@ const normalizationAst: NormalizationAst = [
     kind: "Linked",
     fieldName: "viewer",
     arguments: null,
+    concreteType: "User",
     selections: [
       {
         kind: "Scalar",

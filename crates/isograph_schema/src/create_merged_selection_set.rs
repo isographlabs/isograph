@@ -112,6 +112,8 @@ pub struct MergedLinkedFieldSelection {
     pub name: LinkedFieldName,
     pub selection_map: MergedSelectionMap,
     pub arguments: Vec<ArgumentKeyAndValue>,
+    /// Some if the object is concrete; None otherwise.
+    pub concrete_type: Option<IsographObjectTypeName>,
 }
 
 impl MergedLinkedFieldSelection {
@@ -302,6 +304,7 @@ fn transform_and_merge_child_selection_map_into_parent_map(
                     }
                     MergedServerSelection::LinkedField(linked_field_selection) => {
                         MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
+                            concrete_type: linked_field_selection.concrete_type,
                             name: linked_field_selection.name,
                             selection_map: transform_child_map_with_parent_context(
                                 &linked_field_selection.selection_map,
@@ -489,6 +492,7 @@ fn process_imperatively_loaded_field(
         client_field_scalar_selection_name,
         top_level_schema_field_name,
         top_level_schema_field_arguments,
+        top_level_schema_field_concrete_type,
         primary_field_info,
         root_object_id,
     } = variant;
@@ -543,9 +547,13 @@ fn process_imperatively_loaded_field(
                 }
             })
             .collect(),
+        top_level_schema_field_concrete_type,
         primary_field_info
             .as_ref()
             .map(|x| x.primary_field_name.lookup().intern().into()),
+        primary_field_info
+            .as_ref()
+            .and_then(|x| x.primary_field_concrete_type),
         requires_refinement,
     );
 
@@ -739,6 +747,9 @@ fn merge_validated_selections_into_selection_map(
                         let linked_field =
                             parent_map.entry(normalization_key).or_insert_with(|| {
                                 MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
+                                    concrete_type: linked_field_selection
+                                        .associated_data
+                                        .concrete_type,
                                     name: linked_field_selection.name.item,
                                     selection_map: BTreeMap::new(),
                                     arguments: transform_arguments_with_child_context(
@@ -989,8 +1000,10 @@ pub fn selection_map_wrapped(
     mut inner_selection_map: MergedSelectionMap,
     top_level_field: LinkedFieldName,
     top_level_field_arguments: Vec<ArgumentKeyAndValue>,
+    top_level_field_concrete_type: Option<IsographObjectTypeName>,
     // TODO support arguments and vectors of subfields
     subfield: Option<LinkedFieldName>,
+    subfield_concrete_type: Option<IsographObjectTypeName>,
     type_to_refine_to: RequiresRefinement,
 ) -> MergedSelectionMap {
     // We are proceeding inside out, i.e. creating
@@ -1026,6 +1039,7 @@ pub fn selection_map_wrapped(
                     name: subfield,
                     selection_map: selection_set_with_inline_fragment,
                     arguments: vec![],
+                    concrete_type: subfield_concrete_type,
                 }),
             );
             map
@@ -1043,6 +1057,7 @@ pub fn selection_map_wrapped(
             name: top_level_field,
             selection_map: selection_set_with_subfield,
             arguments: top_level_field_arguments,
+            concrete_type: top_level_field_concrete_type,
         }),
     );
 

@@ -103,6 +103,7 @@ export type StoreRecord = {
   readonly id?: DataId;
 };
 
+export type TypeName = string;
 export type DataId = string;
 
 export const ROOT_ID: DataId & '__ROOT' = '__ROOT';

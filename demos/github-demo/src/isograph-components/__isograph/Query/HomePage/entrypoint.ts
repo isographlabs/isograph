@@ -21,6 +21,7 @@ const normalizationAst: NormalizationAst = [
     kind: "Linked",
     fieldName: "viewer",
     arguments: null,
+    concreteType: "User",
     selections: [
       {
         kind: "Scalar",

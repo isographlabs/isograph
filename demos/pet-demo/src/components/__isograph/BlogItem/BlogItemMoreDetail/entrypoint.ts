@@ -24,6 +24,7 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "id" },
       ],
     ],
+    concreteType: "BlogItem",
     selections: [
       {
         kind: "InlineFragment",
