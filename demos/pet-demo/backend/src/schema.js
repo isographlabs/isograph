@@ -181,10 +181,7 @@ export const schema = createSchema({
     },
     Viewer: {
       newsfeed: (_obj, args) => {
-        return getNewsfeedItems(
-          args.skip + (args.additionalSkip ?? 0),
-          args.limit,
-        );
+        return getNewsfeedItems(args.skip, args.limit);
       },
     },
     ...newsfeedResolvers,

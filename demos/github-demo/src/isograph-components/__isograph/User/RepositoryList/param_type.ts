@@ -4,6 +4,7 @@ import { type User__RepositoryConnection__param } from '../../User/RepositoryCon
 
 export type User__RepositoryList__param = {
   readonly data: {
+    readonly firstPage: User__RepositoryConnection__output_type,
     readonly RepositoryConnection: LoadableField<
       User__RepositoryConnection__param,
       User__RepositoryConnection__output_type

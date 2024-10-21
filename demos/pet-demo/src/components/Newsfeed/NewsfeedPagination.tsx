@@ -3,7 +3,7 @@ import { iso } from '@iso';
 
 export const NewsfeedPaginationComponent = iso(`
   field Viewer.NewsfeedPaginationComponent($skip: Int!, $limit: Int!) {
-    newsfeed(skip: $skip, limit: $limit, additionalSkip: 5) {
+    newsfeed(skip: $skip, limit: $limit) {
       NewsfeedAdOrBlog
     }
   }
