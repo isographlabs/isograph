@@ -80,7 +80,7 @@ type UseConnectionSpecPaginationArgs = {
 
 export function useConnectionSpecPagination<
   TReadFromStore extends {
-    parameters: UseConnectionSpecPaginationArgs;
+    parameters: object;
     data: object;
   },
   TItem,
