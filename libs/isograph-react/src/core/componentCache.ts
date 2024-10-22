@@ -4,6 +4,7 @@ import { FragmentReference } from './FragmentReference';
 import { useReadAndSubscribe } from '../react/useReadAndSubscribe';
 import { NetworkRequestReaderOptions } from './read';
 import { readPromise } from './PromiseWrapper';
+import { logMessage } from './logging';
 
 export function getOrCreateCachedComponent(
   environment: IsographEnvironment,
@@ -47,17 +48,11 @@ export function getOrCreateCachedComponent(
           readerWithRefetchQueries.readerArtifact.readerAst,
         );
 
-        // @ts-expect-error
-        if (typeof window !== 'undefined' && window.__LOG) {
-          console.log(
-            'Component re-rendered: ' +
-              componentName +
-              ' ' +
-              fragmentReference.root.__typename +
-              ' ' +
-              fragmentReference.root.__link,
-          );
-        }
+        logMessage(environment, {
+          kind: 'ComponentRerendered',
+          componentName,
+          rootId: fragmentReference.root,
+        });
 
         const firstParameter = {
           data,

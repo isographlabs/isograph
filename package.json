@@ -3,7 +3,7 @@
   "devDependencies": {
     "gulp": "4.0.2",
     "prettier": "^3.2.4",
-    "typescript": "^5.0.3",
+    "typescript": "5.6.3",
     "vitest": "^2.1.2"
   },
   "scripts": {
@@ -33,9 +33,6 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/isographlabs/isograph.git"
-  },
-  "dependencies": {
-    "react-twitter-embed": "^4.0.4"
   },
   "engines": {
     "node": "22.9.0"

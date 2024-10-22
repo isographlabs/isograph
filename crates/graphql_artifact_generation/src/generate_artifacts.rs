@@ -142,7 +142,7 @@ pub fn get_artifact_path_and_content(
                         merged_selection_map.clone(),
                         *NODE_FIELD_NAME,
                         vec![id_arg.clone()],
-                        type_to_refine_to.concrete_type,
+                        None,
                         None,
                         None,
                         RequiresRefinement::Yes(type_to_refine_to.name),

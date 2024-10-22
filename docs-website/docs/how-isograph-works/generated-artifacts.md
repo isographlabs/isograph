@@ -4,11 +4,13 @@
 The precise nature of the generated artifacts is liable to change.
 :::
 
-The Isograph compiler generates artifacts in the `artifact_directory` folder. These fall into three types:
+The Isograph compiler generates artifacts in the `artifact_directory` folder. These fall into several categories:
 
 - reader artifacts
 - entrypoint artifacts
 - refetch artifacts
+- artifacts containing types (e.g. `param_type.ts` and `parameters_type.ts`)
+- the `iso.ts` file
 
 ## Reader artifacts
 
@@ -83,3 +85,9 @@ User.UserDetail {
 ```
 
 In this case, the `UserDetail`'s refetch artifact will select `{ id, name, best_friend { id, name }}`. The `best_friend.UserDetail`'s refetch artifact will select `{ id, name }`. So, where a resolver is selected affects what fields are selected in refetch and magic mutation field queries.
+
+## `iso.ts`
+
+In Isograph, the `iso` function is always imported as `import { iso } from '@iso'`, and `@iso` is an alias pointing to the generated `iso.ts` file. The `iso.ts` file contains a bunch of overloads for the `iso` function, thus providing the types that your IDE and tsc can understand.
+
+See the [babel plugin](../babel-plugin) docs for more. Notably, the `iso` function does not exist at runtime.

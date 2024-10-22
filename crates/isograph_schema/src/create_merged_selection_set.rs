@@ -110,9 +110,10 @@ impl MergedScalarFieldSelection {
 pub struct MergedLinkedFieldSelection {
     // TODO no location
     pub name: LinkedFieldName,
-    pub concrete_type: Option<IsographObjectTypeName>,
     pub selection_map: MergedSelectionMap,
     pub arguments: Vec<ArgumentKeyAndValue>,
+    /// Some if the object is concrete; None otherwise.
+    pub concrete_type: Option<IsographObjectTypeName>,
 }
 
 impl MergedLinkedFieldSelection {
@@ -1005,14 +1006,14 @@ pub fn selection_map_wrapped(
     // TODO support arguments and vectors of subfields
     subfield: Option<LinkedFieldName>,
     subfield_concrete_type: Option<IsographObjectTypeName>,
-    requires_refinement: RequiresRefinement,
+    type_to_refine_to: RequiresRefinement,
 ) -> MergedSelectionMap {
     // We are proceeding inside out, i.e. creating
     // `mutation_name { subfield { ...on Type { existing_selection_set }}}`
     // first by creating the inline fragment, then subfield, etc.
 
     // Should we wrap the selection set in a type to refine to?
-    let selection_set_with_inline_fragment = match requires_refinement {
+    let selection_set_with_inline_fragment = match type_to_refine_to {
         RequiresRefinement::Yes(type_to_refine_to) => {
             maybe_add_typename_selection(&mut inner_selection_map);
             let mut map = BTreeMap::new();

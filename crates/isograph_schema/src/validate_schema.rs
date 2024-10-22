@@ -63,10 +63,11 @@ pub type ValidatedSchemaIdField = SchemaIdField<ServerScalarId>;
 
 #[derive(Debug)]
 pub struct ValidatedLinkedFieldAssociatedData {
-    pub concrete_type: Option<IsographObjectTypeName>,
     pub parent_object_id: ServerObjectId,
     // N.B. we don't actually support loadable linked fields
     pub selection_variant: ValidatedIsographSelectionVariant,
+    /// Some if the object is concrete; None otherwise.
+    pub concrete_type: Option<IsographObjectTypeName>,
 }
 
 #[derive(Debug)]

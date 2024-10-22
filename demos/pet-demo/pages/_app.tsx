@@ -36,16 +36,6 @@ const missingFieldHandler = (
   arguments_: { [index: string]: any } | null,
   variables: { [index: string]: any } | null,
 ): Link | undefined => {
-  // @ts-expect-error
-  if (typeof window !== 'undefined' && window.__LOG) {
-    console.log('Missing field handler called', {
-      storeRecord,
-      root,
-      fieldName,
-      arguments_,
-      variables,
-    });
-  }
   const val = defaultMissingFieldHandler(
     storeRecord,
     root,
@@ -77,6 +67,7 @@ export default function App({ Component, pageProps }: AppProps) {
         createIsographStore(),
         makeNetworkRequest,
         missingFieldHandler,
+        typeof window != 'undefined' ? console.log : null,
       ),
     [],
   );
@@ -85,10 +76,4 @@ export default function App({ Component, pageProps }: AppProps) {
       <Component {...pageProps} />
     </IsographEnvironmentProvider>
   );
-}
-
-// If window.__LOG is true, Isograph will log a bunch of diagnostics.
-if (typeof window !== 'undefined') {
-  // @ts-expect-error
-  window.__LOG = true;
 }

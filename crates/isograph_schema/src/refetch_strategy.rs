@@ -132,9 +132,11 @@ pub trait GenerateRefetchQueryFn: Debug {
 struct GenerateRefetchQueryImpl {
     top_level_field_name: LinkedFieldName,
     top_level_arguments: Vec<ArgumentKeyAndValue>,
+    /// Some if the object is concrete; None otherwise.
     top_level_field_concrete_type: Option<IsographObjectTypeName>,
     refine_to_type: RequiresRefinement,
     subfield: Option<LinkedFieldName>,
+    /// Some if the object is concrete; None otherwise.
     subfield_concrete_type: Option<IsographObjectTypeName>,
 }
 

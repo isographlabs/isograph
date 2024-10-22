@@ -67,6 +67,12 @@ export {
   type ExtractData,
   stableIdForFragmentReference,
 } from './core/FragmentReference';
+export {
+  type LogMessage,
+  type LogFunction,
+  logMessage,
+  registerLogger,
+} from './core/logging';
 
 export {
   IsographEnvironmentProvider,
