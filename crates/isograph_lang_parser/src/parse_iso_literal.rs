@@ -21,6 +21,7 @@ use crate::{
     ParseResultWithLocation, ParseResultWithSpan, PeekableLexer,
 };
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IsoLiteralExtractionResult {
     ClientFieldDeclaration(WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>),
     EntrypointDeclaration(WithSpan<EntrypointTypeAndField>),
