@@ -28,6 +28,7 @@ import {
 } from './PromiseWrapper';
 import { ReaderAst } from './reader';
 import { Arguments } from './util';
+import { logMessage } from './logging';
 
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: Set<DataId>;
@@ -57,10 +58,12 @@ export function readButDoNotEvaluate<
     networkRequestOptions,
     mutableEncounteredRecords,
   );
-  // @ts-expect-error
-  if (typeof window !== 'undefined' && window.__LOG) {
-    console.log('done reading: ' + response.kind, { response });
-  }
+
+  logMessage(environment, {
+    kind: 'DoneReading',
+    response,
+  });
+
   if (response.kind === 'MissingData') {
     // There are two cases here that we care about:
     // 1. the network request is in flight, we haven't suspend on it, and we want
@@ -90,7 +93,7 @@ export function readButDoNotEvaluate<
   }
 }
 
-type ReadDataResult<TReadFromStore> =
+export type ReadDataResult<TReadFromStore> =
   | {
       readonly kind: 'Success';
       readonly data: ExtractData<TReadFromStore>;
@@ -207,6 +210,7 @@ function readData<TReadFromStore>(
           // TODO make this configurable, and also generated and derived from the schema
           const missingFieldHandler =
             environment.missingFieldHandler ?? defaultMissingFieldHandler;
+
           const altLink = missingFieldHandler(
             storeRecord,
             root,
@@ -214,6 +218,15 @@ function readData<TReadFromStore>(
             field.arguments,
             variables,
           );
+          logMessage(environment, {
+            kind: 'MissingFieldHandlerCalled',
+            root,
+            storeRecord,
+            fieldName: field.fieldName,
+            arguments: field.arguments,
+            variables,
+          });
+
           if (altLink === undefined) {
             return {
               kind: 'MissingData',

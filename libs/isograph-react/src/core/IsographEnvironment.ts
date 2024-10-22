@@ -5,6 +5,7 @@ import { FragmentReference, Variables } from './FragmentReference';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { IsographEntrypoint } from './entrypoint';
 import type { ReaderAst } from './reader';
+import { LogFunction, WrappedLogFunction } from './logging';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -63,6 +64,7 @@ export type IsographEnvironment = {
   readonly retainedQueries: Set<RetainedQuery>;
   readonly gcBuffer: Array<RetainedQuery>;
   readonly gcBufferSize: number;
+  readonly loggers: Set<WrappedLogFunction>;
 };
 
 export type MissingFieldHandler = (
@@ -117,7 +119,8 @@ const DEFAULT_GC_BUFFER_SIZE = 10;
 export function createIsographEnvironment(
   store: IsographStore,
   networkFunction: IsographNetworkFunction,
-  missingFieldHandler?: MissingFieldHandler,
+  missingFieldHandler?: MissingFieldHandler | null,
+  logFunction?: LogFunction | null,
 ): IsographEnvironment {
   return {
     store,
@@ -130,6 +133,7 @@ export function createIsographEnvironment(
     retainedQueries: new Set(),
     gcBuffer: [],
     gcBufferSize: DEFAULT_GC_BUFFER_SIZE,
+    loggers: logFunction != null ? new Set([{ log: logFunction }]) : new Set(),
   };
 }
 
