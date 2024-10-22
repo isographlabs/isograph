@@ -1,6 +1,5 @@
 import { CleanupFn } from '@isograph/disposable-types';
 import {
-  DataId,
   IsographEnvironment,
   IsographStore,
   StoreRecord,
@@ -12,7 +11,7 @@ import {
   RefetchQueryNormalizationArtifact,
 } from './entrypoint';
 import { FragmentReference, Variables } from './FragmentReference';
-import { NetworkResponseObject } from './cache';
+import { NetworkResponseObject, type EncounteredIds } from './cache';
 import { Arguments } from './util';
 import { ReadDataResult } from './read';
 
@@ -32,7 +31,7 @@ export type LogMessage =
   | {
       kind: 'AfterNormalization';
       store: IsographStore;
-      encounteredIds: Set<string>;
+      encounteredIds: EncounteredIds;
     }
   | {
       kind: 'DeepEqualityCheck';

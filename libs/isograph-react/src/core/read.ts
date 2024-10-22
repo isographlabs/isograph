@@ -251,7 +251,7 @@ function readData<TReadFromStore>(
           );
           logMessage(environment, {
             kind: 'MissingFieldHandlerCalled',
-            root: root,
+            root,
             storeRecord,
             fieldName: field.fieldName,
             arguments: field.arguments,
