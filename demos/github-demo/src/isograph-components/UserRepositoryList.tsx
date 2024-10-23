@@ -20,13 +20,10 @@ export const RepositoryList = iso(`
   { data },
   { setRoute }: { setRoute: (route: Route) => void },
 ) {
-  const pagination = useConnectionSpecPagination(data.RepositoryConnection, {
-    after: data.firstPage.pageInfo.endCursor,
-  });
-  const hasNextPage =
-    data.firstPage.pageInfo.hasNextPage &&
-    pagination.kind === 'Complete' &&
-    pagination.hasNextPage;
+  const pagination = useConnectionSpecPagination(
+    data.RepositoryConnection,
+    data.firstPage.pageInfo,
+  );
   const repositories = (data.firstPage.edges ?? []).concat(pagination.results);
   return (
     <>
@@ -64,12 +61,14 @@ export const RepositoryList = iso(`
             <TableCell>
               <Button
                 variant="contained"
-                disabled={!(pagination.kind === 'Complete' && hasNextPage)}
+                disabled={
+                  !(pagination.kind === 'Complete' && pagination.hasNextPage)
+                }
                 onClick={() =>
                   pagination.kind === 'Complete' && pagination.fetchMore(10)
                 }
               >
-                {pagination.kind === 'Complete' && !hasNextPage
+                {pagination.kind === 'Complete' && !pagination.hasNextPage
                   ? 'All fetched'
                   : 'Fetch more'}
               </Button>

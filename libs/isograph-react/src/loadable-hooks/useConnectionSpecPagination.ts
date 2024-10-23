@@ -90,9 +90,7 @@ export function useConnectionSpecPagination<
     Connection<TItem>,
     UseConnectionSpecPaginationArgs
   >,
-  initialArgs?: {
-    after?: string | void | null;
-  },
+  pageInfo?: PageInfo,
 ): UsePaginationReturnValue<TReadFromStore, TItem> {
   const networkRequestOptions = {
     suspendIfInFlight: true,
@@ -274,9 +272,9 @@ export function useConnectionSpecPagination<
   if (!networkRequestStatus) {
     return {
       kind: 'Complete',
-      fetchMore: getFetchMore(initialArgs?.after ?? null),
+      fetchMore: getFetchMore(pageInfo?.endCursor ?? null),
       results: [],
-      hasNextPage: true,
+      hasNextPage: pageInfo?.hasNextPage ?? true,
     };
   }
 
