@@ -47,7 +47,7 @@ export const PetDetailDeferredRouteComponent = iso(`
           <Button
             onClick={() =>
               skipLimitPaginationState.kind === 'Complete'
-                ? skipLimitPaginationState.fetchMore(undefined, count)
+                ? skipLimitPaginationState.fetchMore(count)
                 : null
             }
             disabled={skipLimitPaginationState.kind === 'Pending'}

@@ -11,7 +11,11 @@ export function useClientSideDefer<
   TReadFromStore extends { data: object; parameters: object },
   TResult,
 >(
-  loadableField: LoadableField<TReadFromStore, TResult>,
+  loadableField: LoadableField<
+    TReadFromStore,
+    TResult,
+    ExtractParameters<TReadFromStore>
+  >,
 ): { fragmentReference: FragmentReference<TReadFromStore, TResult> };
 
 export function useClientSideDefer<
@@ -19,7 +23,11 @@ export function useClientSideDefer<
   TResult,
   TProvidedArgs extends object,
 >(
-  loadableField: LoadableField<TReadFromStore, TResult, TProvidedArgs>,
+  loadableField: LoadableField<
+    TReadFromStore,
+    TResult,
+    Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
+  >,
   args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>,
 ): { fragmentReference: FragmentReference<TReadFromStore, TResult> };
 
@@ -28,7 +36,11 @@ export function useClientSideDefer<
   TResult,
   TProvidedArgs extends object,
 >(
-  loadableField: LoadableField<TReadFromStore, TResult, TProvidedArgs>,
+  loadableField: LoadableField<
+    TReadFromStore,
+    TResult,
+    Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
+  >,
   args?: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>,
 ): { fragmentReference: FragmentReference<TReadFromStore, TResult> } {
   const [id, loader] = loadableField(args);

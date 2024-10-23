@@ -18,19 +18,13 @@ import { getPromiseState, readPromise } from '../core/PromiseWrapper';
 import { type WithEncounteredRecords } from '../core/read';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 
-type SkipOrLimit = 'skip' | 'limit';
-type OmitSkipLimit<TArgs> = keyof Omit<TArgs, SkipOrLimit> extends never
-  ? void | Record<PropertyKey, never>
-  : Omit<TArgs, SkipOrLimit>;
-
 type UseSkipLimitReturnValue<
   TReadFromStore extends { data: object; parameters: object },
-  TArgs,
   TItem,
 > =
   | {
       readonly kind: 'Complete';
-      readonly fetchMore: (args: OmitSkipLimit<TArgs>, count: number) => void;
+      readonly fetchMore: (count: number) => void;
       readonly results: ReadonlyArray<TItem>;
     }
   | {
@@ -69,16 +63,27 @@ function flatten<T>(arr: ReadonlyArray<ReadonlyArray<T>>): ReadonlyArray<T> {
   return outArray;
 }
 
+type UseSkipLimitPaginationArgs = {
+  skip: number;
+  limit: number;
+};
+
 export function useSkipLimitPagination<
-  TArgs extends {
-    skip: number | void | null;
-    limit: number | void | null;
-  },
   TItem,
-  TReadFromStore extends { parameters: TArgs; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+  },
 >(
-  loadableField: LoadableField<TReadFromStore, ReadonlyArray<TItem>>,
-): UseSkipLimitReturnValue<TReadFromStore, TArgs, TItem> {
+  loadableField: LoadableField<
+    TReadFromStore,
+    ReadonlyArray<TItem>,
+    UseSkipLimitPaginationArgs
+  >,
+  initialArgs?: {
+    skip?: number | void | null;
+  },
+): UseSkipLimitReturnValue<TReadFromStore, TItem> {
   const networkRequestOptions = {
     suspendIfInFlight: true,
     throwOnNetworkError: true,
@@ -158,10 +163,8 @@ export function useSkipLimitPagination<
 
   const getFetchMore =
     (loadedSoFar: number) =>
-    (args: OmitSkipLimit<TArgs>, count: number): void => {
-      // @ts-expect-error
+    (count: number): void => {
       const loadedField = loadableField({
-        ...args,
         skip: loadedSoFar,
         limit: count,
       })[1]();
@@ -252,7 +255,7 @@ export function useSkipLimitPagination<
   if (!networkRequestStatus) {
     return {
       kind: 'Complete',
-      fetchMore: getFetchMore(0),
+      fetchMore: getFetchMore(initialArgs?.skip ?? 0),
       results: [],
     };
   }
@@ -284,4 +287,46 @@ export function useSkipLimitPagination<
       };
     }
   }
+}
+
+// @ts-ignore
+function tsTests() {
+  type Parameters = {
+    readonly search: string;
+    readonly skip: number;
+    readonly limit: number;
+  };
+
+  let basicLoadable!: LoadableField<
+    {
+      readonly data: object;
+      readonly parameters: Omit<Parameters, 'search'>;
+    },
+    object[]
+  >;
+
+  useSkipLimitPagination(basicLoadable);
+  useSkipLimitPagination(basicLoadable, {});
+  useSkipLimitPagination(basicLoadable, { skip: 10 });
+
+  let unprovidedSearchLoadable!: LoadableField<
+    {
+      readonly data: object;
+      readonly parameters: Parameters;
+    },
+    object[]
+  >;
+  // @ts-expect-error
+  useSkipLimitPagination(unprovidedSearchLoadable);
+
+  let providedSearchLoadable!: LoadableField<
+    {
+      readonly data: object;
+      readonly parameters: Parameters;
+    },
+    object[],
+    Omit<Parameters, 'search'>
+  >;
+
+  useSkipLimitPagination(providedSearchLoadable);
 }

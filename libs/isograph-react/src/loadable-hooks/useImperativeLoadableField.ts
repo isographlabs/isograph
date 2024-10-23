@@ -26,7 +26,11 @@ export function useImperativeLoadableField<
   TResult,
   TProvidedArgs extends object,
 >(
-  loadableField: LoadableField<TReadFromStore, TResult, TProvidedArgs>,
+  loadableField: LoadableField<
+    TReadFromStore,
+    TResult,
+    Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
+  >,
 ): UseImperativeLoadableFieldReturn<TReadFromStore, TResult, TProvidedArgs> {
   const { state, setState } =
     useUpdatableDisposableState<FragmentReference<TReadFromStore, TResult>>();
