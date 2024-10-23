@@ -727,7 +727,7 @@ export const SECOND_SPLIT_KEY = '___';
 
 // Returns a key to look up an item in the store
 function getDataIdOfNetworkResponse(
-  parentrecordLink: Link,
+  parentRecordLink: Link,
   dataToNormalize: NetworkResponseObject,
   astNode: NormalizationLinkedField | NormalizationScalarField,
   variables: Variables,
@@ -741,7 +741,7 @@ function getDataIdOfNetworkResponse(
     return dataId;
   }
 
-  let storeKey = `${parentrecordLink.__link}.${astNode.fieldName}`;
+  let storeKey = `${parentRecordLink.__link}.${astNode.fieldName}`;
   if (index != null) {
     storeKey += `.${index}`;
   }
