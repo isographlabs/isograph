@@ -4,5 +4,5 @@ export type AdItem__AdItemDisplay__param = {
     readonly advertiser: string,
     readonly message: string,
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

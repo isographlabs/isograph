@@ -15,5 +15,5 @@ export type Query__Newsfeed__param = {
       >,
     },
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

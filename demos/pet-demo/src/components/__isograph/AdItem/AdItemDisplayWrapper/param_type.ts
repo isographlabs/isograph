@@ -9,5 +9,5 @@ export type AdItem__AdItemDisplayWrapper__param = {
       AdItem__AdItemDisplay__output_type
     >,
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

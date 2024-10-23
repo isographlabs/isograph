@@ -6,5 +6,5 @@ export type Query__HomePage__param = {
     readonly Header: Query__Header__output_type,
     readonly HomePageList: Query__HomePageList__output_type,
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

@@ -10,5 +10,5 @@ Returns a boolean indicating whether the viewing user has starred this starrable
     */
     readonly viewerHasStarred: boolean,
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

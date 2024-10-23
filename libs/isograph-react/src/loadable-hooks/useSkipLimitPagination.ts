@@ -20,7 +20,7 @@ import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 
 type SkipOrLimit = 'skip' | 'limit';
 type OmitSkipLimit<TArgs> = keyof Omit<TArgs, SkipOrLimit> extends never
-  ? void | Record<string, never>
+  ? void | Record<PropertyKey, never>
   : Omit<TArgs, SkipOrLimit>;
 
 type UseSkipLimitReturnValue<

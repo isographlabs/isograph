@@ -7,5 +7,5 @@ export type Pet__FirstCheckinMakeSuperButton__param = {
       readonly location: string,
     }>,
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

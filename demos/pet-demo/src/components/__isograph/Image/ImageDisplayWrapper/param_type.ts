@@ -9,5 +9,5 @@ export type Image__ImageDisplayWrapper__param = {
       Image__ImageDisplay__output_type
     >,
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

@@ -1,7 +1,7 @@
 export type ExtractSecondParam<T extends (arg1: any, arg2: any) => any> =
   T extends (arg1: any, arg2: infer P) => any ? P : never;
 export type CombineWithIntrinsicAttributes<T> =
-  T extends Record<string, never>
+  T extends Record<PropertyKey, never>
     ? JSX.IntrinsicAttributes
     : T & JSX.IntrinsicAttributes;
 

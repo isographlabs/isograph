@@ -22,5 +22,5 @@ A refetch field for the User type.
       readonly __refetch: User____refetch__output_type,
     },
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

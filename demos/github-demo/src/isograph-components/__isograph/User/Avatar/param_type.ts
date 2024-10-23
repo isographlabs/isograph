@@ -10,5 +10,5 @@ A URL pointing to the user's public avatar.
     */
     readonly avatarUrl: string,
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

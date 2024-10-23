@@ -22,7 +22,7 @@ import { maybeUnwrapNetworkRequest } from '../react/useResult';
 
 type FirstOrAfter = 'first' | 'after';
 type OmitFirstAfter<TArgs> = keyof Omit<TArgs, FirstOrAfter> extends never
-  ? void | Record<string, never>
+  ? void | Record<PropertyKey, never>
   : Omit<TArgs, FirstOrAfter>;
 
 type UsePaginationReturnValue<

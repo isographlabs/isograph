@@ -163,7 +163,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
             reader_parameters_type,
         )
     } else {
-        ("".to_string(), "Record<string, never>".to_string())
+        ("".to_string(), "Record<PropertyKey, never>".to_string())
     };
 
     let indent = "  ";
