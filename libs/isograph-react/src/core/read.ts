@@ -6,10 +6,10 @@ import {
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
 import {
-  ExtractData,
-  ExtractParameters,
   FragmentReference,
   Variables,
+  ExtractData,
+  ExtractParameters,
 } from './FragmentReference';
 import {
   assertLink,
