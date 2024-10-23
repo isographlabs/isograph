@@ -24,7 +24,7 @@ pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
     IsographSelectionVariant,
 >;
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
     pub const_export_name: ConstExportName,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
@@ -63,7 +63,7 @@ pub struct LoadableDirectiveParameters {
     pub lazy_load_artifact: bool,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum Selection<TScalarField, TLinkedField> {
     ServerField(ServerFieldSelection<TScalarField, TLinkedField>),
     // FieldGroup(FieldGroupSelection),
@@ -96,7 +96,7 @@ impl<TScalarField, TLinkedField> Selection<TScalarField, TLinkedField> {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum ServerFieldSelection<TScalarField, TLinkedField> {
     ScalarField(ScalarFieldSelection<TScalarField>),
     LinkedField(LinkedFieldSelection<TScalarField, TLinkedField>),
@@ -179,7 +179,7 @@ impl<TScalarField, TLinkedField> HasName for ServerFieldSelection<TScalarField, 
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct ScalarFieldSelection<TScalarField> {
     pub name: WithLocation<ScalarFieldName>,
     pub reader_alias: Option<WithLocation<ScalarFieldAlias>>,
@@ -223,7 +223,7 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
     pub name: WithLocation<LinkedFieldName>,
     // pub alias
@@ -276,14 +276,14 @@ impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum Unwrap {
     ActualUnwrap,
     SkippedUnwrap,
     // FakeUnwrap?
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct SelectionFieldArgument {
     pub name: WithSpan<FieldArgumentName>,
     pub value: WithLocation<NonConstantValue>,

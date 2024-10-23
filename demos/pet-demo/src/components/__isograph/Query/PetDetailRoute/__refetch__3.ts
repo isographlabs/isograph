@@ -22,11 +22,13 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "checkin_id" },
       ],
     ],
+    concreteType: "MakeCheckinSuperResponse",
     selections: [
       {
         kind: "Linked",
         fieldName: "checkin",
         arguments: null,
+        concreteType: null,
         selections: [
           {
             kind: "InlineFragment",

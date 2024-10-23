@@ -30,7 +30,13 @@ function makeNetworkRequest<T>(
 
 export default function App() {
   const environment = useMemo(
-    () => createIsographEnvironment(createIsographStore(), makeNetworkRequest),
+    () =>
+      createIsographEnvironment(
+        createIsographStore(),
+        makeNetworkRequest,
+        null,
+        typeof window != 'undefined' ? console.log : null,
+      ),
     [],
   );
   return (

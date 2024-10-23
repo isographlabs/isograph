@@ -7,5 +7,5 @@ export type Pet__UnreachableFromEntrypoint__param = {
     readonly Unreachable2: Pet__Unreachable2__output_type,
     readonly set_best_friend_do_not_use: Pet__set_best_friend_do_not_use__output_type,
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

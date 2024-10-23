@@ -16,5 +16,5 @@ A refetch field for the Pet type.
     */
     readonly __refetch: Pet____refetch__output_type,
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

@@ -9,5 +9,5 @@ export type User__RepositoryList__param = {
       User__RepositoryConnection__output_type
     >,
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

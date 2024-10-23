@@ -4,6 +4,16 @@ import {
   ParentCache,
 } from '@isograph/react-disposable-state';
 import {
+  DataId,
+  Link,
+  ROOT_ID,
+  StoreRecord,
+  type IsographEnvironment,
+  DataTypeValue,
+  getLink,
+  FragmentSubscription,
+} from './IsographEnvironment';
+import {
   IsographEntrypoint,
   NormalizationAst,
   NormalizationInlineFragment,
@@ -11,27 +21,18 @@ import {
   NormalizationScalarField,
   RefetchQueryNormalizationArtifactWrapper,
 } from '../core/entrypoint';
-import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
-import {
-  ExtractParameters,
-  FragmentReference,
-  Variables,
-} from './FragmentReference';
-import {
-  DataId,
-  DataTypeValue,
-  FragmentSubscription,
-  Link,
-  ROOT_ID,
-  StoreRecord,
-  getLink,
-  type IsographEnvironment,
-} from './IsographEnvironment';
-import { makeNetworkRequest } from './makeNetworkRequest';
-import { wrapResolvedValue } from './PromiseWrapper';
-import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
 import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
 import { Argument, ArgumentValue } from './util';
+import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
+import {
+  FragmentReference,
+  Variables,
+  ExtractParameters,
+} from './FragmentReference';
+import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
+import { makeNetworkRequest } from './makeNetworkRequest';
+import { wrapResolvedValue } from './PromiseWrapper';
+import { logMessage } from './logging';
 
 const TYPENAME_FIELD_NAME = '__typename';
 
@@ -43,14 +44,13 @@ export function getOrCreateItemInSuspenseCache<
   index: string,
   factory: Factory<FragmentReference<TReadFromStore, TClientFieldValue>>,
 ): ParentCache<FragmentReference<TReadFromStore, TClientFieldValue>> {
-  // @ts-expect-error
-  if (typeof window !== 'undefined' && window.__LOG) {
-    console.log('getting cache for', {
-      index,
-      cache: Object.keys(environment.fragmentCache),
-      found: !!environment.fragmentCache[index],
-    });
-  }
+  // TODO this is probably a useless message, we should remove it
+  logMessage(environment, {
+    kind: 'GettingSuspenseCacheItem',
+    index,
+    availableCacheItems: Object.keys(environment.fragmentCache),
+    found: !!environment.fragmentCache[index],
+  });
   if (environment.fragmentCache[index] == null) {
     environment.fragmentCache[index] = new ParentCache(factory);
   }
@@ -124,7 +124,8 @@ type NetworkResponseValue =
   | NetworkResponseObject
   | NetworkResponseObject[]
   | NetworkResponseScalarValue[];
-type NetworkResponseObject = {
+
+export type NetworkResponseObject = {
   // N.B. undefined is here to support optional id's, but
   // undefined should not *actually* be present in the network response.
   [index: string]: undefined | NetworkResponseValue;
@@ -140,15 +141,12 @@ export function normalizeData(
 ): Set<DataId> {
   const encounteredIds = new Set<DataId>();
 
-  // @ts-expect-error
-  if (typeof window !== 'undefined' && window.__LOG) {
-    console.log(
-      'about to normalize',
-      normalizationAst,
-      networkResponse,
-      variables,
-    );
-  }
+  logMessage(environment, {
+    kind: 'AboutToNormalize',
+    normalizationAst,
+    networkResponse,
+    variables,
+  });
   normalizeDataIntoRecord(
     environment,
     normalizationAst,
@@ -159,14 +157,13 @@ export function normalizeData(
     nestedRefetchQueries,
     encounteredIds,
   );
-  // @ts-expect-error
-  if (typeof window !== 'undefined' && window.__LOG) {
-    console.log('after normalization', {
-      store: environment.store,
-      encounteredIds,
-      environment,
-    });
-  }
+
+  logMessage(environment, {
+    kind: 'AfterNormalization',
+    store: environment.store,
+    encounteredIds,
+  });
+
   callSubscriptions(environment, encounteredIds);
   return encounteredIds;
 }
@@ -292,24 +289,18 @@ function callSubscriptions(
               subscription.encounteredDataAndRecords.item,
               newEncounteredDataAndRecords.item,
             );
+
+            logMessage(environment, {
+              kind: 'DeepEqualityCheck',
+              fragmentReference: subscription.fragmentReference,
+              old: subscription.encounteredDataAndRecords.item,
+              new: newEncounteredDataAndRecords.item,
+              deeplyEqual:
+                mergedItem === subscription.encounteredDataAndRecords.item,
+            });
+
             if (mergedItem !== subscription.encounteredDataAndRecords.item) {
-              // @ts-expect-error
-              if (typeof window !== 'undefined' && window.__LOG) {
-                console.log('Deep equality - No', {
-                  fragmentReference: subscription.fragmentReference,
-                  old: subscription.encounteredDataAndRecords.item,
-                  new: newEncounteredDataAndRecords.item,
-                });
-              }
               subscription.callback(newEncounteredDataAndRecords);
-            } else {
-              // @ts-expect-error
-              if (typeof window !== 'undefined' && window.__LOG) {
-                console.log('Deep equality - Yes', {
-                  fragmentReference: subscription.fragmentReference,
-                  old: subscription.encounteredDataAndRecords.item,
-                });
-              }
             }
           }
           return;

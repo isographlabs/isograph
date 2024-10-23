@@ -16,6 +16,7 @@ const normalizationAst: NormalizationAst = [
     kind: "Linked",
     fieldName: "me",
     arguments: null,
+    concreteType: "Economist",
     selections: [
       {
         kind: "Scalar",

@@ -163,7 +163,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
             reader_parameters_type,
         )
     } else {
-        ("".to_string(), "Record<string, never>".to_string())
+        ("".to_string(), "Record<PropertyKey, never>".to_string())
     };
 
     let indent = "  ";
@@ -212,7 +212,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact(
             output_type_text
         } else {
             format!(
-                "import type {{ ExtractSecondParam }} \
+                "import type {{ ExtractSecondParam, CombineWithIntrinsicAttributes }} \
                 from '@isograph/react';\n\
                 {output_type_text}\n",
             )

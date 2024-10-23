@@ -65,9 +65,7 @@ export const PetDetailDeferredRouteComponent = iso(`
         </div>
 
         {skipLimitPaginationState.results.map((item) => (
-          <div key={item.id}>
-            <item.CheckinDisplay />
-          </div>
+          <item.CheckinDisplay key={item.id} />
         ))}
         {skipLimitPaginationState.kind === 'Pending' && <div>Loading...</div>}
       </Stack>
@@ -91,6 +89,7 @@ export function PetCheckinListLoader({
         <FragmentReader
           fragmentReference={fragmentReference}
           networkRequestOptions={{ suspendIfInFlight: false }}
+          additionalProps={{}}
         />
       </React.Suspense>
     </ErrorBoundary>

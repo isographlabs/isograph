@@ -4,5 +4,5 @@ export type Pet__PetTaglineCard__param = {
     readonly id: string,
     readonly tagline: string,
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

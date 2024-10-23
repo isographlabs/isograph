@@ -5,5 +5,5 @@ export type Query__meName__param = {
       readonly name: string,
     },
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

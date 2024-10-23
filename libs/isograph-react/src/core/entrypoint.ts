@@ -1,3 +1,4 @@
+import type { TypeName } from './IsographEnvironment';
 import { TopLevelReaderArtifact } from './reader';
 import { Arguments } from './util';
 
@@ -57,6 +58,7 @@ export type NormalizationLinkedField = {
   readonly fieldName: string;
   readonly arguments: Arguments | null;
   readonly selections: NormalizationAst;
+  readonly concreteType: TypeName | null;
 };
 
 export type NormalizationInlineFragment = {

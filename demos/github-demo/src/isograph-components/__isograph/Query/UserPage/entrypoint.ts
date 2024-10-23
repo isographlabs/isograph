@@ -26,6 +26,7 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "userLogin" },
       ],
     ],
+    concreteType: "User",
     selections: [
       {
         kind: "Scalar",
@@ -43,6 +44,7 @@ const normalizationAst: NormalizationAst = [
     kind: "Linked",
     fieldName: "viewer",
     arguments: null,
+    concreteType: "User",
     selections: [
       {
         kind: "Scalar",

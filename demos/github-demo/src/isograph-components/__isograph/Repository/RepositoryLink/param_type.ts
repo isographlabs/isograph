@@ -19,5 +19,5 @@ The username used to login.
       readonly login: string,
     },
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

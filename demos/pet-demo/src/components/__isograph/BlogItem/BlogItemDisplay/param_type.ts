@@ -16,5 +16,5 @@ export type BlogItem__BlogItemDisplay__param = {
       readonly ImageDisplayWrapper: Image__ImageDisplayWrapper__output_type,
     } | null),
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

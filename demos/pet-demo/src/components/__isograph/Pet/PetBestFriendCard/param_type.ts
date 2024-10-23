@@ -18,5 +18,5 @@ You can update the best friend and the tagline.
       },
     } | null),
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };
