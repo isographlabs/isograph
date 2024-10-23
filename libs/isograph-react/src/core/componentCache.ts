@@ -44,7 +44,7 @@ export function getOrCreateCachedComponent(
         logMessage(environment, {
           kind: 'ComponentRerendered',
           componentName,
-          rootId: fragmentReference.root,
+          rootLink: fragmentReference.root,
         });
 
         const firstParameter = {
