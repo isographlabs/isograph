@@ -365,9 +365,10 @@ pub(crate) fn generate_output_type(client_field: &ValidatedClientField) -> Clien
             UserWrittenComponentVariant::Eager => {
                 ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
             }
-            UserWrittenComponentVariant::Component => {
-                ClientFieldOutputType("(React.FC<ExtractSecondParam<typeof resolver>>)".to_string())
-            }
+            UserWrittenComponentVariant::Component => ClientFieldOutputType(
+                "(React.FC<CombineWithIntrinsicAttributes<ExtractSecondParam<typeof resolver>>>)"
+                    .to_string(),
+            ),
         },
         ClientFieldVariant::ImperativelyLoadedField(params) => {
             // N.B. the string is a stable id for deduplicating

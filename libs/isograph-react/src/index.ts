@@ -55,6 +55,7 @@ export {
 export { readButDoNotEvaluate } from './core/read';
 export {
   type ExtractSecondParam,
+  type CombineWithIntrinsicAttributes,
   type Argument,
   type ArgumentName,
   type ArgumentValue,
