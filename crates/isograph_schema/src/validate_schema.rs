@@ -66,6 +66,8 @@ pub struct ValidatedLinkedFieldAssociatedData {
     pub parent_object_id: ServerObjectId,
     // N.B. we don't actually support loadable linked fields
     pub selection_variant: ValidatedIsographSelectionVariant,
+    /// Some if the object is concrete; None otherwise.
+    pub concrete_type: Option<IsographObjectTypeName>,
 }
 
 #[derive(Debug)]
@@ -1031,6 +1033,7 @@ fn validate_field_type_exists_and_is_linked(
                                 ).collect::<Result<Vec<_>, _>>()?,
                                 unwraps: linked_field_selection.unwraps,
                                 associated_data: ValidatedLinkedFieldAssociatedData {
+                                    concrete_type: object.concrete_type,
                                     parent_object_id: object_id,
                                     selection_variant: match linked_field_selection.associated_data {
                                         IsographSelectionVariant::Regular => {

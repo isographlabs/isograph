@@ -7,5 +7,5 @@ export type Query__HomeRoute__param = {
       readonly PetSummaryCard: Pet__PetSummaryCard__output_type,
     }>,
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

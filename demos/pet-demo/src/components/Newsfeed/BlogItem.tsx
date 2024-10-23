@@ -6,7 +6,6 @@ import {
   FragmentReader,
   useClientSideDefer,
   useImperativeLoadableField,
-  useImperativeReference,
 } from '@isograph/react';
 import { UNASSIGNED_STATE } from '@isograph/react-disposable-state';
 
@@ -48,7 +47,10 @@ export const BlogItem = iso(`
         ))}
         <Suspense fallback={<p>Loading more...</p>}>
           {fragmentReference !== UNASSIGNED_STATE ? (
-            <FragmentReader fragmentReference={fragmentReference} />
+            <FragmentReader
+              fragmentReference={fragmentReference}
+              additionalProps={{}}
+            />
           ) : (
             <Button variant="contained" onClick={() => loadField()}>
               Load more content...
@@ -68,7 +70,10 @@ export const ImageDisplayWrapper = iso(`
   const { fragmentReference } = useClientSideDefer(image.ImageDisplay);
   return (
     <Suspense fallback={null}>
-      <FragmentReader fragmentReference={fragmentReference} />
+      <FragmentReader
+        fragmentReference={fragmentReference}
+        additionalProps={{}}
+      />
     </Suspense>
   );
 });

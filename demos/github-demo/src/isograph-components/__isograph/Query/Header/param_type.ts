@@ -13,5 +13,5 @@ The user's public profile name.
       readonly Avatar: User__Avatar__output_type,
     },
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

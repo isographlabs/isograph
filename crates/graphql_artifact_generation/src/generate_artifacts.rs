@@ -129,8 +129,7 @@ pub fn get_artifact_path_and_content(
 
                     let type_to_refine_to = schema
                         .server_field_data
-                        .object(encountered_client_field.parent_object_id)
-                        .name;
+                        .object(encountered_client_field.parent_object_id);
 
                     if schema
                         .fetchable_types
@@ -144,7 +143,9 @@ pub fn get_artifact_path_and_content(
                         "node".intern().into(),
                         vec![id_arg.clone()],
                         None,
-                        RequiresRefinement::Yes(type_to_refine_to),
+                        None,
+                        None,
+                        RequiresRefinement::Yes(type_to_refine_to.name),
                     );
                     let id_var = ValidatedVariableDefinition {
                         name: WithLocation::new("id".intern().into(), Location::Generated),
@@ -168,9 +169,10 @@ pub fn get_artifact_path_and_content(
                         .refetch_paths
                         .into_iter()
                         .map(|(mut key, value)| {
-                            key.0
-                                .linked_fields
-                                .insert(0, NormalizationKey::InlineFragment(type_to_refine_to));
+                            key.0.linked_fields.insert(
+                                0,
+                                NormalizationKey::InlineFragment(type_to_refine_to.name),
+                            );
                             key.0.linked_fields.insert(
                                 0,
                                 NormalizationKey::ServerField(NameAndArguments {
@@ -363,9 +365,10 @@ pub(crate) fn generate_output_type(client_field: &ValidatedClientField) -> Clien
             UserWrittenComponentVariant::Eager => {
                 ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
             }
-            UserWrittenComponentVariant::Component => {
-                ClientFieldOutputType("(React.FC<ExtractSecondParam<typeof resolver>>)".to_string())
-            }
+            UserWrittenComponentVariant::Component => ClientFieldOutputType(
+                "(React.FC<CombineWithIntrinsicAttributes<ExtractSecondParam<typeof resolver>>>)"
+                    .to_string(),
+            ),
         },
         ClientFieldVariant::ImperativelyLoadedField(params) => {
             // N.B. the string is a stable id for deduplicating

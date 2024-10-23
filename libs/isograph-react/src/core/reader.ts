@@ -20,7 +20,7 @@ import { Arguments } from './util';
 export type TopLevelReaderArtifact<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
-  TComponentProps extends Record<string, never>,
+  TComponentProps extends Record<PropertyKey, never>,
 > =
   | EagerReaderArtifact<TReadFromStore, TClientFieldValue>
   | ComponentReaderArtifact<TReadFromStore, TComponentProps>;
@@ -38,7 +38,7 @@ export type EagerReaderArtifact<
 
 export type ComponentReaderArtifact<
   TReadFromStore extends { parameters: object; data: object },
-  TComponentProps extends Record<string, unknown> = Record<string, never>,
+  TComponentProps extends Record<string, unknown> = Record<PropertyKey, never>,
 > = {
   readonly kind: 'ComponentReaderArtifact';
   readonly componentName: ComponentOrFieldName;

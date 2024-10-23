@@ -48,6 +48,7 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "id" },
       ],
     ],
+    concreteType: null,
     selections: [
       {
         kind: "InlineFragment",

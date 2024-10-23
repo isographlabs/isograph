@@ -10,5 +10,5 @@ export type Pet__PetDetailDeferredRouteInnerComponent__param = {
       Pet__PetCheckinsCard__output_type
     >,
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

@@ -13,16 +13,26 @@ import {
 import { IsographEnvironment } from './IsographEnvironment';
 import { AnyError, PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { normalizeData } from './cache';
+import { logMessage } from './logging';
+
+let networkRequestId = 0;
 
 export function makeNetworkRequest(
   environment: IsographEnvironment,
   artifact: RefetchQueryNormalizationArtifact | IsographEntrypoint<any, any>,
   variables: Variables,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
-  // @ts-expect-error
-  if (typeof window !== 'undefined' && window.__LOG) {
-    console.log('make network request', artifact, variables);
-  }
+  // TODO this should be a DataId and stored in the store
+  const myNetworkRequestId = networkRequestId + '';
+  networkRequestId++;
+
+  logMessage(environment, {
+    kind: 'MakeNetworkRequest',
+    artifact,
+    variables,
+    networkRequestId: myNetworkRequestId,
+  });
+
   let status: NetworkRequestStatus = {
     kind: 'UndisposedIncomplete',
   };
@@ -30,10 +40,11 @@ export function makeNetworkRequest(
   const promise = environment
     .networkFunction(artifact.queryText, variables)
     .then((networkResponse) => {
-      // @ts-expect-error
-      if (typeof window !== 'undefined' && window.__LOG) {
-        console.log('network response', artifact, networkResponse);
-      }
+      logMessage(environment, {
+        kind: 'ReceivedNetworkResponse',
+        networkResponse,
+        networkRequestId: myNetworkRequestId,
+      });
 
       if (networkResponse.errors != null) {
         // @ts-expect-error Why are we getting the wrong constructor here?

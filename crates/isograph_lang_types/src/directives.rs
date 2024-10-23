@@ -8,7 +8,7 @@ use thiserror::Error;
 
 use crate::{NonConstantValue, SelectionFieldArgument};
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct IsographFieldDirective {
     pub name: WithSpan<IsographDirectiveName>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,

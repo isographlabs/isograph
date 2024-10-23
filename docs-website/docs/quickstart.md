@@ -160,7 +160,15 @@ function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
 
 export default function App({ Component, pageProps }: AppProps) {
   const environment = useMemo(
-    () => createIsographEnvironment(createIsographStore(), makeNetworkRequest),
+    () =>
+      createIsographEnvironment(
+        createIsographStore(),
+        makeNetworkRequest,
+        // Optional missing field handler
+        null,
+        // Optional logger
+        console.log,
+      ),
     [],
   );
   return (

@@ -38,6 +38,7 @@ const normalizationAst: NormalizationAst = [
         { kind: "Variable", name: "id" },
       ],
     ],
+    concreteType: null,
     selections: [
       {
         kind: "InlineFragment",
@@ -67,6 +68,7 @@ const normalizationAst: NormalizationAst = [
                 { kind: "Variable", name: "limit" },
               ],
             ],
+            concreteType: "NewsfeedItem",
             selections: [
               {
                 kind: "Scalar",
@@ -77,6 +79,7 @@ const normalizationAst: NormalizationAst = [
                 kind: "Linked",
                 fieldName: "adItem",
                 arguments: null,
+                concreteType: "AdItem",
                 selections: [
                   {
                     kind: "Scalar",
@@ -89,6 +92,7 @@ const normalizationAst: NormalizationAst = [
                 kind: "Linked",
                 fieldName: "blogItem",
                 arguments: null,
+                concreteType: "BlogItem",
                 selections: [
                   {
                     kind: "Scalar",
@@ -109,6 +113,7 @@ const normalizationAst: NormalizationAst = [
                     kind: "Linked",
                     fieldName: "image",
                     arguments: null,
+                    concreteType: "Image",
                     selections: [
                       {
                         kind: "Scalar",

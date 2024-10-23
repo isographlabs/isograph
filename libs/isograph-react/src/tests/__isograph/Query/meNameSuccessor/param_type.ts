@@ -10,5 +10,5 @@ export type Query__meNameSuccessor__param = {
       } | null),
     },
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

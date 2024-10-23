@@ -1,6 +1,7 @@
 pub mod batch_compile;
 mod field_directives;
 mod isograph_literals;
+mod parse_files;
 mod refetch_fields;
 mod schema;
 pub mod watch;
