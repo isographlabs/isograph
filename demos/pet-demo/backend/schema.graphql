@@ -8,7 +8,7 @@ type Query {
 
 type Viewer implements Node {
   id: ID!
-  newsfeed(limit: Int!, skip: Int!, additionalSkip: Int): [NewsfeedItem!]!
+  newsfeed(limit: Int!, skip: Int!): [NewsfeedItem!]!
 }
 
 type Mutation {

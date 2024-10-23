@@ -144,7 +144,7 @@ type StableId = string;
 export type LoadableField<
   TReadFromStore extends { data: object; parameters: object },
   TResult,
-  TProvidedArgs extends object = object,
+  TArgs = ExtractParameters<TReadFromStore>,
 > = (
-  args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs> | void,
+  args: TArgs | void,
 ) => [StableId, Factory<FragmentReference<TReadFromStore, TResult>>];

@@ -497,12 +497,13 @@ fn write_param_type_from_selection(
                                         "".to_string()
                                     } else {
                                         format!(
-                                            ",\n{indent}{}",
-                                            get_loadable_field_type_from_arguments(
-                                                schema,
-                                                provided_arguments
-                                            )
+                                        ",\n{indent}Omit<ExtractParameters<{}__param>, keyof {}>",
+                                        client_field.type_and_field.underscore_separated(),
+                                        get_loadable_field_type_from_arguments(
+                                            schema,
+                                            provided_arguments
                                         )
+                                    )
                                     };
 
                                     format!(
