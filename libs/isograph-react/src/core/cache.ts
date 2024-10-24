@@ -22,18 +22,18 @@ import {
   NormalizationScalarField,
   RefetchQueryNormalizationArtifactWrapper,
 } from '../core/entrypoint';
-import {
-  ExtractParameters,
-  FragmentReference,
-  Variables,
-} from './FragmentReference';
-import { wrapResolvedValue } from './PromiseWrapper';
-import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
-import { logMessage } from './logging';
-import { makeNetworkRequest } from './makeNetworkRequest';
-import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
 import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
 import { Argument, ArgumentValue } from './util';
+import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
+import {
+  FragmentReference,
+  Variables,
+  ExtractParameters,
+} from './FragmentReference';
+import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
+import { makeNetworkRequest } from './makeNetworkRequest';
+import { wrapResolvedValue } from './PromiseWrapper';
+import { logMessage } from './logging';
 
 export const TYPENAME_FIELD_NAME = '__typename';
 

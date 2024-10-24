@@ -11,10 +11,10 @@ import {
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
 import {
-  ExtractData,
-  ExtractParameters,
   FragmentReference,
   Variables,
+  ExtractData,
+  ExtractParameters,
 } from './FragmentReference';
 import {
   assertLink,
@@ -23,7 +23,6 @@ import {
   IsographEnvironment,
   type Link,
 } from './IsographEnvironment';
-import { logMessage } from './logging';
 import { makeNetworkRequest } from './makeNetworkRequest';
 import {
   getPromiseState,
@@ -34,6 +33,7 @@ import {
 } from './PromiseWrapper';
 import { ReaderAst } from './reader';
 import { Arguments } from './util';
+import { logMessage } from './logging';
 
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: EncounteredIds;

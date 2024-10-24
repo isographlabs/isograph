@@ -1,5 +1,5 @@
-import { ReaderWithRefetchQueries } from '../core/entrypoint';
 import { type Link } from './IsographEnvironment';
+import { ReaderWithRefetchQueries } from '../core/entrypoint';
 import { PromiseWrapper } from './PromiseWrapper';
 
 // TODO type this better
@@ -35,7 +35,7 @@ export type FragmentReference<
 export function stableIdForFragmentReference(
   fragmentReference: FragmentReference<any, any>,
 ): string {
-  return `${fragmentReference.root.__typename}/${fragmentReference.root.__link}/TODO_FRAGMENT_NAME/${serializeVariables(fragmentReference.variables ?? {})}`;
+  return `${fragmentReference.root.__link}/${fragmentReference.root.__typename}/TODO_FRAGMENT_NAME/${serializeVariables(fragmentReference.variables ?? {})}`;
 }
 
 function serializeVariables(variables: Variables) {

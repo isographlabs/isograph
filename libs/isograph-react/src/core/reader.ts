@@ -1,8 +1,8 @@
 import { Factory } from '@isograph/disposable-types';
 import {
-  ExtractData,
-  ExtractParameters,
   FragmentReference,
+  ExtractParameters,
+  ExtractData,
 } from './FragmentReference';
 import {
   ComponentOrFieldName,

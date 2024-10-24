@@ -1,11 +1,11 @@
 import { ParentCache } from '@isograph/react-disposable-state';
+import { RetainedQuery } from './garbageCollection';
+import { WithEncounteredRecords } from './read';
 import { FragmentReference, Variables } from './FragmentReference';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { IsographEntrypoint } from './entrypoint';
-import { RetainedQuery } from './garbageCollection';
-import { LogFunction, WrappedLogFunction } from './logging';
-import { WithEncounteredRecords } from './read';
 import type { ReaderAst } from './reader';
+import { LogFunction, WrappedLogFunction } from './logging';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
