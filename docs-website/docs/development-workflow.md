@@ -94,6 +94,10 @@ pnpm format # which also formats the TypeScript code
 
 Many of these tests come from the libraries that we brought in from Relay, and aren't specific to Isograph.
 
+### Documentation
+
+To show the rustdoc, `pnpm watch-rs`, then press the `d` key.
+
 ## Commands related to the runtime and JavaScript
 
 ### Install dependencies
