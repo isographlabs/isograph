@@ -1,9 +1,9 @@
 import { CleanupFn } from '@isograph/disposable-types';
 import {
-  DataId,
   IsographEnvironment,
   IsographStore,
   StoreRecord,
+  type Link,
 } from './IsographEnvironment';
 import {
   IsographEntrypoint,
@@ -43,7 +43,7 @@ export type LogMessage =
   | {
       kind: 'ComponentRerendered';
       componentName: string;
-      rootId: DataId;
+      rootLink: Link;
     }
   | {
       kind: 'MakeNetworkRequest';
@@ -61,7 +61,7 @@ export type LogMessage =
     }
   | {
       kind: 'MissingFieldHandlerCalled';
-      root: DataId;
+      root: Link;
       storeRecord: StoreRecord;
       fieldName: string;
       arguments: Arguments | null;
