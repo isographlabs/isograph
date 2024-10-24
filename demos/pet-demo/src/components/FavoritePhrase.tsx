@@ -22,7 +22,10 @@ export const FavoritePhraseLoader = iso(`
       ) : (
         <ErrorBoundary>
           <React.Suspense fallback="Loading favorite phrase...">
-            <FragmentReader fragmentReference={fragmentReference} />
+            <FragmentReader
+              fragmentReference={fragmentReference}
+              additionalProps={{}}
+            />
           </React.Suspense>
         </ErrorBoundary>
       )}

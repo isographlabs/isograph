@@ -13,7 +13,7 @@ use thiserror::Error;
 
 use crate::{
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
-    ClientField, FieldDefinitionLocation, FieldMapItem, ObjectTypeAndFieldName, RequiresRefinement,
+    ClientField, FieldMapItem, FieldType, ObjectTypeAndFieldName, RequiresRefinement,
     UnvalidatedSchema, UnvalidatedVariableDefinition, NODE_FIELD_NAME,
 };
 
@@ -70,7 +70,7 @@ impl UnvalidatedSchema {
             .encountered_fields
             .insert(
                 client_field_name.into(),
-                FieldDefinitionLocation::Client(next_client_field_id),
+                FieldType::ClientField(next_client_field_id),
             )
             .is_some()
         {

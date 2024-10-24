@@ -129,7 +129,7 @@ fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctio
         {indent}artifact: RefetchQueryNormalizationArtifact,\n\
         {indent}readOutData: any,\n\
         {indent}filteredVariables: any,\n\
-        {indent}rootId: Link,\n\
+        {indent}rootLink: Link,\n\
         {indent}// TODO type this\n\
         {indent}readerArtifact: TopLevelReaderArtifact<any, any, any> | null,\n\
         {indent}nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],\n\
@@ -144,7 +144,7 @@ fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctio
         {indent}    readerArtifact,\n\
         {indent}    nestedRefetchQueries,\n\
         {indent}  }} as const),\n\
-        {indent}  root: rootId,\n\
+        {indent}  root: rootLink,\n\
         {indent}  variables,\n\
         {indent}  networkRequest,\n\
         {indent}}} as const;\n\
@@ -172,7 +172,7 @@ fn generate_function_import_statement_for_mutation_reader(
         {indent}artifact: RefetchQueryNormalizationArtifact,\n\
         {indent}readOutData: any,\n\
         {indent}filteredVariables: any,\n\
-        {indent}rootId: Link,\n\
+        {indent}rootLink: Link,\n\
         {indent}// TODO type this\n\
         {indent}readerArtifact: TopLevelReaderArtifact<any, any, any>,\n\
         {indent}nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],\n\
@@ -187,7 +187,7 @@ fn generate_function_import_statement_for_mutation_reader(
         {indent}    readerArtifact,\n\
         {indent}    nestedRefetchQueries,\n\
         {indent}  }} as const),\n\
-        {indent}  root: rootId,\n\
+        {indent}  root: rootLink,\n\
         {indent}  variables,\n\
         {indent}  networkRequest,\n\
         {indent}}} as const;\n\

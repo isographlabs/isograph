@@ -61,6 +61,7 @@ export function PetDetailRouteLoader({ route }: { route: PetDetailRoute }) {
         <FragmentReader
           fragmentReference={fragmentReference}
           networkRequestOptions={{ suspendIfInFlight: false }}
+          additionalProps={{}}
         />
       </React.Suspense>
     </ErrorBoundary>

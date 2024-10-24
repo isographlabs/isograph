@@ -47,5 +47,5 @@ Returns a count of how many comments this pull request has received.
       } | null),
     } | null)> | null),
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

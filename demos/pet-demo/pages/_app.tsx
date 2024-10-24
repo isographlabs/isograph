@@ -1,13 +1,13 @@
 import {
-  StoreRecord,
-  defaultMissingFieldHandler,
   IsographEnvironmentProvider,
+  StoreRecord,
   createIsographEnvironment,
   createIsographStore,
+  defaultMissingFieldHandler,
   type Link,
 } from '@isograph/react';
-import { useMemo } from 'react';
 import type { AppProps } from 'next/app';
+import { useMemo } from 'react';
 
 function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
   const promise = fetch('http://localhost:4000/graphql', {

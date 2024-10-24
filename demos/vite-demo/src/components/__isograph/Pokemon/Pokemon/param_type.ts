@@ -18,5 +18,5 @@ Bulbapedia page for a Pokémon
     */
     readonly bulbapediaPage: string,
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

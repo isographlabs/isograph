@@ -1,19 +1,19 @@
 import { CleanupFn } from '@isograph/disposable-types';
+import { FragmentReference, Variables } from './FragmentReference';
 import {
   IsographEnvironment,
   IsographStore,
   StoreRecord,
   type Link,
 } from './IsographEnvironment';
+import { NetworkResponseObject, type EncounteredIds } from './cache';
 import {
   IsographEntrypoint,
   NormalizationAst,
   RefetchQueryNormalizationArtifact,
 } from './entrypoint';
-import { FragmentReference, Variables } from './FragmentReference';
-import { NetworkResponseObject, type EncounteredIds } from './cache';
-import { Arguments } from './util';
 import { ReadDataResult } from './read';
+import { Arguments } from './util';
 
 export type LogMessage =
   | {
@@ -43,7 +43,7 @@ export type LogMessage =
   | {
       kind: 'ComponentRerendered';
       componentName: string;
-      rootId: Link;
+      rootLink: Link;
     }
   | {
       kind: 'MakeNetworkRequest';

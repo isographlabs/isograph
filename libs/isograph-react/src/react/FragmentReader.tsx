@@ -8,7 +8,7 @@ export function FragmentReader<
   TProps extends Record<any, any>,
   TEntrypoint extends IsographEntrypoint<any, React.FC<TProps>>,
 >(
-  props: TProps extends Record<string, never>
+  props: TProps extends Record<PropertyKey, never>
     ? {
         fragmentReference: FragmentReference<
           ExtractReadFromStore<TEntrypoint>,

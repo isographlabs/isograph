@@ -4,13 +4,13 @@ import {
 } from '@isograph/react-disposable-state';
 import { IsographEntrypoint } from '../core/entrypoint';
 import {
-  FragmentReference,
   ExtractParameters,
+  FragmentReference,
 } from '../core/FragmentReference';
-import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import { ROOT_ID } from '../core/IsographEnvironment';
 import { makeNetworkRequest } from '../core/makeNetworkRequest';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
+import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
 // TODO rename this to useImperativelyLoadedEntrypoint
 

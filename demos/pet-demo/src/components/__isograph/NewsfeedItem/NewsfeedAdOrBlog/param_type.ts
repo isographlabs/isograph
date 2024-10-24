@@ -10,5 +10,5 @@ export type NewsfeedItem__NewsfeedAdOrBlog__param = {
       readonly BlogItemDisplay: BlogItem__BlogItemDisplay__output_type,
     } | null),
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

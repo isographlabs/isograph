@@ -12,7 +12,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     get_provided_arguments, selection_map_wrapped, ClientFieldTraversalResult, ClientFieldVariant,
-    FieldDefinitionLocation, NameAndArguments, NormalizationKey, RequiresRefinement, SchemaObject,
+    FieldType, NameAndArguments, NormalizationKey, RequiresRefinement, SchemaObject,
     UserWrittenComponentVariant, ValidatedClientField, ValidatedIsographSelectionVariant,
     ValidatedSchema, ValidatedSelection, ValidatedVariableDefinition, NODE_FIELD_NAME,
 };
@@ -365,9 +365,10 @@ pub(crate) fn generate_output_type(client_field: &ValidatedClientField) -> Clien
             UserWrittenComponentVariant::Eager => {
                 ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
             }
-            UserWrittenComponentVariant::Component => {
-                ClientFieldOutputType("(React.FC<ExtractSecondParam<typeof resolver>>)".to_string())
-            }
+            UserWrittenComponentVariant::Component => ClientFieldOutputType(
+                "(React.FC<CombineWithIntrinsicAttributes<ExtractSecondParam<typeof resolver>>>)"
+                    .to_string(),
+            ),
         },
         ClientFieldVariant::ImperativelyLoadedField(params) => {
             // N.B. the string is a stable id for deduplicating
@@ -427,7 +428,7 @@ fn write_param_type_from_selection(
         Selection::ServerField(field) => match field {
             ServerFieldSelection::ScalarField(scalar_field_selection) => {
                 match scalar_field_selection.associated_data.location {
-                    FieldDefinitionLocation::Server(_server_field) => {
+                    FieldType::ServerField(_server_field) => {
                         let parent_field = parent_type
                             .encountered_fields
                             .get(&scalar_field_selection.name.item.into())
@@ -465,7 +466,7 @@ fn write_param_type_from_selection(
                             print_javascript_type_declaration(&output_type)
                         ));
                     }
-                    FieldDefinitionLocation::Client(client_field_id) => {
+                    FieldType::ClientField(client_field_id) => {
                         let client_field = schema.client_field(client_field_id);
                         write_optional_description(
                             client_field.description,
@@ -496,12 +497,13 @@ fn write_param_type_from_selection(
                                         "".to_string()
                                     } else {
                                         format!(
-                                            ",\n{indent}{}",
-                                            get_loadable_field_type_from_arguments(
-                                                schema,
-                                                provided_arguments
-                                            )
+                                        ",\n{indent}Omit<ExtractParameters<{}__param>, keyof {}>",
+                                        client_field.type_and_field.underscore_separated(),
+                                        get_loadable_field_type_from_arguments(
+                                            schema,
+                                            provided_arguments
                                         )
+                                    )
                                     };
 
                                     format!(

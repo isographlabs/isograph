@@ -4,7 +4,7 @@ use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 use isograph_lang_types::{
     ClientFieldId, SelectableServerFieldId, ServerFieldId, TypeAnnotation, UnionVariant,
 };
-use isograph_schema::{FieldDefinitionLocation, ValidatedSchema};
+use isograph_schema::{FieldType, ValidatedSchema};
 
 pub(crate) fn format_parameter_type(
     schema: &ValidatedSchema,
@@ -53,7 +53,7 @@ fn format_server_field_type(
                 .iter()
                 .filter(|x| matches!(
                     x.1,
-                    FieldDefinitionLocation::Server(server_field_id) if !schema.server_field(*server_field_id).is_discriminator),
+                    FieldType::ServerField(server_field_id) if !schema.server_field(*server_field_id).is_discriminator),
                 )
             {
                 let field_type =
@@ -74,11 +74,11 @@ fn format_server_field_type(
 fn format_field_definition(
     schema: &ValidatedSchema,
     name: &SelectableFieldName,
-    type_: &FieldDefinitionLocation<ServerFieldId, ClientFieldId>,
+    type_: &FieldType<ServerFieldId, ClientFieldId>,
     indentation_level: u8,
 ) -> String {
     match type_ {
-        FieldDefinitionLocation::Server(server_field_id) => {
+        FieldType::ServerField(server_field_id) => {
             let type_annotation = &schema.server_field(*server_field_id).associated_data;
             format!(
                 "{}readonly {}: {},\n",
@@ -87,7 +87,7 @@ fn format_field_definition(
                 format_type_annotation(schema, type_annotation, indentation_level + 1),
             )
         }
-        FieldDefinitionLocation::Client(_) => {
+        FieldType::ClientField(_) => {
             panic!(
                 "Unexpected object. Client fields are not supported as parameters, yet. \
                 This is indicative of an unimplemented feature in Isograph."

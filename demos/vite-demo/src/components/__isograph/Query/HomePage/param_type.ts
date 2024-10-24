@@ -29,5 +29,5 @@ The form identifier of a Pokémon
       readonly Pokemon: Pokemon__Pokemon__output_type,
     }>,
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

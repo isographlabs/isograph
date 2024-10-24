@@ -9,7 +9,7 @@ const queryText = 'query NewsfeedPaginationComponent ($skip: Int!, $limit: Int!,
     ... on Viewer {\
       __typename,\
       id,\
-      newsfeed____skip___v_skip____limit___v_limit____additionalSkip___l_5: newsfeed(skip: $skip, limit: $limit, additionalSkip: 5) {\
+      newsfeed____skip___v_skip____limit___v_limit: newsfeed(skip: $skip, limit: $limit) {\
         id,\
         adItem {\
           id,\
@@ -66,11 +66,6 @@ const normalizationAst: NormalizationAst = [
               [
                 "limit",
                 { kind: "Variable", name: "limit" },
-              ],
-
-              [
-                "additionalSkip",
-                { kind: "Literal", value: 5 },
               ],
             ],
             concreteType: "NewsfeedItem",

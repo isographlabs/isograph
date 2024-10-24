@@ -10,7 +10,7 @@ const resolver = (
   artifact: RefetchQueryNormalizationArtifact,
   readOutData: any,
   filteredVariables: any,
-  rootId: Link,
+  rootLink: Link,
   // TODO type this
   readerArtifact: TopLevelReaderArtifact<any, any, any>,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
@@ -25,7 +25,7 @@ const resolver = (
       readerArtifact,
       nestedRefetchQueries,
     } as const),
-    root: rootId,
+    root: rootLink,
     variables,
     networkRequest,
   } as const;

@@ -6,5 +6,5 @@ export type Checkin__CheckinDisplay__param = {
     readonly time: string,
     readonly make_super: ICheckin__make_super__output_type,
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

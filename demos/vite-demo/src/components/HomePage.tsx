@@ -1,5 +1,4 @@
 import { iso } from '@iso';
-import { Fragment } from 'react';
 
 export const HomePage = iso(`
   field Query.HomePage @component {
@@ -25,11 +24,7 @@ export const HomePage = iso(`
     >
       {data.getAllPokemon
         ?.filter(({ forme }) => !forme)
-        .map((pokemon) => (
-          <Fragment key={pokemon.key}>
-            <pokemon.Pokemon />
-          </Fragment>
-        ))}
+        .map((pokemon) => <pokemon.Pokemon key={pokemon.key} />)}
     </div>
   );
 });

@@ -1,6 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
-
-use common_lang_types::{IsographDirectiveName, Location, TextSource, WithLocation, WithSpan};
+use common_lang_types::{IsographDirectiveName, Location, WithLocation, WithSpan};
 use intern::string_key::Intern;
 use isograph_lang_types::{
     from_isograph_field_directive, ClientFieldDeclaration,
@@ -17,97 +15,65 @@ lazy_static! {
 
 #[allow(clippy::complexity)]
 pub fn validate_isograph_field_directives(
-    client_fields: Vec<(
-        WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>,
-        TextSource,
-    )>,
+    client_field: WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>,
 ) -> Result<
-    Vec<(
-        WithSpan<ClientFieldDeclarationWithValidatedDirectives>,
-        TextSource,
-    )>,
+    WithSpan<ClientFieldDeclarationWithValidatedDirectives>,
     Vec<WithLocation<ProcessClientFieldDeclarationError>>,
 > {
-    let errors = Rc::new(RefCell::new(vec![]));
-    let mut transformed_client_fields = vec![];
-    for (with_span, text_source) in client_fields {
-        let ClientFieldDeclaration {
+    let ClientFieldDeclaration {
+        const_export_name,
+        parent_type,
+        client_field_name,
+        description,
+        selection_set,
+        unwraps,
+        directives,
+        variable_definitions,
+        definition_path,
+        dot,
+        field_keyword,
+    } = client_field.item;
+    let new_selecton_set = and_then_selection_set_and_collect_errors(
+        selection_set,
+        &|scalar_field_selection| {
+            if let Some(directive) =
+                find_directive_named(&scalar_field_selection.directives, *LOADABLE_DIRECTIVE_NAME)
+            {
+                let loadable_variant =
+                    from_isograph_field_directive(&directive.item).map_err(|message| {
+                        WithLocation::new(
+                            ProcessClientFieldDeclarationError::UnableToDeserialize {
+                                directive_name: *LOADABLE_DIRECTIVE_NAME,
+                                message,
+                            },
+                            Location::generated(),
+                        )
+                    })?;
+                // TODO validate that the field is actually loadable (i.e. implements Node or
+                // whatnot)
+                Ok(IsographSelectionVariant::Loadable(loadable_variant))
+            } else {
+                Ok(IsographSelectionVariant::Regular)
+            }
+        },
+        &|_linked_field_selection| Ok(IsographSelectionVariant::Regular),
+    )?;
+    Ok(WithSpan::new(
+        ClientFieldDeclarationWithValidatedDirectives {
             const_export_name,
             parent_type,
             client_field_name,
             description,
-            selection_set,
+            selection_set: new_selecton_set,
             unwraps,
             directives,
             variable_definitions,
             definition_path,
             dot,
             field_keyword,
-        } = with_span.item;
-        let selecton_set_or_errors = and_then_selection_set_and_collect_errors(
-            selection_set,
-            &|scalar_field_selection| {
-                if let Some(directive) = find_directive_named(
-                    &scalar_field_selection.directives,
-                    *LOADABLE_DIRECTIVE_NAME,
-                ) {
-                    let loadable_variant =
-                        from_isograph_field_directive(&directive.item).map_err(|message| {
-                            WithLocation::new(
-                                ProcessClientFieldDeclarationError::UnableToDeserialize {
-                                    directive_name: *LOADABLE_DIRECTIVE_NAME,
-                                    message,
-                                },
-                                Location::generated(),
-                            )
-                        })?;
-                    // TODO validate that the field is actually loadable (i.e. implements Node or
-                    // whatnot)
-                    Ok(IsographSelectionVariant::Loadable(loadable_variant))
-                } else {
-                    Ok(IsographSelectionVariant::Regular)
-                }
-            },
-            &|_linked_field_selection| Ok(IsographSelectionVariant::Regular),
-        );
-        match selecton_set_or_errors {
-            Ok(new_selection_set) => transformed_client_fields.push((
-                WithSpan::new(
-                    ClientFieldDeclarationWithValidatedDirectives {
-                        const_export_name,
-                        parent_type,
-                        client_field_name,
-                        description,
-                        selection_set: new_selection_set,
-                        unwraps,
-                        directives,
-                        variable_definitions,
-                        definition_path,
-                        dot,
-                        field_keyword,
-                    },
-                    with_span.span,
-                ),
-                text_source,
-            )),
-            Err(e) => errors
-                .try_borrow_mut()
-                .expect(
-                    "Expected Rc to yield mutable reference. \
-                        This is indicative of a bug in Isograph.",
-                )
-                .extend(e),
-        }
-    }
-
-    let errors = Rc::into_inner(errors)
-        .expect("Expected Rc to yield inner value")
-        .into_inner();
-    if errors.is_empty() {
-        Ok(transformed_client_fields)
-    } else {
-        Err(errors)
-    }
+        },
+        client_field.span,
+    ))
 }
 
 fn and_then_selection_set_and_collect_errors<

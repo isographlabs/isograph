@@ -20,7 +20,7 @@ import { Arguments } from './util';
 export type TopLevelReaderArtifact<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
-  TComponentProps extends Record<string, never>,
+  TComponentProps extends Record<PropertyKey, never>,
 > =
   | EagerReaderArtifact<TReadFromStore, TClientFieldValue>
   | ComponentReaderArtifact<TReadFromStore, TComponentProps>;
@@ -38,7 +38,7 @@ export type EagerReaderArtifact<
 
 export type ComponentReaderArtifact<
   TReadFromStore extends { parameters: object; data: object },
-  TComponentProps extends Record<string, unknown> = Record<string, never>,
+  TComponentProps extends Record<string, unknown> = Record<PropertyKey, never>,
 > = {
   readonly kind: 'ComponentReaderArtifact';
   readonly componentName: ComponentOrFieldName;
@@ -66,7 +66,7 @@ export type RefetchReaderArtifact = {
     variables: any,
     // TODO type this better
     filteredVariables: any,
-    rootId: Link,
+    rootLink: Link,
     readerArtifact: TopLevelReaderArtifact<any, any, any> | null,
     // TODO type this better
     nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
@@ -144,7 +144,7 @@ type StableId = string;
 export type LoadableField<
   TReadFromStore extends { data: object; parameters: object },
   TResult,
-  TProvidedArgs extends object = object,
+  TArgs = ExtractParameters<TReadFromStore>,
 > = (
-  args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs> | void,
+  args: TArgs | void,
 ) => [StableId, Factory<FragmentReference<TReadFromStore, TResult>>];

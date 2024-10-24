@@ -33,7 +33,7 @@ These commands will install the appropriate node.js and pnpm version used by Iso
 
 Isograph currently uses `rustc 1.81.0 (eeb90cda1 2024-09-04)`. Rust is fairly stable and we don't rely on anything crazy, so it should be safe to keep your `rustc` up-to-date.
 
-You should also install `cargo watch` via `cargo install cargo-watch`.
+You should also install [`bacon`](https://dystroy.org/bacon/) via `cargo install --locked bacon`.
 
 ## Commands related to the compiler and Rust
 
@@ -93,6 +93,10 @@ pnpm format # which also formats the TypeScript code
 ```
 
 Many of these tests come from the libraries that we brought in from Relay, and aren't specific to Isograph.
+
+### Documentation
+
+To show the rustdoc, `pnpm watch-rs`, then press the `d` key.
 
 ## Commands related to the runtime and JavaScript
 

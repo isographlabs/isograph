@@ -23,13 +23,14 @@ export const Newsfeed = iso(`
 
   const paginationState = useSkipLimitPagination(
     viewer.NewsfeedPaginationComponent,
+    { skip: viewer.newsfeed.length },
   );
 
   const newsfeedItems = viewer.newsfeed.concat(paginationState.results);
 
   const loadMore = () => {
     if (paginationState.kind === 'Complete') {
-      paginationState.fetchMore({}, 4);
+      paginationState.fetchMore(4);
     }
   };
 
@@ -66,6 +67,7 @@ export function NewsfeedLoader() {
         <FragmentReader
           fragmentReference={fragmentReference}
           networkRequestOptions={{ suspendIfInFlight: false }}
+          additionalProps={{}}
         />
       </React.Suspense>
     </ErrorBoundary>

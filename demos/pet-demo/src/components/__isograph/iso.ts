@@ -55,7 +55,7 @@ type IdentityWithParam<TParam extends object> = <TClientFieldReturn>(
 // whenever the @component field is rendered.
 type IdentityWithParamComponent<TParam extends object> = <
   TClientFieldReturn,
-  TComponentProps = Record<string, never>,
+  TComponentProps = Record<PropertyKey, never>,
 >(
   clientComponentField: (data: TParam, componentProps: TComponentProps) => TClientFieldReturn
 ) => (data: TParam, componentProps: TComponentProps) => TClientFieldReturn;

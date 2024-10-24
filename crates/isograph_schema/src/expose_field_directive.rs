@@ -14,10 +14,10 @@ use isograph_lang_types::{
 use serde::Deserialize;
 
 use crate::{
-    generate_refetch_field_strategy, ArgumentMap, ClientField, ClientFieldVariant,
-    FieldDefinitionLocation, FieldMapItem, ImperativelyLoadedFieldVariant, ObjectTypeAndFieldName,
-    PrimaryFieldInfo, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
-    ProcessedFieldMapItem, UnvalidatedSchema, UnvalidatedVariableDefinition,
+    generate_refetch_field_strategy, ArgumentMap, ClientField, ClientFieldVariant, FieldMapItem,
+    FieldType, ImperativelyLoadedFieldVariant, ObjectTypeAndFieldName, PrimaryFieldInfo,
+    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
+    UnvalidatedSchema, UnvalidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -159,7 +159,7 @@ impl UnvalidatedSchema {
 
             let (maybe_abstract_parent_object_id, maybe_abstract_parent_type_name) =
                 match primary_field {
-                    Some(FieldDefinitionLocation::Server(server_field_id)) => {
+                    Some(FieldType::ServerField(server_field_id)) => {
                         let server_field = self.server_field(*server_field_id);
 
                         // This is the parent type name (Pet)
@@ -314,10 +314,7 @@ impl UnvalidatedSchema {
             .object_mut(client_field_parent_object_id);
         if client_field_parent
             .encountered_fields
-            .insert(
-                mutation_field_name,
-                FieldDefinitionLocation::Client(client_field_id),
-            )
+            .insert(mutation_field_name, FieldType::ClientField(client_field_id))
             .is_some()
         {
             return Err(WithLocation::new(
@@ -367,7 +364,7 @@ impl UnvalidatedSchema {
             .encountered_fields
             .iter()
             .find_map(|(name, field_id)| {
-                if let FieldDefinitionLocation::Server(server_field_id) = field_id {
+                if let FieldType::ServerField(server_field_id) = field_id {
                     if *name == field_arg {
                         return Some(server_field_id);
                     }

@@ -20,11 +20,6 @@ import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 import { maybeUnwrapNetworkRequest } from '../react/useResult';
 
-type FirstOrAfter = 'first' | 'after';
-type OmitFirstAfter<TArgs> = keyof Omit<TArgs, FirstOrAfter> extends never
-  ? void | Record<string, never>
-  : Omit<TArgs, FirstOrAfter>;
-
 type UsePaginationReturnValue<
   TReadFromStore extends { parameters: object; data: object },
   TItem,
@@ -36,10 +31,7 @@ type UsePaginationReturnValue<
     }
   | {
       kind: 'Complete';
-      fetchMore: (
-        args: OmitFirstAfter<TReadFromStore['parameters']>,
-        first: number,
-      ) => void;
+      fetchMore: (count: number) => void;
       results: ReadonlyArray<TItem>;
       hasNextPage: boolean;
     };
@@ -81,17 +73,24 @@ type NonNullConnection<T> = {
   readonly pageInfo: PageInfo;
 };
 
+type UseConnectionSpecPaginationArgs = {
+  first: number;
+  after: string | null;
+};
+
 export function useConnectionSpecPagination<
   TReadFromStore extends {
-    parameters: {
-      readonly first?: number | void | null;
-      readonly after?: string | void | null;
-    };
+    parameters: object;
     data: object;
   },
   TItem,
 >(
-  loadableField: LoadableField<TReadFromStore, Connection<TItem>>,
+  loadableField: LoadableField<
+    TReadFromStore,
+    Connection<TItem>,
+    UseConnectionSpecPaginationArgs
+  >,
+  pageInfo?: PageInfo,
 ): UsePaginationReturnValue<TReadFromStore, TItem> {
   const networkRequestOptions = {
     suspendIfInFlight: true,
@@ -178,16 +177,11 @@ export function useConnectionSpecPagination<
   }
 
   const getFetchMore =
-    (after: string | null | undefined) =>
-    (
-      args: OmitFirstAfter<TReadFromStore['parameters']>,
-      first: number,
-    ): void => {
-      // @ts-expect-error
+    (after: string | null) =>
+    (count: number): void => {
       const loadedField = loadableField({
-        ...args,
         after: after,
-        first: first,
+        first: count,
       })[1]();
       const newPointer = createReferenceCountedPointer(loadedField);
       const clonedPointers = loadedReferences.map(([refCountedPointer]) => {
@@ -278,9 +272,9 @@ export function useConnectionSpecPagination<
   if (!networkRequestStatus) {
     return {
       kind: 'Complete',
-      fetchMore: getFetchMore(null),
+      fetchMore: getFetchMore(pageInfo?.endCursor ?? null),
       results: [],
-      hasNextPage: true,
+      hasNextPage: pageInfo?.hasNextPage ?? true,
     };
   }
 

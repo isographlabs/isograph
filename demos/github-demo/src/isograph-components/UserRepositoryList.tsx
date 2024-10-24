@@ -13,14 +13,18 @@ import { Route } from './GithubDemo';
 
 export const RepositoryList = iso(`
   field User.RepositoryList @component {
+    firstPage: RepositoryConnection(first: 10)
     RepositoryConnection @loadable
   }
 `)(function UserRepositoryListComponent(
   { data },
   { setRoute }: { setRoute: (route: Route) => void },
 ) {
-  const pagination = useConnectionSpecPagination(data.RepositoryConnection);
-  const repositories = pagination.results;
+  const pagination = useConnectionSpecPagination(
+    data.RepositoryConnection,
+    data.firstPage.pageInfo,
+  );
+  const repositories = (data.firstPage.edges ?? []).concat(pagination.results);
   return (
     <>
       <Table>
@@ -61,8 +65,7 @@ export const RepositoryList = iso(`
                   !(pagination.kind === 'Complete' && pagination.hasNextPage)
                 }
                 onClick={() =>
-                  pagination.kind === 'Complete' &&
-                  pagination.fetchMore(undefined, 10)
+                  pagination.kind === 'Complete' && pagination.fetchMore(10)
                 }
               >
                 {pagination.kind === 'Complete' && !pagination.hasNextPage

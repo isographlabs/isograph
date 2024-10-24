@@ -18,9 +18,7 @@ export const HomeRoute = iso(`
       <h1>Robert&apos;s Pet List 3000</h1>
       <Stack direction="column" spacing={4}>
         {data.pets.map((pet) => (
-          // the key is not needed here!
-          // eslint-disable-next-line react/jsx-key
-          <pet.PetSummaryCard />
+          <pet.PetSummaryCard key={pet.id} />
         ))}
       </Stack>
     </Container>
@@ -39,6 +37,7 @@ export function HomeRouteLoader() {
         <FragmentReader
           fragmentReference={fragmentReference}
           networkRequestOptions={{ suspendIfInFlight: false }}
+          additionalProps={{}}
         />
       </React.Suspense>
     </ErrorBoundary>

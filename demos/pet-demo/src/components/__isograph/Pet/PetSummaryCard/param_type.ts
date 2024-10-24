@@ -8,5 +8,5 @@ export type Pet__PetSummaryCard__param = {
     readonly tagline: string,
     readonly FavoritePhraseLoader: Pet__FavoritePhraseLoader__output_type,
   },
-  readonly parameters: Record<string, never>,
+  readonly parameters: Record<PropertyKey, never>,
 };

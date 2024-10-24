@@ -28,11 +28,11 @@ impl UnvalidatedSchema {
             for subtype_id in subtype_ids {
                 for (supertype_field_name, defined_field) in &supertype_encountered_fields {
                     match defined_field {
-                        crate::FieldDefinitionLocation::Server(_) => {
+                        crate::FieldType::ServerField(_) => {
                             // Should we transfer server fields??? That makes no sense for
                             // GraphQL, but ... does it make sense otherwise? Who knows.
                         }
-                        crate::FieldDefinitionLocation::Client(_) => {
+                        crate::FieldType::ClientField(_) => {
                             let subtype = self.server_field_data.object_mut(*subtype_id);
 
                             if subtype
