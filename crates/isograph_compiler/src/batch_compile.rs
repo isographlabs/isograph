@@ -204,9 +204,10 @@ fn process_iso_literals(
 /// validate that no other types have exposeAs directives.
 fn process_exposed_fields(schema: &mut UnvalidatedSchema) -> Result<(), BatchCompileError> {
     let fetchable_types: Vec<_> = schema.fetchable_types.keys().copied().collect();
-    Ok(for fetchable_object_id in fetchable_types.into_iter() {
+    for fetchable_object_id in fetchable_types.into_iter() {
         schema.add_exposed_fields_to_parent_object_types(fetchable_object_id)?;
-    })
+    }
+    Ok(())
 }
 
 #[derive(Error, Debug)]
