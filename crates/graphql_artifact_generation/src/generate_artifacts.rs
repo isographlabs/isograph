@@ -14,7 +14,7 @@ use isograph_schema::{
     get_provided_arguments, selection_map_wrapped, ClientFieldTraversalResult, ClientFieldVariant,
     FieldType, NameAndArguments, NormalizationKey, RequiresRefinement, SchemaObject,
     UserWrittenComponentVariant, ValidatedClientField, ValidatedIsographSelectionVariant,
-    ValidatedSchema, ValidatedSelection, ValidatedVariableDefinition,
+    ValidatedSchema, ValidatedSelection, ValidatedVariableDefinition, NODE_FIELD_NAME,
 };
 use lazy_static::lazy_static;
 use std::path::Path;
@@ -140,7 +140,7 @@ pub fn get_artifact_path_and_content(
 
                     let wrapped_map = selection_map_wrapped(
                         merged_selection_map.clone(),
-                        "node".intern().into(),
+                        *NODE_FIELD_NAME,
                         vec![id_arg.clone()],
                         None,
                         None,
@@ -192,7 +192,7 @@ pub fn get_artifact_path_and_content(
                             &traversal_state,
                             &global_client_field_map,
                             variable_definitions_iter,
-                            &schema.query_root_operation_name(),
+                            &schema.find_query(),
                         ),
                     );
                 }

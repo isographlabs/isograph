@@ -223,6 +223,7 @@ const normalizationAst: NormalizationAst = [
 const artifact: RefetchQueryNormalizationArtifact = {
   kind: "RefetchQuery",
   queryText,
+  concreteType: "Mutation",
   normalizationAst,
 };
 

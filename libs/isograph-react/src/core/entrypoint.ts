@@ -28,6 +28,7 @@ export type IsographEntrypoint<
     TReadFromStore,
     TClientFieldValue
   >;
+  readonly concreteType: TypeName;
 };
 
 export type IsographEntrypointLoader<
@@ -72,6 +73,7 @@ export type RefetchQueryNormalizationArtifact = {
   readonly kind: 'RefetchQuery';
   readonly queryText: string;
   readonly normalizationAst: NormalizationAst;
+  readonly concreteType: TypeName;
 };
 
 // TODO rename

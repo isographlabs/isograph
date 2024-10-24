@@ -1,15 +1,14 @@
 import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
-import {Image__ImageDisplay__param} from './param_type';
-import {Image__ImageDisplay__output_type} from './output_type';
+import {Query__subquery__param} from './param_type';
+import {Query__subquery__output_type} from './output_type';
 import readerResolver from './resolver_reader';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
-const queryText = 'query ImageDisplay ($id: ID!) {\
-  node____id___v_id: node(id: $id) {\
-    ... on Image {\
+const queryText = 'query subquery ($id: ID!) {\
+  query {\
+    node____id___v_id: node(id: $id) {\
       __typename,\
       id,\
-      url,\
     },\
   },\
 }';
@@ -17,18 +16,20 @@ const queryText = 'query ImageDisplay ($id: ID!) {\
 const normalizationAst: NormalizationAst = [
   {
     kind: "Linked",
-    fieldName: "node",
-    arguments: [
-      [
-        "id",
-        { kind: "Variable", name: "id" },
-      ],
-    ],
-    concreteType: null,
+    fieldName: "query",
+    arguments: null,
+    concreteType: "Query",
     selections: [
       {
-        kind: "InlineFragment",
-        type: "Image",
+        kind: "Linked",
+        fieldName: "node",
+        arguments: [
+          [
+            "id",
+            { kind: "Variable", name: "id" },
+          ],
+        ],
+        concreteType: null,
         selections: [
           {
             kind: "Scalar",
@@ -40,19 +41,14 @@ const normalizationAst: NormalizationAst = [
             fieldName: "id",
             arguments: null,
           },
-          {
-            kind: "Scalar",
-            fieldName: "url",
-            arguments: null,
-          },
         ],
       },
     ],
   },
 ];
 const artifact: IsographEntrypoint<
-  Image__ImageDisplay__param,
-  Image__ImageDisplay__output_type
+  Query__subquery__param,
+  Query__subquery__output_type
 > = {
   kind: "Entrypoint",
   queryText,

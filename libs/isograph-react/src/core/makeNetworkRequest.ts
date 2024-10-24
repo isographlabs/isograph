@@ -10,7 +10,7 @@ import {
   retainQuery,
   unretainQuery,
 } from './garbageCollection';
-import { IsographEnvironment } from './IsographEnvironment';
+import { IsographEnvironment, ROOT_ID } from './IsographEnvironment';
 import { AnyError, PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { normalizeData } from './cache';
 import { logMessage } from './logging';
@@ -62,10 +62,13 @@ export function makeNetworkRequest(
           artifact.kind === 'Entrypoint'
             ? artifact.readerWithRefetchQueries.nestedRefetchQueries
             : [],
+          { __link: ROOT_ID, __typename: artifact.concreteType },
         );
-        const retainedQuery = {
+        const retainedQuery: RetainedQuery = {
           normalizationAst: artifact.normalizationAst,
           variables,
+          typeName: artifact.concreteType,
+          root: ROOT_ID,
         };
         status = {
           kind: 'UndisposedComplete',
