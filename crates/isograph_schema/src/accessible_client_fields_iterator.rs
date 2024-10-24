@@ -1,7 +1,7 @@
 use common_lang_types::WithSpan;
 use isograph_lang_types::{Selection, ServerFieldSelection};
 
-use crate::{FieldDefinitionLocation, ValidatedClientField, ValidatedSchema, ValidatedSelection};
+use crate::{FieldType, ValidatedClientField, ValidatedSchema, ValidatedSelection};
 
 impl ValidatedClientField {
     // This should really be replaced with a proper visitor, or something
@@ -45,11 +45,11 @@ impl<'a> Iterator for AccessibleClientFieldIterator<'a> {
                     Selection::ServerField(server_field) => match server_field {
                         ServerFieldSelection::ScalarField(scalar) => {
                             match scalar.associated_data.location {
-                                FieldDefinitionLocation::Server(_) => {
+                                FieldType::ServerField(_) => {
                                     self.index += 1;
                                     continue 'main_loop;
                                 }
-                                FieldDefinitionLocation::Client(client_field_id) => {
+                                FieldType::ClientField(client_field_id) => {
                                     let nested_client_field =
                                         self.schema.client_field(client_field_id);
                                     self.index += 1;

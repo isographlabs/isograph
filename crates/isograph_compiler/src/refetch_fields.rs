@@ -4,7 +4,7 @@ use intern::string_key::Intern;
 use isograph_lang_types::ServerObjectId;
 use isograph_schema::{
     generate_refetch_field_strategy, id_arguments, id_selection, id_top_level_arguments,
-    ClientField, ClientFieldVariant, FieldDefinitionLocation, ImperativelyLoadedFieldVariant,
+    ClientField, ClientFieldVariant, FieldType, ImperativelyLoadedFieldVariant,
     ObjectTypeAndFieldName, RefetchStrategy, RequiresRefinement, SchemaObject,
     UnvalidatedClientField, UnvalidatedSchema, NODE_FIELD_NAME, REFETCH_FIELD_NAME,
 };
@@ -43,7 +43,7 @@ fn add_refetch_field_to_object(
         Entry::Vacant(vacant_entry) => {
             let next_client_field_id = client_fields.len().into();
 
-            vacant_entry.insert(FieldDefinitionLocation::Client(next_client_field_id));
+            vacant_entry.insert(FieldType::ClientField(next_client_field_id));
 
             client_fields.push(ClientField {
                 description: Some(

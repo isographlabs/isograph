@@ -9,7 +9,7 @@ use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{SelectableServerFieldId, ServerFieldId};
 
 use crate::{
-    FieldDefinitionLocation, FieldMapItem, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
+    FieldMapItem, FieldType, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
     ProcessedFieldMapItem, UnvalidatedSchema, UnvalidatedVariableDefinition,
 };
 
@@ -217,10 +217,10 @@ impl ModifiedArgument {
                             .encountered_fields
                             .iter()
                             .flat_map(|(name, field_id)| match field_id {
-                                FieldDefinitionLocation::Server(s) => {
+                                FieldType::ServerField(s) => {
                                     Some((*name, PotentiallyModifiedField::Unmodified(*s)))
                                 }
-                                FieldDefinitionLocation::Client(_) => None,
+                                FieldType::ClientField(_) => None,
                             })
                             .collect(),
                     }

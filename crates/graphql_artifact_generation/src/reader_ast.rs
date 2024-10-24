@@ -5,8 +5,8 @@ use isograph_lang_types::{
     LoadableDirectiveParameters, RefetchQueryIndex, Selection, ServerFieldSelection,
 };
 use isograph_schema::{
-    categorize_field_loadability, transform_arguments_with_child_context, FieldDefinitionLocation,
-    Loadability, NameAndArguments, NormalizationKey, PathToRefetchField, RefetchedPathsMap,
+    categorize_field_loadability, transform_arguments_with_child_context, FieldType, Loadability,
+    NameAndArguments, NormalizationKey, PathToRefetchField, RefetchedPathsMap,
     ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
     ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSelection, VariableContext,
 };
@@ -31,12 +31,12 @@ fn generate_reader_ast_node(
         Selection::ServerField(field) => match field {
             ServerFieldSelection::ScalarField(scalar_field_selection) => {
                 match scalar_field_selection.associated_data.location {
-                    FieldDefinitionLocation::Server(_) => server_defined_scalar_field_ast_node(
+                    FieldType::ServerField(_) => server_defined_scalar_field_ast_node(
                         scalar_field_selection,
                         indentation_level,
                         initial_variable_context,
                     ),
-                    FieldDefinitionLocation::Client(client_field_id) => {
+                    FieldType::ClientField(client_field_id) => {
                         let client_field = schema.client_field(client_field_id);
                         scalar_client_defined_field_ast_node(
                             scalar_field_selection,
@@ -543,10 +543,10 @@ fn refetched_paths_with_path(
             Selection::ServerField(field) => match field {
                 ServerFieldSelection::ScalarField(scalar_field_selection) => {
                     match scalar_field_selection.associated_data.location {
-                        FieldDefinitionLocation::Server(_) => {
+                        FieldType::ServerField(_) => {
                             // Do nothing, we encountered a server field
                         }
-                        FieldDefinitionLocation::Client(client_field_id) => {
+                        FieldType::ClientField(client_field_id) => {
                             let client_field = schema.client_field(client_field_id);
                             match categorize_field_loadability(
                                 client_field,

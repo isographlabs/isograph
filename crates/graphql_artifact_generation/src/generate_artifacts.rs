@@ -12,7 +12,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     get_provided_arguments, selection_map_wrapped, ClientFieldTraversalResult, ClientFieldVariant,
-    FieldDefinitionLocation, NameAndArguments, NormalizationKey, RequiresRefinement, SchemaObject,
+    FieldType, NameAndArguments, NormalizationKey, RequiresRefinement, SchemaObject,
     UserWrittenComponentVariant, ValidatedClientField, ValidatedIsographSelectionVariant,
     ValidatedSchema, ValidatedSelection, ValidatedVariableDefinition,
 };
@@ -428,7 +428,7 @@ fn write_param_type_from_selection(
         Selection::ServerField(field) => match field {
             ServerFieldSelection::ScalarField(scalar_field_selection) => {
                 match scalar_field_selection.associated_data.location {
-                    FieldDefinitionLocation::Server(_server_field) => {
+                    FieldType::ServerField(_server_field) => {
                         let parent_field = parent_type
                             .encountered_fields
                             .get(&scalar_field_selection.name.item.into())
@@ -466,7 +466,7 @@ fn write_param_type_from_selection(
                             print_javascript_type_declaration(&output_type)
                         ));
                     }
-                    FieldDefinitionLocation::Client(client_field_id) => {
+                    FieldType::ClientField(client_field_id) => {
                         let client_field = schema.client_field(client_field_id);
                         write_optional_description(
                             client_field.description,

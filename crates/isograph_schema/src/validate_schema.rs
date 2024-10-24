@@ -15,11 +15,11 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    ClientField, ClientFieldVariant, FieldDefinitionLocation, ImperativelyLoadedFieldVariant,
-    RefetchStrategy, Schema, SchemaIdField, SchemaObject, SchemaServerField, SchemaValidationState,
-    ServerFieldData, UnvalidatedClientField, UnvalidatedLinkedFieldSelection,
-    UnvalidatedRefetchFieldStrategy, UnvalidatedSchema, UnvalidatedSchemaSchemaField,
-    UnvalidatedSchemaState, UnvalidatedVariableDefinition, UseRefetchFieldRefetchStrategy,
+    ClientField, ClientFieldVariant, FieldType, ImperativelyLoadedFieldVariant, RefetchStrategy,
+    Schema, SchemaIdField, SchemaObject, SchemaServerField, SchemaValidationState, ServerFieldData,
+    UnvalidatedClientField, UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
+    UnvalidatedSchema, UnvalidatedSchemaSchemaField, UnvalidatedSchemaState,
+    UnvalidatedVariableDefinition, UseRefetchFieldRefetchStrategy,
     ValidateEntrypointDeclarationError,
 };
 
@@ -57,7 +57,7 @@ pub type ValidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
 >;
 
 /// The validated defined field that shows up in the TScalarField generic.
-pub type ValidatedFieldDefinitionLocation = FieldDefinitionLocation<ServerFieldId, ClientFieldId>;
+pub type ValidatedFieldDefinitionLocation = FieldType<ServerFieldId, ClientFieldId>;
 
 pub type ValidatedSchemaIdField = SchemaIdField<ServerScalarId>;
 
@@ -216,12 +216,12 @@ fn transform_object_field_ids(unvalidated_object: SchemaObject) -> SchemaObject 
     let validated_encountered_fields = unvalidated_encountered_fields
         .into_iter()
         .map(|(encountered_field_name, value)| match value {
-            FieldDefinitionLocation::Server(server_field_id) => (encountered_field_name, {
-                FieldDefinitionLocation::Server(server_field_id)
+            FieldType::ServerField(server_field_id) => (encountered_field_name, {
+                FieldType::ServerField(server_field_id)
             }),
-            FieldDefinitionLocation::Client(client_field_id) => (
+            FieldType::ClientField(client_field_id) => (
                 encountered_field_name,
-                FieldDefinitionLocation::Client(client_field_id),
+                FieldType::ClientField(client_field_id),
             ),
         })
         .collect();
@@ -855,7 +855,7 @@ fn validate_field_type_exists_and_is_scalar(
     let scalar_field_name = scalar_field_selection.name.item.into();
     match parent_object.encountered_fields.get(&scalar_field_name) {
         Some(defined_field_type) => match defined_field_type {
-            FieldDefinitionLocation::Server(server_field_id) => {
+            FieldType::ServerField(server_field_id) => {
                 let server_field = &server_fields[server_field_id.as_usize()];
                 let missing_arguments = get_missing_arguments_and_validate_argument_types(
                     server_field
@@ -873,7 +873,7 @@ fn validate_field_type_exists_and_is_scalar(
                     SelectableServerFieldId::Scalar(_) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
                         associated_data: ValidatedScalarFieldAssociatedData {
-                            location: FieldDefinitionLocation::Server(*server_field_id),
+                            location: FieldType::ServerField(*server_field_id),
                             selection_variant: match scalar_field_selection.associated_data {
                                 IsographSelectionVariant::Regular => {
                                     assert_no_missing_arguments(
@@ -910,7 +910,7 @@ fn validate_field_type_exists_and_is_scalar(
                     )),
                 }
             }
-            FieldDefinitionLocation::Client(client_field_id) => validate_client_field(
+            FieldType::ClientField(client_field_id) => validate_client_field(
                 client_field_args,
                 client_field_id,
                 scalar_field_selection,
@@ -952,7 +952,7 @@ fn validate_client_field(
         reader_alias: scalar_field_selection.reader_alias,
         unwraps: scalar_field_selection.unwraps,
         associated_data: ValidatedScalarFieldAssociatedData {
-            location: FieldDefinitionLocation::Client(*client_field_id),
+            location: FieldType::ClientField(*client_field_id),
             selection_variant: match scalar_field_selection.associated_data {
                 IsographSelectionVariant::Regular => {
                     assert_no_missing_arguments(
@@ -985,7 +985,7 @@ fn validate_field_type_exists_and_is_linked(
     let linked_field_name = linked_field_selection.name.item.into();
     match (parent_object.encountered_fields).get(&linked_field_name) {
         Some(defined_field_type) => match defined_field_type {
-            FieldDefinitionLocation::Server(server_field_id) => {
+            FieldType::ServerField(server_field_id) => {
                 let server_field = &server_fields[server_field_id.as_usize()];
                 match server_field.associated_data.inner_non_null() {
                     SelectableServerFieldId::Scalar(scalar_id) => Err(WithLocation::new(
@@ -1052,7 +1052,7 @@ fn validate_field_type_exists_and_is_linked(
                     }
                 }
             }
-            FieldDefinitionLocation::Client(_) => Err(WithLocation::new(
+            FieldType::ClientField(_) => Err(WithLocation::new(
                 ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsClientField {
                     field_parent_type_name: parent_object.name,
                     field_name: linked_field_name,

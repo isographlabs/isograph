@@ -11,8 +11,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ClientField, FieldDefinitionLocation, Schema, SchemaScalar, SchemaServerField,
-    SchemaValidationState, ServerFieldData, UseRefetchFieldRefetchStrategy,
+    ClientField, FieldType, Schema, SchemaScalar, SchemaServerField, SchemaValidationState,
+    ServerFieldData, UseRefetchFieldRefetchStrategy,
 };
 use lazy_static::lazy_static;
 
@@ -36,7 +36,7 @@ pub type UnvalidatedSchema = Schema<UnvalidatedSchemaState>;
 /// On unvalidated schema objects, the encountered types are either a type annotation
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
 /// client field.)
-pub type UnvalidatedObjectFieldInfo = FieldDefinitionLocation<ServerFieldId, ClientFieldId>;
+pub type UnvalidatedObjectFieldInfo = FieldType<ServerFieldId, ClientFieldId>;
 
 pub(crate) type UnvalidatedSchemaSchemaField = SchemaServerField<
     <UnvalidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,

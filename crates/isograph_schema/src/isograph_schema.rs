@@ -140,25 +140,23 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
 /// an iso field literal. Refetch fields and generated mutation fields are
 /// also local fields.
 #[derive(Debug, Clone, Copy)]
-pub enum FieldDefinitionLocation<TServer, TClient> {
-    Server(TServer),
-    Client(TClient),
+pub enum FieldType<TServer, TClient> {
+    ServerField(TServer),
+    ClientField(TClient),
 }
 
-impl<TFieldAssociatedData, TClientFieldType>
-    FieldDefinitionLocation<TFieldAssociatedData, TClientFieldType>
-{
+impl<TFieldAssociatedData, TClientFieldType> FieldType<TFieldAssociatedData, TClientFieldType> {
     pub fn as_server_field(&self) -> Option<&TFieldAssociatedData> {
         match self {
-            FieldDefinitionLocation::Server(server_field) => Some(server_field),
-            FieldDefinitionLocation::Client(_) => None,
+            FieldType::ServerField(server_field) => Some(server_field),
+            FieldType::ClientField(_) => None,
         }
     }
 
     pub fn as_client_field(&self) -> Option<&TClientFieldType> {
         match self {
-            FieldDefinitionLocation::Server(_) => None,
-            FieldDefinitionLocation::Client(client_field) => Some(client_field),
+            FieldType::ServerField(_) => None,
+            FieldType::ClientField(client_field) => Some(client_field),
         }
     }
 }
@@ -363,8 +361,7 @@ pub struct SchemaObject {
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
-    pub encountered_fields:
-        BTreeMap<SelectableFieldName, FieldDefinitionLocation<ServerFieldId, ClientFieldId>>,
+    pub encountered_fields: BTreeMap<SelectableFieldName, FieldType<ServerFieldId, ClientFieldId>>,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 }
