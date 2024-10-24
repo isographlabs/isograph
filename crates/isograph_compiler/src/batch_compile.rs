@@ -149,7 +149,7 @@ pub(crate) fn handle_compile_command(
 }
 
 fn create_unvalidated_schema_from_sources(
-    schema: &mut Schema<isograph_schema::UnvalidatedSchemaState>,
+    schema: &mut UnvalidatedSchema,
     sources: ParsedFiles,
     config: &CompilerConfig,
 ) -> Result<(), BatchCompileError> {
@@ -166,7 +166,7 @@ fn create_unvalidated_schema_from_sources(
 }
 
 fn process_iso_literals(
-    schema: &mut Schema<isograph_schema::UnvalidatedSchemaState>,
+    schema: &mut UnvalidatedSchema,
     contains_iso: HashMap<FilePath, Vec<(IsoLiteralExtractionResult, TextSource)>>,
 ) -> Result<(), BatchCompileError> {
     let mut errors = vec![];
@@ -202,9 +202,7 @@ fn process_iso_literals(
 /// Here, we are processing exposeAs fields. Note that we only process these
 /// directives on root objects (Query, Mutation, Subscription) and we should
 /// validate that no other types have exposeAs directives.
-fn process_exposed_fields(
-    schema: &mut Schema<isograph_schema::UnvalidatedSchemaState>,
-) -> Result<(), BatchCompileError> {
+fn process_exposed_fields(schema: &mut UnvalidatedSchema) -> Result<(), BatchCompileError> {
     let fetchable_types: Vec<_> = schema.fetchable_types.keys().copied().collect();
     Ok(for fetchable_object_id in fetchable_types.into_iter() {
         schema.add_exposed_fields_to_parent_object_types(fetchable_object_id)?;
