@@ -230,7 +230,6 @@ const artifact: IsographEntrypoint<
   queryText,
   normalizationAst,
   concreteType: "Query",
-  queryType: "Query",
   readerWithRefetchQueries: {
     kind: "ReaderWithRefetchQueries",
     nestedRefetchQueries,

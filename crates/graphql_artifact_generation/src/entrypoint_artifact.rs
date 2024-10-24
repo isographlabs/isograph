@@ -32,7 +32,6 @@ struct EntrypointArtifactInfo<'schema> {
     normalization_ast_text: NormalizationAstText,
     refetch_query_artifact_import: RefetchQueryArtifactImport,
     concrete_type: IsographObjectTypeName,
-    query_type: IsographObjectTypeName,
 }
 
 pub(crate) fn generate_entrypoint_artifacts(
@@ -163,8 +162,6 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
         },
     );
 
-    let query_type = schema.server_field_data.object(schema.query_id()).name;
-
     let mut paths_and_contents = vec![EntrypointArtifactInfo {
         query_text,
         query_name,
@@ -172,7 +169,6 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
         normalization_ast_text,
         refetch_query_artifact_import,
         concrete_type: concrete_type.name,
-        query_type,
     }
     .path_and_content()];
 
@@ -268,7 +264,6 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             query_name,
             parent_type,
             concrete_type,
-            query_type,
         } = self;
         let entrypoint_params_typename = format!("{}__{}__param", parent_type.name, query_name);
         let entrypoint_output_type_name =
@@ -294,7 +289,6 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             {}queryText,\n\
             {}normalizationAst,\n\
             {}concreteType: \"{concrete_type}\",\n\
-            {}queryType: \"{query_type}\",\n\
             {}readerWithRefetchQueries: {{\n\
             {}  kind: \"ReaderWithRefetchQueries\",\n\
             {}  nestedRefetchQueries,\n\
@@ -302,7 +296,7 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             {}}},\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  "
+            "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     }
 }

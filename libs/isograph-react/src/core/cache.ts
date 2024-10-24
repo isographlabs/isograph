@@ -141,7 +141,6 @@ export function normalizeData(
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   root: Link,
-  queryType: Link,
 ): EncounteredIds {
   const encounteredIds: EncounteredIds = new Map();
 
@@ -164,7 +163,6 @@ export function normalizeData(
     variables,
     nestedRefetchQueries,
     encounteredIds,
-    queryType,
   );
 
   logMessage(environment, {
@@ -378,7 +376,6 @@ function normalizeDataIntoRecord(
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: EncounteredIds,
-  queryType: Link,
 ): RecordHasBeenUpdated {
   let recordHasBeenUpdated = false;
   for (const normalizationNode of normalizationAst) {
@@ -404,7 +401,6 @@ function normalizeDataIntoRecord(
           variables,
           nestedRefetchQueries,
           mutableEncounteredIds,
-          queryType,
         );
         recordHasBeenUpdated =
           recordHasBeenUpdated || linkedFieldResultedInChange;
@@ -420,7 +416,6 @@ function normalizeDataIntoRecord(
           variables,
           nestedRefetchQueries,
           mutableEncounteredIds,
-          queryType,
         );
         recordHasBeenUpdated =
           recordHasBeenUpdated || inlineFragmentResultedInChange;
@@ -490,7 +485,6 @@ function normalizeLinkedField(
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: EncounteredIds,
-  root: Link,
 ): RecordHasBeenUpdated {
   const networkResponseKey = getNetworkResponseKey(astNode);
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
@@ -522,7 +516,6 @@ function normalizeLinkedField(
         i,
         nestedRefetchQueries,
         mutableEncounteredIds,
-        root,
       );
 
       const __typename =
@@ -550,7 +543,6 @@ function normalizeLinkedField(
       null,
       nestedRefetchQueries,
       mutableEncounteredIds,
-      root,
     );
 
     let __typename =
@@ -585,7 +577,6 @@ function normalizeInlineFragment(
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: EncounteredIds,
-  root: Link,
 ): RecordHasBeenUpdated {
   const typeToRefineTo = astNode.type;
   if (networkResponseParentRecord[TYPENAME_FIELD_NAME] === typeToRefineTo) {
@@ -598,7 +589,6 @@ function normalizeInlineFragment(
       variables,
       nestedRefetchQueries,
       mutableEncounteredIds,
-      root,
     );
     return hasBeenModified;
   }
@@ -639,7 +629,6 @@ function normalizeNetworkResponseObject(
   index: number | null,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: EncounteredIds,
-  queryType: Link,
 ): DataId /* The id of the modified or newly created item */ {
   const newStoreRecordId = getDataIdOfNetworkResponse(
     targetParentRecordLink,
@@ -647,7 +636,6 @@ function normalizeNetworkResponseObject(
     astNode,
     variables,
     index,
-    queryType,
   );
   const __typename =
     astNode.concreteType ?? networkResponseData[TYPENAME_FIELD_NAME];
@@ -671,7 +659,6 @@ function normalizeNetworkResponseObject(
     variables,
     nestedRefetchQueries,
     mutableEncounteredIds,
-    queryType,
   );
 
   return newStoreRecordId;
@@ -811,11 +798,10 @@ function getDataIdOfNetworkResponse(
   astNode: NormalizationLinkedField,
   variables: Variables,
   index: number | null,
-  root: Link,
 ): DataId {
   // If we are dealing with nested Query, use __ROOT as id
-  if (astNode.concreteType === root.__typename) {
-    return root.__link;
+  if (astNode.concreteType === 'Query') {
+    return ROOT_ID;
   }
 
   // Check whether the dataToNormalize has an id field. If so, that is the key.

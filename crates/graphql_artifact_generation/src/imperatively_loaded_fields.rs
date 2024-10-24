@@ -17,7 +17,6 @@ pub(crate) struct ImperativelyLoadedEntrypointArtifactInfo {
     pub root_fetchable_field_parent_object: IsographObjectTypeName,
     pub refetch_query_index: RefetchQueryIndex,
     pub concrete_type: IsographObjectTypeName,
-    pub query_type: IsographObjectTypeName,
 }
 
 impl ImperativelyLoadedEntrypointArtifactInfo {
@@ -49,7 +48,6 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
             normalization_ast_text: normalization_ast,
             query_text,
             concrete_type,
-            query_type,
             ..
         } = self;
 
@@ -61,11 +59,9 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
             {}kind: \"RefetchQuery\",\n\
             {}queryText,\n\
             {}concreteType: \"{concrete_type}\",\n\
-            {}queryType: \"{query_type}\",\n\
             {}normalizationAst,\n\
             }};\n\n\
             export default artifact;\n",
-            "  ",
             "  ",
             "  ",
             "  ",
@@ -103,8 +99,6 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field(
     let normalization_ast_text =
         generate_normalization_ast_text(schema, merged_selection_set.values(), 0);
 
-    let query_type = schema.server_field_data.object(schema.query_id()).name;
-
     ImperativelyLoadedEntrypointArtifactInfo {
         normalization_ast_text,
         query_text,
@@ -112,7 +106,6 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field(
         root_fetchable_field_parent_object: root_parent_object,
         refetch_query_index,
         concrete_type,
-        query_type,
     }
     .path_and_content()
 }

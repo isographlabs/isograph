@@ -65,7 +65,6 @@ const artifact: RefetchQueryNormalizationArtifact = {
   kind: "RefetchQuery",
   queryText,
   concreteType: "Mutation",
-  queryType: "Query",
   normalizationAst,
 };
 
