@@ -41,8 +41,8 @@ describe('normalizeData', () => {
       },
       { id: '1' },
       entrypoint.readerWithRefetchQueries.nestedRefetchQueries,
-      { id: ROOT_ID, concreteType: entrypoint.concreteType },
-      { id: ROOT_ID, concreteType: entrypoint.queryType },
+      { __link: ROOT_ID, __typename: entrypoint.concreteType },
+      { __link: ROOT_ID, __typename: entrypoint.queryType },
     );
 
     expect(store).toStrictEqual({
