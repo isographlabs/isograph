@@ -523,7 +523,7 @@ function normalizeLinkedField(
       if (!__typename) {
         throw new Error(
           'Unexpected missing __typename in network response when normalizing a linked field. ' +
-            'This is indicative of bug in Isograph.',
+            'This is indicative of a bug in Isograph.',
         );
       }
       dataIds.push({
@@ -551,7 +551,7 @@ function normalizeLinkedField(
     if (!__typename) {
       throw new Error(
         'Unexpected missing __typename in network response when normalizing a linked field. ' +
-          'This is indicative of bug in Isograph.',
+          'This is indicative of a bug in Isograph.',
       );
     }
 
@@ -643,7 +643,7 @@ function normalizeNetworkResponseObject(
   if (!__typename) {
     throw new Error(
       'Unexpected missing __typename in network response object. ' +
-        'This is indicative of bug in Isograph.',
+        'This is indicative of a bug in Isograph.',
     );
   }
 

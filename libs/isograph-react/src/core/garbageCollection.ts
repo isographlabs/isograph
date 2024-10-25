@@ -137,7 +137,7 @@ function recordReachableIdsFromRecord(
           if (!__typename) {
             throw new Error(
               'Unexpected missing __typename in Link when garbage collecting. ' +
-                'This is indicative of bug in Isograph.',
+                'This is indicative of a bug in Isograph.',
             );
           }
 
