@@ -3,7 +3,6 @@ import {
   StoreRecord,
   createIsographEnvironment,
   createIsographStore,
-  defaultMissingFieldHandler,
   type Link,
 } from '@isograph/react';
 import type { AppProps } from 'next/app';
@@ -36,27 +35,16 @@ const missingFieldHandler = (
   arguments_: { [index: string]: any } | null,
   variables: { [index: string]: any } | null,
 ): Link | undefined => {
-  const val = defaultMissingFieldHandler(
-    storeRecord,
-    root,
-    fieldName,
-    arguments_,
-    variables,
-  );
-  if (val == undefined) {
-    // This is the custom missing field handler
-    //
-    // N.B. this **not** correct. We need to pass the correct variables/args here.
-    // But it works for this demo.
-    if (
-      fieldName === 'pet' &&
-      variables?.id != null &&
-      root.__link === '__ROOT'
-    ) {
-      return { __link: variables.id, __typename: 'Pet' };
-    }
-  } else {
-    return val;
+  // This is the custom missing field handler
+  //
+  // N.B. this **not** correct. We need to pass the correct variables/args here.
+  // But it works for this demo.
+  if (
+    fieldName === 'pet' &&
+    variables?.id != null &&
+    root.__link === '__ROOT'
+  ) {
+    return { __link: variables.id, __typename: 'Pet' };
   }
 };
 

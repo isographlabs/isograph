@@ -18,7 +18,6 @@ import {
 } from './FragmentReference';
 import {
   assertLink,
-  defaultMissingFieldHandler,
   getOrLoadIsographArtifact,
   IsographEnvironment,
   type Link,
@@ -220,10 +219,9 @@ function readData<TReadFromStore>(
         let link = assertLink(value);
         if (link === undefined) {
           // TODO make this configurable, and also generated and derived from the schema
-          const missingFieldHandler =
-            environment.missingFieldHandler ?? defaultMissingFieldHandler;
+          const missingFieldHandler = environment.missingFieldHandler;
 
-          const altLink = missingFieldHandler(
+          const altLink = missingFieldHandler?.(
             storeRecord,
             root,
             field.fieldName,

@@ -150,24 +150,6 @@ export function createIsographStore(): IsographStore {
   };
 }
 
-export function defaultMissingFieldHandler(
-  _storeRecord: StoreRecord,
-  _root: Link,
-  fieldName: string,
-  arguments_: { [index: string]: any } | null,
-  variables: Variables | null,
-): Link | undefined {
-  if (fieldName === 'node' || fieldName === 'user') {
-    const variable = arguments_?.['id'];
-    const value = variables?.[variable];
-
-    // TODO can we handle explicit nulls here too? Probably, after wrapping in objects
-    if (typeof value === 'string') {
-      return { __link: value, __typename: 'Pet' };
-    }
-  }
-}
-
 export function assertLink(link: DataTypeValue): Link | null | undefined {
   if (Array.isArray(link)) {
     throw new Error('Unexpected array');
