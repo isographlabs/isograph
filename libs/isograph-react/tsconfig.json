@@ -2,5 +2,6 @@
   "extends": "./tsconfig.pkg.json",
   "compilerOptions": {
     "noEmit": true
-  }
+  },
+  "exclude": ["**/node_modules", "**/dist"]
 }
