@@ -13,6 +13,7 @@
     "noFallthroughCasesInSwitch": true,
     "noPropertyAccessFromIndexSignature": true,
     "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": true,
     "paths": {
       "@isograph/*": ["./libs/*"]
     },
