@@ -801,6 +801,7 @@ function getDataIdOfNetworkResponse(
   index: number | null,
 ): DataId {
   // If we are dealing with nested Query, use __ROOT as id
+  // TODO do not hard code this value here
   if (astNode.concreteType === 'Query') {
     return ROOT_ID;
   }
