@@ -30,9 +30,10 @@ import {
   ExtractParameters,
 } from './FragmentReference';
 import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
-import { makeNetworkRequest } from './makeNetworkRequest';
+import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import { wrapResolvedValue } from './PromiseWrapper';
 import { logMessage } from './logging';
+import { DEFAULT_FETCH_POLICY, FetchOptions } from './check';
 
 const TYPENAME_FIELD_NAME = '__typename';
 
@@ -87,14 +88,18 @@ export function getOrCreateCacheForArtifact<
   environment: IsographEnvironment,
   entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
   variables: ExtractParameters<TReadFromStore>,
+  options?: FetchOptions,
 ): ParentCache<FragmentReference<TReadFromStore, TClientFieldValue>> {
   const cacheKey = entrypoint.queryText + JSON.stringify(stableCopy(variables));
   const factory = () => {
-    const [networkRequest, disposeNetworkRequest] = makeNetworkRequest(
+    const fetchPolicy = options?.fetchPolicy ?? DEFAULT_FETCH_POLICY;
+    const [networkRequest, disposeNetworkRequest] = maybeMakeNetworkRequest(
       environment,
       entrypoint,
       variables,
+      fetchPolicy,
     );
+
     const itemCleanupPair: ItemCleanupPair<
       FragmentReference<TReadFromStore, TClientFieldValue>
     > = [

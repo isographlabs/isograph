@@ -1,4 +1,3 @@
-import { CleanupFn } from '@isograph/isograph-disposable-types/dist';
 import { getParentRecordKey, onNextChangeToRecord } from './cache';
 import { getOrCreateCachedComponent } from './componentCache';
 import {
@@ -30,6 +29,7 @@ import {
 import { ReaderAst } from './reader';
 import { Arguments } from './util';
 import { logMessage } from './logging';
+import { CleanupFn } from '@isograph/disposable-types';
 
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: Set<DataId>;

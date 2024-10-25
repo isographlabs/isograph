@@ -8,8 +8,17 @@ import {
   ROOT_ID,
   StoreRecord,
 } from './IsographEnvironment';
+import { logMessage } from './logging';
 
-type CheckResult =
+export type FetchPolicy = 'Yes' | 'No' | 'IfNecessary';
+
+export const DEFAULT_FETCH_POLICY: FetchPolicy = 'IfNecessary';
+
+export type FetchOptions = {
+  fetchPolicy?: FetchPolicy;
+};
+
+export type CheckResult =
   | {
       kind: 'EnoughData';
     }
@@ -23,13 +32,18 @@ export function check(
   normalizationAst: NormalizationAst,
   variables: Variables,
 ): CheckResult {
-  return checkFromRecord(
+  const checkResult = checkFromRecord(
     environment,
     normalizationAst,
     variables,
     environment.store[ROOT_ID],
     ROOT_ID,
   );
+  logMessage(environment, {
+    kind: 'EnvironmentCheck',
+    result: checkResult,
+  });
+  return checkResult;
 }
 
 function checkFromRecord(
