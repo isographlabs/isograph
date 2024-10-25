@@ -89,7 +89,6 @@ export function PetCheckinListLoader({
         <FragmentReader
           fragmentReference={fragmentReference}
           networkRequestOptions={{ suspendIfInFlight: false }}
-          additionalProps={{}}
         />
       </React.Suspense>
     </ErrorBoundary>

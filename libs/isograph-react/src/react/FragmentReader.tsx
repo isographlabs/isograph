@@ -4,17 +4,23 @@ import { FragmentReference } from '../core/FragmentReference';
 import { useResult } from './useResult';
 import { NetworkRequestReaderOptions } from '../core/read';
 
+type IsExactlyIntrinsicAttributes<T> = T extends JSX.IntrinsicAttributes
+  ? JSX.IntrinsicAttributes extends T
+    ? true
+    : false
+  : false;
+
 export function FragmentReader<
   TProps extends Record<any, any>,
   TEntrypoint extends IsographEntrypoint<any, React.FC<TProps>>,
 >(
-  props: TProps extends Record<PropertyKey, never>
+  props: IsExactlyIntrinsicAttributes<TProps> extends true
     ? {
         fragmentReference: FragmentReference<
           ExtractReadFromStore<TEntrypoint>,
-          React.FC<{}>
+          React.FC<TProps>
         >;
-        additionalProps?: TProps;
+        additionalProps?: Record<PropertyKey, never>;
         networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
       }
     : {
@@ -22,7 +28,7 @@ export function FragmentReader<
           ExtractReadFromStore<TEntrypoint>,
           React.FC<TProps>
         >;
-        additionalProps: TProps;
+        additionalProps: Omit<TProps, keyof JSX.IntrinsicAttributes>;
         networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
       },
 ): React.ReactNode {
@@ -30,5 +36,8 @@ export function FragmentReader<
     props.fragmentReference,
     props.networkRequestOptions,
   );
+  // TypeScript is not understanding that if additionalProps is Record<PropertyKey, never>,
+  // it means that TProps === JSX.IntrinsicAttributes.
+  // @ts-expect-error
   return <Component {...props.additionalProps} />;
 }

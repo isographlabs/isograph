@@ -47,10 +47,7 @@ export const BlogItem = iso(`
         ))}
         <Suspense fallback={<p>Loading more...</p>}>
           {fragmentReference !== UNASSIGNED_STATE ? (
-            <FragmentReader
-              fragmentReference={fragmentReference}
-              additionalProps={{}}
-            />
+            <FragmentReader fragmentReference={fragmentReference} />
           ) : (
             <Button variant="contained" onClick={() => loadField()}>
               Load more content...
@@ -70,10 +67,7 @@ export const ImageDisplayWrapper = iso(`
   const { fragmentReference } = useClientSideDefer(image.ImageDisplay);
   return (
     <Suspense fallback={null}>
-      <FragmentReader
-        fragmentReference={fragmentReference}
-        additionalProps={{}}
-      />
+      <FragmentReader fragmentReference={fragmentReference} />
     </Suspense>
   );
 });

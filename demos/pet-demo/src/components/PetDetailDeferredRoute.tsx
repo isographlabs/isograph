@@ -54,10 +54,7 @@ export const PetDetailDeferredRouteInnerComponent = iso(`
       <React.Suspense fallback={<h2>Loading pet details...</h2>}>
         <Stack direction="row" spacing={4}>
           <Stack direction="column" spacing={4}>
-            <FragmentReader
-              fragmentReference={petCheckinsCard}
-              additionalProps={{}}
-            />
+            <FragmentReader fragmentReference={petCheckinsCard} />
           </Stack>
         </Stack>
       </React.Suspense>
@@ -81,7 +78,6 @@ export function PetDetailDeferredRouteLoader({
         <FragmentReader
           fragmentReference={fragmentReference}
           networkRequestOptions={{ suspendIfInFlight: false }}
-          additionalProps={{}}
         />
       </React.Suspense>
     </ErrorBoundary>
