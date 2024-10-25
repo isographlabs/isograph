@@ -37,7 +37,6 @@ export function HomeRouteLoader() {
         <FragmentReader
           fragmentReference={fragmentReference}
           networkRequestOptions={{ suspendIfInFlight: false }}
-          additionalProps={{}}
         />
       </React.Suspense>
     </ErrorBoundary>

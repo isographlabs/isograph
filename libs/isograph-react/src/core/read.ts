@@ -1,4 +1,3 @@
-import { CleanupFn } from '@isograph/isograph-disposable-types/dist';
 import {
   getParentRecordKey,
   insertIfNotExists,
@@ -33,6 +32,7 @@ import {
 import { ReaderAst } from './reader';
 import { Arguments } from './util';
 import { logMessage } from './logging';
+import { CleanupFn } from '@isograph/disposable-types';
 
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: EncounteredIds;

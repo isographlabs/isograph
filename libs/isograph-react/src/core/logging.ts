@@ -14,6 +14,7 @@ import { FragmentReference, Variables } from './FragmentReference';
 import { NetworkResponseObject, type EncounteredIds } from './cache';
 import { Arguments } from './util';
 import { ReadDataResult } from './read';
+import { CheckResult } from './check';
 
 export type LogMessage =
   | {
@@ -74,6 +75,10 @@ export type LogMessage =
   | {
       kind: 'NonEntrypointReceived';
       entrypoint: any;
+    }
+  | {
+      kind: 'EnvironmentCheck';
+      result: CheckResult;
     };
 
 export type LogFunction = (logMessage: LogMessage) => void;
