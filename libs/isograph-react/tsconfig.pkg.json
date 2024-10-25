@@ -8,5 +8,10 @@
     "lib": ["es2017", "DOM"]
   },
   "include": ["./**/*.ts", "./**/*.tsx"],
-  "exclude": ["./src/tests/**/*", "./vitest.config.ts", "**/node_modules", "**/dist"]
+  "exclude": [
+    "./src/tests/**/*",
+    "./vitest.config.ts",
+    "**/node_modules",
+    "**/dist"
+  ]
 }
