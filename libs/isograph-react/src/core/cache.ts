@@ -127,8 +127,8 @@ type NetworkResponseValue =
   | NetworkResponseScalarValue
   | null
   | NetworkResponseObject
-  | NetworkResponseObject[]
-  | NetworkResponseScalarValue[];
+  | (NetworkResponseObject | null)[]
+  | (NetworkResponseScalarValue | null)[];
 
 export type NetworkResponseObject = {
   // N.B. undefined is here to support optional id's, but
@@ -461,7 +461,10 @@ function normalizeLinkedField(
     return existingValue !== null;
   }
 
-  if (isScalarButNotEmptyArray(networkResponseData)) {
+  if (
+    isScalarOrEmptyArray(networkResponseData) &&
+    !isNullOrEmptyArray(networkResponseData)
+  ) {
     throw new Error(
       'Unexpected scalar network response when normalizing a linked field',
     );
@@ -469,9 +472,13 @@ function normalizeLinkedField(
 
   if (Array.isArray(networkResponseData)) {
     // TODO check astNode.plural or the like
-    const dataIds: Link[] = [];
+    const dataIds: (Link | null)[] = [];
     for (let i = 0; i < networkResponseData.length; i++) {
       const networkResponseObject = networkResponseData[i];
+      if (networkResponseObject === null) {
+        dataIds.push(null);
+        continue;
+      }
       const newStoreRecordId = normalizeNetworkResponseObject(
         environment,
         astNode,
@@ -539,7 +546,7 @@ function normalizeInlineFragment(
 
 function dataIdsAreTheSame(
   existingValue: DataTypeValue,
-  newDataIds: Link[],
+  newDataIds: (Link | null)[],
 ): boolean {
   if (Array.isArray(existingValue)) {
     if (newDataIds.length !== existingValue.length) {
@@ -547,10 +554,8 @@ function dataIdsAreTheSame(
     }
     for (let i = 0; i < newDataIds.length; i++) {
       const maybeLink = getLink(existingValue[i]);
-      if (maybeLink !== null) {
-        if (newDataIds[i].__link !== maybeLink.__link) {
-          return false;
-        }
+      if (newDataIds[i]?.__link !== maybeLink?.__link) {
+        return false;
       }
     }
     return true;
@@ -596,35 +601,29 @@ function normalizeNetworkResponseObject(
 
 function isScalarOrEmptyArray(
   data: NonNullable<NetworkResponseValue>,
-): data is NetworkResponseScalarValue | NetworkResponseScalarValue[] {
+): data is NetworkResponseScalarValue | (NetworkResponseScalarValue | null)[] {
   // N.B. empty arrays count as empty arrays of scalar fields.
   if (Array.isArray(data)) {
     // This is maybe fixed in a new version of Typescript??
     return (data as any).every((x: any) => isScalarOrEmptyArray(x));
   }
   const isScalarValue =
+    data === null ||
     typeof data === 'string' ||
     typeof data === 'number' ||
     typeof data === 'boolean';
   return isScalarValue;
 }
 
-function isScalarButNotEmptyArray(
-  data: NonNullable<NetworkResponseValue>,
-): data is NetworkResponseScalarValue | NetworkResponseScalarValue[] {
-  // N.B. empty arrays count as empty arrays of linked fields.
+function isNullOrEmptyArray(data: unknown): data is never[] | null[] | null {
   if (Array.isArray(data)) {
     if (data.length === 0) {
-      return false;
+      return true;
     }
-    // This is maybe fixed in a new version of Typescript??
-    return (data as any).every((x: any) => isScalarOrEmptyArray(x));
+    return data.every((x) => isNullOrEmptyArray(x));
   }
-  const isScalarValue =
-    typeof data === 'string' ||
-    typeof data === 'number' ||
-    typeof data === 'boolean';
-  return isScalarValue;
+
+  return data === null;
 }
 
 export function getParentRecordKey(
