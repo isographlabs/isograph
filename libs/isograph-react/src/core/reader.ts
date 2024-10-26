@@ -16,6 +16,7 @@ import {
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
 import { Arguments } from './util';
+import { FetchOptions } from './check';
 
 export type TopLevelReaderArtifact<
   TReadFromStore extends { parameters: object; data: object },
@@ -147,4 +148,9 @@ export type LoadableField<
   TArgs = ExtractParameters<TReadFromStore>,
 > = (
   args: TArgs | void,
+  // Note: fetchOptions is not nullable here because a LoadableField is not a
+  // user-facing API. Users should only interact with LoadableFields via APIs
+  // like useClientSideDefer. These APIs should have a nullable fetchOptions
+  // parameter, and provide a default value ({}) to the LoadableField.
+  fetchOptions: FetchOptions,
 ) => [StableId, Factory<FragmentReference<TReadFromStore, TResult>>];
