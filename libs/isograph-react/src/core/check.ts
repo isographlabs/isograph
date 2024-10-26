@@ -37,7 +37,7 @@ export function check(
     normalizationAst,
     variables,
     environment.store[ROOT_ID],
-    ROOT_ID,
+    { __link: ROOT_ID },
   );
   logMessage(environment, {
     kind: 'EnvironmentCheck',
@@ -51,7 +51,7 @@ function checkFromRecord(
   normalizationAst: NormalizationAst,
   variables: Variables,
   record: StoreRecord,
-  backupId: string,
+  recordLink: Link,
 ): CheckResult {
   normalizationAstLoop: for (const normalizationAstNode of normalizationAst) {
     switch (normalizationAstNode.kind) {
@@ -67,9 +67,7 @@ function checkFromRecord(
         if (scalarValue === undefined) {
           return {
             kind: 'MissingData',
-            record: {
-              __link: record.id ?? backupId,
-            },
+            record: recordLink,
           };
         }
         continue normalizationAstLoop;
@@ -85,9 +83,7 @@ function checkFromRecord(
         if (linkedValue === undefined) {
           return {
             kind: 'MissingData',
-            record: {
-              __link: record.id ?? backupId,
-            },
+            record: recordLink,
           };
         } else if (linkedValue === null) {
           continue;
@@ -117,8 +113,7 @@ function checkFromRecord(
                 normalizationAstNode.selections,
                 variables,
                 linkedRecord,
-                // TODO this seems likely to be wrong
-                backupId + '.' + parentRecordKey,
+                link,
               );
 
               if (result.kind === 'MissingData') {
@@ -151,8 +146,7 @@ function checkFromRecord(
               normalizationAstNode.selections,
               variables,
               linkedRecord,
-              // TODO this seems likely to be wrong
-              backupId + '.' + parentRecordKey,
+              link,
             );
 
             if (result.kind === 'MissingData') {
@@ -172,9 +166,7 @@ function checkFromRecord(
         ) {
           return {
             kind: 'MissingData',
-            record: {
-              __link: record.id ?? backupId,
-            },
+            record: recordLink,
           };
         }
 
@@ -183,7 +175,7 @@ function checkFromRecord(
           normalizationAstNode.selections,
           variables,
           record,
-          backupId,
+          recordLink,
         );
 
         if (result.kind === 'MissingData') {
