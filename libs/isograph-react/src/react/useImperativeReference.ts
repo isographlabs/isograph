@@ -11,7 +11,7 @@ import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import { ROOT_ID } from '../core/IsographEnvironment';
 import { maybeMakeNetworkRequest } from '../core/makeNetworkRequest';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
-import { DEFAULT_FETCH_POLICY, FetchOptions } from '../core/check';
+import { DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from '../core/check';
 
 // TODO rename this to useImperativelyLoadedEntrypoint
 
@@ -40,12 +40,13 @@ export function useImperativeReference<
       variables: ExtractParameters<TReadFromStore>,
       fetchOptions?: FetchOptions,
     ) => {
-      const fetchPolicy = fetchOptions?.fetchPolicy ?? DEFAULT_FETCH_POLICY;
+      const shouldFetch =
+        fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE;
       const [networkRequest, disposeNetworkRequest] = maybeMakeNetworkRequest(
         environment,
         entrypoint,
         variables,
-        fetchPolicy,
+        shouldFetch,
       );
       setState([
         {

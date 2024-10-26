@@ -74,7 +74,7 @@ export {
   logMessage,
   registerLogger,
 } from './core/logging';
-export { check, CheckResult, FetchOptions, FetchPolicy } from './core/check';
+export { check, CheckResult, FetchOptions, ShouldFetch } from './core/check';
 
 export {
   IsographEnvironmentProvider,

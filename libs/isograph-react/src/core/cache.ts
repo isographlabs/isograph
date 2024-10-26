@@ -33,7 +33,7 @@ import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import { wrapResolvedValue } from './PromiseWrapper';
 import { logMessage } from './logging';
-import { DEFAULT_FETCH_POLICY, FetchOptions } from './check';
+import { DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
 
 const TYPENAME_FIELD_NAME = '__typename';
 
@@ -92,12 +92,12 @@ export function getOrCreateCacheForArtifact<
 ): ParentCache<FragmentReference<TReadFromStore, TClientFieldValue>> {
   const cacheKey = entrypoint.queryText + JSON.stringify(stableCopy(variables));
   const factory = () => {
-    const fetchPolicy = fetchOptions?.fetchPolicy ?? DEFAULT_FETCH_POLICY;
+    const shouldFetch = fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE;
     const [networkRequest, disposeNetworkRequest] = maybeMakeNetworkRequest(
       environment,
       entrypoint,
       variables,
-      fetchPolicy,
+      shouldFetch,
     );
 
     const itemCleanupPair: ItemCleanupPair<

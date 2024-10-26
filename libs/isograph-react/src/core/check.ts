@@ -10,12 +10,12 @@ import {
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 
-export type FetchPolicy = 'Yes' | 'No' | 'IfNecessary';
+export type ShouldFetch = 'Yes' | 'No' | 'IfNecessary';
 
-export const DEFAULT_FETCH_POLICY: FetchPolicy = 'IfNecessary';
+export const DEFAULT_SHOULD_FETCH_VALUE: ShouldFetch = 'IfNecessary';
 
 export type FetchOptions = {
-  fetchPolicy?: FetchPolicy;
+  shouldFetch?: ShouldFetch;
 };
 
 export type CheckResult =

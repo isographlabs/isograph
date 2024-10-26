@@ -19,7 +19,7 @@ import {
 } from './PromiseWrapper';
 import { normalizeData } from './cache';
 import { logMessage } from './logging';
-import { check, FetchPolicy } from './check';
+import { check, ShouldFetch } from './check';
 
 let networkRequestId = 0;
 
@@ -27,9 +27,9 @@ export function maybeMakeNetworkRequest(
   environment: IsographEnvironment,
   artifact: RefetchQueryNormalizationArtifact | IsographEntrypoint<any, any>,
   variables: Variables,
-  fetchPolicy: FetchPolicy,
+  shouldFetch: ShouldFetch,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
-  switch (fetchPolicy) {
+  switch (shouldFetch) {
     case 'Yes': {
       return makeNetworkRequest(environment, artifact, variables);
     }
