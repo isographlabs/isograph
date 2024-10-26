@@ -58,7 +58,6 @@ Add two aliases to your `tsconfig.json`'s `compilerOptions` field. These alias s
 {
   "compilerOptions": {
     "paths": {
-      "@iso/*": ["./src/components/__isograph/*"],
       "@iso": ["./src/components/__isograph/iso.ts"]
     }
   }
