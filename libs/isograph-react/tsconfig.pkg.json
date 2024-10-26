@@ -2,14 +2,14 @@
   "extends": "../../tsconfig.build.json",
   "compilerOptions": {
     "outDir": "./dist/",
-    "rootDir": "./src/",
+    "rootDir": "./",
     "declaration": true,
     "jsx": "react",
     "lib": ["es2017", "DOM"]
   },
   "include": ["./**/*.ts", "./**/*.tsx"],
   "exclude": [
-    "./src/tests/**/*",
+    "./src/tests/**",
     "./vitest.config.ts",
     "**/node_modules",
     "**/dist"
