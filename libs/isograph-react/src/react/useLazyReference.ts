@@ -15,7 +15,7 @@ export function useLazyReference<
 >(
   entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
   variables: ExtractParameters<TReadFromStore>,
-  options?: FetchOptions,
+  fetchOptions?: FetchOptions,
 ): {
   fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>;
 } {
@@ -33,7 +33,7 @@ export function useLazyReference<
     environment,
     entrypoint,
     variables,
-    options,
+    fetchOptions,
   );
 
   return {

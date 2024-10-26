@@ -26,7 +26,7 @@ export function useImperativeReference<
     | UnassignedState;
   loadFragmentReference: (
     variables: ExtractParameters<TReadFromStore>,
-    options?: FetchOptions,
+    fetchOptions?: FetchOptions,
   ) => void;
 } {
   const { state, setState } =
@@ -38,9 +38,9 @@ export function useImperativeReference<
     fragmentReference: state,
     loadFragmentReference: (
       variables: ExtractParameters<TReadFromStore>,
-      options?: FetchOptions,
+      fetchOptions?: FetchOptions,
     ) => {
-      const fetchPolicy = options?.fetchPolicy ?? DEFAULT_FETCH_POLICY;
+      const fetchPolicy = fetchOptions?.fetchPolicy ?? DEFAULT_FETCH_POLICY;
       const [networkRequest, disposeNetworkRequest] = maybeMakeNetworkRequest(
         environment,
         entrypoint,
