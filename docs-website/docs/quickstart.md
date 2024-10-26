@@ -64,10 +64,6 @@ Add two aliases to your `tsconfig.json`'s `compilerOptions` field. These alias s
 }
 ```
 
-:::note
-We won't be using the first alias in this demo, but it is a best practice for Isograph projects.
-:::
-
 ## Disable React strict mode
 
 NextJS defaults to using strict mode. Isograph is currently incompatible with strict mode. Disable strict mode in your `next.config.js` file as follows:
