@@ -49,6 +49,23 @@ impl UnvalidatedSchema {
                                 ));
                             }
                         }
+                        crate::FieldType::ClientPointer(_) => {
+                            let subtype = self.server_field_data.object_mut(*subtype_id);
+
+                            if subtype
+                                .encountered_fields
+                                .insert(*supertype_field_name, *defined_field)
+                                .is_some()
+                            {
+                                return Err(WithLocation::new(
+                                    ProcessTypeDefinitionError::FieldExistsOnSubtype {
+                                        field_name: *supertype_field_name,
+                                        parent_type: subtype.name,
+                                    },
+                                    Location::generated(),
+                                ));
+                            }
+                        }
                     }
                 }
             }

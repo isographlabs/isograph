@@ -36,6 +36,7 @@ fn generate_reader_ast_node(
                         indentation_level,
                         initial_variable_context,
                     ),
+                    FieldType::ClientPointer(_) => todo!(),
                     FieldType::ClientField(client_field_id) => {
                         let client_field = schema.client_field(client_field_id);
                         scalar_client_defined_field_ast_node(
@@ -546,6 +547,7 @@ fn refetched_paths_with_path(
                         FieldType::ServerField(_) => {
                             // Do nothing, we encountered a server field
                         }
+                        FieldType::ClientPointer(_) => todo!(),
                         FieldType::ClientField(client_field_id) => {
                             let client_field = schema.client_field(client_field_id);
                             match categorize_field_loadability(

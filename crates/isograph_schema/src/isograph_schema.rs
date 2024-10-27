@@ -4,9 +4,9 @@ use std::{
 };
 
 use common_lang_types::{
-    ArtifactFileType, DescriptionValue, GraphQLInterfaceTypeName, GraphQLScalarTypeName, HasName,
-    InputTypeName, IsographObjectTypeName, JavascriptName, SelectableFieldName,
-    UnvalidatedTypeName, WithLocation, WithSpan,
+    ArtifactFileType, ClientPointerFieldName, DescriptionValue, GraphQLInterfaceTypeName,
+    GraphQLScalarTypeName, HasName, InputTypeName, IsographObjectTypeName, JavascriptName,
+    SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition,
@@ -14,8 +14,8 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, SelectableServerFieldId, Selection, ServerFieldId,
-    ServerObjectId, ServerScalarId, ServerStrongIdFieldId, TypeAnnotation, Unwrap,
+    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, SelectableServerFieldId, Selection,
+    ServerFieldId, ServerObjectId, ServerScalarId, ServerStrongIdFieldId, TypeAnnotation, Unwrap,
     VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -41,6 +41,17 @@ pub trait SchemaValidationState: Debug {
     /// - Validated: ValidatedFieldDefinitionLocation
     ///   i.e. DefinedField<ServerFieldId, ClientFieldId>
     type ClientFieldSelectionScalarFieldAssociatedData: Debug;
+
+    /// The associated data type of scalars in client pointers' selection sets and unwraps
+    /// - Unvalidated: ()
+    /// - Validated: ValidatedPointerDefinitionLocation
+    ///   i.e. DefinedPointer<ServerPointerId, ClientPointerId>
+    type ClientPointerSelectionScalarFieldAssociatedData: Debug;
+
+    /// The associated data type of linked fields in client pointers' selection sets and unwraps
+    /// - Unvalidated: ()
+    /// - Validated: ObjectId
+    type ClientPointerSelectionLinkedFieldAssociatedData: Debug;
 
     /// The associated data type of linked fields in client fields' selection sets and unwraps
     /// - Unvalidated: ()
@@ -74,6 +85,13 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
     pub server_fields: Vec<
         SchemaServerField<
             TSchemaValidationState::ServerFieldTypeAssociatedData,
+            TSchemaValidationState::VariableDefinitionInnerType,
+        >,
+    >,
+    pub client_pointers: Vec<
+        ClientPointer<
+            TSchemaValidationState::ClientPointerSelectionScalarFieldAssociatedData,
+            TSchemaValidationState::ClientPointerSelectionLinkedFieldAssociatedData,
             TSchemaValidationState::VariableDefinitionInnerType,
         >,
     >,
@@ -140,16 +158,28 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
 /// an iso field literal. Refetch fields and generated mutation fields are
 /// also local fields.
 #[derive(Debug, Clone, Copy)]
-pub enum FieldType<TServer, TClient> {
+pub enum FieldType<TServer, TClient, TPointer> {
     ServerField(TServer),
     ClientField(TClient),
+    ClientPointer(TPointer),
 }
 
-impl<TFieldAssociatedData, TClientFieldType> FieldType<TFieldAssociatedData, TClientFieldType> {
+impl<TFieldAssociatedData, TClientFieldType, TClientPointerType>
+    FieldType<TFieldAssociatedData, TClientFieldType, TClientPointerType>
+{
     pub fn as_server_field(&self) -> Option<&TFieldAssociatedData> {
         match self {
             FieldType::ServerField(server_field) => Some(server_field),
             FieldType::ClientField(_) => None,
+            FieldType::ClientPointer(_) => None,
+        }
+    }
+
+    pub fn as_client_pointer(&self) -> Option<&TClientPointerType> {
+        match self {
+            FieldType::ServerField(_) => None,
+            FieldType::ClientField(_) => None,
+            FieldType::ClientPointer(client_pointer) => Some(client_pointer),
         }
     }
 
@@ -157,6 +187,7 @@ impl<TFieldAssociatedData, TClientFieldType> FieldType<TFieldAssociatedData, TCl
         match self {
             FieldType::ServerField(_) => None,
             FieldType::ClientField(client_field) => Some(client_field),
+            FieldType::ClientPointer(_) => None,
         }
     }
 }
@@ -361,7 +392,8 @@ pub struct SchemaObject {
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
-    pub encountered_fields: BTreeMap<SelectableFieldName, FieldType<ServerFieldId, ClientFieldId>>,
+    pub encountered_fields:
+        BTreeMap<SelectableFieldName, FieldType<ServerFieldId, ClientFieldId, ClientPointerId>>,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 }
@@ -485,6 +517,32 @@ impl ObjectTypeAndFieldName {
             format!("../{field_name}/{}", file_type)
         }
     }
+}
+
+#[derive(Debug)]
+pub struct ClientPointer<
+    TClientPointerSelectionScalarFieldAssociatedData,
+    TClientPointerSelectionLinkedFieldAssociatedData,
+    TClientPointerVariableDefinitionAssociatedData: Ord + Debug,
+> {
+    pub description: Option<DescriptionValue>,
+    pub name: ClientPointerFieldName,
+    pub id: ClientPointerId,
+
+    pub reader_selection_set: Vec<
+        WithSpan<
+            Selection<
+                TClientPointerSelectionScalarFieldAssociatedData,
+                TClientPointerSelectionLinkedFieldAssociatedData,
+            >,
+        >,
+    >,
+
+    // TODO this should probably be a HashMap
+    pub variable_definitions:
+        Vec<WithSpan<VariableDefinition<TClientPointerVariableDefinitionAssociatedData>>>,
+
+    pub parent_object_id: ServerObjectId,
 }
 
 #[derive(Debug)]

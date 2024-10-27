@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    vec,
+};
 
 use common_lang_types::{
     JavascriptName, Location, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
@@ -6,13 +9,14 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ClientFieldId, EntrypointTypeAndField, IsographSelectionVariant, LinkedFieldSelection,
-    SelectableServerFieldId, ServerFieldId, ServerScalarId, VariableDefinition,
+    ClientFieldId, ClientPointerId, EntrypointTypeAndField, IsographSelectionVariant,
+    LinkedFieldSelection, SelectableServerFieldId, ServerFieldId, ServerScalarId,
+    VariableDefinition,
 };
 
 use crate::{
-    ClientField, FieldType, Schema, SchemaScalar, SchemaServerField, SchemaValidationState,
-    ServerFieldData, UseRefetchFieldRefetchStrategy,
+    ClientField, ClientPointer, FieldType, Schema, SchemaScalar, SchemaServerField,
+    SchemaValidationState, ServerFieldData, UseRefetchFieldRefetchStrategy,
 };
 use lazy_static::lazy_static;
 
@@ -27,6 +31,8 @@ impl SchemaValidationState for UnvalidatedSchemaState {
     type ServerFieldTypeAssociatedData = GraphQLTypeAnnotation<UnvalidatedTypeName>;
     type ClientFieldSelectionScalarFieldAssociatedData = IsographSelectionVariant;
     type ClientFieldSelectionLinkedFieldAssociatedData = IsographSelectionVariant;
+    type ClientPointerSelectionLinkedFieldAssociatedData = IsographSelectionVariant;
+    type ClientPointerSelectionScalarFieldAssociatedData = IsographSelectionVariant;
     type VariableDefinitionInnerType = UnvalidatedTypeName;
     type Entrypoint = Vec<(TextSource, WithSpan<EntrypointTypeAndField>)>;
 }
@@ -36,7 +42,7 @@ pub type UnvalidatedSchema = Schema<UnvalidatedSchemaState>;
 /// On unvalidated schema objects, the encountered types are either a type annotation
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
 /// client field.)
-pub type UnvalidatedObjectFieldInfo = FieldType<ServerFieldId, ClientFieldId>;
+pub type UnvalidatedObjectFieldInfo = FieldType<ServerFieldId, ClientFieldId, ClientPointerId>;
 
 pub(crate) type UnvalidatedSchemaSchemaField = SchemaServerField<
     <UnvalidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
@@ -45,6 +51,11 @@ pub(crate) type UnvalidatedSchemaSchemaField = SchemaServerField<
 
 pub type UnvalidatedVariableDefinition = VariableDefinition<
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+>;
+
+pub type UnvalidatedClientPointer = ClientPointer<
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientPointerSelectionScalarFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientPointerSelectionLinkedFieldAssociatedData,    <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
 >;
 
 pub type UnvalidatedClientField = ClientField<
@@ -74,6 +85,7 @@ impl UnvalidatedSchema {
         // TODO add __typename
         let fields = vec![];
         let client_fields = vec![];
+        let client_pointers = vec![];
         let objects = vec![];
         let mut scalars = vec![];
         let mut defined_types = HashMap::default();
@@ -119,6 +131,7 @@ impl UnvalidatedSchema {
         );
 
         Self {
+            client_pointers,
             server_fields: fields,
             client_fields,
             entrypoints: Default::default(),

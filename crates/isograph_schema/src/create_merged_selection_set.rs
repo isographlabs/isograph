@@ -670,6 +670,7 @@ fn merge_validated_selections_into_selection_map(
                                     variable_context,
                                 );
                             }
+                            FieldType::ClientPointer(_) => todo!(),
                             FieldType::ClientField(client_field_id) => {
                                 let newly_encountered_scalar_client_field =
                                     schema.client_field(*client_field_id);

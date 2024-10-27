@@ -526,6 +526,7 @@ fn write_param_type_from_selection(
                             )),
                         );
                     }
+                    FieldType::ClientPointer(_client_pointer_id) => todo!(),
                 }
             }
             ServerFieldSelection::LinkedField(linked_field) => {

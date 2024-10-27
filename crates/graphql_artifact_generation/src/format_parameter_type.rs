@@ -2,7 +2,8 @@ use common_lang_types::SelectableFieldName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
 use isograph_lang_types::{
-    ClientFieldId, SelectableServerFieldId, ServerFieldId, TypeAnnotation, UnionVariant,
+    ClientFieldId, ClientPointerId, SelectableServerFieldId, ServerFieldId, TypeAnnotation,
+    UnionVariant,
 };
 use isograph_schema::{FieldType, ValidatedSchema};
 
@@ -74,7 +75,7 @@ fn format_server_field_type(
 fn format_field_definition(
     schema: &ValidatedSchema,
     name: &SelectableFieldName,
-    type_: &FieldType<ServerFieldId, ClientFieldId>,
+    type_: &FieldType<ServerFieldId, ClientFieldId, ClientPointerId>,
     indentation_level: u8,
 ) -> String {
     match type_ {
@@ -92,6 +93,9 @@ fn format_field_definition(
                 "Unexpected object. Client fields are not supported as parameters, yet. \
                 This is indicative of an unimplemented feature in Isograph."
             )
+        }
+        FieldType::ClientPointer(_) => {
+            panic!("Unexpected object. Client pointers are not supported as parameters.")
         }
     }
 }
