@@ -158,28 +158,16 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
 /// an iso field literal. Refetch fields and generated mutation fields are
 /// also local fields.
 #[derive(Debug, Clone, Copy)]
-pub enum FieldType<TServer, TClient, TPointer> {
+pub enum FieldType<TServer, TClient> {
     ServerField(TServer),
     ClientField(TClient),
-    ClientPointer(TPointer),
 }
 
-impl<TFieldAssociatedData, TClientFieldType, TClientPointerType>
-    FieldType<TFieldAssociatedData, TClientFieldType, TClientPointerType>
-{
+impl<TFieldAssociatedData, TClientFieldType> FieldType<TFieldAssociatedData, TClientFieldType> {
     pub fn as_server_field(&self) -> Option<&TFieldAssociatedData> {
         match self {
             FieldType::ServerField(server_field) => Some(server_field),
             FieldType::ClientField(_) => None,
-            FieldType::ClientPointer(_) => None,
-        }
-    }
-
-    pub fn as_client_pointer(&self) -> Option<&TClientPointerType> {
-        match self {
-            FieldType::ServerField(_) => None,
-            FieldType::ClientField(_) => None,
-            FieldType::ClientPointer(client_pointer) => Some(client_pointer),
         }
     }
 
@@ -187,7 +175,6 @@ impl<TFieldAssociatedData, TClientFieldType, TClientPointerType>
         match self {
             FieldType::ServerField(_) => None,
             FieldType::ClientField(client_field) => Some(client_field),
-            FieldType::ClientPointer(_) => None,
         }
     }
 }
@@ -392,8 +379,7 @@ pub struct SchemaObject {
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
-    pub encountered_fields:
-        BTreeMap<SelectableFieldName, FieldType<ServerFieldId, ClientFieldId, ClientPointerId>>,
+    pub encountered_fields: BTreeMap<SelectableFieldName, FieldType<ServerFieldId, ClientFieldId>>,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 }

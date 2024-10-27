@@ -670,7 +670,7 @@ fn merge_validated_selections_into_selection_map(
                                     variable_context,
                                 );
                             }
-                            FieldType::ClientPointer(_) => todo!(),
+
                             FieldType::ClientField(client_field_id) => {
                                 let newly_encountered_scalar_client_field =
                                     schema.client_field(*client_field_id);
@@ -770,20 +770,25 @@ fn merge_validated_selections_into_selection_map(
                                 )
                             }
                             MergedServerSelection::LinkedField(existing_linked_field) => {
-                                let type_id =
-                                    linked_field_selection.associated_data.parent_object_id;
-                                let linked_field_parent_type =
-                                    schema.server_field_data.object(type_id);
+                                match linked_field_selection.associated_data.parent_object_id {
+                                    FieldType::ServerField(type_id) => {
+                                        let linked_field_parent_type =
+                                            schema.server_field_data.object(type_id);
 
-                                merge_validated_selections_into_selection_map(
-                                    schema,
-                                    &mut existing_linked_field.selection_map,
-                                    linked_field_parent_type,
-                                    &linked_field_selection.selection_set,
-                                    merge_traversal_state,
-                                    global_client_field_map,
-                                    variable_context,
-                                );
+                                        merge_validated_selections_into_selection_map(
+                                            schema,
+                                            &mut existing_linked_field.selection_map,
+                                            linked_field_parent_type,
+                                            &linked_field_selection.selection_set,
+                                            merge_traversal_state,
+                                            global_client_field_map,
+                                            variable_context,
+                                        );
+                                    }
+                                    FieldType::ClientField(_client_pointer_id) => {
+                                        todo!()
+                                    }
+                                }
                             }
                             MergedServerSelection::InlineFragment(_) => {
                                 panic!(

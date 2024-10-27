@@ -49,10 +49,6 @@ impl<'a> Iterator for AccessibleClientFieldIterator<'a> {
                                     self.index += 1;
                                     continue 'main_loop;
                                 }
-                                FieldType::ClientPointer(_) => {
-                                    self.index += 1;
-                                    continue 'main_loop;
-                                }
                                 FieldType::ClientField(client_field_id) => {
                                     let nested_client_field =
                                         self.schema.client_field(client_field_id);

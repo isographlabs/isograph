@@ -9,9 +9,8 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ClientFieldId, ClientPointerId, EntrypointTypeAndField, IsographSelectionVariant,
-    LinkedFieldSelection, SelectableServerFieldId, ServerFieldId, ServerScalarId,
-    VariableDefinition,
+    ClientFieldId, EntrypointTypeAndField, IsographSelectionVariant, LinkedFieldSelection,
+    SelectableServerFieldId, ServerFieldId, ServerScalarId, VariableDefinition,
 };
 
 use crate::{
@@ -42,7 +41,7 @@ pub type UnvalidatedSchema = Schema<UnvalidatedSchemaState>;
 /// On unvalidated schema objects, the encountered types are either a type annotation
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
 /// client field.)
-pub type UnvalidatedObjectFieldInfo = FieldType<ServerFieldId, ClientFieldId, ClientPointerId>;
+pub type UnvalidatedObjectFieldInfo = FieldType<ServerFieldId, ClientFieldId>;
 
 pub(crate) type UnvalidatedSchemaSchemaField = SchemaServerField<
     <UnvalidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
@@ -55,7 +54,8 @@ pub type UnvalidatedVariableDefinition = VariableDefinition<
 
 pub type UnvalidatedClientPointer = ClientPointer<
     <UnvalidatedSchemaState as SchemaValidationState>::ClientPointerSelectionScalarFieldAssociatedData,
-    <UnvalidatedSchemaState as SchemaValidationState>::ClientPointerSelectionLinkedFieldAssociatedData,    <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientPointerSelectionLinkedFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
 >;
 
 pub type UnvalidatedClientField = ClientField<

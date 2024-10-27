@@ -96,13 +96,6 @@ impl UnvalidatedSchema {
                     },
                     Location::new(text_source, field_name.span),
                 )),
-                FieldType::ClientPointer(_) => Err(WithLocation::new(
-                    ValidateEntrypointDeclarationError::FieldMustBeClientField {
-                        parent_type_name: parent_object.name,
-                        client_field_name: field_name.item,
-                    },
-                    Location::new(text_source, field_name.span),
-                )),
                 FieldType::ClientField(client_field_id) => Ok(*client_field_id),
             },
             None => Err(WithLocation::new(

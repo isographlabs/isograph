@@ -221,7 +221,6 @@ impl ModifiedArgument {
                                     Some((*name, PotentiallyModifiedField::Unmodified(*s)))
                                 }
                                 FieldType::ClientField(_) => None,
-                                FieldType::ClientPointer(_) => None,
                             })
                             .collect(),
                     }
