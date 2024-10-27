@@ -1,6 +1,4 @@
 import { ItemCleanupPair } from '@isograph/disposable-types';
-import { normalizeData } from './cache';
-import { check, FetchPolicy } from './check';
 import {
   IsographEntrypoint,
   RefetchQueryNormalizationArtifact,
@@ -13,13 +11,15 @@ import {
   unretainQuery,
 } from './garbageCollection';
 import { IsographEnvironment, ROOT_ID } from './IsographEnvironment';
-import { logMessage } from './logging';
 import {
   AnyError,
   PromiseWrapper,
   wrapPromise,
   wrapResolvedValue,
 } from './PromiseWrapper';
+import { normalizeData } from './cache';
+import { logMessage } from './logging';
+import { check, ShouldFetch } from './check';
 
 let networkRequestId = 0;
 
@@ -27,9 +27,9 @@ export function maybeMakeNetworkRequest(
   environment: IsographEnvironment,
   artifact: RefetchQueryNormalizationArtifact | IsographEntrypoint<any, any>,
   variables: Variables,
-  fetchPolicy: FetchPolicy,
+  shouldFetch: ShouldFetch,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
-  switch (fetchPolicy) {
+  switch (shouldFetch) {
     case 'Yes': {
       return makeNetworkRequest(environment, artifact, variables);
     }
@@ -37,7 +37,10 @@ export function maybeMakeNetworkRequest(
       return [wrapResolvedValue(undefined), () => {}];
     }
     case 'IfNecessary': {
-      const result = check(environment, artifact.normalizationAst, variables);
+      const result = check(environment, artifact.normalizationAst, variables, {
+        __link: ROOT_ID,
+        __typename: artifact.concreteType,
+      });
       if (result.kind === 'EnoughData') {
         return [wrapResolvedValue(undefined), () => {}];
       } else {

@@ -5,17 +5,16 @@ import {
   getLink,
   IsographEnvironment,
   Link,
-  ROOT_ID,
   StoreRecord,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 
-export type FetchPolicy = 'Yes' | 'No' | 'IfNecessary';
+export type ShouldFetch = 'Yes' | 'No' | 'IfNecessary';
 
-export const DEFAULT_FETCH_POLICY: FetchPolicy = 'IfNecessary';
+export const DEFAULT_SHOULD_FETCH_VALUE: ShouldFetch = 'IfNecessary';
 
 export type FetchOptions = {
-  fetchPolicy?: FetchPolicy;
+  shouldFetch?: ShouldFetch;
 };
 
 export type CheckResult =
@@ -31,13 +30,17 @@ export function check(
   environment: IsographEnvironment,
   normalizationAst: NormalizationAst,
   variables: Variables,
+  root: Link,
 ): CheckResult {
+  const recordsById = (environment.store[root.__typename] ??= {});
+  const newStoreRecord = (recordsById[root.__link] ??= {});
+
   const checkResult = checkFromRecord(
     environment,
     normalizationAst,
     variables,
-    environment.store[ROOT_ID],
-    ROOT_ID,
+    newStoreRecord,
+    root,
   );
   logMessage(environment, {
     kind: 'EnvironmentCheck',
@@ -51,7 +54,7 @@ function checkFromRecord(
   normalizationAst: NormalizationAst,
   variables: Variables,
   record: StoreRecord,
-  backupId: string,
+  recordLink: Link,
 ): CheckResult {
   normalizationAstLoop: for (const normalizationAstNode of normalizationAst) {
     switch (normalizationAstNode.kind) {
@@ -67,9 +70,7 @@ function checkFromRecord(
         if (scalarValue === undefined) {
           return {
             kind: 'MissingData',
-            record: {
-              __link: record.id ?? backupId,
-            },
+            record: recordLink,
           };
         }
         continue normalizationAstLoop;
@@ -85,9 +86,7 @@ function checkFromRecord(
         if (linkedValue === undefined) {
           return {
             kind: 'MissingData',
-            record: {
-              __link: record.id ?? backupId,
-            },
+            record: recordLink,
           };
         } else if (linkedValue === null) {
           continue;
@@ -101,7 +100,8 @@ function checkFromRecord(
               );
             }
 
-            const linkedRecord = environment.store[link.__link];
+            const linkedRecord =
+              environment.store[link.__typename]?.[link.__link];
 
             if (linkedRecord === undefined) {
               return {
@@ -117,8 +117,7 @@ function checkFromRecord(
                 normalizationAstNode.selections,
                 variables,
                 linkedRecord,
-                // TODO this seems likely to be wrong
-                backupId + '.' + parentRecordKey,
+                link,
               );
 
               if (result.kind === 'MissingData') {
@@ -135,7 +134,8 @@ function checkFromRecord(
             );
           }
 
-          const linkedRecord = environment.store[link.__link];
+          const linkedRecord =
+            environment.store[link.__typename]?.[link.__link];
 
           if (linkedRecord === undefined) {
             return {
@@ -151,8 +151,7 @@ function checkFromRecord(
               normalizationAstNode.selections,
               variables,
               linkedRecord,
-              // TODO this seems likely to be wrong
-              backupId + '.' + parentRecordKey,
+              link,
             );
 
             if (result.kind === 'MissingData') {
@@ -172,9 +171,7 @@ function checkFromRecord(
         ) {
           return {
             kind: 'MissingData',
-            record: {
-              __link: record.id ?? backupId,
-            },
+            record: recordLink,
           };
         }
 
@@ -183,7 +180,7 @@ function checkFromRecord(
           normalizationAstNode.selections,
           variables,
           record,
-          backupId,
+          recordLink,
         );
 
         if (result.kind === 'MissingData') {

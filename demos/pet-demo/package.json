@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "backend": "cd backend && node ./src/index.js",
-    "tsc": "tsc"
+    "tsc": "tsc",
+    "iso": "../../target/debug/isograph_cli --config ./isograph.config.json",
+    "iso-watch": "../../target/debug/isograph_cli --config ./isograph.config.json --watch"
   },
   "dependencies": {
     "@emotion/react": "^11.11.1",

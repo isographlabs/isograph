@@ -20,7 +20,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@iso': path.resolve(__dirname, './src/components/__isograph/iso.ts'),
-      '@iso/*': path.resolve(__dirname, './src/components/__isograph/*'),
     },
   },
   optimizeDeps: {

@@ -1,5 +1,5 @@
 {
-  "exclude": ["**/*.test.ts", "**/*.stub.ts", "node_modules", "dist"],
+  "exclude": ["**/*.test.ts", "**/*.stub.ts", "**/node_modules", "**/dist"],
   "compilerOptions": {
     "target": "ES2015",
     "module": "commonjs",

@@ -21,7 +21,7 @@ import {
   IsographEnvironment,
   type Link,
 } from './IsographEnvironment';
-import { makeNetworkRequest } from './makeNetworkRequest';
+import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import {
   getPromiseState,
   PromiseWrapper,
@@ -33,6 +33,7 @@ import { ReaderAst } from './reader';
 import { Arguments } from './util';
 import { logMessage } from './logging';
 import { CleanupFn } from '@isograph/disposable-types';
+import { DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
 
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: EncounteredIds;
@@ -416,7 +417,7 @@ function readData<TReadFromStore>(
             recordLink: refetchReaderParams.recordLink,
           };
         } else {
-          target[field.alias] = (args: any) => {
+          target[field.alias] = (args: any, fetchOptions?: FetchOptions) => {
             // TODO we should use the reader AST for this
             const includeReadOutData = (variables: any, readOutData: any) => {
               variables.id = readOutData.id;
@@ -446,8 +447,15 @@ function readData<TReadFromStore>(
                 const fragmentReferenceAndDisposeFromEntrypoint = (
                   entrypoint: IsographEntrypoint<any, any>,
                 ): [FragmentReference<any, any>, CleanupFn] => {
+                  const shouldFetch =
+                    fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE;
                   const [networkRequest, disposeNetworkRequest] =
-                    makeNetworkRequest(environment, entrypoint, localVariables);
+                    maybeMakeNetworkRequest(
+                      environment,
+                      entrypoint,
+                      localVariables,
+                      shouldFetch,
+                    );
 
                   const fragmentReference: FragmentReference<any, any> = {
                     kind: 'FragmentReference',
@@ -503,11 +511,15 @@ function readData<TReadFromStore>(
                           if (
                             entrypointLoaderState.kind === 'EntrypointNotLoaded'
                           ) {
+                            const shouldFetch =
+                              fetchOptions?.shouldFetch ??
+                              DEFAULT_SHOULD_FETCH_VALUE;
                             const [networkRequest, disposeNetworkRequest] =
-                              makeNetworkRequest(
+                              maybeMakeNetworkRequest(
                                 environment,
                                 entrypoint,
                                 localVariables,
+                                shouldFetch,
                               );
                             entrypointLoaderState = {
                               kind: 'NetworkRequestStarted',

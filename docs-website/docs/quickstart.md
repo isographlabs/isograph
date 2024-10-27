@@ -58,16 +58,11 @@ Add two aliases to your `tsconfig.json`'s `compilerOptions` field. These alias s
 {
   "compilerOptions": {
     "paths": {
-      "@iso/*": ["./src/components/__isograph/*"],
       "@iso": ["./src/components/__isograph/iso.ts"]
     }
   }
 }
 ```
-
-:::note
-We won't be using the first alias in this demo, but it is a best practice for Isograph projects.
-:::
 
 ## Disable React strict mode
 

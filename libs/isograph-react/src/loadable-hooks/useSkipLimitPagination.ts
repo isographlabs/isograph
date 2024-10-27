@@ -17,6 +17,7 @@ import {
 import { getPromiseState, readPromise } from '../core/PromiseWrapper';
 import { type WithEncounteredRecords } from '../core/read';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
+import { FetchOptions } from '../core/check';
 
 type UseSkipLimitReturnValue<
   TReadFromStore extends { data: object; parameters: object },
@@ -24,7 +25,7 @@ type UseSkipLimitReturnValue<
 > =
   | {
       readonly kind: 'Complete';
-      readonly fetchMore: (count: number) => void;
+      readonly fetchMore: (count: number, fetchOptions?: FetchOptions) => void;
       readonly results: ReadonlyArray<TItem>;
     }
   | {
@@ -163,11 +164,14 @@ export function useSkipLimitPagination<
 
   const getFetchMore =
     (loadedSoFar: number) =>
-    (count: number): void => {
-      const loadedField = loadableField({
-        skip: loadedSoFar,
-        limit: count,
-      })[1]();
+    (count: number, fetchOptions?: FetchOptions): void => {
+      const loadedField = loadableField(
+        {
+          skip: loadedSoFar,
+          limit: count,
+        },
+        fetchOptions ?? {},
+      )[1]();
       const newPointer = createReferenceCountedPointer(loadedField);
       const clonedPointers = loadedReferences.map(([refCountedPointer]) => {
         const clonedRefCountedPointer = refCountedPointer.cloneIfNotDisposed();

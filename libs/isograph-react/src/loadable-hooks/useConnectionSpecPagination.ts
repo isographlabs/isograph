@@ -19,6 +19,7 @@ import { LoadableField, type ReaderAst } from '../core/reader';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 import { maybeUnwrapNetworkRequest } from '../react/useResult';
+import { FetchOptions } from '../core/check';
 
 type UsePaginationReturnValue<
   TReadFromStore extends { parameters: object; data: object },
@@ -31,7 +32,7 @@ type UsePaginationReturnValue<
     }
   | {
       kind: 'Complete';
-      fetchMore: (count: number) => void;
+      fetchMore: (count: number, fetchOptions?: FetchOptions) => void;
       results: ReadonlyArray<TItem>;
       hasNextPage: boolean;
     };
@@ -178,11 +179,14 @@ export function useConnectionSpecPagination<
 
   const getFetchMore =
     (after: string | null) =>
-    (count: number): void => {
-      const loadedField = loadableField({
-        after: after,
-        first: count,
-      })[1]();
+    (count: number, fetchOptions?: FetchOptions): void => {
+      const loadedField = loadableField(
+        {
+          after: after,
+          first: count,
+        },
+        fetchOptions ?? {},
+      )[1]();
       const newPointer = createReferenceCountedPointer(loadedField);
       const clonedPointers = loadedReferences.map(([refCountedPointer]) => {
         const clonedRefCountedPointer = refCountedPointer.cloneIfNotDisposed();
