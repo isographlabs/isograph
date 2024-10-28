@@ -35,16 +35,17 @@ pub fn compile_and_print(config: &CompilerConfig) -> Result<CompilationStats, Ba
     match result.item {
         Ok(stats) => {
             eprintln!(
-                    "{}",
-                    format!(
-                        "Successfully compiled {} client fields and {} entrypoints, and wrote {} artifacts, in {}.\n",
-                        stats.client_field_count,
-                        stats.entrypoint_count,
-                        stats.total_artifacts_written,
-                        pretty_duration(&elapsed_time, None)
-                    )
-                    .bright_green()
-                );
+                "{}",
+                format!(
+                    "Successfully compiled {} client fields and {} \
+                        entrypoints, and wrote {} artifacts, in {}.\n",
+                    stats.client_field_count,
+                    stats.entrypoint_count,
+                    stats.total_artifacts_written,
+                    pretty_duration(&elapsed_time, None)
+                )
+                .bright_green()
+            );
             Ok(stats)
         }
         Err(err) => {
