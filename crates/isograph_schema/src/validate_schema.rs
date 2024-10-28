@@ -140,6 +140,7 @@ impl ValidatedSchema {
             int_type_id,
             null_type_id,
             fetchable_types: root_types,
+            client_pointers: _,
         } = unvalidated_schema;
 
         let updated_server_fields = match validate_and_transform_server_fields(fields, &schema_data)
@@ -180,6 +181,7 @@ impl ValidatedSchema {
                 .collect();
 
             Ok(Self {
+                client_pointers: vec![],
                 server_fields: updated_server_fields,
                 client_fields: updated_client_fields,
                 entrypoints: updated_entrypoints,

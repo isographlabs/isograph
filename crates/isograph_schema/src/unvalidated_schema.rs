@@ -74,6 +74,7 @@ impl UnvalidatedSchema {
         // TODO add __typename
         let fields = vec![];
         let client_fields = vec![];
+        let client_pointers = vec![];
         let objects = vec![];
         let mut scalars = vec![];
         let mut defined_types = HashMap::default();
@@ -119,6 +120,7 @@ impl UnvalidatedSchema {
         );
 
         Self {
+            client_pointers,
             server_fields: fields,
             client_fields,
             entrypoints: Default::default(),
