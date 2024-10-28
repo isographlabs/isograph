@@ -162,6 +162,7 @@ fn create_unvalidated_schema_from_sources(
     process_iso_literals(schema, sources.contains_iso)?;
     process_exposed_fields(schema)?;
     schema.add_fields_to_subtypes(&outcome.type_refinement_maps.supertype_to_subtype_map)?;
+    schema.add_pointers_to_supertypes(&outcome.type_refinement_maps.subtype_to_supertype_map)?;
     add_refetch_fields_to_objects(schema)?;
     Ok(())
 }
