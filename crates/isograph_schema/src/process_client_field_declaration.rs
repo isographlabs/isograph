@@ -5,8 +5,7 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDeclarationWithValidatedDirectives,
-    DeserializationError, NonConstantValue, SelectableServerFieldId, ServerObjectId,
+    ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDeclarationWithValidatedDirectives, ClientPointerId, DeserializationError, NonConstantValue, SelectableServerFieldId, ServerObjectId
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
@@ -162,6 +161,11 @@ pub struct PrimaryFieldInfo {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ClientPointerVariant {
+    client_pointer_id: ClientPointerId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ImperativelyLoadedFieldVariant {
     pub client_field_scalar_selection_name: ScalarFieldName,
     /// What field should we select when generating the refetch query?
@@ -199,6 +203,7 @@ pub struct UserWrittenClientFieldInfo {
 pub enum ClientFieldVariant {
     UserWritten(UserWrittenClientFieldInfo),
     ImperativelyLoadedField(ImperativelyLoadedFieldVariant),
+    ClientPointer(ClientPointerVariant)
 }
 
 lazy_static! {

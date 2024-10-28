@@ -102,6 +102,7 @@ pub fn get_artifact_path_and_content(
         let encountered_client_field = schema.client_field(*encountered_client_field_id);
         // Generate reader ASTs for all encountered client fields, which may be reader or refetch reader
         match &encountered_client_field.variant {
+            ClientFieldVariant::ClientPointer(_) => todo!(),
             ClientFieldVariant::UserWritten(info) => {
                 path_and_contents.extend(generate_eager_reader_artifacts(
                     schema,
@@ -214,6 +215,7 @@ pub fn get_artifact_path_and_content(
             .client_fields
             .iter()
             .filter(|field| match field.variant {
+                ClientFieldVariant::ClientPointer(_) => false,
                 ClientFieldVariant::UserWritten(_) => true,
                 ClientFieldVariant::ImperativelyLoadedField(_) => false,
             })
@@ -247,6 +249,7 @@ pub fn get_artifact_path_and_content(
     for output_type_id in encountered_output_types {
         let client_field = schema.client_field(output_type_id);
         let path_and_content = match client_field.variant {
+            ClientFieldVariant::ClientPointer(_) => todo!(),
             ClientFieldVariant::UserWritten(info) => generate_eager_reader_output_type_artifact(
                 schema,
                 client_field,
@@ -361,6 +364,7 @@ pub(crate) fn get_serialized_field_arguments(
 pub(crate) fn generate_output_type(client_field: &ValidatedClientField) -> ClientFieldOutputType {
     let variant = &client_field.variant;
     match variant {
+        ClientFieldVariant::ClientPointer(_) => todo!(),
         ClientFieldVariant::UserWritten(info) => match info.user_written_component_variant {
             UserWrittenComponentVariant::Eager => {
                 ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
