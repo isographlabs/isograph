@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use common_lang_types::{FilePath, Location, SourceFileName, Span, TextSource, WithLocation};
 use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
@@ -76,7 +79,7 @@ impl ParsedFiles {
 pub fn read_and_parse_iso_literals(
     file_path: PathBuf,
     file_content: String,
-    canonicalized_root_path: &PathBuf,
+    canonicalized_root_path: &Path,
 ) -> Result<
     (FilePath, Vec<(IsoLiteralExtractionResult, TextSource)>),
     Vec<WithLocation<IsographLiteralParseError>>,
@@ -152,7 +155,7 @@ pub fn read_and_parse_schema_extensions(
 
 fn get_canonicalized_root_path(project_root: &PathBuf) -> Result<PathBuf, BatchCompileError> {
     let current_dir = std::env::current_dir().expect("current_dir should exist");
-    let joined = current_dir.join(&project_root);
+    let joined = current_dir.join(project_root);
     joined
         .canonicalize()
         .map_err(|message| BatchCompileError::UnableToLoadSchema {

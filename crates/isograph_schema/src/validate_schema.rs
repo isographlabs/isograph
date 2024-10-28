@@ -1171,13 +1171,9 @@ fn validate_no_undefined_variables_and_get_reachable_variables(
     for argument in arguments {
         let reachable_variables = reachable_variables(&argument.item.value);
         for reachable_variable in reachable_variables.iter() {
-            if variable_definitions
-                .iter()
-                .find(|variable_definition| {
-                    variable_definition.item.name.item == reachable_variable.item
-                })
-                .is_none()
-            {
+            if variable_definitions.iter().all(|variable_definition| {
+                variable_definition.item.name.item != reachable_variable.item
+            }) {
                 return Err(WithLocation::new(
                     ValidateSelectionsError::UsedUndefinedVariable {
                         undefined_variable: reachable_variable.item,
@@ -1189,7 +1185,7 @@ fn validate_no_undefined_variables_and_get_reachable_variables(
         all_reachable_variables.extend(reachable_variables);
     }
 
-    return Ok(all_reachable_variables);
+    Ok(all_reachable_variables)
 }
 
 fn get_missing_arguments_and_validate_argument_types<'a>(
