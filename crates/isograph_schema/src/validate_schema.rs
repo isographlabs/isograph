@@ -15,12 +15,12 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    ClientField, ClientFieldVariant, FieldType, ImperativelyLoadedFieldVariant, RefetchStrategy,
-    Schema, SchemaIdField, SchemaObject, SchemaServerField, SchemaValidationState, ServerFieldData,
-    UnvalidatedClientField, UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
-    UnvalidatedSchema, UnvalidatedSchemaSchemaField, UnvalidatedSchemaState,
-    UnvalidatedVariableDefinition, UseRefetchFieldRefetchStrategy,
-    ValidateEntrypointDeclarationError,
+    ClientField, ClientFieldVariant, FieldType, ImperativelyLoadedFieldVariant,
+    ObjectTypeAndFieldName, RefetchStrategy, Schema, SchemaIdField, SchemaObject,
+    SchemaServerField, SchemaValidationState, ServerFieldData, UnvalidatedClientField,
+    UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy, UnvalidatedSchema,
+    UnvalidatedSchemaSchemaField, UnvalidatedSchemaState, UnvalidatedVariableDefinition,
+    UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
 };
 
 use intern::string_key::Intern;
@@ -467,8 +467,8 @@ fn validate_and_transform_client_fields(
 fn validate_all_variables_are_used(
     variable_definitions: Vec<WithSpan<UnvalidatedVariableDefinition>>,
     used_variables: UsedVariables,
-    parent_type_name: IsographObjectTypeName,
-    client_field_name: SelectableFieldName,
+    field_parent_object_type_name: IsographObjectTypeName,
+    top_level_client_field_type_and_field_name: ObjectTypeAndFieldName,
 ) -> ValidateSelectionsResult<()> {
     let unused_variables: Vec<_> = variable_definitions
         .into_iter()
@@ -486,8 +486,8 @@ fn validate_all_variables_are_used(
         return Err(WithLocation::new(
             ValidateSelectionsError::UnusedVariables {
                 unused_variables,
-                type_name: parent_type_name,
-                field_name: client_field_name,
+                type_name: field_parent_object_type_name,
+                field_name: top_level_client_field_type_and_field_name.field_name,
             },
             Location::generated(),
         ));
@@ -497,44 +497,43 @@ fn validate_all_variables_are_used(
 
 fn validate_client_field_selection_set(
     schema_data: &ServerFieldData,
-    unvalidated_client_field: UnvalidatedClientField,
+    top_level_client_field: UnvalidatedClientField,
     server_fields: &[ValidatedSchemaServerField],
     client_field_args: &ClientFieldArgsMap,
 ) -> Result<ValidatedClientField, Vec<WithLocation<ValidateSchemaError>>> {
     let variable_definitions = client_field_args
-        .get(&unvalidated_client_field.id)
+        .get(&top_level_client_field.id)
         .expect(
             "Expected variable definitions to exist. \
             This is indicative of a bug in Isograph",
         )
         .clone();
 
-    let parent_object = schema_data.object(unvalidated_client_field.parent_object_id);
-    let selection_set_result = unvalidated_client_field
+    let client_field_parent_object = schema_data.object(top_level_client_field.parent_object_id);
+    let selection_set_result = top_level_client_field
         .reader_selection_set
         .map(|selection_set| {
             validate_client_field_definition_selections_exist_and_types_match(
                 schema_data,
                 selection_set,
-                parent_object,
+                client_field_parent_object,
                 server_fields,
                 client_field_args,
-                unvalidated_client_field.variable_definitions,
-                unvalidated_client_field.name,
+                top_level_client_field.variable_definitions,
+                top_level_client_field.type_and_field,
             )
             .map_err(|errs| {
                 errs.into_iter().map(|err| {
                     validate_selections_error_to_validate_schema_error(
                         err,
-                        parent_object,
-                        unvalidated_client_field.name,
+                        top_level_client_field.type_and_field,
                     )
                 })
             })
         })
         .transpose();
 
-    let refetch_strategy_result = unvalidated_client_field
+    let refetch_strategy_result = top_level_client_field
         .refetch_strategy
         .map(|refetch_strategy| match refetch_strategy {
             RefetchStrategy::UseRefetchField(use_refetch_field_strategy) => {
@@ -543,8 +542,8 @@ fn validate_client_field_selection_set(
                         schema_data,
                         use_refetch_field_strategy,
                         server_fields,
-                        parent_object,
-                        unvalidated_client_field.name,
+                        client_field_parent_object,
+                        top_level_client_field.type_and_field,
                         client_field_args,
                     )?,
                 ))
@@ -556,15 +555,15 @@ fn validate_client_field_selection_set(
         get_all_errors_or_tuple_ok(selection_set_result, refetch_strategy_result)?;
 
     Ok(ClientField {
-        description: unvalidated_client_field.description,
-        name: unvalidated_client_field.name,
-        id: unvalidated_client_field.id,
+        description: top_level_client_field.description,
+        name: top_level_client_field.name,
+        id: top_level_client_field.id,
         reader_selection_set: selection_set,
-        unwraps: unvalidated_client_field.unwraps,
-        variant: unvalidated_client_field.variant,
+        unwraps: top_level_client_field.unwraps,
+        variant: top_level_client_field.variant,
         variable_definitions,
-        type_and_field: unvalidated_client_field.type_and_field,
-        parent_object_id: unvalidated_client_field.parent_object_id,
+        type_and_field: top_level_client_field.type_and_field,
+        parent_object_id: top_level_client_field.parent_object_id,
         refetch_strategy,
     })
 }
@@ -575,26 +574,25 @@ fn validate_use_refetch_field_strategy(
     schema_data: &ServerFieldData,
     use_refetch_field_strategy: UnvalidatedRefetchFieldStrategy,
     server_fields: &[ValidatedSchemaServerField],
-    parent_object: &SchemaObject,
-    client_field_name: SelectableFieldName,
-    client_field_args: &ClientFieldArgsMap,
+    client_field_parent_object: &SchemaObject,
+    top_level_client_field_type_and_field_name: ObjectTypeAndFieldName,
+    top_level_client_field_args: &ClientFieldArgsMap,
 ) -> Result<ValidatedRefetchFieldStrategy, Vec<WithLocation<ValidateSchemaError>>> {
     let refetch_selection_set = validate_client_field_definition_selections_exist_and_types_match(
         schema_data,
         use_refetch_field_strategy.refetch_selection_set,
-        parent_object,
+        client_field_parent_object,
         server_fields,
-        client_field_args,
+        top_level_client_field_args,
         vec![],
-        client_field_name,
+        top_level_client_field_type_and_field_name,
     )
     .map_err(|errs| {
         errs.into_iter()
             .map(|err| {
                 validate_selections_error_to_validate_schema_error(
                     err,
-                    parent_object,
-                    client_field_name,
+                    top_level_client_field_type_and_field_name,
                 )
             })
             .collect::<Vec<_>>()
@@ -643,14 +641,13 @@ fn validate_variable_definitions(
 
 fn validate_selections_error_to_validate_schema_error(
     err: WithLocation<ValidateSelectionsError>,
-    parent_object: &SchemaObject,
-    client_field_name: SelectableFieldName,
+    top_level_client_field_type_and_field_name: ObjectTypeAndFieldName,
 ) -> WithLocation<ValidateSchemaError> {
     err.map(|item| match item {
         ValidateSelectionsError::FieldDoesNotExist(field_parent_type_name, field_name) => {
             ValidateSchemaError::ClientFieldSelectionFieldDoesNotExist {
-                client_field_parent_type_name: parent_object.name,
-                client_field_name,
+                client_field_parent_type_name: top_level_client_field_type_and_field_name.type_name,
+                client_field_name: top_level_client_field_type_and_field_name.field_name,
                 field_parent_type_name,
                 field_name,
             }
@@ -661,8 +658,8 @@ fn validate_selections_error_to_validate_schema_error(
             target_type,
             target_type_name,
         } => ValidateSchemaError::ClientFieldSelectionFieldIsNotScalar {
-            client_field_parent_type_name: parent_object.name,
-            client_field_name,
+            client_field_parent_type_name: top_level_client_field_type_and_field_name.type_name,
+            client_field_name: top_level_client_field_type_and_field_name.field_name,
             field_parent_type_name: parent_type_name,
             field_name,
             field_type: target_type,
@@ -674,8 +671,8 @@ fn validate_selections_error_to_validate_schema_error(
             target_type,
             target_type_name,
         } => ValidateSchemaError::ClientFieldSelectionFieldIsScalar {
-            client_field_parent_type_name: parent_object.name,
-            client_field_name,
+            client_field_parent_type_name: top_level_client_field_type_and_field_name.type_name,
+            client_field_name: top_level_client_field_type_and_field_name.field_name,
             field_parent_type_name,
             field_name,
             field_type: target_type,
@@ -685,8 +682,8 @@ fn validate_selections_error_to_validate_schema_error(
             field_parent_type_name,
             field_name,
         } => ValidateSchemaError::ClientFieldSelectionClientFieldSelectedAsLinked {
-            client_field_parent_type_name: parent_object.name,
-            client_field_name: field_name,
+            client_field_parent_type_name: top_level_client_field_type_and_field_name.type_name,
+            client_field_name: top_level_client_field_type_and_field_name.field_name,
             field_parent_type_name,
             field_name,
         },
@@ -758,11 +755,11 @@ enum ValidateSelectionsError {
 fn validate_client_field_definition_selections_exist_and_types_match(
     schema_data: &ServerFieldData,
     selection_set: Vec<WithSpan<UnvalidatedSelection>>,
-    parent_object: &SchemaObject,
+    client_field_parent_object: &SchemaObject,
     server_fields: &[ValidatedSchemaServerField],
     client_field_args: &ClientFieldArgsMap,
     variable_definitions: Vec<WithSpan<UnvalidatedVariableDefinition>>,
-    client_field_name: SelectableFieldName,
+    top_level_client_field_type_and_field_name: ObjectTypeAndFieldName,
 ) -> Result<Vec<WithSpan<ValidatedSelection>>, Vec<WithLocation<ValidateSelectionsError>>> {
     // Currently, we only check that each field exists and has an appropriate type, not that
     // there are no selection conflicts due to aliases or parameters.
@@ -773,7 +770,7 @@ fn validate_client_field_definition_selections_exist_and_types_match(
         get_all_errors_or_all_ok(selection_set.into_iter().map(|selection| {
             validate_client_field_definition_selection_exists_and_type_matches(
                 selection,
-                parent_object,
+                client_field_parent_object,
                 schema_data,
                 server_fields,
                 client_field_args,
@@ -787,8 +784,8 @@ fn validate_client_field_definition_selections_exist_and_types_match(
         validate_all_variables_are_used(
             variable_definitions,
             used_variables,
-            parent_object.name,
-            client_field_name,
+            client_field_parent_object.name,
+            top_level_client_field_type_and_field_name,
         )
         .map_err(|err| vec![err]),
     )?;
@@ -798,7 +795,7 @@ fn validate_client_field_definition_selections_exist_and_types_match(
 
 fn validate_client_field_definition_selection_exists_and_type_matches(
     selection: WithSpan<UnvalidatedSelection>,
-    parent_object: &SchemaObject,
+    field_parent_object: &SchemaObject,
     schema_data: &ServerFieldData,
     server_fields: &[ValidatedSchemaServerField],
     client_field_args: &ClientFieldArgsMap,
@@ -813,7 +810,7 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
                 &mut |scalar_field_selection| {
                     validate_field_type_exists_and_is_scalar(
                         schema_data,
-                        parent_object,
+                        field_parent_object,
                         scalar_field_selection,
                         server_fields,
                         client_field_args,
@@ -824,7 +821,7 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
                 &mut |linked_field_selection| {
                     validate_field_type_exists_and_is_linked(
                         schema_data,
-                        parent_object,
+                        field_parent_object,
                         linked_field_selection,
                         server_fields,
                         client_field_args,
@@ -845,7 +842,7 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
 /// and type should be a client field (which is a scalar) or a server scalar type.
 fn validate_field_type_exists_and_is_scalar(
     schema_data: &ServerFieldData,
-    parent_object: &SchemaObject,
+    scalar_field_selection_parent_object: &SchemaObject,
     scalar_field_selection: UnvalidatedScalarFieldSelection,
     server_fields: &[ValidatedSchemaServerField],
     client_field_args: &ClientFieldArgsMap,
@@ -853,7 +850,10 @@ fn validate_field_type_exists_and_is_scalar(
     variable_definitions: &[WithSpan<UnvalidatedVariableDefinition>],
 ) -> ValidateSelectionsResult<ValidatedScalarFieldSelection> {
     let scalar_field_name = scalar_field_selection.name.item.into();
-    match parent_object.encountered_fields.get(&scalar_field_name) {
+    match scalar_field_selection_parent_object
+        .encountered_fields
+        .get(&scalar_field_name)
+    {
         Some(defined_field_type) => match defined_field_type {
             FieldType::ServerField(server_field_id) => {
                 let server_field = &server_fields[server_field_id.as_usize()];
@@ -901,7 +901,7 @@ fn validate_field_type_exists_and_is_scalar(
                     }),
                     SelectableServerFieldId::Object(object_id) => Err(WithLocation::new(
                         ValidateSelectionsError::FieldSelectedAsScalarButTypeIsNotScalar {
-                            field_parent_type_name: parent_object.name,
+                            field_parent_type_name: scalar_field_selection_parent_object.name,
                             field_name: scalar_field_name,
                             target_type: "an object",
                             target_type_name: schema_data.object(object_id).name.into(),
@@ -919,7 +919,10 @@ fn validate_field_type_exists_and_is_scalar(
             ),
         },
         None => Err(WithLocation::new(
-            ValidateSelectionsError::FieldDoesNotExist(parent_object.name, scalar_field_name),
+            ValidateSelectionsError::FieldDoesNotExist(
+                scalar_field_selection_parent_object.name,
+                scalar_field_name,
+            ),
             scalar_field_selection.name.location,
         )),
     }
@@ -975,7 +978,7 @@ fn validate_client_field(
 /// and type should be a server interface, object or union.
 fn validate_field_type_exists_and_is_linked(
     schema_data: &ServerFieldData,
-    parent_object: &SchemaObject,
+    field_parent_object: &SchemaObject,
     linked_field_selection: UnvalidatedLinkedFieldSelection,
     server_fields: &[ValidatedSchemaServerField],
     client_field_args: &ClientFieldArgsMap,
@@ -983,14 +986,14 @@ fn validate_field_type_exists_and_is_linked(
     variable_definitions: &[WithSpan<UnvalidatedVariableDefinition>],
 ) -> ValidateSelectionsResult<ValidatedLinkedFieldSelection> {
     let linked_field_name = linked_field_selection.name.item.into();
-    match (parent_object.encountered_fields).get(&linked_field_name) {
+    match (field_parent_object.encountered_fields).get(&linked_field_name) {
         Some(defined_field_type) => match defined_field_type {
             FieldType::ServerField(server_field_id) => {
                 let server_field = &server_fields[server_field_id.as_usize()];
                 match server_field.associated_data.inner_non_null() {
                     SelectableServerFieldId::Scalar(scalar_id) => Err(WithLocation::new(
                         ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsScalar {
-                            field_parent_type_name: parent_object.name,
+                            field_parent_type_name: field_parent_object.name,
                             field_name: linked_field_name,
                             target_type: "a scalar",
                             target_type_name: schema_data.scalar(scalar_id).name.item.into(),
@@ -998,7 +1001,7 @@ fn validate_field_type_exists_and_is_linked(
                         linked_field_selection.name.location,
                     )),
                     SelectableServerFieldId::Object(object_id) => {
-                        let object = schema_data
+                        let linked_field_target_object = schema_data
                             .server_objects
                             .get(object_id.as_usize())
                             .unwrap();
@@ -1016,52 +1019,52 @@ fn validate_field_type_exists_and_is_linked(
                         )?;
 
                         Ok(LinkedFieldSelection {
-                                name: linked_field_selection.name,
-                                reader_alias: linked_field_selection.reader_alias,
-                                selection_set: linked_field_selection.selection_set.into_iter().map(
-                                    |selection| {
-                                        validate_client_field_definition_selection_exists_and_type_matches(
-                                            selection,
-                                            object,
-                                            schema_data,
-                                            server_fields,
-                                            client_field_args,
-                                            used_variables,
-                                            variable_definitions
-                                        )
+                            name: linked_field_selection.name,
+                            reader_alias: linked_field_selection.reader_alias,
+                            selection_set: linked_field_selection.selection_set.into_iter().map(
+                                |selection| {
+                                    validate_client_field_definition_selection_exists_and_type_matches(
+                                        selection,
+                                        linked_field_target_object,
+                                        schema_data,
+                                        server_fields,
+                                        client_field_args,
+                                        used_variables,
+                                        variable_definitions
+                                    )
+                                },
+                            ).collect::<Result<Vec<_>, _>>()?,
+                            unwraps: linked_field_selection.unwraps,
+                            associated_data: ValidatedLinkedFieldAssociatedData {
+                                concrete_type: linked_field_target_object.concrete_type,
+                                parent_object_id: object_id,
+                                selection_variant: match linked_field_selection.associated_data {
+                                    IsographSelectionVariant::Regular => {
+                                        assert_no_missing_arguments(missing_arguments, linked_field_selection.name.location)?;
+                                        ValidatedIsographSelectionVariant::Regular
                                     },
-                                ).collect::<Result<Vec<_>, _>>()?,
-                                unwraps: linked_field_selection.unwraps,
-                                associated_data: ValidatedLinkedFieldAssociatedData {
-                                    concrete_type: object.concrete_type,
-                                    parent_object_id: object_id,
-                                    selection_variant: match linked_field_selection.associated_data {
-                                        IsographSelectionVariant::Regular => {
-                                            assert_no_missing_arguments(missing_arguments, linked_field_selection.name.location)?;
-                                            ValidatedIsographSelectionVariant::Regular
-                                        },
-                                        IsographSelectionVariant::Loadable(l) => {
-                                            server_field_cannot_be_selected_loadably(linked_field_name, linked_field_selection.name.location)?;
-                                            ValidatedIsographSelectionVariant::Loadable((l, missing_arguments))
-                                        },
+                                    IsographSelectionVariant::Loadable(l) => {
+                                        server_field_cannot_be_selected_loadably(linked_field_name, linked_field_selection.name.location)?;
+                                        ValidatedIsographSelectionVariant::Loadable((l, missing_arguments))
                                     },
                                 },
-                                arguments: linked_field_selection.arguments,
-                                directives: linked_field_selection.directives
-                            })
+                            },
+                            arguments: linked_field_selection.arguments,
+                            directives: linked_field_selection.directives
+                        })
                     }
                 }
             }
             FieldType::ClientField(_) => Err(WithLocation::new(
                 ValidateSelectionsError::FieldSelectedAsLinkedButTypeIsClientField {
-                    field_parent_type_name: parent_object.name,
+                    field_parent_type_name: field_parent_object.name,
                     field_name: linked_field_name,
                 },
                 linked_field_selection.name.location,
             )),
         },
         None => Err(WithLocation::new(
-            ValidateSelectionsError::FieldDoesNotExist(parent_object.name, linked_field_name),
+            ValidateSelectionsError::FieldDoesNotExist(field_parent_object.name, linked_field_name),
             linked_field_selection.name.location,
         )),
     }
