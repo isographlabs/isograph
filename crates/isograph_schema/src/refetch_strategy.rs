@@ -126,6 +126,8 @@ pub trait GenerateRefetchQueryFn: Debug {
         &self,
         inner: MergedSelectionMap,
     ) -> (MergedSelectionMap, BTreeSet<VariableName>);
+
+    fn clone_box(&self) -> Box<dyn GenerateRefetchQueryFn>;
 }
 
 #[derive(Debug)]
@@ -160,6 +162,17 @@ impl GenerateRefetchQueryFn for GenerateRefetchQueryImpl {
         let variables = get_reachable_variables(&new_selection_map);
 
         (new_selection_map, variables)
+    }
+
+    fn clone_box(&self) -> Box<dyn GenerateRefetchQueryFn> {
+        Box::new(Self {
+            top_level_field_name: self.top_level_field_name,
+            top_level_arguments: self.top_level_arguments.clone(),
+            top_level_field_concrete_type: self.top_level_field_concrete_type,
+            refine_to_type: self.refine_to_type,
+            subfield: self.subfield,
+            subfield_concrete_type: self.subfield_concrete_type,
+        })
     }
 }
 
