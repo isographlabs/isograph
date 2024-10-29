@@ -535,9 +535,10 @@ fn validate_field_type_exists_and_is_linked(
                                         ValidatedIsographSelectionVariant::Loadable((l, missing_arguments))
                                     },
                                 },
+                                variant: server_field.variant.clone()
                             },
                             arguments: linked_field_selection.arguments,
-                            directives: linked_field_selection.directives
+                            directives: linked_field_selection.directives,
                         })
                     }
                 }
