@@ -114,6 +114,7 @@ fn and_then_selection_set_and_collect_errors<
                                         unwraps: l.unwraps,
                                         arguments: l.arguments,
                                         directives: l.directives,
+                                        is_inline: l.is_inline,
                                     },
                                 )),
                                 with_span.span,

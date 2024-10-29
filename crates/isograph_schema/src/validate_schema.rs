@@ -326,6 +326,7 @@ fn validate_and_transform_field(
     field: UnvalidatedSchemaSchemaField,
     schema_data: &ServerFieldData,
 ) -> Result<ValidatedSchemaServerField, impl Iterator<Item = WithLocation<ValidateSchemaError>>> {
+    let is_inline = field.is_inline;
     // TODO rewrite as field.map(...).transpose()
     let (empty_field, server_field_type) = field.split();
 
@@ -366,6 +367,7 @@ fn validate_and_transform_field(
                 parent_type_id: empty_field.parent_type_id,
                 arguments: valid_arguments,
                 is_discriminator: empty_field.is_discriminator,
+                is_inline,
             });
         }
     }
@@ -1050,7 +1052,8 @@ fn validate_field_type_exists_and_is_linked(
                                 },
                             },
                             arguments: linked_field_selection.arguments,
-                            directives: linked_field_selection.directives
+                            directives: linked_field_selection.directives,
+                            is_inline: server_field.is_inline,
                         })
                     }
                 }
