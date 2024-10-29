@@ -332,7 +332,6 @@ fn parse_selection(
                     unwraps,
                     arguments,
                     directives,
-                    is_inline: false,
                 }))
             }
             None => {

@@ -20,9 +20,9 @@ use crate::{
     expose_field_directive::RequiresRefinement, transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context, FieldType,
     ImperativelyLoadedFieldVariant, Loadability, NameAndArguments, PathToRefetchField,
-    RootOperationName, SchemaObject, UnvalidatedVariableDefinition, ValidatedClientField,
-    ValidatedIsographSelectionVariant, ValidatedScalarFieldSelection, ValidatedSchema,
-    ValidatedSchemaIdField, ValidatedSelection, VariableContext,
+    RootOperationName, SchemaObject, SchemaServerFieldVariant, UnvalidatedVariableDefinition,
+    ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedScalarFieldSelection,
+    ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection, VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -730,8 +730,8 @@ fn merge_validated_selections_into_selection_map(
                         let type_id = linked_field_selection.associated_data.parent_object_id;
                         let linked_field_parent_type = schema.server_field_data.object(type_id);
 
-                        match linked_field_selection.is_inline {
-                            true => {
+                        match linked_field_selection.associated_data.variant {
+                            SchemaServerFieldVariant::InlineFragment => {
                                 let type_to_refine_to = linked_field_parent_type.name;
                                 let normalization_key =
                                     NormalizationKey::InlineFragment(type_to_refine_to);
@@ -778,7 +778,7 @@ fn merge_validated_selections_into_selection_map(
                                     }
                                 }
                             }
-                            false => {
+                            SchemaServerFieldVariant::LinkedField => {
                                 let normalization_key = create_transformed_name_and_arguments(
                                     linked_field_selection.name.item.into(),
                                     &linked_field_selection.arguments,

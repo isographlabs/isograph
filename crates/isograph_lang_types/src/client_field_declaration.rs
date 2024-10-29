@@ -233,7 +233,6 @@ pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
     pub unwraps: Vec<WithSpan<Unwrap>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
-    pub is_inline: bool,
 }
 
 impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField> {
@@ -267,7 +266,6 @@ impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField
             unwraps: self.unwraps,
             arguments: self.arguments,
             directives: self.directives,
-            is_inline: self.is_inline,
         }
     }
 

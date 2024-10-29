@@ -381,7 +381,13 @@ pub struct SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData
     // TODO remove this. This is indicative of poor modeling.
     pub is_discriminator: bool,
 
-    pub is_inline: bool,
+    pub variant: SchemaServerFieldVariant,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SchemaServerFieldVariant {
+    InlineFragment,
+    LinkedField,
 }
 
 impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug>
@@ -399,7 +405,7 @@ impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug>
             parent_type_id: self.parent_type_id,
             arguments: self.arguments.clone(),
             is_discriminator: self.is_discriminator,
-            is_inline: self.is_inline,
+            variant: self.variant.clone(),
         })
     }
 
@@ -415,7 +421,7 @@ impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug>
             parent_type_id: self.parent_type_id,
             arguments: self.arguments.clone(),
             is_discriminator: self.is_discriminator,
-            is_inline: self.is_inline,
+            variant: self.variant.clone(),
         }
     }
 }
@@ -611,7 +617,7 @@ impl<T, VariableDefinitionInnerType: Ord + Debug>
             parent_type_id,
             arguments,
             is_discriminator,
-            is_inline,
+            variant: is_inline,
         } = self;
         (
             SchemaServerField {
@@ -622,7 +628,7 @@ impl<T, VariableDefinitionInnerType: Ord + Debug>
                 parent_type_id,
                 arguments,
                 is_discriminator,
-                is_inline,
+                variant: is_inline,
             },
             associated_data,
         )

@@ -16,8 +16,8 @@ use crate::{
     validate_client_field::validate_and_transform_client_fields,
     validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
     FieldType, ImperativelyLoadedFieldVariant, Schema, SchemaIdField, SchemaObject,
-    SchemaServerField, SchemaValidationState, ServerFieldData, UnvalidatedSchema,
-    UnvalidatedVariableDefinition, UseRefetchFieldRefetchStrategy,
+    SchemaServerField, SchemaServerFieldVariant, SchemaValidationState, ServerFieldData,
+    UnvalidatedSchema, UnvalidatedVariableDefinition, UseRefetchFieldRefetchStrategy,
     ValidateEntrypointDeclarationError,
 };
 
@@ -63,6 +63,8 @@ pub struct ValidatedLinkedFieldAssociatedData {
     pub selection_variant: ValidatedIsographSelectionVariant,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
+
+    pub variant: SchemaServerFieldVariant,
 }
 
 #[derive(Debug)]
