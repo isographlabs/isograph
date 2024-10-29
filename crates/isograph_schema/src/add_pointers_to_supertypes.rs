@@ -4,7 +4,7 @@ use intern::string_key::Intern;
 
 use crate::{
     FieldType, ProcessTypeDefinitionError, ProcessTypeDefinitionResult, SchemaObject,
-    SchemaServerField, TypeRefinementMap, UnvalidatedSchema,
+    SchemaServerField, SchemaServerFieldVariant, TypeRefinementMap, UnvalidatedSchema,
 };
 use common_lang_types::Location;
 impl UnvalidatedSchema {
@@ -39,6 +39,7 @@ impl UnvalidatedSchema {
                 arguments: vec![],
                 associated_data,
                 is_discriminator: false,
+                variant: SchemaServerFieldVariant::InlineFragment,
             };
 
             self.server_fields.push(server_field);
