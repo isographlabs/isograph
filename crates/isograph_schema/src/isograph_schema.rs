@@ -14,8 +14,8 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, SelectableServerFieldId, Selection,
-    ServerFieldId, ServerObjectId, ServerScalarId, ServerStrongIdFieldId, TypeAnnotation, Unwrap,
+    ArgumentKeyAndValue, ClientFieldId, SelectableServerFieldId, Selection, ServerFieldId,
+    ServerObjectId, ServerScalarId, ServerStrongIdFieldId, TypeAnnotation, Unwrap,
     VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -77,7 +77,6 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
             TSchemaValidationState::VariableDefinitionInnerType,
         >,
     >,
-    pub client_pointers: Vec<ClientPointer>,
     pub client_fields: Vec<
         ClientField<
             TSchemaValidationState::ClientFieldSelectionScalarFieldAssociatedData,
@@ -486,11 +485,6 @@ impl ObjectTypeAndFieldName {
             format!("../{field_name}/{}", file_type)
         }
     }
-}
-
-#[derive(Debug)]
-pub struct ClientPointer {
-    pub id: ClientPointerId,
 }
 
 #[derive(Debug)]

@@ -1,13 +1,12 @@
-use common_lang_types::ClientPointerFieldName;
+use common_lang_types::{SelectableFieldName, Span, UnvalidatedTypeName, WithLocation};
+use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::string_key::Intern;
 
 use crate::{
-    generate_refetch_field_strategy, id_arguments, id_selection, id_top_level_arguments,
-    ClientField, ClientPointer, ImperativelyLoadedFieldVariant, ObjectTypeAndFieldName,
-    ProcessTypeDefinitionResult, RefetchStrategy, RequiresRefinement, TypeRefinementMap,
-    UnvalidatedSchema, NODE_FIELD_NAME, REFETCH_FIELD_NAME,
+    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, SchemaServerField, TypeRefinementMap,
+    UnvalidatedSchema,
 };
-
+use common_lang_types::Location;
 impl UnvalidatedSchema {
     /// For each supertype (e.g. Node), add the pointers for each subtype (e.g. User implements Node)
     /// to supertype (e.g. creating Node.asUser).
@@ -15,67 +14,36 @@ impl UnvalidatedSchema {
         &mut self,
         subtype_to_supertype_map: &TypeRefinementMap,
     ) -> ProcessTypeDefinitionResult<()> {
-        let query_id = self.query_id();
-
         for (subtype_id, supertype_ids) in subtype_to_supertype_map {
             let subtype: &crate::SchemaObject = self.server_field_data.object(*subtype_id);
 
-            let field_name: ClientPointerFieldName = format!("as{}", subtype.name).intern().into();
+            let field_name: SelectableFieldName = format!("as{}", subtype.name).intern().into();
 
-            let next_client_field_id = self.client_fields.len().into();
-            let next_client_pointer_id = self.client_pointers.len().into();
+            let next_server_field_id = self.server_fields.len().into();
 
-            let client_field = ClientField {
+            let associated_data: GraphQLTypeAnnotation<UnvalidatedTypeName> =
+                GraphQLTypeAnnotation::Named(graphql_lang_types::GraphQLNamedTypeAnnotation(
+                    common_lang_types::WithSpan {
+                        item: subtype.name.into(),
+                        span: Span::todo_generated(),
+                    },
+                ));
+
+            let server_field = SchemaServerField {
                 description: Some(
                     format!("A client poiter for the {} type.", subtype.name)
                         .intern()
                         .into(),
                 ),
-                id: next_client_field_id,
-                name: field_name.into(),
-                parent_object_id: subtype.id,
-                reader_selection_set: None,
-                refetch_strategy: subtype.id_field.map(|_| {
-                    // Assume that if we have an id field, this implements Node
-
-                    RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
-                        vec![id_selection()],
-                        query_id,
-                        format!("refetch__{}", subtype.name).intern().into(),
-                        *NODE_FIELD_NAME,
-                        id_top_level_arguments(),
-                        None,
-                        RequiresRefinement::Yes(subtype.name),
-                        None,
-                        None,
-                    ))
-                }),
-                type_and_field: ObjectTypeAndFieldName {
-                    type_name: subtype.name,
-                    field_name: field_name.into(),
-                },
-                variable_definitions: vec![],
-                unwraps: vec![],
-                // This will be replaced with ClientFieldVariant::ClientPointer
-                variant: crate::ClientFieldVariant::ImperativelyLoadedField(
-                    ImperativelyLoadedFieldVariant {
-                        client_field_scalar_selection_name: *REFETCH_FIELD_NAME,
-                        top_level_schema_field_name: *NODE_FIELD_NAME,
-                        top_level_schema_field_arguments: id_arguments(),
-                        top_level_schema_field_concrete_type: None,
-                        primary_field_info: None,
-
-                        root_object_id: query_id,
-                    },
-                ),
+                id: next_server_field_id,
+                name: WithLocation::new(field_name, Location::generated()),
+                parent_type_id: subtype.id,
+                arguments: vec![],
+                associated_data,
+                is_discriminator: false,
             };
 
-            let client_pointer = ClientPointer {
-                id: next_client_pointer_id,
-            };
-
-            self.client_fields.push(client_field);
-            self.client_pointers.push(client_pointer);
+            self.server_fields.push(server_field);
 
             for supertype_id in supertype_ids {
                 let supertype = self.server_field_data.object_mut(*supertype_id);
@@ -84,18 +52,17 @@ impl UnvalidatedSchema {
                     .encountered_fields
                     .insert(
                         field_name.into(),
-                        crate::FieldType::ClientField(next_client_field_id),
+                        crate::FieldType::ServerField(next_server_field_id),
                     )
                     .is_some()
                 {
-                    panic!("TODO implement ProcessTypeDefinitionError::FieldExistsOnSupertype");
-                    // return Err(WithLocation::new(
-                    //     ProcessTypeDefinitionError::FieldExistsOnSubtype {
-                    //         field_name: *supertype_field_name,
-                    //         parent_type: subtype.name,
-                    //     },
-                    //     Location::generated(),
-                    // ));
+                    return Err(WithLocation::new(
+                        ProcessTypeDefinitionError::FieldExistsOnSubtype {
+                            field_name,
+                            parent_type: supertype.name,
+                        },
+                        Location::generated(),
+                    ));
                 }
             }
         }
