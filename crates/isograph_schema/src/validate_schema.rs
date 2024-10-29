@@ -4,7 +4,6 @@ use common_lang_types::{
     FieldArgumentName, IsographObjectTypeName, Location, SelectableFieldName, UnvalidatedTypeName,
     VariableName, WithLocation, WithSpan,
 };
-use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
 use isograph_lang_types::{
     reachable_variables, ClientFieldId, IsographSelectionVariant, LinkedFieldSelection,
@@ -15,12 +14,12 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    ClientField, ClientFieldVariant, FieldType, ImperativelyLoadedFieldVariant,
-    ObjectTypeAndFieldName, RefetchStrategy, Schema, SchemaIdField, SchemaObject,
-    SchemaServerField, SchemaValidationState, ServerFieldData, UnvalidatedClientField,
-    UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy, UnvalidatedSchema,
-    UnvalidatedSchemaSchemaField, UnvalidatedSchemaState, UnvalidatedVariableDefinition,
-    UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
+    validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
+    FieldType, ImperativelyLoadedFieldVariant, ObjectTypeAndFieldName, RefetchStrategy, Schema,
+    SchemaIdField, SchemaObject, SchemaServerField, SchemaValidationState, ServerFieldData,
+    UnvalidatedClientField, UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
+    UnvalidatedSchema, UnvalidatedVariableDefinition, UseRefetchFieldRefetchStrategy,
+    ValidateEntrypointDeclarationError,
 };
 
 use intern::string_key::Intern;
@@ -237,18 +236,7 @@ fn transform_object_field_ids(unvalidated_object: SchemaObject) -> SchemaObject 
     }
 }
 
-fn validate_and_transform_server_fields(
-    fields: Vec<UnvalidatedSchemaSchemaField>,
-    schema_data: &ServerFieldData,
-) -> Result<Vec<ValidatedSchemaServerField>, Vec<WithLocation<ValidateSchemaError>>> {
-    get_all_errors_or_all_ok_iter(
-        fields
-            .into_iter()
-            .map(|field| validate_and_transform_field(field, schema_data)),
-    )
-}
-
-fn get_all_errors_or_all_ok_as_hashmap<K: std::cmp::Eq + std::hash::Hash, V, E>(
+pub(crate) fn get_all_errors_or_all_ok_as_hashmap<K: std::cmp::Eq + std::hash::Hash, V, E>(
     items: impl Iterator<Item = Result<(K, V), E>>,
 ) -> Result<HashMap<K, V>, Vec<E>> {
     let mut oks = HashMap::new();
@@ -270,7 +258,7 @@ fn get_all_errors_or_all_ok_as_hashmap<K: std::cmp::Eq + std::hash::Hash, V, E>(
     }
 }
 
-fn get_all_errors_or_all_ok<T, E>(
+pub(crate) fn get_all_errors_or_all_ok<T, E>(
     items: impl Iterator<Item = Result<T, E>>,
 ) -> Result<Vec<T>, Vec<E>> {
     let mut oks = vec![];
@@ -290,7 +278,7 @@ fn get_all_errors_or_all_ok<T, E>(
     }
 }
 
-fn get_all_errors_or_tuple_ok<T1, T2, E>(
+pub(crate) fn get_all_errors_or_tuple_ok<T1, T2, E>(
     a: Result<T1, impl IntoIterator<Item = E>>,
     b: Result<T2, impl IntoIterator<Item = E>>,
 ) -> Result<(T1, T2), Vec<E>> {
@@ -302,7 +290,7 @@ fn get_all_errors_or_tuple_ok<T1, T2, E>(
     }
 }
 
-fn get_all_errors_or_all_ok_iter<T, E>(
+pub(crate) fn get_all_errors_or_all_ok_iter<T, E>(
     items: impl Iterator<Item = Result<T, impl Iterator<Item = E>>>,
 ) -> Result<Vec<T>, Vec<E>> {
     let mut oks = vec![];
@@ -319,113 +307,6 @@ fn get_all_errors_or_all_ok_iter<T, E>(
         Ok(oks)
     } else {
         Err(errors)
-    }
-}
-
-fn validate_and_transform_field(
-    field: UnvalidatedSchemaSchemaField,
-    schema_data: &ServerFieldData,
-) -> Result<ValidatedSchemaServerField, impl Iterator<Item = WithLocation<ValidateSchemaError>>> {
-    // TODO rewrite as field.map(...).transpose()
-    let (empty_field, server_field_type) = field.split();
-
-    let mut errors = vec![];
-
-    let field_type =
-        match validate_server_field_type_exists(schema_data, &server_field_type, &empty_field) {
-            Ok(type_annotation) => Some(type_annotation),
-            Err(e) => {
-                errors.push(e);
-                None
-            }
-        };
-
-    let valid_arguments =
-        match get_all_errors_or_all_ok(empty_field.arguments.into_iter().map(|argument| {
-            validate_server_field_argument(
-                argument,
-                schema_data,
-                empty_field.parent_type_id,
-                empty_field.name,
-            )
-        })) {
-            Ok(arguments) => Some(arguments),
-            Err(e) => {
-                errors.extend(e);
-                None
-            }
-        };
-
-    if let Some(field_type) = field_type {
-        if let Some(valid_arguments) = valid_arguments {
-            return Ok(SchemaServerField {
-                description: empty_field.description,
-                name: empty_field.name,
-                id: empty_field.id,
-                associated_data: field_type,
-                parent_type_id: empty_field.parent_type_id,
-                arguments: valid_arguments,
-                is_discriminator: empty_field.is_discriminator,
-            });
-        }
-    }
-
-    Err(errors.into_iter())
-}
-
-fn validate_server_field_type_exists(
-    schema_data: &ServerFieldData,
-    server_field_type: &GraphQLTypeAnnotation<UnvalidatedTypeName>,
-    field: &SchemaServerField<
-        (),
-        <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
-    >,
-) -> ValidateSchemaResult<TypeAnnotation<SelectableServerFieldId>> {
-    // look up the item in defined_types. If it's not there, error.
-    match schema_data.defined_types.get(server_field_type.inner()) {
-        // Why do we need to clone here? Can we avoid this?
-        Some(type_id) => Ok(TypeAnnotation::from_graphql_type_annotation(
-            server_field_type.clone().map(|_| *type_id),
-        )),
-        None => Err(WithLocation::new(
-            ValidateSchemaError::FieldTypenameDoesNotExist {
-                parent_type_name: schema_data.object(field.parent_type_id).name,
-                field_name: field.name.item,
-                field_type: *server_field_type.inner(),
-            },
-            field.name.location,
-        )),
-    }
-}
-
-fn validate_server_field_argument(
-    argument: WithLocation<UnvalidatedVariableDefinition>,
-    schema_data: &ServerFieldData,
-    parent_type_id: ServerObjectId,
-    name: WithLocation<SelectableFieldName>,
-) -> ValidateSchemaResult<WithLocation<ValidatedVariableDefinition>> {
-    // Isograph doesn't care about the default value, and that remains
-    // unvalidated.
-
-    // look up the item in defined_types. If it's not there, error.
-    match schema_data.defined_types.get(argument.item.type_.inner()) {
-        Some(selectable_server_field_id) => Ok(WithLocation::new(
-            VariableDefinition {
-                name: argument.item.name,
-                type_: argument.item.type_.map(|_| *selectable_server_field_id),
-                default_value: argument.item.default_value,
-            },
-            argument.location,
-        )),
-        None => Err(WithLocation::new(
-            ValidateSchemaError::FieldArgumentTypeDoesNotExist {
-                parent_type_name: schema_data.object(parent_type_id).name,
-                field_name: name.item,
-                argument_name: argument.item.name.item,
-                argument_type: *argument.item.type_.inner(),
-            },
-            name.location,
-        )),
     }
 }
 
@@ -1163,7 +1044,7 @@ pub fn get_provided_arguments<'a>(
         .collect()
 }
 
-type ValidateSchemaResult<T> = Result<T, WithLocation<ValidateSchemaError>>;
+pub(crate) type ValidateSchemaResult<T> = Result<T, WithLocation<ValidateSchemaError>>;
 
 #[derive(Debug, Error)]
 pub enum ValidateSchemaError {

@@ -11,6 +11,7 @@ mod root_types;
 mod unvalidated_schema;
 mod validate_entrypoint;
 mod validate_schema;
+mod validate_server_field;
 mod variable_context;
 
 use argument_map::*;
