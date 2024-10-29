@@ -1,10 +1,10 @@
-use common_lang_types::{SelectableFieldName, Span, UnvalidatedTypeName, WithLocation};
-use graphql_lang_types::GraphQLTypeAnnotation;
+use common_lang_types::{SelectableFieldName, Span, UnvalidatedTypeName, WithLocation, WithSpan};
+use graphql_lang_types::{GraphQLNamedTypeAnnotation, GraphQLTypeAnnotation};
 use intern::string_key::Intern;
 
 use crate::{
-    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, SchemaServerField, TypeRefinementMap,
-    UnvalidatedSchema,
+    FieldType, ProcessTypeDefinitionError, ProcessTypeDefinitionResult, SchemaObject,
+    SchemaServerField, TypeRefinementMap, UnvalidatedSchema,
 };
 use common_lang_types::Location;
 impl UnvalidatedSchema {
@@ -15,19 +15,17 @@ impl UnvalidatedSchema {
         subtype_to_supertype_map: &TypeRefinementMap,
     ) -> ProcessTypeDefinitionResult<()> {
         for (subtype_id, supertype_ids) in subtype_to_supertype_map {
-            let subtype: &crate::SchemaObject = self.server_field_data.object(*subtype_id);
+            let subtype: &SchemaObject = self.server_field_data.object(*subtype_id);
 
             let field_name: SelectableFieldName = format!("as{}", subtype.name).intern().into();
 
             let next_server_field_id = self.server_fields.len().into();
 
             let associated_data: GraphQLTypeAnnotation<UnvalidatedTypeName> =
-                GraphQLTypeAnnotation::Named(graphql_lang_types::GraphQLNamedTypeAnnotation(
-                    common_lang_types::WithSpan {
-                        item: subtype.name.into(),
-                        span: Span::todo_generated(),
-                    },
-                ));
+                GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan {
+                    item: subtype.name.into(),
+                    span: Span::todo_generated(),
+                }));
 
             let server_field = SchemaServerField {
                 description: Some(
@@ -50,10 +48,7 @@ impl UnvalidatedSchema {
 
                 if supertype
                     .encountered_fields
-                    .insert(
-                        field_name.into(),
-                        crate::FieldType::ServerField(next_server_field_id),
-                    )
+                    .insert(field_name, FieldType::ServerField(next_server_field_id))
                     .is_some()
                 {
                     return Err(WithLocation::new(
