@@ -319,7 +319,7 @@ impl UnvalidatedSchema {
         {
             return Err(WithLocation::new(
                 // TODO use a more generic error message when making this
-                ProcessTypeDefinitionError::FieldExistsOnSubtype {
+                ProcessTypeDefinitionError::FieldExistsOnType {
                     field_name: mutation_field_name,
                     parent_type: payload_object_name,
                 },

@@ -41,7 +41,7 @@ impl UnvalidatedSchema {
                                 .is_some()
                             {
                                 return Err(WithLocation::new(
-                                    ProcessTypeDefinitionError::FieldExistsOnSubtype {
+                                    ProcessTypeDefinitionError::FieldExistsOnType {
                                         field_name: *supertype_field_name,
                                         parent_type: subtype.name,
                                     },
