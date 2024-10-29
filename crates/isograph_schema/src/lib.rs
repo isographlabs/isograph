@@ -9,8 +9,10 @@ mod process_type_definition;
 mod refetch_strategy;
 mod root_types;
 mod unvalidated_schema;
+mod validate_client_field;
 mod validate_entrypoint;
 mod validate_schema;
+mod validate_server_field;
 mod variable_context;
 
 use argument_map::*;
