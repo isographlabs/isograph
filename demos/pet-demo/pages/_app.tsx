@@ -10,7 +10,10 @@ import {
 import { useMemo } from 'react';
 import type { AppProps } from 'next/app';
 
-function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
+function makeNetworkRequest<T>(
+  queryText: string,
+  variables: unknown,
+): Promise<T> {
   const promise = fetch('http://localhost:4000/graphql', {
     method: 'POST',
     headers: {

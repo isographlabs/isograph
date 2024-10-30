@@ -129,7 +129,10 @@ import {
   IsographEnvironmentProvider,
 } from '@isograph/react';
 
-function makeNetworkRequest<T>(queryText: string, variables: any): Promise<T> {
+function makeNetworkRequest<T>(
+  queryText: string,
+  variables: unknown,
+): Promise<T> {
   const promise = fetch(
     'https://swapi-graphql.netlify.app/.netlify/functions/index',
     {
