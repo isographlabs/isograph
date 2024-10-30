@@ -39,7 +39,7 @@ impl UnvalidatedSchema {
                 arguments: vec![],
                 associated_data,
                 is_discriminator: false,
-                variant: SchemaServerFieldVariant::InlineFragment,
+                variant: SchemaServerFieldVariant::InlineFragment(next_server_field_id),
             };
 
             self.server_fields.push(server_field);

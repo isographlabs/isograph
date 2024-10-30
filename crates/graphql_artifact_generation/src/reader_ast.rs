@@ -6,8 +6,9 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, FieldType, Loadability,
-    NameAndArguments, NormalizationKey, PathToRefetchField, RefetchedPathsMap,
-    ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
+    NameAndArguments, NormalizationKey, ObjectTypeAndFieldName, PathToRefetchField,
+    RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
+    ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
     ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSelection, VariableContext,
 };
 
@@ -83,10 +84,12 @@ fn generate_reader_ast_node(
                 path.pop();
 
                 linked_field_ast_node(
+                    schema,
                     linked_field_selection,
                     indentation_level,
                     inner_reader_ast,
                     initial_variable_context,
+                    reader_imports,
                 )
             }
         },
@@ -94,10 +97,12 @@ fn generate_reader_ast_node(
 }
 
 fn linked_field_ast_node(
+    schema: &ValidatedSchema,
     linked_field: &ValidatedLinkedFieldSelection,
     indentation_level: u8,
     inner_reader_ast: ReaderAst,
     initial_variable_context: &VariableContext,
+    reader_imports: &mut ReaderImports,
 ) -> String {
     let name = linked_field.name.item;
     let alias = linked_field
@@ -117,15 +122,63 @@ fn linked_field_ast_node(
     );
     let indent_1 = "  ".repeat(indentation_level as usize);
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
-    format!(
-        "{indent_1}{{\n\
-        {indent_2}kind: \"Linked\",\n\
-        {indent_2}fieldName: \"{name}\",\n\
-        {indent_2}alias: {alias},\n\
-        {indent_2}arguments: {arguments},\n\
-        {indent_2}selections: {inner_reader_ast},\n\
-        {indent_1}}},\n",
-    )
+
+    match linked_field.associated_data.variant {
+        SchemaServerFieldVariant::InlineFragment(_) => {
+            let object = schema
+                .server_field_data
+                .object(linked_field.associated_data.parent_object_id);
+
+            let entrypoint_text = {
+                let type_and_field: ObjectTypeAndFieldName = ObjectTypeAndFieldName {
+                    field_name: linked_field.name.item.into(),
+                    type_name: object.name,
+                };
+
+                reader_imports.insert((type_and_field, ImportedFileCategory::Entrypoint));
+                let type_and_field_underscore_separated = type_and_field.underscore_separated();
+                format!("{type_and_field_underscore_separated}__entrypoint")
+            };
+
+            let (reader_ast, additional_reader_imports) = generate_reader_ast(
+                schema,
+                // TODO: make proper selection_set
+                &linked_field.selection_set,
+                indentation_level + 1,
+                &Default::default(),
+                // TODO: make child context
+                &initial_variable_context,
+            );
+
+            // N.B. additional_reader_imports will be empty for now, but at some point, we may have
+            // refetch selection sets that import other things! Who knows!
+            for import in additional_reader_imports {
+                reader_imports.insert(import);
+            }
+
+            return format!(
+                "{indent_1}{{\n\
+        {indent_2}kind: \"LoadablySelectedField\",\n\
+        {indent_2}alias: \"{alias}\",\n\
+        {indent_2}name: \"{name}\",\n\
+        {indent_2}queryArguments: {arguments},\n\
+        {indent_2}refetchReaderAst: {reader_ast},\n\
+        {indent_2}entrypoint: {entrypoint_text},\n\
+        {indent_1}}},\n"
+            );
+        }
+        SchemaServerFieldVariant::LinkedField => {
+            format!(
+                "{indent_1}{{\n\
+                {indent_2}kind: \"Linked\",\n\
+                {indent_2}fieldName: \"{name}\",\n\
+                {indent_2}alias: {alias},\n\
+                {indent_2}arguments: {arguments},\n\
+                {indent_2}selections: {inner_reader_ast},\n\
+                {indent_1}}},\n",
+            )
+        }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]

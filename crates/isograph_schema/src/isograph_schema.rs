@@ -139,7 +139,7 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
 /// Note that locally-defined fields do **not** only include fields defined in
 /// an iso field literal. Refetch fields and generated mutation fields are
 /// also local fields.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
 pub enum FieldType<TServer, TClient> {
     ServerField(TServer),
     ClientField(TClient),
@@ -386,7 +386,7 @@ pub struct SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SchemaServerFieldVariant {
-    InlineFragment,
+    InlineFragment(ServerFieldId),
     LinkedField,
 }
 

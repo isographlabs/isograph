@@ -10,7 +10,7 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, IsographSelectionVariant, NonConstantValue,
-    RefetchQueryIndex, SelectableServerFieldId, Selection, SelectionFieldArgument,
+    RefetchQueryIndex, SelectableServerFieldId, Selection, SelectionFieldArgument, ServerFieldId,
     ServerFieldSelection, ServerObjectId, VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -29,10 +29,10 @@ pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
 
 // Maybe this should be FNVHashMap? We don't really need stable iteration order
 pub type ClientFieldToCompletedMergeTraversalStateMap =
-    BTreeMap<ClientFieldId, ClientFieldTraversalResult>;
+    BTreeMap<FieldType<ServerFieldId, ClientFieldId>, FieldTraversalResult>;
 
 #[derive(Clone, Debug)]
-pub struct ClientFieldTraversalResult {
+pub struct FieldTraversalResult {
     pub traversal_state: ScalarClientFieldTraversalState,
     /// This is used to generate the normalization AST and query text
     pub merged_selection_map: MergedSelectionMap,
@@ -393,17 +393,18 @@ fn transform_child_map_with_parent_context(
     transformed_child_map
 }
 
-pub fn create_merged_selection_map_for_client_field_and_insert_into_global_map(
+pub fn create_merged_selection_map_for_field_and_insert_into_global_map(
     schema: &ValidatedSchema,
     parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
     global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
-    root_client_field: &ValidatedClientField,
+    root_field_id: &FieldType<ServerFieldId, ClientFieldId>,
     variable_context: &VariableContext,
     // TODO return Cow?
-) -> ClientFieldTraversalResult {
+) -> FieldTraversalResult {
     // TODO move this check outside of this function
-    match global_client_field_map.get_mut(&root_client_field.id) {
+
+    match global_client_field_map.get_mut(&root_field_id) {
         Some(traversal_result) => traversal_result.clone(),
         None => {
             let mut merge_traversal_state = ScalarClientFieldTraversalState::new();
@@ -419,8 +420,8 @@ pub fn create_merged_selection_map_for_client_field_and_insert_into_global_map(
             // N.B. global_client_field_map might actually have an item stored in root_object.id,
             // if we have some sort of recursion. That probably stack overflows right now.
             global_client_field_map.insert(
-                root_client_field.id,
-                ClientFieldTraversalResult {
+                root_field_id.clone(),
+                FieldTraversalResult {
                     traversal_state: merge_traversal_state.clone(),
                     merged_selection_map: merged_selection_map.clone(),
                     was_ever_selected_loadably: false,
@@ -428,7 +429,7 @@ pub fn create_merged_selection_map_for_client_field_and_insert_into_global_map(
             );
 
             // TODO we don't always use this return value, so we shouldn't always clone above
-            ClientFieldTraversalResult {
+            FieldTraversalResult {
                 traversal_state: merge_traversal_state,
                 merged_selection_map,
                 was_ever_selected_loadably: false,
@@ -439,7 +440,8 @@ pub fn create_merged_selection_map_for_client_field_and_insert_into_global_map(
 
 pub fn get_imperatively_loaded_artifact_info(
     schema: &ValidatedSchema,
-    entrypoint: &ValidatedClientField,
+    entrypoint_parent_object_id: &ServerObjectId,
+    entrypoint_name: &SelectableFieldName,
     root_refetch_path: RootRefetchedPath,
     nested_selection_map: &MergedSelectionMap,
     reachable_variables: &BTreeSet<VariableName>,
@@ -463,7 +465,8 @@ pub fn get_imperatively_loaded_artifact_info(
         imperatively_loaded_field_variant,
         refetch_field_parent_id,
         nested_selection_map,
-        entrypoint,
+        entrypoint_parent_object_id,
+        entrypoint_name,
         index,
         reachable_variables,
         client_field,
@@ -483,7 +486,8 @@ fn process_imperatively_loaded_field(
     variant: ImperativelyLoadedFieldVariant,
     refetch_field_parent_id: ServerObjectId,
     selection_map: &MergedSelectionMap,
-    entrypoint: &ValidatedClientField,
+    entrypoint_parent_object_id: &ServerObjectId,
+    entrypoint_name: &SelectableFieldName,
     index: usize,
     reachable_variables: &BTreeSet<VariableName>,
     client_field: &ValidatedClientField,
@@ -559,7 +563,7 @@ fn process_imperatively_loaded_field(
 
     let root_parent_object = schema
         .server_field_data
-        .object(entrypoint.parent_object_id)
+        .object(*entrypoint_parent_object_id)
         .name;
 
     let root_operation_name = schema
@@ -587,7 +591,7 @@ fn process_imperatively_loaded_field(
         merged_selection_set: wrapped_selection_map,
         root_parent_object,
         variable_definitions: definitions_of_used_variables,
-        root_fetchable_field: entrypoint.name,
+        root_fetchable_field: *entrypoint_name,
         refetch_query_index: RefetchQueryIndex(index as u32),
         root_operation_name,
         query_name,
@@ -681,17 +685,19 @@ fn merge_validated_selections_into_selection_map(
                                     &scalar_field_selection.associated_data.selection_variant,
                                 ) {
                                     Some(Loadability::LoadablySelectedField(_loadable_variant)) => {
-                                        create_merged_selection_map_for_client_field_and_insert_into_global_map(
+                                        create_merged_selection_map_for_field_and_insert_into_global_map(
                                             schema,
                                             parent_type,
                                             newly_encountered_scalar_client_field.selection_set_for_parent_query(),
                                             global_client_field_map,
-                                            newly_encountered_scalar_client_field,
+                                            &FieldType::ClientField(newly_encountered_scalar_client_field.id),
                                             &newly_encountered_scalar_client_field.initial_variable_context(),
                                         );
 
                                         let state = global_client_field_map
-                                            .get_mut(client_field_id)
+                                            .get_mut(&FieldType::ClientField(
+                                                client_field_id.clone(),
+                                            ))
                                             .expect(
                                                 "Expected field to exist when \
                                                 it is encountered loadably",
@@ -731,7 +737,7 @@ fn merge_validated_selections_into_selection_map(
                         let linked_field_parent_type = schema.server_field_data.object(type_id);
 
                         match linked_field_selection.associated_data.variant {
-                            SchemaServerFieldVariant::InlineFragment => {
+                            SchemaServerFieldVariant::InlineFragment(server_field_id) => {
                                 let type_to_refine_to = linked_field_parent_type.name;
                                 let normalization_key =
                                     NormalizationKey::InlineFragment(type_to_refine_to);
@@ -774,6 +780,27 @@ fn merge_validated_selections_into_selection_map(
                                             merge_traversal_state,
                                             global_client_field_map,
                                             variable_context,
+                                        );
+                                        let server_field =
+                                            &schema.server_fields[server_field_id.as_usize()];
+
+                                        create_merged_selection_map_for_field_and_insert_into_global_map(
+                                            schema,
+                                            parent_type,
+                                            &linked_field_selection.selection_set,
+                                            global_client_field_map,
+                                            &FieldType::ServerField(server_field_id),
+                                            &VariableContext(
+                                                server_field.arguments
+            .iter()
+            .map(|variable_definition| {
+                (
+                    variable_definition.item.name.item,
+                    NonConstantValue::Variable(variable_definition.item.name.item),
+                )
+            })
+            .collect()
+                                            )
                                         );
                                     }
                                 }
@@ -880,7 +907,7 @@ fn insert_imperative_field_into_refetch_paths(
     );
 
     // Generate a merged selection set, but using the refetch strategy
-    create_merged_selection_map_for_client_field_and_insert_into_global_map(
+    create_merged_selection_map_for_field_and_insert_into_global_map(
         schema,
         parent_type,
         newly_encountered_scalar_client_field
@@ -892,7 +919,7 @@ fn insert_imperative_field_into_refetch_paths(
             )
             .refetch_selection_set(),
         global_client_field_map,
-        newly_encountered_scalar_client_field,
+        &FieldType::ClientField(newly_encountered_scalar_client_field.id),
         &newly_encountered_scalar_client_field.initial_variable_context(),
     );
 }
@@ -927,11 +954,11 @@ fn merge_non_loadable_scalar_client_field(
 ) {
     // Here, we are doing a bunch of work, just so that we can have the refetched paths,
     // which is really really silly.
-    let ClientFieldTraversalResult {
+    let FieldTraversalResult {
         traversal_state,
         merged_selection_map: child_merged_selection_map,
         ..
-    } = create_merged_selection_map_for_client_field_and_insert_into_global_map(
+    } = create_merged_selection_map_for_field_and_insert_into_global_map(
         schema,
         parent_type,
         newly_encountered_scalar_client_field
@@ -942,7 +969,7 @@ fn merge_non_loadable_scalar_client_field(
                 This is indicative of a bug in Isograph.",
             ),
         global_client_field_map,
-        newly_encountered_scalar_client_field,
+        &FieldType::ClientField(newly_encountered_scalar_client_field.id),
         &newly_encountered_scalar_client_field.initial_variable_context(),
     );
 

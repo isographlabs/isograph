@@ -3,6 +3,7 @@ import { iso } from '@iso';
 
 import { Link } from '@mui/material';
 import { Route } from './GithubDemo';
+import { useClientSideDefer } from '@isograph/react';
 
 export const PullRequestLink = iso(`
   field PullRequest.PullRequestLink @component {
@@ -11,6 +12,10 @@ export const PullRequestLink = iso(`
       name
       owner {
         login
+        asUser {
+          id
+          bio
+        }
       }
     }
   }
@@ -24,6 +29,7 @@ export const PullRequestLink = iso(`
     children: ReactNode;
   },
 ) {
+  const user = useClientSideDefer(data.repository.owner.asUser);
   return (
     <Link
       onClick={() =>
@@ -37,6 +43,7 @@ export const PullRequestLink = iso(`
       style={{ cursor: 'pointer' }}
     >
       {children}
+      {JSON.stringify(user)}
     </Link>
   );
 });

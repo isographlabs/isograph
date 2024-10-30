@@ -21,6 +21,19 @@ The User owner of the repository.
 The username used to login.
         */
         readonly login: string,
+        /**
+A client poiter for the User type.
+        */
+        readonly asUser: ({
+          /**
+The Node ID of the User object
+          */
+          readonly id: string,
+          /**
+The user's public profile bio.
+          */
+          readonly bio: (string | null),
+        } | null),
       },
     },
   },

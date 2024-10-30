@@ -1,15 +1,16 @@
 use std::collections::BTreeSet;
 
-use common_lang_types::{ArtifactPathAndContent, QueryOperationName, VariableName};
+use common_lang_types::{
+    ArtifactPathAndContent, QueryOperationName, SelectableFieldName, VariableName,
+};
 use intern::{string_key::Intern, Lookup};
-use isograph_lang_types::{ClientFieldId, IsographSelectionVariant};
+use isograph_lang_types::{ClientFieldId, IsographSelectionVariant, ServerObjectId};
 use isograph_schema::{
-    create_merged_selection_map_for_client_field_and_insert_into_global_map,
+    create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
-    get_reachable_variables, ClientFieldToCompletedMergeTraversalStateMap,
-    ClientFieldTraversalResult, MergedSelectionMap, RootOperationName, RootRefetchedPath,
-    ScalarClientFieldTraversalState, SchemaObject, ValidatedClientField, ValidatedSchema,
-    ValidatedVariableDefinition,
+    get_reachable_variables, ClientFieldToCompletedMergeTraversalStateMap, FieldTraversalResult,
+    FieldType, MergedSelectionMap, RootOperationName, RootRefetchedPath,
+    ScalarClientFieldTraversalState, SchemaObject, ValidatedSchema, ValidatedVariableDefinition,
 };
 
 use crate::{
@@ -38,22 +39,23 @@ pub(crate) fn generate_entrypoint_artifacts(
 ) -> Vec<ArtifactPathAndContent> {
     let entrypoint = schema.client_field(entrypoint_id);
 
-    let ClientFieldTraversalResult {
+    let FieldTraversalResult {
         traversal_state,
         merged_selection_map,
         ..
-    } = create_merged_selection_map_for_client_field_and_insert_into_global_map(
+    } = create_merged_selection_map_for_field_and_insert_into_global_map(
         schema,
         schema.server_field_data.object(entrypoint.parent_object_id),
         entrypoint.selection_set_for_parent_query(),
         global_client_field_map,
-        entrypoint,
+        &FieldType::ClientField(entrypoint.id),
         &entrypoint.initial_variable_context(),
     );
 
-    generate_entrypoint_artifacts_with_client_field_traversal_result(
+    return generate_entrypoint_artifacts_with_client_field_traversal_result(
         schema,
-        entrypoint,
+        &entrypoint.parent_object_id,
+        &entrypoint.name,
         &merged_selection_map,
         &traversal_state,
         global_client_field_map,
@@ -62,26 +64,27 @@ pub(crate) fn generate_entrypoint_artifacts(
             .iter()
             .map(|variable_definition| &variable_definition.item),
         &schema.mutation_root_operation_name(),
-    )
+    );
 }
 
 pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'a>(
     schema: &ValidatedSchema,
-    entrypoint: &ValidatedClientField,
+    entrypoint_parent_object_id: &ServerObjectId,
+    entrypoint_name: &SelectableFieldName,
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
     global_client_field_map: &ClientFieldToCompletedMergeTraversalStateMap,
     variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
     default_root_operation_name: &Option<&RootOperationName>,
 ) -> Vec<ArtifactPathAndContent> {
-    let query_name = entrypoint.name.into();
+    let query_name = entrypoint_name.clone().into();
     // TODO when we do not call generate_entrypoint_artifact extraneously,
     // we can panic instead of using a default entrypoint type
     // TODO model this better so that the RootOperationName is somehow a
     // parameter
     let root_operation_name = schema
         .fetchable_types
-        .get(&entrypoint.parent_object_id)
+        .get(&entrypoint_parent_object_id)
         .unwrap_or_else(|| {
             default_root_operation_name.unwrap_or_else(|| {
                 schema
@@ -93,7 +96,9 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
             })
         });
 
-    let parent_object = schema.server_field_data.object(entrypoint.parent_object_id);
+    let parent_object = schema
+        .server_field_data
+        .object(*entrypoint_parent_object_id);
     let query_text = generate_query_text(
         query_name,
         schema,
@@ -113,7 +118,9 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
                     // Note: it would be cleaner to include a reference to the merged selection set here via
                     // the selection_variant variable, instead of by looking it up like this.
                     &global_client_field_map
-                        .get(&root_refetch_path.path_to_refetch_field_info.client_field_id)
+                        .get(&FieldType::ClientField(
+                            root_refetch_path.path_to_refetch_field_info.client_field_id,
+                        ))
                         .expect(
                             "Expected field to have been encountered, \
                                 since it is being used as a refetch field.",
@@ -151,7 +158,8 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
     {
         let artifact_info = get_imperatively_loaded_artifact_info(
             schema,
-            entrypoint,
+            entrypoint_parent_object_id,
+            entrypoint_name,
             root_refetch_path,
             nested_selection_map,
             &reachable_variables,
