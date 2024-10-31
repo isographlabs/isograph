@@ -107,13 +107,63 @@ pub fn get_artifact_path_and_content(
             FieldType::ServerField(encountered_server_field_id) => {
                 let encountered_server_field = &schema.server_field(*encountered_server_field_id);
 
-                // path_and_contents.push(generate_refetch_reader_artifact(
-                //     schema,
-                //     encountered_server_field,
-                //     None,
-                //     &traversal_state.refetch_paths,
-                //     true,
-                // ));
+                let field_name = encountered_server_field.name.item;
+
+                let parent_type = schema
+                    .server_field_data
+                    .object(encountered_server_field.parent_type_id);
+
+                match encountered_server_field.variant.clone() {
+                    SchemaServerFieldVariant::LinkedField => {}
+                    SchemaServerFieldVariant::InlineFragment(inline_fragment) => {
+                        let concrete_type = inline_fragment.concrete_type;
+
+                        let (reader_ast, reader_imports) = generate_reader_ast(
+                            schema,
+                            &inline_fragment.condition_selection_set,
+                            0,
+                            &traversal_state.refetch_paths,
+                            &encountered_server_field.initial_variable_context(),
+                        );
+
+                        let reader_import_statement =
+                            reader_imports_to_import_statement(&reader_imports);
+
+                        let reader_param_type =
+                            format!("{}__{}__param", parent_type.name, field_name);
+
+                        let reader_output_type =
+                            format!("{}__{}__output_type", parent_type.name, field_name);
+                        let param_type_file_name = *RESOLVER_PARAM_TYPE;
+                        let output_type_file_name = *RESOLVER_OUTPUT_TYPE;
+
+                        let reader_content =         format!(
+                            "import type {{ EagerReaderArtifact, ReaderAst }} from '@isograph/react';\n\
+                            import {{ {reader_param_type} }} from './{param_type_file_name}';\n\
+                            import {{ {reader_output_type} }} from './{output_type_file_name}';\n\
+                            {reader_import_statement}\n\
+                            const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
+                            const artifact: EagerReaderArtifact<\n\
+                            {}{reader_param_type},\n\
+                            {}{reader_output_type}\n\
+                            > = {{\n\
+                            {}kind: \"EagerReaderArtifact\",\n\
+                            {}resolver: ({{ data }}) => data.__typename === \"{concrete_type}\" ? data.id : null,\n\
+                            {}readerAst,\n\
+                            }};\n\n\
+                            export default artifact;\n",
+                            "  ", "  ", "  ", "  ", "  ",
+                        );
+
+                        let relative_directory = generate_path(parent_type.name, field_name);
+
+                        path_and_contents.push(ArtifactPathAndContent {
+                            relative_directory: relative_directory.clone(),
+                            file_name_prefix: *RESOLVER_READER,
+                            file_content: reader_content,
+                        });
+                    }
+                };
             }
             FieldType::ClientField(encountered_client_field_id) => {
                 let encountered_client_field = schema.client_field(*encountered_client_field_id);

@@ -20,7 +20,10 @@ use isograph_lang_types::{
 };
 use lazy_static::lazy_static;
 
-use crate::{refetch_strategy::RefetchStrategy, ClientFieldVariant, NormalizationKey};
+use crate::{
+    refetch_strategy::RefetchStrategy, ClientFieldVariant, NormalizationKey,
+    UnvalidatedSchemaServerFieldVariant, ValidatedSelection,
+};
 
 lazy_static! {
     pub static ref ID_GRAPHQL_TYPE: GraphQLScalarTypeName = "ID".intern().into();
@@ -381,13 +384,20 @@ pub struct SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData
     // TODO remove this. This is indicative of poor modeling.
     pub is_discriminator: bool,
 
-    pub variant: SchemaServerFieldVariant,
+    pub variant: UnvalidatedSchemaServerFieldVariant,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone)]
 pub enum SchemaServerFieldVariant {
-    InlineFragment(ServerFieldId),
+    InlineFragment(SchemaServerFieldInlineFragmentVariant),
     LinkedField,
+}
+
+#[derive(Debug, Clone)]
+pub struct SchemaServerFieldInlineFragmentVariant {
+    pub server_field_id: ServerFieldId,
+    pub concrete_type: IsographObjectTypeName,
+    pub condition_selection_set: Vec<WithSpan<ValidatedSelection>>,
 }
 
 impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug>

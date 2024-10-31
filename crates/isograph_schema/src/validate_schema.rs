@@ -56,7 +56,9 @@ pub type ValidatedFieldDefinitionLocation = FieldType<ServerFieldId, ClientField
 
 pub type ValidatedSchemaIdField = SchemaIdField<ServerScalarId>;
 
-#[derive(Debug)]
+pub type ValidatedSchemaServerFieldVariant = SchemaServerFieldVariant;
+
+#[derive(Debug, Clone)]
 pub struct ValidatedLinkedFieldAssociatedData {
     pub parent_object_id: ServerObjectId,
     // N.B. we don't actually support loadable linked fields
@@ -64,10 +66,10 @@ pub struct ValidatedLinkedFieldAssociatedData {
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 
-    pub variant: SchemaServerFieldVariant,
+    pub variant: ValidatedSchemaServerFieldVariant,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ValidatedScalarFieldAssociatedData {
     pub location: ValidatedFieldDefinitionLocation,
     pub selection_variant: ValidatedIsographSelectionVariant,
