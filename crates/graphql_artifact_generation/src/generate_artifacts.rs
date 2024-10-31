@@ -133,17 +133,11 @@ pub fn get_artifact_path_and_content(
                             reader_imports_to_import_statement(&reader_imports);
 
                         let reader_param_type =
-                            format!("{}__{}__param", parent_type.name, field_name);
-
-                        let reader_output_type =
-                            format!("{}__{}__output_type", parent_type.name, field_name);
-                        let param_type_file_name = *RESOLVER_PARAM_TYPE;
-                        let output_type_file_name = *RESOLVER_OUTPUT_TYPE;
+                            "{ data: any, parameters: Record<PropertyKey, never> }";
+                        let reader_output_type = "Link | null";
 
                         let reader_content =         format!(
-                            "import type {{ EagerReaderArtifact, ReaderAst }} from '@isograph/react';\n\
-                            import {{ {reader_param_type} }} from './{param_type_file_name}';\n\
-                            import {{ {reader_output_type} }} from './{output_type_file_name}';\n\
+                            "import type {{ EagerReaderArtifact, ReaderAst, Link }} from '@isograph/react';\n\
                             {reader_import_statement}\n\
                             const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
                             const artifact: EagerReaderArtifact<\n\
