@@ -22,7 +22,7 @@ const artifact: EagerReaderArtifact<
   User__asUser__output_type
 > = {
   kind: "EagerReaderArtifact",
-  resolver: ({ data }) => data.__typename === "User" ? data.id : null,
+  resolver: ({ data }) => data.__typename === "User" ? { __link: data.id } : null,
   readerAst,
 };
 

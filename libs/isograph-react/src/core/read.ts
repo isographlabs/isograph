@@ -209,6 +209,37 @@ function readData<TReadFromStore>(
           break;
         }
         let link = assertLink(value);
+
+        if (field.condition) {
+          const data = readData(
+            environment,
+            field.condition.readerAst,
+            root,
+            variables,
+            nestedRefetchQueries,
+            networkRequest,
+            networkRequestOptions,
+            mutableEncounteredRecords,
+          );
+          if (data.kind === 'MissingData') {
+            return {
+              kind: 'MissingData',
+              reason:
+                'Missing data for ' +
+                storeRecordName +
+                ' on root ' +
+                root.__link,
+              nestedReason: data,
+              recordLink: data.recordLink,
+            };
+          }
+          link =
+            field.condition.resolver({
+              data: data.data,
+              parameters: {},
+            }) ?? undefined;
+        }
+
         if (link === undefined) {
           // TODO make this configurable, and also generated and derived from the schema
           const missingFieldHandler =
