@@ -55,7 +55,7 @@ lazy_static! {
 /// generating the merged selection map.
 ///
 /// - While creating a client field's merged selection map, whenever we enter
-///   a client field, we check a cache (`global_client_field_map`). If that
+///   a client field, we check a cache (`encountered_client_field_map`). If that
 ///   cache is empty, we populate it with the client field's merged selection
 ///   map, reachable variables, and paths to refetch fields.
 /// - If that cache is full, we reuse the values in the cache.
@@ -75,14 +75,17 @@ pub fn get_artifact_path_and_content(
     project_root: &Path,
     artifact_directory: &Path,
 ) -> Vec<ArtifactPathAndContent> {
-    let mut global_client_field_map = BTreeMap::new();
+    let mut encountered_client_field_map = BTreeMap::new();
     let mut path_and_contents = vec![];
     let mut encountered_output_types = HashSet::<ClientFieldId>::new();
 
     // For each entrypoint, generate an entrypoint artifact and refetch artifacts
     for entrypoint_id in schema.entrypoints.iter() {
-        let entrypoint_path_and_content =
-            generate_entrypoint_artifacts(schema, *entrypoint_id, &mut global_client_field_map);
+        let entrypoint_path_and_content = generate_entrypoint_artifacts(
+            schema,
+            *entrypoint_id,
+            &mut encountered_client_field_map,
+        );
         path_and_contents.extend(entrypoint_path_and_content);
 
         // We also need to generate output types for entrypoints
@@ -97,7 +100,7 @@ pub fn get_artifact_path_and_content(
             was_ever_selected_loadably,
             ..
         },
-    ) in &global_client_field_map
+    ) in &encountered_client_field_map
     {
         let encountered_client_field = schema.client_field(*encountered_client_field_id);
         // Generate reader ASTs for all encountered client fields, which may be reader or refetch reader
@@ -190,7 +193,7 @@ pub fn get_artifact_path_and_content(
                             encountered_client_field,
                             &wrapped_map,
                             &traversal_state,
-                            &global_client_field_map,
+                            &encountered_client_field_map,
                             variable_definitions_iter,
                             &schema.query_root_operation_name(),
                         ),
@@ -224,7 +227,7 @@ pub fn get_artifact_path_and_content(
             user_written_client_field,
         ));
 
-        match global_client_field_map.get(&user_written_client_field.id) {
+        match encountered_client_field_map.get(&user_written_client_field.id) {
             Some(ClientFieldTraversalResult {
                 traversal_state, ..
             }) => {
