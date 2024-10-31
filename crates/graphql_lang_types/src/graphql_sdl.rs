@@ -72,7 +72,7 @@ impl From<GraphQLSchemaDefinition> for GraphQLTypeSystemDefinition {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default)]
 pub struct GraphQLTypeSystemDocument(pub Vec<WithLocation<GraphQLTypeSystemDefinition>>);
 
 impl Deref for GraphQLTypeSystemDocument {
