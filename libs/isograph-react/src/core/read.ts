@@ -233,11 +233,17 @@ function readData<TReadFromStore>(
               recordLink: data.recordLink,
             };
           }
-          link =
-            field.condition.resolver({
-              data: data.data,
-              parameters: {},
-            }) ?? undefined;
+          const condition = field.condition.resolver({
+            data: data.data,
+            parameters: {},
+          });
+          if (condition === true) {
+            link = root;
+          } else if (condition === false) {
+            link = null;
+          } else {
+            link = condition;
+          }
         }
 
         if (link === undefined) {

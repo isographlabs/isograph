@@ -98,7 +98,7 @@ export type ReaderLinkedField = {
   readonly arguments: Arguments | null;
   readonly condition: EagerReaderArtifact<
     { data: object; parameters: object },
-    Link | null
+    boolean | Link | null
   > | null;
 };
 
