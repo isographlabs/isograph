@@ -8,17 +8,18 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection,
-    ServerFieldSelection, ServerObjectId, TypeAnnotation, UnionVariant, VariableDefinition,
+    ServerFieldSelection, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
-    get_provided_arguments, selection_map_wrapped, ClientFieldToCompletedMergeTraversalStateMap,
-    ClientFieldVariant, FieldTraversalResult, FieldType, MergedSelectionMap, NameAndArguments,
-    NormalizationKey, RequiresRefinement, ScalarClientFieldTraversalState, SchemaObject,
-    UserWrittenComponentVariant, ValidatedClientField, ValidatedIsographSelectionVariant,
-    ValidatedSchema, ValidatedSelection, ValidatedVariableDefinition,
+    get_provided_arguments, selection_map_wrapped, ClientFieldVariant, FieldTraversalResult,
+    FieldType, NameAndArguments, NormalizationKey, RequiresRefinement, SchemaObject,
+    SchemaServerFieldVariant, UserWrittenComponentVariant, ValidatedClientField,
+    ValidatedIsographSelectionVariant, ValidatedSchema, ValidatedSelection,
+    ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use std::path::Path;
+use std::vec;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::{self, Debug, Display},
@@ -27,6 +28,8 @@ use std::{
 
 use crate::entrypoint_artifact::generate_entrypoint_artifacts_with_client_field_traversal_result;
 use crate::format_parameter_type::format_parameter_type;
+use crate::import_statements::reader_imports_to_import_statement;
+use crate::reader_ast::generate_reader_ast;
 use crate::{
     eager_reader_artifact::{
         generate_eager_reader_artifacts, generate_eager_reader_output_type_artifact,
@@ -135,19 +138,79 @@ pub fn get_artifact_path_and_content(
                                 true,
                             ));
 
-                            generate_entrypoint_artifacts_with_field_traversal_result(
-                                schema,
-                                &encountered_client_field.parent_object_id,
-                                &encountered_client_field.name,
-                                merged_selection_map,
-                                &mut path_and_contents,
-                                &global_client_field_map,
-                                traversal_state,
-                                &encountered_client_field
-                                    .variable_definitions
-                                    .iter()
-                                    .map(|variable_defition| variable_defition.item.clone())
-                                    .collect::<Vec<_>>(),
+                            // Everything about this is quite sus
+                            let id_arg = ArgumentKeyAndValue {
+                                key: "id".intern().into(),
+                                value: NonConstantValue::Variable("id".intern().into()),
+                            };
+
+                            let type_to_refine_to = schema
+                                .server_field_data
+                                .object(encountered_client_field.parent_object_id);
+
+                            if schema
+                                .fetchable_types
+                                .contains_key(&encountered_client_field.parent_object_id)
+                            {
+                                panic!("Loadable fields on root objects are not yet supported");
+                            }
+
+                            let wrapped_map = selection_map_wrapped(
+                                merged_selection_map.clone(),
+                                "node".intern().into(),
+                                vec![id_arg.clone()],
+                                None,
+                                None,
+                                None,
+                                RequiresRefinement::Yes(type_to_refine_to.name),
+                            );
+                            let id_var = ValidatedVariableDefinition {
+                                name: WithLocation::new("id".intern().into(), Location::Generated),
+                                type_: GraphQLTypeAnnotation::NonNull(Box::new(
+                                    GraphQLNonNullTypeAnnotation::Named(
+                                        GraphQLNamedTypeAnnotation(WithSpan::new(
+                                            SelectableServerFieldId::Scalar(schema.id_type_id),
+                                            Span::todo_generated(),
+                                        )),
+                                    ),
+                                )),
+                                default_value: None,
+                            };
+                            let variable_definitions_iter = encountered_client_field
+                                .variable_definitions
+                                .iter()
+                                .map(|variable_defition| &variable_defition.item)
+                                .chain(std::iter::once(&id_var));
+                            let mut traversal_state = traversal_state.clone();
+                            traversal_state.refetch_paths = traversal_state
+                                .refetch_paths
+                                .into_iter()
+                                .map(|(mut key, value)| {
+                                    key.0.linked_fields.insert(
+                                        0,
+                                        NormalizationKey::InlineFragment(type_to_refine_to.name),
+                                    );
+                                    key.0.linked_fields.insert(
+                                        0,
+                                        NormalizationKey::ServerField(NameAndArguments {
+                                            name: "node".intern().into(),
+                                            arguments: vec![id_arg.clone()],
+                                        }),
+                                    );
+                                    (key, value)
+                                })
+                                .collect();
+
+                            path_and_contents.extend(
+                                generate_entrypoint_artifacts_with_client_field_traversal_result(
+                                    schema,
+                                    encountered_client_field,
+                                    &wrapped_map,
+                                    &traversal_state,
+                                    &global_client_field_map,
+                                    variable_definitions_iter,
+                                    &schema.query_root_operation_name(),
+                                ),
                             );
                         }
                     }
@@ -220,86 +283,6 @@ pub fn get_artifact_path_and_content(
     path_and_contents.push(build_iso_overload_artifact(schema));
 
     path_and_contents
-}
-
-pub fn generate_entrypoint_artifacts_with_field_traversal_result<'a>(
-    schema: &ValidatedSchema,
-    encountered_field_parent_object_id: &ServerObjectId,
-    encountered_field_name: &SelectableFieldName,
-    merged_selection_map: &MergedSelectionMap,
-    path_and_contents: &mut Vec<ArtifactPathAndContent>,
-    global_client_field_map: &ClientFieldToCompletedMergeTraversalStateMap,
-    traversal_state: &ScalarClientFieldTraversalState,
-    variable_definitions: &Vec<ValidatedVariableDefinition>,
-) {
-    // Everything about this is quite sus
-    let id_arg = ArgumentKeyAndValue {
-        key: "id".intern().into(),
-        value: NonConstantValue::Variable("id".intern().into()),
-    };
-
-    let type_to_refine_to = schema
-        .server_field_data
-        .object(*encountered_field_parent_object_id);
-
-    if schema
-        .fetchable_types
-        .contains_key(&encountered_field_parent_object_id)
-    {
-        panic!("Loadable fields on root objects are not yet supported");
-    }
-
-    let wrapped_map = selection_map_wrapped(
-        merged_selection_map.clone(),
-        "node".intern().into(),
-        vec![id_arg.clone()],
-        None,
-        None,
-        None,
-        RequiresRefinement::Yes(type_to_refine_to.name),
-    );
-    let id_var = ValidatedVariableDefinition {
-        name: WithLocation::new("id".intern().into(), Location::Generated),
-        type_: GraphQLTypeAnnotation::NonNull(Box::new(GraphQLNonNullTypeAnnotation::Named(
-            GraphQLNamedTypeAnnotation(WithSpan::new(
-                SelectableServerFieldId::Scalar(schema.id_type_id),
-                Span::todo_generated(),
-            )),
-        ))),
-        default_value: None,
-    };
-    let variable_definitions_iter = variable_definitions.iter().chain(std::iter::once(&id_var));
-    let mut traversal_state = traversal_state.clone();
-    traversal_state.refetch_paths = traversal_state
-        .refetch_paths
-        .into_iter()
-        .map(|(mut key, value)| {
-            key.0
-                .linked_fields
-                .insert(0, NormalizationKey::InlineFragment(type_to_refine_to.name));
-            key.0.linked_fields.insert(
-                0,
-                NormalizationKey::ServerField(NameAndArguments {
-                    name: "node".intern().into(),
-                    arguments: vec![id_arg.clone()],
-                }),
-            );
-            (key, value)
-        })
-        .collect();
-
-    path_and_contents.extend(
-        generate_entrypoint_artifacts_with_client_field_traversal_result(
-            schema,
-            encountered_field_parent_object_id,
-            encountered_field_name,
-            &wrapped_map,
-            &traversal_state,
-            &global_client_field_map,
-            variable_definitions_iter,
-            &schema.query_root_operation_name(),
-        ),
-    );
 }
 
 pub(crate) fn get_serialized_field_arguments(

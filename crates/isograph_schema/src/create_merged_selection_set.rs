@@ -440,8 +440,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map(
 
 pub fn get_imperatively_loaded_artifact_info(
     schema: &ValidatedSchema,
-    entrypoint_parent_object_id: &ServerObjectId,
-    entrypoint_name: &SelectableFieldName,
+    entrypoint: &ValidatedClientField,
     root_refetch_path: RootRefetchedPath,
     nested_selection_map: &MergedSelectionMap,
     reachable_variables: &BTreeSet<VariableName>,
@@ -465,8 +464,7 @@ pub fn get_imperatively_loaded_artifact_info(
         imperatively_loaded_field_variant,
         refetch_field_parent_id,
         nested_selection_map,
-        entrypoint_parent_object_id,
-        entrypoint_name,
+        entrypoint,
         index,
         reachable_variables,
         client_field,
@@ -486,8 +484,7 @@ fn process_imperatively_loaded_field(
     variant: ImperativelyLoadedFieldVariant,
     refetch_field_parent_id: ServerObjectId,
     selection_map: &MergedSelectionMap,
-    entrypoint_parent_object_id: &ServerObjectId,
-    entrypoint_name: &SelectableFieldName,
+    entrypoint: &ValidatedClientField,
     index: usize,
     reachable_variables: &BTreeSet<VariableName>,
     client_field: &ValidatedClientField,
@@ -563,7 +560,7 @@ fn process_imperatively_loaded_field(
 
     let root_parent_object = schema
         .server_field_data
-        .object(*entrypoint_parent_object_id)
+        .object(entrypoint.parent_object_id)
         .name;
 
     let root_operation_name = schema
@@ -591,7 +588,7 @@ fn process_imperatively_loaded_field(
         merged_selection_set: wrapped_selection_map,
         root_parent_object,
         variable_definitions: definitions_of_used_variables,
-        root_fetchable_field: *entrypoint_name,
+        root_fetchable_field: entrypoint.name,
         refetch_query_index: RefetchQueryIndex(index as u32),
         root_operation_name,
         query_name,
@@ -736,8 +733,8 @@ fn merge_validated_selections_into_selection_map(
                         let type_id = linked_field_selection.associated_data.parent_object_id;
                         let linked_field_parent_type = schema.server_field_data.object(type_id);
 
-                        match linked_field_selection.associated_data.variant {
-                            SchemaServerFieldVariant::InlineFragment(server_field_id) => {
+                        match linked_field_selection.associated_data.variant.clone() {
+                            SchemaServerFieldVariant::InlineFragment(inline_fragment_variant) => {
                                 let type_to_refine_to = linked_field_parent_type.name;
                                 let normalization_key =
                                     NormalizationKey::InlineFragment(type_to_refine_to);
@@ -781,25 +778,17 @@ fn merge_validated_selections_into_selection_map(
                                             global_client_field_map,
                                             variable_context,
                                         );
-                                        let server_field =
-                                            &schema.server_fields[server_field_id.as_usize()];
+                                        let server_field = &schema.server_fields
+                                            [inline_fragment_variant.server_field_id.as_usize()];
 
                                         create_merged_selection_map_for_field_and_insert_into_global_map(
                                             schema,
                                             parent_type,
                                             &linked_field_selection.selection_set,
                                             global_client_field_map,
-                                            &FieldType::ServerField(server_field_id),
-                                            &VariableContext(
-                                                server_field.arguments
-            .iter()
-            .map(|variable_definition| {
-                (
-                    variable_definition.item.name.item,
-                    NonConstantValue::Variable(variable_definition.item.name.item),
-                )
-            })
-            .collect()
+                                            &FieldType::ServerField(inline_fragment_variant.server_field_id),
+                                            &(
+                                                server_field.initial_variable_context()
                                             )
                                         );
                                     }
