@@ -148,7 +148,7 @@ pub fn get_artifact_path_and_content(
                             {}{reader_output_type}\n\
                             > = {{\n\
                             {}kind: \"EagerReaderArtifact\",\n\
-                            {}resolver: ({{ data }}) => data.__typename === \"{concrete_type}\" ? data.id : null,\n\
+                            {}resolver: ({{ data }}) => data.__typename === \"{concrete_type}\" ? {{ __link: data.id }} : null,\n\
                             {}readerAst,\n\
                             }};\n\n\
                             export default artifact;\n",
