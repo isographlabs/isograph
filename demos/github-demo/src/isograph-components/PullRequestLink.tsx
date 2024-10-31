@@ -1,5 +1,5 @@
-import React, { ReactNode } from 'react';
 import { iso } from '@iso';
+import { ReactNode } from 'react';
 
 import { Link } from '@mui/material';
 import { Route } from './GithubDemo';
@@ -11,10 +11,6 @@ export const PullRequestLink = iso(`
       name
       owner {
         login
-        asUser {
-          id
-          bio
-        }
       }
     }
   }
@@ -28,7 +24,6 @@ export const PullRequestLink = iso(`
     children: ReactNode;
   },
 ) {
-  const user = data.repository.owner.asUser;
   return (
     <Link
       onClick={() =>
@@ -42,7 +37,6 @@ export const PullRequestLink = iso(`
       style={{ cursor: 'pointer' }}
     >
       {children}
-      {JSON.stringify(user)}
     </Link>
   );
 });

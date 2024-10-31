@@ -1,7 +1,6 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { PullRequest__PullRequestLink__param } from './param_type';
 import { PullRequestLink as resolver } from '../../../PullRequestLink';
-import User__asUser__resolver_reader from '../../User/asUser/resolver_reader';
 
 const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
   {
@@ -35,27 +34,6 @@ const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
             fieldName: "login",
             alias: null,
             arguments: null,
-          },
-          {
-            kind: "Linked",
-            fieldName: "asUser",
-            alias: null,
-            arguments: null,
-            condition: User__asUser__resolver_reader,
-            selections: [
-              {
-                kind: "Scalar",
-                fieldName: "id",
-                alias: null,
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "bio",
-                alias: null,
-                arguments: null,
-              },
-            ],
           },
         ],
       },
