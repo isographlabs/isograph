@@ -34,7 +34,7 @@ struct EntrypointArtifactInfo<'schema> {
 pub(crate) fn generate_entrypoint_artifacts(
     schema: &ValidatedSchema,
     entrypoint_id: ClientFieldId,
-    global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
+    encountered_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
 ) -> Vec<ArtifactPathAndContent> {
     let entrypoint = schema.client_field(entrypoint_id);
 
@@ -46,7 +46,7 @@ pub(crate) fn generate_entrypoint_artifacts(
         schema,
         schema.server_field_data.object(entrypoint.parent_object_id),
         entrypoint.selection_set_for_parent_query(),
-        global_client_field_map,
+        encountered_client_field_map,
         &FieldType::ClientField(entrypoint.id),
         &entrypoint.initial_variable_context(),
     );
@@ -56,7 +56,7 @@ pub(crate) fn generate_entrypoint_artifacts(
         &entrypoint,
         &merged_selection_map,
         &traversal_state,
-        global_client_field_map,
+        encountered_client_field_map,
         entrypoint
             .variable_definitions
             .iter()
@@ -70,7 +70,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
     entrypoint: &ValidatedClientField,
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
-    global_client_field_map: &ClientFieldToCompletedMergeTraversalStateMap,
+    encountered_client_field_map: &ClientFieldToCompletedMergeTraversalStateMap,
     variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
     default_root_operation_name: &Option<&RootOperationName>,
 ) -> Vec<ArtifactPathAndContent> {
@@ -112,7 +112,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
                 IsographSelectionVariant::Loadable(_) => {
                     // Note: it would be cleaner to include a reference to the merged selection set here via
                     // the selection_variant variable, instead of by looking it up like this.
-                    &global_client_field_map
+                    &encountered_client_field_map
                         .get(&FieldType::ClientField(
                             root_refetch_path.path_to_refetch_field_info.client_field_id,
                         ))
