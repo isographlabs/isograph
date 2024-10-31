@@ -9,6 +9,7 @@ const readerAst: ReaderAst<Query__meName__param> = [
     fieldName: "me",
     alias: null,
     arguments: null,
+    condition: null,
     selections: [
       {
         kind: "Scalar",

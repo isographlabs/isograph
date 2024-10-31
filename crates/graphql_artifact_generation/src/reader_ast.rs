@@ -123,62 +123,37 @@ fn linked_field_ast_node(
     let indent_1 = "  ".repeat(indentation_level as usize);
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
-    match linked_field.associated_data.variant {
+    let condition = match linked_field.associated_data.variant {
         SchemaServerFieldVariant::InlineFragment(_) => {
             let object = schema
                 .server_field_data
                 .object(linked_field.associated_data.parent_object_id);
 
-            let entrypoint_text = {
-                let type_and_field: ObjectTypeAndFieldName = ObjectTypeAndFieldName {
-                    field_name: linked_field.name.item.into(),
-                    type_name: object.name,
-                };
-
-                reader_imports.insert((type_and_field, ImportedFileCategory::Entrypoint));
-                let type_and_field_underscore_separated = type_and_field.underscore_separated();
-                format!("{type_and_field_underscore_separated}__entrypoint")
+            let type_and_field: ObjectTypeAndFieldName = ObjectTypeAndFieldName {
+                field_name: linked_field.name.item.into(),
+                type_name: object.name,
             };
 
-            let (reader_ast, additional_reader_imports) = generate_reader_ast(
-                schema,
-                // TODO: make proper selection_set
-                &linked_field.selection_set,
-                indentation_level + 1,
-                &Default::default(),
-                // TODO: make child context
-                &initial_variable_context,
-            );
+            let reader_artifact_import_name =
+                format!("{}__resolver_reader", type_and_field.underscore_separated());
 
-            // N.B. additional_reader_imports will be empty for now, but at some point, we may have
-            // refetch selection sets that import other things! Who knows!
-            for import in additional_reader_imports {
-                reader_imports.insert(import);
-            }
+            reader_imports.insert((type_and_field, ImportedFileCategory::ResolverReader));
 
-            return format!(
-                "{indent_1}{{\n\
-        {indent_2}kind: \"LoadablySelectedField\",\n\
-        {indent_2}alias: \"{alias}\",\n\
-        {indent_2}name: \"{name}\",\n\
-        {indent_2}queryArguments: {arguments},\n\
-        {indent_2}refetchReaderAst: {reader_ast},\n\
-        {indent_2}entrypoint: {entrypoint_text},\n\
-        {indent_1}}},\n"
-            );
+            reader_artifact_import_name
         }
-        SchemaServerFieldVariant::LinkedField => {
-            format!(
-                "{indent_1}{{\n\
-                {indent_2}kind: \"Linked\",\n\
-                {indent_2}fieldName: \"{name}\",\n\
-                {indent_2}alias: {alias},\n\
-                {indent_2}arguments: {arguments},\n\
-                {indent_2}selections: {inner_reader_ast},\n\
-                {indent_1}}},\n",
-            )
-        }
-    }
+        SchemaServerFieldVariant::LinkedField => "null".to_string(),
+    };
+
+    format!(
+        "{indent_1}{{\n\
+        {indent_2}kind: \"Linked\",\n\
+        {indent_2}fieldName: \"{name}\",\n\
+        {indent_2}alias: {alias},\n\
+        {indent_2}arguments: {arguments},\n\
+        {indent_2}condition: {condition},\n\
+        {indent_2}selections: {inner_reader_ast},\n\
+        {indent_1}}},\n",
+    )
 }
 
 #[allow(clippy::too_many_arguments)]

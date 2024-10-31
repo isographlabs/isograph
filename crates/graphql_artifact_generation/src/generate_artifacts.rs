@@ -111,21 +111,6 @@ pub fn get_artifact_path_and_content(
                 //     &traversal_state.refetch_paths,
                 //     true,
                 // ));
-
-                generate_entrypoint_artifacts_with_field_traversal_result(
-                    schema,
-                    &encountered_server_field.parent_type_id,
-                    &encountered_server_field.name.item,
-                    merged_selection_map,
-                    &mut path_and_contents,
-                    &global_client_field_map,
-                    traversal_state,
-                    &encountered_server_field
-                        .arguments
-                        .iter()
-                        .map(|variable_defition| variable_defition.item.clone())
-                        .collect::<Vec<_>>(),
-                );
             }
             FieldType::ClientField(encountered_client_field_id) => {
                 let encountered_client_field = schema.client_field(*encountered_client_field_id);

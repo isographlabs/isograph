@@ -10,6 +10,7 @@ const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
     fieldName: "adItem",
     alias: null,
     arguments: null,
+    condition: null,
     selections: [
       {
         kind: "Resolver",
@@ -25,6 +26,7 @@ const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
     fieldName: "blogItem",
     alias: null,
     arguments: null,
+    condition: null,
     selections: [
       {
         kind: "Resolver",

@@ -10,6 +10,7 @@ const readerAst: ReaderAst<Query__Newsfeed__param> = [
     fieldName: "viewer",
     alias: null,
     arguments: null,
+    condition: null,
     selections: [
       {
         kind: "Linked",
@@ -26,6 +27,7 @@ const readerAst: ReaderAst<Query__Newsfeed__param> = [
             { kind: "Literal", value: 6 },
           ],
         ],
+        condition: null,
         selections: [
           {
             kind: "Resolver",

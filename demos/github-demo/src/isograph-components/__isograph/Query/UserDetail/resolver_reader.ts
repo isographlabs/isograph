@@ -14,6 +14,7 @@ const readerAst: ReaderAst<Query__UserDetail__param> = [
         { kind: "Variable", name: "userLogin" },
       ],
     ],
+    condition: null,
     selections: [
       {
         kind: "Scalar",
