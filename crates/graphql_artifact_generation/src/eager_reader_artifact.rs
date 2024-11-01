@@ -150,11 +150,13 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
         1,
     );
 
-    let param_type_import_statement = param_type_imports_to_import_statement(&param_type_imports);
+    let param_type_import_statement =
+        param_type_imports_to_import_statement(&param_type_imports, file_extensions);
     let reader_param_type = format!("{}__{}__param", parent_type.name, client_field.name);
 
     let loadable_field_imports = if !loadable_fields.is_empty() {
-        let param_imports = param_type_imports_to_import_param_statement(&loadable_fields);
+        let param_imports =
+            param_type_imports_to_import_param_statement(&loadable_fields, file_extensions);
         format!(
             "import {{ type LoadableField, type ExtractParameters }} from '@isograph/react';\n\
             {param_imports}"

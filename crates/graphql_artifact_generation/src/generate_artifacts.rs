@@ -88,6 +88,7 @@ pub fn get_artifact_path_and_content(
             schema,
             *entrypoint_id,
             &mut encountered_client_field_map,
+            file_extensions,
         );
         path_and_contents.extend(entrypoint_path_and_content);
 
@@ -201,6 +202,7 @@ pub fn get_artifact_path_and_content(
                             &encountered_client_field_map,
                             variable_definitions_iter,
                             &schema.query_root_operation_name(),
+                            file_extensions,
                         ),
                     );
                 }
@@ -272,7 +274,7 @@ pub fn get_artifact_path_and_content(
         path_and_contents.push(path_and_content);
     }
 
-    path_and_contents.push(build_iso_overload_artifact(schema));
+    path_and_contents.push(build_iso_overload_artifact(schema, file_extensions));
 
     path_and_contents
 }
