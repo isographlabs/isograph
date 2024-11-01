@@ -30,56 +30,39 @@ pub struct ConfigOptions {
 }
 
 #[derive(Debug, Clone)]
-pub struct OptionalGenerateFileExtensions {
-    extensions: HashMap<String, String>,
+pub enum OptionalGenerateFileExtensions {
+    Yes(HashMap<String, String>),
+    No,
 }
 
 impl OptionalGenerateFileExtensions {
-    pub fn get(&self, extension: &str) -> Option<&String> {
-        let mapped_extension = self.extensions.get(extension);
-
-        if mapped_extension.is_none() {
-            eprintln!(
-                "{}\nmissing .{} file extension in options.generate_file_extensions\n",
-                "Warning:".yellow(),
-                extension
-            );
-        };
-
-        mapped_extension
+    pub fn get(&self, extension: &str) -> &str {
+        match self {
+            OptionalGenerateFileExtensions::No => "",
+            OptionalGenerateFileExtensions::Yes(extensions) => match extensions.get(extension) {
+                Some(mapped_extension) => mapped_extension,
+                None => {
+                    eprintln!(
+                        "{}\nmissing .{} file extension in options.generate_file_extensions\n",
+                        "Warning:".yellow(),
+                        extension
+                    );
+                    ""
+                }
+            },
+        }
     }
     pub fn ts(&self) -> &str {
-        match self.get("ts") {
-            None => "",
-            Some(v) => v,
-        }
+        self.get("ts")
     }
     pub fn tsx(&self) -> &str {
-        match self.get("tsx") {
-            None => "",
-            Some(v) => v,
-        }
+        self.get("tsx")
     }
 }
 
 impl Default for OptionalGenerateFileExtensions {
     fn default() -> Self {
-        let mut map = HashMap::new();
-        map.insert("js".to_string(), "".to_string());
-        map.insert("jsx".to_string(), "".to_string());
-        map.insert("cjs".to_string(), "".to_string());
-        map.insert("cjsx".to_string(), "".to_string());
-        map.insert("mjs".to_string(), "".to_string());
-        map.insert("mjsx".to_string(), "".to_string());
-
-        map.insert("ts".to_string(), "".to_string());
-        map.insert("tsx".to_string(), "".to_string());
-        map.insert("cts".to_string(), "".to_string());
-        map.insert("ctsx".to_string(), "".to_string());
-        map.insert("mts".to_string(), "".to_string());
-        map.insert("mtsx".to_string(), "".to_string());
-
-        OptionalGenerateFileExtensions { extensions: map }
+        OptionalGenerateFileExtensions::No
     }
 }
 
@@ -269,9 +252,9 @@ fn create_generate_file_extensions(
 ) -> OptionalGenerateFileExtensions {
     match optional_generate_file_extensions {
         ConfigFileOptionalGenerateFileExtensions::Yes(extensions) => {
-            OptionalGenerateFileExtensions { extensions }
+            OptionalGenerateFileExtensions::Yes(extensions)
         }
 
-        ConfigFileOptionalGenerateFileExtensions::No => OptionalGenerateFileExtensions::default(),
+        ConfigFileOptionalGenerateFileExtensions::No => OptionalGenerateFileExtensions::No,
     }
 }

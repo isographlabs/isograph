@@ -281,9 +281,7 @@ fn generate_function_import_statement(
         file_name,
         match extension.and_then(|extension| extension.to_str()) {
             None => file_extensions.tsx(),
-            Some(extension) => {
-                file_extensions.get(extension).map_or("", |v| v)
-            }
+            Some(extension) => file_extensions.get(extension),
         }
     ))
 }
