@@ -21,14 +21,12 @@ async fn main() {
 }
 
 async fn start_compiler(compile_command: CompileCommand) {
-    let config = create_config(
-        compile_command
-            .config
-            .unwrap_or("./isograph.config.json".into()),
-    );
+    let config_location = compile_command
+        .config
+        .unwrap_or("./isograph.config.json".into());
 
     if compile_command.watch {
-        match handle_watch_command(config).await {
+        match handle_watch_command(config_location).await {
             Ok(res) => match res {
                 Ok(_) => {
                     eprintln!("{}", "Successfully watched. Exiting.\n".bright_green())
@@ -51,7 +49,7 @@ async fn start_compiler(compile_command: CompileCommand) {
                 std::process::exit(1);
             }
         };
-    } else if compile_and_print(&config).is_err() {
+    } else if compile_and_print(config_location).is_err() {
         std::process::exit(1);
     }
 }
