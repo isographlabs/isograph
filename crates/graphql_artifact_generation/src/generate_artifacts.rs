@@ -6,6 +6,8 @@ use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
+
+use isograph_config::OptionalGenerateFileExtensions;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection,
     ServerFieldSelection, TypeAnnotation, UnionVariant, VariableDefinition,
@@ -74,6 +76,7 @@ pub fn get_artifact_path_and_content(
     schema: &ValidatedSchema,
     project_root: &Path,
     artifact_directory: &Path,
+    file_extensions: &OptionalGenerateFileExtensions,
 ) -> Vec<ArtifactPathAndContent> {
     let mut encountered_client_field_map = BTreeMap::new();
     let mut path_and_contents = vec![];
@@ -113,6 +116,7 @@ pub fn get_artifact_path_and_content(
                     artifact_directory,
                     *info,
                     &traversal_state.refetch_paths,
+                    file_extensions,
                 ));
 
                 if *was_ever_selected_loadably {
@@ -122,6 +126,7 @@ pub fn get_artifact_path_and_content(
                         None,
                         &traversal_state.refetch_paths,
                         true,
+                        file_extensions,
                     ));
 
                     // Everything about this is quite sus
@@ -207,6 +212,7 @@ pub fn get_artifact_path_and_content(
                     variant.primary_field_info.as_ref(),
                     &traversal_state.refetch_paths,
                     false,
+                    file_extensions,
                 ));
             }
         };
@@ -225,6 +231,7 @@ pub fn get_artifact_path_and_content(
         path_and_contents.push(generate_eager_reader_param_type_artifact(
             schema,
             user_written_client_field,
+            file_extensions,
         ));
 
         match encountered_client_field_map.get(&user_written_client_field.id) {
@@ -256,6 +263,7 @@ pub fn get_artifact_path_and_content(
                 project_root,
                 artifact_directory,
                 info,
+                file_extensions,
             ),
             ClientFieldVariant::ImperativelyLoadedField(_) => {
                 generate_refetch_output_type_artifact(schema, client_field)

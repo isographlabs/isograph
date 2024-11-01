@@ -1,17 +1,5 @@
 use std::{collections::HashMap, path::PathBuf, str::Utf8Error};
 
-use colored::Colorize;
-use common_lang_types::{FilePath, TextSource, WithLocation};
-use graphql_artifact_generation::get_artifact_path_and_content;
-use graphql_schema_parser::SchemaParseError;
-use isograph_config::CompilerConfig;
-use isograph_lang_parser::{IsoLiteralExtractionResult, IsographLiteralParseError};
-use isograph_schema::{
-    ProcessClientFieldDeclarationError, Schema, UnvalidatedSchema, ValidateSchemaError,
-};
-use pretty_duration::pretty_duration;
-use thiserror::Error;
-
 use crate::{
     field_directives::validate_isograph_field_directives,
     parse_files::{IsoLiteralParseStats, ParsedFiles},
@@ -19,6 +7,19 @@ use crate::{
     with_duration::WithDuration,
     write_artifacts::{write_artifacts_to_disk, GenerateArtifactsError},
 };
+use colored::Colorize;
+use common_lang_types::{FilePath, TextSource, WithLocation};
+use graphql_artifact_generation::get_artifact_path_and_content;
+use graphql_schema_parser::SchemaParseError;
+
+use isograph_config::CompilerConfig;
+use isograph_lang_parser::{IsoLiteralExtractionResult, IsographLiteralParseError};
+use isograph_schema::{
+    ProcessClientFieldDeclarationError, Schema, UnvalidatedSchema, ValidateSchemaError,
+};
+
+use pretty_duration::pretty_duration;
+use thiserror::Error;
 
 pub struct CompilationStats {
     pub client_field_count: usize,
@@ -137,6 +138,7 @@ pub(crate) fn handle_compile_command(
         &validated_schema,
         &config.project_root,
         &config.artifact_directory,
+        &config.options.generate_file_extensions,
     );
 
     let total_artifacts_written =
@@ -154,10 +156,10 @@ fn create_unvalidated_schema_from_sources(
     sources: ParsedFiles,
     config: &CompilerConfig,
 ) -> Result<(), BatchCompileError> {
-    let outcome = schema.process_graphql_type_system_document(sources.schema, config.options)?;
+    let outcome = schema.process_graphql_type_system_document(sources.schema, &config.options)?;
     for extension_document in sources.schema_extensions.into_values() {
         let _extension_outcome =
-            schema.process_graphql_type_extension_document(extension_document, config.options)?;
+            schema.process_graphql_type_extension_document(extension_document, &config.options)?;
     }
     process_iso_literals(schema, sources.contains_iso)?;
     process_exposed_fields(schema)?;

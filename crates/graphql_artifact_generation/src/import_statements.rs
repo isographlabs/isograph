@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 
+use isograph_config::OptionalGenerateFileExtensions;
 use isograph_schema::ObjectTypeAndFieldName;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -22,16 +23,20 @@ impl ImportedFileCategory {
 pub(crate) type ReaderImports = BTreeSet<(ObjectTypeAndFieldName, ImportedFileCategory)>;
 pub(crate) type ParamTypeImports = BTreeSet<ObjectTypeAndFieldName>;
 
-pub(crate) fn reader_imports_to_import_statement(reader_imports: &ReaderImports) -> String {
+pub(crate) fn reader_imports_to_import_statement(
+    reader_imports: &ReaderImports,
+    file_extensions: &OptionalGenerateFileExtensions,
+) -> String {
     let mut output = String::new();
     for (type_and_field, artifact_type) in reader_imports.iter() {
         output.push_str(&format!(
-            "import {}__{} from '../../{}/{}/{}';\n",
+            "import {}__{} from '../../{}/{}/{}{}';\n",
             type_and_field.underscore_separated(),
             artifact_type.filename(),
             type_and_field.type_name,
             type_and_field.field_name,
-            artifact_type.filename()
+            artifact_type.filename(),
+            file_extensions.ts()
         ));
     }
     output

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use serde::Deserialize;
 
@@ -23,9 +23,64 @@ pub struct CompilerConfig {
     pub options: ConfigOptions,
 }
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone)]
 pub struct ConfigOptions {
     pub on_invalid_id_type: OptionalValidationLevel,
+    pub generate_file_extensions: OptionalGenerateFileExtensions,
+}
+
+#[derive(Debug, Clone)]
+pub struct OptionalGenerateFileExtensions {
+    extensions: HashMap<String, String>,
+}
+
+impl OptionalGenerateFileExtensions {
+    pub fn get(&self, extension: &str) -> Option<&String> {
+        let mapped_extension = self.extensions.get(extension);
+
+        if mapped_extension.is_none() {
+            eprintln!(
+                "{}\nmissing .{} file extension in options.generate_file_extensions\n",
+                "Warning:".yellow(),
+                extension
+            );
+        };
+
+        mapped_extension
+    }
+    pub fn ts(&self) -> &str {
+        match self.get("ts") {
+            None => "",
+            Some(v) => v,
+        }
+    }
+    pub fn tsx(&self) -> &str {
+        match self.get("tsx") {
+            None => "",
+            Some(v) => v,
+        }
+    }
+}
+
+impl Default for OptionalGenerateFileExtensions {
+    fn default() -> Self {
+        let mut map = HashMap::new();
+        map.insert("js".to_string(), "".to_string());
+        map.insert("jsx".to_string(), "".to_string());
+        map.insert("cjs".to_string(), "".to_string());
+        map.insert("cjsx".to_string(), "".to_string());
+        map.insert("mjs".to_string(), "".to_string());
+        map.insert("mjsx".to_string(), "".to_string());
+
+        map.insert("ts".to_string(), "".to_string());
+        map.insert("tsx".to_string(), "".to_string());
+        map.insert("cts".to_string(), "".to_string());
+        map.insert("ctsx".to_string(), "".to_string());
+        map.insert("mts".to_string(), "".to_string());
+        map.insert("mtsx".to_string(), "".to_string());
+
+        OptionalGenerateFileExtensions { extensions: map }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -159,6 +214,7 @@ pub fn create_config(mut config_location: PathBuf) -> CompilerConfig {
 #[serde(default, deny_unknown_fields)]
 struct ConfigFileOptions {
     on_invalid_id_type: ConfigFileOptionalValidationLevel,
+    generate_file_extensions: ConfigFileOptionalGenerateFileExtensions,
 }
 
 #[derive(Deserialize, Debug, Clone, Copy)]
@@ -178,9 +234,23 @@ impl Default for ConfigFileOptionalValidationLevel {
     }
 }
 
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
+enum ConfigFileOptionalGenerateFileExtensions {
+    Yes(HashMap<String, String>),
+    No,
+}
+
+impl Default for ConfigFileOptionalGenerateFileExtensions {
+    fn default() -> Self {
+        Self::No
+    }
+}
+
 fn create_options(options: ConfigFileOptions) -> ConfigOptions {
     ConfigOptions {
         on_invalid_id_type: create_optional_validation_level(options.on_invalid_id_type),
+        generate_file_extensions: create_generate_file_extensions(options.generate_file_extensions),
     }
 }
 
@@ -191,5 +261,17 @@ fn create_optional_validation_level(
         ConfigFileOptionalValidationLevel::Ignore => OptionalValidationLevel::Ignore,
         ConfigFileOptionalValidationLevel::Warn => OptionalValidationLevel::Warn,
         ConfigFileOptionalValidationLevel::Error => OptionalValidationLevel::Error,
+    }
+}
+
+fn create_generate_file_extensions(
+    optional_generate_file_extensions: ConfigFileOptionalGenerateFileExtensions,
+) -> OptionalGenerateFileExtensions {
+    match optional_generate_file_extensions {
+        ConfigFileOptionalGenerateFileExtensions::Yes(extensions) => {
+            OptionalGenerateFileExtensions { extensions }
+        }
+
+        ConfigFileOptionalGenerateFileExtensions::No => OptionalGenerateFileExtensions::default(),
     }
 }

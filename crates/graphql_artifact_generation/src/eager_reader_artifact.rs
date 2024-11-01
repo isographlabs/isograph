@@ -1,5 +1,7 @@
 use common_lang_types::ArtifactPathAndContent;
 use intern::Lookup;
+
+use isograph_config::OptionalGenerateFileExtensions;
 use isograph_schema::{
     RefetchedPathsMap, UserWrittenClientFieldInfo, UserWrittenComponentVariant,
     ValidatedClientField, ValidatedSchema,
@@ -29,7 +31,9 @@ pub(crate) fn generate_eager_reader_artifacts(
     artifact_directory: &Path,
     info: UserWrittenClientFieldInfo,
     refetched_paths: &RefetchedPathsMap,
+    file_extensions: &OptionalGenerateFileExtensions,
 ) -> Vec<ArtifactPathAndContent> {
+    let ts_file_extension = file_extensions.ts();
     let user_written_component_variant = info.user_written_component_variant;
     let parent_type = schema
         .server_field_data
@@ -44,13 +48,15 @@ pub(crate) fn generate_eager_reader_artifacts(
     );
 
     let function_import_statement =
-        generate_function_import_statement(project_root, artifact_directory, info);
+        generate_function_import_statement(project_root, artifact_directory, info, file_extensions);
 
     let relative_directory = generate_path(parent_type.name, client_field.name);
 
-    let reader_import_statement = reader_imports_to_import_statement(&reader_imports);
+    let reader_import_statement =
+        reader_imports_to_import_statement(&reader_imports, file_extensions);
 
     let reader_param_type = format!("{}__{}__param", parent_type.name, client_field.name);
+
     let reader_content = if let UserWrittenComponentVariant::Eager = user_written_component_variant
     {
         let reader_output_type =
@@ -59,8 +65,8 @@ pub(crate) fn generate_eager_reader_artifacts(
         let output_type_file_name = *RESOLVER_OUTPUT_TYPE;
         format!(
             "import type {{ EagerReaderArtifact, ReaderAst }} from '@isograph/react';\n\
-            import {{ {reader_param_type} }} from './{param_type_file_name}';\n\
-            import {{ {reader_output_type} }} from './{output_type_file_name}';\n\
+            import {{ {reader_param_type} }} from './{param_type_file_name}{ts_file_extension}';\n\
+            import {{ {reader_output_type} }} from './{output_type_file_name}{ts_file_extension}';\n\
             {function_import_statement}\n\
             {reader_import_statement}\n\
             const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
@@ -81,7 +87,7 @@ pub(crate) fn generate_eager_reader_artifacts(
         format!(
             "import type {{ComponentReaderArtifact, ExtractSecondParam, \
             ReaderAst }} from '@isograph/react';\n\
-            import {{ {reader_param_type} }} from './{param_type_file_name}';\n\
+            import {{ {reader_param_type} }} from './{param_type_file_name}{ts_file_extension}';\n\
             {function_import_statement}\n\
             {reader_import_statement}\n\
             const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
@@ -125,7 +131,9 @@ pub(crate) fn generate_eager_reader_artifacts(
 pub(crate) fn generate_eager_reader_param_type_artifact(
     schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
+    file_extensions: &OptionalGenerateFileExtensions,
 ) -> ArtifactPathAndContent {
+    let ts_file_extension = file_extensions.ts();
     let parent_type = schema
         .server_field_data
         .object(client_field.parent_object_id);
@@ -159,7 +167,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
         let reader_parameters_type =
             format!("{}__{}__parameters", parent_type.name, client_field.name);
         (
-            format!("import type {{ {reader_parameters_type} }} from './parameters_type';\n"),
+            format!("import type {{ {reader_parameters_type} }} from './parameters_type{ts_file_extension}';\n"),
             reader_parameters_type,
         )
     } else {
@@ -189,6 +197,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact(
     project_root: &Path,
     artifact_directory: &Path,
     info: UserWrittenClientFieldInfo,
+    file_extensions: &OptionalGenerateFileExtensions,
 ) -> ArtifactPathAndContent {
     let parent_type = schema
         .server_field_data
@@ -196,7 +205,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact(
     let relative_directory = generate_path(parent_type.name, client_field.name);
 
     let function_import_statement =
-        generate_function_import_statement(project_root, artifact_directory, info);
+        generate_function_import_statement(project_root, artifact_directory, info, file_extensions);
 
     let client_field_output_type = generate_output_type(client_field);
 
@@ -230,6 +239,7 @@ fn generate_function_import_statement(
     project_root: &Path,
     artifact_directory: &Path,
     user_written_client_field_info: UserWrittenClientFieldInfo,
+    file_extensions: &OptionalGenerateFileExtensions,
 ) -> ClientFieldFunctionImportStatement {
     let const_export_name = user_written_client_field_info.const_export_name;
     let path_to_client_field = project_root.join(
@@ -250,6 +260,7 @@ fn generate_function_import_statement(
         // Anyway, TODO do better.
         pathdiff::diff_paths(path_to_client_field, artifact_directory.join("Type/Field"))
             .expect("Relative path should work");
+    let extension = relative_path.extension();
     let extension_char_count_including_dot =
         relative_path.extension().map(|x| x.len() + 1).unwrap_or(0);
     let complete_file_name = relative_path.to_str().expect(
@@ -266,7 +277,13 @@ fn generate_function_import_statement(
         &normalized_file_name[0..(normalized_file_name.len() - extension_char_count_including_dot)];
 
     ClientFieldFunctionImportStatement(format!(
-        "import {{ {const_export_name} as resolver }} from '{}';",
-        file_name
+        "import {{ {const_export_name} as resolver }} from '{}{}';",
+        file_name,
+        match extension.and_then(|extension| extension.to_str()) {
+            None => file_extensions.tsx(),
+            Some(extension) => {
+                file_extensions.get(extension).map_or("", |v| v)
+            }
+        }
     ))
 }
