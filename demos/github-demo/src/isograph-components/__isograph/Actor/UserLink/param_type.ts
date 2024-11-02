@@ -2,7 +2,7 @@
 export type Actor__UserLink__param = {
   readonly data: {
     /**
-A client poiter for the User type.
+A client pointer for the User type.
     */
     readonly asUser: ({
       /**

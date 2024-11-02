@@ -35,7 +35,8 @@ export const UserLink = iso(`
         style={{ cursor: 'pointer' }}
       >
         {children}
-      </Link>&nbsp;
+      </Link>
+      &nbsp;
       {data.asUser?.twitterUsername && (
         <Link
           href={`https://x.com/${data.asUser.twitterUsername}`}
