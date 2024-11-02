@@ -112,7 +112,7 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       # TODO reuse some artifacts or something, we're doing this in multiple steps
       - name: Build JS files
-        run: pnpm -r compile
+        run: pnpm exec tsc --build
       - name: Typecheck
         run: cd ./demos/${{ matrix.target.folder }} && pnpm tsc
       - name: Lint
@@ -132,7 +132,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Build
-        run: pnpm -r compile
+        run: pnpm exec tsc --build
       - name: Run unit tests
         # Note: unit tests have to run after building, because the unit tests
         # rely on Isograph, which relies on @isograph/react being a valid input
@@ -296,7 +296,7 @@ jobs:
           RELEASE_COMMIT_SHA: ${{ github.sha }}
       # TODO reuse this somehow?
       - name: Build
-        run: pnpm -r compile
+        run: pnpm exec tsc --build
       - name: Download artifact isograph_cli-linux-x64
         uses: actions/download-artifact@v4
         with:
@@ -353,7 +353,7 @@ jobs:
       #   run: pnpm gulp setMainVersion
       #   # TODO do this less hackily
       - name: Build
-        run: pnpm -r compile
+        run: pnpm exec tsc --build
       - name: Download artifact isograph_cli-linux-x64
         uses: actions/download-artifact@v4
         with:

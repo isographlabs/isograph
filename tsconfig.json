@@ -1,12 +1,18 @@
 {
-  "extends": "./tsconfig.build.json",
-  "compilerOptions": {
-    "baseUrl": "./"
-  },
-  "include": [
-    "./libs/**/*.ts",
-    "libs/isograph-react/src/index.tsx",
-    "libs/isograph-react/src/cache.tsx"
-  ],
-  "exclude": ["**/dist"]
+  "files": [],
+  "include": [],
+  "references": [
+    {
+      "path": "./libs/isograph-disposable-types/tsconfig.pkg.json"
+    },
+    {
+      "path": "./libs/isograph-react/tsconfig.pkg.json"
+    },
+    {
+      "path": "./libs/isograph-react-disposable-state/tsconfig.pkg.json"
+    },
+    {
+      "path": "./libs/isograph-reference-counted-pointer/tsconfig.pkg.json"
+    }
+  ]
 }
