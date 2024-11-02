@@ -19,7 +19,6 @@ use isograph_schema::{
 };
 use lazy_static::lazy_static;
 use std::path::Path;
-use std::vec;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::{self, Debug, Display},
@@ -136,7 +135,7 @@ pub fn get_artifact_path_and_content(
                             "{ data: any, parameters: Record<PropertyKey, never> }";
                         let reader_output_type = "boolean";
 
-                        let reader_content =         format!(
+                        let reader_content = format!(
                             "import type {{ EagerReaderArtifact, ReaderAst }} from '@isograph/react';\n\
                             {reader_import_statement}\n\
                             const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
