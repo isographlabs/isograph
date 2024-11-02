@@ -56,8 +56,6 @@ pub type ValidatedFieldDefinitionLocation = FieldType<ServerFieldId, ClientField
 
 pub type ValidatedSchemaIdField = SchemaIdField<ServerScalarId>;
 
-pub type ValidatedSchemaServerFieldVariant = SchemaServerFieldVariant;
-
 #[derive(Debug, Clone)]
 pub struct ValidatedLinkedFieldAssociatedData {
     pub parent_object_id: ServerObjectId,
@@ -66,7 +64,7 @@ pub struct ValidatedLinkedFieldAssociatedData {
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 
-    pub variant: ValidatedSchemaServerFieldVariant,
+    pub variant: SchemaServerFieldVariant,
 }
 
 #[derive(Debug, Clone)]

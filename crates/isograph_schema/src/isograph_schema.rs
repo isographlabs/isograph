@@ -21,8 +21,7 @@ use isograph_lang_types::{
 use lazy_static::lazy_static;
 
 use crate::{
-    refetch_strategy::RefetchStrategy, ClientFieldVariant, NormalizationKey,
-    UnvalidatedSchemaServerFieldVariant, ValidatedSelection,
+    refetch_strategy::RefetchStrategy, ClientFieldVariant, NormalizationKey, ValidatedSelection,
 };
 
 lazy_static! {
@@ -384,7 +383,7 @@ pub struct SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData
     // TODO remove this. This is indicative of poor modeling.
     pub is_discriminator: bool,
 
-    pub variant: UnvalidatedSchemaServerFieldVariant,
+    pub variant: SchemaServerFieldVariant,
 }
 
 #[derive(Debug, Clone)]
