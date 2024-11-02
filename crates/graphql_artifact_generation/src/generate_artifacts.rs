@@ -109,15 +109,14 @@ pub fn get_artifact_path_and_content(
             FieldType::ServerField(encountered_server_field_id) => {
                 let encountered_server_field = &schema.server_field(*encountered_server_field_id);
 
-                let field_name = encountered_server_field.name.item;
-
-                let parent_type = schema
-                    .server_field_data
-                    .object(encountered_server_field.parent_type_id);
-
-                match encountered_server_field.variant.clone() {
+                match &encountered_server_field.variant {
                     SchemaServerFieldVariant::LinkedField => {}
                     SchemaServerFieldVariant::InlineFragment(inline_fragment) => {
+                        let field_name = encountered_server_field.name.item;
+
+                        let parent_type = schema
+                            .server_field_data
+                            .object(encountered_server_field.parent_type_id);
                         let concrete_type = inline_fragment.concrete_type;
 
                         let (reader_ast, reader_imports) = generate_reader_ast(

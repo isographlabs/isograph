@@ -731,7 +731,7 @@ fn merge_validated_selections_into_selection_map(
                         let type_id = linked_field_selection.associated_data.parent_object_id;
                         let linked_field_parent_type = schema.server_field_data.object(type_id);
 
-                        match linked_field_selection.associated_data.variant.clone() {
+                        match &linked_field_selection.associated_data.variant {
                             SchemaServerFieldVariant::InlineFragment(inline_fragment_variant) => {
                                 let type_to_refine_to = linked_field_parent_type.name;
                                 let normalization_key =
@@ -786,8 +786,8 @@ fn merge_validated_selections_into_selection_map(
                                             variable_context,
                                         );
 
-                                        let server_field = &schema.server_fields
-                                            [inline_fragment_variant.server_field_id.as_usize()];
+                                        let server_field = schema
+                                            .server_field(inline_fragment_variant.server_field_id);
 
                                         create_merged_selection_map_for_field_and_insert_into_global_map(
                                             schema,
@@ -795,9 +795,7 @@ fn merge_validated_selections_into_selection_map(
                                             &linked_field_selection.selection_set,
                                             encountered_client_field_map,
                                             FieldType::ServerField(inline_fragment_variant.server_field_id),
-                                            &(
-                                                server_field.initial_variable_context()
-                                            )
+                                            &server_field.initial_variable_context()
                                         );
                                     }
                                 }
