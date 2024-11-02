@@ -64,7 +64,7 @@ impl UnvalidatedSchema {
 
                 let server_field = SchemaServerField {
                     description: Some(
-                        format!("A client poiter for the {} type.", subtype.name)
+                        format!("A client pointer for the {} type.", subtype.name)
                             .intern()
                             .into(),
                     ),
