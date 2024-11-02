@@ -110,7 +110,12 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
-      # TODO reuse some artifacts or something, we're doing this in multiple steps
+      - name: Cache Build JS files
+        uses: actions/cache@v3
+        with:
+          path: '**/dist'
+          key: cache-build
+          enableCrossOsArchive: true
       - name: Build JS files
         run: pnpm compile
       - name: Typecheck
@@ -131,6 +136,12 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Cache Build
+        uses: actions/cache@v3
+        with:
+          path: '**/dist'
+          key: cache-build
+          enableCrossOsArchive: true
       - name: Build
         run: pnpm compile
       - name: Run unit tests
@@ -294,7 +305,13 @@ jobs:
         run: pnpm gulp setMainVersion
         env:
           RELEASE_COMMIT_SHA: ${{ github.sha }}
-      # TODO reuse this somehow?
+
+      - name: Cache Build
+        uses: actions/cache@v3
+        with:
+          path: '**/dist'
+          key: cache-build
+          enableCrossOsArchive: true
       - name: Build
         run: pnpm compile
       - name: Download artifact isograph_cli-linux-x64
@@ -352,6 +369,12 @@ jobs:
       # - name: Change package versions to commit
       #   run: pnpm gulp setMainVersion
       #   # TODO do this less hackily
+      - name: Cache Build
+        uses: actions/cache@v3
+        with:
+          path: '**/dist'
+          key: cache-build
+          enableCrossOsArchive: true
       - name: Build
         run: pnpm compile
       - name: Download artifact isograph_cli-linux-x64
