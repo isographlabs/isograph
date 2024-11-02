@@ -25,10 +25,10 @@ use std::{
     path::PathBuf,
 };
 
+use crate::eager_reader_artifact::generate_eager_reader_condition_artifact;
 use crate::entrypoint_artifact::generate_entrypoint_artifacts_with_client_field_traversal_result;
 use crate::format_parameter_type::format_parameter_type;
-use crate::import_statements::reader_imports_to_import_statement;
-use crate::reader_ast::generate_reader_ast;
+
 use crate::{
     eager_reader_artifact::{
         generate_eager_reader_artifacts, generate_eager_reader_output_type_artifact,
@@ -107,56 +107,17 @@ pub fn get_artifact_path_and_content(
     {
         match encountered_field_id {
             FieldType::ServerField(encountered_server_field_id) => {
-                let encountered_server_field = &schema.server_field(*encountered_server_field_id);
+                let encountered_server_field = schema.server_field(*encountered_server_field_id);
 
                 match &encountered_server_field.variant {
                     SchemaServerFieldVariant::LinkedField => {}
                     SchemaServerFieldVariant::InlineFragment(inline_fragment) => {
-                        let field_name = encountered_server_field.name.item;
-
-                        let parent_type = schema
-                            .server_field_data
-                            .object(encountered_server_field.parent_type_id);
-                        let concrete_type = inline_fragment.concrete_type;
-
-                        let (reader_ast, reader_imports) = generate_reader_ast(
+                        path_and_contents.push(generate_eager_reader_condition_artifact(
                             schema,
-                            &inline_fragment.condition_selection_set,
-                            0,
+                            encountered_server_field,
+                            inline_fragment,
                             &traversal_state.refetch_paths,
-                            &encountered_server_field.initial_variable_context(),
-                        );
-
-                        let reader_import_statement =
-                            reader_imports_to_import_statement(&reader_imports);
-
-                        let reader_param_type =
-                            "{ data: any, parameters: Record<PropertyKey, never> }";
-                        let reader_output_type = "boolean";
-
-                        let reader_content = format!(
-                            "import type {{ EagerReaderArtifact, ReaderAst }} from '@isograph/react';\n\
-                            {reader_import_statement}\n\
-                            const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
-                            const artifact: EagerReaderArtifact<\n\
-                            {}{reader_param_type},\n\
-                            {}{reader_output_type}\n\
-                            > = {{\n\
-                            {}kind: \"EagerReaderArtifact\",\n\
-                            {}resolver: ({{ data }}) => data.__typename === \"{concrete_type}\",\n\
-                            {}readerAst,\n\
-                            }};\n\n\
-                            export default artifact;\n",
-                            "  ", "  ", "  ", "  ", "  ",
-                        );
-
-                        let relative_directory = generate_path(parent_type.name, field_name);
-
-                        path_and_contents.push(ArtifactPathAndContent {
-                            relative_directory: relative_directory.clone(),
-                            file_name_prefix: *RESOLVER_READER,
-                            file_content: reader_content,
-                        });
+                        ));
                     }
                 };
             }
