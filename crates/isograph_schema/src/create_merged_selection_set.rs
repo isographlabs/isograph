@@ -398,7 +398,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map(
     parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
-    root_field_id: &FieldType<ServerFieldId, ClientFieldId>,
+    root_field_id: FieldType<ServerFieldId, ClientFieldId>,
     variable_context: &VariableContext,
     // TODO return Cow?
 ) -> FieldTraversalResult {
@@ -420,7 +420,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map(
             // N.B. encountered_client_field_map might actually have an item stored in root_object.id,
             // if we have some sort of recursion. That probably stack overflows right now.
             encountered_client_field_map.insert(
-                root_field_id.clone(),
+                root_field_id,
                 FieldTraversalResult {
                     traversal_state: merge_traversal_state.clone(),
                     merged_selection_map: merged_selection_map.clone(),
@@ -687,14 +687,12 @@ fn merge_validated_selections_into_selection_map(
                                             parent_type,
                                             newly_encountered_scalar_client_field.selection_set_for_parent_query(),
                                             encountered_client_field_map,
-                                            &FieldType::ClientField(newly_encountered_scalar_client_field.id),
+                                            FieldType::ClientField(newly_encountered_scalar_client_field.id),
                                             &newly_encountered_scalar_client_field.initial_variable_context(),
                                         );
 
                                         let state = encountered_client_field_map
-                                            .get_mut(&FieldType::ClientField(
-                                                client_field_id.clone(),
-                                            ))
+                                            .get_mut(&FieldType::ClientField(*client_field_id))
                                             .expect(
                                                 "Expected field to exist when \
                                                 it is encountered loadably",
@@ -796,7 +794,7 @@ fn merge_validated_selections_into_selection_map(
                                             parent_type,
                                             &linked_field_selection.selection_set,
                                             encountered_client_field_map,
-                                            &FieldType::ServerField(inline_fragment_variant.server_field_id),
+                                            FieldType::ServerField(inline_fragment_variant.server_field_id),
                                             &(
                                                 server_field.initial_variable_context()
                                             )
@@ -918,7 +916,7 @@ fn insert_imperative_field_into_refetch_paths(
             )
             .refetch_selection_set(),
         encountered_client_field_map,
-        &FieldType::ClientField(newly_encountered_scalar_client_field.id),
+        FieldType::ClientField(newly_encountered_scalar_client_field.id),
         &newly_encountered_scalar_client_field.initial_variable_context(),
     );
 }
@@ -968,7 +966,7 @@ fn merge_non_loadable_scalar_client_field(
                 This is indicative of a bug in Isograph.",
             ),
         encountered_client_field_map,
-        &FieldType::ClientField(newly_encountered_scalar_client_field.id),
+        FieldType::ClientField(newly_encountered_scalar_client_field.id),
         &newly_encountered_scalar_client_field.initial_variable_context(),
     );
 

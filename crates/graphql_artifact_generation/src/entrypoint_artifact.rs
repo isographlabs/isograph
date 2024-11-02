@@ -47,13 +47,13 @@ pub(crate) fn generate_entrypoint_artifacts(
         schema.server_field_data.object(entrypoint.parent_object_id),
         entrypoint.selection_set_for_parent_query(),
         encountered_client_field_map,
-        &FieldType::ClientField(entrypoint.id),
+        FieldType::ClientField(entrypoint.id),
         &entrypoint.initial_variable_context(),
     );
 
-    return generate_entrypoint_artifacts_with_client_field_traversal_result(
+    generate_entrypoint_artifacts_with_client_field_traversal_result(
         schema,
-        &entrypoint,
+        entrypoint,
         &merged_selection_map,
         &traversal_state,
         encountered_client_field_map,
@@ -62,7 +62,7 @@ pub(crate) fn generate_entrypoint_artifacts(
             .iter()
             .map(|variable_definition| &variable_definition.item),
         &schema.mutation_root_operation_name(),
-    );
+    )
 }
 
 pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'a>(
