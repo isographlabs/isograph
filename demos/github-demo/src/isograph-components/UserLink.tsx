@@ -41,7 +41,7 @@ export const UserLink = iso(`
           href={`https://x.com/${data.asUser?.twitterUsername}`}
           target="_blank"
         >
-          {data.asUser?.twitterUsername && <XIcon> </XIcon>}
+          {data.asUser?.twitterUsername && <XIcon />}
         </Link>
       )}
     </>
