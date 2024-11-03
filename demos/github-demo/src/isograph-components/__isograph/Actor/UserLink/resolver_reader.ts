@@ -5,6 +5,12 @@ import User__asUser__resolver_reader from '../../User/asUser/resolver_reader';
 
 const readerAst: ReaderAst<Actor__UserLink__param> = [
   {
+    kind: "Scalar",
+    fieldName: "login",
+    alias: null,
+    arguments: null,
+  },
+  {
     kind: "Linked",
     fieldName: "asUser",
     alias: null,
@@ -14,12 +20,6 @@ const readerAst: ReaderAst<Actor__UserLink__param> = [
       {
         kind: "Scalar",
         fieldName: "id",
-        alias: null,
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "login",
         alias: null,
         arguments: null,
       },

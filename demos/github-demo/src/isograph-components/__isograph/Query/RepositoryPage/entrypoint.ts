@@ -28,7 +28,6 @@ const queryText = 'query RepositoryPage ($repositoryName: String!, $repositoryOw
             ... on User {\
               id,\
               __typename,\
-              login,\
               twitterUsername,\
             },\
           },\
@@ -188,11 +187,6 @@ const normalizationAst: NormalizationAst = [
                           {
                             kind: "Scalar",
                             fieldName: "__typename",
-                            arguments: null,
-                          },
-                          {
-                            kind: "Scalar",
-                            fieldName: "login",
                             arguments: null,
                           },
                           {

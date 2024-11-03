@@ -6,9 +6,9 @@ import { Route } from './GithubDemo';
 
 export const UserLink = iso(`
   field Actor.UserLink @component {
+    login
     asUser {
       id
-      login
       twitterUsername
     }
   }
@@ -22,6 +22,9 @@ export const UserLink = iso(`
     children: ReactNode;
   },
 ) {
+  if (!data.asUser) {
+    return data.login;
+  }
   return (
     <>
       <Link
@@ -29,7 +32,7 @@ export const UserLink = iso(`
           data.asUser &&
           setRoute({
             kind: 'User',
-            userLogin: data.asUser.login,
+            userLogin: data.login,
           })
         }
         style={{ cursor: 'pointer' }}

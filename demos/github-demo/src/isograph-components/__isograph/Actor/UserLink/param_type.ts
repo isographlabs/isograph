@@ -2,6 +2,10 @@
 export type Actor__UserLink__param = {
   readonly data: {
     /**
+The username of the actor.
+    */
+    readonly login: string,
+    /**
 A client pointer for the User type.
     */
     readonly asUser: ({
@@ -9,10 +13,6 @@ A client pointer for the User type.
 The Node ID of the User object
       */
       readonly id: string,
-      /**
-The username used to login.
-      */
-      readonly login: string,
       /**
 The user's Twitter username.
       */
