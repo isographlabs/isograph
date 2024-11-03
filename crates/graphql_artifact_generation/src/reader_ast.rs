@@ -129,7 +129,7 @@ fn linked_field_ast_node(
                 .server_field_data
                 .object(linked_field.associated_data.parent_object_id);
 
-            let type_and_field: ObjectTypeAndFieldName = ObjectTypeAndFieldName {
+            let type_and_field = ObjectTypeAndFieldName {
                 field_name: linked_field.name.item.into(),
                 type_name: object.name,
             };
