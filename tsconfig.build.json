@@ -10,7 +10,6 @@
     "forceConsistentCasingInFileNames": true,
     "composite": true,
     "declaration": true,
-    "declarationMap": true,
     "noUnusedLocals": true,
     "noFallthroughCasesInSwitch": true,
     "noPropertyAccessFromIndexSignature": true,
