@@ -19,6 +19,7 @@ const readerAst: ReaderAst<Query__HomePage__param> = [
         { kind: "Literal", value: 93 },
       ],
     ],
+    condition: null,
     selections: [
       {
         kind: "Scalar",

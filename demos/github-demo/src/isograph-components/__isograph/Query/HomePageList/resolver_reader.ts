@@ -10,6 +10,7 @@ const readerAst: ReaderAst<Query__HomePageList__param> = [
     fieldName: "viewer",
     alias: null,
     arguments: null,
+    condition: null,
     selections: [
       {
         kind: "Scalar",

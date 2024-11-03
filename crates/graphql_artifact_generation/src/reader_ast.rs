@@ -6,8 +6,9 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, FieldType, Loadability,
-    NameAndArguments, NormalizationKey, PathToRefetchField, RefetchedPathsMap,
-    ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
+    NameAndArguments, NormalizationKey, ObjectTypeAndFieldName, PathToRefetchField,
+    RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
+    ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
     ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSelection, VariableContext,
 };
 
@@ -83,10 +84,12 @@ fn generate_reader_ast_node(
                 path.pop();
 
                 linked_field_ast_node(
+                    schema,
                     linked_field_selection,
                     indentation_level,
                     inner_reader_ast,
                     initial_variable_context,
+                    reader_imports,
                 )
             }
         },
@@ -94,10 +97,12 @@ fn generate_reader_ast_node(
 }
 
 fn linked_field_ast_node(
+    schema: &ValidatedSchema,
     linked_field: &ValidatedLinkedFieldSelection,
     indentation_level: u8,
     inner_reader_ast: ReaderAst,
     initial_variable_context: &VariableContext,
+    reader_imports: &mut ReaderImports,
 ) -> String {
     let name = linked_field.name.item;
     let alias = linked_field
@@ -117,12 +122,35 @@ fn linked_field_ast_node(
     );
     let indent_1 = "  ".repeat(indentation_level as usize);
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
+
+    let condition = match linked_field.associated_data.variant {
+        SchemaServerFieldVariant::InlineFragment(_) => {
+            let object = schema
+                .server_field_data
+                .object(linked_field.associated_data.parent_object_id);
+
+            let type_and_field: ObjectTypeAndFieldName = ObjectTypeAndFieldName {
+                field_name: linked_field.name.item.into(),
+                type_name: object.name,
+            };
+
+            let reader_artifact_import_name =
+                format!("{}__resolver_reader", type_and_field.underscore_separated());
+
+            reader_imports.insert((type_and_field, ImportedFileCategory::ResolverReader));
+
+            reader_artifact_import_name
+        }
+        SchemaServerFieldVariant::LinkedField => "null".to_string(),
+    };
+
     format!(
         "{indent_1}{{\n\
         {indent_2}kind: \"Linked\",\n\
         {indent_2}fieldName: \"{name}\",\n\
         {indent_2}alias: {alias},\n\
         {indent_2}arguments: {arguments},\n\
+        {indent_2}condition: {condition},\n\
         {indent_2}selections: {inner_reader_ast},\n\
         {indent_1}}},\n",
     )
