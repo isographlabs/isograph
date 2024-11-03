@@ -20,12 +20,14 @@ const readerAst: ReaderAst<User__RepositoryConnection__param> = [
         { kind: "Variable", name: "after" },
       ],
     ],
+    condition: null,
     selections: [
       {
         kind: "Linked",
         fieldName: "pageInfo",
         alias: null,
         arguments: null,
+        condition: null,
         selections: [
           {
             kind: "Scalar",
@@ -46,12 +48,14 @@ const readerAst: ReaderAst<User__RepositoryConnection__param> = [
         fieldName: "edges",
         alias: null,
         arguments: null,
+        condition: null,
         selections: [
           {
             kind: "Linked",
             fieldName: "node",
             alias: null,
             arguments: null,
+            condition: null,
             selections: [
               {
                 kind: "Scalar",
@@ -95,6 +99,7 @@ const readerAst: ReaderAst<User__RepositoryConnection__param> = [
                 fieldName: "pullRequests",
                 alias: null,
                 arguments: null,
+                condition: null,
                 selections: [
                   {
                     kind: "Scalar",
@@ -115,6 +120,7 @@ const readerAst: ReaderAst<User__RepositoryConnection__param> = [
                 fieldName: "watchers",
                 alias: null,
                 arguments: null,
+                condition: null,
                 selections: [
                   {
                     kind: "Scalar",

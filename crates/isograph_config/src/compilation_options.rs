@@ -8,8 +8,10 @@ use std::error::Error;
 
 use colorize::AnsiColor;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CompilerConfig {
+    // The absolute path to the config file
+    pub config_location: PathBuf,
     /// The folder where the compiler should look for Isograph literals
     pub project_root: PathBuf,
     /// The folder where the compiler should create artifacts
@@ -82,7 +84,7 @@ struct ConfigFile {
     pub options: ConfigFileOptions,
 }
 
-pub fn create_config(mut config_location: PathBuf) -> CompilerConfig {
+pub fn create_config(config_location: PathBuf) -> CompilerConfig {
     let config_contents = match std::fs::read_to_string(&config_location) {
         Ok(contents) => contents,
         Err(_) => match config_location.to_str() {
@@ -98,8 +100,9 @@ pub fn create_config(mut config_location: PathBuf) -> CompilerConfig {
     let config_parsed: ConfigFile = serde_json::from_str(&config_contents)
         .unwrap_or_else(|e| panic!("Error parsing config. Error: {}", e));
 
-    config_location.pop();
-    let config_dir = config_location;
+    let mut config = config_location.clone();
+    config.pop();
+    let config_dir = config;
 
     let artifact_dir = config_dir
         .join(
@@ -115,6 +118,12 @@ pub fn create_config(mut config_location: PathBuf) -> CompilerConfig {
     std::fs::create_dir_all(&project_root_dir).expect("Unable to create project root directory");
 
     CompilerConfig {
+        config_location: config_location.canonicalize().unwrap_or_else(|_| {
+            panic!(
+                "Unable to canonicalize config_file at {:?}.",
+                config_location
+            )
+        }),
         project_root: project_root_dir.canonicalize().unwrap_or_else(|_| {
             panic!(
                 "Unable to canonicalize project root at {:?}.",

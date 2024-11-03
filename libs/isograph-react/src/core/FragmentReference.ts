@@ -1,4 +1,4 @@
-import { DataId } from './IsographEnvironment';
+import { type Link } from './IsographEnvironment';
 import { ReaderWithRefetchQueries } from '../core/entrypoint';
 import { PromiseWrapper } from './PromiseWrapper';
 
@@ -27,7 +27,7 @@ export type FragmentReference<
   readonly readerWithRefetchQueries: PromiseWrapper<
     ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
   >;
-  readonly root: DataId;
+  readonly root: Link;
   readonly variables: ExtractParameters<TReadFromStore>;
   readonly networkRequest: PromiseWrapper<void, any>;
 };
@@ -35,7 +35,7 @@ export type FragmentReference<
 export function stableIdForFragmentReference(
   fragmentReference: FragmentReference<any, any>,
 ): string {
-  return `${fragmentReference.root}/TODO_FRAGMENT_NAME/${serializeVariables(fragmentReference.variables ?? {})}`;
+  return `${fragmentReference.root.__link}/TODO_FRAGMENT_NAME/${serializeVariables(fragmentReference.variables ?? {})}`;
 }
 
 function serializeVariables(variables: Variables) {

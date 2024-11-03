@@ -9,6 +9,7 @@ const readerAst: ReaderAst<Query__HomeRoute__param> = [
     fieldName: "pets",
     alias: null,
     arguments: null,
+    condition: null,
     selections: [
       {
         kind: "Scalar",

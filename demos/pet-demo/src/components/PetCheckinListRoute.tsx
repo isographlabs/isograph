@@ -47,7 +47,7 @@ export const PetDetailDeferredRouteComponent = iso(`
           <Button
             onClick={() =>
               skipLimitPaginationState.kind === 'Complete'
-                ? skipLimitPaginationState.fetchMore(undefined, count)
+                ? skipLimitPaginationState.fetchMore(count)
                 : null
             }
             disabled={skipLimitPaginationState.kind === 'Pending'}
@@ -89,7 +89,6 @@ export function PetCheckinListLoader({
         <FragmentReader
           fragmentReference={fragmentReference}
           networkRequestOptions={{ suspendIfInFlight: false }}
-          additionalProps={{}}
         />
       </React.Suspense>
     </ErrorBoundary>

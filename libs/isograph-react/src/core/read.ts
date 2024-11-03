@@ -1,4 +1,3 @@
-import { CleanupFn } from '@isograph/isograph-disposable-types/dist';
 import { getParentRecordKey, onNextChangeToRecord } from './cache';
 import { getOrCreateCachedComponent } from './componentCache';
 import {
@@ -17,8 +16,9 @@ import {
   defaultMissingFieldHandler,
   getOrLoadIsographArtifact,
   IsographEnvironment,
+  type Link,
 } from './IsographEnvironment';
-import { makeNetworkRequest } from './makeNetworkRequest';
+import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import {
   getPromiseState,
   PromiseWrapper,
@@ -29,6 +29,8 @@ import {
 import { ReaderAst } from './reader';
 import { Arguments } from './util';
 import { logMessage } from './logging';
+import { CleanupFn } from '@isograph/disposable-types';
+import { DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
 
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: Set<DataId>;
@@ -80,11 +82,11 @@ export function readButDoNotEvaluate<
     ) {
       // TODO assert that the network request state is not Err
       throw new Promise((resolve, reject) => {
-        onNextChangeToRecord(environment, response.recordId).then(resolve);
+        onNextChangeToRecord(environment, response.recordLink).then(resolve);
         fragmentReference.networkRequest.promise.catch(reject);
       });
     }
-    throw onNextChangeToRecord(environment, response.recordId);
+    throw onNextChangeToRecord(environment, response.recordLink);
   } else {
     return {
       encounteredRecords: mutableEncounteredRecords,
@@ -103,26 +105,26 @@ export type ReadDataResult<TReadFromStore> =
       readonly kind: 'MissingData';
       readonly reason: string;
       readonly nestedReason?: ReadDataResult<unknown>;
-      readonly recordId: DataId;
+      readonly recordLink: Link;
     };
 
 function readData<TReadFromStore>(
   environment: IsographEnvironment,
   ast: ReaderAst<TReadFromStore>,
-  root: DataId,
+  root: Link,
   variables: ExtractParameters<TReadFromStore>,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableEncounteredRecords: Set<DataId>,
 ): ReadDataResult<TReadFromStore> {
-  mutableEncounteredRecords.add(root);
-  let storeRecord = environment.store[root];
+  mutableEncounteredRecords.add(root.__link);
+  let storeRecord = environment.store[root.__link];
   if (storeRecord === undefined) {
     return {
       kind: 'MissingData',
-      reason: 'No record for root ' + root,
-      recordId: root,
+      reason: 'No record for root ' + root.__link,
+      recordLink: root,
     };
   }
 
@@ -146,8 +148,9 @@ function readData<TReadFromStore>(
         if (value === undefined) {
           return {
             kind: 'MissingData',
-            reason: 'No value for ' + storeRecordName + ' on root ' + root,
-            recordId: root,
+            reason:
+              'No value for ' + storeRecordName + ' on root ' + root.__link,
+            recordLink: root,
           };
         }
         target[field.alias ?? field.fieldName] = value;
@@ -167,10 +170,10 @@ function readData<TReadFromStore>(
                   'No link for ' +
                   storeRecordName +
                   ' on root ' +
-                  root +
+                  root.__link +
                   '. Link is ' +
                   JSON.stringify(item),
-                recordId: root,
+                recordLink: root,
               };
             } else if (link === null) {
               results.push(null);
@@ -179,7 +182,7 @@ function readData<TReadFromStore>(
             const result = readData(
               environment,
               field.selections,
-              link.__link,
+              link,
               variables,
               nestedRefetchQueries,
               networkRequest,
@@ -193,11 +196,11 @@ function readData<TReadFromStore>(
                   'Missing data for ' +
                   storeRecordName +
                   ' on root ' +
-                  root +
+                  root.__link +
                   '. Link is ' +
                   JSON.stringify(item),
                 nestedReason: result,
-                recordId: result.recordId,
+                recordLink: result.recordLink,
               };
             }
             results.push(result.data);
@@ -206,6 +209,43 @@ function readData<TReadFromStore>(
           break;
         }
         let link = assertLink(value);
+
+        if (field.condition) {
+          const data = readData(
+            environment,
+            field.condition.readerAst,
+            root,
+            variables,
+            nestedRefetchQueries,
+            networkRequest,
+            networkRequestOptions,
+            mutableEncounteredRecords,
+          );
+          if (data.kind === 'MissingData') {
+            return {
+              kind: 'MissingData',
+              reason:
+                'Missing data for ' +
+                storeRecordName +
+                ' on root ' +
+                root.__link,
+              nestedReason: data,
+              recordLink: data.recordLink,
+            };
+          }
+          const condition = field.condition.resolver({
+            data: data.data,
+            parameters: {},
+          });
+          if (condition === true) {
+            link = root;
+          } else if (condition === false) {
+            link = null;
+          } else {
+            link = condition;
+          }
+        }
+
         if (link === undefined) {
           // TODO make this configurable, and also generated and derived from the schema
           const missingFieldHandler =
@@ -234,10 +274,10 @@ function readData<TReadFromStore>(
                 'No link for ' +
                 storeRecordName +
                 ' on root ' +
-                root +
+                root.__link +
                 '. Link is ' +
                 JSON.stringify(value),
-              recordId: root,
+              recordLink: root,
             };
           } else {
             link = altLink;
@@ -246,7 +286,7 @@ function readData<TReadFromStore>(
           target[field.alias ?? field.fieldName] = null;
           break;
         }
-        const targetId = link.__link;
+        const targetId = link;
         const data = readData(
           environment,
           field.selections,
@@ -260,9 +300,10 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return {
             kind: 'MissingData',
-            reason: 'Missing data for ' + storeRecordName + ' on root ' + root,
+            reason:
+              'Missing data for ' + storeRecordName + ' on root ' + root.__link,
             nestedReason: data,
-            recordId: data.recordId,
+            recordLink: data.recordLink,
           };
         }
         target[field.alias ?? field.fieldName] = data.data;
@@ -287,9 +328,10 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return {
             kind: 'MissingData',
-            reason: 'Missing data for ' + field.alias + ' on root ' + root,
+            reason:
+              'Missing data for ' + field.alias + ' on root ' + root.__link,
             nestedReason: data,
-            recordId: data.recordId,
+            recordLink: data.recordLink,
           };
         } else {
           const refetchQueryIndex = field.refetchQuery;
@@ -304,7 +346,7 @@ function readData<TReadFromStore>(
           // use the resolver reader AST to get the resolver parameters.
           target[field.alias] = (args: any) => [
             // Stable id
-            root + '__' + field.name,
+            root.__link + '__' + field.name,
             // Fetcher
             field.refetchReaderArtifact.resolver(
               environment,
@@ -341,9 +383,10 @@ function readData<TReadFromStore>(
             if (data.kind === 'MissingData') {
               return {
                 kind: 'MissingData',
-                reason: 'Missing data for ' + field.alias + ' on root ' + root,
+                reason:
+                  'Missing data for ' + field.alias + ' on root ' + root.__link,
                 nestedReason: data,
-                recordId: data.recordId,
+                recordLink: data.recordLink,
               };
             } else {
               const firstParameter = {
@@ -397,12 +440,13 @@ function readData<TReadFromStore>(
         if (refetchReaderParams.kind === 'MissingData') {
           return {
             kind: 'MissingData',
-            reason: 'Missing data for ' + field.alias + ' on root ' + root,
+            reason:
+              'Missing data for ' + field.alias + ' on root ' + root.__link,
             nestedReason: refetchReaderParams,
-            recordId: refetchReaderParams.recordId,
+            recordLink: refetchReaderParams.recordLink,
           };
         } else {
-          target[field.alias] = (args: any) => {
+          target[field.alias] = (args: any, fetchOptions?: FetchOptions) => {
             // TODO we should use the reader AST for this
             const includeReadOutData = (variables: any, readOutData: any) => {
               variables.id = readOutData.id;
@@ -420,7 +464,7 @@ function readData<TReadFromStore>(
 
             return [
               // Stable id
-              root +
+              root.__link +
                 '/' +
                 field.name +
                 '/' +
@@ -430,8 +474,15 @@ function readData<TReadFromStore>(
                 const fragmentReferenceAndDisposeFromEntrypoint = (
                   entrypoint: IsographEntrypoint<any, any>,
                 ): [FragmentReference<any, any>, CleanupFn] => {
+                  const shouldFetch =
+                    fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE;
                   const [networkRequest, disposeNetworkRequest] =
-                    makeNetworkRequest(environment, entrypoint, localVariables);
+                    maybeMakeNetworkRequest(
+                      environment,
+                      entrypoint,
+                      localVariables,
+                      shouldFetch,
+                    );
 
                   const fragmentReference: FragmentReference<any, any> = {
                     kind: 'FragmentReference',
@@ -445,7 +496,7 @@ function readData<TReadFromStore>(
                     } as const),
 
                     // TODO localVariables is not guaranteed to have an id field
-                    root: localVariables.id,
+                    root: { __link: localVariables.id },
                     variables: localVariables,
                     networkRequest,
                   };
@@ -487,11 +538,15 @@ function readData<TReadFromStore>(
                           if (
                             entrypointLoaderState.kind === 'EntrypointNotLoaded'
                           ) {
+                            const shouldFetch =
+                              fetchOptions?.shouldFetch ??
+                              DEFAULT_SHOULD_FETCH_VALUE;
                             const [networkRequest, disposeNetworkRequest] =
-                              makeNetworkRequest(
+                              maybeMakeNetworkRequest(
                                 environment,
                                 entrypoint,
                                 localVariables,
+                                shouldFetch,
                               );
                             entrypointLoaderState = {
                               kind: 'NetworkRequestStarted',
@@ -514,7 +569,7 @@ function readData<TReadFromStore>(
                       ),
 
                       // TODO localVariables is not guaranteed to have an id field
-                      root: localVariables.id,
+                      root: { __link: localVariables.id },
                       variables: localVariables,
                       networkRequest,
                     };

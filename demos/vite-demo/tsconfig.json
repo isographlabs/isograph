@@ -26,7 +26,6 @@
 
     /* Paths */
     "paths": {
-      "@iso/*": ["./src/components/__isograph/*"],
       "@iso": ["./src/components/__isograph/iso.ts"]
     },
 

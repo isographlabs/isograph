@@ -6,8 +6,8 @@ import {
 } from './FragmentReference';
 import {
   ComponentOrFieldName,
-  DataId,
   IsographEnvironment,
+  type Link,
 } from './IsographEnvironment';
 import {
   IsographEntrypoint,
@@ -16,6 +16,7 @@ import {
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
 import { Arguments } from './util';
+import { FetchOptions } from './check';
 
 export type TopLevelReaderArtifact<
   TReadFromStore extends { parameters: object; data: object },
@@ -66,7 +67,7 @@ export type RefetchReaderArtifact = {
     variables: any,
     // TODO type this better
     filteredVariables: any,
-    rootId: DataId,
+    rootLink: Link,
     readerArtifact: TopLevelReaderArtifact<any, any, any> | null,
     // TODO type this better
     nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
@@ -95,6 +96,10 @@ export type ReaderLinkedField = {
   readonly alias: string | null;
   readonly selections: ReaderAst<unknown>;
   readonly arguments: Arguments | null;
+  readonly condition: EagerReaderArtifact<
+    { data: object; parameters: object },
+    boolean | Link | null
+  > | null;
 };
 
 export type ReaderNonLoadableResolverField = {
@@ -144,7 +149,12 @@ type StableId = string;
 export type LoadableField<
   TReadFromStore extends { data: object; parameters: object },
   TResult,
-  TProvidedArgs extends object = object,
+  TArgs = ExtractParameters<TReadFromStore>,
 > = (
-  args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs> | void,
+  args: TArgs | void,
+  // Note: fetchOptions is not nullable here because a LoadableField is not a
+  // user-facing API. Users should only interact with LoadableFields via APIs
+  // like useClientSideDefer. These APIs should have a nullable fetchOptions
+  // parameter, and provide a default value ({}) to the LoadableField.
+  fetchOptions: FetchOptions,
 ) => [StableId, Factory<FragmentReference<TReadFromStore, TResult>>];

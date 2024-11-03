@@ -9,8 +9,9 @@ import {
 } from '../core/FragmentReference';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import { ROOT_ID } from '../core/IsographEnvironment';
-import { makeNetworkRequest } from '../core/makeNetworkRequest';
+import { maybeMakeNetworkRequest } from '../core/makeNetworkRequest';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
+import { DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from '../core/check';
 
 // TODO rename this to useImperativelyLoadedEntrypoint
 
@@ -23,7 +24,10 @@ export function useImperativeReference<
   fragmentReference:
     | FragmentReference<TReadFromStore, TClientFieldValue>
     | UnassignedState;
-  loadFragmentReference: (variables: ExtractParameters<TReadFromStore>) => void;
+  loadFragmentReference: (
+    variables: ExtractParameters<TReadFromStore>,
+    fetchOptions?: FetchOptions,
+  ) => void;
 } {
   const { state, setState } =
     useUpdatableDisposableState<
@@ -32,11 +36,17 @@ export function useImperativeReference<
   const environment = useIsographEnvironment();
   return {
     fragmentReference: state,
-    loadFragmentReference: (variables: ExtractParameters<TReadFromStore>) => {
-      const [networkRequest, disposeNetworkRequest] = makeNetworkRequest(
+    loadFragmentReference: (
+      variables: ExtractParameters<TReadFromStore>,
+      fetchOptions?: FetchOptions,
+    ) => {
+      const shouldFetch =
+        fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE;
+      const [networkRequest, disposeNetworkRequest] = maybeMakeNetworkRequest(
         environment,
         entrypoint,
         variables,
+        shouldFetch,
       );
       setState([
         {
@@ -47,7 +57,7 @@ export function useImperativeReference<
             nestedRefetchQueries:
               entrypoint.readerWithRefetchQueries.nestedRefetchQueries,
           }),
-          root: ROOT_ID,
+          root: { __link: ROOT_ID },
           variables,
           networkRequest,
         },

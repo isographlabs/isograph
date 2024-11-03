@@ -11,27 +11,29 @@ use isograph_lang_types::{
     ServerFieldSelection, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
-    get_provided_arguments, selection_map_wrapped, ClientFieldTraversalResult, ClientFieldVariant,
-    FieldDefinitionLocation, NameAndArguments, NormalizationKey, RequiresRefinement, SchemaObject,
-    UserWrittenComponentVariant, ValidatedClientField, ValidatedIsographSelectionVariant,
-    ValidatedSchema, ValidatedSelection, ValidatedVariableDefinition,
+    get_provided_arguments, selection_map_wrapped, ClientFieldVariant, FieldTraversalResult,
+    FieldType, NameAndArguments, NormalizationKey, RequiresRefinement, SchemaObject,
+    SchemaServerFieldVariant, UserWrittenComponentVariant, ValidatedClientField,
+    ValidatedIsographSelectionVariant, ValidatedSchema, ValidatedSelection,
+    ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
-use std::path::Path;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::{self, Debug, Display},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
-use crate::entrypoint_artifact::generate_entrypoint_artifacts_with_client_field_traversal_result;
-use crate::format_parameter_type::format_parameter_type;
 use crate::{
     eager_reader_artifact::{
-        generate_eager_reader_artifacts, generate_eager_reader_output_type_artifact,
-        generate_eager_reader_param_type_artifact,
+        generate_eager_reader_artifacts, generate_eager_reader_condition_artifact,
+        generate_eager_reader_output_type_artifact, generate_eager_reader_param_type_artifact,
     },
-    entrypoint_artifact::generate_entrypoint_artifacts,
+    entrypoint_artifact::{
+        generate_entrypoint_artifacts,
+        generate_entrypoint_artifacts_with_client_field_traversal_result,
+    },
+    format_parameter_type::format_parameter_type,
     import_statements::ParamTypeImports,
     iso_overload_file::build_iso_overload_artifact,
     refetch_reader_artifact::{
@@ -55,7 +57,7 @@ lazy_static! {
 /// generating the merged selection map.
 ///
 /// - While creating a client field's merged selection map, whenever we enter
-///   a client field, we check a cache (`global_client_field_map`). If that
+///   a client field, we check a cache (`encountered_client_field_map`). If that
 ///   cache is empty, we populate it with the client field's merged selection
 ///   map, reachable variables, and paths to refetch fields.
 /// - If that cache is full, we reuse the values in the cache.
@@ -75,14 +77,17 @@ pub fn get_artifact_path_and_content(
     project_root: &Path,
     artifact_directory: &Path,
 ) -> Vec<ArtifactPathAndContent> {
-    let mut global_client_field_map = BTreeMap::new();
+    let mut encountered_client_field_map = BTreeMap::new();
     let mut path_and_contents = vec![];
     let mut encountered_output_types = HashSet::<ClientFieldId>::new();
 
     // For each entrypoint, generate an entrypoint artifact and refetch artifacts
     for entrypoint_id in schema.entrypoints.iter() {
-        let entrypoint_path_and_content =
-            generate_entrypoint_artifacts(schema, *entrypoint_id, &mut global_client_field_map);
+        let entrypoint_path_and_content = generate_entrypoint_artifacts(
+            schema,
+            *entrypoint_id,
+            &mut encountered_client_field_map,
+        );
         path_and_contents.extend(entrypoint_path_and_content);
 
         // We also need to generate output types for entrypoints
@@ -90,123 +95,142 @@ pub fn get_artifact_path_and_content(
     }
 
     for (
-        encountered_client_field_id,
-        ClientFieldTraversalResult {
+        encountered_field_id,
+        FieldTraversalResult {
             traversal_state,
             merged_selection_map,
             was_ever_selected_loadably,
             ..
         },
-    ) in &global_client_field_map
+    ) in &encountered_client_field_map
     {
-        let encountered_client_field = schema.client_field(*encountered_client_field_id);
-        // Generate reader ASTs for all encountered client fields, which may be reader or refetch reader
-        match &encountered_client_field.variant {
-            ClientFieldVariant::UserWritten(info) => {
-                path_and_contents.extend(generate_eager_reader_artifacts(
-                    schema,
-                    encountered_client_field,
-                    project_root,
-                    artifact_directory,
-                    *info,
-                    &traversal_state.refetch_paths,
-                ));
+        match encountered_field_id {
+            FieldType::ServerField(encountered_server_field_id) => {
+                let encountered_server_field = schema.server_field(*encountered_server_field_id);
 
-                if *was_ever_selected_loadably {
-                    path_and_contents.push(generate_refetch_reader_artifact(
-                        schema,
-                        encountered_client_field,
-                        None,
-                        &traversal_state.refetch_paths,
-                        true,
-                    ));
-
-                    // Everything about this is quite sus
-                    let id_arg = ArgumentKeyAndValue {
-                        key: "id".intern().into(),
-                        value: NonConstantValue::Variable("id".intern().into()),
-                    };
-
-                    let type_to_refine_to = schema
-                        .server_field_data
-                        .object(encountered_client_field.parent_object_id);
-
-                    if schema
-                        .fetchable_types
-                        .contains_key(&encountered_client_field.parent_object_id)
-                    {
-                        panic!("Loadable fields on root objects are not yet supported");
+                match &encountered_server_field.variant {
+                    SchemaServerFieldVariant::LinkedField => {}
+                    SchemaServerFieldVariant::InlineFragment(inline_fragment) => {
+                        path_and_contents.push(generate_eager_reader_condition_artifact(
+                            schema,
+                            encountered_server_field,
+                            inline_fragment,
+                            &traversal_state.refetch_paths,
+                        ));
                     }
-
-                    let wrapped_map = selection_map_wrapped(
-                        merged_selection_map.clone(),
-                        "node".intern().into(),
-                        vec![id_arg.clone()],
-                        None,
-                        None,
-                        None,
-                        RequiresRefinement::Yes(type_to_refine_to.name),
-                    );
-                    let id_var = ValidatedVariableDefinition {
-                        name: WithLocation::new("id".intern().into(), Location::Generated),
-                        type_: GraphQLTypeAnnotation::NonNull(Box::new(
-                            GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                                WithSpan::new(
-                                    SelectableServerFieldId::Scalar(schema.id_type_id),
-                                    Span::todo_generated(),
-                                ),
-                            )),
-                        )),
-                        default_value: None,
-                    };
-                    let variable_definitions_iter = encountered_client_field
-                        .variable_definitions
-                        .iter()
-                        .map(|variable_defition| &variable_defition.item)
-                        .chain(std::iter::once(&id_var));
-                    let mut traversal_state = traversal_state.clone();
-                    traversal_state.refetch_paths = traversal_state
-                        .refetch_paths
-                        .into_iter()
-                        .map(|(mut key, value)| {
-                            key.0.linked_fields.insert(
-                                0,
-                                NormalizationKey::InlineFragment(type_to_refine_to.name),
-                            );
-                            key.0.linked_fields.insert(
-                                0,
-                                NormalizationKey::ServerField(NameAndArguments {
-                                    name: "node".intern().into(),
-                                    arguments: vec![id_arg.clone()],
-                                }),
-                            );
-                            (key, value)
-                        })
-                        .collect();
-
-                    path_and_contents.extend(
-                        generate_entrypoint_artifacts_with_client_field_traversal_result(
+                };
+            }
+            FieldType::ClientField(encountered_client_field_id) => {
+                let encountered_client_field = schema.client_field(*encountered_client_field_id);
+                // Generate reader ASTs for all encountered client fields, which may be reader or refetch reader
+                match &encountered_client_field.variant {
+                    ClientFieldVariant::UserWritten(info) => {
+                        path_and_contents.extend(generate_eager_reader_artifacts(
                             schema,
                             encountered_client_field,
-                            &wrapped_map,
-                            &traversal_state,
-                            &global_client_field_map,
-                            variable_definitions_iter,
-                            &schema.query_root_operation_name(),
-                        ),
-                    );
-                }
+                            project_root,
+                            artifact_directory,
+                            *info,
+                            &traversal_state.refetch_paths,
+                        ));
+
+                        if *was_ever_selected_loadably {
+                            path_and_contents.push(generate_refetch_reader_artifact(
+                                schema,
+                                encountered_client_field,
+                                None,
+                                &traversal_state.refetch_paths,
+                                true,
+                            ));
+
+                            // Everything about this is quite sus
+                            let id_arg = ArgumentKeyAndValue {
+                                key: "id".intern().into(),
+                                value: NonConstantValue::Variable("id".intern().into()),
+                            };
+
+                            let type_to_refine_to = schema
+                                .server_field_data
+                                .object(encountered_client_field.parent_object_id);
+
+                            if schema
+                                .fetchable_types
+                                .contains_key(&encountered_client_field.parent_object_id)
+                            {
+                                panic!("Loadable fields on root objects are not yet supported");
+                            }
+
+                            let wrapped_map = selection_map_wrapped(
+                                merged_selection_map.clone(),
+                                "node".intern().into(),
+                                vec![id_arg.clone()],
+                                None,
+                                None,
+                                None,
+                                RequiresRefinement::Yes(type_to_refine_to.name),
+                            );
+                            let id_var = ValidatedVariableDefinition {
+                                name: WithLocation::new("id".intern().into(), Location::Generated),
+                                type_: GraphQLTypeAnnotation::NonNull(Box::new(
+                                    GraphQLNonNullTypeAnnotation::Named(
+                                        GraphQLNamedTypeAnnotation(WithSpan::new(
+                                            SelectableServerFieldId::Scalar(schema.id_type_id),
+                                            Span::todo_generated(),
+                                        )),
+                                    ),
+                                )),
+                                default_value: None,
+                            };
+                            let variable_definitions_iter = encountered_client_field
+                                .variable_definitions
+                                .iter()
+                                .map(|variable_defition| &variable_defition.item)
+                                .chain(std::iter::once(&id_var));
+                            let mut traversal_state = traversal_state.clone();
+                            traversal_state.refetch_paths = traversal_state
+                                .refetch_paths
+                                .into_iter()
+                                .map(|(mut key, value)| {
+                                    key.0.linked_fields.insert(
+                                        0,
+                                        NormalizationKey::InlineFragment(type_to_refine_to.name),
+                                    );
+                                    key.0.linked_fields.insert(
+                                        0,
+                                        NormalizationKey::ServerField(NameAndArguments {
+                                            name: "node".intern().into(),
+                                            arguments: vec![id_arg.clone()],
+                                        }),
+                                    );
+                                    (key, value)
+                                })
+                                .collect();
+
+                            path_and_contents.extend(
+                                generate_entrypoint_artifacts_with_client_field_traversal_result(
+                                    schema,
+                                    encountered_client_field,
+                                    &wrapped_map,
+                                    &traversal_state,
+                                    &encountered_client_field_map,
+                                    variable_definitions_iter,
+                                    &schema.query_root_operation_name(),
+                                ),
+                            );
+                        }
+                    }
+                    ClientFieldVariant::ImperativelyLoadedField(variant) => {
+                        path_and_contents.push(generate_refetch_reader_artifact(
+                            schema,
+                            encountered_client_field,
+                            variant.primary_field_info.as_ref(),
+                            &traversal_state.refetch_paths,
+                            false,
+                        ));
+                    }
+                };
             }
-            ClientFieldVariant::ImperativelyLoadedField(variant) => {
-                path_and_contents.push(generate_refetch_reader_artifact(
-                    schema,
-                    encountered_client_field,
-                    variant.primary_field_info.as_ref(),
-                    &traversal_state.refetch_paths,
-                    false,
-                ));
-            }
-        };
+        }
     }
 
     for user_written_client_field in
@@ -224,8 +248,10 @@ pub fn get_artifact_path_and_content(
             user_written_client_field,
         ));
 
-        match global_client_field_map.get(&user_written_client_field.id) {
-            Some(ClientFieldTraversalResult {
+        match encountered_client_field_map
+            .get(&FieldType::ClientField(user_written_client_field.id))
+        {
+            Some(FieldTraversalResult {
                 traversal_state, ..
             }) => {
                 // If this user-written client field is reachable from an entrypoint,
@@ -428,7 +454,7 @@ fn write_param_type_from_selection(
         Selection::ServerField(field) => match field {
             ServerFieldSelection::ScalarField(scalar_field_selection) => {
                 match scalar_field_selection.associated_data.location {
-                    FieldDefinitionLocation::Server(_server_field) => {
+                    FieldType::ServerField(_server_field) => {
                         let parent_field = parent_type
                             .encountered_fields
                             .get(&scalar_field_selection.name.item.into())
@@ -466,7 +492,7 @@ fn write_param_type_from_selection(
                             print_javascript_type_declaration(&output_type)
                         ));
                     }
-                    FieldDefinitionLocation::Client(client_field_id) => {
+                    FieldType::ClientField(client_field_id) => {
                         let client_field = schema.client_field(client_field_id);
                         write_optional_description(
                             client_field.description,
@@ -497,12 +523,13 @@ fn write_param_type_from_selection(
                                         "".to_string()
                                     } else {
                                         format!(
-                                            ",\n{indent}{}",
-                                            get_loadable_field_type_from_arguments(
-                                                schema,
-                                                provided_arguments
-                                            )
+                                        ",\n{indent}Omit<ExtractParameters<{}__param>, keyof {}>",
+                                        client_field.type_and_field.underscore_separated(),
+                                        get_loadable_field_type_from_arguments(
+                                            schema,
+                                            provided_arguments
                                         )
+                                    )
                                     };
 
                                     format!(

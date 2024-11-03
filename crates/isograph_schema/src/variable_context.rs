@@ -7,7 +7,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ClientField, NameAndArguments, ValidatedIsographSelectionVariant, ValidatedVariableDefinition,
+    ClientField, NameAndArguments, SchemaServerField, ValidatedIsographSelectionVariant,
+    ValidatedVariableDefinition,
 };
 
 #[derive(Debug)]
@@ -125,6 +126,25 @@ impl<
                 )
             })
             .collect();
+        VariableContext(variable_context)
+    }
+}
+
+impl<TData, TClientFieldVariableDefinitionAssociatedData: Ord + Debug>
+    SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData>
+{
+    pub fn initial_variable_context(&self) -> VariableContext {
+        let variable_context = self
+            .arguments
+            .iter()
+            .map(|variable_definition| {
+                (
+                    variable_definition.item.name.item,
+                    NonConstantValue::Variable(variable_definition.item.name.item),
+                )
+            })
+            .collect();
+
         VariableContext(variable_context)
     }
 }

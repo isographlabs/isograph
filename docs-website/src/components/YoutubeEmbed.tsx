@@ -4,9 +4,8 @@ export default function YoutubeEmbed() {
       <div className="container padding-bottom--xl padding-top--xl">
         <div className="row">
           <div className="col col--8 col--offset-2">
-            {/* <div className="kicker">Tell me more!</div> */}
             <h2 className="text--center">
-              Watch the talk at GraphQL&nbsp;Conf
+              Watch the talk at GraphQL&nbsp;Conf 2024
             </h2>
           </div>
         </div>
@@ -15,9 +14,9 @@ export default function YoutubeEmbed() {
             <iframe
               width="100%"
               height="444"
-              src="https://www.youtube-nocookie.com/embed/gO65JJRqjuc?si=cPnngBys86lgWeLA"
-              title="YouTube video player"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              src="https://www.youtube-nocookie.com/embed/sf8ac2NtwPY?si=Ztxho3m1mPKFO6ME"
+              title="Performing Impossible Feats with Isograph at GraphQL Conf 2024"
+              allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
               allowFullScreen
               frameBorder="0"
             ></iframe>

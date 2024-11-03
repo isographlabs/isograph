@@ -2,8 +2,7 @@ use std::ops::ControlFlow;
 
 use lsp_types::notification::Notification;
 
-use crate::lsp_runtime_error::LSPRuntimeError;
-use crate::lsp_runtime_error::LSPRuntimeResult;
+use crate::lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult};
 
 pub struct LSPNotificationDispatch<'state, TState> {
     notification: lsp_server::Notification,

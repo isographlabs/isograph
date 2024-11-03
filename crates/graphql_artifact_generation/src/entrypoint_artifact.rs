@@ -4,10 +4,10 @@ use common_lang_types::{ArtifactPathAndContent, QueryOperationName, VariableName
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{ClientFieldId, IsographSelectionVariant};
 use isograph_schema::{
-    create_merged_selection_map_for_client_field_and_insert_into_global_map,
+    create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
-    get_reachable_variables, ClientFieldToCompletedMergeTraversalStateMap,
-    ClientFieldTraversalResult, MergedSelectionMap, RootOperationName, RootRefetchedPath,
+    get_reachable_variables, ClientFieldToCompletedMergeTraversalStateMap, FieldTraversalResult,
+    FieldType, MergedSelectionMap, RootOperationName, RootRefetchedPath,
     ScalarClientFieldTraversalState, SchemaObject, ValidatedClientField, ValidatedSchema,
     ValidatedVariableDefinition,
 };
@@ -34,20 +34,20 @@ struct EntrypointArtifactInfo<'schema> {
 pub(crate) fn generate_entrypoint_artifacts(
     schema: &ValidatedSchema,
     entrypoint_id: ClientFieldId,
-    global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
+    encountered_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
 ) -> Vec<ArtifactPathAndContent> {
     let entrypoint = schema.client_field(entrypoint_id);
 
-    let ClientFieldTraversalResult {
+    let FieldTraversalResult {
         traversal_state,
         merged_selection_map,
         ..
-    } = create_merged_selection_map_for_client_field_and_insert_into_global_map(
+    } = create_merged_selection_map_for_field_and_insert_into_global_map(
         schema,
         schema.server_field_data.object(entrypoint.parent_object_id),
         entrypoint.selection_set_for_parent_query(),
-        global_client_field_map,
-        entrypoint,
+        encountered_client_field_map,
+        FieldType::ClientField(entrypoint.id),
         &entrypoint.initial_variable_context(),
     );
 
@@ -56,7 +56,7 @@ pub(crate) fn generate_entrypoint_artifacts(
         entrypoint,
         &merged_selection_map,
         &traversal_state,
-        global_client_field_map,
+        encountered_client_field_map,
         entrypoint
             .variable_definitions
             .iter()
@@ -70,7 +70,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
     entrypoint: &ValidatedClientField,
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
-    global_client_field_map: &ClientFieldToCompletedMergeTraversalStateMap,
+    encountered_client_field_map: &ClientFieldToCompletedMergeTraversalStateMap,
     variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
     default_root_operation_name: &Option<&RootOperationName>,
 ) -> Vec<ArtifactPathAndContent> {
@@ -112,8 +112,10 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
                 IsographSelectionVariant::Loadable(_) => {
                     // Note: it would be cleaner to include a reference to the merged selection set here via
                     // the selection_variant variable, instead of by looking it up like this.
-                    &global_client_field_map
-                        .get(&root_refetch_path.path_to_refetch_field_info.client_field_id)
+                    &encountered_client_field_map
+                        .get(&FieldType::ClientField(
+                            root_refetch_path.path_to_refetch_field_info.client_field_id,
+                        ))
                         .expect(
                             "Expected field to have been encountered, \
                                 since it is being used as a refetch field.",

@@ -16,17 +16,7 @@ export default function () {
         <div className="row">
           <div className="col col--8 col--offset-2">
             <div className="text--center-wide">
-              <p>
-                Isograph is <b>alpha software</b> under active development. The
-                APIs are likely to change substantially. The project is feature
-                incomplete.
-              </p>
-              <p>
-                Nonetheless, we stand behind the developer experience, and the
-                foundations are solid. Isograph is a a good fit for certain side
-                projects and internal tools. The Isograph team would encourage
-                you to give it a try and provide feedback!
-              </p>
+              <p>Interested in giving Isograph a try?</p>
               <p>
                 Join the <a href="https://discord.gg/qcHUxb6deQ">Discord</a>.
                 Follow the{' '}

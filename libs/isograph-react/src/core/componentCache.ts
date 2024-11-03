@@ -17,9 +17,9 @@ export function getOrCreateCachedComponent(
   // time.
   const cachedComponentsById = environment.componentCache;
 
-  cachedComponentsById[fragmentReference.root] =
-    cachedComponentsById[fragmentReference.root] ?? {};
-  const componentsByName = cachedComponentsById[fragmentReference.root];
+  const recordLink = fragmentReference.root.__link;
+
+  const componentsByName = (cachedComponentsById[recordLink] ??= {});
 
   componentsByName[componentName] = componentsByName[componentName] ?? {};
   const byArgs = componentsByName[componentName];
@@ -44,7 +44,7 @@ export function getOrCreateCachedComponent(
         logMessage(environment, {
           kind: 'ComponentRerendered',
           componentName,
-          rootId: fragmentReference.root,
+          rootLink: fragmentReference.root,
         });
 
         const firstParameter = {

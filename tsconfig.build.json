@@ -1,5 +1,5 @@
 {
-  "exclude": ["**/*.test.ts", "**/*.stub.ts", "node_modules", "dist"],
+  "exclude": ["**/*.test.ts", "**/*.stub.ts", "**/node_modules", "**/dist"],
   "compilerOptions": {
     "target": "ES2015",
     "module": "commonjs",
@@ -9,6 +9,7 @@
     "jsx": "react",
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
+    "declarationMap": true,
     "noUnusedLocals": true,
     "noFallthroughCasesInSwitch": true,
     "noPropertyAccessFromIndexSignature": true,

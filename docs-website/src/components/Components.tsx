@@ -68,11 +68,11 @@ export const PetList = iso(\`
       PetProfile
     }
   }
-\`)(function(props) {
+\`)(function({ data }) {
   return (<>
     <h1>Pet Hotel Guest List</h1>
-    <p>{props.data.pets.length} pets checked in.</p>
-    {props.data.pets.map(pet => (
+    <p>{data.pets.length} pets checked in.</p>
+    {data.pets.map(pet => (
       <pet.PetProfile key={pet.id} />
     ))}
   </>);
@@ -83,9 +83,9 @@ export const PetProfile = iso(\`
     name
     species
   }
-\`)(function(props) {
+\`)(function({ data }) {
   return (<Box>
-    {props.data.name}, a {props.data.species}
+    {data.name}, a {data.species}
   </Box>);
 });
 `;

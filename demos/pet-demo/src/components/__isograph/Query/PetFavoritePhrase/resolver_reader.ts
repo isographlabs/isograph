@@ -13,6 +13,7 @@ const readerAst: ReaderAst<Query__PetFavoritePhrase__param> = [
         { kind: "Variable", name: "id" },
       ],
     ],
+    condition: null,
     selections: [
       {
         kind: "Scalar",

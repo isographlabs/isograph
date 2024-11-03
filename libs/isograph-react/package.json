@@ -14,7 +14,9 @@
     "test-watch": "vitest watch",
     "coverage": "vitest run --coverage",
     "prepack": "pnpm run test && pnpm run compile",
-    "tsc": "tsc"
+    "tsc": "tsc",
+    "iso": "../../target/debug/isograph_cli --config ./isograph.config.json",
+    "iso-watch": "../../target/debug/isograph_cli --config ./isograph.config.json --watch"
   },
   "dependencies": {
     "@isograph/disposable-types": "0.2.0",

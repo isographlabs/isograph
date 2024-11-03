@@ -1,10 +1,10 @@
 use std::collections::{hash_map::Entry, BTreeMap, HashMap};
 
 use crate::{
-    EncounteredRootTypes, FieldDefinitionLocation, IsographObjectTypeDefinition,
-    ProcessedRootTypes, RootOperationName, RootTypes, Schema, SchemaObject, SchemaScalar,
-    SchemaServerField, UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaSchemaField,
-    ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
+    EncounteredRootTypes, FieldType, IsographObjectTypeDefinition, ProcessedRootTypes,
+    RootOperationName, RootTypes, Schema, SchemaObject, SchemaScalar, SchemaServerField,
+    SchemaServerFieldVariant, UnvalidatedObjectFieldInfo, UnvalidatedSchema,
+    UnvalidatedSchemaSchemaField, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
 };
 use common_lang_types::{
     GraphQLObjectTypeName, GraphQLScalarTypeName, IsographObjectTypeName, Location,
@@ -646,7 +646,7 @@ fn get_field_objects_ids_and_names(
 
         match encountered_fields.insert(
             field.item.name.item,
-            FieldDefinitionLocation::Server(next_server_field_id),
+            FieldType::ServerField(next_server_field_id),
         ) {
             None => {
                 // TODO check for @strong directive instead!
@@ -673,6 +673,7 @@ fn get_field_objects_ids_and_names(
                         .map(graphql_input_value_definition_to_variable_definition)
                         .collect::<Result<Vec<_>, _>>()?,
                     is_discriminator: false,
+                    variant: SchemaServerFieldVariant::LinkedField,
                 });
                 server_field_ids.push(next_server_field_id);
             }
@@ -705,12 +706,13 @@ fn get_field_objects_ids_and_names(
         parent_type_id,
         arguments: vec![],
         is_discriminator: true,
+        variant: SchemaServerFieldVariant::LinkedField,
     });
 
     if encountered_fields
         .insert(
             typename_name.item,
-            FieldDefinitionLocation::Server(typename_field_id),
+            FieldType::ServerField(typename_field_id),
         )
         .is_some()
     {
@@ -889,7 +891,7 @@ pub enum ProcessTypeDefinitionError {
         "The Isograph compiler attempted to create a field named \
     \"{field_name}\" on type \"{parent_type}\", but a field with that name already exists."
     )]
-    FieldExistsOnSubtype {
+    FieldExistsOnType {
         field_name: SelectableFieldName,
         parent_type: IsographObjectTypeName,
     },

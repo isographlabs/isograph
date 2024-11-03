@@ -1,5 +1,4 @@
 import { iso } from '@iso';
-import { Fragment } from 'react';
 
 export const HomePage = iso(`
   field Query.HomePage @component {

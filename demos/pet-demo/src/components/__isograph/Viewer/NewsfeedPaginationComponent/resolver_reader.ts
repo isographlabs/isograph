@@ -19,12 +19,8 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
         "limit",
         { kind: "Variable", name: "limit" },
       ],
-
-      [
-        "additionalSkip",
-        { kind: "Literal", value: 5 },
-      ],
     ],
+    condition: null,
     selections: [
       {
         kind: "Resolver",
