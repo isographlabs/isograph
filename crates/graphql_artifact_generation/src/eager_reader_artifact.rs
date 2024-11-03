@@ -4,20 +4,22 @@ use isograph_schema::{
     RefetchedPathsMap, SchemaServerFieldInlineFragmentVariant, UserWrittenClientFieldInfo,
     UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema, ValidatedSchemaServerField,
 };
-use std::borrow::Cow;
-use std::path::Path;
-use std::{collections::BTreeSet, path::PathBuf, str::FromStr};
+use std::{
+    borrow::Cow,
+    collections::BTreeSet,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
-use crate::generate_artifacts::generate_parameters;
-use crate::import_statements::param_type_imports_to_import_param_statement;
 use crate::{
     generate_artifacts::{
-        generate_client_field_parameter_type, generate_output_type, generate_path,
-        ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAMETERS_TYPE,
-        RESOLVER_PARAM_TYPE, RESOLVER_READER,
+        generate_client_field_parameter_type, generate_output_type, generate_parameters,
+        generate_path, ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE,
+        RESOLVER_PARAMETERS_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
     },
     import_statements::{
-        param_type_imports_to_import_statement, reader_imports_to_import_statement,
+        param_type_imports_to_import_param_statement, param_type_imports_to_import_statement,
+        reader_imports_to_import_statement,
     },
     reader_ast::generate_reader_ast,
 };

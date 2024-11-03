@@ -18,23 +18,22 @@ use isograph_schema::{
     ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
-use std::path::Path;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::{self, Debug, Display},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
-
-use crate::eager_reader_artifact::generate_eager_reader_condition_artifact;
-use crate::entrypoint_artifact::generate_entrypoint_artifacts_with_client_field_traversal_result;
-use crate::format_parameter_type::format_parameter_type;
 
 use crate::{
     eager_reader_artifact::{
-        generate_eager_reader_artifacts, generate_eager_reader_output_type_artifact,
-        generate_eager_reader_param_type_artifact,
+        generate_eager_reader_artifacts, generate_eager_reader_condition_artifact,
+        generate_eager_reader_output_type_artifact, generate_eager_reader_param_type_artifact,
     },
-    entrypoint_artifact::generate_entrypoint_artifacts,
+    entrypoint_artifact::{
+        generate_entrypoint_artifacts,
+        generate_entrypoint_artifacts_with_client_field_traversal_result,
+    },
+    format_parameter_type::format_parameter_type,
     import_statements::ParamTypeImports,
     iso_overload_file::build_iso_overload_artifact,
     refetch_reader_artifact::{

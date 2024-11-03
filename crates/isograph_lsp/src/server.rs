@@ -1,15 +1,17 @@
 use std::ops::ControlFlow;
 
-use crate::lsp_request_dispatch::LSPRequestDispatch;
-use crate::lsp_runtime_error::LSPRuntimeError;
-use crate::lsp_state::LSPState;
-use crate::semantic_tokens::on_semantic_token_full_request;
-use crate::semantic_tokens::semantic_token_legend::semantic_token_legend;
-use crate::text_document::{
-    on_did_change_text_document, on_did_close_text_document, on_did_open_text_document,
-};
 use crate::{
-    lsp_notification_dispatch::LSPNotificationDispatch, lsp_process_error::LSPProcessResult,
+    lsp_notification_dispatch::LSPNotificationDispatch,
+    lsp_process_error::LSPProcessResult,
+    lsp_request_dispatch::LSPRequestDispatch,
+    lsp_runtime_error::LSPRuntimeError,
+    lsp_state::LSPState,
+    semantic_tokens::{
+        on_semantic_token_full_request, semantic_token_legend::semantic_token_legend,
+    },
+    text_document::{
+        on_did_change_text_document, on_did_close_text_document, on_did_open_text_document,
+    },
 };
 use isograph_config::CompilerConfig as Config;
 use lsp_server::{Connection, ErrorCode, Response, ResponseError};
