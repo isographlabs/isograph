@@ -7,6 +7,7 @@ use isograph_config::create_config;
 use opt::{Command, CompileCommand, LspCommand, Opt};
 use std::io;
 use tracing::{error, info, level_filters::LevelFilter};
+use tracing_subscriber::fmt::format::FmtSpan;
 
 #[tokio::main]
 async fn main() {
@@ -66,16 +67,22 @@ async fn start_language_server(lsp_command: LspCommand) {
     }
 }
 
-// TODO: Configure parameters based on provided log_level.
-// Add more verbosity to debug and trace levels
 fn configure_logger(log_level: LevelFilter) {
-    tracing_subscriber::fmt()
+    let mut collector = tracing_subscriber::fmt()
         .pretty()
         .without_time()
-        .with_file(false)
-        .with_line_number(false)
-        .with_target(false)
         .with_max_level(log_level)
-        .with_writer(io::stderr)
-        .init();
+        .with_writer(io::stderr);
+    match log_level {
+        LevelFilter::DEBUG | LevelFilter::TRACE => {
+            collector = collector.with_span_events(FmtSpan::FULL);
+        }
+        _ => {
+            collector = collector
+                .with_file(false)
+                .with_line_number(false)
+                .with_target(false);
+        }
+    }
+    collector.init();
 }
