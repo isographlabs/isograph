@@ -540,6 +540,7 @@ dependencies = [
  "common_lang_types",
  "graphql_lang_types",
  "intern",
+ "isograph_config",
  "isograph_lang_types",
  "isograph_schema",
  "lazy_static",

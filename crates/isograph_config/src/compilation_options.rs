@@ -28,6 +28,23 @@ pub struct CompilerConfig {
 #[derive(Default, Debug, Clone, Copy)]
 pub struct ConfigOptions {
     pub on_invalid_id_type: OptionalValidationLevel,
+    pub generate_file_extensions: OptionalGenerateFileExtensions,
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+pub enum OptionalGenerateFileExtensions {
+    Yes,
+    #[default]
+    No,
+}
+
+impl OptionalGenerateFileExtensions {
+    pub fn ts(&self) -> &str {
+        match self {
+            OptionalGenerateFileExtensions::No => "",
+            OptionalGenerateFileExtensions::Yes => ".ts",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -168,6 +185,7 @@ pub fn create_config(config_location: PathBuf) -> CompilerConfig {
 #[serde(default, deny_unknown_fields)]
 struct ConfigFileOptions {
     on_invalid_id_type: ConfigFileOptionalValidationLevel,
+    include_file_extensions_in_import_statements: bool,
 }
 
 #[derive(Deserialize, Debug, Clone, Copy)]
@@ -190,6 +208,7 @@ impl Default for ConfigFileOptionalValidationLevel {
 fn create_options(options: ConfigFileOptions) -> ConfigOptions {
     ConfigOptions {
         on_invalid_id_type: create_optional_validation_level(options.on_invalid_id_type),
+        generate_file_extensions: create_generate_file_extensions(options.include_file_extensions_in_import_statements),
     }
 }
 
@@ -200,5 +219,14 @@ fn create_optional_validation_level(
         ConfigFileOptionalValidationLevel::Ignore => OptionalValidationLevel::Ignore,
         ConfigFileOptionalValidationLevel::Warn => OptionalValidationLevel::Warn,
         ConfigFileOptionalValidationLevel::Error => OptionalValidationLevel::Error,
+    }
+}
+
+fn create_generate_file_extensions(
+    optional_generate_file_extensions: bool,
+) -> OptionalGenerateFileExtensions {
+    match optional_generate_file_extensions {
+        true => OptionalGenerateFileExtensions::Yes,
+        false => OptionalGenerateFileExtensions::No,
     }
 }

@@ -1,5 +1,7 @@
 use common_lang_types::ArtifactPathAndContent;
 use intern::Lookup;
+
+use isograph_config::OptionalGenerateFileExtensions;
 use isograph_schema::{
     RefetchedPathsMap, SchemaServerFieldInlineFragmentVariant, UserWrittenClientFieldInfo,
     UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema, ValidatedSchemaServerField,
@@ -31,7 +33,9 @@ pub(crate) fn generate_eager_reader_artifacts(
     artifact_directory: &Path,
     info: UserWrittenClientFieldInfo,
     refetched_paths: &RefetchedPathsMap,
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> Vec<ArtifactPathAndContent> {
+    let ts_file_extension = file_extensions.ts();
     let user_written_component_variant = info.user_written_component_variant;
     let parent_type = schema
         .server_field_data
@@ -46,13 +50,15 @@ pub(crate) fn generate_eager_reader_artifacts(
     );
 
     let function_import_statement =
-        generate_function_import_statement(project_root, artifact_directory, info);
+        generate_function_import_statement(project_root, artifact_directory, info, file_extensions);
 
     let relative_directory = generate_path(parent_type.name, client_field.name);
 
-    let reader_import_statement = reader_imports_to_import_statement(&reader_imports);
+    let reader_import_statement =
+        reader_imports_to_import_statement(&reader_imports, file_extensions);
 
     let reader_param_type = format!("{}__{}__param", parent_type.name, client_field.name);
+
     let reader_content = if let UserWrittenComponentVariant::Eager = user_written_component_variant
     {
         let reader_output_type =
@@ -61,8 +67,8 @@ pub(crate) fn generate_eager_reader_artifacts(
         let output_type_file_name = *RESOLVER_OUTPUT_TYPE;
         format!(
             "import type {{ EagerReaderArtifact, ReaderAst }} from '@isograph/react';\n\
-            import {{ {reader_param_type} }} from './{param_type_file_name}';\n\
-            import {{ {reader_output_type} }} from './{output_type_file_name}';\n\
+            import {{ {reader_param_type} }} from './{param_type_file_name}{ts_file_extension}';\n\
+            import {{ {reader_output_type} }} from './{output_type_file_name}{ts_file_extension}';\n\
             {function_import_statement}\n\
             {reader_import_statement}\n\
             const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
@@ -83,7 +89,7 @@ pub(crate) fn generate_eager_reader_artifacts(
         format!(
             "import type {{ComponentReaderArtifact, ExtractSecondParam, \
             ReaderAst }} from '@isograph/react';\n\
-            import {{ {reader_param_type} }} from './{param_type_file_name}';\n\
+            import {{ {reader_param_type} }} from './{param_type_file_name}{ts_file_extension}';\n\
             {function_import_statement}\n\
             {reader_import_statement}\n\
             const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
@@ -129,6 +135,7 @@ pub(crate) fn generate_eager_reader_condition_artifact(
     encountered_server_field: &ValidatedSchemaServerField,
     inline_fragment: &SchemaServerFieldInlineFragmentVariant,
     refetch_paths: &RefetchedPathsMap,
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> ArtifactPathAndContent {
     let field_name = encountered_server_field.name.item;
 
@@ -145,7 +152,8 @@ pub(crate) fn generate_eager_reader_condition_artifact(
         &encountered_server_field.initial_variable_context(),
     );
 
-    let reader_import_statement = reader_imports_to_import_statement(&reader_imports);
+    let reader_import_statement =
+        reader_imports_to_import_statement(&reader_imports, file_extensions);
 
     let reader_param_type = "{ data: any, parameters: Record<PropertyKey, never> }";
     let reader_output_type = "boolean";
@@ -178,7 +186,9 @@ pub(crate) fn generate_eager_reader_condition_artifact(
 pub(crate) fn generate_eager_reader_param_type_artifact(
     schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> ArtifactPathAndContent {
+    let ts_file_extension = file_extensions.ts();
     let parent_type = schema
         .server_field_data
         .object(client_field.parent_object_id);
@@ -195,11 +205,13 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
         1,
     );
 
-    let param_type_import_statement = param_type_imports_to_import_statement(&param_type_imports);
+    let param_type_import_statement =
+        param_type_imports_to_import_statement(&param_type_imports, file_extensions);
     let reader_param_type = format!("{}__{}__param", parent_type.name, client_field.name);
 
     let loadable_field_imports = if !loadable_fields.is_empty() {
-        let param_imports = param_type_imports_to_import_param_statement(&loadable_fields);
+        let param_imports =
+            param_type_imports_to_import_param_statement(&loadable_fields, file_extensions);
         format!(
             "import {{ type LoadableField, type ExtractParameters }} from '@isograph/react';\n\
             {param_imports}"
@@ -212,7 +224,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
         let reader_parameters_type =
             format!("{}__{}__parameters", parent_type.name, client_field.name);
         (
-            format!("import type {{ {reader_parameters_type} }} from './parameters_type';\n"),
+            format!("import type {{ {reader_parameters_type} }} from './parameters_type{ts_file_extension}';\n"),
             reader_parameters_type,
         )
     } else {
@@ -242,6 +254,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact(
     project_root: &Path,
     artifact_directory: &Path,
     info: UserWrittenClientFieldInfo,
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> ArtifactPathAndContent {
     let parent_type = schema
         .server_field_data
@@ -249,7 +262,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact(
     let relative_directory = generate_path(parent_type.name, client_field.name);
 
     let function_import_statement =
-        generate_function_import_statement(project_root, artifact_directory, info);
+        generate_function_import_statement(project_root, artifact_directory, info, file_extensions);
 
     let client_field_output_type = generate_output_type(client_field);
 
@@ -283,6 +296,7 @@ fn generate_function_import_statement(
     project_root: &Path,
     artifact_directory: &Path,
     user_written_client_field_info: UserWrittenClientFieldInfo,
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> ClientFieldFunctionImportStatement {
     let const_export_name = user_written_client_field_info.const_export_name;
     let path_to_client_field = project_root.join(
@@ -303,10 +317,8 @@ fn generate_function_import_statement(
         // Anyway, TODO do better.
         pathdiff::diff_paths(path_to_client_field, artifact_directory.join("Type/Field"))
             .expect("Relative path should work");
-    let extension_char_count_including_dot =
-        relative_path.extension().map(|x| x.len() + 1).unwrap_or(0);
     let complete_file_name = relative_path.to_str().expect(
-        "This path should be stringifiable. This probably is indicative of a bug in Relay.",
+        "This path should be stringifiable. This probably is indicative of a bug in Isograph.",
     );
 
     let normalized_file_name = if cfg!(windows) {
@@ -315,8 +327,15 @@ fn generate_function_import_statement(
         Cow::Borrowed(complete_file_name)
     };
 
-    let file_name =
-        &normalized_file_name[0..(normalized_file_name.len() - extension_char_count_including_dot)];
+    let file_name = match file_extensions {
+        OptionalGenerateFileExtensions::No => {
+            let extension_char_count_including_dot =
+                relative_path.extension().map(|x| x.len() + 1).unwrap_or(0);
+            &normalized_file_name
+                [0..(normalized_file_name.len() - extension_char_count_including_dot)]
+        }
+        OptionalGenerateFileExtensions::Yes => &normalized_file_name,
+    };
 
     ClientFieldFunctionImportStatement(format!(
         "import {{ {const_export_name} as resolver }} from '{}';",

@@ -1,5 +1,6 @@
 use std::{path::PathBuf, str::Utf8Error};
 
+use crate::{with_duration::WithDuration, write_artifacts::GenerateArtifactsError};
 use colored::Colorize;
 use common_lang_types::WithLocation;
 use graphql_schema_parser::SchemaParseError;
@@ -8,10 +9,7 @@ use isograph_schema::{ProcessClientFieldDeclarationError, ValidateSchemaError};
 use pretty_duration::pretty_duration;
 use thiserror::Error;
 
-use crate::{
-    compiler_state::CompilerState, with_duration::WithDuration,
-    write_artifacts::GenerateArtifactsError,
-};
+use crate::compiler_state::CompilerState;
 
 pub struct CompilationStats {
     pub client_field_count: usize,

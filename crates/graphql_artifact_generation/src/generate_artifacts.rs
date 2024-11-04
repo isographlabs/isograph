@@ -6,6 +6,8 @@ use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
+
+use isograph_config::OptionalGenerateFileExtensions;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection,
     ServerFieldSelection, TypeAnnotation, UnionVariant, VariableDefinition,
@@ -76,6 +78,7 @@ pub fn get_artifact_path_and_content(
     schema: &ValidatedSchema,
     project_root: &Path,
     artifact_directory: &Path,
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> Vec<ArtifactPathAndContent> {
     let mut encountered_client_field_map = BTreeMap::new();
     let mut path_and_contents = vec![];
@@ -87,6 +90,7 @@ pub fn get_artifact_path_and_content(
             schema,
             *entrypoint_id,
             &mut encountered_client_field_map,
+            file_extensions,
         );
         path_and_contents.extend(entrypoint_path_and_content);
 
@@ -116,6 +120,7 @@ pub fn get_artifact_path_and_content(
                             encountered_server_field,
                             inline_fragment,
                             &traversal_state.refetch_paths,
+                            file_extensions,
                         ));
                     }
                 };
@@ -132,6 +137,7 @@ pub fn get_artifact_path_and_content(
                             artifact_directory,
                             *info,
                             &traversal_state.refetch_paths,
+                            file_extensions,
                         ));
 
                         if *was_ever_selected_loadably {
@@ -141,6 +147,7 @@ pub fn get_artifact_path_and_content(
                                 None,
                                 &traversal_state.refetch_paths,
                                 true,
+                                file_extensions,
                             ));
 
                             // Everything about this is quite sus
@@ -215,6 +222,7 @@ pub fn get_artifact_path_and_content(
                                     &encountered_client_field_map,
                                     variable_definitions_iter,
                                     &schema.query_root_operation_name(),
+                                    file_extensions,
                                 ),
                             );
                         }
@@ -226,6 +234,7 @@ pub fn get_artifact_path_and_content(
                             variant.primary_field_info.as_ref(),
                             &traversal_state.refetch_paths,
                             false,
+                            file_extensions,
                         ));
                     }
                 };
@@ -246,6 +255,7 @@ pub fn get_artifact_path_and_content(
         path_and_contents.push(generate_eager_reader_param_type_artifact(
             schema,
             user_written_client_field,
+            file_extensions,
         ));
 
         match encountered_client_field_map
@@ -279,6 +289,7 @@ pub fn get_artifact_path_and_content(
                 project_root,
                 artifact_directory,
                 info,
+                file_extensions,
             ),
             ClientFieldVariant::ImperativelyLoadedField(_) => {
                 generate_refetch_output_type_artifact(schema, client_field)
@@ -287,7 +298,7 @@ pub fn get_artifact_path_and_content(
         path_and_contents.push(path_and_content);
     }
 
-    path_and_contents.push(build_iso_overload_artifact(schema));
+    path_and_contents.push(build_iso_overload_artifact(schema, file_extensions));
 
     path_and_contents
 }

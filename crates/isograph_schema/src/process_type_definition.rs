@@ -89,14 +89,15 @@ impl UnvalidatedSchema {
                 GraphQLTypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
                     let concrete_type = Some(object_type_definition.name.item.into());
                     let object_type_definition = object_type_definition.into();
-                    let outcome = self.process_object_type_definition(
-                        object_type_definition,
-                        &mut supertype_to_subtype_map,
-                        &mut subtype_to_supertype_map,
-                        true,
-                        options,
-                        concrete_type,
-                    )?;
+                    let outcome: ProcessObjectTypeDefinitionOutcome = self
+                        .process_object_type_definition(
+                            object_type_definition,
+                            &mut supertype_to_subtype_map,
+                            &mut subtype_to_supertype_map,
+                            true,
+                            options,
+                            concrete_type,
+                        )?;
                     if let Some(encountered_root_kind) = outcome.encountered_root_kind {
                         encountered_root_types
                             .set_root_type(encountered_root_kind, outcome.object_id);
