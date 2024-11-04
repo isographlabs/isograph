@@ -185,7 +185,7 @@ pub fn create_config(config_location: PathBuf) -> CompilerConfig {
 #[serde(default, deny_unknown_fields)]
 struct ConfigFileOptions {
     on_invalid_id_type: ConfigFileOptionalValidationLevel,
-    generate_file_extensions: ConfigFileOptionalGenerateFileExtensions,
+    include_file_extensions_in_import_statements: bool,
 }
 
 #[derive(Deserialize, Debug, Clone, Copy)]
@@ -205,23 +205,10 @@ impl Default for ConfigFileOptionalValidationLevel {
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(rename_all = "snake_case")]
-enum ConfigFileOptionalGenerateFileExtensions {
-    Yes,
-    No,
-}
-
-impl Default for ConfigFileOptionalGenerateFileExtensions {
-    fn default() -> Self {
-        Self::No
-    }
-}
-
 fn create_options(options: ConfigFileOptions) -> ConfigOptions {
     ConfigOptions {
         on_invalid_id_type: create_optional_validation_level(options.on_invalid_id_type),
-        generate_file_extensions: create_generate_file_extensions(options.generate_file_extensions),
+        generate_file_extensions: create_generate_file_extensions(options.include_file_extensions_in_import_statements),
     }
 }
 
@@ -236,10 +223,10 @@ fn create_optional_validation_level(
 }
 
 fn create_generate_file_extensions(
-    optional_generate_file_extensions: ConfigFileOptionalGenerateFileExtensions,
+    optional_generate_file_extensions: bool,
 ) -> OptionalGenerateFileExtensions {
     match optional_generate_file_extensions {
-        ConfigFileOptionalGenerateFileExtensions::Yes => OptionalGenerateFileExtensions::Yes,
-        ConfigFileOptionalGenerateFileExtensions::No => OptionalGenerateFileExtensions::No,
+        true => OptionalGenerateFileExtensions::Yes,
+        false => OptionalGenerateFileExtensions::No,
     }
 }
