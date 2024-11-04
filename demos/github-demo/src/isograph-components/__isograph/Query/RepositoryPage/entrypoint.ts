@@ -25,6 +25,11 @@ const queryText = 'query RepositoryPage ($repositoryName: String!, $repositoryOw
           author {\
             __typename,\
             login,\
+            ... on User {\
+              id,\
+              __typename,\
+              twitterUsername,\
+            },\
           },\
           closed,\
           createdAt,\
@@ -170,6 +175,27 @@ const normalizationAst: NormalizationAst = [
                         fieldName: "login",
                         arguments: null,
                       },
+                      {
+                        kind: "InlineFragment",
+                        type: "User",
+                        selections: [
+                          {
+                            kind: "Scalar",
+                            fieldName: "id",
+                            arguments: null,
+                          },
+                          {
+                            kind: "Scalar",
+                            fieldName: "__typename",
+                            arguments: null,
+                          },
+                          {
+                            kind: "Scalar",
+                            fieldName: "twitterUsername",
+                            arguments: null,
+                          },
+                        ],
+                      },
                     ],
                   },
                   {
@@ -285,8 +311,11 @@ const artifact: IsographEntrypoint<
   Query__RepositoryPage__output_type
 > = {
   kind: "Entrypoint",
-  queryText,
-  normalizationAst,
+  networkRequestInfo: {
+    kind: "NetworkRequestInfo",
+    queryText,
+    normalizationAst,
+  },
   concreteType: "Query",
   readerWithRefetchQueries: {
     kind: "ReaderWithRefetchQueries",

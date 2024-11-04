@@ -41,8 +41,11 @@ const artifact: IsographEntrypoint<
   Query__PetByName__output_type
 > = {
   kind: "Entrypoint",
-  queryText,
-  normalizationAst,
+  networkRequestInfo: {
+    kind: "NetworkRequestInfo",
+    queryText,
+    normalizationAst,
+  },
   concreteType: "Query",
   readerWithRefetchQueries: {
     kind: "ReaderWithRefetchQueries",

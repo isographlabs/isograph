@@ -16,14 +16,18 @@ export type ReaderWithRefetchQueries<
   readonly nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[];
 };
 
+export type NetworkRequestInfo = {
+  readonly kind: 'NetworkRequestInfo';
+  readonly queryText: string;
+  readonly normalizationAst: NormalizationAst;
+};
 // This type should be treated as an opaque type.
 export type IsographEntrypoint<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
 > = {
   readonly kind: 'Entrypoint';
-  readonly queryText: string;
-  readonly normalizationAst: NormalizationAst;
+  readonly networkRequestInfo: NetworkRequestInfo;
   readonly readerWithRefetchQueries: ReaderWithRefetchQueries<
     TReadFromStore,
     TClientFieldValue
@@ -71,8 +75,7 @@ export type NormalizationInlineFragment = {
 // This is more like an entrypoint, but one specifically for a refetch query/mutation
 export type RefetchQueryNormalizationArtifact = {
   readonly kind: 'RefetchQuery';
-  readonly queryText: string;
-  readonly normalizationAst: NormalizationAst;
+  readonly networkRequestInfo: NetworkRequestInfo;
   readonly concreteType: TypeName;
 };
 

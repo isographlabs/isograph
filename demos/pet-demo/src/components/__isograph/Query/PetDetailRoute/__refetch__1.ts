@@ -222,9 +222,12 @@ const normalizationAst: NormalizationAst = [
 ];
 const artifact: RefetchQueryNormalizationArtifact = {
   kind: "RefetchQuery",
-  queryText,
+  networkRequestInfo: {
+    kind: "NetworkRequestInfo",
+    queryText,
+    normalizationAst,
+  },
   concreteType: "Mutation",
-  normalizationAst,
 };
 
 export default artifact;

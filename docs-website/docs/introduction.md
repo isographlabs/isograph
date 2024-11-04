@@ -16,10 +16,10 @@ Isograph is a framework for building React applications that are backed by Graph
 ```js
 export const Avatar = iso(`
   User.Avatar @component {
-    name,
-    avatar_url,
+    name
+    avatar_url
   }
-`)(function AvatarComponent(data, otherRuntimeProps) {
+`)(function AvatarComponent({ data }, otherRuntimeProps) {
   return <CircleImage image={data.avatar_url} />;
 });
 ```
@@ -29,13 +29,13 @@ This avatar component is available on any GraphQL User. You might use this avata
 ```js
 export const UserProfileButton = iso(`
   User.UserProfileButton @component {
-    Avatar,
+    Avatar
 
     # you can also select server fields, like in regular GraphQL:
-    id,
-    name,
+    id
+    name
   }
-`)(function UserProfileButtonComponent(data) {
+`)(function UserProfileButtonComponent({ data }) {
   return (
     <Button onClick={() => navigateToUserProfile(data.id)}>
       {data.name}
@@ -109,23 +109,24 @@ type SetUserNameResponse {
 type Mutation
   @exposeField(
     field: "set_user_name" # expose this field
+    as: "set_name" # optionally, rename the field
     path: "updated_user" # on the type at this path (relative to the response object)
-    fieldMap: [{ from: "id", to: "id" }] # mapping these fields
+    fieldMap: [{ from: "id", to: "input.id" }] # mapping these fields
   ) {
   set_user_name(input: SetUserNameParams!): SetUserNameResponse!
 }
 ```
 
-In the above example, the `set_user_name` field will be made available on every `User` object, under the key `set_user_name` (this will be customizable.) So, one could write a resolver:
+In the above example, the `set_user_name` field will be made available on every `User` object, under the key `set_name`. So, one could write a resolver:
 
 ```js
 export const UpdateUserNameButton = iso(`
   User.UpdateUserNameButton {
-    set_user_name,
+    set_name
   }
-`)(({ data: { set_user_name } }) => {
+`)(({ data }) => {
   return (
-    <div onClick={() => set_user_name({ input: { new_name: 'Maybe' } })}>
+    <div onClick={() => data.set_name({ input: { new_name: 'Maybe' } })}>
       Call me, maybe
     </div>
   );

@@ -20,6 +20,7 @@ const readerAst: ReaderAst<Pet__PetCheckinsCardList__param> = [
         { kind: "Variable", name: "limit" },
       ],
     ],
+    condition: null,
     selections: [
       {
         kind: "Resolver",

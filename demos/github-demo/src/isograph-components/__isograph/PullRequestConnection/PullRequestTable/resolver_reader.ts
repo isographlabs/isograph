@@ -11,12 +11,14 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
     fieldName: "edges",
     alias: null,
     arguments: null,
+    condition: null,
     selections: [
       {
         kind: "Linked",
         fieldName: "node",
         alias: null,
         arguments: null,
+        condition: null,
         selections: [
           {
             kind: "Scalar",
@@ -48,6 +50,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
             fieldName: "author",
             alias: null,
             arguments: null,
+            condition: null,
             selections: [
               {
                 kind: "Resolver",

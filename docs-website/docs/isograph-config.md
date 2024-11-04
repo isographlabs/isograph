@@ -1,10 +1,5 @@
 # The Isograph configuration object
 
-:::info
-If anything in this document is inaccurate, please consult the source of truth:
-[the code in GitHub](https://github.com/isographlabs/isograph/blob/main/crates/isograph_cli/src/config.rs). Make sure to change `main` in the URL to the specific commit that you actually installed.
-:::
-
 ## Config file location and name
 
 The file should be named `isograph.config.json` and located at the root of your project.

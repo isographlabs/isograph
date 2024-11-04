@@ -51,8 +51,11 @@ const artifact: IsographEntrypoint<
   Mutation__SetTagline__output_type
 > = {
   kind: "Entrypoint",
-  queryText,
-  normalizationAst,
+  networkRequestInfo: {
+    kind: "NetworkRequestInfo",
+    queryText,
+    normalizationAst,
+  },
   concreteType: "Mutation",
   readerWithRefetchQueries: {
     kind: "ReaderWithRefetchQueries",

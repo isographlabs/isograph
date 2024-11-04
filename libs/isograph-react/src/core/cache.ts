@@ -91,7 +91,9 @@ export function getOrCreateCacheForArtifact<
   variables: ExtractParameters<TReadFromStore>,
   fetchOptions?: FetchOptions,
 ): ParentCache<FragmentReference<TReadFromStore, TClientFieldValue>> {
-  const cacheKey = entrypoint.queryText + JSON.stringify(stableCopy(variables));
+  const cacheKey =
+    entrypoint.networkRequestInfo.queryText +
+    JSON.stringify(stableCopy(variables));
   const factory = () => {
     const shouldFetch = fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE;
     const [networkRequest, disposeNetworkRequest] = maybeMakeNetworkRequest(

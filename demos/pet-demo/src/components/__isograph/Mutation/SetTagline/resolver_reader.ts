@@ -14,12 +14,14 @@ const readerAst: ReaderAst<Mutation__SetTagline__param> = [
         { kind: "Variable", name: "input" },
       ],
     ],
+    condition: null,
     selections: [
       {
         kind: "Linked",
         fieldName: "pet",
         alias: null,
         arguments: null,
+        condition: null,
         selections: [
           {
             kind: "Scalar",

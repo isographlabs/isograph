@@ -4,12 +4,13 @@ use common_lang_types::{
     ArtifactPathAndContent, IsographObjectTypeName, QueryOperationName, VariableName,
 };
 use intern::{string_key::Intern, Lookup};
+use isograph_config::OptionalGenerateFileExtensions;
 use isograph_lang_types::{ClientFieldId, IsographSelectionVariant, ServerObjectId};
 use isograph_schema::{
-    create_merged_selection_map_for_client_field_and_insert_into_global_map,
+    create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
-    get_reachable_variables, ClientFieldToCompletedMergeTraversalStateMap,
-    ClientFieldTraversalResult, MergedSelectionMap, RootOperationName, RootRefetchedPath,
+    get_reachable_variables, ClientFieldToCompletedMergeTraversalStateMap, FieldTraversalResult,
+    FieldType, MergedSelectionMap, RootOperationName, RootRefetchedPath,
     ScalarClientFieldTraversalState, SchemaObject, ValidatedClientField, ValidatedSchema,
     ValidatedVariableDefinition,
 };
@@ -37,20 +38,21 @@ struct EntrypointArtifactInfo<'schema> {
 pub(crate) fn generate_entrypoint_artifacts(
     schema: &ValidatedSchema,
     entrypoint_id: ClientFieldId,
-    global_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
+    encountered_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> Vec<ArtifactPathAndContent> {
     let entrypoint = schema.client_field(entrypoint_id);
 
-    let ClientFieldTraversalResult {
+    let FieldTraversalResult {
         traversal_state,
         merged_selection_map,
         ..
-    } = create_merged_selection_map_for_client_field_and_insert_into_global_map(
+    } = create_merged_selection_map_for_field_and_insert_into_global_map(
         schema,
         schema.server_field_data.object(entrypoint.parent_object_id),
         entrypoint.selection_set_for_parent_query(),
-        global_client_field_map,
-        entrypoint,
+        encountered_client_field_map,
+        FieldType::ClientField(entrypoint.id),
         &entrypoint.initial_variable_context(),
     );
 
@@ -59,12 +61,13 @@ pub(crate) fn generate_entrypoint_artifacts(
         entrypoint,
         &merged_selection_map,
         &traversal_state,
-        global_client_field_map,
+        encountered_client_field_map,
         entrypoint
             .variable_definitions
             .iter()
             .map(|variable_definition| &variable_definition.item),
         &schema.find_mutation(),
+        file_extensions,
     )
 }
 
@@ -73,9 +76,10 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
     entrypoint: &ValidatedClientField,
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
-    global_client_field_map: &ClientFieldToCompletedMergeTraversalStateMap,
+    encountered_client_field_map: &ClientFieldToCompletedMergeTraversalStateMap,
     variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
     default_root_operation: &Option<(&ServerObjectId, &RootOperationName)>,
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> Vec<ArtifactPathAndContent> {
     let query_name = entrypoint.name.into();
     // TODO when we do not call generate_entrypoint_artifact extraneously,
@@ -117,8 +121,10 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
                 IsographSelectionVariant::Loadable(_) => {
                     // Note: it would be cleaner to include a reference to the merged selection set here via
                     // the selection_variant variable, instead of by looking it up like this.
-                    &global_client_field_map
-                        .get(&root_refetch_path.path_to_refetch_field_info.client_field_id)
+                    &encountered_client_field_map
+                        .get(&FieldType::ClientField(
+                            root_refetch_path.path_to_refetch_field_info.client_field_id,
+                        ))
                         .expect(
                             "Expected field to have been encountered, \
                                 since it is being used as a refetch field.",
@@ -137,7 +143,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
         .collect::<Vec<_>>();
 
     let refetch_query_artifact_import =
-        generate_refetch_query_artifact_import(&refetch_paths_with_variables);
+        generate_refetch_query_artifact_import(&refetch_paths_with_variables, file_extensions);
 
     let normalization_ast_text =
         generate_normalization_ast_text(schema, merged_selection_map.values(), 0);
@@ -170,7 +176,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
         refetch_query_artifact_import,
         concrete_type: concrete_type.name,
     }
-    .path_and_content()];
+    .path_and_content(file_extensions)];
 
     for (index, (root_refetch_path, nested_selection_map, reachable_variables)) in
         refetch_paths_with_variables.into_iter().enumerate()
@@ -199,6 +205,7 @@ fn generate_refetch_query_artifact_import(
         &MergedSelectionMap,
         BTreeSet<VariableName>,
     )],
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> RefetchQueryArtifactImport {
     // TODO name the refetch queries with the path, or something, instead of
     // with indexes.
@@ -210,8 +217,10 @@ fn generate_refetch_query_artifact_import(
             ..
         } = &item.0;
         output.push_str(&format!(
-            "import refetchQuery{} from './__refetch__{}';\n",
-            query_index, query_index,
+            "import refetchQuery{} from './__refetch__{}{}';\n",
+            query_index,
+            query_index,
+            file_extensions.ts()
         ));
         let variable_names_str = variable_names_to_string(
             &item.2,
@@ -240,7 +249,10 @@ fn generate_refetch_query_artifact_import(
 }
 
 impl<'schema> EntrypointArtifactInfo<'schema> {
-    fn path_and_content(self) -> ArtifactPathAndContent {
+    fn path_and_content(
+        self,
+        file_extensions: OptionalGenerateFileExtensions,
+    ) -> ArtifactPathAndContent {
         let EntrypointArtifactInfo {
             query_name,
             parent_type,
@@ -251,12 +263,12 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
 
         ArtifactPathAndContent {
             relative_directory: directory,
-            file_content: self.file_contents(),
+            file_content: self.file_contents(file_extensions),
             file_name_prefix: *ENTRYPOINT,
         }
     }
 
-    fn file_contents(self) -> String {
+    fn file_contents(self, file_extensions: OptionalGenerateFileExtensions) -> String {
         let EntrypointArtifactInfo {
             query_text,
             normalization_ast_text,
@@ -265,6 +277,7 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             parent_type,
             concrete_type,
         } = self;
+        let ts_file_extension = file_extensions.ts();
         let entrypoint_params_typename = format!("{}__{}__param", parent_type.name, query_name);
         let entrypoint_output_type_name =
             format!("{}__{}__output_type", parent_type.name, query_name);
@@ -275,9 +288,9 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
         format!(
             "import type {{IsographEntrypoint, \
             NormalizationAst, RefetchQueryNormalizationArtifactWrapper}} from '@isograph/react';\n\
-            import {{{entrypoint_params_typename}}} from './{param_type_file_name}';\n\
-            import {{{entrypoint_output_type_name}}} from './{output_type_file_name}';\n\
-            import readerResolver from './{resolver_reader_file_name}';\n\
+            import {{{entrypoint_params_typename}}} from './{param_type_file_name}{ts_file_extension}';\n\
+            import {{{entrypoint_output_type_name}}} from './{output_type_file_name}{ts_file_extension}';\n\
+            import readerResolver from './{resolver_reader_file_name}{ts_file_extension}';\n\
             {refetch_query_artifact_import}\n\n\
             const queryText = '{query_text}';\n\n\
             const normalizationAst: NormalizationAst = {normalization_ast_text};\n\
@@ -286,8 +299,11 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             {}{entrypoint_output_type_name}\n\
             > = {{\n\
             {}kind: \"Entrypoint\",\n\
-            {}queryText,\n\
-            {}normalizationAst,\n\
+            {}networkRequestInfo: {{\n\
+            {}  kind: \"NetworkRequestInfo\",\n\
+            {}  queryText,\n\
+            {}  normalizationAst,\n\
+            {}}},\n\
             {}concreteType: \"{concrete_type}\",\n\
             {}readerWithRefetchQueries: {{\n\
             {}  kind: \"ReaderWithRefetchQueries\",\n\
@@ -296,7 +312,7 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             {}}},\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
+            "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     }
 }

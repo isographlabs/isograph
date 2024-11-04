@@ -50,6 +50,7 @@ export {
   type ExtractProps,
   type ExtractReadFromStore,
   type ExtractResolverResult,
+  type NetworkRequestInfo,
 } from './core/entrypoint';
 export { readButDoNotEvaluate } from './core/read';
 export {

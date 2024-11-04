@@ -348,10 +348,7 @@ pub fn reachable_variables(
                 .collect();
         }
         NonConstantValue::List(list) => {
-            return list
-                .iter()
-                .flat_map(|element| reachable_variables(&element))
-                .collect();
+            return list.iter().flat_map(reachable_variables).collect();
         }
         _ => vec![],
     }

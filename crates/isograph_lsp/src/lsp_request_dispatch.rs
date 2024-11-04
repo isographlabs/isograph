@@ -7,16 +7,13 @@
 
 use std::ops::ControlFlow;
 
-use lsp_server::ErrorCode;
-use lsp_server::Request as ServerRequest;
-use lsp_server::RequestId as ServerRequestId;
-use lsp_server::Response;
-use lsp_server::ResponseError;
+use lsp_server::{
+    ErrorCode, Request as ServerRequest, RequestId as ServerRequestId, Response, ResponseError,
+};
 use lsp_types::request::Request;
 use serde_json::Value;
 
-use crate::lsp_runtime_error::LSPRuntimeError;
-use crate::lsp_runtime_error::LSPRuntimeResult;
+use crate::lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult};
 
 pub struct LSPRequestDispatch<'state, TState> {
     request: lsp_server::Request,

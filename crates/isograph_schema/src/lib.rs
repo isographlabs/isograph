@@ -1,5 +1,6 @@
 mod accessible_client_fields_iterator;
 mod add_fields_to_subtypes;
+mod add_pointers_to_supertypes;
 mod argument_map;
 mod create_merged_selection_set;
 mod expose_field_directive;
@@ -9,8 +10,10 @@ mod process_type_definition;
 mod refetch_strategy;
 mod root_types;
 mod unvalidated_schema;
+mod validate_client_field;
 mod validate_entrypoint;
 mod validate_schema;
+mod validate_server_field;
 mod variable_context;
 
 use argument_map::*;
