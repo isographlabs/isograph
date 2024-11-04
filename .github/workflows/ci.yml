@@ -113,7 +113,9 @@ jobs:
       - name: Cache Build JS files
         uses: actions/cache@v3
         with:
-          path: '**/dist'
+          path: |
+            **/dist
+            *.tsbuildinfo
           key: cache-build-${{ github.sha }}
           enableCrossOsArchive: true
       - name: Build JS files
@@ -139,7 +141,9 @@ jobs:
       - name: Cache Build
         uses: actions/cache@v3
         with:
-          path: '**/dist'
+          path: |
+            **/dist
+            *.tsbuildinfo
           key: cache-build-${{ github.sha }}
           enableCrossOsArchive: true
       - name: Build
@@ -309,7 +313,9 @@ jobs:
       - name: Cache Build
         uses: actions/cache@v3
         with:
-          path: '**/dist'
+          path: |
+            **/dist
+            *.tsbuildinfo
           key: cache-build-${{ github.sha }}
           enableCrossOsArchive: true
       - name: Build
@@ -372,7 +378,9 @@ jobs:
       - name: Cache Build
         uses: actions/cache@v3
         with:
-          path: '**/dist'
+          path: |
+            **/dist
+            *.tsbuildinfo
           key: cache-build-${{ github.sha }}
           enableCrossOsArchive: true
       - name: Build
