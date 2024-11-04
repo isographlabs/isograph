@@ -261,8 +261,11 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             {}{entrypoint_output_type_name}\n\
             > = {{\n\
             {}kind: \"Entrypoint\",\n\
-            {}queryText,\n\
-            {}normalizationAst,\n\
+            {}networkRequestInfo: {{\n\
+            {}  kind: \"NetworkRequestInfo\",\n\
+            {}  queryText,\n\
+            {}  normalizationAst,\n\
+            {}}},\n\
             {}readerWithRefetchQueries: {{\n\
             {}  kind: \"ReaderWithRefetchQueries\",\n\
             {}  nestedRefetchQueries,\n\
@@ -270,7 +273,7 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             {}}},\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  "
+            "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  "
         )
     }
 }

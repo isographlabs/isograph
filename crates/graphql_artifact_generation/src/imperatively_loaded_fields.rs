@@ -55,10 +55,16 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
             const normalizationAst: NormalizationAst = {normalization_ast};\n\
             const artifact: RefetchQueryNormalizationArtifact = {{\n\
             {}kind: \"RefetchQuery\",\n\
-            {}queryText,\n\
-            {}normalizationAst,\n\
+            {}networkRequestInfo: {{\n\
+            {}  kind: \"NetworkRequestInfo\",\n\
+            {}  queryText,\n\
+            {}  normalizationAst,\n\
+            {}}},\n\
             }};\n\n\
             export default artifact;\n",
+            "  ",
+            "  ",
+            "  ",
             "  ",
             "  ",
             "  ",
