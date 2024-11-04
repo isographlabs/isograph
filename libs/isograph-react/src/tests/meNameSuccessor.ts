@@ -14,6 +14,7 @@ export const meNameField = iso(`
 `)(() => {});
 const meNameSuccessorEntrypoint = iso(`entrypoint Query.meNameSuccessor`);
 export const meNameSuccessorRetainedQuery = {
-  normalizationAst: meNameSuccessorEntrypoint.normalizationAst,
+  normalizationAst:
+    meNameSuccessorEntrypoint.networkRequestInfo.normalizationAst,
   variables: {},
 };
