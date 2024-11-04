@@ -208,7 +208,9 @@ impl Default for ConfigFileOptionalValidationLevel {
 fn create_options(options: ConfigFileOptions) -> ConfigOptions {
     ConfigOptions {
         on_invalid_id_type: create_optional_validation_level(options.on_invalid_id_type),
-        generate_file_extensions: create_generate_file_extensions(options.include_file_extensions_in_import_statements),
+        generate_file_extensions: create_generate_file_extensions(
+            options.include_file_extensions_in_import_statements,
+        ),
     }
 }
 

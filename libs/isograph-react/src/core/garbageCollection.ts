@@ -86,7 +86,8 @@ function recordReachableIds(
   retainedQuery: RetainedQuery,
   mutableRetainedIds: RetainedIds,
 ) {
-  const record = store[retainedQuery.root.__typename]?.[retainedQuery.root.__link];
+  const record =
+    store[retainedQuery.root.__typename]?.[retainedQuery.root.__link];
   if (record)
     recordReachableIdsFromRecord(
       store,

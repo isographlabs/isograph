@@ -1,4 +1,3 @@
-import type { RetainedQuery } from '../core/garbageCollection';
 import { ROOT_ID } from '../core/IsographEnvironment';
 import { iso } from './__isograph/iso';
 
@@ -19,6 +18,8 @@ export const meNameSuccessorRetainedQuery = {
   normalizationAst:
     meNameSuccessorEntrypoint.networkRequestInfo.normalizationAst,
   variables: {},
-  root: ROOT_ID,
-  typeName: 'Query',
+  root: {
+    __link: ROOT_ID,
+    __typename: 'Query',
+  },
 };

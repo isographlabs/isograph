@@ -7,7 +7,6 @@ import {
 import {
   garbageCollectEnvironment,
   retainQuery,
-  type RetainedQuery,
 } from '../core/garbageCollection';
 import { iso } from './__isograph/iso';
 import { nodeFieldRetainedQuery } from './nodeQuery';
@@ -58,8 +57,7 @@ const meNameEntrypoint = iso(`entrypoint Query.meName`);
 const meNameRetainedQuery = {
   normalizationAst: meNameEntrypoint.networkRequestInfo.normalizationAst,
   variables: {},
-  root: ROOT_ID,
-  typeName: 'Query',
+  root: { __link: ROOT_ID, __typename: 'Query' },
 };
 
 describe('garbage collection', () => {

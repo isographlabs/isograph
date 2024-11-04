@@ -35,14 +35,13 @@ describe('normalizeData', () => {
 
     normalizeData(
       environment,
-      entrypoint.normalizationAst,
+      entrypoint.networkRequestInfo.normalizationAst,
       {
         query: { node____id___v_id: { __typename: 'Economist', id: '1' } },
       },
       { id: '1' },
       entrypoint.readerWithRefetchQueries.nestedRefetchQueries,
       { __link: ROOT_ID, __typename: entrypoint.concreteType },
-      { __link: ROOT_ID, __typename: entrypoint.queryType },
     );
 
     expect(store).toStrictEqual({
