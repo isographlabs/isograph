@@ -21,7 +21,7 @@ pub(crate) fn generate_refetch_reader_artifact(
     primary_field_info: Option<&PrimaryFieldInfo>,
     refetched_paths: &RefetchedPathsMap,
     was_selected_loadably: bool,
-    file_extensions: &OptionalGenerateFileExtensions,
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> ArtifactPathAndContent {
     let function_import_statement = match primary_field_info {
         Some(info) => {

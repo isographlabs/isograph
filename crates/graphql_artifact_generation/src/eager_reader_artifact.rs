@@ -33,7 +33,7 @@ pub(crate) fn generate_eager_reader_artifacts(
     artifact_directory: &Path,
     info: UserWrittenClientFieldInfo,
     refetched_paths: &RefetchedPathsMap,
-    file_extensions: &OptionalGenerateFileExtensions,
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> Vec<ArtifactPathAndContent> {
     let ts_file_extension = file_extensions.ts();
     let user_written_component_variant = info.user_written_component_variant;
@@ -135,7 +135,7 @@ pub(crate) fn generate_eager_reader_condition_artifact(
     encountered_server_field: &ValidatedSchemaServerField,
     inline_fragment: &SchemaServerFieldInlineFragmentVariant,
     refetch_paths: &RefetchedPathsMap,
-    file_extensions: &OptionalGenerateFileExtensions,
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> ArtifactPathAndContent {
     let field_name = encountered_server_field.name.item;
 
@@ -186,7 +186,7 @@ pub(crate) fn generate_eager_reader_condition_artifact(
 pub(crate) fn generate_eager_reader_param_type_artifact(
     schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
-    file_extensions: &OptionalGenerateFileExtensions,
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> ArtifactPathAndContent {
     let ts_file_extension = file_extensions.ts();
     let parent_type = schema
@@ -254,7 +254,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact(
     project_root: &Path,
     artifact_directory: &Path,
     info: UserWrittenClientFieldInfo,
-    file_extensions: &OptionalGenerateFileExtensions,
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> ArtifactPathAndContent {
     let parent_type = schema
         .server_field_data
@@ -296,7 +296,7 @@ fn generate_function_import_statement(
     project_root: &Path,
     artifact_directory: &Path,
     user_written_client_field_info: UserWrittenClientFieldInfo,
-    file_extensions: &OptionalGenerateFileExtensions,
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> ClientFieldFunctionImportStatement {
     let const_export_name = user_written_client_field_info.const_export_name;
     let path_to_client_field = project_root.join(

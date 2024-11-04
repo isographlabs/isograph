@@ -36,7 +36,7 @@ pub(crate) fn generate_entrypoint_artifacts(
     schema: &ValidatedSchema,
     entrypoint_id: ClientFieldId,
     encountered_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
-    file_extensions: &OptionalGenerateFileExtensions,
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> Vec<ArtifactPathAndContent> {
     let entrypoint = schema.client_field(entrypoint_id);
 
@@ -76,7 +76,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
     encountered_client_field_map: &ClientFieldToCompletedMergeTraversalStateMap,
     variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
     default_root_operation_name: &Option<&RootOperationName>,
-    file_extensions: &OptionalGenerateFileExtensions,
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> Vec<ArtifactPathAndContent> {
     let query_name = entrypoint.name.into();
     // TODO when we do not call generate_entrypoint_artifact extraneously,
@@ -179,7 +179,7 @@ fn generate_refetch_query_artifact_import(
         &MergedSelectionMap,
         BTreeSet<VariableName>,
     )],
-    file_extensions: &OptionalGenerateFileExtensions,
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> RefetchQueryArtifactImport {
     // TODO name the refetch queries with the path, or something, instead of
     // with indexes.
@@ -225,7 +225,7 @@ fn generate_refetch_query_artifact_import(
 impl<'schema> EntrypointArtifactInfo<'schema> {
     fn path_and_content(
         self,
-        file_extensions: &OptionalGenerateFileExtensions,
+        file_extensions: OptionalGenerateFileExtensions,
     ) -> ArtifactPathAndContent {
         let EntrypointArtifactInfo {
             query_name,
@@ -242,7 +242,7 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
         }
     }
 
-    fn file_contents(self, file_extensions: &OptionalGenerateFileExtensions) -> String {
+    fn file_contents(self, file_extensions: OptionalGenerateFileExtensions) -> String {
         let EntrypointArtifactInfo {
             query_text,
             normalization_ast_text,

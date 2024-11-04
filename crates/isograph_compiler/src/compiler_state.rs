@@ -82,7 +82,7 @@ impl CompilerState {
         let total_artifacts_written = validate_and_create_artifacts_from_source_files(
             source_files,
             &self.config,
-            &self.config.options.generate_file_extensions,
+            self.config.options.generate_file_extensions,
         )?;
         Ok(CompilationStats {
             client_field_count: stats.client_field_count,
@@ -98,7 +98,7 @@ impl CompilerState {
         let total_artifacts_written = validate_and_create_artifacts_from_source_files(
             source_files,
             &self.config,
-            &self.config.options.generate_file_extensions,
+            self.config.options.generate_file_extensions,
         )?;
         Ok(CompilationStats {
             client_field_count: stats.client_field_count,
@@ -116,7 +116,7 @@ impl CompilerState {
         let total_artifacts_written = validate_and_create_artifacts_from_source_files(
             source_files,
             &self.config,
-            &self.config.options.generate_file_extensions,
+            self.config.options.generate_file_extensions,
         )?;
         Ok(CompilationStats {
             client_field_count: stats.client_field_count,
@@ -146,7 +146,7 @@ impl CompilerState {
 pub fn validate_and_create_artifacts_from_source_files(
     source_files: SourceFiles,
     config: &CompilerConfig,
-    file_extensions: &OptionalGenerateFileExtensions,
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> Result<usize, BatchCompileError> {
     // Create schema
     let mut unvalidated_schema = UnvalidatedSchema::new();

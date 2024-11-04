@@ -78,7 +78,7 @@ pub fn get_artifact_path_and_content(
     schema: &ValidatedSchema,
     project_root: &Path,
     artifact_directory: &Path,
-    file_extensions: &OptionalGenerateFileExtensions,
+    file_extensions: OptionalGenerateFileExtensions,
 ) -> Vec<ArtifactPathAndContent> {
     let mut encountered_client_field_map = BTreeMap::new();
     let mut path_and_contents = vec![];
