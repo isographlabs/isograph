@@ -92,6 +92,7 @@ export function makeNetworkRequest(
       }
 
       if (status.kind === 'UndisposedIncomplete') {
+        const root = { __link: ROOT_ID, __typename: artifact.concreteType };
         normalizeData(
           environment,
           artifact.networkRequestInfo.normalizationAst,
@@ -100,13 +101,12 @@ export function makeNetworkRequest(
           artifact.kind === 'Entrypoint'
             ? artifact.readerWithRefetchQueries.nestedRefetchQueries
             : [],
-          { __link: ROOT_ID, __typename: artifact.concreteType },
+          root,
         );
         const retainedQuery = {
           normalizationAst: artifact.networkRequestInfo.normalizationAst,
           variables,
-          typeName: artifact.concreteType,
-          root: ROOT_ID,
+          root,
         };
         status = {
           kind: 'UndisposedComplete',

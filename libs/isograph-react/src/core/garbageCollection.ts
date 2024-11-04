@@ -15,8 +15,7 @@ import { NormalizationAst } from './entrypoint';
 export type RetainedQuery = {
   readonly normalizationAst: NormalizationAst;
   readonly variables: {};
-  readonly typeName: TypeName;
-  readonly root: DataId;
+  readonly root: Link;
 };
 
 type DidUnretainSomeQuery = boolean;
@@ -87,7 +86,7 @@ function recordReachableIds(
   retainedQuery: RetainedQuery,
   mutableRetainedIds: RetainedIds,
 ) {
-  const record = store[retainedQuery.typeName]?.[retainedQuery.root];
+  const record = store[retainedQuery.root.__typename]?.[retainedQuery.root.__link];
   if (record)
     recordReachableIdsFromRecord(
       store,
