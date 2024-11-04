@@ -262,11 +262,8 @@ fn generate_function_import_statement(
         // Anyway, TODO do better.
         pathdiff::diff_paths(path_to_client_field, artifact_directory.join("Type/Field"))
             .expect("Relative path should work");
-    let extension = relative_path.extension();
-    let extension_char_count_including_dot =
-        relative_path.extension().map(|x| x.len() + 1).unwrap_or(0);
     let complete_file_name = relative_path.to_str().expect(
-        "This path should be stringifiable. This probably is indicative of a bug in Relay.",
+        "This path should be stringifiable. This probably is indicative of a bug in Isograph.",
     );
 
     let normalized_file_name = if cfg!(windows) {
@@ -275,15 +272,18 @@ fn generate_function_import_statement(
         Cow::Borrowed(complete_file_name)
     };
 
-    let file_name =
-        &normalized_file_name[0..(normalized_file_name.len() - extension_char_count_including_dot)];
+    let file_name = match file_extensions {
+        OptionalGenerateFileExtensions::No => {
+            let extension_char_count_including_dot =
+                relative_path.extension().map(|x| x.len() + 1).unwrap_or(0);
+            &normalized_file_name
+                [0..(normalized_file_name.len() - extension_char_count_including_dot)]
+        }
+        OptionalGenerateFileExtensions::Yes => &normalized_file_name,
+    };
 
     ClientFieldFunctionImportStatement(format!(
-        "import {{ {const_export_name} as resolver }} from '{}{}';",
-        file_name,
-        match extension.and_then(|extension| extension.to_str()) {
-            None => file_extensions.tsx(),
-            Some(extension) => file_extensions.get(extension),
-        }
+        "import {{ {const_export_name} as resolver }} from '{}';",
+        file_name
     ))
 }

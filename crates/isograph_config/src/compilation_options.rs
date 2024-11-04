@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 use serde::Deserialize;
 
@@ -29,40 +29,19 @@ pub struct ConfigOptions {
     pub generate_file_extensions: OptionalGenerateFileExtensions,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub enum OptionalGenerateFileExtensions {
-    Yes(HashMap<String, String>),
+    Yes,
+    #[default]
     No,
 }
 
 impl OptionalGenerateFileExtensions {
-    pub fn get(&self, extension: &str) -> &str {
+    pub fn ts(&self) -> &str {
         match self {
             OptionalGenerateFileExtensions::No => "",
-            OptionalGenerateFileExtensions::Yes(extensions) => match extensions.get(extension) {
-                Some(mapped_extension) => mapped_extension,
-                None => {
-                    eprintln!(
-                        "{}\nmissing .{} file extension in options.generate_file_extensions\n",
-                        "Warning:".yellow(),
-                        extension
-                    );
-                    ""
-                }
-            },
+            OptionalGenerateFileExtensions::Yes => ".ts",
         }
-    }
-    pub fn ts(&self) -> &str {
-        self.get("ts")
-    }
-    pub fn tsx(&self) -> &str {
-        self.get("tsx")
-    }
-}
-
-impl Default for OptionalGenerateFileExtensions {
-    fn default() -> Self {
-        OptionalGenerateFileExtensions::No
     }
 }
 
@@ -220,7 +199,7 @@ impl Default for ConfigFileOptionalValidationLevel {
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "snake_case")]
 enum ConfigFileOptionalGenerateFileExtensions {
-    Yes(HashMap<String, String>),
+    Yes,
     No,
 }
 
@@ -251,10 +230,7 @@ fn create_generate_file_extensions(
     optional_generate_file_extensions: ConfigFileOptionalGenerateFileExtensions,
 ) -> OptionalGenerateFileExtensions {
     match optional_generate_file_extensions {
-        ConfigFileOptionalGenerateFileExtensions::Yes(extensions) => {
-            OptionalGenerateFileExtensions::Yes(extensions)
-        }
-
+        ConfigFileOptionalGenerateFileExtensions::Yes => OptionalGenerateFileExtensions::Yes,
         ConfigFileOptionalGenerateFileExtensions::No => OptionalGenerateFileExtensions::No,
     }
 }
