@@ -5,6 +5,8 @@ use colored::Colorize;
 use isograph_compiler::{compile_and_print, handle_watch_command};
 use isograph_config::create_config;
 use opt::{Command, CompileCommand, LspCommand, Opt};
+use std::io;
+use tracing::{error, info, level_filters::LevelFilter};
 
 #[tokio::main]
 async fn main() {
@@ -21,6 +23,7 @@ async fn main() {
 }
 
 async fn start_compiler(compile_command: CompileCommand) {
+    configure_logger(compile_command.log_level);
     let config_location = compile_command
         .config
         .unwrap_or("./isograph.config.json".into());
@@ -29,23 +32,15 @@ async fn start_compiler(compile_command: CompileCommand) {
         match handle_watch_command(config_location).await {
             Ok(res) => match res {
                 Ok(_) => {
-                    eprintln!("{}", "Successfully watched. Exiting.\n".bright_green())
+                    info!("{}", "Successfully watched. Exiting.\n")
                 }
                 Err(err) => {
-                    eprintln!(
-                        "{}\n{:?}",
-                        "Error in watch process of some sort.\n".bright_red(),
-                        err
-                    );
+                    error!("{}\n{:?}", "Error in watch process of some sort.\n", err);
                     std::process::exit(1);
                 }
             },
             Err(err) => {
-                eprintln!(
-                    "{}\n{}",
-                    "Error in watch process of some sort.\n".bright_red(),
-                    err
-                );
+                error!("{}\n{}", "Error in watch process of some sort.\n", err);
                 std::process::exit(1);
             }
         };
@@ -60,13 +55,27 @@ async fn start_language_server(lsp_command: LspCommand) {
             .config
             .unwrap_or("./isograph.config.json".into()),
     );
-    eprintln!("Starting language server");
+    info!("Starting language server");
     if let Err(_e) = isograph_lsp::start_language_server(config).await {
-        eprintln!(
+        error!(
             "{}",
             "Error encountered when running language server.".bright_red(),
             // TODO derive Error and print e
         );
         std::process::exit(1);
     }
+}
+
+// TODO: Configure parameters based on provided log_level.
+// Add more verbosity to debug and trace levels
+fn configure_logger(log_level: LevelFilter) {
+    tracing_subscriber::fmt()
+        .pretty()
+        .without_time()
+        .with_file(false)
+        .with_line_number(false)
+        .with_target(false)
+        .with_max_level(log_level)
+        .with_writer(io::stderr)
+        .init();
 }
