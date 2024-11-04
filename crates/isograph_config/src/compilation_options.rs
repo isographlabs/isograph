@@ -1,12 +1,11 @@
 use std::path::PathBuf;
 
 use serde::Deserialize;
+use tracing::warn;
 
 pub static ISOGRAPH_FOLDER: &str = "__isograph";
 
 use std::error::Error;
-
-use colorize::AnsiColor;
 
 #[derive(Debug, Clone)]
 pub struct CompilerConfig {
@@ -66,9 +65,7 @@ impl OptionalValidationLevel {
             OptionalValidationLevel::Ignore => Ok(()),
             OptionalValidationLevel::Warn => {
                 let warning = on_error();
-                // TODO pass to some sort of warning gatherer, this is weird!
-                // The fact that we know about colorize here is weird!
-                eprintln!("{}\n{}\n", "Warning:".yellow(), warning);
+                warn!("{warning}");
                 Ok(())
             }
             OptionalValidationLevel::Error => Err(on_error()),

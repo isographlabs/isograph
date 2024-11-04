@@ -8,6 +8,7 @@ use isograph_lang_parser::IsographLiteralParseError;
 use isograph_schema::{ProcessClientFieldDeclarationError, ValidateSchemaError};
 use pretty_duration::pretty_duration;
 use thiserror::Error;
+use tracing::{error, info};
 
 use crate::compiler_state::CompilerState;
 
@@ -18,7 +19,7 @@ pub struct CompilationStats {
 }
 
 pub fn compile_and_print(config_location: PathBuf) -> Result<(), BatchCompileError> {
-    eprintln!("{}", "Starting to compile.".cyan());
+    info!("{}", "Starting to compile.".cyan());
     print_result(WithDuration::new(|| {
         CompilerState::new(config_location).batch_compile()
     }))
@@ -30,7 +31,7 @@ pub fn print_result(
     let elapsed_time = result.elapsed_time;
     match result.item {
         Ok(stats) => {
-            eprintln!(
+            info!(
                 "{}",
                 format!(
                     "Successfully compiled {} client fields and {} \
@@ -40,12 +41,11 @@ pub fn print_result(
                     stats.total_artifacts_written,
                     pretty_duration(&elapsed_time, None)
                 )
-                .bright_green()
             );
             Ok(())
         }
         Err(err) => {
-            eprintln!(
+            error!(
                 "{}\n{}\n{}",
                 "Error when compiling.\n".bright_red(),
                 err,

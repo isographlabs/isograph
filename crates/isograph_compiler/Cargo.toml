@@ -22,3 +22,4 @@ notify = { workspace = true }
 tokio = { workspace = true }
 notify-debouncer-full = { workspace = true }
 pretty-duration = { workspace = true }
+tracing = { workspace = true }
