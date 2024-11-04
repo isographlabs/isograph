@@ -311,8 +311,11 @@ const artifact: IsographEntrypoint<
   Query__RepositoryPage__output_type
 > = {
   kind: "Entrypoint",
-  queryText,
-  normalizationAst,
+  networkRequestInfo: {
+    kind: "NetworkRequestInfo",
+    queryText,
+    normalizationAst,
+  },
   readerWithRefetchQueries: {
     kind: "ReaderWithRefetchQueries",
     nestedRefetchQueries,
