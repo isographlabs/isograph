@@ -22,6 +22,7 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
     fieldName: "best_friend_relationship",
     alias: null,
     arguments: null,
+    condition: null,
     selections: [
       {
         kind: "Scalar",
@@ -34,6 +35,7 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
         fieldName: "best_friend",
         alias: null,
         arguments: null,
+        condition: null,
         selections: [
           {
             kind: "Scalar",

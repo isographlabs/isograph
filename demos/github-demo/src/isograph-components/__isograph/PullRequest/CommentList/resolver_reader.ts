@@ -14,18 +14,21 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
         { kind: "Variable", name: "last" },
       ],
     ],
+    condition: null,
     selections: [
       {
         kind: "Linked",
         fieldName: "edges",
         alias: null,
         arguments: null,
+        condition: null,
         selections: [
           {
             kind: "Linked",
             fieldName: "node",
             alias: null,
             arguments: null,
+            condition: null,
             selections: [
               {
                 kind: "Scalar",
@@ -51,6 +54,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
                 fieldName: "author",
                 alias: null,
                 arguments: null,
+                condition: null,
                 selections: [
                   {
                     kind: "Scalar",

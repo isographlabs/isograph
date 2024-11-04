@@ -96,6 +96,10 @@ export type ReaderLinkedField = {
   readonly alias: string | null;
   readonly selections: ReaderAst<unknown>;
   readonly arguments: Arguments | null;
+  readonly condition: EagerReaderArtifact<
+    { data: object; parameters: object },
+    boolean | Link | null
+  > | null;
 };
 
 export type ReaderNonLoadableResolverField = {

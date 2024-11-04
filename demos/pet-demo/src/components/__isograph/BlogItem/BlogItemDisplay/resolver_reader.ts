@@ -46,6 +46,7 @@ const readerAst: ReaderAst<BlogItem__BlogItemDisplay__param> = [
     fieldName: "image",
     alias: null,
     arguments: null,
+    condition: null,
     selections: [
       {
         kind: "Resolver",

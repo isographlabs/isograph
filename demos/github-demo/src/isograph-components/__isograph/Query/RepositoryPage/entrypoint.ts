@@ -25,6 +25,11 @@ const queryText = 'query RepositoryPage ($repositoryName: String!, $repositoryOw
           author {\
             __typename,\
             login,\
+            ... on User {\
+              id,\
+              __typename,\
+              twitterUsername,\
+            },\
           },\
           closed,\
           createdAt,\
@@ -169,6 +174,27 @@ const normalizationAst: NormalizationAst = [
                         kind: "Scalar",
                         fieldName: "login",
                         arguments: null,
+                      },
+                      {
+                        kind: "InlineFragment",
+                        type: "User",
+                        selections: [
+                          {
+                            kind: "Scalar",
+                            fieldName: "id",
+                            arguments: null,
+                          },
+                          {
+                            kind: "Scalar",
+                            fieldName: "__typename",
+                            arguments: null,
+                          },
+                          {
+                            kind: "Scalar",
+                            fieldName: "twitterUsername",
+                            arguments: null,
+                          },
+                        ],
                       },
                     ],
                   },

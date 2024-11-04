@@ -20,6 +20,7 @@ const readerAst: ReaderAst<Repository__RepositoryLink__param> = [
     fieldName: "owner",
     alias: null,
     arguments: null,
+    condition: null,
     selections: [
       {
         kind: "Scalar",

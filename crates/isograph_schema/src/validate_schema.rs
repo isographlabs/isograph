@@ -56,7 +56,7 @@ pub type ValidatedFieldDefinitionLocation = FieldType<ServerFieldId, ClientField
 
 pub type ValidatedSchemaIdField = SchemaIdField<ServerScalarId>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ValidatedLinkedFieldAssociatedData {
     pub parent_object_id: ServerObjectId,
     // N.B. we don't actually support loadable linked fields
@@ -67,7 +67,7 @@ pub struct ValidatedLinkedFieldAssociatedData {
     pub variant: SchemaServerFieldVariant,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ValidatedScalarFieldAssociatedData {
     pub location: ValidatedFieldDefinitionLocation,
     pub selection_variant: ValidatedIsographSelectionVariant,

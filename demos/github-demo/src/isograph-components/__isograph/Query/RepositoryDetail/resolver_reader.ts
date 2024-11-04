@@ -21,6 +21,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
         { kind: "Variable", name: "repositoryOwner" },
       ],
     ],
+    condition: null,
     selections: [
       {
         kind: "Resolver",
@@ -40,6 +41,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
         fieldName: "parent",
         alias: null,
         arguments: null,
+        condition: null,
         selections: [
           {
             kind: "Resolver",
@@ -66,6 +68,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
             { kind: "Variable", name: "first" },
           ],
         ],
+        condition: null,
         selections: [
           {
             kind: "Resolver",

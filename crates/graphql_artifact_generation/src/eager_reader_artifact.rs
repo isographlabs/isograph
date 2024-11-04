@@ -3,23 +3,25 @@ use intern::Lookup;
 
 use isograph_config::OptionalGenerateFileExtensions;
 use isograph_schema::{
-    RefetchedPathsMap, UserWrittenClientFieldInfo, UserWrittenComponentVariant,
-    ValidatedClientField, ValidatedSchema,
+    RefetchedPathsMap, SchemaServerFieldInlineFragmentVariant, UserWrittenClientFieldInfo,
+    UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema, ValidatedSchemaServerField,
 };
-use std::borrow::Cow;
-use std::path::Path;
-use std::{collections::BTreeSet, path::PathBuf, str::FromStr};
+use std::{
+    borrow::Cow,
+    collections::BTreeSet,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
-use crate::generate_artifacts::generate_parameters;
-use crate::import_statements::param_type_imports_to_import_param_statement;
 use crate::{
     generate_artifacts::{
-        generate_client_field_parameter_type, generate_output_type, generate_path,
-        ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAMETERS_TYPE,
-        RESOLVER_PARAM_TYPE, RESOLVER_READER,
+        generate_client_field_parameter_type, generate_output_type, generate_parameters,
+        generate_path, ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE,
+        RESOLVER_PARAMETERS_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
     },
     import_statements::{
-        param_type_imports_to_import_statement, reader_imports_to_import_statement,
+        param_type_imports_to_import_param_statement, param_type_imports_to_import_statement,
+        reader_imports_to_import_statement,
     },
     reader_ast::generate_reader_ast,
 };
@@ -126,6 +128,59 @@ pub(crate) fn generate_eager_reader_artifacts(
     }
 
     path_and_contents
+}
+
+pub(crate) fn generate_eager_reader_condition_artifact(
+    schema: &ValidatedSchema,
+    encountered_server_field: &ValidatedSchemaServerField,
+    inline_fragment: &SchemaServerFieldInlineFragmentVariant,
+    refetch_paths: &RefetchedPathsMap,
+    file_extensions: &OptionalGenerateFileExtensions,
+) -> ArtifactPathAndContent {
+    let field_name = encountered_server_field.name.item;
+
+    let parent_type = schema
+        .server_field_data
+        .object(encountered_server_field.parent_type_id);
+    let concrete_type = inline_fragment.concrete_type;
+
+    let (reader_ast, reader_imports) = generate_reader_ast(
+        schema,
+        &inline_fragment.condition_selection_set,
+        0,
+        refetch_paths,
+        &encountered_server_field.initial_variable_context(),
+    );
+
+    let reader_import_statement =
+        reader_imports_to_import_statement(&reader_imports, file_extensions);
+
+    let reader_param_type = "{ data: any, parameters: Record<PropertyKey, never> }";
+    let reader_output_type = "boolean";
+
+    let reader_content = format!(
+        "import type {{ EagerReaderArtifact, ReaderAst }} from '@isograph/react';\n\
+        {reader_import_statement}\n\
+        const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
+        const artifact: EagerReaderArtifact<\n\
+        {}{reader_param_type},\n\
+        {}{reader_output_type}\n\
+        > = {{\n\
+        {}kind: \"EagerReaderArtifact\",\n\
+        {}resolver: ({{ data }}) => data.__typename === \"{concrete_type}\",\n\
+        {}readerAst,\n\
+        }};\n\n\
+        export default artifact;\n",
+        "  ", "  ", "  ", "  ", "  ",
+    );
+
+    let relative_directory = generate_path(parent_type.name, field_name);
+
+    ArtifactPathAndContent {
+        relative_directory: relative_directory.clone(),
+        file_name_prefix: *RESOLVER_READER,
+        file_content: reader_content,
+    }
 }
 
 pub(crate) fn generate_eager_reader_param_type_artifact(
