@@ -164,8 +164,15 @@ export function iso(_isographLiteralText: string):
       'was not set up, or it failed to identify this call site. Make sure it ' +
       'is being used verbatim as `iso`.');"
         }
-        OptionalValidationLevel::Warn | OptionalValidationLevel::Ignore => {
-            "  return (fn: any) => fn"
+        OptionalValidationLevel::Warn => {
+
+            "  console.warn('iso: Unexpected invocation at runtime. Either the Babel transform ' +
+      'was not set up, or it failed to identify this call site. Make sure it ' +
+      'is being used verbatim as `iso`.');
+  return (clientFieldResolver: any) => clientFieldResolver;"
+        }
+        OptionalValidationLevel::Ignore => {
+            "  return (clientFieldResolver: any) => clientFieldResolver;"
         }
     });
 
