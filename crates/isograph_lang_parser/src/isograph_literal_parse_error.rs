@@ -23,7 +23,7 @@ pub enum IsographLiteralParseError {
     #[error("Isograph literals must be immediately called, and passed a function")]
     ExpectedAssociatedJsFunction,
 
-    #[error("Isograph literals must start with field or pointer or entrypoint")]
+    #[error("Isograph literals must start with on the keywords field, pointer or entrypoint")]
     ExpectedFieldOrPointerOrEntrypoint,
 
     #[error(
