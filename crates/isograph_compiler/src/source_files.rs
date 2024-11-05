@@ -326,6 +326,7 @@ pub struct ContainsIso(pub HashMap<SourceFileName, Vec<(IsoLiteralExtractionResu
 impl ContainsIso {
     pub fn stats(&self) -> ContainsIsoStats {
         let mut client_field_count: usize = 0;
+        let mut client_pointer_count: usize = 0;
         let mut entrypoint_count: usize = 0;
         for iso_literals in self.values() {
             for (iso_literal, ..) in iso_literals {
@@ -334,12 +335,16 @@ impl ContainsIso {
                         client_field_count += 1
                     }
                     IsoLiteralExtractionResult::EntrypointDeclaration(_) => entrypoint_count += 1,
+                    IsoLiteralExtractionResult::ClientPointerDeclaration(_) => {
+                        client_pointer_count += 1
+                    }
                 }
             }
         }
         ContainsIsoStats {
             client_field_count,
             entrypoint_count,
+            client_pointer_count,
         }
     }
 }
@@ -361,4 +366,5 @@ impl DerefMut for ContainsIso {
 pub struct ContainsIsoStats {
     pub client_field_count: usize,
     pub entrypoint_count: usize,
+    pub client_pointer_count: usize,
 }
