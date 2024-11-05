@@ -35,7 +35,7 @@ pub fn print_result(
                 "{}",
                 format!(
                     "Successfully compiled {} client fields and {} \
-                        entrypoints, and wrote {} artifacts, in {}.\n",
+                        entrypoints, and wrote {} artifacts, in {}.",
                     stats.client_field_count,
                     stats.entrypoint_count,
                     stats.total_artifacts_written,
