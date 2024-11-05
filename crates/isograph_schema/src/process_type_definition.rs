@@ -85,12 +85,21 @@ impl UnvalidatedSchema {
             match type_system_definition {
                 GraphQLTypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
                     let concrete_type = Some(object_type_definition.name.item.into());
+
+                    for interface_name in object_type_definition.interfaces.iter() {
+                        insert_into_type_refinement_maps(
+                            interface_name.item.into(),
+                            object_type_definition.name.item.into(),
+                            &mut supertype_to_subtype_map,
+                            &mut subtype_to_supertype_map,
+                        );
+                    }
+
                     let object_type_definition = object_type_definition.into();
+
                     let outcome: ProcessObjectTypeDefinitionOutcome = self
                         .process_object_type_definition(
                             object_type_definition,
-                            &mut supertype_to_subtype_map,
-                            &mut subtype_to_supertype_map,
                             true,
                             options,
                             concrete_type,
@@ -107,8 +116,6 @@ impl UnvalidatedSchema {
                 GraphQLTypeSystemDefinition::InterfaceTypeDefinition(interface_type_definition) => {
                     self.process_object_type_definition(
                         interface_type_definition.into(),
-                        &mut supertype_to_subtype_map,
-                        &mut subtype_to_supertype_map,
                         true,
                         options,
                         None,
@@ -121,8 +128,6 @@ impl UnvalidatedSchema {
                     let concrete_type = Some(input_object_type_definition.name.item.into());
                     self.process_object_type_definition(
                         input_object_type_definition.into(),
-                        &mut supertype_to_subtype_map,
-                        &mut subtype_to_supertype_map,
                         false,
                         options,
                         // Shouldn't really matter what we pass here
@@ -151,12 +156,19 @@ impl UnvalidatedSchema {
                             directives: union_definition.directives,
                             fields: vec![],
                         },
-                        &mut supertype_to_subtype_map,
-                        &mut subtype_to_supertype_map,
                         false,
                         options,
                         None,
                     )?;
+
+                    for union_member_type in union_definition.union_member_types {
+                        insert_into_type_refinement_maps(
+                            union_definition.name.item.into(),
+                            union_member_type.item.into(),
+                            &mut supertype_to_subtype_map,
+                            &mut subtype_to_supertype_map,
+                        )
+                    }
                 }
                 GraphQLTypeSystemDefinition::SchemaDefinition(schema_definition) => {
                     if processed_root_types.is_some() {
@@ -348,8 +360,6 @@ impl UnvalidatedSchema {
     pub(crate) fn process_object_type_definition(
         &mut self,
         object_type_definition: IsographObjectTypeDefinition,
-        supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
-        subtype_to_supertype_map: &mut UnvalidatedTypeRefinementMap,
         // TODO this smells! We should probably pass Option<ServerIdFieldId>
         may_have_id_field: bool,
         options: ConfigOptions,
@@ -417,32 +427,6 @@ impl UnvalidatedSchema {
                 }
             }
         };
-
-        for interface in &object_type_definition.interfaces {
-            // type_definition implements interface
-            let definitions = supertype_to_subtype_map
-                .entry(interface.item.into())
-                .or_default();
-            definitions.push(object_type_definition.name.item.into());
-        }
-        // This check isn't necessary, but it keeps the data structure smaller
-        if !object_type_definition.interfaces.is_empty() {
-            match subtype_to_supertype_map.entry(object_type_definition.name.item.into()) {
-                Entry::Occupied(_) => panic!(
-                    "Expected object id to not have been encountered before.\
-                    This is indicative of a bug in Isograph."
-                ),
-                Entry::Vacant(vacant) => {
-                    vacant.insert(
-                        object_type_definition
-                            .interfaces
-                            .into_iter()
-                            .map(|with_location| with_location.item.into())
-                            .collect(),
-                    );
-                }
-            }
-        }
 
         Ok(ProcessObjectTypeDefinitionOutcome {
             object_id: next_object_id,
@@ -829,6 +813,22 @@ fn convert_graphql_constant_value_to_isograph_constant_value(
             isograph_lang_types::ConstantValue::Object(converted_object)
         }
     }
+}
+
+fn insert_into_type_refinement_maps(
+    supertype_name: UnvalidatedTypeName,
+    subtype_name: UnvalidatedTypeName, // aka the concrete type or union member
+    supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
+    subtype_to_supertype_map: &mut UnvalidatedTypeRefinementMap,
+) {
+    supertype_to_subtype_map
+        .entry(supertype_name)
+        .or_default()
+        .push(subtype_name);
+    subtype_to_supertype_map
+        .entry(subtype_name)
+        .or_default()
+        .push(supertype_name);
 }
 
 // TODO this should be a different type.
