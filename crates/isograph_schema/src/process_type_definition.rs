@@ -156,7 +156,7 @@ impl UnvalidatedSchema {
                         },
                         &mut supertype_to_subtype_map,
                         &mut subtype_to_supertype_map,
-                        true,
+                        false,
                         options,
                         None,
                     )?;
