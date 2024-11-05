@@ -251,12 +251,6 @@ fn parse_client_pointer_declaration_inner(
             )
         })?;
 
-        // --------------------
-        // TODO: use directives to:
-        // - ensure only component exists
-        // - it ends up in the reader AST
-        // --------------------
-
         Ok(ClientPointerDeclaration {
             parent_type,
             client_pointer_name,
