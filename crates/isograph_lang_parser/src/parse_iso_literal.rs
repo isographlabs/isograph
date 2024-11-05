@@ -10,10 +10,11 @@ use graphql_lang_types::{
 };
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
-    ClientFieldDeclaration, ClientFieldDeclarationWithUnvalidatedDirectives, ConstantValue,
-    EntrypointTypeAndField, IsographFieldDirective, LinkedFieldSelection, NonConstantValue,
-    ScalarFieldSelection, Selection, SelectionFieldArgument, ServerFieldSelection,
-    UnvalidatedSelectionWithUnvalidatedDirectives, Unwrap, VariableDefinition,
+    ClientFieldDeclaration, ClientFieldDeclarationWithUnvalidatedDirectives,
+    ClientPointerDeclaration, ConstantValue, EntrypointTypeAndField, IsographFieldDirective,
+    LinkedFieldSelection, NonConstantValue, ScalarFieldSelection, Selection,
+    SelectionFieldArgument, ServerFieldSelection, UnvalidatedSelectionWithUnvalidatedDirectives,
+    Unwrap, VariableDefinition,
 };
 
 use crate::{
@@ -23,6 +24,7 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IsoLiteralExtractionResult {
+    ClientPointerDeclaration(WithSpan<ClientPointerDeclaration<(), ()>>),
     ClientFieldDeclaration(WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>),
     EntrypointDeclaration(WithSpan<EntrypointTypeAndField>),
 }
@@ -51,8 +53,17 @@ pub fn parse_iso_literal(
                 discriminator.span,
             )?,
         )),
+        "pointer" => Ok(IsoLiteralExtractionResult::ClientPointerDeclaration(
+            parse_iso_client_pointer_declaration(
+                &mut tokens,
+                definition_file_path,
+                const_export_name,
+                text_source,
+                discriminator.span,
+            )?,
+        )),
         _ => Err(WithLocation::new(
-            IsographLiteralParseError::ExpectedFieldOrEntrypoint,
+            IsographLiteralParseError::ExpectedFieldOrPointerOrEntrypoint,
             Location::new(text_source, discriminator.span),
         )),
     }
@@ -174,6 +185,88 @@ fn parse_client_field_declaration_inner(
             const_export_name: const_export_name.intern().into(),
             variable_definitions,
             field_keyword: WithSpan::new((), field_keyword_span),
+            dot: dot.map(|_| ()),
+        })
+    })
+}
+
+fn parse_iso_client_pointer_declaration(
+    tokens: &mut PeekableLexer<'_>,
+    definition_file_path: FilePath,
+    const_export_name: Option<&str>,
+    text_source: TextSource,
+    field_keyword_span: Span,
+) -> ParseResultWithLocation<WithSpan<ClientPointerDeclaration<(), ()>>> {
+    let client_pointer_declaration = parse_client_pointer_declaration_inner(
+        tokens,
+        definition_file_path,
+        const_export_name,
+        text_source,
+        field_keyword_span,
+    )
+    .map_err(|with_span| with_span.to_with_location(text_source))?;
+
+    if let Some(span) = tokens.remaining_token_span() {
+        return Err(WithLocation::new(
+            IsographLiteralParseError::LeftoverTokens,
+            Location::new(text_source, span),
+        ));
+    }
+
+    Ok(client_pointer_declaration)
+}
+
+fn parse_client_pointer_declaration_inner(
+    tokens: &mut PeekableLexer<'_>,
+    definition_file_path: FilePath,
+    const_export_name: Option<&str>,
+    text_source: TextSource,
+    pointer_keyword_span: Span,
+) -> ParseResultWithSpan<WithSpan<ClientPointerDeclaration<(), ()>>> {
+    tokens.with_span(|tokens| {
+        let parent_type = tokens
+            .parse_string_key_type(IsographLangTokenKind::Identifier)
+            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+
+        let dot = tokens
+            .parse_token_of_kind(IsographLangTokenKind::Period)
+            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+
+        let client_pointer_name: WithSpan<ScalarFieldName> = tokens
+            .parse_string_key_type(IsographLangTokenKind::Identifier)
+            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+
+        let variable_definitions = parse_variable_definitions(tokens, text_source)?;
+
+        let description = parse_optional_description(tokens);
+
+        let (selection_set, unwraps) = parse_selection_set_and_unwraps(tokens, text_source)?;
+
+        let const_export_name = const_export_name.ok_or_else(|| {
+            WithSpan::new(
+                IsographLiteralParseError::ExpectedLiteralToBeExported {
+                    suggested_const_export_name: client_pointer_name.item,
+                },
+                Span::todo_generated(),
+            )
+        })?;
+
+        // --------------------
+        // TODO: use directives to:
+        // - ensure only component exists
+        // - it ends up in the reader AST
+        // --------------------
+
+        Ok(ClientPointerDeclaration {
+            parent_type,
+            client_pointer_name,
+            description,
+            selection_set,
+            unwraps,
+            definition_path: definition_file_path,
+            const_export_name: const_export_name.intern().into(),
+            variable_definitions,
+            pointer_keyword: WithSpan::new((), pointer_keyword_span),
             dot: dot.map(|_| ()),
         })
     })
