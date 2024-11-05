@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use graphql_artifact_generation::get_artifact_path_and_content;
 use isograph_config::{
-    create_config, CompilerConfig, OptionalGenerateFileExtensions, OptionalValidationLevel,
+    create_config, CompilerConfig, GenerateFileExtensionsOption, OptionalValidationLevel,
 };
 use isograph_schema::{Schema, UnvalidatedSchema};
 
@@ -151,7 +151,7 @@ impl CompilerState {
 pub fn validate_and_create_artifacts_from_source_files(
     source_files: SourceFiles,
     config: &CompilerConfig,
-    file_extensions: OptionalGenerateFileExtensions,
+    file_extensions: GenerateFileExtensionsOption,
     on_missing_babel_transform: OptionalValidationLevel,
 ) -> Result<usize, BatchCompileError> {
     // Create schema

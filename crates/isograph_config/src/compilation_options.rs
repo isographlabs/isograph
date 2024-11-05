@@ -28,21 +28,21 @@ pub struct CompilerConfig {
 pub struct ConfigOptions {
     pub on_invalid_id_type: OptionalValidationLevel,
     pub on_missing_babel_transform: OptionalValidationLevel,
-    pub generate_file_extensions: OptionalGenerateFileExtensions,
+    pub generate_file_extensions: GenerateFileExtensionsOption,
 }
 
 #[derive(Default, Debug, Clone, Copy)]
-pub enum OptionalGenerateFileExtensions {
-    Yes,
+pub enum GenerateFileExtensionsOption {
+    IncludeExtensionsInFileImports,
     #[default]
-    No,
+    ExcludeExtensionsInFileImports,
 }
 
-impl OptionalGenerateFileExtensions {
+impl GenerateFileExtensionsOption {
     pub fn ts(&self) -> &str {
         match self {
-            OptionalGenerateFileExtensions::No => "",
-            OptionalGenerateFileExtensions::Yes => ".ts",
+            GenerateFileExtensionsOption::ExcludeExtensionsInFileImports => "",
+            GenerateFileExtensionsOption::IncludeExtensionsInFileImports => ".ts",
         }
     }
 }
@@ -189,13 +189,6 @@ struct ConfigFileOptions {
 
 #[derive(Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
-enum ConfigFileOptionalMissingBabelTransformValidationLevel {
-    Ignore,
-    Error,
-}
-
-#[derive(Deserialize, Debug, Clone, Copy)]
-#[serde(rename_all = "snake_case")]
 enum ConfigFileOptionalValidationLevel {
     /// If this validation error is encountered, it will be ignored
     Ignore,
@@ -235,9 +228,9 @@ fn create_optional_validation_level(
 
 fn create_generate_file_extensions(
     optional_generate_file_extensions: bool,
-) -> OptionalGenerateFileExtensions {
+) -> GenerateFileExtensionsOption {
     match optional_generate_file_extensions {
-        true => OptionalGenerateFileExtensions::Yes,
-        false => OptionalGenerateFileExtensions::No,
+        true => GenerateFileExtensionsOption::IncludeExtensionsInFileImports,
+        false => GenerateFileExtensionsOption::ExcludeExtensionsInFileImports,
     }
 }
