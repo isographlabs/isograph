@@ -27,6 +27,7 @@ pub struct CompilerConfig {
 #[derive(Default, Debug, Clone, Copy)]
 pub struct ConfigOptions {
     pub on_invalid_id_type: OptionalValidationLevel,
+    pub on_missing_babel_transform: OptionalValidationLevel,
     pub generate_file_extensions: OptionalGenerateFileExtensions,
 }
 
@@ -182,7 +183,15 @@ pub fn create_config(config_location: PathBuf) -> CompilerConfig {
 #[serde(default, deny_unknown_fields)]
 struct ConfigFileOptions {
     on_invalid_id_type: ConfigFileOptionalValidationLevel,
+    on_missing_babel_transform: ConfigFileOptionalValidationLevel,
     include_file_extensions_in_import_statements: bool,
+}
+
+#[derive(Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+enum ConfigFileOptionalMissingBabelTransformValidationLevel {
+    Ignore,
+    Error,
 }
 
 #[derive(Deserialize, Debug, Clone, Copy)]
@@ -205,6 +214,9 @@ impl Default for ConfigFileOptionalValidationLevel {
 fn create_options(options: ConfigFileOptions) -> ConfigOptions {
     ConfigOptions {
         on_invalid_id_type: create_optional_validation_level(options.on_invalid_id_type),
+        on_missing_babel_transform: create_optional_validation_level(
+            options.on_missing_babel_transform,
+        ),
         generate_file_extensions: create_generate_file_extensions(
             options.include_file_extensions_in_import_statements,
         ),

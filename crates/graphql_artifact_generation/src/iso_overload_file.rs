@@ -1,5 +1,5 @@
 use intern::Lookup;
-use isograph_config::OptionalGenerateFileExtensions;
+use isograph_config::{OptionalGenerateFileExtensions, OptionalValidationLevel};
 use std::{cmp::Ordering, path::PathBuf};
 
 use common_lang_types::{ArtifactPathAndContent, SelectableFieldName};
@@ -79,6 +79,7 @@ export function iso<T>(
 pub(crate) fn build_iso_overload_artifact(
     schema: &ValidatedSchema,
     file_extensions: OptionalGenerateFileExtensions,
+    on_missing_babel_transform: OptionalValidationLevel,
 ) -> ArtifactPathAndContent {
     let mut imports = "import type { IsographEntrypoint } from '@isograph/react';\n".to_string();
     let mut content = String::from(
@@ -154,12 +155,22 @@ export function iso(_isographLiteralText: string):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
   | IsographEntrypoint<any, any>
-{
-  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
-      'was not set up, or it failed to identify this call site. Make sure it ' +
-      'is being used verbatim as `iso`.');
-}",
+{\n",
     );
+
+    content.push_str(match on_missing_babel_transform {
+        OptionalValidationLevel::Error => {
+"  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
+      'was not set up, or it failed to identify this call site. Make sure it ' +
+      'is being used verbatim as `iso`.');"
+        }
+        OptionalValidationLevel::Warn | OptionalValidationLevel::Ignore => {
+            "  return (fn: any) => fn"
+        }
+    });
+
+    content.push_str("\n}");
+
     imports.push_str(&content);
     ArtifactPathAndContent {
         file_content: imports,
