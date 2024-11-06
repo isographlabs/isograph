@@ -366,5 +366,6 @@ impl DerefMut for ContainsIso {
 pub struct ContainsIsoStats {
     pub client_field_count: usize,
     pub entrypoint_count: usize,
+    #[allow(unused)]
     pub client_pointer_count: usize,
 }
