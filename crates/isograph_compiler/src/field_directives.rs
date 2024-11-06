@@ -35,12 +35,38 @@ pub fn validate_isograph_field_directives(
         dot,
         field_keyword,
     } = client_field.item;
-    let new_selecton_set = and_then_selection_set_and_collect_errors(
+
+    Ok(WithSpan::new(
+        ClientFieldDeclarationWithValidatedDirectives {
+            const_export_name,
+            parent_type,
+            client_field_name,
+            description,
+            selection_set: validate_isograph_selection_set_directives(selection_set)?,
+            unwraps,
+            directives,
+            variable_definitions,
+            definition_path,
+            dot,
+            field_keyword,
+        },
+        client_field.span,
+    ))
+}
+
+pub fn validate_isograph_selection_set_directives(
+    selection_set: Vec<WithSpan<Selection<(), ()>>>,
+) -> Result<
+    Vec<WithSpan<Selection<IsographSelectionVariant, IsographSelectionVariant>>>,
+    Vec<WithLocation<ProcessClientFieldDeclarationError>>,
+> {
+    and_then_selection_set_and_collect_errors(
         selection_set,
-        &|scalar_field_selection| {
-            if let Some(directive) =
-                find_directive_named(&scalar_field_selection.directives, *LOADABLE_DIRECTIVE_NAME)
-            {
+        &|scalar_pointer_selection| {
+            if let Some(directive) = find_directive_named(
+                &scalar_pointer_selection.directives,
+                *LOADABLE_DIRECTIVE_NAME,
+            ) {
                 let loadable_variant =
                     from_isograph_field_directive(&directive.item).map_err(|message| {
                         WithLocation::new(
@@ -58,24 +84,8 @@ pub fn validate_isograph_field_directives(
                 Ok(IsographSelectionVariant::Regular)
             }
         },
-        &|_linked_field_selection| Ok(IsographSelectionVariant::Regular),
-    )?;
-    Ok(WithSpan::new(
-        ClientFieldDeclarationWithValidatedDirectives {
-            const_export_name,
-            parent_type,
-            client_field_name,
-            description,
-            selection_set: new_selecton_set,
-            unwraps,
-            directives,
-            variable_definitions,
-            definition_path,
-            dot,
-            field_keyword,
-        },
-        client_field.span,
-    ))
+        &|_linked_pointer_selection| Ok(IsographSelectionVariant::Regular),
+    )
 }
 
 #[allow(clippy::complexity)]
@@ -98,39 +108,14 @@ pub fn validate_isograph_pointer_directives(
         pointer_keyword,
         to_type,
     } = client_pointer.item;
-    let new_selecton_set = and_then_selection_set_and_collect_errors(
-        selection_set,
-        &|scalar_pointer_selection| {
-            if let Some(directive) = find_directive_named(
-                &scalar_pointer_selection.directives,
-                *LOADABLE_DIRECTIVE_NAME,
-            ) {
-                let loadable_variant =
-                    from_isograph_field_directive(&directive.item).map_err(|message| {
-                        WithLocation::new(
-                            ProcessClientFieldDeclarationError::UnableToDeserialize {
-                                directive_name: *LOADABLE_DIRECTIVE_NAME,
-                                message,
-                            },
-                            Location::generated(),
-                        )
-                    })?;
-                // TODO validate that the pointer is actually loadable (i.e. implements Node or
-                // whatnot)
-                Ok(IsographSelectionVariant::Loadable(loadable_variant))
-            } else {
-                Ok(IsographSelectionVariant::Regular)
-            }
-        },
-        &|_linked_pointer_selection| Ok(IsographSelectionVariant::Regular),
-    )?;
+
     Ok(WithSpan::new(
         ClientPointerDeclarationWithValidatedDirectives {
             const_export_name,
             parent_type,
             client_pointer_name,
             description,
-            selection_set: new_selecton_set,
+            selection_set: validate_isograph_selection_set_directives(selection_set)?,
             unwraps,
             variable_definitions,
             definition_path,
