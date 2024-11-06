@@ -1,8 +1,8 @@
 use std::{collections::HashSet, ops::ControlFlow};
 
 use common_lang_types::{
-    FilePath, Location, ScalarFieldName, Span, TextSource, UnvalidatedTypeName, WithLocation,
-    WithSpan,
+    ClientPointerFieldName, FilePath, Location, ScalarFieldName, Span, TextSource,
+    UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
@@ -11,10 +11,10 @@ use graphql_lang_types::{
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
     ClientFieldDeclaration, ClientFieldDeclarationWithUnvalidatedDirectives,
-    ClientPointerDeclaration, ConstantValue, EntrypointTypeAndField, IsographFieldDirective,
-    LinkedFieldSelection, NonConstantValue, ScalarFieldSelection, Selection,
-    SelectionFieldArgument, ServerFieldSelection, UnvalidatedSelectionWithUnvalidatedDirectives,
-    Unwrap, VariableDefinition,
+    ClientPointerDeclaration, ClientPointerDeclarationWithUnvalidatedDirectives, ConstantValue,
+    EntrypointTypeAndField, IsographFieldDirective, LinkedFieldSelection, NonConstantValue,
+    ScalarFieldSelection, Selection, SelectionFieldArgument, ServerFieldSelection,
+    UnvalidatedSelectionWithUnvalidatedDirectives, Unwrap, VariableDefinition,
 };
 
 use crate::{
@@ -24,7 +24,7 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IsoLiteralExtractionResult {
-    ClientPointerDeclaration(WithSpan<ClientPointerDeclaration<(), ()>>),
+    ClientPointerDeclaration(WithSpan<ClientPointerDeclarationWithUnvalidatedDirectives>),
     ClientFieldDeclaration(WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>),
     EntrypointDeclaration(WithSpan<EntrypointTypeAndField>),
 }
@@ -162,7 +162,8 @@ fn parse_client_field_declaration_inner(
         let const_export_name = const_export_name.ok_or_else(|| {
             WithSpan::new(
                 IsographLiteralParseError::ExpectedLiteralToBeExported {
-                    suggested_const_export_name: client_field_name.item,
+                    literal_type: "field".to_string(),
+                    suggested_const_export_name: client_field_name.item.into(),
                 },
                 Span::todo_generated(),
             )
@@ -196,7 +197,7 @@ fn parse_iso_client_pointer_declaration(
     const_export_name: Option<&str>,
     text_source: TextSource,
     field_keyword_span: Span,
-) -> ParseResultWithLocation<WithSpan<ClientPointerDeclaration<(), ()>>> {
+) -> ParseResultWithLocation<WithSpan<ClientPointerDeclarationWithUnvalidatedDirectives>> {
     let client_pointer_declaration = parse_client_pointer_declaration_inner(
         tokens,
         definition_file_path,
@@ -222,7 +223,7 @@ fn parse_client_pointer_declaration_inner(
     const_export_name: Option<&str>,
     text_source: TextSource,
     pointer_keyword_span: Span,
-) -> ParseResultWithSpan<WithSpan<ClientPointerDeclaration<(), ()>>> {
+) -> ParseResultWithSpan<WithSpan<ClientPointerDeclarationWithUnvalidatedDirectives>> {
     tokens.with_span(|tokens| {
         let parent_type = tokens
             .parse_string_key_type(IsographLangTokenKind::Identifier)
@@ -232,7 +233,7 @@ fn parse_client_pointer_declaration_inner(
             .parse_token_of_kind(IsographLangTokenKind::Period)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-        let client_pointer_name: WithSpan<ScalarFieldName> = tokens
+        let client_pointer_name: WithSpan<ClientPointerFieldName> = tokens
             .parse_string_key_type(IsographLangTokenKind::Identifier)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
@@ -245,7 +246,8 @@ fn parse_client_pointer_declaration_inner(
         let const_export_name = const_export_name.ok_or_else(|| {
             WithSpan::new(
                 IsographLiteralParseError::ExpectedLiteralToBeExported {
-                    suggested_const_export_name: client_pointer_name.item,
+                    literal_type: "pointer".to_string(),
+                    suggested_const_export_name: client_pointer_name.item.into(),
                 },
                 Span::todo_generated(),
             )
@@ -254,6 +256,7 @@ fn parse_client_pointer_declaration_inner(
         Ok(ClientPointerDeclaration {
             parent_type,
             client_pointer_name,
+            to_type: parent_type,
             description,
             selection_set,
             unwraps,
