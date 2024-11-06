@@ -7,7 +7,7 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 
-use isograph_config::OptionalGenerateFileExtensions;
+use isograph_config::{GenerateFileExtensionsOption, OptionalValidationLevel};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection,
     ServerFieldSelection, TypeAnnotation, UnionVariant, VariableDefinition,
@@ -78,7 +78,8 @@ pub fn get_artifact_path_and_content(
     schema: &ValidatedSchema,
     project_root: &Path,
     artifact_directory: &Path,
-    file_extensions: OptionalGenerateFileExtensions,
+    file_extensions: GenerateFileExtensionsOption,
+    on_missing_babel_transform: OptionalValidationLevel,
 ) -> Vec<ArtifactPathAndContent> {
     let mut encountered_client_field_map = BTreeMap::new();
     let mut path_and_contents = vec![];
@@ -298,7 +299,11 @@ pub fn get_artifact_path_and_content(
         path_and_contents.push(path_and_content);
     }
 
-    path_and_contents.push(build_iso_overload_artifact(schema, file_extensions));
+    path_and_contents.push(build_iso_overload_artifact(
+        schema,
+        file_extensions,
+        on_missing_babel_transform,
+    ));
 
     path_and_contents
 }

@@ -1,7 +1,7 @@
 use common_lang_types::ArtifactPathAndContent;
 use intern::string_key::Intern;
 
-use isograph_config::OptionalGenerateFileExtensions;
+use isograph_config::GenerateFileExtensionsOption;
 use isograph_schema::{
     FieldMapItem, PrimaryFieldInfo, RefetchedPathsMap, ValidatedClientField, ValidatedSchema,
 };
@@ -21,7 +21,7 @@ pub(crate) fn generate_refetch_reader_artifact(
     primary_field_info: Option<&PrimaryFieldInfo>,
     refetched_paths: &RefetchedPathsMap,
     was_selected_loadably: bool,
-    file_extensions: OptionalGenerateFileExtensions,
+    file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
     let function_import_statement = match primary_field_info {
         Some(info) => {

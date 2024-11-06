@@ -162,6 +162,7 @@ pub(crate) fn process_iso_literals(
                         Err(e) => errors.extend(e),
                     };
                 }
+                IsoLiteralExtractionResult::ClientPointerDeclaration(_) => todo!(),
                 IsoLiteralExtractionResult::EntrypointDeclaration(entrypoint_declaration) => schema
                     .entrypoints
                     .push((text_source, entrypoint_declaration)),

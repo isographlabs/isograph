@@ -1,5 +1,5 @@
 use intern::Lookup;
-use isograph_config::OptionalGenerateFileExtensions;
+use isograph_config::{GenerateFileExtensionsOption, OptionalValidationLevel};
 use std::{cmp::Ordering, path::PathBuf};
 
 use common_lang_types::{ArtifactPathAndContent, SelectableFieldName};
@@ -11,7 +11,7 @@ use crate::generate_artifacts::ISO_TS;
 
 fn build_iso_overload_for_entrypoint(
     validated_client_field: &ValidatedClientField,
-    file_extensions: OptionalGenerateFileExtensions,
+    file_extensions: GenerateFileExtensionsOption,
 ) -> (String, String) {
     let mut s: String = "".to_string();
     let import = format!(
@@ -39,7 +39,7 @@ export function iso<T>(
 
 fn build_iso_overload_for_client_defined_field(
     client_field_and_variant: (&ValidatedClientField, UserWrittenComponentVariant),
-    file_extensions: OptionalGenerateFileExtensions,
+    file_extensions: GenerateFileExtensionsOption,
 ) -> (String, String) {
     let (client_field, variant) = client_field_and_variant;
     let mut s: String = "".to_string();
@@ -78,7 +78,8 @@ export function iso<T>(
 
 pub(crate) fn build_iso_overload_artifact(
     schema: &ValidatedSchema,
-    file_extensions: OptionalGenerateFileExtensions,
+    file_extensions: GenerateFileExtensionsOption,
+    on_missing_babel_transform: OptionalValidationLevel,
 ) -> ArtifactPathAndContent {
     let mut imports = "import type { IsographEntrypoint } from '@isograph/react';\n".to_string();
     let mut content = String::from(
@@ -154,12 +155,29 @@ export function iso(_isographLiteralText: string):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
   | IsographEntrypoint<any, any>
-{
-  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
+{\n",
+    );
+
+    content.push_str(match on_missing_babel_transform {
+        OptionalValidationLevel::Error => {
+"  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
+      'was not set up, or it failed to identify this call site. Make sure it ' +
+      'is being used verbatim as `iso`.');"
+        }
+        OptionalValidationLevel::Warn => {
+
+            "  console.warn('iso: Unexpected invocation at runtime. Either the Babel transform ' +
       'was not set up, or it failed to identify this call site. Make sure it ' +
       'is being used verbatim as `iso`.');
-}",
-    );
+  return (clientFieldResolver: any) => clientFieldResolver;"
+        }
+        OptionalValidationLevel::Ignore => {
+            "  return (clientFieldResolver: any) => clientFieldResolver;"
+        }
+    });
+
+    content.push_str("\n}");
+
     imports.push_str(&content);
     ArtifactPathAndContent {
         file_content: imports,

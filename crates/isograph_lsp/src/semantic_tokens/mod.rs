@@ -103,6 +103,9 @@ fn iso_literal_parse_result_to_tokens(
                 initial_diff,
             )
         }
+        IsoLiteralExtractionResult::ClientPointerDeclaration(_) => {
+            todo!()
+        }
         IsoLiteralExtractionResult::EntrypointDeclaration(entrypoint_declaration) => {
             entrypoint_declaration_to_tokens(entrypoint_declaration, iso_literal_text, initial_diff)
         }

@@ -1,7 +1,8 @@
 use common_lang_types::{Location, WithLocation};
 
 use crate::{
-    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, TypeRefinementMap, UnvalidatedSchema,
+    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, UnvalidatedSchema,
+    ValidatedTypeRefinementMap,
 };
 
 impl UnvalidatedSchema {
@@ -15,7 +16,7 @@ impl UnvalidatedSchema {
     /// TODO confirm we don't do this for unions...
     pub fn add_fields_to_subtypes(
         &mut self,
-        supertype_to_subtype_map: &TypeRefinementMap,
+        supertype_to_subtype_map: &ValidatedTypeRefinementMap,
     ) -> ProcessTypeDefinitionResult<()> {
         for (supertype_id, subtype_ids) in supertype_to_subtype_map {
             let supertype = self.server_field_data.object(*supertype_id);

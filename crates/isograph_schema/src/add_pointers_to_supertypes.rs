@@ -6,8 +6,8 @@ use isograph_lang_types::{ScalarFieldSelection, Selection, ServerFieldSelection}
 use crate::{
     FieldType, ProcessTypeDefinitionError, ProcessTypeDefinitionResult, SchemaObject,
     SchemaServerField, SchemaServerFieldInlineFragmentVariant, SchemaServerFieldVariant,
-    TypeRefinementMap, UnvalidatedSchema, ValidatedIsographSelectionVariant,
-    ValidatedScalarFieldAssociatedData,
+    UnvalidatedSchema, ValidatedIsographSelectionVariant, ValidatedScalarFieldAssociatedData,
+    ValidatedTypeRefinementMap,
 };
 use common_lang_types::Location;
 impl UnvalidatedSchema {
@@ -15,7 +15,7 @@ impl UnvalidatedSchema {
     /// to supertype (e.g. creating Node.asUser).
     pub fn add_pointers_to_supertypes(
         &mut self,
-        subtype_to_supertype_map: &TypeRefinementMap,
+        subtype_to_supertype_map: &ValidatedTypeRefinementMap,
     ) -> ProcessTypeDefinitionResult<()> {
         for (subtype_id, supertype_ids) in subtype_to_supertype_map {
             let subtype: &SchemaObject = self.server_field_data.object(*subtype_id);

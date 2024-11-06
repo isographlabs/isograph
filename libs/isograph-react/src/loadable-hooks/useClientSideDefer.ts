@@ -17,6 +17,7 @@ export function useClientSideDefer<
     TResult,
     ExtractParameters<TReadFromStore>
   >,
+  args?: Record<PropertyKey, never>,
   fetchOptions?: FetchOptions,
 ): { fragmentReference: FragmentReference<TReadFromStore, TResult> };
 

@@ -8,12 +8,14 @@ const queryText = 'query Newsfeed  {\
   viewer {\
     id,\
     newsfeed____skip___l_0____limit___l_6: newsfeed(skip: 0, limit: 6) {\
-      id,\
-      adItem {\
+      __typename,\
+      ... on AdItem {\
         id,\
+        __typename,\
       },\
-      blogItem {\
+      ... on BlogItem {\
         id,\
+        __typename,\
         author,\
         content,\
         image {\
@@ -51,35 +53,41 @@ const normalizationAst: NormalizationAst = [
             { kind: "Literal", value: 6 },
           ],
         ],
-        concreteType: "NewsfeedItem",
+        concreteType: null,
         selections: [
           {
             kind: "Scalar",
-            fieldName: "id",
+            fieldName: "__typename",
             arguments: null,
           },
           {
-            kind: "Linked",
-            fieldName: "adItem",
-            arguments: null,
-            concreteType: "AdItem",
+            kind: "InlineFragment",
+            type: "AdItem",
             selections: [
               {
                 kind: "Scalar",
                 fieldName: "id",
                 arguments: null,
               },
+              {
+                kind: "Scalar",
+                fieldName: "__typename",
+                arguments: null,
+              },
             ],
           },
           {
-            kind: "Linked",
-            fieldName: "blogItem",
-            arguments: null,
-            concreteType: "BlogItem",
+            kind: "InlineFragment",
+            type: "BlogItem",
             selections: [
               {
                 kind: "Scalar",
                 fieldName: "id",
+                arguments: null,
+              },
+              {
+                kind: "Scalar",
+                fieldName: "__typename",
                 arguments: null,
               },
               {
