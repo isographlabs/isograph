@@ -507,6 +507,46 @@ impl ObjectTypeAndFieldName {
 }
 
 #[derive(Debug)]
+pub struct ClientPointer<
+    TClientFieldSelectionScalarFieldAssociatedData,
+    TClientFieldSelectionLinkedFieldAssociatedData,
+    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
+> {
+    pub description: Option<DescriptionValue>,
+    pub name: ClientPointerFieldName,
+    pub id: ClientPointerId,
+    pub to: ServerObjectId,
+
+    pub condition_selection_set: Vec<
+        WithSpan<
+            Selection<
+                TClientFieldSelectionScalarFieldAssociatedData,
+                TClientFieldSelectionLinkedFieldAssociatedData,
+            >,
+        >,
+    >,
+
+    pub refetch_strategy: RefetchStrategy<
+        TClientFieldSelectionScalarFieldAssociatedData,
+        TClientFieldSelectionLinkedFieldAssociatedData,
+    >,
+
+    pub unwraps: Vec<WithSpan<Unwrap>>,
+
+    // TODO this should probably be a HashMap
+    // Is this used for anything except for some reason, for refetch fields?
+    pub variable_definitions:
+        Vec<WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
+
+    // TODO this is probably unused
+    // Why is this not calculated when needed?
+    pub type_and_field: ObjectTypeAndFieldName,
+
+    // TODO should this be TypeWithFieldsId???
+    pub parent_object_id: ServerObjectId,
+}
+
+#[derive(Debug)]
 pub struct ClientField<
     TClientFieldSelectionScalarFieldAssociatedData,
     TClientFieldSelectionLinkedFieldAssociatedData,

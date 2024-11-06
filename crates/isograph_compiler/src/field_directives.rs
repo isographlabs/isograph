@@ -3,8 +3,10 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     from_isograph_field_directive, ClientFieldDeclaration,
     ClientFieldDeclarationWithUnvalidatedDirectives, ClientFieldDeclarationWithValidatedDirectives,
-    IsographFieldDirective, IsographSelectionVariant, LinkedFieldSelection, ScalarFieldSelection,
-    Selection, ServerFieldSelection,
+    ClientPointerDeclaration, ClientPointerDeclarationWithUnvalidatedDirectives,
+    ClientPointerDeclarationWithValidatedDirectives, IsographFieldDirective,
+    IsographSelectionVariant, LinkedFieldSelection, ScalarFieldSelection, Selection,
+    ServerFieldSelection,
 };
 use isograph_schema::ProcessClientFieldDeclarationError;
 use lazy_static::lazy_static;
@@ -73,6 +75,70 @@ pub fn validate_isograph_field_directives(
             field_keyword,
         },
         client_field.span,
+    ))
+}
+
+#[allow(clippy::complexity)]
+pub fn validate_isograph_pointer_directives(
+    client_pointer: WithSpan<ClientPointerDeclarationWithUnvalidatedDirectives>,
+) -> Result<
+    WithSpan<ClientPointerDeclarationWithValidatedDirectives>,
+    Vec<WithLocation<ProcessClientFieldDeclarationError>>,
+> {
+    let ClientPointerDeclaration {
+        const_export_name,
+        parent_type,
+        client_pointer_name,
+        description,
+        selection_set,
+        unwraps,
+        variable_definitions,
+        definition_path,
+        dot,
+        pointer_keyword,
+        to_type,
+    } = client_pointer.item;
+    let new_selecton_set = and_then_selection_set_and_collect_errors(
+        selection_set,
+        &|scalar_pointer_selection| {
+            if let Some(directive) = find_directive_named(
+                &scalar_pointer_selection.directives,
+                *LOADABLE_DIRECTIVE_NAME,
+            ) {
+                let loadable_variant =
+                    from_isograph_field_directive(&directive.item).map_err(|message| {
+                        WithLocation::new(
+                            ProcessClientFieldDeclarationError::UnableToDeserialize {
+                                directive_name: *LOADABLE_DIRECTIVE_NAME,
+                                message,
+                            },
+                            Location::generated(),
+                        )
+                    })?;
+                // TODO validate that the pointer is actually loadable (i.e. implements Node or
+                // whatnot)
+                Ok(IsographSelectionVariant::Loadable(loadable_variant))
+            } else {
+                Ok(IsographSelectionVariant::Regular)
+            }
+        },
+        &|_linked_pointer_selection| Ok(IsographSelectionVariant::Regular),
+    )?;
+    Ok(WithSpan::new(
+        ClientPointerDeclarationWithValidatedDirectives {
+            const_export_name,
+            parent_type,
+            client_pointer_name,
+            description,
+            selection_set: new_selecton_set,
+            unwraps,
+            variable_definitions,
+            definition_path,
+            dot,
+            pointer_keyword,
+            to_type,
+        },
+        client_pointer.span,
     ))
 }
 

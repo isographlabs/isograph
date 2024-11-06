@@ -46,7 +46,8 @@ pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
 pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
     pub const_export_name: ConstExportName,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
-    pub client_pointer_name: WithSpan<ScalarFieldName>,
+    pub to_type: WithSpan<UnvalidatedTypeName>,
+    pub client_pointer_name: WithSpan<ClientPointerFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
     pub unwraps: Vec<WithSpan<Unwrap>>,
@@ -60,8 +61,12 @@ pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
 }
 
 pub type ClientFieldDeclarationWithUnvalidatedDirectives = ClientFieldDeclaration<(), ()>;
+pub type ClientPointerDeclarationWithUnvalidatedDirectives = ClientPointerDeclaration<(), ()>;
 pub type ClientFieldDeclarationWithValidatedDirectives =
     ClientFieldDeclaration<IsographSelectionVariant, IsographSelectionVariant>;
+
+pub type ClientPointerDeclarationWithValidatedDirectives =
+    ClientPointerDeclaration<IsographSelectionVariant, IsographSelectionVariant>;
 
 // TODO we should not have an enum, but instead a struct with fields lazy_load_artifact_info
 // and loadable_info or something.
