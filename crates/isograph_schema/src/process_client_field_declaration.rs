@@ -141,7 +141,7 @@ impl UnvalidatedSchema {
             .encountered_fields
             .insert(
                 client_field_name.into(),
-                FieldType::ClientField(next_client_field_id),
+                FieldType::ClientField(FieldType::ClientField(next_client_field_id)),
             )
             .is_some()
         {

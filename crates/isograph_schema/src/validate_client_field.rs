@@ -379,13 +379,16 @@ fn validate_field_type_exists_and_is_scalar(
                     )),
                 }
             }
-            FieldType::ClientField(client_field_id) => validate_client_field(
-                client_field_id,
-                scalar_field_selection,
-                used_variables,
-                variable_definitions,
-                top_level_client_field_info,
-            ),
+            FieldType::ClientField(FieldType::ServerField(_)) => todo!(),
+            FieldType::ClientField(FieldType::ClientField(client_field_id)) => {
+                validate_client_field(
+                    client_field_id,
+                    scalar_field_selection,
+                    used_variables,
+                    variable_definitions,
+                    top_level_client_field_info,
+                )
+            }
         },
         None => Err(WithLocation::new(
             ValidateSchemaError::ClientFieldSelectionFieldDoesNotExist {

@@ -89,14 +89,18 @@ impl UnvalidatedSchema {
             .get(&field_name.item.into())
         {
             Some(defined_field) => match defined_field {
-                FieldType::ServerField(_) => Err(WithLocation::new(
-                    ValidateEntrypointDeclarationError::FieldMustBeClientField {
-                        parent_type_name: parent_object.name,
-                        client_field_name: field_name.item,
-                    },
-                    Location::new(text_source, field_name.span),
-                )),
-                FieldType::ClientField(client_field_id) => Ok(*client_field_id),
+                FieldType::ClientField(FieldType::ServerField(_)) | FieldType::ServerField(_) => {
+                    Err(WithLocation::new(
+                        ValidateEntrypointDeclarationError::FieldMustBeClientField {
+                            parent_type_name: parent_object.name,
+                            client_field_name: field_name.item,
+                        },
+                        Location::new(text_source, field_name.span),
+                    ))
+                }
+                FieldType::ClientField(FieldType::ClientField(client_field_id)) => {
+                    Ok(*client_field_id)
+                }
             },
             None => Err(WithLocation::new(
                 ValidateEntrypointDeclarationError::ClientFieldMustExist {

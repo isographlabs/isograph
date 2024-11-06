@@ -314,7 +314,10 @@ impl UnvalidatedSchema {
             .object_mut(client_field_parent_object_id);
         if client_field_parent
             .encountered_fields
-            .insert(mutation_field_name, FieldType::ClientField(client_field_id))
+            .insert(
+                mutation_field_name,
+                FieldType::ClientField(FieldType::ClientField(client_field_id)),
+            )
             .is_some()
         {
             return Err(WithLocation::new(

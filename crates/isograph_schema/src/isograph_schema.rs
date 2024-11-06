@@ -4,9 +4,9 @@ use std::{
 };
 
 use common_lang_types::{
-    ArtifactFileType, DescriptionValue, GraphQLInterfaceTypeName, GraphQLScalarTypeName, HasName,
-    InputTypeName, IsographObjectTypeName, JavascriptName, SelectableFieldName,
-    UnvalidatedTypeName, WithLocation, WithSpan,
+    ArtifactFileType, ClientPointerFieldName, DescriptionValue, GraphQLInterfaceTypeName,
+    GraphQLScalarTypeName, HasName, InputTypeName, IsographObjectTypeName, JavascriptName,
+    SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition,
@@ -14,8 +14,8 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, SelectableServerFieldId, Selection, ServerFieldId,
-    ServerObjectId, ServerScalarId, ServerStrongIdFieldId, TypeAnnotation, Unwrap,
+    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, SelectableServerFieldId, Selection,
+    ServerFieldId, ServerObjectId, ServerScalarId, ServerStrongIdFieldId, TypeAnnotation, Unwrap,
     VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -363,7 +363,10 @@ pub struct SchemaObject {
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
-    pub encountered_fields: BTreeMap<SelectableFieldName, FieldType<ServerFieldId, ClientFieldId>>,
+    pub encountered_fields: BTreeMap<
+        SelectableFieldName,
+        FieldType<ServerFieldId, FieldType<ClientPointerId, ClientFieldId>>,
+    >,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 }

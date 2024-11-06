@@ -43,7 +43,9 @@ fn add_refetch_field_to_object(
         Entry::Vacant(vacant_entry) => {
             let next_client_field_id = client_fields.len().into();
 
-            vacant_entry.insert(FieldType::ClientField(next_client_field_id));
+            vacant_entry.insert(FieldType::ClientField(FieldType::ClientField(
+                next_client_field_id,
+            )));
 
             client_fields.push(ClientField {
                 description: Some(
