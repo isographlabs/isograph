@@ -80,10 +80,12 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
         >,
     >,
     pub client_fields: Vec<
-        ClientField<
-            TSchemaValidationState::ClientFieldSelectionScalarFieldAssociatedData,
-            TSchemaValidationState::ClientFieldSelectionLinkedFieldAssociatedData,
-            TSchemaValidationState::VariableDefinitionInnerType,
+        ClientType<
+            ClientField<
+                TSchemaValidationState::ClientFieldSelectionScalarFieldAssociatedData,
+                TSchemaValidationState::ClientFieldSelectionLinkedFieldAssociatedData,
+                TSchemaValidationState::VariableDefinitionInnerType,
+            >,
         >,
     >,
     // TODO consider whether this belongs here. It could just be a free variable.
@@ -147,6 +149,11 @@ pub enum FieldType<TServer, TClient> {
     ClientField(TClient),
 }
 
+#[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq, Hash)]
+pub enum ClientType<TField> {
+    ClientField(TField),
+}
+
 impl<TFieldAssociatedData, TClientFieldType> FieldType<TFieldAssociatedData, TClientFieldType> {
     pub fn as_server_field(&self) -> Option<&TFieldAssociatedData> {
         match self {
@@ -191,7 +198,9 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
         TSchemaValidationState::ClientFieldSelectionLinkedFieldAssociatedData,
         TSchemaValidationState::VariableDefinitionInnerType,
     > {
-        &self.client_fields[client_field_id.as_usize()]
+        match &self.client_fields[client_field_id.as_usize()] {
+            ClientType::ClientField(client_field) => client_field,
+        }
     }
 }
 
@@ -363,7 +372,8 @@ pub struct SchemaObject {
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
-    pub encountered_fields: BTreeMap<SelectableFieldName, FieldType<ServerFieldId, ClientFieldId>>,
+    pub encountered_fields:
+        BTreeMap<SelectableFieldName, FieldType<ServerFieldId, ClientType<ClientFieldId>>>,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 }

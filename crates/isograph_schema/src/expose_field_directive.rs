@@ -14,10 +14,10 @@ use isograph_lang_types::{
 use serde::Deserialize;
 
 use crate::{
-    generate_refetch_field_strategy, ArgumentMap, ClientField, ClientFieldVariant, FieldMapItem,
-    FieldType, ImperativelyLoadedFieldVariant, ObjectTypeAndFieldName, PrimaryFieldInfo,
-    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
-    UnvalidatedSchema, UnvalidatedVariableDefinition,
+    generate_refetch_field_strategy, ArgumentMap, ClientField, ClientFieldVariant, ClientType,
+    FieldMapItem, FieldType, ImperativelyLoadedFieldVariant, ObjectTypeAndFieldName,
+    PrimaryFieldInfo, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
+    ProcessedFieldMapItem, UnvalidatedSchema, UnvalidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -289,7 +289,8 @@ impl UnvalidatedSchema {
                     ),
                 )),
             };
-            self.client_fields.push(mutation_client_field);
+            self.client_fields
+                .push(ClientType::ClientField(mutation_client_field));
 
             self.insert_client_field_on_object(
                 client_field_scalar_selection_name,
@@ -314,7 +315,10 @@ impl UnvalidatedSchema {
             .object_mut(client_field_parent_object_id);
         if client_field_parent
             .encountered_fields
-            .insert(mutation_field_name, FieldType::ClientField(client_field_id))
+            .insert(
+                mutation_field_name,
+                FieldType::ClientField(ClientType::ClientField(client_field_id)),
+            )
             .is_some()
         {
             return Err(WithLocation::new(

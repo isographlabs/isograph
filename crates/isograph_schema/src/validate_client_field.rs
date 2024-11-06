@@ -14,28 +14,29 @@ use lazy_static::lazy_static;
 
 use crate::{
     get_all_errors_or_all_ok, get_all_errors_or_all_ok_as_hashmap, get_all_errors_or_all_ok_iter,
-    get_all_errors_or_tuple_ok, ClientField, FieldType, ObjectTypeAndFieldName, RefetchStrategy,
-    SchemaObject, ServerFieldData, UnvalidatedClientField, UnvalidatedLinkedFieldSelection,
-    UnvalidatedRefetchFieldStrategy, UnvalidatedVariableDefinition, ValidateSchemaError,
-    ValidateSchemaResult, ValidatedClientField, ValidatedIsographSelectionVariant,
-    ValidatedLinkedFieldAssociatedData, ValidatedLinkedFieldSelection,
-    ValidatedRefetchFieldStrategy, ValidatedScalarFieldAssociatedData,
-    ValidatedScalarFieldSelection, ValidatedSchemaServerField, ValidatedSelection,
-    ValidatedVariableDefinition,
+    get_all_errors_or_tuple_ok, ClientField, ClientType, FieldType, ObjectTypeAndFieldName,
+    RefetchStrategy, SchemaObject, ServerFieldData, UnvalidatedClientField,
+    UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
+    UnvalidatedVariableDefinition, ValidateSchemaError, ValidateSchemaResult, ValidatedClientField,
+    ValidatedIsographSelectionVariant, ValidatedLinkedFieldAssociatedData,
+    ValidatedLinkedFieldSelection, ValidatedRefetchFieldStrategy,
+    ValidatedScalarFieldAssociatedData, ValidatedScalarFieldSelection, ValidatedSchemaServerField,
+    ValidatedSelection, ValidatedVariableDefinition,
 };
 
 type UsedVariables = BTreeSet<VariableName>;
-type ClientFieldArgsMap = HashMap<ClientFieldId, Vec<WithSpan<ValidatedVariableDefinition>>>;
+type ClientFieldArgsMap =
+    HashMap<ClientType<ClientFieldId>, Vec<WithSpan<ValidatedVariableDefinition>>>;
 
 lazy_static! {
     static ref ID: FieldArgumentName = "id".intern().into();
 }
 
 pub(crate) fn validate_and_transform_client_fields(
-    client_fields: Vec<UnvalidatedClientField>,
+    client_fields: Vec<ClientType<UnvalidatedClientField>>,
     schema_data: &ServerFieldData,
     server_fields: &[ValidatedSchemaServerField],
-) -> Result<Vec<ValidatedClientField>, Vec<WithLocation<ValidateSchemaError>>> {
+) -> Result<Vec<ClientType<ValidatedClientField>>, Vec<WithLocation<ValidateSchemaError>>> {
     // TODO this smells. We probably should do this in two passes instead of doing it this
     // way. We are validating client fields, which includes validating their selections. When
     // validating a selection of a client field, we need to ensure that we pass the correct
@@ -43,24 +44,33 @@ pub(crate) fn validate_and_transform_client_fields(
     //
     // For now, we'll make a new datastructure containing all of the client field's arguments,
     // cloned.
-    let client_field_args = get_all_errors_or_all_ok_as_hashmap(client_fields.iter().map(
-        |unvalidated_client_field| {
-            let validated_variable_definitions = validate_variable_definitions(
-                schema_data,
-                unvalidated_client_field.variable_definitions.clone(),
-            )?;
-            Ok((unvalidated_client_field.id, validated_variable_definitions))
-        },
-    ))?;
+    let client_field_args =
+        get_all_errors_or_all_ok_as_hashmap(client_fields.iter().map(|unvalidated_client| {
+            match unvalidated_client {
+                ClientType::ClientField(unvalidated_client_field) => {
+                    let validated_variable_definitions = validate_variable_definitions(
+                        schema_data,
+                        unvalidated_client_field.variable_definitions.clone(),
+                    )?;
+                    Ok((
+                        ClientType::ClientField(unvalidated_client_field.id),
+                        validated_variable_definitions,
+                    ))
+                }
+            }
+        }))?;
 
     get_all_errors_or_all_ok_iter(client_fields.into_iter().map(|client_field| {
-        validate_client_field_selection_set(
-            schema_data,
-            client_field,
-            server_fields,
-            &client_field_args,
-        )
-        .map_err(|err| err.into_iter())
+        match client_field {
+            ClientType::ClientField(client_field) => validate_client_field_selection_set(
+                schema_data,
+                client_field,
+                server_fields,
+                &client_field_args,
+            )
+            .map(ClientType::ClientField)
+            .map_err(|err| err.into_iter()),
+        }
     }))
 }
 
@@ -123,7 +133,7 @@ fn validate_client_field_selection_set(
     };
 
     let variable_definitions = client_field_args
-        .get(&top_level_client_field.id)
+        .get(&ClientType::ClientField(top_level_client_field.id))
         .expect(
             "Expected variable definitions to exist. \
             This is indicative of a bug in Isograph",
@@ -404,7 +414,7 @@ fn validate_field_type_exists_and_is_scalar(
 }
 
 fn validate_client_field(
-    client_field_id: &ClientFieldId,
+    client_field_id: &ClientType<ClientFieldId>,
     scalar_field_selection: UnvalidatedScalarFieldSelection,
     used_variables: &mut UsedVariables,
     variable_definitions: &[WithSpan<UnvalidatedVariableDefinition>],

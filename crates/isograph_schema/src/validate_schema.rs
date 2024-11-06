@@ -15,7 +15,7 @@ use thiserror::Error;
 use crate::{
     validate_client_field::validate_and_transform_client_fields,
     validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
-    FieldType, ImperativelyLoadedFieldVariant, Schema, SchemaIdField, SchemaObject,
+    ClientType, FieldType, ImperativelyLoadedFieldVariant, Schema, SchemaIdField, SchemaObject,
     SchemaServerField, SchemaServerFieldVariant, SchemaValidationState, ServerFieldData,
     UnvalidatedSchema, UnvalidatedVariableDefinition, UseRefetchFieldRefetchStrategy,
     ValidateEntrypointDeclarationError,
@@ -52,7 +52,7 @@ pub type ValidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
 >;
 
 /// The validated defined field that shows up in the TScalarField generic.
-pub type ValidatedFieldDefinitionLocation = FieldType<ServerFieldId, ClientFieldId>;
+pub type ValidatedFieldDefinitionLocation = FieldType<ServerFieldId, ClientType<ClientFieldId>>;
 
 pub type ValidatedSchemaIdField = SchemaIdField<ServerScalarId>;
 

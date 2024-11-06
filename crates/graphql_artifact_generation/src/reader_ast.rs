@@ -5,8 +5,8 @@ use isograph_lang_types::{
     LoadableDirectiveParameters, RefetchQueryIndex, Selection, ServerFieldSelection,
 };
 use isograph_schema::{
-    categorize_field_loadability, transform_arguments_with_child_context, FieldType, Loadability,
-    NameAndArguments, NormalizationKey, ObjectTypeAndFieldName, PathToRefetchField,
+    categorize_field_loadability, transform_arguments_with_child_context, ClientType, FieldType,
+    Loadability, NameAndArguments, NormalizationKey, ObjectTypeAndFieldName, PathToRefetchField,
     RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
     ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
     ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSelection, VariableContext,
@@ -37,7 +37,7 @@ fn generate_reader_ast_node(
                         indentation_level,
                         initial_variable_context,
                     ),
-                    FieldType::ClientField(client_field_id) => {
+                    FieldType::ClientField(ClientType::ClientField(client_field_id)) => {
                         let client_field = schema.client_field(client_field_id);
                         scalar_client_defined_field_ast_node(
                             scalar_field_selection,
@@ -574,7 +574,7 @@ fn refetched_paths_with_path(
                         FieldType::ServerField(_) => {
                             // Do nothing, we encountered a server field
                         }
-                        FieldType::ClientField(client_field_id) => {
+                        FieldType::ClientField(ClientType::ClientField(client_field_id)) => {
                             let client_field = schema.client_field(client_field_id);
                             match categorize_field_loadability(
                                 client_field,

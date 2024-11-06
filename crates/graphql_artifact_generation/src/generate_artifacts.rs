@@ -13,9 +13,9 @@ use isograph_lang_types::{
     ServerFieldSelection, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
-    get_provided_arguments, selection_map_wrapped, ClientFieldVariant, FieldTraversalResult,
-    FieldType, NameAndArguments, NormalizationKey, RequiresRefinement, SchemaObject,
-    SchemaServerFieldVariant, UserWrittenComponentVariant, ValidatedClientField,
+    get_provided_arguments, selection_map_wrapped, ClientFieldVariant, ClientType,
+    FieldTraversalResult, FieldType, NameAndArguments, NormalizationKey, RequiresRefinement,
+    SchemaObject, SchemaServerFieldVariant, UserWrittenComponentVariant, ValidatedClientField,
     ValidatedIsographSelectionVariant, ValidatedSchema, ValidatedSelection,
     ValidatedVariableDefinition,
 };
@@ -243,15 +243,12 @@ pub fn get_artifact_path_and_content(
         }
     }
 
-    for user_written_client_field in
-        schema
-            .client_fields
-            .iter()
-            .filter(|field| match field.variant {
-                ClientFieldVariant::UserWritten(_) => true,
-                ClientFieldVariant::ImperativelyLoadedField(_) => false,
-            })
-    {
+    for user_written_client_field in schema.client_fields.iter().flat_map(|field| match field {
+        ClientType::ClientField(field) => match field.variant {
+            ClientFieldVariant::UserWritten(_) => Some(field),
+            ClientFieldVariant::ImperativelyLoadedField(_) => None,
+        },
+    }) {
         // For each user-written client field, generate a param type artifact
         path_and_contents.push(generate_eager_reader_param_type_artifact(
             schema,
@@ -508,7 +505,7 @@ fn write_param_type_from_selection(
                             print_javascript_type_declaration(&output_type)
                         ));
                     }
-                    FieldType::ClientField(client_field_id) => {
+                    FieldType::ClientField(ClientType::ClientField(client_field_id)) => {
                         let client_field = schema.client_field(client_field_id);
                         write_optional_description(
                             client_field.description,

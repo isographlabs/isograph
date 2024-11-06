@@ -18,7 +18,7 @@ use lazy_static::lazy_static;
 use crate::{
     categorize_field_loadability, create_transformed_name_and_arguments,
     expose_field_directive::RequiresRefinement, transform_arguments_with_child_context,
-    transform_name_and_arguments_with_child_variable_context, FieldType,
+    transform_name_and_arguments_with_child_variable_context, ClientType, FieldType,
     ImperativelyLoadedFieldVariant, Loadability, NameAndArguments, PathToRefetchField,
     RootOperationName, SchemaObject, SchemaServerFieldVariant, UnvalidatedVariableDefinition,
     ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedScalarFieldSelection,
@@ -671,7 +671,7 @@ fn merge_validated_selections_into_selection_map(
                                     variable_context,
                                 );
                             }
-                            FieldType::ClientField(client_field_id) => {
+                            FieldType::ClientField(ClientType::ClientField(client_field_id)) => {
                                 let newly_encountered_scalar_client_field =
                                     schema.client_field(*client_field_id);
 
