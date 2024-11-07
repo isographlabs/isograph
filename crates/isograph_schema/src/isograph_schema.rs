@@ -150,8 +150,8 @@ pub enum FieldType<TServer, TClient> {
 }
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq, Hash)]
-pub enum ClientType<TClient> {
-    ClientField(TClient),
+pub enum ClientType<TField> {
+    ClientField(TField),
     // ClientPointer(TPointer)
 }
 
