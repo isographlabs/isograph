@@ -288,7 +288,7 @@ pub enum ProcessClientFieldDeclarationError {
         parent_type_name: UnvalidatedTypeName,
     },
 
-    #[error("Invalid to type. `{to_type_name}` has no id field. You are attempting to define a pointer to it. \
+    #[error("Invalid type pointed to. `{to_type_name}` has no id field. You are attempting to define a pointer to it. \
         In order to do so, the to object must be an object implementing Node interface.")]
     ToTypeHasNoId { to_type_name: UnvalidatedTypeName },
 
