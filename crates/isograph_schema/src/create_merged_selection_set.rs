@@ -19,7 +19,7 @@ use crate::{
     categorize_field_loadability, create_transformed_name_and_arguments,
     expose_field_directive::RequiresRefinement, transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context, FieldType,
-    ImperativelyLoadedFieldVariant, LinkedType, Loadability, NameAndArguments, PathToRefetchField,
+    ImperativelyLoadedFieldVariant, Loadability, NameAndArguments, ObjectType, PathToRefetchField,
     RootOperationName, SchemaObject, SchemaServerFieldVariant, UnvalidatedVariableDefinition,
     ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedScalarFieldSelection,
     ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection, VariableContext,
@@ -729,7 +729,7 @@ fn merge_validated_selections_into_selection_map(
                     }
                     ServerFieldSelection::LinkedField(linked_field_selection) => {
                         match linked_field_selection.associated_data.parent_object_id {
-                            LinkedType::ServerObject(type_id) => {
+                            ObjectType::ServerObject(type_id) => {
                                 let linked_field_parent_type =
                                     schema.server_field_data.object(type_id);
 
