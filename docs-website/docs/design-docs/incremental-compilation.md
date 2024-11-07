@@ -42,14 +42,14 @@ When a source node is updated, it's value is compared to the old one. If differe
 A computed node is a deterministic function that always receives, as its first parameter, the database (as `&mut self`), and as its second parameter, receives a single struct of parameters. It must always call `db.calculate` immediately. This is not enforced, but could be via `#[derive]` macro.
 
 ```rs
-fn syntax_highlighting(db_view: &mut DatabaseView, file_name: FileName) -> &SyntaxHighlighting {
-  db_view.calculate<T>(
+fn syntax_highlighting(parent_db_view: &mut DatabaseView, file_name: FileName) -> &SyntaxHighlighting {
+  parent_db_view.calculate<T>(
     "syntax_highlighting",
     file_name: T,
     // inner function:
-    |nested_db_view, file_name: &FileName /* &T */| {
-      let asts = get_asts_in(nested_db_view, file_name);
-      calculate_syntax_highlighting_from_asts(asts)
+    |self_db_view, file_name: &FileName /* &T */| {
+      let asts = get_asts(self_db_view, file_name); // tracked
+      calculate_syntax_highlighting_from_asts(asts) // pure
     }
   )
 }
@@ -57,8 +57,8 @@ fn syntax_highlighting(db_view: &mut DatabaseView, file_name: FileName) -> &Synt
 // Or if we have a proc macro that does the db_view.calculate stuff:
 #[track]
 fn syntax_highlighting(db_view: &mut DatabaseView, file_name: &FileName) -> SyntaxHighlighting {
-    let asts = get_asts_in(nested_db_view, file_name);
-    calculate_syntax_highlighting_from_asts(asts) // this is a SyntaxHighlighting
+  let asts = get_asts(nested_db_view, file_name);
+  calculate_syntax_highlighting_from_asts(asts) // this is a SyntaxHighlighting
 }
 ```
 
@@ -146,39 +146,39 @@ hover info   syntax highlighting   go to definition
 - the `time_calculated` epoch.
   - Invariant: `time_calculated <= time_verified`
 - perhaps: `time_accessed` epoch (for garbage collection)
-- list of dependencies from last call
+- `Vec<Dependency>`
 
 ### Dependencies
 
 A sketch of how to store dependencies
 
 ```rs
-struct DatabaseView<'parent> {
-  database: &'parent Database,
-  dependencies: Vec<Box<dyn Fn() -> RevalidationResult>> + 'parent
+struct DatabaseView<'parent, 'db: 'parent> {
+  database: &'db Database,
+  dependencies: Vec<Box<dyn Fn() -> bool>> + 'parent
   parent_view: &'parent DatabaseView
 }
 
-impl DatabaseView {
+impl<'parent, 'db: 'parent> DatabaseView<'parent, 'db> {
   fn calculate<TParam: Any, TOutput: Any>(
+    &'parent mut self,
     static_key: &'static str,
     param: TParam,
-    inner_fn: impl Fn(&mut DatabaseView /* nested db view */, &TParam) -> TOutput;
-  ) -> &TOutput {
-    self.parent_view.dependencies.push(Box::new(|| {
-      let recalculate_inner = |database_view| { inner_fn(database_view, param) };
+    inner_fn: impl Fn(&'db mut DatabaseView /* self db view */, &TParam) -> TOutput + 'parent;
+  ) -> &'db TOutput {
+    let parent_db_view = self;
+    // tell parent_db_view that "syntax_highlighting" was called
+    parent_db_view.dependencies.push(Box::new(DerivedNodeDependency {
+      static_key,
+      param_hash: hash(param),
+      recalculate_inner_no_params: Box::new(|database_view| {
+        inner_fn(database_view, param)
+      }),
+    }));
 
-      || self.database.revalidate(
-        static_key,
-        param,
-        recalculate_inner
-      )
-    }))
-
-    if let Some(mut result) = self.database.get_mut(static_key, param) {
-      let dependencies = result.dependencies;
+    if let Some(mut previously_derived_node) = self.database.get_mut(static_key, param) {
       let has_changed = false;
-      for revalidate_dependency in dependencies.iter_mut() {
+      for revalidate_dependency in previously_derived_node.dependencies.iter_mut() {
         has_changed = revalidate_dependency();
         if has_changed {
           break;
@@ -186,26 +186,100 @@ impl DatabaseView {
       }
       if has_changed {
         let nested_view = self.nested_view();
-        let result = inner_fn(nested_view, &param);
-        // ?
-        result.dependencies = nested_view.dependencies;
+        let derived_node_value = Box::new(inner_fn(&mut nested_view, &param));
+
+        parent_db_view.max_time_calculated = std::cmp::max(
+          parent_db_view.max_time_calculated,
+          nested_view.max_time_calculated,
+        );
+
+        // database.store returns a reference to the derived_node_value
+        return self.database.store(static_key, param, DerivedNode {
+          derived_node_value, // Box<dyn Any>,
+          time_verified: self.database.epoch,
+          time_calculated: nested_view.max_time_calculated,
+          dependencies: nested_view.dependencies,
+        }).downcast_ref::<TOutput>().expect("Expected to be the correct type")
+      } else {
+        return &previously_derived_node.derived_node_value;
       }
     } else {
-      let nested_view = self.nested_view();
-      let result = inner_fn(nested_view, &param);
-      // ?
-      self.dependencies = nested_view.dependencies;
-      // calculate initially
+      panic!("same thing as above");
     }
+
   }
 
   fn nested_view(&mut self) -> DatabaseView {
     Self {
       database: self.database,
       dependencies: vec![],
-      parent_view: &self,
+      max_time_calculated: 0,
     }
   }
+}
+
+impl Database {
+  fn revalidate<'db>(
+    &'db mut self,
+    parent_static_key: &'static str,
+    parent_param: HashString,
+    parent_recalculate_inner: impl Fn(&'db mut DatabaseView) -> Box<dyn Any + Eq> + 'db
+  ) -> ChangeStatus {
+    match self.get_mut(static_key, param) {
+      Some(previously_derived_node) => {
+        // check each dependency
+        // if all dependencies are not invalidated, return HasNotChanged
+        // if any dependency is invalidated, recalculate_inner, compare, and
+        // if different, store and return HasChanged
+        // always set revalidated at to current epoch
+
+        let dependency_change_status = ChangeStatus::Unchanged;
+        for dependency in previously_derived_node.dependencies.iter_mut() {
+          if let Some(dependency_pdn) = self.get_mut(dependency.static_key, dependency.param_hash) {
+
+              if (dependency_pdn.time_validated === self.current_epoch) {
+                continue;
+              } else {
+                // potentially
+                dependency_change_status = ChangeStatus::Changed;
+                break;
+              }
+
+          } else {
+            panic!("Expected nested dep to exist");
+          }
+        }
+        match dependency_change_status {
+          ChangeStatus::Unchanged => {
+            return ChangeStatus::Unchanged
+          },
+          ChangeStatus::Changed => {
+            let mut database_view = self.database_view();
+            let new_value = parent_recalculate_inner(&mut database_view);
+
+            previously_derived_node.dependencies = database_view.dependencies;
+            previously_derived_node.time_verified = self.current_epoch;
+
+            if new_value != previously_derived_node.derived_node_value {
+              previously_derived_node.derived_node_value = new_value;
+              previously_derived_node.time_calculated = database_view.max_time_calculated;
+              return ChangeStatus::Changed
+            }
+
+            return ChangeStatus::Unchanged
+          },
+        }
+      }
+      None => {
+        panic!("Expected to exist if revalidating")
+      }
+    }
+  }
+}
+
+enum ChangeStatus {
+  Changed,
+  Unchanged,
 }
 
 
@@ -223,6 +297,7 @@ impl DatabaseView {
 
 - references
 - hash maps
+- tracked inputs
 
 # unneeded
 
