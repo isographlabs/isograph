@@ -5,8 +5,8 @@ use isograph_lang_types::{
     LoadableDirectiveParameters, RefetchQueryIndex, Selection, ServerFieldSelection,
 };
 use isograph_schema::{
-    categorize_field_loadability, transform_arguments_with_child_context, FieldType, Loadability,
-    NameAndArguments, NormalizationKey, ObjectType, ObjectTypeAndFieldName, PathToRefetchField,
+    categorize_field_loadability, transform_arguments_with_child_context, FieldType, LinkedType,
+    Loadability, NameAndArguments, NormalizationKey, ObjectTypeAndFieldName, PathToRefetchField,
     RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
     ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
     ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSelection, VariableContext,
@@ -126,7 +126,7 @@ fn linked_field_ast_node(
     let condition = match linked_field.associated_data.variant {
         SchemaServerFieldVariant::InlineFragment(_) => {
             match linked_field.associated_data.parent_object_id {
-                ObjectType::ServerObject(parent_object_id) => {
+                LinkedType::LinkedServerObject(parent_object_id) => {
                     let object = schema.server_field_data.object(parent_object_id);
 
                     let type_and_field = ObjectTypeAndFieldName {

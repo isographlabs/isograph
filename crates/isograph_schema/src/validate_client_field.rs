@@ -14,7 +14,7 @@ use lazy_static::lazy_static;
 
 use crate::{
     get_all_errors_or_all_ok, get_all_errors_or_all_ok_as_hashmap, get_all_errors_or_all_ok_iter,
-    get_all_errors_or_tuple_ok, ClientField, ClientType, FieldType, ObjectType,
+    get_all_errors_or_tuple_ok, ClientField, ClientType, FieldType, LinkedType,
     ObjectTypeAndFieldName, RefetchStrategy, SchemaObject, ServerFieldData, UnvalidatedClientField,
     UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
     UnvalidatedVariableDefinition, ValidateSchemaError, ValidateSchemaResult, ValidatedClientField,
@@ -536,7 +536,7 @@ fn validate_field_type_exists_and_is_linked(
                             unwraps: linked_field_selection.unwraps,
                             associated_data: ValidatedLinkedFieldAssociatedData {
                                 concrete_type: linked_field_target_object.concrete_type,
-                                parent_object_id: ObjectType::ServerObject(object_id),
+                                parent_object_id: LinkedType::LinkedServerObject(object_id),
                                 selection_variant: match linked_field_selection.associated_data {
                                     IsographSelectionVariant::Regular => {
                                         assert_no_missing_arguments(missing_arguments, linked_field_selection.name.location)?;

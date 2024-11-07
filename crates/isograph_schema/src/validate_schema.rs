@@ -15,7 +15,7 @@ use thiserror::Error;
 use crate::{
     validate_client_field::validate_and_transform_client_fields,
     validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
-    FieldType, ImperativelyLoadedFieldVariant, ObjectType, Schema, SchemaIdField, SchemaObject,
+    FieldType, ImperativelyLoadedFieldVariant, LinkedType, Schema, SchemaIdField, SchemaObject,
     SchemaServerField, SchemaServerFieldVariant, SchemaValidationState, ServerFieldData,
     UnvalidatedSchema, UnvalidatedVariableDefinition, UseRefetchFieldRefetchStrategy,
     ValidateEntrypointDeclarationError,
@@ -58,7 +58,7 @@ pub type ValidatedSchemaIdField = SchemaIdField<ServerScalarId>;
 
 #[derive(Debug, Clone)]
 pub struct ValidatedLinkedFieldAssociatedData {
-    pub parent_object_id: ObjectType<ServerObjectId>,
+    pub parent_object_id: LinkedType<ServerObjectId>,
     // N.B. we don't actually support loadable linked fields
     pub selection_variant: ValidatedIsographSelectionVariant,
     /// Some if the object is concrete; None otherwise.

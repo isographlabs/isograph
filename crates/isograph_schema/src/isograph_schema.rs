@@ -156,9 +156,9 @@ pub enum ClientType<TField> {
 }
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
-pub enum ObjectType<TServer> {
-    ServerObject(TServer),
-    // PointerObject(TPointer)
+pub enum LinkedType<TServerObject> {
+    LinkedServerObject(TServerObject),
+    // LinkedClientPointer(TClientPointer)
 }
 
 impl<TFieldAssociatedData, TClientFieldType> FieldType<TFieldAssociatedData, TClientFieldType> {
