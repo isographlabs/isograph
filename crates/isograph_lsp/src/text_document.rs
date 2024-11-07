@@ -1,13 +1,11 @@
-use lsp_types::notification::DidChangeTextDocument;
-use lsp_types::notification::DidCloseTextDocument;
-use lsp_types::notification::DidOpenTextDocument;
-use lsp_types::notification::Notification;
-use lsp_types::DidChangeTextDocumentParams;
-use lsp_types::DidOpenTextDocumentParams;
-use lsp_types::TextDocumentItem;
+use lsp_types::{
+    notification::{
+        DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification,
+    },
+    DidChangeTextDocumentParams, DidOpenTextDocumentParams, TextDocumentItem,
+};
 
-use crate::lsp_runtime_error::LSPRuntimeResult;
-use crate::lsp_state::LSPState;
+use crate::{lsp_runtime_error::LSPRuntimeResult, lsp_state::LSPState};
 
 pub fn on_did_open_text_document(
     lsp_state: &mut LSPState,

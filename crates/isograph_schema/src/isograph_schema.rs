@@ -20,7 +20,9 @@ use isograph_lang_types::{
 };
 use lazy_static::lazy_static;
 
-use crate::{refetch_strategy::RefetchStrategy, ClientFieldVariant, NormalizationKey};
+use crate::{
+    refetch_strategy::RefetchStrategy, ClientFieldVariant, NormalizationKey, ValidatedSelection,
+};
 
 lazy_static! {
     pub static ref ID_GRAPHQL_TYPE: GraphQLScalarTypeName = "ID".intern().into();
@@ -139,7 +141,7 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
 /// Note that locally-defined fields do **not** only include fields defined in
 /// an iso field literal. Refetch fields and generated mutation fields are
 /// also local fields.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
 pub enum FieldType<TServer, TClient> {
     ServerField(TServer),
     ClientField(TClient),
@@ -384,10 +386,17 @@ pub struct SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData
     pub variant: SchemaServerFieldVariant,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone)]
 pub enum SchemaServerFieldVariant {
-    InlineFragment,
+    InlineFragment(SchemaServerFieldInlineFragmentVariant),
     LinkedField,
+}
+
+#[derive(Debug, Clone)]
+pub struct SchemaServerFieldInlineFragmentVariant {
+    pub server_field_id: ServerFieldId,
+    pub concrete_type: IsographObjectTypeName,
+    pub condition_selection_set: Vec<WithSpan<ValidatedSelection>>,
 }
 
 impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug>

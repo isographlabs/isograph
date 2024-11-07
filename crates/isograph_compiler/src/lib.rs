@@ -1,9 +1,10 @@
 pub mod batch_compile;
+mod compiler_state;
 mod field_directives;
 mod isograph_literals;
-mod parse_files;
 mod refetch_fields;
 mod schema;
+mod source_files;
 pub mod watch;
 mod with_duration;
 mod write_artifacts;

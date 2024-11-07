@@ -10,10 +10,12 @@
     "forceConsistentCasingInFileNames": true,
     "composite": true,
     "declaration": true,
+    "declarationMap": true,
     "noUnusedLocals": true,
     "noFallthroughCasesInSwitch": true,
     "noPropertyAccessFromIndexSignature": true,
     "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": true,
     "paths": {
       "@isograph/*": ["./libs/*"]
     },

@@ -18,6 +18,7 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
     fieldName: "potential_new_best_friends",
     alias: null,
     arguments: null,
+    condition: null,
     selections: [
       {
         kind: "Scalar",

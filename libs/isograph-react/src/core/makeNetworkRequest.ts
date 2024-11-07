@@ -37,7 +37,11 @@ export function maybeMakeNetworkRequest(
       return [wrapResolvedValue(undefined), () => {}];
     }
     case 'IfNecessary': {
-      const result = check(environment, artifact.normalizationAst, variables);
+      const result = check(
+        environment,
+        artifact.networkRequestInfo.normalizationAst,
+        variables,
+      );
       if (result.kind === 'EnoughData') {
         return [wrapResolvedValue(undefined), () => {}];
       } else {
@@ -68,7 +72,7 @@ export function makeNetworkRequest(
   };
   // This should be an observable, not a promise
   const promise = environment
-    .networkFunction(artifact.queryText, variables)
+    .networkFunction(artifact.networkRequestInfo.queryText, variables)
     .then((networkResponse) => {
       logMessage(environment, {
         kind: 'ReceivedNetworkResponse',
@@ -86,7 +90,7 @@ export function makeNetworkRequest(
       if (status.kind === 'UndisposedIncomplete') {
         normalizeData(
           environment,
-          artifact.normalizationAst,
+          artifact.networkRequestInfo.normalizationAst,
           networkResponse.data ?? {},
           variables,
           artifact.kind === 'Entrypoint'
@@ -94,7 +98,7 @@ export function makeNetworkRequest(
             : [],
         );
         const retainedQuery = {
-          normalizationAst: artifact.normalizationAst,
+          normalizationAst: artifact.networkRequestInfo.normalizationAst,
           variables,
         };
         status = {

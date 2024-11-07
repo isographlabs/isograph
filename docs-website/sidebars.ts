@@ -32,6 +32,11 @@ const sidebars: SidebarsConfig = {
         'how-isograph-works/babel-plugin',
       ],
     },
+    {
+      type: 'category',
+      label: 'Design docs',
+      items: ['design-docs/incremental-compilation'],
+    },
     'development-workflow',
     'backlog',
   ],

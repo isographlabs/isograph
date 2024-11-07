@@ -2,14 +2,17 @@ import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@iso
 import { NewsfeedItem__NewsfeedAdOrBlog__param } from './param_type';
 import { NewsfeedAdOrBlog as resolver } from '../../../Newsfeed/NewsfeedRoute';
 import AdItem__AdItemDisplayWrapper__resolver_reader from '../../AdItem/AdItemDisplayWrapper/resolver_reader';
+import AdItem__asAdItem__resolver_reader from '../../AdItem/asAdItem/resolver_reader';
 import BlogItem__BlogItemDisplay__resolver_reader from '../../BlogItem/BlogItemDisplay/resolver_reader';
+import BlogItem__asBlogItem__resolver_reader from '../../BlogItem/asBlogItem/resolver_reader';
 
 const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
   {
     kind: "Linked",
-    fieldName: "adItem",
+    fieldName: "asAdItem",
     alias: null,
     arguments: null,
+    condition: AdItem__asAdItem__resolver_reader,
     selections: [
       {
         kind: "Resolver",
@@ -22,9 +25,10 @@ const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
   },
   {
     kind: "Linked",
-    fieldName: "blogItem",
+    fieldName: "asBlogItem",
     alias: null,
     arguments: null,
+    condition: BlogItem__asBlogItem__resolver_reader,
     selections: [
       {
         kind: "Resolver",

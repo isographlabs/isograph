@@ -28,12 +28,7 @@ Pergit facere meliorem hominem, et sperat unum diem quibusdam modis ei aequare.\
 Id abhorret a physicis mundi.',
   moreContent: 'Is that not enough for you?',
 };
-const newsfeedItems = [
-  {
-    id: 'newsFeed_0',
-    blogItem: firstBlog,
-  },
-];
+const newsfeedItems = [firstBlog];
 const blogItems = [firstBlog];
 const adItems = [];
 const images = [
@@ -94,10 +89,7 @@ function fillNewsfeedItems(limit) {
       };
       // insert an ad
       adItems.push(adItem);
-      newsfeedItems.push({
-        id: `newsFeed_${newsfeedItems.length}`,
-        adItem,
-      });
+      newsfeedItems.push(adItem);
     } else {
       const image =
         blogItems.length > 15 && Math.random() > 0.7
@@ -114,10 +106,7 @@ function fillNewsfeedItems(limit) {
       };
       // insert a blog
       blogItems.push(blogItem);
-      newsfeedItems.push({
-        id: `newsFeed_${newsfeedItems.length}`,
-        blogItem,
-      });
+      newsfeedItems.push(blogItem);
     }
   }
 }
@@ -129,11 +118,8 @@ export const getImage = (id) => images.find((image) => image.id === id);
 
 export const newsfeedResolvers = {
   NewsfeedItem: {
-    adItem: (obj) => {
-      return obj.adItem;
-    },
-    blogItem: (obj) => {
-      return obj.blogItem;
+    __resolveType: (obj) => {
+      return obj.__typename;
     },
   },
   BlogItem: {

@@ -42,6 +42,23 @@ pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
     pub dot: WithSpan<()>,
 }
 
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
+pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
+    pub const_export_name: ConstExportName,
+    pub parent_type: WithSpan<UnvalidatedTypeName>,
+    pub client_pointer_name: WithSpan<ScalarFieldName>,
+    pub description: Option<WithSpan<DescriptionValue>>,
+    pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
+    pub unwraps: Vec<WithSpan<Unwrap>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
+    pub definition_path: FilePath,
+
+    // TODO consider making these behind a cfg flag, since they're only used
+    // by the LSP
+    pub pointer_keyword: WithSpan<()>,
+    pub dot: WithSpan<()>,
+}
+
 pub type ClientFieldDeclarationWithUnvalidatedDirectives = ClientFieldDeclaration<(), ()>;
 pub type ClientFieldDeclarationWithValidatedDirectives =
     ClientFieldDeclaration<IsographSelectionVariant, IsographSelectionVariant>;
