@@ -154,6 +154,11 @@ pub enum ClientType<TField> {
     ClientField(TField),
 }
 
+#[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
+pub enum LinkedType<TServerObject> {
+    ServerObject(TServerObject),
+}
+
 impl<TFieldAssociatedData, TClientFieldType> FieldType<TFieldAssociatedData, TClientFieldType> {
     pub fn as_server_field(&self) -> Option<&TFieldAssociatedData> {
         match self {

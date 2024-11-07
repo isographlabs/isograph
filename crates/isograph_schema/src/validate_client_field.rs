@@ -14,8 +14,8 @@ use lazy_static::lazy_static;
 
 use crate::{
     get_all_errors_or_all_ok, get_all_errors_or_all_ok_as_hashmap, get_all_errors_or_all_ok_iter,
-    get_all_errors_or_tuple_ok, ClientField, ClientType, FieldType, ObjectTypeAndFieldName,
-    RefetchStrategy, SchemaObject, ServerFieldData, UnvalidatedClientField,
+    get_all_errors_or_tuple_ok, ClientField, ClientType, FieldType, LinkedType,
+    ObjectTypeAndFieldName, RefetchStrategy, SchemaObject, ServerFieldData, UnvalidatedClientField,
     UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
     UnvalidatedVariableDefinition, ValidateSchemaError, ValidateSchemaResult, ValidatedClientField,
     ValidatedIsographSelectionVariant, ValidatedLinkedFieldAssociatedData,
@@ -389,13 +389,15 @@ fn validate_field_type_exists_and_is_scalar(
                     )),
                 }
             }
-            FieldType::ClientField(client_field_id) => validate_client_field(
-                client_field_id,
-                scalar_field_selection,
-                used_variables,
-                variable_definitions,
-                top_level_client_field_info,
-            ),
+            FieldType::ClientField(ClientType::ClientField(client_field_id)) => {
+                validate_client_field(
+                    client_field_id,
+                    scalar_field_selection,
+                    used_variables,
+                    variable_definitions,
+                    top_level_client_field_info,
+                )
+            }
         },
         None => Err(WithLocation::new(
             ValidateSchemaError::ClientFieldSelectionFieldDoesNotExist {
@@ -414,7 +416,7 @@ fn validate_field_type_exists_and_is_scalar(
 }
 
 fn validate_client_field(
-    client_field_id: &ClientType<ClientFieldId>,
+    client_field_id: &ClientFieldId,
     scalar_field_selection: UnvalidatedScalarFieldSelection,
     used_variables: &mut UsedVariables,
     variable_definitions: &[WithSpan<UnvalidatedVariableDefinition>],
@@ -422,7 +424,7 @@ fn validate_client_field(
 ) -> ValidateSchemaResult<ValidatedScalarFieldSelection> {
     let argument_definitions = top_level_client_field_info
         .client_field_args
-        .get(client_field_id)
+        .get(&ClientType::ClientField(*client_field_id))
         .expect(
             "Expected client field to exist in map. \
             This is indicative of a bug in Isograph.",
@@ -534,7 +536,7 @@ fn validate_field_type_exists_and_is_linked(
                             unwraps: linked_field_selection.unwraps,
                             associated_data: ValidatedLinkedFieldAssociatedData {
                                 concrete_type: linked_field_target_object.concrete_type,
-                                parent_object_id: object_id,
+                                parent_object_id: LinkedType::ServerObject(object_id),
                                 selection_variant: match linked_field_selection.associated_data {
                                     IsographSelectionVariant::Regular => {
                                         assert_no_missing_arguments(missing_arguments, linked_field_selection.name.location)?;

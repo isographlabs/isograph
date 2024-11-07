@@ -5,7 +5,7 @@ use isograph_lang_types::{
     LoadableDirectiveParameters, RefetchQueryIndex, Selection, ServerFieldSelection,
 };
 use isograph_schema::{
-    categorize_field_loadability, transform_arguments_with_child_context, ClientType, FieldType,
+    categorize_field_loadability, transform_arguments_with_child_context, FieldType, LinkedType,
     Loadability, NameAndArguments, NormalizationKey, ObjectTypeAndFieldName, PathToRefetchField,
     RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
     ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
@@ -37,7 +37,7 @@ fn generate_reader_ast_node(
                         indentation_level,
                         initial_variable_context,
                     ),
-                    FieldType::ClientField(ClientType::ClientField(client_field_id)) => {
+                    FieldType::ClientField(client_field_id) => {
                         let client_field = schema.client_field(client_field_id);
                         scalar_client_defined_field_ast_node(
                             scalar_field_selection,
@@ -125,21 +125,23 @@ fn linked_field_ast_node(
 
     let condition = match linked_field.associated_data.variant {
         SchemaServerFieldVariant::InlineFragment(_) => {
-            let object = schema
-                .server_field_data
-                .object(linked_field.associated_data.parent_object_id);
+            match linked_field.associated_data.parent_object_id {
+                LinkedType::ServerObject(parent_object_id) => {
+                    let object = schema.server_field_data.object(parent_object_id);
 
-            let type_and_field = ObjectTypeAndFieldName {
-                field_name: linked_field.name.item.into(),
-                type_name: object.name,
-            };
+                    let type_and_field = ObjectTypeAndFieldName {
+                        field_name: linked_field.name.item.into(),
+                        type_name: object.name,
+                    };
 
-            let reader_artifact_import_name =
-                format!("{}__resolver_reader", type_and_field.underscore_separated());
+                    let reader_artifact_import_name =
+                        format!("{}__resolver_reader", type_and_field.underscore_separated());
 
-            reader_imports.insert((type_and_field, ImportedFileCategory::ResolverReader));
+                    reader_imports.insert((type_and_field, ImportedFileCategory::ResolverReader));
 
-            reader_artifact_import_name
+                    reader_artifact_import_name
+                }
+            }
         }
         SchemaServerFieldVariant::LinkedField => "null".to_string(),
     };
@@ -574,7 +576,7 @@ fn refetched_paths_with_path(
                         FieldType::ServerField(_) => {
                             // Do nothing, we encountered a server field
                         }
-                        FieldType::ClientField(ClientType::ClientField(client_field_id)) => {
+                        FieldType::ClientField(client_field_id) => {
                             let client_field = schema.client_field(client_field_id);
                             match categorize_field_loadability(
                                 client_field,

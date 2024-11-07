@@ -505,7 +505,7 @@ fn write_param_type_from_selection(
                             print_javascript_type_declaration(&output_type)
                         ));
                     }
-                    FieldType::ClientField(ClientType::ClientField(client_field_id)) => {
+                    FieldType::ClientField(client_field_id) => {
                         let client_field = schema.client_field(client_field_id);
                         write_optional_description(
                             client_field.description,
