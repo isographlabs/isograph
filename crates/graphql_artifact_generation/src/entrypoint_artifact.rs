@@ -68,6 +68,7 @@ pub(crate) fn generate_entrypoint_artifacts(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'a>(
     schema: &ValidatedSchema,
     entrypoint: &ValidatedClientField,

@@ -281,7 +281,7 @@ pub(crate) fn get_all_errors_or_tuple_ok<T1, T2, E>(
 ) -> Result<(T1, T2), Vec<E>> {
     match (a, b) {
         (Ok(v1), Ok(v2)) => Ok((v1, v2)),
-        (Err(e1), Err(e2)) => Err(e1.into_iter().chain(e2.into_iter()).collect()),
+        (Err(e1), Err(e2)) => Err(e1.into_iter().chain(e2).collect()),
         (_, Err(e)) => Err(e.into_iter().collect()),
         (Err(e), _) => Err(e.into_iter().collect()),
     }

@@ -54,7 +54,7 @@ impl<
         }
     }
 }
-
+#[allow(clippy::too_many_arguments)]
 pub fn generate_refetch_field_strategy<
     TClientFieldSelectionScalarFieldAssociatedData,
     TClientFieldSelectionLinkedFieldAssociatedData,
