@@ -14,7 +14,7 @@ use thiserror::Error;
 
 use crate::{
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
-    ClientField, ClientPointer, FieldMapItem, FieldType, ObjectTypeAndFieldName,
+    ClientField, ClientPointer, ClientType, FieldMapItem, FieldType, ObjectTypeAndFieldName,
     RequiresRefinement, UnvalidatedSchema, UnvalidatedVariableDefinition, NODE_FIELD_NAME,
 };
 
@@ -141,7 +141,7 @@ impl UnvalidatedSchema {
             .encountered_fields
             .insert(
                 client_field_name.into(),
-                FieldType::ClientField(FieldType::ClientField(next_client_field_id)),
+                FieldType::ClientField(ClientType::ClientField(next_client_field_id)),
             )
             .is_some()
         {
@@ -208,7 +208,7 @@ impl UnvalidatedSchema {
             .encountered_fields
             .insert(
                 client_pointer_name.into(),
-                FieldType::ClientField(FieldType::ServerField(next_client_pointer_id)),
+                FieldType::ClientField(ClientType::ClientPointer(next_client_pointer_id)),
             )
             .is_some()
         {

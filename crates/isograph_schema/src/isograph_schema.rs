@@ -147,6 +147,12 @@ pub enum FieldType<TServer, TClient> {
     ClientField(TClient),
 }
 
+#[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq, Hash)]
+pub enum ClientType<TField, TPointer> {
+    ClientField(TField),
+    ClientPointer(TPointer),
+}
+
 impl<TFieldAssociatedData, TClientFieldType> FieldType<TFieldAssociatedData, TClientFieldType> {
     pub fn as_server_field(&self) -> Option<&TFieldAssociatedData> {
         match self {
@@ -365,7 +371,7 @@ pub struct SchemaObject {
     pub id_field: Option<ServerStrongIdFieldId>,
     pub encountered_fields: BTreeMap<
         SelectableFieldName,
-        FieldType<ServerFieldId, FieldType<ClientPointerId, ClientFieldId>>,
+        FieldType<ServerFieldId, ClientType<ClientFieldId, ClientPointerId>>,
     >,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,

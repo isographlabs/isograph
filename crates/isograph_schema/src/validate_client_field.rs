@@ -14,14 +14,14 @@ use lazy_static::lazy_static;
 
 use crate::{
     get_all_errors_or_all_ok, get_all_errors_or_all_ok_as_hashmap, get_all_errors_or_all_ok_iter,
-    get_all_errors_or_tuple_ok, ClientField, FieldType, ObjectTypeAndFieldName, RefetchStrategy,
-    SchemaObject, ServerFieldData, UnvalidatedClientField, UnvalidatedLinkedFieldSelection,
-    UnvalidatedRefetchFieldStrategy, UnvalidatedVariableDefinition, ValidateSchemaError,
-    ValidateSchemaResult, ValidatedClientField, ValidatedIsographSelectionVariant,
-    ValidatedLinkedFieldAssociatedData, ValidatedLinkedFieldSelection,
-    ValidatedRefetchFieldStrategy, ValidatedScalarFieldAssociatedData,
-    ValidatedScalarFieldSelection, ValidatedSchemaServerField, ValidatedSelection,
-    ValidatedVariableDefinition,
+    get_all_errors_or_tuple_ok, ClientField, ClientType, FieldType, ObjectTypeAndFieldName,
+    RefetchStrategy, SchemaObject, ServerFieldData, UnvalidatedClientField,
+    UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
+    UnvalidatedVariableDefinition, ValidateSchemaError, ValidateSchemaResult, ValidatedClientField,
+    ValidatedIsographSelectionVariant, ValidatedLinkedFieldAssociatedData,
+    ValidatedLinkedFieldSelection, ValidatedRefetchFieldStrategy,
+    ValidatedScalarFieldAssociatedData, ValidatedScalarFieldSelection, ValidatedSchemaServerField,
+    ValidatedSelection, ValidatedVariableDefinition,
 };
 
 type UsedVariables = BTreeSet<VariableName>;
@@ -379,8 +379,8 @@ fn validate_field_type_exists_and_is_scalar(
                     )),
                 }
             }
-            FieldType::ClientField(FieldType::ServerField(_)) => todo!(),
-            FieldType::ClientField(FieldType::ClientField(client_field_id)) => {
+            FieldType::ClientField(ClientType::ClientPointer(_)) => todo!(),
+            FieldType::ClientField(ClientType::ClientField(client_field_id)) => {
                 validate_client_field(
                     client_field_id,
                     scalar_field_selection,

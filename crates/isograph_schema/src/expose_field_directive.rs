@@ -14,10 +14,10 @@ use isograph_lang_types::{
 use serde::Deserialize;
 
 use crate::{
-    generate_refetch_field_strategy, ArgumentMap, ClientField, ClientFieldVariant, FieldMapItem,
-    FieldType, ImperativelyLoadedFieldVariant, ObjectTypeAndFieldName, PrimaryFieldInfo,
-    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
-    UnvalidatedSchema, UnvalidatedVariableDefinition,
+    generate_refetch_field_strategy, ArgumentMap, ClientField, ClientFieldVariant, ClientType,
+    FieldMapItem, FieldType, ImperativelyLoadedFieldVariant, ObjectTypeAndFieldName,
+    PrimaryFieldInfo, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
+    ProcessedFieldMapItem, UnvalidatedSchema, UnvalidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -316,7 +316,7 @@ impl UnvalidatedSchema {
             .encountered_fields
             .insert(
                 mutation_field_name,
-                FieldType::ClientField(FieldType::ClientField(client_field_id)),
+                FieldType::ClientField(ClientType::ClientField(client_field_id)),
             )
             .is_some()
         {
