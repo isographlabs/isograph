@@ -79,14 +79,10 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
             TSchemaValidationState::VariableDefinitionInnerType,
         >,
     >,
-    pub client_fields: Vec<
-        ClientType<
-            ClientField<
-                TSchemaValidationState::ClientFieldSelectionScalarFieldAssociatedData,
-                TSchemaValidationState::ClientFieldSelectionLinkedFieldAssociatedData,
-                TSchemaValidationState::VariableDefinitionInnerType,
-            >,
-        >,
+    pub client_fields: ClientFields<
+        TSchemaValidationState::ClientFieldSelectionScalarFieldAssociatedData,
+        TSchemaValidationState::ClientFieldSelectionLinkedFieldAssociatedData,
+        TSchemaValidationState::VariableDefinitionInnerType,
     >,
     // TODO consider whether this belongs here. It could just be a free variable.
     pub entrypoints: TSchemaValidationState::Entrypoint,
@@ -105,6 +101,20 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
     /// These are root types like Query, Mutation, Subscription
     pub fetchable_types: BTreeMap<ServerObjectId, RootOperationName>,
 }
+
+type ClientFields<
+    TClientFieldSelectionScalarFieldAssociatedData,
+    TClientFieldSelectionLinkedFieldAssociatedData,
+    TClientFieldVariableDefinitionAssociatedData,
+> = Vec<
+    ClientType<
+        ClientField<
+            TClientFieldSelectionScalarFieldAssociatedData,
+            TClientFieldSelectionLinkedFieldAssociatedData,
+            TClientFieldVariableDefinitionAssociatedData,
+        >,
+    >,
+>;
 
 impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationState> {
     /// This is a smell, and we should refactor away from it, or all schema's
