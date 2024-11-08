@@ -441,7 +441,6 @@ function normalizeDataIntoRecord(
     let encounteredRecordsIds = insertIfNotExists(
       mutableEncounteredIds,
       targetParentRecordLink.__typename,
-      new Set(),
     );
 
     encounteredRecordsIds.add(targetParentRecordLink.__link);
@@ -449,11 +448,11 @@ function normalizeDataIntoRecord(
   return recordHasBeenUpdated;
 }
 
-export function insertIfNotExists<K, V>(map: Map<K, V>, key: K, value: V) {
+export function insertIfNotExists<K, V>(map: Map<K, Set<V>>, key: K) {
   let result = map.get(key);
   if (result === undefined) {
-    result = value;
-    map.set(key, value);
+    result = new Set();
+    map.set(key, result);
   }
   return result;
 }

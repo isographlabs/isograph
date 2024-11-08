@@ -124,7 +124,6 @@ function readData<TReadFromStore>(
   const encounteredIds = insertIfNotExists(
     mutableEncounteredRecords,
     root.__typename,
-    new Set(),
   );
   encounteredIds.add(root.__link);
   let storeRecord = environment.store[root.__typename]?.[root.__link];
