@@ -79,7 +79,10 @@ fn format_field_definition(
 ) -> String {
     match type_ {
         FieldType::ServerField(server_field_id) => {
-            let type_annotation = &schema.server_field(*server_field_id).associated_data;
+            let type_annotation = &schema
+                .server_field(*server_field_id)
+                .associated_data
+                .type_name;
             format!(
                 "{}readonly {}: {},\n",
                 "  ".repeat(indentation_level as usize),

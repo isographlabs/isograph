@@ -338,7 +338,7 @@ fn validate_field_type_exists_and_is_scalar(
                     variable_definitions,
                 )?;
 
-                match server_field.associated_data.inner_non_null() {
+                match server_field.associated_data.type_name.inner_non_null() {
                     SelectableServerFieldId::Scalar(_) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
                         associated_data: ValidatedScalarFieldAssociatedData {
@@ -479,7 +479,7 @@ fn validate_field_type_exists_and_is_linked(
             FieldType::ServerField(server_field_id) => {
                 let server_field =
                     &top_level_client_field_info.server_fields[server_field_id.as_usize()];
-                match server_field.associated_data.inner_non_null() {
+                match server_field.associated_data.type_name.inner_non_null() {
                     SelectableServerFieldId::Scalar(scalar_id) => Err(WithLocation::new(
                         ValidateSchemaError::ClientFieldSelectionFieldIsScalar {
                             field_parent_type_name: field_parent_object.name,
@@ -536,6 +536,8 @@ fn validate_field_type_exists_and_is_linked(
                             unwraps: linked_field_selection.unwraps,
                             associated_data: ValidatedLinkedFieldAssociatedData {
                                 concrete_type: linked_field_target_object.concrete_type,
+                                parent_object_id: object_id,
+                                field_id: FieldType::ServerField(server_field.id),
                                 selection_variant: match linked_field_selection.associated_data {
                                     IsographSelectionVariant::Regular => {
                                         assert_no_missing_arguments(missing_arguments, linked_field_selection.name.location)?;
@@ -546,7 +548,6 @@ fn validate_field_type_exists_and_is_linked(
                                         ValidatedIsographSelectionVariant::Loadable((l, missing_arguments))
                                     },
                                 },
-                                variant: server_field.variant.clone()
                             },
                             arguments: linked_field_selection.arguments,
                             directives: linked_field_selection.directives,

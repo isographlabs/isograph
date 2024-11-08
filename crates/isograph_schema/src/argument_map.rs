@@ -276,7 +276,8 @@ impl ModifiedArgument {
                         match field {
                             PotentiallyModifiedField::Unmodified(field_id) => {
                                 let field_object = schema.server_field(*field_id);
-                                let field_object_type = field_object.associated_data.inner();
+                                let field_object_type =
+                                    field_object.associated_data.type_name.inner();
 
                                 // N.B. this should be done via a validation pass.
                                 match schema

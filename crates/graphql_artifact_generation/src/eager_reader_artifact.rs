@@ -3,7 +3,7 @@ use intern::Lookup;
 
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_schema::{
-    RefetchedPathsMap, SchemaServerFieldInlineFragmentVariant, UserWrittenClientFieldInfo,
+    RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientFieldInfo,
     UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema, ValidatedSchemaServerField,
 };
 use std::{
@@ -133,7 +133,7 @@ pub(crate) fn generate_eager_reader_artifacts(
 pub(crate) fn generate_eager_reader_condition_artifact(
     schema: &ValidatedSchema,
     encountered_server_field: &ValidatedSchemaServerField,
-    inline_fragment: &SchemaServerFieldInlineFragmentVariant,
+    inline_fragment: &ServerFieldTypeAssociatedDataInlineFragment,
     refetch_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {

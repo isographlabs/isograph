@@ -113,8 +113,8 @@ pub fn get_artifact_path_and_content(
             FieldType::ServerField(encountered_server_field_id) => {
                 let encountered_server_field = schema.server_field(*encountered_server_field_id);
 
-                match &encountered_server_field.variant {
-                    SchemaServerFieldVariant::LinkedField(_) => {}
+                match &encountered_server_field.associated_data.variant {
+                    SchemaServerFieldVariant::LinkedField => {}
                     SchemaServerFieldVariant::InlineFragment(inline_fragment) => {
                         path_and_contents.push(generate_eager_reader_condition_artifact(
                             schema,
@@ -486,17 +486,21 @@ fn write_param_type_from_selection(
 
                         // TODO there should be a clever way to print without cloning
                         let output_type =
-                            field.associated_data.clone().map(&mut |output_type_id| {
-                                // TODO not just scalars, enums as well. Both should have a javascript name
-                                let scalar_id = if let SelectableServerFieldId::Scalar(scalar) =
-                                    output_type_id
-                                {
-                                    scalar
-                                } else {
-                                    panic!("output_type_id should be a scalar");
-                                };
-                                schema.server_field_data.scalar(scalar_id).javascript_name
-                            });
+                            field
+                                .associated_data
+                                .type_name
+                                .clone()
+                                .map(&mut |output_type_id| {
+                                    // TODO not just scalars, enums as well. Both should have a javascript name
+                                    let scalar_id = if let SelectableServerFieldId::Scalar(scalar) =
+                                        output_type_id
+                                    {
+                                        scalar
+                                    } else {
+                                        panic!("output_type_id should be a scalar");
+                                    };
+                                    schema.server_field_data.scalar(scalar_id).javascript_name
+                                });
 
                         query_type_declaration.push_str(&format!(
                             "{}readonly {}: {},\n",
@@ -584,21 +588,26 @@ fn write_param_type_from_selection(
                     .push_str(&"  ".repeat(indentation_level as usize).to_string());
                 let name_or_alias = linked_field.name_or_alias().item;
 
-                let type_annotation = field.associated_data.clone().map(&mut |output_type_id| {
-                    let object_id = output_type_id.try_into().expect(
-                        "output_type_id should be an object. \
+                let type_annotation =
+                    field
+                        .associated_data
+                        .type_name
+                        .clone()
+                        .map(&mut |output_type_id| {
+                            let object_id = output_type_id.try_into().expect(
+                                "output_type_id should be an object. \
                         This is indicative of a bug in Isograph.",
-                    );
-                    let object = schema.server_field_data.object(object_id);
-                    generate_client_field_parameter_type(
-                        schema,
-                        &linked_field.selection_set,
-                        object,
-                        nested_client_field_imports,
-                        loadable_fields,
-                        indentation_level,
-                    )
-                });
+                            );
+                            let object = schema.server_field_data.object(object_id);
+                            generate_client_field_parameter_type(
+                                schema,
+                                &linked_field.selection_set,
+                                object,
+                                nested_client_field_imports,
+                                loadable_fields,
+                                indentation_level,
+                            )
+                        });
                 query_type_declaration.push_str(&format!(
                     "readonly {}: {},\n",
                     name_or_alias,

@@ -6,9 +6,11 @@ use isograph_lang_types::{
 
 use crate::{
     get_all_errors_or_all_ok, get_all_errors_or_all_ok_iter, SchemaServerField,
-    SchemaValidationState, ServerFieldData, UnvalidatedSchemaSchemaField, UnvalidatedSchemaState,
-    UnvalidatedVariableDefinition, ValidateSchemaError, ValidateSchemaResult,
-    ValidatedSchemaServerField, ValidatedVariableDefinition,
+    SchemaServerFieldVariant, SchemaValidationState, ServerFieldData,
+    ServerFieldTypeAssociatedData, ServerFieldTypeAssociatedDataInlineFragment,
+    UnvalidatedSchemaSchemaField, UnvalidatedSchemaState, UnvalidatedVariableDefinition,
+    ValidateSchemaError, ValidateSchemaResult, ValidatedSchemaServerField,
+    ValidatedVariableDefinition,
 };
 
 pub(crate) fn validate_and_transform_server_fields(
@@ -27,18 +29,30 @@ fn validate_and_transform_server_field(
     schema_data: &ServerFieldData,
 ) -> Result<ValidatedSchemaServerField, impl Iterator<Item = WithLocation<ValidateSchemaError>>> {
     // TODO rewrite as field.map(...).transpose()
-    let (empty_field, server_field_type) = field.split();
+    let (empty_field, server_field) = field.split();
 
     let mut errors = vec![];
 
     let field_type =
-        match validate_server_field_type_exists(schema_data, &server_field_type, &empty_field) {
+        match validate_server_field_type_exists(schema_data, &server_field.type_name, &empty_field)
+        {
             Ok(type_annotation) => Some(type_annotation),
             Err(e) => {
                 errors.push(e);
                 None
             }
         };
+
+    let variant = match server_field.variant {
+        SchemaServerFieldVariant::LinkedField => SchemaServerFieldVariant::LinkedField,
+        SchemaServerFieldVariant::InlineFragment(associated_data) => {
+            SchemaServerFieldVariant::InlineFragment(ServerFieldTypeAssociatedDataInlineFragment {
+                concrete_type: associated_data.concrete_type,
+                condition_selection_set: associated_data.condition_selection_set,
+                server_field_id: associated_data.server_field_id,
+            })
+        }
+    };
 
     let valid_arguments =
         match get_all_errors_or_all_ok(empty_field.arguments.into_iter().map(|argument| {
@@ -62,11 +76,13 @@ fn validate_and_transform_server_field(
                 description: empty_field.description,
                 name: empty_field.name,
                 id: empty_field.id,
-                associated_data: field_type,
+                associated_data: ServerFieldTypeAssociatedData {
+                    type_name: field_type,
+                    variant,
+                },
                 parent_type_id: empty_field.parent_type_id,
                 arguments: valid_arguments,
                 is_discriminator: empty_field.is_discriminator,
-                variant: empty_field.variant,
             });
         }
     }

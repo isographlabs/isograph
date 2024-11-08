@@ -121,7 +121,7 @@ impl UnvalidatedSchema {
 
         // TODO do not use mutation naming here
         let mutation_field = self.server_field(mutation_subfield_id);
-        let mutation_field_payload_type_name = *mutation_field.associated_data.inner();
+        let mutation_field_payload_type_name = *mutation_field.associated_data.type_name.inner();
         let client_field_scalar_selection_name = expose_as.unwrap_or(mutation_field.name.item);
         // TODO what is going on here. Should mutation_field have a checked way of converting to LinkedField?
         let top_level_schema_field_name = mutation_field.name.item.lookup().intern().into();
@@ -163,7 +163,7 @@ impl UnvalidatedSchema {
                         let server_field = self.server_field(*server_field_id);
 
                         // This is the parent type name (Pet)
-                        let inner = server_field.associated_data.inner();
+                        let inner = server_field.associated_data.type_name.inner();
 
                         // TODO validate that the payload object has no plural fields in between
 

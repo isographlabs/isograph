@@ -21,7 +21,8 @@ use isograph_lang_types::{
 use lazy_static::lazy_static;
 
 use crate::{
-    refetch_strategy::RefetchStrategy, ClientFieldVariant, NormalizationKey, ValidatedSelection,
+    refetch_strategy::RefetchStrategy, ClientFieldVariant, NormalizationKey,
+    ServerFieldTypeAssociatedData,
 };
 
 lazy_static! {
@@ -217,7 +218,11 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
 
 impl<
         TFieldAssociatedData: Clone + Ord + Copy + Debug,
-        TSchemaValidationState: SchemaValidationState<ServerFieldTypeAssociatedData = TypeAnnotation<TFieldAssociatedData>>,
+        TSchemaValidationState: SchemaValidationState<
+            ServerFieldTypeAssociatedData = ServerFieldTypeAssociatedData<
+                TypeAnnotation<TFieldAssociatedData>,
+            >,
+        >,
     > Schema<TSchemaValidationState>
 {
     // This should not be this complicated!
@@ -233,7 +238,7 @@ impl<
 
         let field = self
             .server_field(field_id)
-            .and_then(|e| e.inner_non_null().try_into())
+            .and_then(|e| e.type_name.inner_non_null().try_into())
             .expect(
                 // N.B. this expect should never be triggered. This is only because server_field
                 // does not have a .map method. TODO implement .map
@@ -403,26 +408,6 @@ pub struct SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData
         Vec<WithLocation<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
     // TODO remove this. This is indicative of poor modeling.
     pub is_discriminator: bool,
-
-    pub variant: SchemaServerFieldVariant,
-}
-
-#[derive(Debug, Clone)]
-pub enum SchemaServerFieldVariant {
-    InlineFragment(SchemaServerFieldInlineFragmentVariant),
-    LinkedField(SchemaServerFieldLinkedFieldVariant),
-}
-
-#[derive(Debug, Clone)]
-pub struct SchemaServerFieldLinkedFieldVariant {
-    pub field_id: FieldType<ServerFieldId, ()>,
-}
-
-#[derive(Debug, Clone)]
-pub struct SchemaServerFieldInlineFragmentVariant {
-    pub server_field_id: ServerFieldId,
-    pub concrete_type: IsographObjectTypeName,
-    pub condition_selection_set: Vec<WithSpan<ValidatedSelection>>,
 }
 
 impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug>
@@ -440,7 +425,6 @@ impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug>
             parent_type_id: self.parent_type_id,
             arguments: self.arguments.clone(),
             is_discriminator: self.is_discriminator,
-            variant: self.variant.clone(),
         })
     }
 
@@ -456,7 +440,6 @@ impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug>
             parent_type_id: self.parent_type_id,
             arguments: self.arguments.clone(),
             is_discriminator: self.is_discriminator,
-            variant: self.variant.clone(),
         }
     }
 }
@@ -652,7 +635,6 @@ impl<T, VariableDefinitionInnerType: Ord + Debug>
             parent_type_id,
             arguments,
             is_discriminator,
-            variant: is_inline,
         } = self;
         (
             SchemaServerField {
@@ -663,7 +645,6 @@ impl<T, VariableDefinitionInnerType: Ord + Debug>
                 parent_type_id,
                 arguments,
                 is_discriminator,
-                variant: is_inline,
             },
             associated_data,
         )
