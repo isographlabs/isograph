@@ -42,27 +42,11 @@ impl<'source> PeekableLexer<'source> {
 
     /// Get the next token (and advance)
     pub fn parse_token(&mut self) -> WithSpan<TokenKind> {
-        // Skip over (and record) any invalid tokens until either a valid token or an EOF is encountered
-        //
-        // TODO: remove this allow after logic changed.
-        #[allow(clippy::never_loop)]
-        loop {
-            let kind = self.lexer.next().unwrap_or(TokenKind::EndOfFile);
-            match kind {
-                TokenKind::Error => {
-                    // TODO propagate? continue?
-                    panic!(
-                        "Encountered an error; this probably means you have an invalid character."
-                    )
-                }
-                _ => {
-                    self.end_index_of_last_parsed_token = self.current.span.end;
-                    let span = self.lexer_span();
-                    // TODO why does self.current = ... not work here?
-                    return std::mem::replace(&mut self.current, WithSpan::new(kind, span));
-                }
-            }
-        }
+        let kind = self.lexer.next().unwrap_or(TokenKind::EndOfFile);
+        self.end_index_of_last_parsed_token = self.current.span.end;
+        let span = self.lexer_span();
+        // TODO why does self.current = ... not work here?
+        return std::mem::replace(&mut self.current, WithSpan::new(kind, span));
     }
 
     pub fn peek(&self) -> WithSpan<TokenKind> {
