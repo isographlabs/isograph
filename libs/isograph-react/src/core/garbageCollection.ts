@@ -60,7 +60,7 @@ export function garbageCollectEnvironment(environment: IsographEnvironment) {
     const retainedTypeIds = retainedIds[typeName];
 
     // delete all objects
-    if (!retainedTypeIds) {
+    if (retainedTypeIds.size === 0) {
       delete environment.store[typeName];
       continue;
     }
@@ -127,24 +127,21 @@ function recordReachableIdsFromRecord(
           }
         }
 
-        let typeStore = selection.concreteType && store[selection.concreteType];
+        let typeStore =
+          selection.concreteType !== null
+            ? store[selection.concreteType]
+            : null;
 
-        if (!typeStore && selection.concreteType) {
+        if (typeStore == null && selection.concreteType !== null) {
           continue;
         }
 
         for (const nextRecordLink of links) {
-          let __typename = selection.concreteType ?? nextRecordLink.__typename;
-          if (!__typename) {
-            throw new Error(
-              'Unexpected missing __typename in Link when garbage collecting. ' +
-                'This is indicative of a bug in Isograph.',
-            );
-          }
+          let __typename = nextRecordLink.__typename;
 
           const resolvedTypeStore = typeStore ?? store[__typename];
 
-          if (!resolvedTypeStore) {
+          if (resolvedTypeStore == null) {
             continue;
           }
 

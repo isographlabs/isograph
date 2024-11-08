@@ -350,7 +350,7 @@ function hasOverlappingIds(
 ): boolean {
   for (const [typeName, set1] of ids1.entries()) {
     const set2 = ids2.get(typeName);
-    if (!set2) {
+    if (set2 === undefined) {
       continue;
     }
 
@@ -534,7 +534,7 @@ function normalizeLinkedField(
 
       const __typename =
         astNode.concreteType ?? networkResponseObject[TYPENAME_FIELD_NAME];
-      if (!__typename) {
+      if (__typename == null) {
         throw new Error(
           'Unexpected missing __typename in network response when normalizing a linked field. ' +
             'This is indicative of a bug in Isograph.',
@@ -562,7 +562,7 @@ function normalizeLinkedField(
     let __typename =
       astNode.concreteType ?? networkResponseData[TYPENAME_FIELD_NAME];
 
-    if (!__typename) {
+    if (__typename == null) {
       throw new Error(
         'Unexpected missing __typename in network response when normalizing a linked field. ' +
           'This is indicative of a bug in Isograph.',
@@ -652,7 +652,7 @@ function normalizeNetworkResponseObject(
   const __typename =
     astNode.concreteType ?? networkResponseData[TYPENAME_FIELD_NAME];
 
-  if (!__typename) {
+  if (__typename == null) {
     throw new Error(
       'Unexpected missing __typename in network response object. ' +
         'This is indicative of a bug in Isograph.',
