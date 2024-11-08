@@ -7,15 +7,15 @@ use common_lang_types::{
 use intern::Lookup;
 use isograph_lang_types::{
     ClientFieldId, LinkedFieldSelection, LoadableDirectiveParameters, ScalarFieldSelection,
-    SelectableServerFieldId, Selection, SelectionFieldArgument, ServerFieldId, ServerObjectId,
-    ServerScalarId, TypeAnnotation, VariableDefinition,
+    SelectableServerFieldId, Selection, SelectionFieldArgument, ServerFieldId, ServerScalarId,
+    TypeAnnotation, VariableDefinition,
 };
 use thiserror::Error;
 
 use crate::{
     validate_client_field::validate_and_transform_client_fields,
     validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
-    FieldType, ImperativelyLoadedFieldVariant, LinkedType, Schema, SchemaIdField, SchemaObject,
+    FieldType, ImperativelyLoadedFieldVariant, Schema, SchemaIdField, SchemaObject,
     SchemaServerField, SchemaServerFieldVariant, SchemaValidationState, ServerFieldData,
     UnvalidatedSchema, UnvalidatedVariableDefinition, UseRefetchFieldRefetchStrategy,
     ValidateEntrypointDeclarationError,
@@ -58,7 +58,6 @@ pub type ValidatedSchemaIdField = SchemaIdField<ServerScalarId>;
 
 #[derive(Debug, Clone)]
 pub struct ValidatedLinkedFieldAssociatedData {
-    pub parent_object_id: LinkedType<ServerObjectId>,
     // N.B. we don't actually support loadable linked fields
     pub selection_variant: ValidatedIsographSelectionVariant,
     /// Some if the object is concrete; None otherwise.

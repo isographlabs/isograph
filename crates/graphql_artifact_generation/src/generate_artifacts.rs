@@ -114,7 +114,7 @@ pub fn get_artifact_path_and_content(
                 let encountered_server_field = schema.server_field(*encountered_server_field_id);
 
                 match &encountered_server_field.variant {
-                    SchemaServerFieldVariant::LinkedField => {}
+                    SchemaServerFieldVariant::LinkedField(_) => {}
                     SchemaServerFieldVariant::InlineFragment(inline_fragment) => {
                         path_and_contents.push(generate_eager_reader_condition_artifact(
                             schema,

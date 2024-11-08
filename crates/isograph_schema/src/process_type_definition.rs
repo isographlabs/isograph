@@ -3,8 +3,8 @@ use std::collections::{hash_map::Entry, BTreeMap, HashMap};
 use crate::{
     EncounteredRootTypes, FieldType, IsographObjectTypeDefinition, ProcessedRootTypes,
     RootOperationName, RootTypes, Schema, SchemaObject, SchemaScalar, SchemaServerField,
-    SchemaServerFieldVariant, UnvalidatedObjectFieldInfo, UnvalidatedSchema,
-    UnvalidatedSchemaSchemaField, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
+    SchemaServerFieldLinkedFieldVariant, SchemaServerFieldVariant, UnvalidatedObjectFieldInfo,
+    UnvalidatedSchema, UnvalidatedSchemaSchemaField, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
 };
 use common_lang_types::{
     GraphQLObjectTypeName, GraphQLScalarTypeName, IsographObjectTypeName, Location,
@@ -626,7 +626,11 @@ fn get_field_objects_ids_and_names(
                         .map(graphql_input_value_definition_to_variable_definition)
                         .collect::<Result<Vec<_>, _>>()?,
                     is_discriminator: false,
-                    variant: SchemaServerFieldVariant::LinkedField,
+                    variant: SchemaServerFieldVariant::LinkedField(
+                        SchemaServerFieldLinkedFieldVariant {
+                            field_id: FieldType::ServerField(next_server_field_id),
+                        },
+                    ),
                 });
                 server_field_ids.push(next_server_field_id);
             }
@@ -659,7 +663,9 @@ fn get_field_objects_ids_and_names(
         parent_type_id,
         arguments: vec![],
         is_discriminator: true,
-        variant: SchemaServerFieldVariant::LinkedField,
+        variant: SchemaServerFieldVariant::LinkedField(SchemaServerFieldLinkedFieldVariant {
+            field_id: FieldType::ServerField(typename_field_id),
+        }),
     });
 
     if encountered_fields

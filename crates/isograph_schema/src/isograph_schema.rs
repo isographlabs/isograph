@@ -165,12 +165,6 @@ pub enum ClientType<TField> {
     // ClientPointer(TPointer)
 }
 
-#[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
-pub enum LinkedType<TServerObject> {
-    LinkedServerObject(TServerObject),
-    // LinkedClientPointer(TClientPointer)
-}
-
 impl<TFieldAssociatedData, TClientFieldType> FieldType<TFieldAssociatedData, TClientFieldType> {
     pub fn as_server_field(&self) -> Option<&TFieldAssociatedData> {
         match self {
@@ -416,7 +410,12 @@ pub struct SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData
 #[derive(Debug, Clone)]
 pub enum SchemaServerFieldVariant {
     InlineFragment(SchemaServerFieldInlineFragmentVariant),
-    LinkedField,
+    LinkedField(SchemaServerFieldLinkedFieldVariant),
+}
+
+#[derive(Debug, Clone)]
+pub struct SchemaServerFieldLinkedFieldVariant {
+    pub field_id: FieldType<ServerFieldId, ()>,
 }
 
 #[derive(Debug, Clone)]
