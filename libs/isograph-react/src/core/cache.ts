@@ -354,7 +354,7 @@ function hasOverlappingIds(
       continue;
     }
 
-    if (isDisjointFrom(set1, set2)) {
+    if (isNotDisjointFrom(set1, set2)) {
       return true;
     }
   }
@@ -362,7 +362,7 @@ function hasOverlappingIds(
 }
 
 // TODO use a polyfill library
-function isDisjointFrom<T>(set1: Set<T>, set2: Set<T>): boolean {
+function isNotDisjointFrom<T>(set1: Set<T>, set2: Set<T>): boolean {
   for (const id of set1) {
     if (set2.has(id)) {
       return true;
