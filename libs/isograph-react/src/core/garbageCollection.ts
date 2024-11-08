@@ -88,7 +88,7 @@ function recordReachableIds(
 ) {
   const record =
     store[retainedQuery.root.__typename]?.[retainedQuery.root.__link];
-  if (record)
+  if (record) {
     recordReachableIdsFromRecord(
       store,
       record,
@@ -96,6 +96,7 @@ function recordReachableIds(
       retainedQuery.normalizationAst,
       retainedQuery.variables,
     );
+  }
 }
 
 function recordReachableIdsFromRecord(
