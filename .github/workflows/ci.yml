@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   build-cli:
+    name: Build compiler
     strategy:
       matrix:
         target:
@@ -40,6 +41,7 @@ jobs:
       cross: ${{ matrix.target.cross }}
 
   build-cli-linux:
+    name: Build compiler
     uses: ./.github/workflows/build-cli.yml
     with:
       target: x86_64-unknown-linux-musl
