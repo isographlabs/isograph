@@ -9,15 +9,9 @@ permissions:
 
 jobs:
   build-cli:
-    name: Build compiler
-    timeout-minutes: 10
     strategy:
       matrix:
         target:
-          - target: x86_64-unknown-linux-musl
-            os: ubuntu-latest
-            build-name: isograph_cli
-            artifact-name: isograph_cli-linux-x64
           - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
             build-name: isograph_cli
@@ -36,36 +30,27 @@ jobs:
             longpaths: true
             build-name: isograph_cli.exe
             artifact-name: isograph_cli-bin-win-x64
-    runs-on: ${{ matrix.target.os }}
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: 1.75.0
-          override: true
-          target: ${{ matrix.target.target }}
-      # more info here:- https://github.com/rust-lang/cargo/issues/13020
-      - name: Enable longer pathnames for git
-        if: matrix.target.longpaths
-        run: git config --system core.longpaths true
-      - name: Install cross
-        if: matrix.target.cross
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cross
-      - name: 'Build isograph_cli with cargo (${{matrix.target.target}})'
-        run: ${{ matrix.target.cross && 'cross' || 'cargo' }} build --target ${{ matrix.target.target }} --release
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.target.artifact-name }}
-          path: target/${{ matrix.target.target }}/release/${{ matrix.target.build-name }}
-          if-no-files-found: error
+    uses: ./.github/workflows/build-cli.yml
+    with:
+      target: ${{ matrix.target.target }}
+      os: ${{ matrix.target.os }}
+      build-name: ${{ matrix.target.build-name }}
+      artifact-name: ${{ matrix.target.artifact-name }}
+      longpaths: ${{ matrix.target.longpaths }}
+      cross: ${{ matrix.target.cross }}
+
+  build-cli-linux:
+    uses: ./.github/workflows/build-cli.yml
+    with:
+      target: x86_64-unknown-linux-musl
+      os: ubuntu-latest
+      build-name: isograph_cli
+      artifact-name: isograph_cli-linux-x64
 
   build-demos:
     name: Build demos
     runs-on: ubuntu-latest
-    needs: [build-cli]
+    needs: [build-cli-linux]
     strategy:
       matrix:
         target:
@@ -227,6 +212,7 @@ jobs:
       [
         build-js-packages,
         build-cli,
+        build-cli-linux,
         build-demos,
         build-website,
         prettier,
