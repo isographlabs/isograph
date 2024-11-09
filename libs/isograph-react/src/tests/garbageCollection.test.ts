@@ -127,7 +127,7 @@ describe('garbage collection', () => {
     expect(store.Economist?.[2]).not.toBe(undefined);
   });
 
-  test('ROOT_ID should not be garbage collected, even if there are no retained queries', () => {
+  test('ROOT_ID should be garbage collected, if there are no retained queries', () => {
     const store = getDefaultStore();
     const environment = createIsographEnvironment(
       store,
@@ -136,7 +136,7 @@ describe('garbage collection', () => {
     );
     garbageCollectEnvironment(environment);
 
-    expect(store.Query[ROOT_ID]).not.toBe(undefined);
+    expect(store.Query?.[ROOT_ID]).toBe(undefined);
     expect(store.Economist?.[0]).toBe(undefined);
   });
 });

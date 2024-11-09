@@ -3,7 +3,6 @@ import {
   DataId,
   IsographEnvironment,
   IsographStore,
-  ROOT_ID,
   StoreRecord,
   assertLink,
   type Link,
@@ -45,7 +44,7 @@ export function retainQuery(
 }
 
 export function garbageCollectEnvironment(environment: IsographEnvironment) {
-  const retainedIds: RetainedIds = { Query: new Set<DataId>([ROOT_ID]) };
+  const retainedIds: RetainedIds = {};
 
   for (const query of environment.retainedQueries) {
     recordReachableIds(environment.store, query, retainedIds);
