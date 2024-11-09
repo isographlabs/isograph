@@ -1,0 +1,51 @@
+on:
+  workflow_call:
+    inputs:
+      target:
+        required: true
+        type: string
+      os:
+        required: true
+        type: string
+      build-name:
+        required: true
+        type: string
+      artifact-name:
+        required: true
+        type: string
+      longpaths:
+        required: false
+        type: boolean
+      cross:
+        required: false
+        type: boolean
+
+jobs:
+  build-cli:
+    name: Build compiler
+    timeout-minutes: 10
+    runs-on: ${{ inputs.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.75.0
+          override: true
+          target: ${{ inputs.target }}
+      # more info here:- https://github.com/rust-lang/cargo/issues/13020
+      - name: Enable longer pathnames for git
+        if: inputs.longpaths
+        run: git config --system core.longpaths true
+      - name: Install cross
+        if: inputs.cross
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cross
+      - name: 'Build isograph_cli with cargo (${{inputs.target}})'
+        run: ${{ inputs.cross && 'cross' || 'cargo' }} build --target ${{ inputs.target }} --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: target/${{ inputs.target }}/release/${{ inputs.build-name }}
+          if-no-files-found: error
