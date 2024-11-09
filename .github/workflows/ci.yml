@@ -37,6 +37,8 @@ jobs:
       os: ${{ matrix.target.os }}
       build-name: ${{ matrix.target.build-name }}
       artifact-name: ${{ matrix.target.artifact-name }}
+      longpaths: ${{ matrix.target.longpaths || null }}
+      cross: ${{ matrix.target.cross || null }}
 
   build-cli-linux:
     name: Build compiler
