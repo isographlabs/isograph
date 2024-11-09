@@ -43,17 +43,6 @@ fn validate_and_transform_server_field(
             }
         };
 
-    let variant = match server_field.variant {
-        SchemaServerFieldVariant::LinkedField => SchemaServerFieldVariant::LinkedField,
-        SchemaServerFieldVariant::InlineFragment(associated_data) => {
-            SchemaServerFieldVariant::InlineFragment(ServerFieldTypeAssociatedDataInlineFragment {
-                concrete_type: associated_data.concrete_type,
-                condition_selection_set: associated_data.condition_selection_set,
-                server_field_id: associated_data.server_field_id,
-            })
-        }
-    };
-
     let valid_arguments =
         match get_all_errors_or_all_ok(empty_field.arguments.into_iter().map(|argument| {
             validate_server_field_argument(
@@ -71,6 +60,22 @@ fn validate_and_transform_server_field(
         };
 
     if let Some(field_type) = field_type {
+        let variant = match server_field.variant {
+            SchemaServerFieldVariant::LinkedField => SchemaServerFieldVariant::LinkedField,
+            SchemaServerFieldVariant::InlineFragment(associated_data) => match field_type {
+                SelectionType::Scalar(_) => {
+                    panic!("Expected inline fragment server field type to be an object")
+                }
+                SelectionType::Object(_) => SchemaServerFieldVariant::InlineFragment(
+                    ServerFieldTypeAssociatedDataInlineFragment {
+                        concrete_type: associated_data.concrete_type,
+                        condition_selection_set: associated_data.condition_selection_set,
+                        server_field_id: associated_data.server_field_id,
+                    },
+                ),
+            },
+        };
+
         if let Some(valid_arguments) = valid_arguments {
             return Ok(SchemaServerField {
                 description: empty_field.description,
