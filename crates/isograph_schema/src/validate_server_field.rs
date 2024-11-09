@@ -1,7 +1,7 @@
 use common_lang_types::{SelectableFieldName, UnvalidatedTypeName, WithLocation};
 use graphql_lang_types::GraphQLTypeAnnotation;
 use isograph_lang_types::{
-    SelectableServerFieldId, ServerObjectId, TypeAnnotation, VariableDefinition,
+    SelectableServerFieldId, SelectionType, ServerObjectId, TypeAnnotation, VariableDefinition,
 };
 
 use crate::{
@@ -76,9 +76,16 @@ fn validate_and_transform_server_field(
                 description: empty_field.description,
                 name: empty_field.name,
                 id: empty_field.id,
-                associated_data: ServerFieldTypeAssociatedData {
-                    type_name: field_type,
-                    variant,
+                associated_data: match field_type.inner_non_null() {
+                    SelectionType::Scalar(scalar_id) => {
+                        SelectionType::Scalar(field_type.map(&mut |_| scalar_id))
+                    }
+                    SelectionType::Object(object_id) => {
+                        SelectionType::Object(ServerFieldTypeAssociatedData {
+                            type_name: field_type.map(&mut |_| object_id),
+                            variant,
+                        })
+                    }
                 },
                 parent_type_id: empty_field.parent_type_id,
                 arguments: valid_arguments,

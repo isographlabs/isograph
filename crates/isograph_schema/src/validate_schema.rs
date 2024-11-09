@@ -7,8 +7,8 @@ use common_lang_types::{
 use intern::Lookup;
 use isograph_lang_types::{
     ClientFieldId, LinkedFieldSelection, LoadableDirectiveParameters, ScalarFieldSelection,
-    SelectableServerFieldId, Selection, SelectionFieldArgument, ServerFieldId, ServerObjectId,
-    ServerScalarId, TypeAnnotation, VariableDefinition,
+    SelectableServerFieldId, Selection, SelectionFieldArgument, SelectionType, ServerFieldId,
+    ServerObjectId, ServerScalarId, TypeAnnotation, VariableDefinition,
 };
 use thiserror::Error;
 
@@ -86,8 +86,10 @@ pub enum ValidatedIsographSelectionVariant {
 
 pub type MissingArguments = Vec<ValidatedVariableDefinition>;
 
-pub type ValidatedServerFieldTypeAssociatedData =
-    ServerFieldTypeAssociatedData<TypeAnnotation<SelectableServerFieldId>>;
+pub type ValidatedServerFieldTypeAssociatedData = SelectionType<
+    ServerFieldTypeAssociatedData<TypeAnnotation<ServerObjectId>>,
+    TypeAnnotation<ServerScalarId>,
+>;
 
 #[derive(Debug)]
 pub struct ValidatedSchemaState {}

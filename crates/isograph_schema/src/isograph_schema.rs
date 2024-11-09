@@ -217,10 +217,12 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
 }
 
 impl<
-        TFieldAssociatedData: Clone + Ord + Copy + Debug,
+        TObjectFieldAssociatedData: Clone + Ord + Copy + Debug,
+        TScalarFieldAssociatedData: Clone + Ord + Copy + Debug,
         TSchemaValidationState: SchemaValidationState<
-            ServerFieldTypeAssociatedData = ServerFieldTypeAssociatedData<
-                TypeAnnotation<TFieldAssociatedData>,
+            ServerFieldTypeAssociatedData = SelectionType<
+                ServerFieldTypeAssociatedData<TypeAnnotation<TObjectFieldAssociatedData>>,
+                TypeAnnotation<TScalarFieldAssociatedData>,
             >,
         >,
     > Schema<TSchemaValidationState>
@@ -229,7 +231,7 @@ impl<
     /// Get a reference to a given id field by its id.
     pub fn id_field<
         TError: Debug,
-        TIdFieldAssociatedData: TryFrom<TFieldAssociatedData, Error = TError> + Copy + Debug,
+        TIdFieldAssociatedData: TryFrom<TScalarFieldAssociatedData, Error = TError> + Copy + Debug,
     >(
         &self,
         id_field_id: ServerStrongIdFieldId,
@@ -238,7 +240,12 @@ impl<
 
         let field = self
             .server_field(field_id)
-            .and_then(|e| e.type_name.inner_non_null().try_into())
+            .and_then(|e| match e {
+                SelectionType::Object(_) => panic!(
+                    "We had an id field, it should be scalar. This indicates a bug in Isograph.",
+                ),
+                SelectionType::Scalar(e) => e.inner_non_null().try_into(),
+            })
             .expect(
                 // N.B. this expect should never be triggered. This is only because server_field
                 // does not have a .map method. TODO implement .map

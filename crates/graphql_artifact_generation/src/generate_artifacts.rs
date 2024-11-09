@@ -10,7 +10,7 @@ use intern::{string_key::Intern, Lookup};
 use isograph_config::{GenerateFileExtensionsOption, OptionalValidationLevel};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, NonConstantValue, SelectableServerFieldId, Selection,
-    ServerFieldSelection, TypeAnnotation, UnionVariant, VariableDefinition,
+    SelectionType, ServerFieldSelection, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
     get_provided_arguments, selection_map_wrapped, ClientFieldVariant, ClientType,
@@ -113,17 +113,20 @@ pub fn get_artifact_path_and_content(
             FieldType::ServerField(encountered_server_field_id) => {
                 let encountered_server_field = schema.server_field(*encountered_server_field_id);
 
-                match &encountered_server_field.associated_data.variant {
-                    SchemaServerFieldVariant::LinkedField => {}
-                    SchemaServerFieldVariant::InlineFragment(inline_fragment) => {
-                        path_and_contents.push(generate_eager_reader_condition_artifact(
-                            schema,
-                            encountered_server_field,
-                            inline_fragment,
-                            &traversal_state.refetch_paths,
-                            file_extensions,
-                        ));
-                    }
+                match &encountered_server_field.associated_data {
+                    SelectionType::Scalar(_) => {}
+                    SelectionType::Object(associated_data) => match &associated_data.variant {
+                        SchemaServerFieldVariant::LinkedField => {}
+                        SchemaServerFieldVariant::InlineFragment(inline_fragment) => {
+                            path_and_contents.push(generate_eager_reader_condition_artifact(
+                                schema,
+                                encountered_server_field,
+                                inline_fragment,
+                                &traversal_state.refetch_paths,
+                                file_extensions,
+                            ));
+                        }
+                    },
                 };
             }
             FieldType::ClientField(encountered_client_field_id) => {
@@ -484,23 +487,18 @@ fn write_param_type_from_selection(
 
                         let name_or_alias = scalar_field_selection.name_or_alias().item;
 
-                        // TODO there should be a clever way to print without cloning
-                        let output_type =
-                            field
-                                .associated_data
-                                .type_name
-                                .clone()
-                                .map(&mut |output_type_id| {
-                                    // TODO not just scalars, enums as well. Both should have a javascript name
-                                    let scalar_id = if let SelectableServerFieldId::Scalar(scalar) =
-                                        output_type_id
-                                    {
-                                        scalar
-                                    } else {
-                                        panic!("output_type_id should be a scalar");
-                                    };
+                        let output_type = match &field.associated_data {
+                            // TODO there should be a clever way to print without cloning
+                            SelectionType::Scalar(type_name) => {
+                                type_name.clone().map(&mut |scalar_id| {
                                     schema.server_field_data.scalar(scalar_id).javascript_name
-                                });
+                                })
+                            }
+                            // TODO not just scalars, enums as well. Both should have a javascript name
+                            SelectionType::Object(_) => {
+                                panic!("output_type_id should be a scalar")
+                            }
+                        };
 
                         query_type_declaration.push_str(&format!(
                             "{}readonly {}: {},\n",
@@ -588,16 +586,16 @@ fn write_param_type_from_selection(
                     .push_str(&"  ".repeat(indentation_level as usize).to_string());
                 let name_or_alias = linked_field.name_or_alias().item;
 
-                let type_annotation =
-                    field
-                        .associated_data
+                let type_annotation = match &field.associated_data {
+                    SelectionType::Scalar(_) => panic!(
+                        "output_type_id should be an object. \
+                            This is indicative of a bug in Isograph.",
+                    ),
+                    SelectionType::Object(associated_data) => associated_data
                         .type_name
                         .clone()
                         .map(&mut |output_type_id| {
-                            let object_id = output_type_id.try_into().expect(
-                                "output_type_id should be an object. \
-                        This is indicative of a bug in Isograph.",
-                            );
+                            let object_id = output_type_id;
                             let object = schema.server_field_data.object(object_id);
                             generate_client_field_parameter_type(
                                 schema,
@@ -607,7 +605,9 @@ fn write_param_type_from_selection(
                                 loadable_fields,
                                 indentation_level,
                             )
-                        });
+                        }),
+                };
+
                 query_type_declaration.push_str(&format!(
                     "readonly {}: {},\n",
                     name_or_alias,

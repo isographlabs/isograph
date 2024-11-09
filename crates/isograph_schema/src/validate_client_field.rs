@@ -7,8 +7,8 @@ use common_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     reachable_variables, ClientFieldId, IsographSelectionVariant, LinkedFieldSelection,
-    ScalarFieldSelection, SelectableServerFieldId, SelectionFieldArgument,
-    UnvalidatedScalarFieldSelection, UnvalidatedSelection, VariableDefinition,
+    ScalarFieldSelection, SelectionFieldArgument, SelectionType, UnvalidatedScalarFieldSelection,
+    UnvalidatedSelection, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -338,8 +338,8 @@ fn validate_field_type_exists_and_is_scalar(
                     variable_definitions,
                 )?;
 
-                match server_field.associated_data.type_name.inner_non_null() {
-                    SelectableServerFieldId::Scalar(_) => Ok(ScalarFieldSelection {
+                match &server_field.associated_data {
+                    SelectionType::Scalar(_) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
                         associated_data: ValidatedScalarFieldAssociatedData {
                             location: FieldType::ServerField(*server_field_id),
@@ -368,14 +368,14 @@ fn validate_field_type_exists_and_is_scalar(
                         arguments: scalar_field_selection.arguments,
                         directives: scalar_field_selection.directives,
                     }),
-                    SelectableServerFieldId::Object(object_id) => Err(WithLocation::new(
+                    SelectionType::Object(object_id) => Err(WithLocation::new(
                         ValidateSchemaError::ClientFieldSelectionFieldIsNotScalar {
                             field_parent_type_name: scalar_field_selection_parent_object.name,
                             field_name: scalar_field_name,
                             field_type: "an object",
                             target_type_name: top_level_client_field_info
                                 .schema_data
-                                .object(object_id)
+                                .object(object_id.type_name.inner_non_null())
                                 .name
                                 .into(),
                             client_field_parent_type_name: top_level_client_field_info
@@ -479,15 +479,15 @@ fn validate_field_type_exists_and_is_linked(
             FieldType::ServerField(server_field_id) => {
                 let server_field =
                     &top_level_client_field_info.server_fields[server_field_id.as_usize()];
-                match server_field.associated_data.type_name.inner_non_null() {
-                    SelectableServerFieldId::Scalar(scalar_id) => Err(WithLocation::new(
+                match &server_field.associated_data {
+                    SelectionType::Scalar(scalar_id) => Err(WithLocation::new(
                         ValidateSchemaError::ClientFieldSelectionFieldIsScalar {
                             field_parent_type_name: field_parent_object.name,
                             field_name: linked_field_name,
                             field_type: "a scalar",
                             target_type_name: top_level_client_field_info
                                 .schema_data
-                                .scalar(scalar_id)
+                                .scalar(scalar_id.inner_non_null())
                                 .name
                                 .item
                                 .into(),
@@ -500,11 +500,11 @@ fn validate_field_type_exists_and_is_linked(
                         },
                         linked_field_selection.name.location,
                     )),
-                    SelectableServerFieldId::Object(object_id) => {
+                    SelectionType::Object(object_id) => {
                         let linked_field_target_object = top_level_client_field_info
                             .schema_data
                             .server_objects
-                            .get(object_id.as_usize())
+                            .get(object_id.type_name.inner_non_null().as_usize())
                             .unwrap();
 
                         let missing_arguments = get_missing_arguments_and_validate_argument_types(
@@ -536,7 +536,7 @@ fn validate_field_type_exists_and_is_linked(
                             unwraps: linked_field_selection.unwraps,
                             associated_data: ValidatedLinkedFieldAssociatedData {
                                 concrete_type: linked_field_target_object.concrete_type,
-                                parent_object_id: object_id,
+                                parent_object_id: object_id.type_name.inner_non_null(),
                                 field_id: FieldType::ServerField(server_field.id),
                                 selection_variant: match linked_field_selection.associated_data {
                                     IsographSelectionVariant::Regular => {
