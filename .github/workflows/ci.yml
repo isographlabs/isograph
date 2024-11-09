@@ -41,7 +41,7 @@ jobs:
       cross: ${{ matrix.target.cross || false }}
 
   build-cli-linux:
-    name: Build compiler
+    name: Build compiler (x86_64-unknown-linux-musl)
     uses: ./.github/workflows/build-cli.yml
     with:
       target: x86_64-unknown-linux-musl
