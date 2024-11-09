@@ -1,7 +1,7 @@
 use common_lang_types::{SelectableFieldName, UnvalidatedTypeName, WithLocation};
 use graphql_lang_types::GraphQLTypeAnnotation;
 use isograph_lang_types::{
-    SelectableServerFieldId, SelectionType, ServerObjectId, TypeAnnotation, VariableDefinition,
+    SelectionType, ServerObjectId, ServerScalarId, TypeAnnotation, VariableDefinition,
 };
 
 use crate::{
@@ -76,13 +76,11 @@ fn validate_and_transform_server_field(
                 description: empty_field.description,
                 name: empty_field.name,
                 id: empty_field.id,
-                associated_data: match field_type.inner_non_null() {
-                    SelectionType::Scalar(scalar_id) => {
-                        SelectionType::Scalar(field_type.map(&mut |_| scalar_id))
-                    }
+                associated_data: match field_type {
+                    SelectionType::Scalar(scalar_id) => SelectionType::Scalar(scalar_id),
                     SelectionType::Object(object_id) => {
                         SelectionType::Object(ServerFieldTypeAssociatedData {
-                            type_name: field_type.map(&mut |_| object_id),
+                            type_name: object_id,
                             variant,
                         })
                     }
@@ -104,13 +102,24 @@ fn validate_server_field_type_exists(
         (),
         <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
     >,
-) -> ValidateSchemaResult<TypeAnnotation<SelectableServerFieldId>> {
+) -> ValidateSchemaResult<
+    SelectionType<TypeAnnotation<ServerObjectId>, TypeAnnotation<ServerScalarId>>,
+> {
     // look up the item in defined_types. If it's not there, error.
     match schema_data.defined_types.get(server_field_type.inner()) {
         // Why do we need to clone here? Can we avoid this?
-        Some(type_id) => Ok(TypeAnnotation::from_graphql_type_annotation(
-            server_field_type.clone().map(|_| *type_id),
-        )),
+        Some(type_id) => Ok(match type_id {
+            SelectionType::Scalar(scalar_id) => {
+                SelectionType::Scalar(TypeAnnotation::from_graphql_type_annotation(
+                    server_field_type.clone().map(|_| *scalar_id),
+                ))
+            }
+            SelectionType::Object(object_id) => {
+                SelectionType::Object(TypeAnnotation::from_graphql_type_annotation(
+                    server_field_type.clone().map(|_| *object_id),
+                ))
+            }
+        }),
         None => Err(WithLocation::new(
             ValidateSchemaError::FieldTypenameDoesNotExist {
                 parent_type_name: schema_data.object(field.parent_type_id).name,
