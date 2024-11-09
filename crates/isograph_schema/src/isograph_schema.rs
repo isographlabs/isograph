@@ -4,9 +4,9 @@ use std::{
 };
 
 use common_lang_types::{
-    ArtifactFileType, DescriptionValue, GraphQLInterfaceTypeName, GraphQLScalarTypeName, HasName,
-    InputTypeName, IsographObjectTypeName, JavascriptName, SelectableFieldName,
-    UnvalidatedTypeName, WithLocation, WithSpan,
+    ArtifactFileType, DescriptionValue, GraphQLInterfaceTypeName, GraphQLScalarTypeName,
+    IsographObjectTypeName, JavascriptName, SelectableFieldName, UnvalidatedTypeName, WithLocation,
+    WithSpan,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition,
@@ -14,8 +14,8 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, SelectableServerFieldId, Selection, ServerFieldId,
-    ServerObjectId, ServerScalarId, ServerStrongIdFieldId, TypeAnnotation, Unwrap,
+    ArgumentKeyAndValue, ClientFieldId, SelectableServerFieldId, Selection, SelectionType,
+    ServerFieldId, ServerObjectId, ServerScalarId, ServerStrongIdFieldId, TypeAnnotation, Unwrap,
     VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -280,44 +280,12 @@ impl ServerFieldData {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum SchemaType<'a> {
-    Object(&'a SchemaObject),
-    Scalar(&'a SchemaScalar),
-}
+pub type SchemaType<'a> = SelectionType<&'a SchemaObject, &'a SchemaScalar>;
 
-impl<'a> HasName for SchemaType<'a> {
-    type Name = UnvalidatedTypeName;
-
-    fn name(&self) -> Self::Name {
-        match self {
-            SchemaType::Object(object) => object.name.into(),
-            SchemaType::Scalar(scalar) => scalar.name.item.into(),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum SchemaOutputType<'a> {
-    Object(&'a SchemaObject),
-    Scalar(&'a SchemaScalar),
-    // excludes input object
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum SchemaInputType<'a> {
-    Scalar(&'a SchemaScalar),
-    // input object
-    // enum
-}
-
-impl<'a> HasName for SchemaInputType<'a> {
-    type Name = InputTypeName;
-
-    fn name(&self) -> Self::Name {
-        match self {
-            SchemaInputType::Scalar(x) => x.name.item.into(),
-        }
+pub fn get_name<'a>(schema_type: SchemaType<'a>) -> UnvalidatedTypeName {
+    match schema_type {
+        SelectionType::Object(object) => object.name.into(),
+        SelectionType::Scalar(scalar) => scalar.name.item.into(),
     }
 }
 

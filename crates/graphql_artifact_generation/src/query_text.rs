@@ -1,8 +1,8 @@
-use common_lang_types::{HasName, QueryOperationName, UnvalidatedTypeName};
+use common_lang_types::{QueryOperationName, UnvalidatedTypeName};
 use graphql_lang_types::GraphQLTypeAnnotation;
 use isograph_lang_types::{ArgumentKeyAndValue, NonConstantValue};
 use isograph_schema::{
-    MergedSelectionMap, MergedServerSelection, RootOperationName, ValidatedSchema,
+    get_name, MergedSelectionMap, MergedServerSelection, RootOperationName, ValidatedSchema,
     ValidatedVariableDefinition,
 };
 
@@ -49,7 +49,7 @@ fn write_variables_to_string<'a>(
                 let schema_input_type = schema
                     .server_field_data
                     .lookup_unvalidated_type(input_type_id);
-                schema_input_type.name()
+                get_name(schema_input_type)
             });
         // TODO this is dangerous, since variable.item.name is a WithLocation, which impl's Display.
         // We should find a way to make WithLocation not impl display, without making error's hard

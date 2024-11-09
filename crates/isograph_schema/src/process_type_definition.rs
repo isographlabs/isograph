@@ -253,7 +253,7 @@ impl UnvalidatedSchema {
         let result = (*self
             .server_field_data
             .defined_types
-            .get(&unvalidated_type_name.into())
+            .get(&unvalidated_type_name)
             .ok_or_else(|| {
                 WithLocation::new(
                     ProcessTypeDefinitionError::IsographObjectTypeNameNotDefined {
