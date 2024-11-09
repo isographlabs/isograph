@@ -1,4 +1,3 @@
-name: Build compiler
 on:
   workflow_call:
     inputs:
@@ -23,6 +22,7 @@ on:
 
 jobs:
   build-cli:
+    name: Build compiler
     timeout-minutes: 10
     runs-on: ${{ inputs.os }}
     steps:
