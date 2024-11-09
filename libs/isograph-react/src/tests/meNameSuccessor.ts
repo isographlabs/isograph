@@ -1,3 +1,4 @@
+import { ROOT_ID } from '../core/IsographEnvironment';
 import { iso } from './__isograph/iso';
 
 export const meNameField = iso(`
@@ -17,4 +18,8 @@ export const meNameSuccessorRetainedQuery = {
   normalizationAst:
     meNameSuccessorEntrypoint.networkRequestInfo.normalizationAst,
   variables: {},
+  root: {
+    __link: ROOT_ID,
+    __typename: 'Query',
+  },
 };

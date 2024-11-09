@@ -222,6 +222,7 @@ const artifact: RefetchQueryNormalizationArtifact = {
     queryText,
     normalizationAst,
   },
+  concreteType: "Query",
 };
 
 export default artifact;

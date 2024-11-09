@@ -178,6 +178,7 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
 
     pub root_operation_name: RootOperationName,
     pub query_name: QueryOperationName,
+    pub concrete_type: IsographObjectTypeName,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -592,6 +593,7 @@ fn process_imperatively_loaded_field(
         refetch_query_index: RefetchQueryIndex(index as u32),
         root_operation_name,
         query_name,
+        concrete_type: schema.server_field_data.object(root_object_id).name,
     }
 }
 
