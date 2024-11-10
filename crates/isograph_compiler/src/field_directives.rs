@@ -6,7 +6,7 @@ use isograph_lang_types::{
     ClientPointerDeclaration, ClientPointerDeclarationWithUnvalidatedDirectives,
     ClientPointerDeclarationWithValidatedDirectives, IsographFieldDirective,
     IsographSelectionVariant, LinkedFieldSelection, ScalarFieldSelection, Selection,
-    ServerFieldSelection,
+    ServerFieldSelection, UnvalidatedSelection,
 };
 use isograph_schema::ProcessClientFieldDeclarationError;
 use lazy_static::lazy_static;
@@ -57,7 +57,7 @@ pub fn validate_isograph_field_directives(
 pub fn validate_isograph_selection_set_directives(
     selection_set: Vec<WithSpan<Selection<(), ()>>>,
 ) -> Result<
-    Vec<WithSpan<Selection<IsographSelectionVariant, IsographSelectionVariant>>>,
+    Vec<WithSpan<UnvalidatedSelection>>,
     Vec<WithLocation<ProcessClientFieldDeclarationError>>,
 > {
     and_then_selection_set_and_collect_errors(

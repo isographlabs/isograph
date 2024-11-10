@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, HashMap};
 
 use common_lang_types::{
-    JavascriptName, Location, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
+    IsographObjectTypeName, JavascriptName, Location, TextSource, UnvalidatedTypeName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::string_key::Intern;
@@ -12,8 +13,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ClientField, ClientType, FieldType, Schema, SchemaScalar, SchemaServerField,
-    SchemaValidationState, ServerFieldData, UseRefetchFieldRefetchStrategy,
+    ClientField, ClientPointer, ClientType, FieldType, Schema, SchemaScalar, SchemaServerField,
+    SchemaValidationState, ServerFieldData, UseRefetchFieldRefetchStrategy, ValidatedSelection,
 };
 use lazy_static::lazy_static;
 
@@ -24,12 +25,35 @@ lazy_static! {
 #[derive(Debug)]
 pub struct UnvalidatedSchemaState {}
 
+type UnvalidatedServerFieldTypeAssociatedData =
+    ServerFieldTypeAssociatedData<GraphQLTypeAnnotation<UnvalidatedTypeName>>;
+
 impl SchemaValidationState for UnvalidatedSchemaState {
-    type ServerFieldTypeAssociatedData = GraphQLTypeAnnotation<UnvalidatedTypeName>;
+    type ServerFieldTypeAssociatedData = UnvalidatedServerFieldTypeAssociatedData;
     type ClientFieldSelectionScalarFieldAssociatedData = IsographSelectionVariant;
     type ClientFieldSelectionLinkedFieldAssociatedData = IsographSelectionVariant;
     type VariableDefinitionInnerType = UnvalidatedTypeName;
     type Entrypoint = Vec<(TextSource, WithSpan<EntrypointTypeAndField>)>;
+}
+
+#[derive(Debug, Clone)]
+
+pub struct ServerFieldTypeAssociatedData<TTypename> {
+    pub type_name: TTypename,
+    pub variant: SchemaServerFieldVariant,
+}
+
+#[derive(Debug, Clone)]
+pub enum SchemaServerFieldVariant {
+    LinkedField,
+    InlineFragment(ServerFieldTypeAssociatedDataInlineFragment),
+}
+
+#[derive(Debug, Clone)]
+pub struct ServerFieldTypeAssociatedDataInlineFragment {
+    pub server_field_id: ServerFieldId,
+    pub concrete_type: IsographObjectTypeName,
+    pub condition_selection_set: Vec<WithSpan<ValidatedSelection>>,
 }
 
 pub type UnvalidatedSchema = Schema<UnvalidatedSchemaState>;
@@ -50,6 +74,12 @@ pub type UnvalidatedVariableDefinition = VariableDefinition<
 >;
 
 pub type UnvalidatedClientField = ClientField<
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+>;
+
+pub type UnvalidatedClientPointer = ClientPointer<
     <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,

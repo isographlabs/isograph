@@ -1,14 +1,14 @@
 import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
-import {Mutation__SetTagline__param} from './param_type';
-import {Mutation__SetTagline__output_type} from './output_type';
+import {Query__subquery__param} from './param_type';
+import {Query__subquery__output_type} from './output_type';
 import readerResolver from './resolver_reader';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
-const queryText = 'mutation SetTagline ($input: SetPetTaglineParams!) {\
-  set_pet_tagline____input___v_input: set_pet_tagline(input: $input) {\
-    pet {\
+const queryText = 'query subquery ($id: ID!) {\
+  query {\
+    node____id___v_id: node(id: $id) {\
+      __typename,\
       id,\
-      tagline,\
     },\
   },\
 }';
@@ -16,29 +16,29 @@ const queryText = 'mutation SetTagline ($input: SetPetTaglineParams!) {\
 const normalizationAst: NormalizationAst = [
   {
     kind: "Linked",
-    fieldName: "set_pet_tagline",
-    arguments: [
-      [
-        "input",
-        { kind: "Variable", name: "input" },
-      ],
-    ],
-    concreteType: "SetPetTaglineResponse",
+    fieldName: "query",
+    arguments: null,
+    concreteType: "Query",
     selections: [
       {
         kind: "Linked",
-        fieldName: "pet",
-        arguments: null,
-        concreteType: "Pet",
+        fieldName: "node",
+        arguments: [
+          [
+            "id",
+            { kind: "Variable", name: "id" },
+          ],
+        ],
+        concreteType: null,
         selections: [
           {
             kind: "Scalar",
-            fieldName: "id",
+            fieldName: "__typename",
             arguments: null,
           },
           {
             kind: "Scalar",
-            fieldName: "tagline",
+            fieldName: "id",
             arguments: null,
           },
         ],
@@ -47,8 +47,8 @@ const normalizationAst: NormalizationAst = [
   },
 ];
 const artifact: IsographEntrypoint<
-  Mutation__SetTagline__param,
-  Mutation__SetTagline__output_type
+  Query__subquery__param,
+  Query__subquery__output_type
 > = {
   kind: "Entrypoint",
   networkRequestInfo: {
@@ -56,7 +56,7 @@ const artifact: IsographEntrypoint<
     queryText,
     normalizationAst,
   },
-  concreteType: "Mutation",
+  concreteType: "Query",
   readerWithRefetchQueries: {
     kind: "ReaderWithRefetchQueries",
     nestedRefetchQueries,

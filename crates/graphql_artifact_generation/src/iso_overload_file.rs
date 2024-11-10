@@ -4,7 +4,8 @@ use std::{cmp::Ordering, path::PathBuf};
 
 use common_lang_types::{ArtifactPathAndContent, SelectableFieldName};
 use isograph_schema::{
-    ClientFieldVariant, UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema,
+    ClientFieldVariant, ClientType, UserWrittenComponentVariant, ValidatedClientField,
+    ValidatedSchema,
 };
 
 use crate::generate_artifacts::ISO_TS;
@@ -260,10 +261,13 @@ fn user_written_fields(
     schema
         .client_fields
         .iter()
-        .filter_map(|client_field| match client_field.variant {
-            ClientFieldVariant::UserWritten(info) => {
-                Some((client_field, info.user_written_component_variant))
-            }
-            ClientFieldVariant::ImperativelyLoadedField(_) => None,
+        .filter_map(|client_field| match client_field {
+            ClientType::ClientPointer(_) => None,
+            ClientType::ClientField(client_field) => match client_field.variant {
+                ClientFieldVariant::UserWritten(info) => {
+                    Some((client_field, info.user_written_component_variant))
+                }
+                ClientFieldVariant::ImperativelyLoadedField(_) => None,
+            },
         })
 }

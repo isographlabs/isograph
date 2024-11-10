@@ -158,35 +158,36 @@ impl UnvalidatedSchema {
         let name = client_field_declaration.item.client_field_name.item.into();
         let variant = get_client_variant(&client_field_declaration.item);
 
-        self.client_fields.push(ClientField {
-            description: client_field_declaration.item.description.map(|x| x.item),
-            name,
-            id: next_client_field_id,
-            reader_selection_set: Some(client_field_declaration.item.selection_set),
-            unwraps: client_field_declaration.item.unwraps,
-            variant,
-            variable_definitions: client_field_declaration.item.variable_definitions,
-            type_and_field: ObjectTypeAndFieldName {
-                type_name: object.name,
-                field_name: name,
-            },
+        self.client_fields
+            .push(ClientType::ClientField(ClientField {
+                description: client_field_declaration.item.description.map(|x| x.item),
+                name,
+                id: next_client_field_id,
+                reader_selection_set: Some(client_field_declaration.item.selection_set),
+                unwraps: client_field_declaration.item.unwraps,
+                variant,
+                variable_definitions: client_field_declaration.item.variable_definitions,
+                type_and_field: ObjectTypeAndFieldName {
+                    type_name: object.name,
+                    field_name: name,
+                },
 
-            parent_object_id,
-            refetch_strategy: object.id_field.map(|_| {
-                // Assume that if we have an id field, this implements Node
-                RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
-                    vec![id_selection()],
-                    query_id,
-                    format!("refetch__{}", object.name).intern().into(),
-                    *NODE_FIELD_NAME,
-                    id_top_level_arguments(),
-                    None,
-                    RequiresRefinement::Yes(object.name),
-                    None,
-                    None,
-                ))
-            }),
-        });
+                parent_object_id,
+                refetch_strategy: object.id_field.map(|_| {
+                    // Assume that if we have an id field, this implements Node
+                    RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
+                        vec![id_selection()],
+                        query_id,
+                        format!("refetch__{}", object.name).intern().into(),
+                        *NODE_FIELD_NAME,
+                        id_top_level_arguments(),
+                        None,
+                        RequiresRefinement::Yes(object.name),
+                        None,
+                        None,
+                    ))
+                }),
+            }));
         Ok(())
     }
 
@@ -224,49 +225,47 @@ impl UnvalidatedSchema {
 
         let name = client_pointer_declaration.item.client_pointer_name.item;
 
-        if true {
-            todo!("store ClientPointer somewhere");
-        }
-        (ClientPointer {
-            description: client_pointer_declaration.item.description.map(|x| x.item),
-            name,
-            id: next_client_pointer_id,
-            condition_selection_set: client_pointer_declaration.item.selection_set,
-            unwraps: client_pointer_declaration.item.unwraps,
+        self.client_fields
+            .push(ClientType::ClientPointer(ClientPointer {
+                description: client_pointer_declaration.item.description.map(|x| x.item),
+                name,
+                id: next_client_pointer_id,
+                condition_selection_set: client_pointer_declaration.item.selection_set,
+                unwraps: client_pointer_declaration.item.unwraps,
 
-            variable_definitions: client_pointer_declaration.item.variable_definitions,
-            type_and_field: ObjectTypeAndFieldName {
-                type_name: object.name,
-                field_name: name.into(),
-            },
+                variable_definitions: client_pointer_declaration.item.variable_definitions,
+                type_and_field: ObjectTypeAndFieldName {
+                    type_name: object.name,
+                    field_name: name.into(),
+                },
 
-            parent_object_id,
-            refetch_strategy: match object.id_field {
-                None => Err(WithSpan::new(
-                    ProcessClientFieldDeclarationError::ToTypeHasNoId {
-                        to_type_name: client_pointer_declaration.item.to_type.item,
-                    },
-                    client_pointer_declaration.item.to_type.span,
-                )),
-                Some(_) => {
-                    // Assume that if we have an id field, this implements Node
-                    Ok(RefetchStrategy::UseRefetchField(
-                        generate_refetch_field_strategy(
-                            vec![id_selection()],
-                            query_id,
-                            format!("refetch__{}", object.name).intern().into(),
-                            *NODE_FIELD_NAME,
-                            id_top_level_arguments(),
-                            None,
-                            RequiresRefinement::Yes(object.name),
-                            None,
-                            None,
-                        ),
-                    ))
-                }
-            }?,
-            to: to_object_id,
-        });
+                parent_object_id,
+                refetch_strategy: match object.id_field {
+                    None => Err(WithSpan::new(
+                        ProcessClientFieldDeclarationError::TypePointedToHasNoId {
+                            to_type_name: client_pointer_declaration.item.to_type.item,
+                        },
+                        client_pointer_declaration.item.to_type.span,
+                    )),
+                    Some(_) => {
+                        // Assume that if we have an id field, this implements Node
+                        Ok(RefetchStrategy::UseRefetchField(
+                            generate_refetch_field_strategy(
+                                vec![id_selection()],
+                                query_id,
+                                format!("refetch__{}", object.name).intern().into(),
+                                *NODE_FIELD_NAME,
+                                id_top_level_arguments(),
+                                None,
+                                RequiresRefinement::Yes(object.name),
+                                None,
+                                None,
+                            ),
+                        ))
+                    }
+                }?,
+                to: to_object_id,
+            }));
         Ok(())
     }
 }
@@ -290,7 +289,7 @@ pub enum ProcessClientFieldDeclarationError {
 
     #[error("Invalid type pointed to. `{to_type_name}` has no id field. You are attempting to define a pointer to it. \
         In order to do so, the to object must be an object implementing Node interface.")]
-    ToTypeHasNoId { to_type_name: UnvalidatedTypeName },
+    TypePointedToHasNoId { to_type_name: UnvalidatedTypeName },
 
     #[error(
         "The Isograph object type \"{parent_type_name}\" already has a field named \"{client_field_name}\"."

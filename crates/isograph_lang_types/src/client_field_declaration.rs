@@ -2,9 +2,9 @@ use std::fmt::Debug;
 
 use common_lang_types::{
     ClientPointerFieldName, ConstExportName, DescriptionValue, EnumLiteralValue, FieldArgumentName,
-    FieldNameOrAlias, FilePath, HasName, LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias,
-    ScalarFieldName, SelectableFieldName, StringLiteralValue, UnvalidatedTypeName, ValueKeyName,
-    VariableName, WithLocation, WithSpan,
+    FieldNameOrAlias, FilePath, LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias,
+    ScalarFieldName, StringLiteralValue, UnvalidatedTypeName, ValueKeyName, VariableName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{FloatValue, GraphQLTypeAnnotation, NameValuePair};
 use serde::Deserialize;
@@ -187,16 +187,6 @@ impl<TScalarField, TLinkedField> ServerFieldSelection<TScalarField, TLinkedField
             ServerFieldSelection::LinkedField(linked_field) => {
                 linked_field.arguments.iter().flat_map(get_variable)
             }
-        }
-    }
-}
-
-impl<TScalarField, TLinkedField> HasName for ServerFieldSelection<TScalarField, TLinkedField> {
-    type Name = SelectableFieldName;
-    fn name(&self) -> Self::Name {
-        match self {
-            ServerFieldSelection::ScalarField(s) => s.name.item.into(),
-            ServerFieldSelection::LinkedField(l) => l.name.item.into(),
         }
     }
 }

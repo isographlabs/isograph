@@ -15,10 +15,12 @@ u32_newtype!(ServerObjectId);
 
 u32_newtype!(ServerScalarId);
 
+pub type SelectableServerFieldId = SelectionType<ServerObjectId, ServerScalarId>;
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
-pub enum SelectableServerFieldId {
-    Object(ServerObjectId),
-    Scalar(ServerScalarId),
+pub enum SelectionType<TObject, TScalar> {
+    Object(TObject),
+    Scalar(TScalar),
 }
 
 impl TryFrom<SelectableServerFieldId> for ServerScalarId {

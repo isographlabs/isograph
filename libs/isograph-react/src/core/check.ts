@@ -5,7 +5,6 @@ import {
   getLink,
   IsographEnvironment,
   Link,
-  ROOT_ID,
   StoreRecord,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
@@ -31,13 +30,17 @@ export function check(
   environment: IsographEnvironment,
   normalizationAst: NormalizationAst,
   variables: Variables,
+  root: Link,
 ): CheckResult {
+  const recordsById = (environment.store[root.__typename] ??= {});
+  const newStoreRecord = (recordsById[root.__link] ??= {});
+
   const checkResult = checkFromRecord(
     environment,
     normalizationAst,
     variables,
-    environment.store[ROOT_ID],
-    { __link: ROOT_ID },
+    newStoreRecord,
+    root,
   );
   logMessage(environment, {
     kind: 'EnvironmentCheck',
@@ -97,7 +100,8 @@ function checkFromRecord(
               );
             }
 
-            const linkedRecord = environment.store[link.__link];
+            const linkedRecord =
+              environment.store[link.__typename]?.[link.__link];
 
             if (linkedRecord === undefined) {
               return {
@@ -130,7 +134,8 @@ function checkFromRecord(
             );
           }
 
-          const linkedRecord = environment.store[link.__link];
+          const linkedRecord =
+            environment.store[link.__typename]?.[link.__link];
 
           if (linkedRecord === undefined) {
             return {

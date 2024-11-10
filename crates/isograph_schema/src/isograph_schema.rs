@@ -5,8 +5,8 @@ use std::{
 
 use common_lang_types::{
     ArtifactFileType, ClientPointerFieldName, DescriptionValue, GraphQLInterfaceTypeName,
-    GraphQLScalarTypeName, HasName, InputTypeName, IsographObjectTypeName, JavascriptName,
-    SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
+    GraphQLScalarTypeName, IsographObjectTypeName, JavascriptName, SelectableFieldName,
+    UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition,
@@ -15,13 +15,14 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, ClientPointerId, SelectableServerFieldId, Selection,
-    ServerFieldId, ServerObjectId, ServerScalarId, ServerStrongIdFieldId, TypeAnnotation, Unwrap,
-    VariableDefinition,
+    SelectionType, ServerFieldId, ServerObjectId, ServerScalarId, ServerStrongIdFieldId,
+    TypeAnnotation, Unwrap, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
 use crate::{
-    refetch_strategy::RefetchStrategy, ClientFieldVariant, NormalizationKey, ValidatedSelection,
+    refetch_strategy::RefetchStrategy, ClientFieldVariant, NormalizationKey,
+    ServerFieldTypeAssociatedData,
 };
 
 lazy_static! {
@@ -79,12 +80,10 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
             TSchemaValidationState::VariableDefinitionInnerType,
         >,
     >,
-    pub client_fields: Vec<
-        ClientField<
-            TSchemaValidationState::ClientFieldSelectionScalarFieldAssociatedData,
-            TSchemaValidationState::ClientFieldSelectionLinkedFieldAssociatedData,
-            TSchemaValidationState::VariableDefinitionInnerType,
-        >,
+    pub client_fields: ClientFields<
+        TSchemaValidationState::ClientFieldSelectionScalarFieldAssociatedData,
+        TSchemaValidationState::ClientFieldSelectionLinkedFieldAssociatedData,
+        TSchemaValidationState::VariableDefinitionInnerType,
     >,
     // TODO consider whether this belongs here. It could just be a free variable.
     pub entrypoints: TSchemaValidationState::Entrypoint,
@@ -104,6 +103,25 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
     pub fetchable_types: BTreeMap<ServerObjectId, RootOperationName>,
 }
 
+type ClientFields<
+    TClientFieldSelectionScalarFieldAssociatedData,
+    TClientFieldSelectionLinkedFieldAssociatedData,
+    TClientFieldVariableDefinitionAssociatedData,
+> = Vec<
+    ClientType<
+        ClientField<
+            TClientFieldSelectionScalarFieldAssociatedData,
+            TClientFieldSelectionLinkedFieldAssociatedData,
+            TClientFieldVariableDefinitionAssociatedData,
+        >,
+        ClientPointer<
+            TClientFieldSelectionScalarFieldAssociatedData,
+            TClientFieldSelectionLinkedFieldAssociatedData,
+            TClientFieldVariableDefinitionAssociatedData,
+        >,
+    >,
+>;
+
 impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationState> {
     /// This is a smell, and we should refactor away from it, or all schema's
     /// should have a root type.
@@ -116,18 +134,16 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
             .0
     }
 
-    pub fn query_root_operation_name(&self) -> Option<&RootOperationName> {
-        self.fetchable_types
-            .iter()
-            .find(|(_, root_operation_name)| root_operation_name.0 == "query")
-            .map(|(_, root_operation_name)| root_operation_name)
-    }
-
-    pub fn mutation_root_operation_name(&self) -> Option<&RootOperationName> {
+    pub fn find_mutation(&self) -> Option<(&ServerObjectId, &RootOperationName)> {
         self.fetchable_types
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "mutation")
-            .map(|(_, root_operation_name)| root_operation_name)
+    }
+
+    pub fn find_query(&self) -> Option<(&ServerObjectId, &RootOperationName)> {
+        self.fetchable_types
+            .iter()
+            .find(|(_, root_operation_name)| root_operation_name.0 == "query")
     }
 }
 
@@ -197,20 +213,29 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
         TSchemaValidationState::ClientFieldSelectionLinkedFieldAssociatedData,
         TSchemaValidationState::VariableDefinitionInnerType,
     > {
-        &self.client_fields[client_field_id.as_usize()]
+        match &self.client_fields[client_field_id.as_usize()] {
+            ClientType::ClientField(client_field) => client_field,
+            ClientType::ClientPointer(_) => panic!("encounterd ClientPointer under ClientFieldId"),
+        }
     }
 }
 
 impl<
-        TFieldAssociatedData: Clone + Ord + Copy + Debug,
-        TSchemaValidationState: SchemaValidationState<ServerFieldTypeAssociatedData = TypeAnnotation<TFieldAssociatedData>>,
+        TObjectFieldAssociatedData: Clone + Ord + Copy + Debug,
+        TScalarFieldAssociatedData: Clone + Ord + Copy + Debug,
+        TSchemaValidationState: SchemaValidationState<
+            ServerFieldTypeAssociatedData = SelectionType<
+                ServerFieldTypeAssociatedData<TypeAnnotation<TObjectFieldAssociatedData>>,
+                TypeAnnotation<TScalarFieldAssociatedData>,
+            >,
+        >,
     > Schema<TSchemaValidationState>
 {
     // This should not be this complicated!
     /// Get a reference to a given id field by its id.
     pub fn id_field<
         TError: Debug,
-        TIdFieldAssociatedData: TryFrom<TFieldAssociatedData, Error = TError> + Copy + Debug,
+        TIdFieldAssociatedData: TryFrom<TScalarFieldAssociatedData, Error = TError> + Copy + Debug,
     >(
         &self,
         id_field_id: ServerStrongIdFieldId,
@@ -219,7 +244,12 @@ impl<
 
         let field = self
             .server_field(field_id)
-            .and_then(|e| e.inner_non_null().try_into())
+            .and_then(|e| match e {
+                SelectionType::Object(_) => panic!(
+                    "We had an id field, it should be scalar. This indicates a bug in Isograph.",
+                ),
+                SelectionType::Scalar(e) => e.inner_non_null().try_into(),
+            })
             .expect(
                 // N.B. this expect should never be triggered. This is only because server_field
                 // does not have a .map method. TODO implement .map
@@ -261,44 +291,12 @@ impl ServerFieldData {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum SchemaType<'a> {
-    Object(&'a SchemaObject),
-    Scalar(&'a SchemaScalar),
-}
+pub type SchemaType<'a> = SelectionType<&'a SchemaObject, &'a SchemaScalar>;
 
-impl<'a> HasName for SchemaType<'a> {
-    type Name = UnvalidatedTypeName;
-
-    fn name(&self) -> Self::Name {
-        match self {
-            SchemaType::Object(object) => object.name.into(),
-            SchemaType::Scalar(scalar) => scalar.name.item.into(),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum SchemaOutputType<'a> {
-    Object(&'a SchemaObject),
-    Scalar(&'a SchemaScalar),
-    // excludes input object
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum SchemaInputType<'a> {
-    Scalar(&'a SchemaScalar),
-    // input object
-    // enum
-}
-
-impl<'a> HasName for SchemaInputType<'a> {
-    type Name = InputTypeName;
-
-    fn name(&self) -> Self::Name {
-        match self {
-            SchemaInputType::Scalar(x) => x.name.item.into(),
-        }
+pub fn get_name<'a>(schema_type: SchemaType<'a>) -> UnvalidatedTypeName {
+    match schema_type {
+        SelectionType::Object(object) => object.name.into(),
+        SelectionType::Scalar(scalar) => scalar.name.item.into(),
     }
 }
 
@@ -391,21 +389,6 @@ pub struct SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData
         Vec<WithLocation<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
     // TODO remove this. This is indicative of poor modeling.
     pub is_discriminator: bool,
-
-    pub variant: SchemaServerFieldVariant,
-}
-
-#[derive(Debug, Clone)]
-pub enum SchemaServerFieldVariant {
-    InlineFragment(SchemaServerFieldInlineFragmentVariant),
-    LinkedField,
-}
-
-#[derive(Debug, Clone)]
-pub struct SchemaServerFieldInlineFragmentVariant {
-    pub server_field_id: ServerFieldId,
-    pub concrete_type: IsographObjectTypeName,
-    pub condition_selection_set: Vec<WithSpan<ValidatedSelection>>,
 }
 
 impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug>
@@ -423,7 +406,6 @@ impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug>
             parent_type_id: self.parent_type_id,
             arguments: self.arguments.clone(),
             is_discriminator: self.is_discriminator,
-            variant: self.variant.clone(),
         })
     }
 
@@ -439,7 +421,6 @@ impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug>
             parent_type_id: self.parent_type_id,
             arguments: self.arguments.clone(),
             is_discriminator: self.is_discriminator,
-            variant: self.variant.clone(),
         }
     }
 }
@@ -675,7 +656,6 @@ impl<T, VariableDefinitionInnerType: Ord + Debug>
             parent_type_id,
             arguments,
             is_discriminator,
-            variant: is_inline,
         } = self;
         (
             SchemaServerField {
@@ -686,7 +666,6 @@ impl<T, VariableDefinitionInnerType: Ord + Debug>
                 parent_type_id,
                 arguments,
                 is_discriminator,
-                variant: is_inline,
             },
             associated_data,
         )

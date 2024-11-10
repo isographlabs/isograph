@@ -57,7 +57,7 @@ export function useImperativeReference<
             nestedRefetchQueries:
               entrypoint.readerWithRefetchQueries.nestedRefetchQueries,
           }),
-          root: { __link: ROOT_ID },
+          root: { __link: ROOT_ID, __typename: entrypoint.concreteType },
           variables,
           networkRequest,
         },

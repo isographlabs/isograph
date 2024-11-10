@@ -24,7 +24,6 @@ export {
   type StoreRecord,
   createIsographEnvironment,
   createIsographStore,
-  defaultMissingFieldHandler,
 } from './core/IsographEnvironment';
 export {
   type EagerReaderArtifact,

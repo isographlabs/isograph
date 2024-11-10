@@ -10,7 +10,7 @@ import {
   retainQuery,
   unretainQuery,
 } from './garbageCollection';
-import { IsographEnvironment } from './IsographEnvironment';
+import { IsographEnvironment, ROOT_ID } from './IsographEnvironment';
 import {
   AnyError,
   PromiseWrapper,
@@ -41,6 +41,10 @@ export function maybeMakeNetworkRequest(
         environment,
         artifact.networkRequestInfo.normalizationAst,
         variables,
+        {
+          __link: ROOT_ID,
+          __typename: artifact.concreteType,
+        },
       );
       if (result.kind === 'EnoughData') {
         return [wrapResolvedValue(undefined), () => {}];
@@ -88,6 +92,7 @@ export function makeNetworkRequest(
       }
 
       if (status.kind === 'UndisposedIncomplete') {
+        const root = { __link: ROOT_ID, __typename: artifact.concreteType };
         normalizeData(
           environment,
           artifact.networkRequestInfo.normalizationAst,
@@ -96,10 +101,12 @@ export function makeNetworkRequest(
           artifact.kind === 'Entrypoint'
             ? artifact.readerWithRefetchQueries.nestedRefetchQueries
             : [],
+          root,
         );
         const retainedQuery = {
           normalizationAst: artifact.networkRequestInfo.normalizationAst,
           variables,
+          root,
         };
         status = {
           kind: 'UndisposedComplete',
