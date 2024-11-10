@@ -7,7 +7,7 @@ use isograph_lang_types::{
 };
 use thiserror::Error;
 
-use crate::{FieldType, UnvalidatedSchema};
+use crate::{ClientType, FieldType, UnvalidatedSchema};
 
 impl UnvalidatedSchema {
     pub fn validate_entrypoint_type_and_field(
@@ -96,7 +96,9 @@ impl UnvalidatedSchema {
                     },
                     Location::new(text_source, field_name.span),
                 )),
-                FieldType::ClientField(client_field_id) => Ok(*client_field_id),
+                FieldType::ClientField(ClientType::ClientField(client_field_id)) => {
+                    Ok(*client_field_id)
+                }
             },
             None => Err(WithLocation::new(
                 ValidateEntrypointDeclarationError::ClientFieldMustExist {

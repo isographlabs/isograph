@@ -5,8 +5,9 @@ use isograph_lang_types::{ScalarFieldSelection, Selection, ServerFieldSelection}
 
 use crate::{
     FieldType, ProcessTypeDefinitionError, ProcessTypeDefinitionResult, SchemaObject,
-    SchemaServerField, SchemaServerFieldInlineFragmentVariant, SchemaServerFieldVariant,
-    UnvalidatedSchema, ValidatedIsographSelectionVariant, ValidatedScalarFieldAssociatedData,
+    SchemaServerField, SchemaServerFieldVariant, ServerFieldTypeAssociatedData,
+    ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
+    ValidatedIsographSelectionVariant, ValidatedScalarFieldAssociatedData,
     ValidatedTypeRefinementMap,
 };
 use common_lang_types::Location;
@@ -70,15 +71,17 @@ impl UnvalidatedSchema {
                     name: WithLocation::new(field_name, Location::generated()),
                     parent_type_id: subtype.id,
                     arguments: vec![],
-                    associated_data,
+                    associated_data: ServerFieldTypeAssociatedData {
+                        type_name: associated_data,
+                        variant: SchemaServerFieldVariant::InlineFragment(
+                            ServerFieldTypeAssociatedDataInlineFragment {
+                                server_field_id: next_server_field_id,
+                                concrete_type,
+                                condition_selection_set,
+                            },
+                        ),
+                    },
                     is_discriminator: false,
-                    variant: SchemaServerFieldVariant::InlineFragment(
-                        SchemaServerFieldInlineFragmentVariant {
-                            server_field_id: next_server_field_id,
-                            concrete_type,
-                            condition_selection_set,
-                        },
-                    ),
                 };
 
                 self.server_fields.push(server_field);
