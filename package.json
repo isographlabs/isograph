@@ -12,7 +12,7 @@
     "watch-rs": "bacon -j build -p ./crates/",
     "check-rs": "bacon -j check -p ./crates/",
     "build": "cargo build",
-    "cross": "cargo cross",
+    "cross": "cross build",
     "watch-pet-demo": "pnpm --filter=pet-demo iso-watch",
     "watch-github-demo": "pnpm --filter=github-demo iso-watch",
     "watch-isograph-react-demo": "pnpm --filter=@isograph/react iso-watch",
