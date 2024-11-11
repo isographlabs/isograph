@@ -57,7 +57,7 @@ jobs:
           command: install
           args: cross
       - name: 'Build isograph_cli with cargo (${{inputs.target}})'
-        run: pnpx turbo ${{ inputs.cross && 'cross' || 'build' }} -- -- --target ${{ inputs.target }} --release
+        run: pnpx turbo ${{ inputs.cross && 'cross' || 'build' }} -- --target ${{ inputs.target }} --release
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact-name }}
