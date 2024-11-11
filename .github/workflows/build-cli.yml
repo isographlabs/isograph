@@ -35,6 +35,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-turbo-
       - uses: pnpm/action-setup@v2
+      - name: Use Node.js 22
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22
+          cache: 'pnpm'
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
