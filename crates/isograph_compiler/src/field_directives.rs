@@ -62,9 +62,9 @@ pub fn validate_isograph_selection_set_directives(
 > {
     and_then_selection_set_and_collect_errors(
         selection_set,
-        &|scalar_pointer_selection| {
+        &|scalar_field_selection| {
             if let Some(directive) = find_directive_named(
-                &scalar_pointer_selection.directives,
+                &scalar_field_selection.directives,
                 *LOADABLE_DIRECTIVE_NAME,
             ) {
                 let loadable_variant =
@@ -84,7 +84,7 @@ pub fn validate_isograph_selection_set_directives(
                 Ok(IsographSelectionVariant::Regular)
             }
         },
-        &|_linked_pointer_selection| Ok(IsographSelectionVariant::Regular),
+        &|_object_pointer_selection| Ok(IsographSelectionVariant::Regular),
     )
 }
 
