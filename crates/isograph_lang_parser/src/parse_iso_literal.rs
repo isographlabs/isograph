@@ -395,7 +395,6 @@ fn parse_selection(
 
         let directives = parse_directives(tokens, text_source)?;
 
-        // commas are required
         parse_comma_line_break_or_curly(tokens)?;
 
         let selection = match selection_set {
