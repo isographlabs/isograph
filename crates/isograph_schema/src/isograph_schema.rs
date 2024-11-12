@@ -15,7 +15,7 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, SelectableServerFieldId, Selection, SelectionType,
-    ServerFieldId, ServerObjectId, ServerScalarId, ServerStrongIdFieldId, TypeAnnotation, Unwrap,
+    ServerFieldId, ServerObjectId, ServerScalarId, ServerStrongIdFieldId, TypeAnnotation,
     VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -519,7 +519,6 @@ pub struct ClientField<
             TClientFieldSelectionLinkedFieldAssociatedData,
         >,
     >,
-    pub unwraps: Vec<WithSpan<Unwrap>>,
 
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,

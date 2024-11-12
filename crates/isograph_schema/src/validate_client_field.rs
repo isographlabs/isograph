@@ -173,7 +173,6 @@ fn validate_client_field_selection_set(
         name: top_level_client_field.name,
         id: top_level_client_field.id,
         reader_selection_set: selection_set,
-        unwraps: top_level_client_field.unwraps,
         variant: top_level_client_field.variant,
         variable_definitions,
         type_and_field: top_level_client_field.type_and_field,
@@ -364,7 +363,6 @@ fn validate_field_type_exists_and_is_scalar(
                             },
                         },
                         reader_alias: scalar_field_selection.reader_alias,
-                        unwraps: scalar_field_selection.unwraps,
                         arguments: scalar_field_selection.arguments,
                         directives: scalar_field_selection.directives,
                     }),
@@ -443,7 +441,6 @@ fn validate_client_field(
     Ok(ScalarFieldSelection {
         name: scalar_field_selection.name,
         reader_alias: scalar_field_selection.reader_alias,
-        unwraps: scalar_field_selection.unwraps,
         associated_data: ValidatedScalarFieldAssociatedData {
             location: FieldType::ClientField(*client_field_id),
             selection_variant: match scalar_field_selection.associated_data {
@@ -533,7 +530,6 @@ fn validate_field_type_exists_and_is_linked(
                                     )
                                 },
                             ).collect::<Result<Vec<_>, _>>()?,
-                            unwraps: linked_field_selection.unwraps,
                             associated_data: ValidatedLinkedFieldAssociatedData {
                                 concrete_type: linked_field_target_object.concrete_type,
                                 parent_object_id: object_id.type_name.inner_non_null(),

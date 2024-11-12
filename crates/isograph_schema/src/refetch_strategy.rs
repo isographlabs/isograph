@@ -169,7 +169,6 @@ pub fn id_selection() -> WithSpan<Selection<IsographSelectionVariant, IsographSe
             name: WithLocation::new("id".intern().into(), Location::generated()),
             reader_alias: None,
             associated_data: IsographSelectionVariant::Regular,
-            unwraps: vec![],
             arguments: vec![],
             directives: vec![],
         })),

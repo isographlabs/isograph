@@ -199,7 +199,6 @@ impl UnvalidatedSchema {
                         ),
                         reader_alias: None,
                         associated_data: IsographSelectionVariant::Regular,
-                        unwraps: vec![],
                         // TODO what about arguments? How would we handle them?
                         arguments: vec![],
                         directives: vec![],
@@ -239,7 +238,6 @@ impl UnvalidatedSchema {
                 id: mutation_field_client_field_id,
                 reader_selection_set: None,
 
-                unwraps: vec![],
                 variant: ClientFieldVariant::ImperativelyLoadedField(
                     ImperativelyLoadedFieldVariant {
                         client_field_scalar_selection_name: client_field_scalar_selection_name

@@ -14,7 +14,7 @@ use isograph_lang_types::{
     ClientPointerDeclaration, ConstantValue, EntrypointTypeAndField, IsographFieldDirective,
     LinkedFieldSelection, NonConstantValue, ScalarFieldSelection, Selection,
     SelectionFieldArgument, ServerFieldSelection, UnvalidatedSelectionWithUnvalidatedDirectives,
-    Unwrap, VariableDefinition,
+    VariableDefinition,
 };
 
 use crate::{
@@ -157,7 +157,7 @@ fn parse_client_field_declaration_inner(
 
         let description = parse_optional_description(tokens);
 
-        let (selection_set, unwraps) = parse_selection_set_and_unwraps(tokens, text_source)?;
+        let selection_set = parse_selection_set(tokens, text_source)?;
 
         let const_export_name = const_export_name.ok_or_else(|| {
             WithSpan::new(
@@ -179,7 +179,6 @@ fn parse_client_field_declaration_inner(
             client_field_name,
             description,
             selection_set,
-            unwraps,
             definition_path: definition_file_path,
             directives,
             const_export_name: const_export_name.intern().into(),
@@ -240,7 +239,7 @@ fn parse_client_pointer_declaration_inner(
 
         let description = parse_optional_description(tokens);
 
-        let (selection_set, unwraps) = parse_selection_set_and_unwraps(tokens, text_source)?;
+        let selection_set = parse_selection_set(tokens, text_source)?;
 
         let const_export_name = const_export_name.ok_or_else(|| {
             WithSpan::new(
@@ -256,7 +255,6 @@ fn parse_client_pointer_declaration_inner(
             client_pointer_name,
             description,
             selection_set,
-            unwraps,
             definition_path: definition_file_path,
             const_export_name: const_export_name.intern().into(),
             variable_definitions,
@@ -270,19 +268,13 @@ fn parse_client_pointer_declaration_inner(
 //
 // TODO: perform some refactor to make type easier to read.
 #[allow(clippy::type_complexity)]
-fn parse_selection_set_and_unwraps(
+fn parse_selection_set(
     tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
-) -> ParseResultWithSpan<(
-    Vec<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>>,
-    Vec<WithSpan<Unwrap>>,
-)> {
+) -> ParseResultWithSpan<Vec<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>>> {
     let selection_set = parse_optional_selection_set(tokens, text_source)?;
     match selection_set {
-        Some(selection_set) => {
-            let unwraps = parse_unwraps(tokens);
-            Ok((selection_set, unwraps))
-        }
+        Some(selection_set) => Ok(selection_set),
         None => Err(WithSpan::new(
             IsographLiteralParseError::ExpectedSelectionSet,
             Span::new(0, 0),
@@ -401,8 +393,6 @@ fn parse_selection(
         // If we encounter a selection set, we are parsing a linked field. Otherwise, a scalar field.
         let selection_set = parse_optional_selection_set(tokens, text_source)?;
 
-        let unwraps = parse_unwraps(tokens);
-
         let directives = parse_directives(tokens, text_source)?;
 
         // commas are required
@@ -416,7 +406,6 @@ fn parse_selection(
                         .map(|with_span| with_span.map(|string_key| string_key.into())),
                     associated_data: (),
                     selection_set,
-                    unwraps,
                     arguments,
                     directives,
                 }))
@@ -427,7 +416,6 @@ fn parse_selection(
                     reader_alias: alias
                         .map(|with_span| with_span.map(|string_key| string_key.into())),
                     associated_data: (),
-                    unwraps,
                     arguments,
                     directives,
                 }))
@@ -455,15 +443,6 @@ fn parse_optional_alias_and_field_name(
         (field_name_or_alias, None)
     };
     Ok((field_name, alias))
-}
-
-fn parse_unwraps(tokens: &mut PeekableLexer) -> Vec<WithSpan<Unwrap>> {
-    // TODO support _, etc.
-    let mut unwraps = vec![];
-    while let Ok(token) = tokens.parse_token_of_kind(IsographLangTokenKind::Exclamation) {
-        unwraps.push(token.map(|_| Unwrap::ActualUnwrap))
-    }
-    unwraps
 }
 
 fn parse_directives(

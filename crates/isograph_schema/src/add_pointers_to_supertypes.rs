@@ -53,7 +53,6 @@ impl UnvalidatedSchema {
                                 Location::generated(),
                             ),
                             reader_alias: None,
-                            unwraps: vec![],
                         },
                     )),
                     Span::todo_generated(),

@@ -30,7 +30,6 @@ pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
     pub client_field_name: WithSpan<ScalarFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
-    pub unwraps: Vec<WithSpan<Unwrap>>,
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: FilePath,
@@ -48,7 +47,6 @@ pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
     pub client_pointer_name: WithSpan<ScalarFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
-    pub unwraps: Vec<WithSpan<Unwrap>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: FilePath,
 
@@ -190,8 +188,6 @@ pub struct ScalarFieldSelection<TScalarField> {
     pub name: WithLocation<ScalarFieldName>,
     pub reader_alias: Option<WithLocation<ScalarFieldAlias>>,
     pub associated_data: TScalarField,
-    // TODO remove until we are ready for this :/
-    pub unwraps: Vec<WithSpan<Unwrap>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
 }
@@ -202,7 +198,6 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
             name: self.name,
             reader_alias: self.reader_alias,
             associated_data: map(self.associated_data),
-            unwraps: self.unwraps,
             arguments: self.arguments,
             directives: self.directives,
         }
@@ -216,7 +211,6 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
             name: self.name,
             reader_alias: self.reader_alias,
             associated_data: map(self.associated_data)?,
-            unwraps: self.unwraps,
             arguments: self.arguments,
             directives: self.directives,
         })
@@ -236,7 +230,6 @@ pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
     pub reader_alias: Option<WithLocation<LinkedFieldAlias>>,
     pub associated_data: TLinkedField,
     pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
-    pub unwraps: Vec<WithSpan<Unwrap>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
 }
@@ -269,7 +262,6 @@ impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField
                     })
                 })
                 .collect(),
-            unwraps: self.unwraps,
             arguments: self.arguments,
             directives: self.directives,
         }
@@ -280,13 +272,6 @@ impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField
             .map(|item| item.map(FieldNameOrAlias::from))
             .unwrap_or_else(|| self.name.map(FieldNameOrAlias::from))
     }
-}
-
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub enum Unwrap {
-    ActualUnwrap,
-    SkippedUnwrap,
-    // FakeUnwrap?
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
