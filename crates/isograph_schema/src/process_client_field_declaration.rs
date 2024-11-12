@@ -231,7 +231,6 @@ impl UnvalidatedSchema {
                 name,
                 id: next_client_pointer_id,
                 condition_selection_set: client_pointer_declaration.item.selection_set,
-                unwraps: client_pointer_declaration.item.unwraps,
 
                 variable_definitions: client_pointer_declaration.item.variable_definitions,
                 type_and_field: ObjectTypeAndFieldName {

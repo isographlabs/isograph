@@ -522,7 +522,6 @@ pub struct ClientPointer<
         TClientFieldSelectionLinkedFieldAssociatedData,
     >,
 
-    pub unwraps: Vec<WithSpan<Unwrap>>,
 
     // TODO this should probably be a HashMap
     // Is this used for anything except for some reason, for refetch fields?

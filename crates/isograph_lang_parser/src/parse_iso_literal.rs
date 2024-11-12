@@ -259,7 +259,6 @@ fn parse_client_pointer_declaration_inner(
             to_type: parent_type,
             description,
             selection_set,
-            unwraps,
             definition_path: definition_file_path,
             const_export_name: const_export_name.intern().into(),
             variable_definitions,

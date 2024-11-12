@@ -50,7 +50,6 @@ pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
     pub client_pointer_name: WithSpan<ClientPointerFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
-    pub unwraps: Vec<WithSpan<Unwrap>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: FilePath,
 
