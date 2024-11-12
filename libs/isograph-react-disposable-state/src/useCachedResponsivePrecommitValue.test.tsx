@@ -1,5 +1,5 @@
 import type { ItemCleanupPair } from '@isograph/disposable-types';
-import React, { type MutableRefObject } from 'react';
+import React, { StrictMode, type MutableRefObject, type ReactElement } from 'react';
 import { create } from 'react-test-renderer';
 import { assert, describe, expect, test, vi } from 'vitest';
 import type { CacheItem, CacheItemState } from './CacheItem';
@@ -52,9 +52,10 @@ function promiseAndResolver() {
 
 // The fact that sometimes we need to render in concurrent mode and sometimes
 // not is a bit worrisome.
-async function awaitableCreate(Component, isConcurrent: boolean) {
+async function awaitableCreate(Component: ReactElement, isConcurrent: boolean) {
   const element = create(
-    Component,
+    <StrictMode>{Component}</StrictMode>,
+    // @ts-expect-error
     isConcurrent ? { unstable_isConcurrent: true } : undefined,
   );
   await shortPromise();
