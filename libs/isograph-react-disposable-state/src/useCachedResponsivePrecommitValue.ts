@@ -50,6 +50,10 @@ export function useCachedResponsivePrecommitValue<T>(
   const lastCommittedParentCache = useRef<ParentCache<T> | null>(null);
 
   useEffect(() => {
+    if (lastCommittedParentCache.current === parentCache) {
+      return;
+    }
+
     lastCommittedParentCache.current = parentCache;
     // On commit, cacheItem may be disposed, because during the render phase,
     // we only temporarily retained the item, and the temporary retain could have
