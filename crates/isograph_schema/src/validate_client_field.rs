@@ -278,28 +278,26 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
     let mut used_variables2 = BTreeSet::new();
 
     let validated_selection = selection.and_then(|selection| {
-        selection.and_then(&mut |field_selection| {
-            field_selection.and_then(
-                &mut |scalar_field_selection| {
-                    validate_field_type_exists_and_is_scalar(
-                        field_parent_object,
-                        scalar_field_selection,
-                        used_variables,
-                        variable_definitions,
-                        top_level_client_field_info,
-                    )
-                },
-                &mut |linked_field_selection| {
-                    validate_field_type_exists_and_is_linked(
-                        field_parent_object,
-                        linked_field_selection,
-                        &mut used_variables2,
-                        variable_definitions,
-                        top_level_client_field_info,
-                    )
-                },
-            )
-        })
+        selection.and_then(
+            &mut |scalar_field_selection| {
+                validate_field_type_exists_and_is_scalar(
+                    field_parent_object,
+                    scalar_field_selection,
+                    used_variables,
+                    variable_definitions,
+                    top_level_client_field_info,
+                )
+            },
+            &mut |linked_field_selection| {
+                validate_field_type_exists_and_is_linked(
+                    field_parent_object,
+                    linked_field_selection,
+                    &mut used_variables2,
+                    variable_definitions,
+                    top_level_client_field_info,
+                )
+            },
+        )
     });
 
     used_variables.append(&mut used_variables2);

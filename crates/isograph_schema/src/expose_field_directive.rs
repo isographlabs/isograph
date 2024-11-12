@@ -8,7 +8,7 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, IsographSelectionVariant, NonConstantValue,
-    ScalarFieldSelection, SelectableServerFieldId, Selection, ServerFieldId, ServerFieldSelection,
+    ScalarFieldSelection, SelectableServerFieldId, ServerFieldId, ServerFieldSelection,
     ServerObjectId,
 };
 use serde::Deserialize;
@@ -205,9 +205,7 @@ impl UnvalidatedSchema {
                     };
 
                     WithSpan::new(
-                        Selection::ServerField(ServerFieldSelection::ScalarField(
-                            scalar_field_selection,
-                        )),
+                        ServerFieldSelection::ScalarField(scalar_field_selection),
                         Span::todo_generated(),
                     )
                 })

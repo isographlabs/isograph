@@ -12,9 +12,8 @@ use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
     ClientFieldDeclaration, ClientFieldDeclarationWithUnvalidatedDirectives,
     ClientPointerDeclaration, ConstantValue, EntrypointTypeAndField, IsographFieldDirective,
-    LinkedFieldSelection, NonConstantValue, ScalarFieldSelection, Selection,
-    SelectionFieldArgument, ServerFieldSelection, UnvalidatedSelectionWithUnvalidatedDirectives,
-    VariableDefinition,
+    LinkedFieldSelection, NonConstantValue, ScalarFieldSelection, SelectionFieldArgument,
+    ServerFieldSelection, UnvalidatedSelectionWithUnvalidatedDirectives, VariableDefinition,
 };
 
 use crate::{
@@ -299,24 +298,20 @@ fn parse_optional_selection_set(
         .is_err()
     {
         let selection = parse_selection(tokens, text_source)?;
-        match &selection.item {
-            Selection::ServerField(server_field_selection) => {
-                let selection_name_or_alias = server_field_selection.name_or_alias().item;
-                if !encountered_names_or_aliases.insert(selection_name_or_alias) {
-                    // We have already encountered this name or alias, so we emit
-                    // an error.
-                    // TODO should SelectionSet be a HashMap<FieldNameOrAlias, ...> instead of
-                    // a Vec??
-                    // TODO find a way to include the location of the previous field with matching
-                    // name or alias
-                    return Err(WithSpan::new(
-                        IsographLiteralParseError::DuplicateNameOrAlias {
-                            name_or_alias: selection_name_or_alias,
-                        },
-                        selection.span,
-                    ));
-                }
-            }
+        let selection_name_or_alias = selection.item.name_or_alias().item;
+        if !encountered_names_or_aliases.insert(selection_name_or_alias) {
+            // We have already encountered this name or alias, so we emit
+            // an error.
+            // TODO should SelectionSet be a HashMap<FieldNameOrAlias, ...> instead of
+            // a Vec??
+            // TODO find a way to include the location of the previous field with matching
+            // name or alias
+            return Err(WithSpan::new(
+                IsographLiteralParseError::DuplicateNameOrAlias {
+                    name_or_alias: selection_name_or_alias,
+                },
+                selection.span,
+            ));
         }
         selections.push(selection);
     }
@@ -398,27 +393,21 @@ fn parse_selection(
         parse_comma_line_break_or_curly(tokens)?;
 
         let selection = match selection_set {
-            Some(selection_set) => {
-                Selection::ServerField(ServerFieldSelection::LinkedField(LinkedFieldSelection {
-                    name: field_name.map(|string_key| string_key.into()),
-                    reader_alias: alias
-                        .map(|with_span| with_span.map(|string_key| string_key.into())),
-                    associated_data: (),
-                    selection_set,
-                    arguments,
-                    directives,
-                }))
-            }
-            None => {
-                Selection::ServerField(ServerFieldSelection::ScalarField(ScalarFieldSelection {
-                    name: field_name.map(|string_key| string_key.into()),
-                    reader_alias: alias
-                        .map(|with_span| with_span.map(|string_key| string_key.into())),
-                    associated_data: (),
-                    arguments,
-                    directives,
-                }))
-            }
+            Some(selection_set) => ServerFieldSelection::LinkedField(LinkedFieldSelection {
+                name: field_name.map(|string_key| string_key.into()),
+                reader_alias: alias.map(|with_span| with_span.map(|string_key| string_key.into())),
+                associated_data: (),
+                selection_set,
+                arguments,
+                directives,
+            }),
+            None => ServerFieldSelection::ScalarField(ScalarFieldSelection {
+                name: field_name.map(|string_key| string_key.into()),
+                reader_alias: alias.map(|with_span| with_span.map(|string_key| string_key.into())),
+                associated_data: (),
+                arguments,
+                directives,
+            }),
         };
         Ok(selection)
     })

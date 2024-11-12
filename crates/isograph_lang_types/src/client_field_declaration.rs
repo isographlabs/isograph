@@ -10,9 +10,9 @@ use serde::Deserialize;
 
 use crate::IsographFieldDirective;
 
-pub type UnvalidatedSelectionWithUnvalidatedDirectives = Selection<(), ()>;
+pub type UnvalidatedSelectionWithUnvalidatedDirectives = ServerFieldSelection<(), ()>;
 
-pub type UnvalidatedSelection = Selection<
+pub type UnvalidatedSelection = ServerFieldSelection<
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
     IsographSelectionVariant,
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
@@ -29,7 +29,7 @@ pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub client_field_name: WithSpan<ScalarFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
+    pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: FilePath,
@@ -46,7 +46,7 @@ pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub client_pointer_name: WithSpan<ScalarFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
+    pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: FilePath,
 
@@ -75,39 +75,6 @@ pub struct LoadableDirectiveParameters {
     complete_selection_set: bool,
     #[serde(default)]
     pub lazy_load_artifact: bool,
-}
-
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub enum Selection<TScalarField, TLinkedField> {
-    ServerField(ServerFieldSelection<TScalarField, TLinkedField>),
-    // FieldGroup(FieldGroupSelection),
-}
-
-impl<TScalarField, TLinkedField> Selection<TScalarField, TLinkedField> {
-    pub fn map<TNewScalarField, TNewLinkedField>(
-        self,
-        map: &mut impl FnMut(
-            ServerFieldSelection<TScalarField, TLinkedField>,
-        ) -> ServerFieldSelection<TNewScalarField, TNewLinkedField>,
-    ) -> Selection<TNewScalarField, TNewLinkedField> {
-        match self {
-            Selection::ServerField(field_selection) => Selection::ServerField(map(field_selection)),
-        }
-    }
-
-    pub fn and_then<TNewScalarField, TNewLinkedField, E>(
-        self,
-        map: &mut impl FnMut(
-            ServerFieldSelection<TScalarField, TLinkedField>,
-        )
-            -> Result<ServerFieldSelection<TNewScalarField, TNewLinkedField>, E>,
-    ) -> Result<Selection<TNewScalarField, TNewLinkedField>, E> {
-        match self {
-            Selection::ServerField(field_selection) => {
-                Ok(Selection::ServerField(map(field_selection)?))
-            }
-        }
-    }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
@@ -229,7 +196,7 @@ pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
     // pub alias
     pub reader_alias: Option<WithLocation<LinkedFieldAlias>>,
     pub associated_data: TLinkedField,
-    pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
+    pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
 }
@@ -249,16 +216,12 @@ impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField
                 .into_iter()
                 .map(|with_span| {
                     with_span.map(|selection| {
-                        selection.map(&mut |server_field_selection| {
-                            server_field_selection.map(
-                                &mut |scalar_field_selection| {
-                                    scalar_field_selection.map(map_scalar)
-                                },
-                                &mut |linked_field_selection| {
-                                    linked_field_selection.map(map_scalar, map_linked)
-                                },
-                            )
-                        })
+                        selection.map(
+                            &mut |scalar_field_selection| scalar_field_selection.map(map_scalar),
+                            &mut |linked_field_selection| {
+                                linked_field_selection.map(map_scalar, map_linked)
+                            },
+                        )
                     })
                 })
                 .collect(),

@@ -2,7 +2,7 @@ use std::collections::{BTreeSet, HashSet};
 
 use common_lang_types::{SelectableFieldName, WithSpan};
 use isograph_lang_types::{
-    LoadableDirectiveParameters, RefetchQueryIndex, Selection, SelectionType, ServerFieldSelection,
+    LoadableDirectiveParameters, RefetchQueryIndex, SelectionType, ServerFieldSelection,
 };
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, FieldType, Loadability,
@@ -29,70 +29,68 @@ fn generate_reader_ast_node(
     initial_variable_context: &VariableContext,
 ) -> String {
     match &selection.item {
-        Selection::ServerField(field) => match field {
-            ServerFieldSelection::ScalarField(scalar_field_selection) => {
-                match scalar_field_selection.associated_data.location {
-                    FieldType::ServerField(_) => server_defined_scalar_field_ast_node(
+        ServerFieldSelection::ScalarField(scalar_field_selection) => {
+            match scalar_field_selection.associated_data.location {
+                FieldType::ServerField(_) => server_defined_scalar_field_ast_node(
+                    scalar_field_selection,
+                    indentation_level,
+                    initial_variable_context,
+                ),
+                FieldType::ClientField(client_field_id) => {
+                    let client_field = schema.client_field(client_field_id);
+                    scalar_client_defined_field_ast_node(
                         scalar_field_selection,
+                        schema,
+                        client_field,
                         indentation_level,
+                        path,
+                        root_refetched_paths,
+                        reader_imports,
                         initial_variable_context,
-                    ),
-                    FieldType::ClientField(client_field_id) => {
-                        let client_field = schema.client_field(client_field_id);
-                        scalar_client_defined_field_ast_node(
-                            scalar_field_selection,
-                            schema,
-                            client_field,
-                            indentation_level,
-                            path,
-                            root_refetched_paths,
-                            reader_imports,
-                            initial_variable_context,
-                        )
-                    }
+                    )
                 }
             }
-            ServerFieldSelection::LinkedField(linked_field_selection) => {
-                path.push(
-                    NameAndArguments {
-                        // TODO use alias
-                        name: linked_field_selection.name.item.into(),
-                        // TODO this clearly does something, but why are we able to pass
-                        // the initial variable context here??
-                        arguments: transform_arguments_with_child_context(
-                            linked_field_selection
-                                .arguments
-                                .iter()
-                                .map(|x| x.item.into_key_and_value()),
-                            // TODO why is this not the transformed context?
-                            initial_variable_context,
-                        ),
-                    }
-                    .normalization_key(),
-                );
+        }
+        ServerFieldSelection::LinkedField(linked_field_selection) => {
+            path.push(
+                NameAndArguments {
+                    // TODO use alias
+                    name: linked_field_selection.name.item.into(),
+                    // TODO this clearly does something, but why are we able to pass
+                    // the initial variable context here??
+                    arguments: transform_arguments_with_child_context(
+                        linked_field_selection
+                            .arguments
+                            .iter()
+                            .map(|x| x.item.into_key_and_value()),
+                        // TODO why is this not the transformed context?
+                        initial_variable_context,
+                    ),
+                }
+                .normalization_key(),
+            );
 
-                let inner_reader_ast = generate_reader_ast_with_path(
-                    schema,
-                    &linked_field_selection.selection_set,
-                    indentation_level + 1,
-                    reader_imports,
-                    root_refetched_paths,
-                    path,
-                    initial_variable_context,
-                );
+            let inner_reader_ast = generate_reader_ast_with_path(
+                schema,
+                &linked_field_selection.selection_set,
+                indentation_level + 1,
+                reader_imports,
+                root_refetched_paths,
+                path,
+                initial_variable_context,
+            );
 
-                path.pop();
+            path.pop();
 
-                linked_field_ast_node(
-                    schema,
-                    linked_field_selection,
-                    indentation_level,
-                    inner_reader_ast,
-                    initial_variable_context,
-                    reader_imports,
-                )
-            }
-        },
+            linked_field_ast_node(
+                schema,
+                linked_field_selection,
+                indentation_level,
+                inner_reader_ast,
+                initial_variable_context,
+                reader_imports,
+            )
+        }
     }
 }
 
@@ -578,75 +576,73 @@ fn refetched_paths_with_path(
 
     for selection in selection_set {
         match &selection.item {
-            Selection::ServerField(field) => match field {
-                ServerFieldSelection::ScalarField(scalar_field_selection) => {
-                    match scalar_field_selection.associated_data.location {
-                        FieldType::ServerField(_) => {
-                            // Do nothing, we encountered a server field
-                        }
-                        FieldType::ClientField(client_field_id) => {
-                            let client_field = schema.client_field(client_field_id);
-                            match categorize_field_loadability(
-                                client_field,
-                                &scalar_field_selection.associated_data.selection_variant,
-                            ) {
-                                Some(Loadability::ImperativelyLoadedField(_)) => {
-                                    paths.insert(PathToRefetchField {
-                                        linked_fields: path.clone(),
-                                        field_name: client_field.name,
-                                    });
-                                }
-                                Some(Loadability::LoadablySelectedField(_)) => {
-                                    // Do not recurse into selections of loadable fields
-                                }
-                                None => {
-                                    let new_paths = refetched_paths_with_path(
-                                        client_field.selection_set_for_parent_query(),
-                                        schema,
-                                        path,
-                                        &initial_variable_context.child_variable_context(
-                                            &scalar_field_selection.arguments,
-                                            &client_field.variable_definitions,
-                                            &ValidatedIsographSelectionVariant::Regular,
-                                        ),
-                                    );
+            ServerFieldSelection::ScalarField(scalar_field_selection) => {
+                match scalar_field_selection.associated_data.location {
+                    FieldType::ServerField(_) => {
+                        // Do nothing, we encountered a server field
+                    }
+                    FieldType::ClientField(client_field_id) => {
+                        let client_field = schema.client_field(client_field_id);
+                        match categorize_field_loadability(
+                            client_field,
+                            &scalar_field_selection.associated_data.selection_variant,
+                        ) {
+                            Some(Loadability::ImperativelyLoadedField(_)) => {
+                                paths.insert(PathToRefetchField {
+                                    linked_fields: path.clone(),
+                                    field_name: client_field.name,
+                                });
+                            }
+                            Some(Loadability::LoadablySelectedField(_)) => {
+                                // Do not recurse into selections of loadable fields
+                            }
+                            None => {
+                                let new_paths = refetched_paths_with_path(
+                                    client_field.selection_set_for_parent_query(),
+                                    schema,
+                                    path,
+                                    &initial_variable_context.child_variable_context(
+                                        &scalar_field_selection.arguments,
+                                        &client_field.variable_definitions,
+                                        &ValidatedIsographSelectionVariant::Regular,
+                                    ),
+                                );
 
-                                    paths.extend(new_paths.into_iter());
-                                }
+                                paths.extend(new_paths.into_iter());
                             }
                         }
                     }
                 }
-                ServerFieldSelection::LinkedField(linked_field_selection) => {
-                    path.push(
-                        NameAndArguments {
-                            // TODO use alias
-                            name: linked_field_selection.name.item.into(),
-                            arguments: transform_arguments_with_child_context(
-                                linked_field_selection
-                                    .arguments
-                                    .iter()
-                                    .map(|x| x.item.into_key_and_value()),
-                                // TODO this clearly does something, but why are we able to pass
-                                // the initial variable context here??
-                                initial_variable_context,
-                            ),
-                        }
-                        .normalization_key(),
-                    );
+            }
+            ServerFieldSelection::LinkedField(linked_field_selection) => {
+                path.push(
+                    NameAndArguments {
+                        // TODO use alias
+                        name: linked_field_selection.name.item.into(),
+                        arguments: transform_arguments_with_child_context(
+                            linked_field_selection
+                                .arguments
+                                .iter()
+                                .map(|x| x.item.into_key_and_value()),
+                            // TODO this clearly does something, but why are we able to pass
+                            // the initial variable context here??
+                            initial_variable_context,
+                        ),
+                    }
+                    .normalization_key(),
+                );
 
-                    let new_paths = refetched_paths_with_path(
-                        &linked_field_selection.selection_set,
-                        schema,
-                        path,
-                        initial_variable_context,
-                    );
+                let new_paths = refetched_paths_with_path(
+                    &linked_field_selection.selection_set,
+                    schema,
+                    path,
+                    initial_variable_context,
+                );
 
-                    paths.extend(new_paths.into_iter());
+                paths.extend(new_paths.into_iter());
 
-                    path.pop();
-                }
-            },
+                path.pop();
+            }
         };
     }
 

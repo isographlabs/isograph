@@ -14,8 +14,8 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, SelectableServerFieldId, Selection, SelectionType,
-    ServerFieldId, ServerObjectId, ServerScalarId, ServerStrongIdFieldId, TypeAnnotation,
+    ArgumentKeyAndValue, ClientFieldId, SelectableServerFieldId, SelectionType, ServerFieldId,
+    ServerFieldSelection, ServerObjectId, ServerScalarId, ServerStrongIdFieldId, TypeAnnotation,
     VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -504,7 +504,7 @@ pub struct ClientField<
     pub reader_selection_set: Option<
         Vec<
             WithSpan<
-                Selection<
+                ServerFieldSelection<
                     TClientFieldSelectionScalarFieldAssociatedData,
                     TClientFieldSelectionLinkedFieldAssociatedData,
                 >,
@@ -547,7 +547,7 @@ impl<
         &self,
     ) -> &Vec<
         WithSpan<
-            Selection<
+            ServerFieldSelection<
                 TClientFieldSelectionScalarFieldAssociatedData,
                 TClientFieldSelectionLinkedFieldAssociatedData,
             >,
