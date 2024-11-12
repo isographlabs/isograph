@@ -95,22 +95,22 @@ pub fn validate_isograph_pointer_directives(
     WithSpan<ClientPointerDeclarationWithValidatedDirectives>,
     Vec<WithLocation<ProcessClientFieldDeclarationError>>,
 > {
-    let ClientPointerDeclaration {
-        const_export_name,
-        parent_type,
-        client_pointer_name,
-        description,
-        selection_set,
-        unwraps,
-        variable_definitions,
-        definition_path,
-        dot,
-        pointer_keyword,
-        to_type,
-    } = client_pointer.item;
+    client_pointer.and_then(|client_pointer| {
+        let ClientPointerDeclaration {
+            const_export_name,
+            parent_type,
+            client_pointer_name,
+            description,
+            selection_set,
+            unwraps,
+            variable_definitions,
+            definition_path,
+            dot,
+            pointer_keyword,
+            to_type,
+        } = client_pointer;
 
-    Ok(WithSpan::new(
-        ClientPointerDeclarationWithValidatedDirectives {
+        Ok(ClientPointerDeclarationWithValidatedDirectives {
             const_export_name,
             parent_type,
             client_pointer_name,
@@ -122,9 +122,8 @@ pub fn validate_isograph_pointer_directives(
             dot,
             pointer_keyword,
             to_type,
-        },
-        client_pointer.span,
-    ))
+        })
+    })
 }
 
 fn and_then_selection_set_and_collect_errors<
