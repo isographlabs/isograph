@@ -2,7 +2,7 @@ import { describe, test, vi, expect, assert } from 'vitest';
 import { ParentCache } from './ParentCache';
 import { ItemCleanupPair } from '@isograph/disposable-types';
 import { useCachedResponsivePrecommitValue } from './useCachedResponsivePrecommitValue';
-import React from 'react';
+import React, { StrictMode, type ReactElement } from 'react';
 import { create } from 'react-test-renderer';
 import { CacheItem, CacheItemState } from './CacheItem';
 
@@ -51,9 +51,10 @@ function promiseAndResolver() {
 
 // The fact that sometimes we need to render in concurrent mode and sometimes
 // not is a bit worrisome.
-async function awaitableCreate(Component, isConcurrent) {
+async function awaitableCreate(Component: ReactElement, isConcurrent) {
   const element = create(
-    Component,
+    <StrictMode>{Component}</StrictMode>,
+    // @ts-expect-error
     isConcurrent ? { unstable_isConcurrent: true } : undefined,
   );
   await shortPromise();
