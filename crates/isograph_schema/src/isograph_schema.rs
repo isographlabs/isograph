@@ -215,7 +215,8 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
     > {
         match &self.client_fields[client_field_id.as_usize()] {
             ClientType::ClientField(client_field) => client_field,
-            ClientType::ClientPointer(_) => panic!("encounterd ClientPointer under ClientFieldId"),
+            ClientType::ClientPointer(_) => panic!("encountered ClientPointer under ClientFieldId. \
+                                                   This is indicative of a bug in Isograph."),
         }
     }
 }
