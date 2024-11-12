@@ -524,16 +524,12 @@ pub struct ClientField<
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,
 
-    // TODO this should probably be a HashMap
-    // Is this used for anything except for some reason, for refetch fields?
     pub variable_definitions:
         Vec<WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
 
-    // TODO this is probably unused
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,
 
-    // TODO should this be TypeWithFieldsId???
     pub parent_object_id: ServerObjectId,
 }
 
