@@ -241,7 +241,7 @@ fn parse_client_pointer_declaration_inner(
 
         let description = parse_optional_description(tokens);
 
-        let (selection_set, unwraps) = parse_selection_set_and_unwraps(tokens, text_source)?;
+        let (selection_set, _) = parse_selection_set_and_unwraps(tokens, text_source)?;
 
         let const_export_name = const_export_name.ok_or_else(|| {
             WithSpan::new(
