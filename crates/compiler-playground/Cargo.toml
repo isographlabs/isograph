@@ -1,0 +1,13 @@
+[package]
+name = "compiler-playground"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+string_key_newtype = { path = "../string_key_newtype" }
+intern = { path = "../../relay-crates/intern" }
+isograph_compiler = { path = "../isograph_compiler" }
+common_lang_types = { path = "../common_lang_types" }
+graphql_schema_parser = { path = "../graphql_schema_parser" }
+serde = { workspace = true } 

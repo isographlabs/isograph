@@ -314,6 +314,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "compiler-playground"
+version = "0.2.0"
+dependencies = [
+ "common_lang_types",
+ "graphql_schema_parser",
+ "intern",
+ "isograph_compiler",
+ "serde",
+ "string_key_newtype",
+]
+
+[[package]]
 name = "crossbeam"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
