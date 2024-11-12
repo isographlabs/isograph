@@ -22,22 +22,22 @@ pub fn validate_isograph_field_directives(
     WithSpan<ClientFieldDeclarationWithValidatedDirectives>,
     Vec<WithLocation<ProcessClientFieldDeclarationError>>,
 > {
-    let ClientFieldDeclaration {
-        const_export_name,
-        parent_type,
-        client_field_name,
-        description,
-        selection_set,
-        unwraps,
-        directives,
-        variable_definitions,
-        definition_path,
-        dot,
-        field_keyword,
-    } = client_field.item;
+    client_field.and_then(|client_field| {
+        let ClientFieldDeclaration {
+            const_export_name,
+            parent_type,
+            client_field_name,
+            description,
+            selection_set,
+            unwraps,
+            directives,
+            variable_definitions,
+            definition_path,
+            dot,
+            field_keyword,
+        } = client_field;
 
-    Ok(WithSpan::new(
-        ClientFieldDeclarationWithValidatedDirectives {
+        Ok(ClientFieldDeclarationWithValidatedDirectives {
             const_export_name,
             parent_type,
             client_field_name,
@@ -49,9 +49,8 @@ pub fn validate_isograph_field_directives(
             definition_path,
             dot,
             field_keyword,
-        },
-        client_field.span,
-    ))
+        })
+    })
 }
 
 pub fn validate_isograph_selection_set_directives(
@@ -63,10 +62,9 @@ pub fn validate_isograph_selection_set_directives(
     and_then_selection_set_and_collect_errors(
         selection_set,
         &|scalar_field_selection| {
-            if let Some(directive) = find_directive_named(
-                &scalar_field_selection.directives,
-                *LOADABLE_DIRECTIVE_NAME,
-            ) {
+            if let Some(directive) =
+                find_directive_named(&scalar_field_selection.directives, *LOADABLE_DIRECTIVE_NAME)
+            {
                 let loadable_variant =
                     from_isograph_field_directive(&directive.item).map_err(|message| {
                         WithLocation::new(
