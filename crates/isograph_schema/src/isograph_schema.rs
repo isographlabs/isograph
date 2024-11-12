@@ -215,8 +215,10 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
     > {
         match &self.client_fields[client_field_id.as_usize()] {
             ClientType::ClientField(client_field) => client_field,
-            ClientType::ClientPointer(_) => panic!("encountered ClientPointer under ClientFieldId. \
-                                                   This is indicative of a bug in Isograph."),
+            ClientType::ClientPointer(_) => panic!(
+                "encountered ClientPointer under ClientFieldId. \
+                                                   This is indicative of a bug in Isograph."
+            ),
         }
     }
 }
@@ -522,17 +524,14 @@ pub struct ClientPointer<
         TClientFieldSelectionLinkedFieldAssociatedData,
     >,
 
-
     // TODO this should probably be a HashMap
     // Is this used for anything except for some reason, for refetch fields?
     pub variable_definitions:
         Vec<WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
 
-    // TODO this is probably unused
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,
 
-    // TODO should this be TypeWithFieldsId???
     pub parent_object_id: ServerObjectId,
 }
 
