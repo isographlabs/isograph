@@ -15,9 +15,9 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, SelectableServerFieldId, Selection,
-    SelectionType, ServerFieldId, ServerObjectId, ServerScalarId, ServerStrongIdFieldId,
-    TypeAnnotation, Unwrap, VariableDefinition,
+    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, SelectableServerFieldId, SelectionType,
+    ServerFieldId, ServerFieldSelection, ServerObjectId, ServerScalarId, ServerStrongIdFieldId,
+    TypeAnnotation, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -513,7 +513,7 @@ pub struct ClientPointer<
 
     pub condition_selection_set: Vec<
         WithSpan<
-            Selection<
+            ServerFieldSelection<
                 TClientFieldSelectionScalarFieldAssociatedData,
                 TClientFieldSelectionLinkedFieldAssociatedData,
             >,
@@ -552,7 +552,7 @@ pub struct ClientField<
     pub reader_selection_set: Option<
         Vec<
             WithSpan<
-                Selection<
+                ServerFieldSelection<
                     TClientFieldSelectionScalarFieldAssociatedData,
                     TClientFieldSelectionLinkedFieldAssociatedData,
                 >,
@@ -567,21 +567,16 @@ pub struct ClientField<
             TClientFieldSelectionLinkedFieldAssociatedData,
         >,
     >,
-    pub unwraps: Vec<WithSpan<Unwrap>>,
 
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,
 
-    // TODO this should probably be a HashMap
-    // Is this used for anything except for some reason, for refetch fields?
     pub variable_definitions:
         Vec<WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
 
-    // TODO this is probably unused
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,
 
-    // TODO should this be TypeWithFieldsId???
     pub parent_object_id: ServerObjectId,
 }
 
@@ -600,7 +595,7 @@ impl<
         &self,
     ) -> &Vec<
         WithSpan<
-            Selection<
+            ServerFieldSelection<
                 TClientFieldSelectionScalarFieldAssociatedData,
                 TClientFieldSelectionLinkedFieldAssociatedData,
             >,

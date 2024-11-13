@@ -8,7 +8,7 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, IsographSelectionVariant, NonConstantValue,
-    ScalarFieldSelection, SelectableServerFieldId, Selection, ServerFieldId, ServerFieldSelection,
+    ScalarFieldSelection, SelectableServerFieldId, ServerFieldId, ServerFieldSelection,
     ServerObjectId,
 };
 use serde::Deserialize;
@@ -199,16 +199,13 @@ impl UnvalidatedSchema {
                         ),
                         reader_alias: None,
                         associated_data: IsographSelectionVariant::Regular,
-                        unwraps: vec![],
                         // TODO what about arguments? How would we handle them?
                         arguments: vec![],
                         directives: vec![],
                     };
 
                     WithSpan::new(
-                        Selection::ServerField(ServerFieldSelection::ScalarField(
-                            scalar_field_selection,
-                        )),
+                        ServerFieldSelection::ScalarField(scalar_field_selection),
                         Span::todo_generated(),
                     )
                 })
@@ -239,7 +236,6 @@ impl UnvalidatedSchema {
                 id: mutation_field_client_field_id,
                 reader_selection_set: None,
 
-                unwraps: vec![],
                 variant: ClientFieldVariant::ImperativelyLoadedField(
                     ImperativelyLoadedFieldVariant {
                         client_field_scalar_selection_name: client_field_scalar_selection_name

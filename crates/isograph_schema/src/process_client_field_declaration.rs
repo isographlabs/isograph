@@ -78,7 +78,7 @@ impl UnvalidatedSchema {
         let to_type_id = self
             .server_field_data
             .defined_types
-            .get(&client_pointer_declaration.item.to_type.inner())
+            .get(client_pointer_declaration.item.to_type.inner())
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
                     parent_type_name: *client_pointer_declaration.item.to_type.inner(),
@@ -168,7 +168,6 @@ impl UnvalidatedSchema {
                 name,
                 id: next_client_field_id,
                 reader_selection_set: Some(client_field_declaration.item.selection_set),
-                unwraps: client_field_declaration.item.unwraps,
                 variant,
                 variable_definitions: client_field_declaration.item.variable_definitions,
                 type_and_field: ObjectTypeAndFieldName {

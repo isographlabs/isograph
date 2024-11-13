@@ -1,7 +1,7 @@
 use common_lang_types::{SelectableFieldName, Span, UnvalidatedTypeName, WithLocation, WithSpan};
 use graphql_lang_types::{GraphQLNamedTypeAnnotation, GraphQLTypeAnnotation};
 use intern::string_key::Intern;
-use isograph_lang_types::{ScalarFieldSelection, Selection, ServerFieldSelection};
+use isograph_lang_types::{ScalarFieldSelection, ServerFieldSelection};
 
 use crate::{
     FieldType, ProcessTypeDefinitionError, ProcessTypeDefinitionResult, SchemaObject,
@@ -33,29 +33,26 @@ impl UnvalidatedSchema {
                     }));
 
                 let typename_selection = WithSpan::new(
-                    Selection::ServerField(ServerFieldSelection::ScalarField(
-                        ScalarFieldSelection {
-                            arguments: vec![],
-                            associated_data: ValidatedScalarFieldAssociatedData {
-                                location: FieldType::ServerField(
-                                    *subtype
-                                        .encountered_fields
-                                        .get(&"__typename".intern().into())
-                                        .expect("Expected __typename to exist")
-                                        .as_server_field()
-                                        .expect("Expected __typename to be server field"),
-                                ),
-                                selection_variant: ValidatedIsographSelectionVariant::Regular,
-                            },
-                            directives: vec![],
-                            name: WithLocation::new(
-                                "__typename".intern().into(),
-                                Location::generated(),
+                    ServerFieldSelection::ScalarField(ScalarFieldSelection {
+                        arguments: vec![],
+                        associated_data: ValidatedScalarFieldAssociatedData {
+                            location: FieldType::ServerField(
+                                *subtype
+                                    .encountered_fields
+                                    .get(&"__typename".intern().into())
+                                    .expect("Expected __typename to exist")
+                                    .as_server_field()
+                                    .expect("Expected __typename to be server field"),
                             ),
-                            reader_alias: None,
-                            unwraps: vec![],
+                            selection_variant: ValidatedIsographSelectionVariant::Regular,
                         },
-                    )),
+                        directives: vec![],
+                        name: WithLocation::new(
+                            "__typename".intern().into(),
+                            Location::generated(),
+                        ),
+                        reader_alias: None,
+                    }),
                     Span::todo_generated(),
                 );
 
