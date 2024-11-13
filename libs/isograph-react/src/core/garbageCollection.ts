@@ -111,7 +111,7 @@ function recordReachableIdsFromRecord(
   selections: NormalizationAst,
   variables: Variables | null,
 ) {
-  for (const selection of selections) {
+  for (const selection of selections.normalizationAst) {
     switch (selection.kind) {
       case 'Linked':
         const linkKey = getParentRecordKey(selection, variables ?? {});

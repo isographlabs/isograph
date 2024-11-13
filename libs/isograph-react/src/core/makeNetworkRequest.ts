@@ -1,7 +1,9 @@
-import { ItemCleanupPair } from '@isograph/disposable-types';
+import { ItemCleanupPair, type CleanupFn } from '@isograph/disposable-types';
 import {
   IsographEntrypoint,
   RefetchQueryNormalizationArtifact,
+  type NormalizationAst,
+  type NormalizationAstLoader,
 } from './entrypoint';
 import { Variables } from './FragmentReference';
 import {
@@ -31,26 +33,34 @@ export function maybeMakeNetworkRequest(
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
   switch (shouldFetch) {
     case 'Yes': {
-      return makeNetworkRequest(environment, artifact, variables);
+      return makeNetworkRequest(environment, artifact, variables, () =>
+        loadNormalizationAst(artifact.networkRequestInfo.normalizationAst),
+      );
     }
     case 'No': {
       return [wrapResolvedValue(undefined), () => {}];
     }
     case 'IfNecessary': {
-      const result = check(
+      return makeNetworkRequestIfNecessary(
         environment,
-        artifact.networkRequestInfo.normalizationAst,
+        artifact,
         variables,
-        {
-          __link: ROOT_ID,
-          __typename: artifact.concreteType,
-        },
+        () =>
+          loadNormalizationAst(artifact.networkRequestInfo.normalizationAst),
       );
-      if (result.kind === 'EnoughData') {
-        return [wrapResolvedValue(undefined), () => {}];
-      } else {
-        return makeNetworkRequest(environment, artifact, variables);
-      }
+    }
+  }
+}
+
+function loadNormalizationAst(
+  normalizationAst: NormalizationAstLoader | NormalizationAst,
+) {
+  switch (normalizationAst.kind) {
+    case 'NormalizationAst': {
+      return Promise.resolve(normalizationAst);
+    }
+    case 'NormalizationAstLoader': {
+      return normalizationAst.loader();
     }
   }
 }
@@ -59,6 +69,7 @@ export function makeNetworkRequest(
   environment: IsographEnvironment,
   artifact: RefetchQueryNormalizationArtifact | IsographEntrypoint<any, any>,
   variables: Variables,
+  normalizationAstLoader: () => Promise<NormalizationAst>,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
   // TODO this should be a DataId and stored in the store
   const myNetworkRequestId = networkRequestId + '';
@@ -75,46 +86,50 @@ export function makeNetworkRequest(
     kind: 'UndisposedIncomplete',
   };
   // This should be an observable, not a promise
-  const promise = environment
-    .networkFunction(artifact.networkRequestInfo.queryText, variables)
-    .then((networkResponse) => {
-      logMessage(environment, {
-        kind: 'ReceivedNetworkResponse',
-        networkResponse,
-        networkRequestId: myNetworkRequestId,
-      });
-
-      if (networkResponse.errors != null) {
-        // @ts-expect-error Why are we getting the wrong constructor here?
-        throw new Error('GraphQL network response had errors', {
-          cause: networkResponse,
-        });
-      }
-
-      if (status.kind === 'UndisposedIncomplete') {
-        const root = { __link: ROOT_ID, __typename: artifact.concreteType };
-        normalizeData(
-          environment,
-          artifact.networkRequestInfo.normalizationAst,
-          networkResponse.data ?? {},
-          variables,
-          artifact.kind === 'Entrypoint'
-            ? artifact.readerWithRefetchQueries.nestedRefetchQueries
-            : [],
-          root,
-        );
-        const retainedQuery = {
-          normalizationAst: artifact.networkRequestInfo.normalizationAst,
-          variables,
-          root,
-        };
-        status = {
-          kind: 'UndisposedComplete',
-          retainedQuery,
-        };
-        retainQuery(environment, retainedQuery);
-      }
+  const promise = Promise.all([
+    environment.networkFunction(
+      artifact.networkRequestInfo.queryText,
+      variables,
+    ),
+    normalizationAstLoader(),
+  ]).then(([networkResponse, normalizationAst]) => {
+    logMessage(environment, {
+      kind: 'ReceivedNetworkResponse',
+      networkResponse,
+      networkRequestId: myNetworkRequestId,
     });
+
+    if (networkResponse.errors != null) {
+      // @ts-expect-error Why are we getting the wrong constructor here?
+      throw new Error('GraphQL network response had errors', {
+        cause: networkResponse,
+      });
+    }
+
+    if (status.kind === 'UndisposedIncomplete') {
+      const root = { __link: ROOT_ID, __typename: artifact.concreteType };
+      normalizeData(
+        environment,
+        normalizationAst,
+        networkResponse.data ?? {},
+        variables,
+        artifact.kind === 'Entrypoint'
+          ? artifact.readerWithRefetchQueries.nestedRefetchQueries
+          : [],
+        root,
+      );
+      const retainedQuery = {
+        normalizationAst: normalizationAst,
+        variables,
+        root,
+      };
+      status = {
+        kind: 'UndisposedComplete',
+        retainedQuery,
+      };
+      retainQuery(environment, retainedQuery);
+    }
+  });
 
   const wrapper = wrapPromise(promise);
 
@@ -149,3 +164,70 @@ type NetworkRequestStatus =
       readonly kind: 'UndisposedComplete';
       readonly retainedQuery: RetainedQuery;
     };
+
+function makeNetworkRequestIfNecessary(
+  environment: IsographEnvironment,
+  artifact: RefetchQueryNormalizationArtifact | IsographEntrypoint<any, any>,
+  variables: Variables,
+  normalizationAstLoader: () => Promise<NormalizationAst>,
+) {
+  return flatMapNetworkRequest(
+    [wrapPromise(normalizationAstLoader()), () => {}],
+    (normalizationAst) => {
+      const result = check(environment, normalizationAst, variables, {
+        __link: ROOT_ID,
+        __typename: artifact.concreteType,
+      });
+
+      if (result.kind === 'EnoughData') {
+        return [wrapResolvedValue(undefined), () => {}];
+      } else {
+        return makeNetworkRequest(
+          environment,
+          artifact,
+          variables,
+          normalizationAstLoader,
+        );
+      }
+    },
+  );
+}
+
+function flatMapNetworkRequest<T, R, E>(
+  networkRequest: ItemCleanupPair<PromiseWrapper<T, E>>,
+  fn: (value: T) => ItemCleanupPair<PromiseWrapper<R, E>>,
+): ItemCleanupPair<PromiseWrapper<R, E>> {
+  let networkRequestState:
+    | {
+        kind: 'Pending';
+      }
+    | {
+        kind: 'NetworkRequestStarted';
+        disposeNetworkRequest: CleanupFn;
+      }
+    | { kind: 'Disposed' } = { kind: 'Pending' };
+
+  const promiseWrapper = wrapPromise(
+    networkRequest[0].promise.then((value) => {
+      if (networkRequestState.kind === 'Pending') {
+        const [networkRequest, disposeNetworkRequest] = fn(value);
+        networkRequestState = {
+          kind: 'NetworkRequestStarted',
+          disposeNetworkRequest,
+        };
+        return networkRequest.promise;
+      }
+      throw new Error('Expected network request to be pending');
+    }),
+  );
+
+  return [
+    promiseWrapper,
+    () => {
+      if (networkRequestState.kind === 'NetworkRequestStarted') {
+        networkRequestState.disposeNetworkRequest();
+      }
+      networkRequestState = { kind: 'Disposed' };
+    },
+  ];
+}

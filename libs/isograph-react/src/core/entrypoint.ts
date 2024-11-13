@@ -19,7 +19,7 @@ export type ReaderWithRefetchQueries<
 export type NetworkRequestInfo = {
   readonly kind: 'NetworkRequestInfo';
   readonly queryText: string;
-  readonly normalizationAst: NormalizationAst;
+  readonly normalizationAst: NormalizationAst | NormalizationAstLoader;
 };
 // This type should be treated as an opaque type.
 export type IsographEntrypoint<
@@ -33,6 +33,11 @@ export type IsographEntrypoint<
     TClientFieldValue
   >;
   readonly concreteType: TypeName;
+};
+
+export type NormalizationAstLoader = {
+  readonly kind: 'NormalizationAstLoader';
+  readonly loader: () => Promise<NormalizationAst>;
 };
 
 export type IsographEntrypointLoader<
@@ -50,7 +55,11 @@ export type NormalizationAstNode =
   | NormalizationScalarField
   | NormalizationLinkedField
   | NormalizationInlineFragment;
-export type NormalizationAst = ReadonlyArray<NormalizationAstNode>;
+
+export type NormalizationAst = {
+  kind: 'NormalizationAst';
+  normalizationAst: ReadonlyArray<NormalizationAstNode>;
+};
 
 export type NormalizationScalarField = {
   readonly kind: 'Scalar';
