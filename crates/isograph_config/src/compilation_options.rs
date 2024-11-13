@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use schemars::schema_for;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use tracing::warn;
 
@@ -80,9 +82,13 @@ impl Default for OptionalValidationLevel {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct ConfigFile {
+    /// The user may hard-code the JSON Schema for their version of the config.
+    #[serde(rename = "$schema")]
+    #[allow(dead_code)]
+    pub json_schema: Option<String>,
     /// The relative path to the folder where the compiler should look for Isograph literals
     pub project_root: PathBuf,
     /// The relative path to the folder where the compiler should create artifacts
@@ -95,7 +101,7 @@ struct ConfigFile {
     pub schema_extensions: Vec<PathBuf>,
 
     /// Various that are of lesser importance
-    #[serde(default = "Default::default")]
+    #[serde(default)]
     pub options: ConfigFileOptions,
 }
 
@@ -179,7 +185,7 @@ pub fn create_config(config_location: PathBuf) -> CompilerConfig {
     }
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 struct ConfigFileOptions {
     on_invalid_id_type: ConfigFileOptionalValidationLevel,
@@ -187,7 +193,7 @@ struct ConfigFileOptions {
     include_file_extensions_in_import_statements: bool,
 }
 
-#[derive(Deserialize, Debug, Clone, Copy)]
+#[derive(Deserialize, Debug, Clone, Copy, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 enum ConfigFileOptionalValidationLevel {
     /// If this validation error is encountered, it will be ignored
@@ -202,6 +208,10 @@ impl Default for ConfigFileOptionalValidationLevel {
     fn default() -> Self {
         Self::Error
     }
+}
+pub fn generate_json_schema_config() {
+    let schema = schema_for!(ConfigFile);
+    println!("{}", serde_json::to_string_pretty(&schema).unwrap());
 }
 
 fn create_options(options: ConfigFileOptions) -> ConfigOptions {
