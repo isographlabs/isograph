@@ -56,7 +56,7 @@ function checkFromRecord(
   record: StoreRecord,
   recordLink: Link,
 ): CheckResult {
-  normalizationAstLoop: for (const normalizationAstNode of normalizationAst) {
+  normalizationAstLoop: for (const normalizationAstNode of normalizationAst.normalizationAst) {
     switch (normalizationAstNode.kind) {
       case 'Scalar': {
         const parentRecordKey = getParentRecordKey(
