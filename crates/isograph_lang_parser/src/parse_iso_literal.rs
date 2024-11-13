@@ -256,7 +256,7 @@ fn parse_client_pointer_declaration_inner(
         Ok(ClientPointerDeclaration {
             parent_type,
             client_pointer_name,
-            to_type: parent_type,
+            to_type: GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(parent_type)),
             description,
             selection_set,
             definition_path: definition_file_path,

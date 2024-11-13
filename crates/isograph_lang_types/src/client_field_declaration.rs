@@ -46,7 +46,7 @@ pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
 pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
     pub const_export_name: ConstExportName,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
-    pub to_type: WithSpan<UnvalidatedTypeName>,
+    pub to_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     pub client_pointer_name: WithSpan<ClientPointerFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
