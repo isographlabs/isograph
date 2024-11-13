@@ -11,12 +11,11 @@ fn main() {
         current_epoch: 0,
         nodes: HashMap::new(),
     };
-    let mut view = database.create_view();
 
     let path = PathBuf::from("demos/github-demo/schema.graphql");
 
-    let _ = view.calculate("read_and_parse_schema", path, |nested_view, param| {
-        let schema = nested_view.calculate("read_schema", param, |_, param2| {
+    let _ = database.calculate("read_and_parse_schema", path, |db, param| {
+        let schema = db.calculate("read_schema", param, |_, param2| {
             let content = read_schema_file(&param2).unwrap();
             let schema_text_source = TextSource {
                 path: param2
@@ -30,5 +29,4 @@ fn main() {
         });
         schema
     });
-    println!("{:?}", database)
 }
