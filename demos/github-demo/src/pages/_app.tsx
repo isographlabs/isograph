@@ -21,6 +21,11 @@ function makeNetworkRequest<T>(
     const json = await response.json();
 
     if (response.ok) {
+      if (json.errors != null) {
+        throw new Error('GraphQLError', {
+          cause: json.errors,
+        });
+      }
       return json;
     } else {
       throw new Error('NetworkError', {

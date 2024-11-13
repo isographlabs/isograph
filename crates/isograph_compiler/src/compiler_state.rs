@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 
 use graphql_artifact_generation::get_artifact_path_and_content;
-use isograph_config::{create_config, CompilerConfig};
+use isograph_config::{
+    create_config, CompilerConfig, GenerateFileExtensionsOption, OptionalValidationLevel,
+};
 use isograph_schema::{Schema, UnvalidatedSchema};
 
 use crate::{
@@ -79,8 +81,12 @@ impl CompilerState {
     pub fn batch_compile(self) -> Result<CompilationStats, BatchCompileError> {
         let source_files = SourceFiles::read_and_parse_all_files(&self.config)?;
         let stats = source_files.contains_iso.stats();
-        let total_artifacts_written =
-            validate_and_create_artifacts_from_source_files(source_files, &self.config)?;
+        let total_artifacts_written = validate_and_create_artifacts_from_source_files(
+            source_files,
+            &self.config,
+            self.config.options.generate_file_extensions,
+            self.config.options.on_missing_babel_transform,
+        )?;
         Ok(CompilationStats {
             client_field_count: stats.client_field_count,
             entrypoint_count: stats.entrypoint_count,
@@ -92,8 +98,12 @@ impl CompilerState {
         let source_files = SourceFiles::read_and_parse_all_files(&self.config)?;
         let stats = source_files.contains_iso.stats();
         self.source_files = Some(source_files.clone());
-        let total_artifacts_written =
-            validate_and_create_artifacts_from_source_files(source_files, &self.config)?;
+        let total_artifacts_written = validate_and_create_artifacts_from_source_files(
+            source_files,
+            &self.config,
+            self.config.options.generate_file_extensions,
+            self.config.options.on_missing_babel_transform,
+        )?;
         Ok(CompilationStats {
             client_field_count: stats.client_field_count,
             entrypoint_count: stats.entrypoint_count,
@@ -107,8 +117,12 @@ impl CompilerState {
     ) -> Result<CompilationStats, BatchCompileError> {
         let source_files = self.update_and_clone_source_files(changes)?;
         let stats = source_files.contains_iso.stats();
-        let total_artifacts_written =
-            validate_and_create_artifacts_from_source_files(source_files, &self.config)?;
+        let total_artifacts_written = validate_and_create_artifacts_from_source_files(
+            source_files,
+            &self.config,
+            self.config.options.generate_file_extensions,
+            self.config.options.on_missing_babel_transform,
+        )?;
         Ok(CompilationStats {
             client_field_count: stats.client_field_count,
             entrypoint_count: stats.entrypoint_count,
@@ -137,6 +151,8 @@ impl CompilerState {
 pub fn validate_and_create_artifacts_from_source_files(
     source_files: SourceFiles,
     config: &CompilerConfig,
+    file_extensions: GenerateFileExtensionsOption,
+    on_missing_babel_transform: OptionalValidationLevel,
 ) -> Result<usize, BatchCompileError> {
     // Create schema
     let mut unvalidated_schema = UnvalidatedSchema::new();
@@ -152,6 +168,8 @@ pub fn validate_and_create_artifacts_from_source_files(
         &validated_schema,
         &config.project_root,
         &config.artifact_directory,
+        file_extensions,
+        on_missing_babel_transform,
     );
 
     let total_artifacts_written = write_artifacts_to_disk(artifacts, &config.artifact_directory)?;

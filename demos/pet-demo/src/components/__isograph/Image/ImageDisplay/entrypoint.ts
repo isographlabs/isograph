@@ -55,8 +55,12 @@ const artifact: IsographEntrypoint<
   Image__ImageDisplay__output_type
 > = {
   kind: "Entrypoint",
-  queryText,
-  normalizationAst,
+  networkRequestInfo: {
+    kind: "NetworkRequestInfo",
+    queryText,
+    normalizationAst,
+  },
+  concreteType: "Query",
   readerWithRefetchQueries: {
     kind: "ReaderWithRefetchQueries",
     nestedRefetchQueries,

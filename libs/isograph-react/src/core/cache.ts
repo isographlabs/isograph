@@ -12,6 +12,7 @@ import {
   DataTypeValue,
   getLink,
   FragmentSubscription,
+  type TypeName,
 } from './IsographEnvironment';
 import {
   IsographEntrypoint,
@@ -35,7 +36,7 @@ import { wrapResolvedValue } from './PromiseWrapper';
 import { logMessage } from './logging';
 import { DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
 
-const TYPENAME_FIELD_NAME = '__typename';
+export const TYPENAME_FIELD_NAME = '__typename';
 
 export function getOrCreateItemInSuspenseCache<
   TReadFromStore extends { parameters: object; data: object },
@@ -90,7 +91,9 @@ export function getOrCreateCacheForArtifact<
   variables: ExtractParameters<TReadFromStore>,
   fetchOptions?: FetchOptions,
 ): ParentCache<FragmentReference<TReadFromStore, TClientFieldValue>> {
-  const cacheKey = entrypoint.queryText + JSON.stringify(stableCopy(variables));
+  const cacheKey =
+    entrypoint.networkRequestInfo.queryText +
+    JSON.stringify(stableCopy(variables));
   const factory = () => {
     const shouldFetch = fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE;
     const [networkRequest, disposeNetworkRequest] = maybeMakeNetworkRequest(
@@ -111,7 +114,7 @@ export function getOrCreateCacheForArtifact<
           nestedRefetchQueries:
             entrypoint.readerWithRefetchQueries.nestedRefetchQueries,
         }),
-        root: { __link: ROOT_ID },
+        root: { __link: ROOT_ID, __typename: entrypoint.concreteType },
         variables,
         networkRequest: networkRequest,
       },
@@ -135,6 +138,7 @@ export type NetworkResponseObject = {
   // undefined should not *actually* be present in the network response.
   [index: string]: undefined | NetworkResponseValue;
   id?: DataId;
+  __typename?: TypeName;
 };
 
 export function normalizeData(
@@ -143,8 +147,9 @@ export function normalizeData(
   networkResponse: NetworkResponseObject,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
-): Set<DataId> {
-  const encounteredIds = new Set<DataId>();
+  root: Link,
+): EncounteredIds {
+  const encounteredIds: EncounteredIds = new Map();
 
   logMessage(environment, {
     kind: 'AboutToNormalize',
@@ -152,13 +157,17 @@ export function normalizeData(
     networkResponse,
     variables,
   });
+
+  const recordsById = (environment.store[root.__typename] ??= {});
+  const newStoreRecord = (recordsById[root.__link] ??= {});
+
   normalizeDataIntoRecord(
     environment,
     normalizationAst,
     networkResponse,
-    environment.store.__ROOT,
-    { __link: ROOT_ID },
-    variables as any,
+    newStoreRecord,
+    root,
+    variables,
     nestedRefetchQueries,
     encounteredIds,
   );
@@ -253,7 +262,7 @@ function withErrorHandling<T>(f: (t: T) => void): (t: T) => void {
 
 function callSubscriptions(
   environment: IsographEnvironment,
-  recordsEncounteredWhenNormalizing: Set<DataId>,
+  recordsEncounteredWhenNormalizing: EncounteredIds,
 ) {
   environment.subscriptions.forEach(
     withErrorHandling((subscription) => {
@@ -316,9 +325,9 @@ function callSubscriptions(
         }
         case 'AnyChangesToRecord': {
           if (
-            recordsEncounteredWhenNormalizing.has(
-              subscription.recordLink.__link,
-            )
+            recordsEncounteredWhenNormalizing
+              .get(subscription.recordLink.__typename)
+              ?.has(subscription.recordLink.__link)
           ) {
             subscription.callback();
           }
@@ -335,7 +344,25 @@ function callSubscriptions(
   );
 }
 
-function hasOverlappingIds(set1: Set<DataId>, set2: Set<DataId>): boolean {
+function hasOverlappingIds(
+  ids1: EncounteredIds,
+  ids2: EncounteredIds,
+): boolean {
+  for (const [typeName, set1] of ids1.entries()) {
+    const set2 = ids2.get(typeName);
+    if (set2 === undefined) {
+      continue;
+    }
+
+    if (isNotDisjointFrom(set1, set2)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// TODO use a polyfill library
+function isNotDisjointFrom<T>(set1: Set<T>, set2: Set<T>): boolean {
   for (const id of set1) {
     if (set2.has(id)) {
       return true;
@@ -344,6 +371,7 @@ function hasOverlappingIds(set1: Set<DataId>, set2: Set<DataId>): boolean {
   return false;
 }
 
+export type EncounteredIds = Map<TypeName, Set<DataId>>;
 /**
  * Mutate targetParentRecord according to the normalizationAst and networkResponseParentRecord.
  */
@@ -355,7 +383,7 @@ function normalizeDataIntoRecord(
   targetParentRecordLink: Link,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
-  mutableEncounteredIds: Set<DataId>,
+  mutableEncounteredIds: EncounteredIds,
 ): RecordHasBeenUpdated {
   let recordHasBeenUpdated = false;
   for (const normalizationNode of normalizationAst) {
@@ -410,9 +438,23 @@ function normalizeDataIntoRecord(
     }
   }
   if (recordHasBeenUpdated) {
-    mutableEncounteredIds.add(targetParentRecordLink.__link);
+    let encounteredRecordsIds = insertIfNotExists(
+      mutableEncounteredIds,
+      targetParentRecordLink.__typename,
+    );
+
+    encounteredRecordsIds.add(targetParentRecordLink.__link);
   }
   return recordHasBeenUpdated;
+}
+
+export function insertIfNotExists<K, V>(map: Map<K, Set<V>>, key: K) {
+  let result = map.get(key);
+  if (result === undefined) {
+    result = new Set();
+    map.set(key, result);
+  }
+  return result;
 }
 
 type RecordHasBeenUpdated = boolean;
@@ -449,7 +491,7 @@ function normalizeLinkedField(
   targetParentRecordLink: Link,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
-  mutableEncounteredIds: Set<DataId>,
+  mutableEncounteredIds: EncounteredIds,
 ): RecordHasBeenUpdated {
   const networkResponseKey = getNetworkResponseKey(astNode);
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
@@ -490,7 +532,18 @@ function normalizeLinkedField(
         mutableEncounteredIds,
       );
 
-      dataIds.push({ __link: newStoreRecordId });
+      const __typename =
+        astNode.concreteType ?? networkResponseObject[TYPENAME_FIELD_NAME];
+      if (__typename == null) {
+        throw new Error(
+          'Unexpected missing __typename in network response when normalizing a linked field. ' +
+            'This is indicative of a bug in Isograph.',
+        );
+      }
+      dataIds.push({
+        __link: newStoreRecordId,
+        __typename,
+      });
     }
     targetParentRecord[parentRecordKey] = dataIds;
     return !dataIdsAreTheSame(existingValue, dataIds);
@@ -506,11 +559,23 @@ function normalizeLinkedField(
       mutableEncounteredIds,
     );
 
+    let __typename =
+      astNode.concreteType ?? networkResponseData[TYPENAME_FIELD_NAME];
+
+    if (__typename == null) {
+      throw new Error(
+        'Unexpected missing __typename in network response when normalizing a linked field. ' +
+          'This is indicative of a bug in Isograph.',
+      );
+    }
+
     targetParentRecord[parentRecordKey] = {
       __link: newStoreRecordId,
+      __typename,
     };
+
     const link = getLink(existingValue);
-    return link?.__link !== newStoreRecordId;
+    return link?.__link !== newStoreRecordId || link.__typename !== __typename;
   }
 }
 
@@ -525,7 +590,7 @@ function normalizeInlineFragment(
   targetParentRecordLink: Link,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
-  mutableEncounteredIds: Set<DataId>,
+  mutableEncounteredIds: EncounteredIds,
 ): RecordHasBeenUpdated {
   const typeToRefineTo = astNode.type;
   if (networkResponseParentRecord[TYPENAME_FIELD_NAME] === typeToRefineTo) {
@@ -554,7 +619,10 @@ function dataIdsAreTheSame(
     }
     for (let i = 0; i < newDataIds.length; i++) {
       const maybeLink = getLink(existingValue[i]);
-      if (newDataIds[i]?.__link !== maybeLink?.__link) {
+      if (
+        newDataIds[i]?.__link !== maybeLink?.__link ||
+        newDataIds[i]?.__typename !== maybeLink?.__typename
+      ) {
         return false;
       }
     }
@@ -572,7 +640,7 @@ function normalizeNetworkResponseObject(
   variables: Variables,
   index: number | null,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
-  mutableEncounteredIds: Set<DataId>,
+  mutableEncounteredIds: EncounteredIds,
 ): DataId /* The id of the modified or newly created item */ {
   const newStoreRecordId = getDataIdOfNetworkResponse(
     targetParentRecordLink,
@@ -581,16 +649,25 @@ function normalizeNetworkResponseObject(
     variables,
     index,
   );
+  const __typename =
+    astNode.concreteType ?? networkResponseData[TYPENAME_FIELD_NAME];
 
-  const newStoreRecord = environment.store[newStoreRecordId] ?? {};
-  environment.store[newStoreRecordId] = newStoreRecord;
+  if (__typename == null) {
+    throw new Error(
+      'Unexpected missing __typename in network response object. ' +
+        'This is indicative of a bug in Isograph.',
+    );
+  }
+
+  const recordsById = (environment.store[__typename] ??= {});
+  const newStoreRecord = (recordsById[newStoreRecordId] ??= {});
 
   normalizeDataIntoRecord(
     environment,
     astNode.selections,
     networkResponseData,
     newStoreRecord,
-    { __link: newStoreRecordId },
+    { __link: newStoreRecordId, __typename: __typename },
     variables,
     nestedRefetchQueries,
     mutableEncounteredIds,
@@ -724,10 +801,16 @@ export const SECOND_SPLIT_KEY = '___';
 function getDataIdOfNetworkResponse(
   parentRecordLink: Link,
   dataToNormalize: NetworkResponseObject,
-  astNode: NormalizationLinkedField | NormalizationScalarField,
+  astNode: NormalizationLinkedField,
   variables: Variables,
   index: number | null,
 ): DataId {
+  // If we are dealing with nested Query, use __ROOT as id
+  // TODO do not hard code this value here
+  if (astNode.concreteType === 'Query') {
+    return ROOT_ID;
+  }
+
   // Check whether the dataToNormalize has an id field. If so, that is the key.
   // If not, we construct an id from the parentRecordId and the field parameters.
 
@@ -736,7 +819,7 @@ function getDataIdOfNetworkResponse(
     return dataId;
   }
 
-  let storeKey = `${parentRecordLink.__link}.${astNode.fieldName}`;
+  let storeKey = `${parentRecordLink.__typename}:${parentRecordLink.__link}.${astNode.fieldName}`;
   if (index != null) {
     storeKey += `.${index}`;
   }

@@ -10,10 +10,10 @@ use graphql_lang_types::{
 };
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
-    ClientFieldDeclaration, ClientFieldDeclarationWithUnvalidatedDirectives, ConstantValue,
-    EntrypointTypeAndField, IsographFieldDirective, LinkedFieldSelection, NonConstantValue,
-    ScalarFieldSelection, Selection, SelectionFieldArgument, ServerFieldSelection,
-    UnvalidatedSelectionWithUnvalidatedDirectives, Unwrap, VariableDefinition,
+    ClientFieldDeclaration, ClientFieldDeclarationWithUnvalidatedDirectives,
+    ClientPointerDeclaration, ConstantValue, EntrypointTypeAndField, IsographFieldDirective,
+    LinkedFieldSelection, NonConstantValue, ScalarFieldSelection, SelectionFieldArgument,
+    ServerFieldSelection, UnvalidatedSelectionWithUnvalidatedDirectives, VariableDefinition,
 };
 
 use crate::{
@@ -23,6 +23,7 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IsoLiteralExtractionResult {
+    ClientPointerDeclaration(WithSpan<ClientPointerDeclaration<(), ()>>),
     ClientFieldDeclaration(WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>),
     EntrypointDeclaration(WithSpan<EntrypointTypeAndField>),
 }
@@ -33,7 +34,7 @@ pub fn parse_iso_literal(
     const_export_name: Option<&str>,
     text_source: TextSource,
 ) -> Result<IsoLiteralExtractionResult, WithLocation<IsographLiteralParseError>> {
-    let mut tokens = PeekableLexer::new(iso_literal_text, text_source);
+    let mut tokens = PeekableLexer::new(iso_literal_text);
     let discriminator = tokens
         .parse_source_of_kind(IsographLangTokenKind::Identifier)
         .map_err(|with_span| with_span.map(IsographLiteralParseError::from))
@@ -51,8 +52,17 @@ pub fn parse_iso_literal(
                 discriminator.span,
             )?,
         )),
+        "pointer" => Ok(IsoLiteralExtractionResult::ClientPointerDeclaration(
+            parse_iso_client_pointer_declaration(
+                &mut tokens,
+                definition_file_path,
+                const_export_name,
+                text_source,
+                discriminator.span,
+            )?,
+        )),
         _ => Err(WithLocation::new(
-            IsographLiteralParseError::ExpectedFieldOrEntrypoint,
+            IsographLiteralParseError::ExpectedFieldOrPointerOrEntrypoint,
             Location::new(text_source, discriminator.span),
         )),
     }
@@ -146,7 +156,7 @@ fn parse_client_field_declaration_inner(
 
         let description = parse_optional_description(tokens);
 
-        let (selection_set, unwraps) = parse_selection_set_and_unwraps(tokens, text_source)?;
+        let selection_set = parse_selection_set(tokens, text_source)?;
 
         let const_export_name = const_export_name.ok_or_else(|| {
             WithSpan::new(
@@ -168,7 +178,6 @@ fn parse_client_field_declaration_inner(
             client_field_name,
             description,
             selection_set,
-            unwraps,
             definition_path: definition_file_path,
             directives,
             const_export_name: const_export_name.intern().into(),
@@ -179,23 +188,92 @@ fn parse_client_field_declaration_inner(
     })
 }
 
+fn parse_iso_client_pointer_declaration(
+    tokens: &mut PeekableLexer<'_>,
+    definition_file_path: FilePath,
+    const_export_name: Option<&str>,
+    text_source: TextSource,
+    field_keyword_span: Span,
+) -> ParseResultWithLocation<WithSpan<ClientPointerDeclaration<(), ()>>> {
+    let client_pointer_declaration = parse_client_pointer_declaration_inner(
+        tokens,
+        definition_file_path,
+        const_export_name,
+        text_source,
+        field_keyword_span,
+    )
+    .map_err(|with_span| with_span.to_with_location(text_source))?;
+
+    if let Some(span) = tokens.remaining_token_span() {
+        return Err(WithLocation::new(
+            IsographLiteralParseError::LeftoverTokens,
+            Location::new(text_source, span),
+        ));
+    }
+
+    Ok(client_pointer_declaration)
+}
+
+fn parse_client_pointer_declaration_inner(
+    tokens: &mut PeekableLexer<'_>,
+    definition_file_path: FilePath,
+    const_export_name: Option<&str>,
+    text_source: TextSource,
+    pointer_keyword_span: Span,
+) -> ParseResultWithSpan<WithSpan<ClientPointerDeclaration<(), ()>>> {
+    tokens.with_span(|tokens| {
+        let parent_type = tokens
+            .parse_string_key_type(IsographLangTokenKind::Identifier)
+            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+
+        let dot = tokens
+            .parse_token_of_kind(IsographLangTokenKind::Period)
+            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+
+        let client_pointer_name: WithSpan<ScalarFieldName> = tokens
+            .parse_string_key_type(IsographLangTokenKind::Identifier)
+            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+
+        let variable_definitions = parse_variable_definitions(tokens, text_source)?;
+
+        let description = parse_optional_description(tokens);
+
+        let selection_set = parse_selection_set(tokens, text_source)?;
+
+        let const_export_name = const_export_name.ok_or_else(|| {
+            WithSpan::new(
+                IsographLiteralParseError::ExpectedLiteralToBeExported {
+                    suggested_const_export_name: client_pointer_name.item,
+                },
+                Span::todo_generated(),
+            )
+        })?;
+
+        Ok(ClientPointerDeclaration {
+            parent_type,
+            client_pointer_name,
+            description,
+            selection_set,
+            definition_path: definition_file_path,
+            const_export_name: const_export_name.intern().into(),
+            variable_definitions,
+            pointer_keyword: WithSpan::new((), pointer_keyword_span),
+            dot: dot.map(|_| ()),
+        })
+    })
+}
+
 // Note: for now, top-level selection sets are required
 //
 // TODO: perform some refactor to make type easier to read.
 #[allow(clippy::type_complexity)]
-fn parse_selection_set_and_unwraps(
+fn parse_selection_set(
     tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
-) -> ParseResultWithSpan<(
-    Vec<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>>,
-    Vec<WithSpan<Unwrap>>,
-)> {
+) -> ParseResultWithSpan<Vec<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>>> {
     let selection_set = parse_optional_selection_set(tokens, text_source)?;
     match selection_set {
-        Some(selection_set) => {
-            let unwraps = parse_unwraps(tokens);
-            Ok((selection_set, unwraps))
-        }
+        Some(selection_set) => Ok(selection_set),
         None => Err(WithSpan::new(
             IsographLiteralParseError::ExpectedSelectionSet,
             Span::new(0, 0),
@@ -220,24 +298,20 @@ fn parse_optional_selection_set(
         .is_err()
     {
         let selection = parse_selection(tokens, text_source)?;
-        match &selection.item {
-            Selection::ServerField(server_field_selection) => {
-                let selection_name_or_alias = server_field_selection.name_or_alias().item;
-                if !encountered_names_or_aliases.insert(selection_name_or_alias) {
-                    // We have already encountered this name or alias, so we emit
-                    // an error.
-                    // TODO should SelectionSet be a HashMap<FieldNameOrAlias, ...> instead of
-                    // a Vec??
-                    // TODO find a way to include the location of the previous field with matching
-                    // name or alias
-                    return Err(WithSpan::new(
-                        IsographLiteralParseError::DuplicateNameOrAlias {
-                            name_or_alias: selection_name_or_alias,
-                        },
-                        selection.span,
-                    ));
-                }
-            }
+        let selection_name_or_alias = selection.item.name_or_alias().item;
+        if !encountered_names_or_aliases.insert(selection_name_or_alias) {
+            // We have already encountered this name or alias, so we emit
+            // an error.
+            // TODO should SelectionSet be a HashMap<FieldNameOrAlias, ...> instead of
+            // a Vec??
+            // TODO find a way to include the location of the previous field with matching
+            // name or alias
+            return Err(WithSpan::new(
+                IsographLiteralParseError::DuplicateNameOrAlias {
+                    name_or_alias: selection_name_or_alias,
+                },
+                selection.span,
+            ));
         }
         selections.push(selection);
     }
@@ -314,37 +388,26 @@ fn parse_selection(
         // If we encounter a selection set, we are parsing a linked field. Otherwise, a scalar field.
         let selection_set = parse_optional_selection_set(tokens, text_source)?;
 
-        let unwraps = parse_unwraps(tokens);
-
         let directives = parse_directives(tokens, text_source)?;
 
-        // commas are required
         parse_comma_line_break_or_curly(tokens)?;
 
         let selection = match selection_set {
-            Some(selection_set) => {
-                Selection::ServerField(ServerFieldSelection::LinkedField(LinkedFieldSelection {
-                    name: field_name.map(|string_key| string_key.into()),
-                    reader_alias: alias
-                        .map(|with_span| with_span.map(|string_key| string_key.into())),
-                    associated_data: (),
-                    selection_set,
-                    unwraps,
-                    arguments,
-                    directives,
-                }))
-            }
-            None => {
-                Selection::ServerField(ServerFieldSelection::ScalarField(ScalarFieldSelection {
-                    name: field_name.map(|string_key| string_key.into()),
-                    reader_alias: alias
-                        .map(|with_span| with_span.map(|string_key| string_key.into())),
-                    associated_data: (),
-                    unwraps,
-                    arguments,
-                    directives,
-                }))
-            }
+            Some(selection_set) => ServerFieldSelection::LinkedField(LinkedFieldSelection {
+                name: field_name.map(|string_key| string_key.into()),
+                reader_alias: alias.map(|with_span| with_span.map(|string_key| string_key.into())),
+                associated_data: (),
+                selection_set,
+                arguments,
+                directives,
+            }),
+            None => ServerFieldSelection::ScalarField(ScalarFieldSelection {
+                name: field_name.map(|string_key| string_key.into()),
+                reader_alias: alias.map(|with_span| with_span.map(|string_key| string_key.into())),
+                associated_data: (),
+                arguments,
+                directives,
+            }),
         };
         Ok(selection)
     })
@@ -368,15 +431,6 @@ fn parse_optional_alias_and_field_name(
         (field_name_or_alias, None)
     };
     Ok((field_name, alias))
-}
-
-fn parse_unwraps(tokens: &mut PeekableLexer) -> Vec<WithSpan<Unwrap>> {
-    // TODO support _, etc.
-    let mut unwraps = vec![];
-    while let Ok(token) = tokens.parse_token_of_kind(IsographLangTokenKind::Exclamation) {
-        unwraps.push(token.map(|_| Unwrap::ActualUnwrap))
-    }
-    unwraps
 }
 
 fn parse_directives(
@@ -637,21 +691,13 @@ fn from_control_flow<T, E>(control_flow: impl FnOnce() -> ControlFlow<T, E>) -> 
 
 #[cfg(test)]
 mod test {
-    use common_lang_types::TextSource;
-    use intern::string_key::Intern;
 
     use crate::{IsographLangTokenKind, PeekableLexer};
 
     #[test]
     fn parse_literal_tests() {
         let source = "\"Description\" Query.foo { bar, baz, }";
-        let mut lexer = PeekableLexer::new(
-            source,
-            TextSource {
-                path: "path".intern().into(),
-                span: None,
-            },
-        );
+        let mut lexer = PeekableLexer::new(source);
 
         loop {
             let token = lexer.parse_token();

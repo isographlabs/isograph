@@ -1,12 +1,11 @@
 use std::path::PathBuf;
 
 use serde::Deserialize;
+use tracing::warn;
 
 pub static ISOGRAPH_FOLDER: &str = "__isograph";
 
 use std::error::Error;
-
-use colorize::AnsiColor;
 
 #[derive(Debug, Clone)]
 pub struct CompilerConfig {
@@ -28,6 +27,24 @@ pub struct CompilerConfig {
 #[derive(Default, Debug, Clone, Copy)]
 pub struct ConfigOptions {
     pub on_invalid_id_type: OptionalValidationLevel,
+    pub on_missing_babel_transform: OptionalValidationLevel,
+    pub generate_file_extensions: GenerateFileExtensionsOption,
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+pub enum GenerateFileExtensionsOption {
+    IncludeExtensionsInFileImports,
+    #[default]
+    ExcludeExtensionsInFileImports,
+}
+
+impl GenerateFileExtensionsOption {
+    pub fn ts(&self) -> &str {
+        match self {
+            GenerateFileExtensionsOption::ExcludeExtensionsInFileImports => "",
+            GenerateFileExtensionsOption::IncludeExtensionsInFileImports => ".ts",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -49,9 +66,7 @@ impl OptionalValidationLevel {
             OptionalValidationLevel::Ignore => Ok(()),
             OptionalValidationLevel::Warn => {
                 let warning = on_error();
-                // TODO pass to some sort of warning gatherer, this is weird!
-                // The fact that we know about colorize here is weird!
-                eprintln!("{}\n{}\n", "Warning:".yellow(), warning);
+                warn!("{warning}");
                 Ok(())
             }
             OptionalValidationLevel::Error => Err(on_error()),
@@ -168,6 +183,8 @@ pub fn create_config(config_location: PathBuf) -> CompilerConfig {
 #[serde(default, deny_unknown_fields)]
 struct ConfigFileOptions {
     on_invalid_id_type: ConfigFileOptionalValidationLevel,
+    on_missing_babel_transform: ConfigFileOptionalValidationLevel,
+    include_file_extensions_in_import_statements: bool,
 }
 
 #[derive(Deserialize, Debug, Clone, Copy)]
@@ -190,6 +207,12 @@ impl Default for ConfigFileOptionalValidationLevel {
 fn create_options(options: ConfigFileOptions) -> ConfigOptions {
     ConfigOptions {
         on_invalid_id_type: create_optional_validation_level(options.on_invalid_id_type),
+        on_missing_babel_transform: create_optional_validation_level(
+            options.on_missing_babel_transform,
+        ),
+        generate_file_extensions: create_generate_file_extensions(
+            options.include_file_extensions_in_import_statements,
+        ),
     }
 }
 
@@ -200,5 +223,14 @@ fn create_optional_validation_level(
         ConfigFileOptionalValidationLevel::Ignore => OptionalValidationLevel::Ignore,
         ConfigFileOptionalValidationLevel::Warn => OptionalValidationLevel::Warn,
         ConfigFileOptionalValidationLevel::Error => OptionalValidationLevel::Error,
+    }
+}
+
+fn create_generate_file_extensions(
+    optional_generate_file_extensions: bool,
+) -> GenerateFileExtensionsOption {
+    match optional_generate_file_extensions {
+        true => GenerateFileExtensionsOption::IncludeExtensionsInFileImports,
+        false => GenerateFileExtensionsOption::ExcludeExtensionsInFileImports,
     }
 }

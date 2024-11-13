@@ -2,6 +2,7 @@ import { describe, test, expect } from 'vitest';
 import {
   ROOT_ID,
   createIsographEnvironment,
+  type IsographStore,
 } from '../core/IsographEnvironment';
 import {
   garbageCollectEnvironment,
@@ -10,32 +11,37 @@ import {
 import { iso } from './__isograph/iso';
 import { nodeFieldRetainedQuery } from './nodeQuery';
 
-const getDefaultStore = () => ({
-  [ROOT_ID]: {
-    me: { __link: '0' },
-    you: { __link: '1' },
-    node____id___0: {
-      __link: '0',
+const getDefaultStore = (): IsographStore => ({
+  Query: {
+    [ROOT_ID]: {
+      me: { __link: '0', __typename: 'Economist' },
+      you: { __link: '1', __typename: 'Economist' },
+      node____id___0: {
+        __link: '0',
+        __typename: 'Economist',
+      },
     },
   },
-  0: {
-    __typename: 'Economist',
-    id: '0',
-    name: 'Jeremy Bentham',
-    successor: { __link: '1' },
-  },
-  1: {
-    __typename: 'Economist',
-    id: '1',
-    name: 'John Stuart Mill',
-    predecessor: { __link: '0' },
-    successor: { __link: '2' },
-  },
-  2: {
-    __typename: 'Economist',
-    id: '2',
-    name: 'Henry Sidgwick',
-    predecessor: { __link: '1' },
+  Economist: {
+    0: {
+      __typename: 'Economist',
+      id: '0',
+      name: 'Jeremy Bentham',
+      successor: { __link: '1', __typename: 'Economist' },
+    },
+    1: {
+      __typename: 'Economist',
+      id: '1',
+      name: 'John Stuart Mill',
+      predecessor: { __link: '0', __typename: 'Economist' },
+      successor: { __link: '2', __typename: 'Economist' },
+    },
+    2: {
+      __typename: 'Economist',
+      id: '2',
+      name: 'Henry Sidgwick',
+      predecessor: { __link: '1', __typename: 'Economist' },
+    },
   },
 });
 
@@ -49,8 +55,9 @@ export const meNameField = iso(`
 import { meNameSuccessorRetainedQuery } from './meNameSuccessor';
 const meNameEntrypoint = iso(`entrypoint Query.meName`);
 const meNameRetainedQuery = {
-  normalizationAst: meNameEntrypoint.normalizationAst,
+  normalizationAst: meNameEntrypoint.networkRequestInfo.normalizationAst,
   variables: {},
+  root: { __link: ROOT_ID, __typename: 'Query' },
 };
 
 describe('garbage collection', () => {
@@ -62,13 +69,13 @@ describe('garbage collection', () => {
       null as any,
     );
 
-    expect(store[1]).not.toBe(undefined);
+    expect(store.Economist?.[1]).not.toBe(undefined);
 
     // TODO enable babel so we don't have to do this
     retainQuery(environment, meNameRetainedQuery);
     garbageCollectEnvironment(environment);
 
-    expect(store[1]).toBe(undefined);
+    expect(store.Economist?.[1]).toBe(undefined);
   });
 
   test('Referenced records should not be garbage collected', () => {
@@ -79,13 +86,13 @@ describe('garbage collection', () => {
       null as any,
     );
 
-    expect(store[0]).not.toBe(undefined);
+    expect(store.Economist?.[0]).not.toBe(undefined);
 
     // TODO enable babel so we don't have to do this
     retainQuery(environment, meNameRetainedQuery);
     garbageCollectEnvironment(environment);
 
-    expect(store[0]).not.toBe(undefined);
+    expect(store.Economist?.[0]).not.toBe(undefined);
   });
 
   test('Referenced records should not be garbage collected, and this should work with variables', () => {
@@ -96,12 +103,12 @@ describe('garbage collection', () => {
       null as any,
     );
 
-    expect(store[0]).not.toBe(undefined);
+    expect(store.Economist?.[0]).not.toBe(undefined);
 
     retainQuery(environment, nodeFieldRetainedQuery);
     garbageCollectEnvironment(environment);
 
-    expect(store[0]).not.toBe(undefined);
+    expect(store.Economist?.[0]).not.toBe(undefined);
   });
 
   test('Referenced records should not be garbage collected, and this should work through multiple levels', () => {
@@ -115,12 +122,12 @@ describe('garbage collection', () => {
     retainQuery(environment, meNameSuccessorRetainedQuery);
     garbageCollectEnvironment(environment);
 
-    expect(store[0]).not.toBe(undefined);
-    expect(store[1]).not.toBe(undefined);
-    expect(store[2]).not.toBe(undefined);
+    expect(store.Economist?.[0]).not.toBe(undefined);
+    expect(store.Economist?.[1]).not.toBe(undefined);
+    expect(store.Economist?.[2]).not.toBe(undefined);
   });
 
-  test('ROOT_ID should not be garbage collected, even if there are no retained queries', () => {
+  test('ROOT_ID should be garbage collected, if there are no retained queries', () => {
     const store = getDefaultStore();
     const environment = createIsographEnvironment(
       store,
@@ -129,7 +136,7 @@ describe('garbage collection', () => {
     );
     garbageCollectEnvironment(environment);
 
-    expect(store[ROOT_ID]).not.toBe(undefined);
-    expect(store[0]).toBe(undefined);
+    expect(store.Query?.[ROOT_ID]).toBe(undefined);
+    expect(store.Economist?.[0]).toBe(undefined);
   });
 });

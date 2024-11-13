@@ -10,12 +10,14 @@ const queryText = 'query NewsfeedPaginationComponent ($skip: Int!, $limit: Int!,
       __typename,\
       id,\
       newsfeed____skip___v_skip____limit___v_limit: newsfeed(skip: $skip, limit: $limit) {\
-        id,\
-        adItem {\
+        __typename,\
+        ... on AdItem {\
           id,\
+          __typename,\
         },\
-        blogItem {\
+        ... on BlogItem {\
           id,\
+          __typename,\
           author,\
           content,\
           image {\
@@ -68,35 +70,41 @@ const normalizationAst: NormalizationAst = [
                 { kind: "Variable", name: "limit" },
               ],
             ],
-            concreteType: "NewsfeedItem",
+            concreteType: null,
             selections: [
               {
                 kind: "Scalar",
-                fieldName: "id",
+                fieldName: "__typename",
                 arguments: null,
               },
               {
-                kind: "Linked",
-                fieldName: "adItem",
-                arguments: null,
-                concreteType: "AdItem",
+                kind: "InlineFragment",
+                type: "AdItem",
                 selections: [
                   {
                     kind: "Scalar",
                     fieldName: "id",
                     arguments: null,
                   },
+                  {
+                    kind: "Scalar",
+                    fieldName: "__typename",
+                    arguments: null,
+                  },
                 ],
               },
               {
-                kind: "Linked",
-                fieldName: "blogItem",
-                arguments: null,
-                concreteType: "BlogItem",
+                kind: "InlineFragment",
+                type: "BlogItem",
                 selections: [
                   {
                     kind: "Scalar",
                     fieldName: "id",
+                    arguments: null,
+                  },
+                  {
+                    kind: "Scalar",
+                    fieldName: "__typename",
                     arguments: null,
                   },
                   {
@@ -141,8 +149,12 @@ const artifact: IsographEntrypoint<
   Viewer__NewsfeedPaginationComponent__output_type
 > = {
   kind: "Entrypoint",
-  queryText,
-  normalizationAst,
+  networkRequestInfo: {
+    kind: "NetworkRequestInfo",
+    queryText,
+    normalizationAst,
+  },
+  concreteType: "Query",
   readerWithRefetchQueries: {
     kind: "ReaderWithRefetchQueries",
     nestedRefetchQueries,

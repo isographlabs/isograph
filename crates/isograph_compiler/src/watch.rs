@@ -9,6 +9,7 @@ use notify_debouncer_full::{
 };
 use std::{path::PathBuf, time::Duration};
 use tokio::{runtime::Handle, sync::mpsc::Receiver, task::JoinError};
+use tracing::info;
 
 use crate::{
     batch_compile::print_result, compiler_state::CompilerState, with_duration::WithDuration,
@@ -22,7 +23,7 @@ pub async fn handle_watch_command(
     let mut state = CompilerState::new(config_location);
     let (mut rx, mut watcher) = create_debounced_file_watcher(&state.config);
 
-    eprintln!("{}", "Starting to compile.".cyan());
+    info!("{}", "Starting to compile.".cyan());
     let _ = print_result(WithDuration::new(|| state.compile()));
 
     tokio::spawn(async move {
@@ -31,7 +32,7 @@ pub async fn handle_watch_command(
                 Ok(events) => {
                     if let Some(changes) = categorize_and_filter_events(&events, &state.config) {
                         let result = if has_config_changes(&changes) {
-                            eprintln!(
+                            info!(
                                 "{}",
                                 "Config change detected. Starting a full compilation.".cyan()
                             );
@@ -40,10 +41,10 @@ pub async fn handle_watch_command(
                             (rx, watcher) = create_debounced_file_watcher(&state.config);
                             WithDuration::new(|| state.compile())
                         } else if changes.len() < MAX_CHANGED_FILES {
-                            eprintln!("{}", "File changes detected. Starting to compile.".cyan());
+                            info!("{}", "File changes detected. Starting to compile.".cyan());
                             WithDuration::new(|| state.update(&changes))
                         } else {
-                            eprintln!(
+                            info!(
                                 "{}",
                                 "Too many changes. Starting a full compilation.".cyan()
                             );

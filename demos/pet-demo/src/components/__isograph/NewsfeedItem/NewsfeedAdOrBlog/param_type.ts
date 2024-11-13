@@ -3,10 +3,16 @@ import { type BlogItem__BlogItemDisplay__output_type } from '../../BlogItem/Blog
 
 export type NewsfeedItem__NewsfeedAdOrBlog__param = {
   readonly data: {
-    readonly adItem: ({
+    /**
+A client pointer for the AdItem type.
+    */
+    readonly asAdItem: ({
       readonly AdItemDisplayWrapper: AdItem__AdItemDisplayWrapper__output_type,
     } | null),
-    readonly blogItem: ({
+    /**
+A client pointer for the BlogItem type.
+    */
+    readonly asBlogItem: ({
       readonly BlogItemDisplay: BlogItem__BlogItemDisplay__output_type,
     } | null),
   },

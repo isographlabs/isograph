@@ -1,14 +1,12 @@
 import {
-  DataId,
-  Link,
-  StoreRecord,
-  defaultMissingFieldHandler,
   IsographEnvironmentProvider,
+  StoreRecord,
   createIsographEnvironment,
   createIsographStore,
+  type Link,
 } from '@isograph/react';
-import { useMemo } from 'react';
 import type { AppProps } from 'next/app';
+import { useMemo } from 'react';
 
 function makeNetworkRequest<T>(
   queryText: string,
@@ -24,6 +22,11 @@ function makeNetworkRequest<T>(
     const json = await response.json();
 
     if (response.ok) {
+      if (json.errors != null) {
+        throw new Error('GraphQLError', {
+          cause: json.errors,
+        });
+      }
       return json;
     } else {
       throw new Error('NetworkError', {
@@ -40,27 +43,16 @@ const missingFieldHandler = (
   arguments_: { [index: string]: any } | null,
   variables: { [index: string]: any } | null,
 ): Link | undefined => {
-  const val = defaultMissingFieldHandler(
-    storeRecord,
-    root,
-    fieldName,
-    arguments_,
-    variables,
-  );
-  if (val == undefined) {
-    // This is the custom missing field handler
-    //
-    // N.B. this **not** correct. We need to pass the correct variables/args here.
-    // But it works for this demo.
-    if (
-      fieldName === 'pet' &&
-      variables?.id != null &&
-      root.__link === '__ROOT'
-    ) {
-      return { __link: variables.id };
-    }
-  } else {
-    return val;
+  // This is the custom missing field handler
+  //
+  // N.B. this **not** correct. We need to pass the correct variables/args here.
+  // But it works for this demo.
+  if (
+    fieldName === 'pet' &&
+    variables?.id != null &&
+    root.__link === '__ROOT'
+  ) {
+    return { __link: variables.id, __typename: 'Pet' };
   }
 };
 

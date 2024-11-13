@@ -75,10 +75,10 @@ export function NewsfeedLoader() {
 
 export const NewsfeedAdOrBlog = iso(`
   field NewsfeedItem.NewsfeedAdOrBlog @component {
-    adItem {
+    asAdItem {
       AdItemDisplayWrapper
     }
-    blogItem {
+    asBlogItem {
       BlogItemDisplay
     }
   }
@@ -91,16 +91,16 @@ export const NewsfeedAdOrBlog = iso(`
       <CardContent>Loading...</CardContent>
     </Card>
   );
-  if (newsfeedItem.adItem != null) {
+  if (newsfeedItem.asAdItem != null) {
     return (
       <Suspense fallback={fallback}>
-        <newsfeedItem.adItem.AdItemDisplayWrapper
+        <newsfeedItem.asAdItem.AdItemDisplayWrapper
           onVisible={onVisible}
           index={index}
         />
       </Suspense>
     );
-  } else if (newsfeedItem.blogItem != null) {
+  } else if (newsfeedItem.asBlogItem != null) {
     // Why is BlogItem not fetched loadably, but AdItemDisplayWrapper is?
     // This is because there is currently a limitation in Isograph:
     // you cannot fetch the *data* for a client field as part of the parent
@@ -112,7 +112,7 @@ export const NewsfeedAdOrBlog = iso(`
     //
     // Fixing this is a priority, but will take some work.
     return (
-      <newsfeedItem.blogItem.BlogItemDisplay
+      <newsfeedItem.asBlogItem.BlogItemDisplay
         onVisible={onVisible}
         index={index}
       />

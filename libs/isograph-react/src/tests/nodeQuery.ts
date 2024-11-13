@@ -1,4 +1,5 @@
 import { RetainedQuery } from '../core/garbageCollection';
+import { ROOT_ID } from '../core/IsographEnvironment';
 import { iso } from './__isograph/iso';
 
 // TODO investigate why this can't be in garbageCollection.test.ts without
@@ -12,6 +13,7 @@ export const nodeField = iso(`
 `)(() => {});
 const nodeFieldEntrypoint = iso(`entrypoint Query.nodeField`);
 export const nodeFieldRetainedQuery: RetainedQuery = {
-  normalizationAst: nodeFieldEntrypoint.normalizationAst,
+  normalizationAst: nodeFieldEntrypoint.networkRequestInfo.normalizationAst,
   variables: { id: 0 },
+  root: { __link: ROOT_ID, __typename: 'Query' },
 };

@@ -1,22 +1,26 @@
 use intern::Lookup;
+use isograph_config::{GenerateFileExtensionsOption, OptionalValidationLevel};
 use std::{cmp::Ordering, path::PathBuf};
 
 use common_lang_types::{ArtifactPathAndContent, SelectableFieldName};
 use isograph_schema::{
-    ClientFieldVariant, UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema,
+    ClientFieldVariant, ClientType, UserWrittenComponentVariant, ValidatedClientField,
+    ValidatedSchema,
 };
 
 use crate::generate_artifacts::ISO_TS;
 
 fn build_iso_overload_for_entrypoint(
     validated_client_field: &ValidatedClientField,
+    file_extensions: GenerateFileExtensionsOption,
 ) -> (String, String) {
     let mut s: String = "".to_string();
     let import = format!(
-        "import entrypoint_{} from '../__isograph/{}/{}/entrypoint';\n",
+        "import entrypoint_{} from '../__isograph/{}/{}/entrypoint{}';\n",
         validated_client_field.type_and_field.underscore_separated(),
         validated_client_field.type_and_field.type_name,
         validated_client_field.type_and_field.field_name,
+        file_extensions.ts()
     );
     let formatted_field = format!(
         "entrypoint {}.{}",
@@ -36,14 +40,16 @@ export function iso<T>(
 
 fn build_iso_overload_for_client_defined_field(
     client_field_and_variant: (&ValidatedClientField, UserWrittenComponentVariant),
+    file_extensions: GenerateFileExtensionsOption,
 ) -> (String, String) {
     let (client_field, variant) = client_field_and_variant;
     let mut s: String = "".to_string();
     let import = format!(
-        "import {{ type {}__param }} from './{}/{}/param_type';\n",
+        "import {{ type {}__param }} from './{}/{}/param_type{}';\n",
         client_field.type_and_field.underscore_separated(),
         client_field.type_and_field.type_name,
         client_field.type_and_field.field_name,
+        file_extensions.ts()
     );
     let formatted_field = format!(
         "field {}.{}",
@@ -71,7 +77,11 @@ export function iso<T>(
     (import, s)
 }
 
-pub(crate) fn build_iso_overload_artifact(schema: &ValidatedSchema) -> ArtifactPathAndContent {
+pub(crate) fn build_iso_overload_artifact(
+    schema: &ValidatedSchema,
+    file_extensions: GenerateFileExtensionsOption,
+    on_missing_babel_transform: OptionalValidationLevel,
+) -> ArtifactPathAndContent {
     let mut imports = "import type { IsographEntrypoint } from '@isograph/react';\n".to_string();
     let mut content = String::from(
         "
@@ -126,7 +136,7 @@ type MatchesWhitespaceAndString<
 
     let client_defined_field_overloads = sorted_user_written_fields(schema)
         .into_iter()
-        .map(build_iso_overload_for_client_defined_field);
+        .map(|field| build_iso_overload_for_client_defined_field(field, file_extensions));
     for (import, field_overload) in client_defined_field_overloads {
         imports.push_str(&import);
         content.push_str(&field_overload);
@@ -134,7 +144,7 @@ type MatchesWhitespaceAndString<
 
     let entrypoint_overloads = sorted_entrypoints(schema)
         .into_iter()
-        .map(build_iso_overload_for_entrypoint);
+        .map(|field| build_iso_overload_for_entrypoint(field, file_extensions));
     for (import, entrypoint_overload) in entrypoint_overloads {
         imports.push_str(&import);
         content.push_str(&entrypoint_overload);
@@ -146,12 +156,29 @@ export function iso(_isographLiteralText: string):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
   | IsographEntrypoint<any, any>
-{
-  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
+{\n",
+    );
+
+    content.push_str(match on_missing_babel_transform {
+        OptionalValidationLevel::Error => {
+"  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
+      'was not set up, or it failed to identify this call site. Make sure it ' +
+      'is being used verbatim as `iso`.');"
+        }
+        OptionalValidationLevel::Warn => {
+
+            "  console.warn('iso: Unexpected invocation at runtime. Either the Babel transform ' +
       'was not set up, or it failed to identify this call site. Make sure it ' +
       'is being used verbatim as `iso`.');
-}",
-    );
+  return (clientFieldResolver: any) => clientFieldResolver;"
+        }
+        OptionalValidationLevel::Ignore => {
+            "  return (clientFieldResolver: any) => clientFieldResolver;"
+        }
+    });
+
+    content.push_str("\n}");
+
     imports.push_str(&content);
     ArtifactPathAndContent {
         file_content: imports,
@@ -234,10 +261,12 @@ fn user_written_fields(
     schema
         .client_fields
         .iter()
-        .filter_map(|client_field| match client_field.variant {
-            ClientFieldVariant::UserWritten(info) => {
-                Some((client_field, info.user_written_component_variant))
-            }
-            ClientFieldVariant::ImperativelyLoadedField(_) => None,
+        .filter_map(|client_field| match client_field {
+            ClientType::ClientField(client_field) => match client_field.variant {
+                ClientFieldVariant::UserWritten(info) => {
+                    Some((client_field, info.user_written_component_variant))
+                }
+                ClientFieldVariant::ImperativelyLoadedField(_) => None,
+            },
         })
 }

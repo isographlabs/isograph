@@ -1,5 +1,6 @@
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
+use tracing::level_filters::LevelFilter;
 
 #[derive(Debug, Parser)]
 pub struct Opt {
@@ -26,6 +27,9 @@ pub(crate) struct CompileCommand {
     /// package.json under the `isograph` key.
     #[arg(long)]
     pub config: Option<PathBuf>,
+
+    #[arg(long, value_enum, default_value = "info")]
+    pub log_level: LevelFilter,
 }
 
 /// LSP

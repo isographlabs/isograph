@@ -16,6 +16,7 @@ pub(crate) struct ImperativelyLoadedEntrypointArtifactInfo {
     pub root_fetchable_field: SelectableFieldName,
     pub root_fetchable_field_parent_object: IsographObjectTypeName,
     pub refetch_query_index: RefetchQueryIndex,
+    pub concrete_type: IsographObjectTypeName,
 }
 
 impl ImperativelyLoadedEntrypointArtifactInfo {
@@ -46,6 +47,7 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
         let ImperativelyLoadedEntrypointArtifactInfo {
             normalization_ast_text: normalization_ast,
             query_text,
+            concrete_type,
             ..
         } = self;
 
@@ -55,10 +57,18 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
             const normalizationAst: NormalizationAst = {normalization_ast};\n\
             const artifact: RefetchQueryNormalizationArtifact = {{\n\
             {}kind: \"RefetchQuery\",\n\
-            {}queryText,\n\
-            {}normalizationAst,\n\
+            {}networkRequestInfo: {{\n\
+            {}  kind: \"NetworkRequestInfo\",\n\
+            {}  queryText,\n\
+            {}  normalizationAst,\n\
+            {}}},\n\
+            {}concreteType: \"{concrete_type}\",\n\
             }};\n\n\
             export default artifact;\n",
+            "  ",
+            "  ",
+            "  ",
+            "  ",
             "  ",
             "  ",
             "  ",
@@ -79,6 +89,7 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field(
         variable_definitions,
         root_operation_name,
         query_name,
+        concrete_type,
     } = imperatively_loaded_field_artifact_info;
 
     let query_text = generate_query_text(
@@ -100,6 +111,7 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field(
         root_fetchable_field,
         root_fetchable_field_parent_object: root_parent_object,
         refetch_query_index,
+        concrete_type,
     }
     .path_and_content()
 }

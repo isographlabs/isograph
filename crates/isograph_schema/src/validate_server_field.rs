@@ -1,14 +1,16 @@
 use common_lang_types::{SelectableFieldName, UnvalidatedTypeName, WithLocation};
 use graphql_lang_types::GraphQLTypeAnnotation;
 use isograph_lang_types::{
-    SelectableServerFieldId, ServerObjectId, TypeAnnotation, VariableDefinition,
+    SelectionType, ServerObjectId, ServerScalarId, TypeAnnotation, VariableDefinition,
 };
 
 use crate::{
     get_all_errors_or_all_ok, get_all_errors_or_all_ok_iter, SchemaServerField,
-    SchemaValidationState, ServerFieldData, UnvalidatedSchemaSchemaField, UnvalidatedSchemaState,
-    UnvalidatedVariableDefinition, ValidateSchemaError, ValidateSchemaResult,
-    ValidatedSchemaServerField, ValidatedVariableDefinition,
+    SchemaServerFieldVariant, SchemaValidationState, ServerFieldData,
+    ServerFieldTypeAssociatedData, ServerFieldTypeAssociatedDataInlineFragment,
+    UnvalidatedSchemaSchemaField, UnvalidatedSchemaState, UnvalidatedVariableDefinition,
+    ValidateSchemaError, ValidateSchemaResult, ValidatedSchemaServerField,
+    ValidatedVariableDefinition,
 };
 
 pub(crate) fn validate_and_transform_server_fields(
@@ -27,12 +29,13 @@ fn validate_and_transform_server_field(
     schema_data: &ServerFieldData,
 ) -> Result<ValidatedSchemaServerField, impl Iterator<Item = WithLocation<ValidateSchemaError>>> {
     // TODO rewrite as field.map(...).transpose()
-    let (empty_field, server_field_type) = field.split();
+    let (empty_field, server_field) = field.split();
 
     let mut errors = vec![];
 
     let field_type =
-        match validate_server_field_type_exists(schema_data, &server_field_type, &empty_field) {
+        match validate_server_field_type_exists(schema_data, &server_field.type_name, &empty_field)
+        {
             Ok(type_annotation) => Some(type_annotation),
             Err(e) => {
                 errors.push(e);
@@ -57,16 +60,39 @@ fn validate_and_transform_server_field(
         };
 
     if let Some(field_type) = field_type {
+        let variant = match server_field.variant {
+            SchemaServerFieldVariant::LinkedField => SchemaServerFieldVariant::LinkedField,
+            SchemaServerFieldVariant::InlineFragment(associated_data) => match field_type {
+                SelectionType::Scalar(_) => {
+                    panic!("Expected inline fragment server field type to be an object")
+                }
+                SelectionType::Object(_) => SchemaServerFieldVariant::InlineFragment(
+                    ServerFieldTypeAssociatedDataInlineFragment {
+                        concrete_type: associated_data.concrete_type,
+                        condition_selection_set: associated_data.condition_selection_set,
+                        server_field_id: associated_data.server_field_id,
+                    },
+                ),
+            },
+        };
+
         if let Some(valid_arguments) = valid_arguments {
             return Ok(SchemaServerField {
                 description: empty_field.description,
                 name: empty_field.name,
                 id: empty_field.id,
-                associated_data: field_type,
+                associated_data: match field_type {
+                    SelectionType::Scalar(scalar_id) => SelectionType::Scalar(scalar_id),
+                    SelectionType::Object(object_id) => {
+                        SelectionType::Object(ServerFieldTypeAssociatedData {
+                            type_name: object_id,
+                            variant,
+                        })
+                    }
+                },
                 parent_type_id: empty_field.parent_type_id,
                 arguments: valid_arguments,
                 is_discriminator: empty_field.is_discriminator,
-                variant: empty_field.variant,
             });
         }
     }
@@ -81,13 +107,24 @@ fn validate_server_field_type_exists(
         (),
         <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
     >,
-) -> ValidateSchemaResult<TypeAnnotation<SelectableServerFieldId>> {
+) -> ValidateSchemaResult<
+    SelectionType<TypeAnnotation<ServerObjectId>, TypeAnnotation<ServerScalarId>>,
+> {
     // look up the item in defined_types. If it's not there, error.
     match schema_data.defined_types.get(server_field_type.inner()) {
         // Why do we need to clone here? Can we avoid this?
-        Some(type_id) => Ok(TypeAnnotation::from_graphql_type_annotation(
-            server_field_type.clone().map(|_| *type_id),
-        )),
+        Some(type_id) => Ok(match type_id {
+            SelectionType::Scalar(scalar_id) => {
+                SelectionType::Scalar(TypeAnnotation::from_graphql_type_annotation(
+                    server_field_type.clone().map(|_| *scalar_id),
+                ))
+            }
+            SelectionType::Object(object_id) => {
+                SelectionType::Object(TypeAnnotation::from_graphql_type_annotation(
+                    server_field_type.clone().map(|_| *object_id),
+                ))
+            }
+        }),
         None => Err(WithLocation::new(
             ValidateSchemaError::FieldTypenameDoesNotExist {
                 parent_type_name: schema_data.object(field.parent_type_id).name,

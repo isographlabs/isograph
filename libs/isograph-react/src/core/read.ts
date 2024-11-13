@@ -1,4 +1,9 @@
-import { getParentRecordKey, onNextChangeToRecord } from './cache';
+import {
+  getParentRecordKey,
+  insertIfNotExists,
+  onNextChangeToRecord,
+  type EncounteredIds,
+} from './cache';
 import { getOrCreateCachedComponent } from './componentCache';
 import {
   IsographEntrypoint,
@@ -12,8 +17,6 @@ import {
 } from './FragmentReference';
 import {
   assertLink,
-  DataId,
-  defaultMissingFieldHandler,
   getOrLoadIsographArtifact,
   IsographEnvironment,
   type Link,
@@ -33,7 +36,7 @@ import { CleanupFn } from '@isograph/disposable-types';
 import { DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
 
 export type WithEncounteredRecords<T> = {
-  readonly encounteredRecords: Set<DataId>;
+  readonly encounteredRecords: EncounteredIds;
   readonly item: ExtractData<T>;
 };
 
@@ -44,7 +47,7 @@ export function readButDoNotEvaluate<
   fragmentReference: FragmentReference<TReadFromStore, unknown>,
   networkRequestOptions: NetworkRequestReaderOptions,
 ): WithEncounteredRecords<TReadFromStore> {
-  const mutableEncounteredRecords = new Set<DataId>();
+  const mutableEncounteredRecords: EncounteredIds = new Map();
 
   const readerWithRefetchQueries = readPromise(
     fragmentReference.readerWithRefetchQueries,
@@ -99,7 +102,7 @@ export type ReadDataResult<TReadFromStore> =
   | {
       readonly kind: 'Success';
       readonly data: ExtractData<TReadFromStore>;
-      readonly encounteredRecords: Set<DataId>;
+      readonly encounteredRecords: EncounteredIds;
     }
   | {
       readonly kind: 'MissingData';
@@ -116,10 +119,14 @@ function readData<TReadFromStore>(
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
-  mutableEncounteredRecords: Set<DataId>,
+  mutableEncounteredRecords: EncounteredIds,
 ): ReadDataResult<TReadFromStore> {
-  mutableEncounteredRecords.add(root.__link);
-  let storeRecord = environment.store[root.__link];
+  const encounteredIds = insertIfNotExists(
+    mutableEncounteredRecords,
+    root.__typename,
+  );
+  encounteredIds.add(root.__link);
+  let storeRecord = environment.store[root.__typename]?.[root.__link];
   if (storeRecord === undefined) {
     return {
       kind: 'MissingData',
@@ -179,6 +186,7 @@ function readData<TReadFromStore>(
               results.push(null);
               continue;
             }
+
             const result = readData(
               environment,
               field.selections,
@@ -248,10 +256,9 @@ function readData<TReadFromStore>(
 
         if (link === undefined) {
           // TODO make this configurable, and also generated and derived from the schema
-          const missingFieldHandler =
-            environment.missingFieldHandler ?? defaultMissingFieldHandler;
+          const missingFieldHandler = environment.missingFieldHandler;
 
-          const altLink = missingFieldHandler(
+          const altLink = missingFieldHandler?.(
             storeRecord,
             root,
             field.fieldName,
@@ -464,7 +471,9 @@ function readData<TReadFromStore>(
 
             return [
               // Stable id
-              root.__link +
+              root.__typename +
+                ':' +
+                root.__link +
                 '/' +
                 field.name +
                 '/' +
@@ -496,7 +505,7 @@ function readData<TReadFromStore>(
                     } as const),
 
                     // TODO localVariables is not guaranteed to have an id field
-                    root: { __link: localVariables.id },
+                    root,
                     variables: localVariables,
                     networkRequest,
                   };
@@ -569,7 +578,7 @@ function readData<TReadFromStore>(
                       ),
 
                       // TODO localVariables is not guaranteed to have an id field
-                      root: { __link: localVariables.id },
+                      root,
                       variables: localVariables,
                       networkRequest,
                     };
@@ -693,7 +702,7 @@ export function getNetworkRequestOptionsWithDefaults(
 // TODO call stableStringifyArgs on the variable values, as well.
 // This doesn't matter for now, since we are just using primitive values
 // in the demo.
-function stableStringifyArgs(args: Object) {
+function stableStringifyArgs(args: object) {
   const keys = Object.keys(args);
   keys.sort();
   let s = '';

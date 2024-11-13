@@ -191,6 +191,12 @@ When React re-renders the children of a suspense boundary, their hooks lose all 
 
 **Finally**, we can get to building our first client field, the `Root.HomePage` component!
 
+:::note
+In the Star Wars API, the query object is `Root` (i.e. the Star Wars schema contains `schema { query: Root }`). That's why in this quickstart, we define a client field on the `Root` object: `Root.HomePage`.
+
+**If you're following along with this quickstart, but using a different schema, then you most likely will want to define a client field on a different object, such as `Query.HomePage`!**
+:::
+
 An Isograph app will be almost entirely made up of client fields. There are two important important facts about client fields that you should know:
 
 - they can reference each other. In this quickstart, `Root.HomePage` will reference `Film.FilmSummary`.

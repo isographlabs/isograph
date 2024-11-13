@@ -1,13 +1,14 @@
 use common_lang_types::{SelectableFieldName, Span, UnvalidatedTypeName, WithLocation, WithSpan};
 use graphql_lang_types::{GraphQLNamedTypeAnnotation, GraphQLTypeAnnotation};
 use intern::string_key::Intern;
-use isograph_lang_types::{ScalarFieldSelection, Selection, ServerFieldSelection};
+use isograph_lang_types::{ScalarFieldSelection, ServerFieldSelection};
 
 use crate::{
     FieldType, ProcessTypeDefinitionError, ProcessTypeDefinitionResult, SchemaObject,
-    SchemaServerField, SchemaServerFieldInlineFragmentVariant, SchemaServerFieldVariant,
-    TypeRefinementMap, UnvalidatedSchema, ValidatedIsographSelectionVariant,
-    ValidatedScalarFieldAssociatedData,
+    SchemaServerField, SchemaServerFieldVariant, ServerFieldTypeAssociatedData,
+    ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
+    ValidatedIsographSelectionVariant, ValidatedScalarFieldAssociatedData,
+    ValidatedTypeRefinementMap,
 };
 use common_lang_types::Location;
 impl UnvalidatedSchema {
@@ -15,7 +16,7 @@ impl UnvalidatedSchema {
     /// to supertype (e.g. creating Node.asUser).
     pub fn add_pointers_to_supertypes(
         &mut self,
-        subtype_to_supertype_map: &TypeRefinementMap,
+        subtype_to_supertype_map: &ValidatedTypeRefinementMap,
     ) -> ProcessTypeDefinitionResult<()> {
         for (subtype_id, supertype_ids) in subtype_to_supertype_map {
             let subtype: &SchemaObject = self.server_field_data.object(*subtype_id);
@@ -32,29 +33,26 @@ impl UnvalidatedSchema {
                     }));
 
                 let typename_selection = WithSpan::new(
-                    Selection::ServerField(ServerFieldSelection::ScalarField(
-                        ScalarFieldSelection {
-                            arguments: vec![],
-                            associated_data: ValidatedScalarFieldAssociatedData {
-                                location: FieldType::ServerField(
-                                    *subtype
-                                        .encountered_fields
-                                        .get(&"__typename".intern().into())
-                                        .expect("Expected __typename to exist")
-                                        .as_server_field()
-                                        .expect("Expected __typename to be server field"),
-                                ),
-                                selection_variant: ValidatedIsographSelectionVariant::Regular,
-                            },
-                            directives: vec![],
-                            name: WithLocation::new(
-                                "__typename".intern().into(),
-                                Location::generated(),
+                    ServerFieldSelection::ScalarField(ScalarFieldSelection {
+                        arguments: vec![],
+                        associated_data: ValidatedScalarFieldAssociatedData {
+                            location: FieldType::ServerField(
+                                *subtype
+                                    .encountered_fields
+                                    .get(&"__typename".intern().into())
+                                    .expect("Expected __typename to exist")
+                                    .as_server_field()
+                                    .expect("Expected __typename to be server field"),
                             ),
-                            reader_alias: None,
-                            unwraps: vec![],
+                            selection_variant: ValidatedIsographSelectionVariant::Regular,
                         },
-                    )),
+                        directives: vec![],
+                        name: WithLocation::new(
+                            "__typename".intern().into(),
+                            Location::generated(),
+                        ),
+                        reader_alias: None,
+                    }),
                     Span::todo_generated(),
                 );
 
@@ -70,15 +68,17 @@ impl UnvalidatedSchema {
                     name: WithLocation::new(field_name, Location::generated()),
                     parent_type_id: subtype.id,
                     arguments: vec![],
-                    associated_data,
+                    associated_data: ServerFieldTypeAssociatedData {
+                        type_name: associated_data,
+                        variant: SchemaServerFieldVariant::InlineFragment(
+                            ServerFieldTypeAssociatedDataInlineFragment {
+                                server_field_id: next_server_field_id,
+                                concrete_type,
+                                condition_selection_set,
+                            },
+                        ),
+                    },
                     is_discriminator: false,
-                    variant: SchemaServerFieldVariant::InlineFragment(
-                        SchemaServerFieldInlineFragmentVariant {
-                            server_field_id: next_server_field_id,
-                            concrete_type,
-                            condition_selection_set,
-                        },
-                    ),
                 };
 
                 self.server_fields.push(server_field);

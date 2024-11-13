@@ -24,7 +24,6 @@ export {
   type StoreRecord,
   createIsographEnvironment,
   createIsographStore,
-  defaultMissingFieldHandler,
 } from './core/IsographEnvironment';
 export {
   type EagerReaderArtifact,
@@ -51,6 +50,7 @@ export {
   type ExtractProps,
   type ExtractReadFromStore,
   type ExtractResolverResult,
+  type NetworkRequestInfo,
 } from './core/entrypoint';
 export { readButDoNotEvaluate } from './core/read';
 export {
