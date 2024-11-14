@@ -48,11 +48,11 @@ export function useDisposableState<T = never>(
         return;
       }
       lastCommittedParentCache.current = parentCache;
-      // capture last set pair in a variable
-      const current = itemCleanupPairRef.current;
+
       return () => {
-        // current is a stale variable
-        current?.[1]();
+        if (itemCleanupPairRef.current !== null) {
+          itemCleanupPairRef.current[1]();
+        }
       };
     },
     [parentCache],
