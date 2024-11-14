@@ -131,9 +131,50 @@ Now, we can use this! Modify the `PetTaglineCardComponent` component as follows:
 }
 ```
 
-#### Additional methods
+#### Future methods
 
 The following methods will be available in the future:
 
 - When reading a fragment reference is not a hook (see [this issue](https://github.com/isographlabs/isograph/issues/273)), you should be able to read the fragment conditionally in the parent component.
-- `useImperativeReference` (et al) will receive a `onCompleted` parameter that will be executed when the mutation completes, and will be passed the mutation results. You can set this in state. This is probably a bad practice, and shouldn't be relied on.
+
+## Being notified when a mutation completes
+
+The `loadFragmentReference` (aka `loadMutation` in these docs) function accepts a `FetchOptions` object, which can include an `onCompleted` callback, e.g.:
+
+```jsx
+loadMutation(
+  {
+    input: {
+      id: pet.id,
+      tagline: 'SUPER DOG',
+    },
+  },
+  {
+    onCompleted: () => {
+      console.log('Done setting');
+    },
+  },
+);
+```
+
+This `onCompleted` callback takes no parameters. **If you need to receive the results of the mutation, please comment on [this issue](https://github.com/isographlabs/isograph/issues/277).**
+
+## Being notified when a mutation errors out
+
+`FetchOptions` also accepts an `onError` callback:
+
+```jsx
+loadMutation(
+  {
+    input: {
+      id: pet.id,
+      tagline: 'SUPER DOG',
+    },
+  },
+  {
+    onError: () => {
+      console.log('Oops');
+    },
+  },
+);
+```
