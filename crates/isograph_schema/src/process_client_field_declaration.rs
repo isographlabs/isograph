@@ -201,8 +201,8 @@ impl UnvalidatedSchema {
         client_pointer_declaration: WithSpan<ClientPointerDeclarationWithValidatedDirectives>,
     ) -> ProcessClientFieldDeclarationResult<()> {
         let query_id = self.query_id();
-        let to_object = &self.server_field_data.server_objects[to_object_id.inner().as_usize()];
-        let object = &self.server_field_data.server_objects[parent_object_id.as_usize()];
+        let to_object = &self.server_field_data.object(*to_object_id.inner());
+        let parent_object = &self.server_field_data.object(parent_object_id);
         let client_pointer_pointer_name_ws = client_pointer_declaration.item.client_pointer_name;
         let client_pointer_name = client_pointer_pointer_name_ws.item;
         let client_pointer_name_span = client_pointer_pointer_name_ws.span;
@@ -220,7 +220,7 @@ impl UnvalidatedSchema {
 
                 variable_definitions: client_pointer_declaration.item.variable_definitions,
                 type_and_field: ObjectTypeAndFieldName {
-                    type_name: object.name,
+                    type_name: parent_object.name,
                     field_name: name.into(),
                 },
 
@@ -252,8 +252,8 @@ impl UnvalidatedSchema {
                 to: to_object_id,
             }));
 
-        let object = &mut self.server_field_data.server_objects[parent_object_id.as_usize()];
-        if object
+        let parent_object = self.server_field_data.object_mut(parent_object_id);
+        if parent_object
             .encountered_fields
             .insert(
                 client_pointer_name.into(),
@@ -264,7 +264,7 @@ impl UnvalidatedSchema {
             // Did not insert, so this object already has a field with the same name :(
             return Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ParentAlreadyHasField {
-                    parent_type_name: object.name,
+                    parent_type_name: parent_object.name,
                     client_field_name: client_pointer_name.into(),
                 },
                 client_pointer_name_span,
