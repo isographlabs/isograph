@@ -19,10 +19,12 @@ const sidebars: SidebarsConfig = {
     'loadable-fields',
     'pagination',
     'mutation',
-    'expose-field-directives',
-    'refetching',
-    'isograph-rules',
     'faq',
+    {
+      type: 'category',
+      label: 'Deprecated features',
+      items: ['expose-field-directives', 'refetching'],
+    },
     {
       type: 'category',
       label: 'How Isograph works',
@@ -40,6 +42,11 @@ const sidebars: SidebarsConfig = {
     },
     'development-workflow',
     'backlog',
+    {
+      type: 'category',
+      label: 'Miscellaneous',
+      items: ['isograph-rules'],
+    },
   ],
 };
 
