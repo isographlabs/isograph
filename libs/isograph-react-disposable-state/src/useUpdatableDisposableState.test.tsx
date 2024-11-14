@@ -1,4 +1,4 @@
-import React, { type MutableRefObject } from 'react';
+import React, { type MutableRefObject, StrictMode } from 'react';
 import { create } from 'react-test-renderer';
 import { describe, expect, test, vi } from 'vitest';
 import {
@@ -51,7 +51,8 @@ function promiseAndResolver() {
 // not is a bit worrisome.
 async function awaitableCreate(Component, isConcurrent: boolean) {
   const element = create(
-    Component,
+    <StrictMode>{Component}</StrictMode>,
+
     isConcurrent ? { unstable_isConcurrent: true } : undefined,
   );
   await shortPromise();

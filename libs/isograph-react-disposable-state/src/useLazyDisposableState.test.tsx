@@ -1,5 +1,5 @@
 import type { ItemCleanupPair } from '@isograph/disposable-types';
-import React, { useEffect, useState } from 'react';
+import { StrictMode, useEffect, useState } from 'react';
 import { create } from 'react-test-renderer';
 import { describe, expect, test, vi } from 'vitest';
 import { ParentCache } from './ParentCache';
@@ -56,7 +56,12 @@ describe('useLazyDisposableState', async () => {
       return null;
     }
 
-    const root = create(<TestComponent />, { unstable_isConcurrent: true });
+    const root = create(
+      <StrictMode>
+        <TestComponent />
+      </StrictMode>,
+      { unstable_isConcurrent: true },
+    );
     await committed.promise;
     expect(cache1.disposeItem).toHaveBeenCalled();
     expect(cache1.cache.factory).toHaveBeenCalledOnce();

@@ -21,7 +21,6 @@ export function useDisposableState<T = never>(
   const preCommitItem = useCachedResponsivePrecommitValue(
     parentCache,
     (pair) => {
-      itemCleanupPairRef.current?.[1]();
       itemCleanupPairRef.current = pair;
     },
   );
@@ -46,14 +45,24 @@ export function useDisposableState<T = never>(
     [stateFromDisposableStateHook],
   );
 
-  useEffect(function cleanupItemCleanupPairRefIfSetStateNotCalled() {
-    return () => {
-      if (itemCleanupPairRef.current != null) {
-        itemCleanupPairRef.current[1]();
-        itemCleanupPairRef.current = null;
+  const lastCommittedParentCache = useRef<ParentCache<T> | null>(null);
+
+  useEffect(
+    function cleanupItemCleanupPairRefIfSetStateNotCalled() {
+      if (lastCommittedParentCache.current === parentCache) {
+        return;
       }
-    };
-  }, []);
+      lastCommittedParentCache.current = parentCache;
+      // capture last set pair in a variable
+      const current = itemCleanupPairRef.current;
+      return () => {
+        // current is a stale variable
+        current?.[1]();
+      };
+    },
+    [parentCache],
+  );
+
   const state: T | undefined =
     (stateFromDisposableStateHook !== UNASSIGNED_STATE
       ? stateFromDisposableStateHook
