@@ -18,10 +18,15 @@ const sidebars: SidebarsConfig = {
     'isograph-config',
     'loadable-fields',
     'pagination',
-    'refetching',
-    'expose-field-directives',
-    'isograph-rules',
+    'mutation',
+    'conditional-fetching',
+    'parameters',
     'faq',
+    {
+      type: 'category',
+      label: 'Deprecated features',
+      items: ['expose-field-directives', 'refetching'],
+    },
     {
       type: 'category',
       label: 'How Isograph works',
@@ -39,6 +44,11 @@ const sidebars: SidebarsConfig = {
     },
     'development-workflow',
     'backlog',
+    {
+      type: 'category',
+      label: 'Miscellaneous',
+      items: ['isograph-rules'],
+    },
   ],
 };
 
