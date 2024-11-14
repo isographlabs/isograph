@@ -116,7 +116,7 @@ export function iso<T>(
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Mutation.SetTagline', T>
-): IdentityWithParam<Mutation__SetTagline__param>;
+): IdentityWithParamComponent<Mutation__SetTagline__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field NewsfeedItem.NewsfeedAdOrBlog', T>
