@@ -40,17 +40,23 @@ export function useDisposableState<T = never>(
     [stateFromDisposableStateHook],
   );
 
+  const lastCommittedParentCache = useRef<ParentCache<T> | null>(null);
+
   useEffect(
     function cleanupItemCleanupPairRefIfSetStateNotCalled() {
+      if (lastCommittedParentCache.current === parentCache) {
+        return;
+      }
+      lastCommittedParentCache.current = parentCache;
+      // capture last set pair in a variable
+      const current = itemCleanupPairRef.current;
       return () => {
-        if (itemCleanupPairRef.current !== null) {
-          itemCleanupPairRef.current[1]();
-        }
+        // current is a stale variable
+        current?.[1]();
       };
     },
     [parentCache],
   );
-
   const state: T | undefined =
     (stateFromDisposableStateHook !== UNASSIGNED_STATE
       ? stateFromDisposableStateHook
@@ -64,7 +70,6 @@ export function useDisposableState<T = never>(
       setState,
     };
   }
-
   // Safety: we can be in one of three states. Pre-commit, in which case
   // preCommitItem is assigned, post-commit but before setState has been
   // called, in which case itemCleanupPairRef.current is assigned, or

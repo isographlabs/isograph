@@ -28,9 +28,17 @@ export function useLazyDisposableState<T>(
     },
   );
 
+  const lastCommittedParentCache = useRef<ParentCache<T> | null>(null);
   useEffect(() => {
+    if (lastCommittedParentCache.current === parentCache) {
+      return;
+    }
+    lastCommittedParentCache.current = parentCache;
+    // capture last set pair in a variable
+    const current = itemCleanupPairRef.current;
     return () => {
-      const cleanupFn = itemCleanupPairRef.current?.[1];
+      // current is a stale variable
+      const cleanupFn = current?.[1];
       // TODO confirm useEffect is called in order.
       if (cleanupFn == null) {
         throw new Error(
