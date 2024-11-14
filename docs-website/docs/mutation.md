@@ -137,7 +137,7 @@ The following methods will be available in the future:
 
 - When reading a fragment reference is not a hook (see [this issue](https://github.com/isographlabs/isograph/issues/273)), you should be able to read the fragment conditionally in the parent component.
 
-## Being notified when a mutation completes
+### Being notified when a mutation completes
 
 The `loadFragmentReference` (aka `loadMutation` in these docs) function accepts a `FetchOptions` object, which can include an `onCompleted` callback, e.g.:
 
@@ -159,7 +159,7 @@ loadMutation(
 
 This `onCompleted` callback takes no parameters. **If you need to receive the results of the mutation, please comment on [this issue](https://github.com/isographlabs/isograph/issues/277).**
 
-## Being notified when a mutation errors out
+### Being notified when a mutation errors out
 
 `FetchOptions` also accepts an `onError` callback:
 
@@ -178,3 +178,7 @@ loadMutation(
   },
 );
 ```
+
+### Appending to a list in response to a mutation
+
+There are no good APIs to do this, currently. If you need this behavior, please [comment on this issue](https://github.com/isographlabs/isograph/issues/278) or reach out in the Discord. We're happy to help you out!
