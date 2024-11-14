@@ -3,7 +3,11 @@
 Loadable fields can also be used to paginate.
 
 :::note
-This API is likely to get simplified substantially, as we support `@loadable` on linked server fields. We will also add support for Relay-style pagination.
+This API is likely to get simplified substantially, as we support `@loadable` on linked server fields.
+:::
+
+:::note
+See [this file](https://github.com/isographlabs/isograph/blob/dc7beaeab163159a9b38dbe3cbd731f7a03b3e38/demos/pet-demo/src/components/Newsfeed/NewsfeedRoute.tsx) for a real-world example.
 :::
 
 ## Walk through
