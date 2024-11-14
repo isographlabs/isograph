@@ -3,6 +3,10 @@
 Loadable fields can also be used to paginate.
 
 :::note
+This documentation demonstrates the `useSkipLimitPagination` hook. You can also use `useConnectionSpecPagination` if your connection field conforms to the [Relay connection spec](https://facebook.github.io/relay/graphql/connections.htm).
+:::
+
+:::note
 This API is likely to get simplified substantially, as we support `@loadable` on linked server fields.
 :::
 
@@ -82,4 +86,30 @@ export const PetDetailDeferredRouteComponent = iso(`
 });
 ```
 
-You can also use `useConnectionSpecPagination` if your connection field conforms to the [Relay connection spec](https://facebook.github.io/relay/graphql/connections.htm).
+## Prefetching initial pages
+
+Each pagination hook accepts a second `initialState` parameter. You can fetch data as part of the parent query (or anywhere, in fact!) and pass the appropriate value to that `initialState`. Consider:
+
+```jsx
+export const Newsfeed = iso(`
+  field Query.Newsfeed @component {
+    viewer {
+      newsfeed(skip: 0, limit: 6) {
+        NewsfeedAdOrBlog
+      }
+      NewsfeedPaginationComponent @loadable
+    }
+  }
+`)(function PetDetailRouteComponent({ data }) {
+  const viewer = data.viewer;
+
+  const paginationState = useSkipLimitPagination(
+    viewer.NewsfeedPaginationComponent,
+    { skip: viewer.newsfeed.length },
+  );
+
+  const newsfeedItems = viewer.newsfeed.concat(paginationState.results);
+
+  // ...
+});
+```
