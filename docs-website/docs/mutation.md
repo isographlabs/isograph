@@ -17,7 +17,7 @@ export const setTagline = iso(`
       }
     }
   }
-`)((({data})) => data);
+`)((()) => {});
 ```
 
 Make sure you select the fields that you want refetched and written into the store. In this case, we want to see the updated pet's tagline. We also return the data.
