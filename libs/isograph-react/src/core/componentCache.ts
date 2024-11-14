@@ -47,13 +47,11 @@ export function getOrCreateCachedComponent(
           rootLink: fragmentReference.root,
         });
 
-        const firstParameter = {
-          data,
-          parameters: fragmentReference.variables,
-        };
-
         return readerWithRefetchQueries.readerArtifact.resolver(
-          firstParameter,
+          {
+            data,
+            parameters: fragmentReference.variables,
+          },
           additionalRuntimeProps,
         );
       }

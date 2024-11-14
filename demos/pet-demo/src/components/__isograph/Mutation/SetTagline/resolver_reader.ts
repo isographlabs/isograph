@@ -1,6 +1,5 @@
-import type { EagerReaderArtifact, ReaderAst } from '@isograph/react';
+import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Mutation__SetTagline__param } from './param_type';
-import { Mutation__SetTagline__output_type } from './output_type';
 import { setTagline as resolver } from '../../../PetTaglineCard';
 
 const readerAst: ReaderAst<Mutation__SetTagline__param> = [
@@ -35,11 +34,12 @@ const readerAst: ReaderAst<Mutation__SetTagline__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact: ComponentReaderArtifact<
   Mutation__SetTagline__param,
-  Mutation__SetTagline__output_type
+  ExtractSecondParam<typeof resolver>
 > = {
-  kind: "EagerReaderArtifact",
+  kind: "ComponentReaderArtifact",
+  componentName: "Mutation.SetTagline",
   resolver,
   readerAst,
 };
