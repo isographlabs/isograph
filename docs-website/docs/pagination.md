@@ -8,7 +8,7 @@ This API is likely to get simplified substantially, as we support `@loadable` on
 
 ## Walk through
 
-Define a client field (without `@component`) that returns an array of items and accepts `skip` and `limit` parameters. It can accept other params:
+First, define a client field (without `@component`) that returns an array of items and accepts `skip` and `limit` parameters. It can accept other params:
 
 ```tsx
 import { iso } from '@iso';
@@ -77,3 +77,5 @@ export const PetDetailDeferredRouteComponent = iso(`
   );
 });
 ```
+
+You can also use `useConnectionSpecPagination` if your connection field conforms to the [Relay connection spec](https://facebook.github.io/relay/graphql/connections.htm).

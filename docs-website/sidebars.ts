@@ -18,8 +18,9 @@ const sidebars: SidebarsConfig = {
     'isograph-config',
     'loadable-fields',
     'pagination',
-    'refetching',
+    'mutation',
     'expose-field-directives',
+    'refetching',
     'isograph-rules',
     'faq',
     {
