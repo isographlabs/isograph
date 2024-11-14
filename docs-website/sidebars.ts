@@ -19,6 +19,7 @@ const sidebars: SidebarsConfig = {
     'loadable-fields',
     'pagination',
     'mutation',
+    'conditional-fetching',
     'faq',
     {
       type: 'category',
