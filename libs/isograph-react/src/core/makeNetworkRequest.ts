@@ -19,7 +19,7 @@ import {
 } from './PromiseWrapper';
 import { normalizeData } from './cache';
 import { logMessage } from './logging';
-import { check, ShouldFetch } from './check';
+import { check, DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
 
 let networkRequestId = 0;
 
@@ -27,11 +27,11 @@ export function maybeMakeNetworkRequest(
   environment: IsographEnvironment,
   artifact: RefetchQueryNormalizationArtifact | IsographEntrypoint<any, any>,
   variables: Variables,
-  shouldFetch: ShouldFetch,
+  fetchOptions?: FetchOptions,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
-  switch (shouldFetch) {
+  switch (fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE) {
     case 'Yes': {
-      return makeNetworkRequest(environment, artifact, variables);
+      return makeNetworkRequest(environment, artifact, variables, fetchOptions);
     }
     case 'No': {
       return [wrapResolvedValue(undefined), () => {}];
@@ -49,7 +49,12 @@ export function maybeMakeNetworkRequest(
       if (result.kind === 'EnoughData') {
         return [wrapResolvedValue(undefined), () => {}];
       } else {
-        return makeNetworkRequest(environment, artifact, variables);
+        return makeNetworkRequest(
+          environment,
+          artifact,
+          variables,
+          fetchOptions,
+        );
       }
     }
   }
@@ -59,6 +64,7 @@ export function makeNetworkRequest(
   environment: IsographEnvironment,
   artifact: RefetchQueryNormalizationArtifact | IsographEntrypoint<any, any>,
   variables: Variables,
+  fetchOptions?: FetchOptions,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
   // TODO this should be a DataId and stored in the store
   const myNetworkRequestId = networkRequestId + '';
@@ -85,6 +91,9 @@ export function makeNetworkRequest(
       });
 
       if (networkResponse.errors != null) {
+        try {
+          fetchOptions?.onError?.();
+        } catch {}
         // @ts-expect-error Why are we getting the wrong constructor here?
         throw new Error('GraphQL network response had errors', {
           cause: networkResponse,
@@ -114,6 +123,16 @@ export function makeNetworkRequest(
         };
         retainQuery(environment, retainedQuery);
       }
+
+      try {
+        fetchOptions?.onComplete?.();
+      } catch {}
+    })
+    .catch((e) => {
+      try {
+        fetchOptions?.onError?.();
+      } catch {}
+      throw e;
     });
 
   const wrapper = wrapPromise(promise);
