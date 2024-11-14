@@ -218,7 +218,7 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
             ClientType::ClientField(client_field) => client_field,
             ClientType::ClientPointer(_) => panic!(
                 "encountered ClientPointer under ClientFieldId. \
-                                                   This is indicative of a bug in Isograph."
+                This is indicative of a bug in Isograph."
             ),
         }
     }
@@ -525,8 +525,6 @@ pub struct ClientPointer<
         TClientFieldSelectionLinkedFieldAssociatedData,
     >,
 
-    // TODO this should probably be a HashMap
-    // Is this used for anything except for some reason, for refetch fields?
     pub variable_definitions:
         Vec<WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
 
