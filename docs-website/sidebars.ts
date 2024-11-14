@@ -20,6 +20,7 @@ const sidebars: SidebarsConfig = {
     'pagination',
     'mutation',
     'conditional-fetching',
+    'parameters',
     'faq',
     {
       type: 'category',
