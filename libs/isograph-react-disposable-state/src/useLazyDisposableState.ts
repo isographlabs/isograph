@@ -5,8 +5,8 @@ import { useEffect, useRef } from 'react';
 import type { ItemCleanupPair } from '@isograph/isograph-disposable-types';
 import { ParentCache } from './ParentCache';
 
-import { type UnassignedState } from './useUpdatableDisposableState';
 import { useCachedResponsivePrecommitValue } from './useCachedResponsivePrecommitValue';
+import { type UnassignedState } from './useUpdatableDisposableState';
 
 /**
  * useLazyDisposableState<T>
@@ -42,7 +42,8 @@ export function useLazyDisposableState<T>(
     lastCommittedParentCache.current = parentCache;
 
     return () => {
-      const cleanupFn = itemCleanupPairRef.current?.[1];
+      // current is a stale variable
+      const cleanupFn = current?.[1];
       // TODO confirm useEffect is called in order.
       if (cleanupFn == null) {
         throw new Error(
