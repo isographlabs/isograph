@@ -81,7 +81,7 @@ export function useSkipLimitPagination<
     ReadonlyArray<TItem>,
     UseSkipLimitPaginationArgs
   >,
-  initialArgs?: {
+  initialState?: {
     skip?: number | void | null;
   },
 ): UseSkipLimitReturnValue<TReadFromStore, TItem> {
@@ -259,7 +259,7 @@ export function useSkipLimitPagination<
   if (!networkRequestStatus) {
     return {
       kind: 'Complete',
-      fetchMore: getFetchMore(initialArgs?.skip ?? 0),
+      fetchMore: getFetchMore(initialState?.skip ?? 0),
       results: [],
     };
   }
