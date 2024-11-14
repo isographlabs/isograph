@@ -15,6 +15,8 @@ export const DEFAULT_SHOULD_FETCH_VALUE: ShouldFetch = 'IfNecessary';
 
 export type FetchOptions = {
   shouldFetch?: ShouldFetch;
+  onComplete?: () => void;
+  onError?: () => void;
 };
 
 export type CheckResult =
