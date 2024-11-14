@@ -3,12 +3,11 @@ use common_lang_types::{
     Location, ScalarFieldName, SelectableFieldName, TextSource, UnvalidatedTypeName, WithLocation,
     WithSpan,
 };
-use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDeclarationWithValidatedDirectives,
     ClientPointerDeclarationWithValidatedDirectives, ClientPointerId, DeserializationError,
-    NonConstantValue, SelectableServerFieldId, ServerObjectId,
+    NonConstantValue, SelectableServerFieldId, ServerObjectId, TypeAnnotation,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
@@ -91,11 +90,13 @@ impl UnvalidatedSchema {
                 SelectableServerFieldId::Object(to_object_id) => {
                     self.add_client_pointer_to_object(
                         *object_id,
-                        client_pointer_declaration
-                            .item
-                            .to_type
-                            .clone()
-                            .map(|_| *to_object_id),
+                        TypeAnnotation::from_graphql_type_annotation(
+                            client_pointer_declaration
+                                .item
+                                .to_type
+                                .clone()
+                                .map(|_| *to_object_id),
+                        ),
                         client_pointer_declaration,
                     )
                     .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?;
@@ -197,12 +198,12 @@ impl UnvalidatedSchema {
     fn add_client_pointer_to_object(
         &mut self,
         parent_object_id: ServerObjectId,
-        to_object_id: GraphQLTypeAnnotation<ServerObjectId>,
+        to_object_id: TypeAnnotation<ServerObjectId>,
         client_pointer_declaration: WithSpan<ClientPointerDeclarationWithValidatedDirectives>,
     ) -> ProcessClientFieldDeclarationResult<()> {
         let query_id = self.query_id();
-        let to_object = &self.server_field_data.object(*to_object_id.inner());
-        let parent_object = &self.server_field_data.object(parent_object_id);
+        let to_object = self.server_field_data.object(to_object_id.inner());
+        let parent_object = self.server_field_data.object(parent_object_id);
         let client_pointer_pointer_name_ws = client_pointer_declaration.item.client_pointer_name;
         let client_pointer_name = client_pointer_pointer_name_ws.item;
         let client_pointer_name_span = client_pointer_pointer_name_ws.span;

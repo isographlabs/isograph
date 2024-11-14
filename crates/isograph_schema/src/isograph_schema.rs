@@ -11,7 +11,6 @@ use common_lang_types::{
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition,
     GraphQLInputObjectTypeDefinition, GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition,
-    GraphQLTypeAnnotation,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -509,7 +508,7 @@ pub struct ClientPointer<
     pub description: Option<DescriptionValue>,
     pub name: ClientPointerFieldName,
     pub id: ClientPointerId,
-    pub to: GraphQLTypeAnnotation<ServerObjectId>,
+    pub to: TypeAnnotation<ServerObjectId>,
 
     pub condition_selection_set: Vec<
         WithSpan<
