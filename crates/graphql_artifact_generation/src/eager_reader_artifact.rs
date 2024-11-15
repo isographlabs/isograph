@@ -167,7 +167,7 @@ pub(crate) fn generate_eager_reader_condition_artifact(
         {}{reader_output_type}\n\
         > = {{\n\
         {}kind: \"EagerReaderArtifact\",\n\
-        {}resolver: ({{ data }}) => data.__typename === \"{concrete_type}\",\n\
+        {}resolver: ({{ data }}) => data.__typename === \"{concrete_type}\" ? data.__link : null,\n\
         {}readerAst,\n\
         }};\n\n\
         export default artifact;\n",

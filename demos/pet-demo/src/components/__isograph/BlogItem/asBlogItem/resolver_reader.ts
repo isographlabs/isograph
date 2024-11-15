@@ -7,6 +7,10 @@ const readerAst: ReaderAst<{ data: any, parameters: Record<PropertyKey, never> }
     alias: null,
     arguments: null,
   },
+  {
+    kind: "Link",
+    alias: "__link",
+  },
 ];
 
 const artifact: EagerReaderArtifact<
@@ -14,7 +18,7 @@ const artifact: EagerReaderArtifact<
   boolean
 > = {
   kind: "EagerReaderArtifact",
-  resolver: ({ data }) => data.__typename === "BlogItem",
+  resolver: ({ data }) => data.__typename === "BlogItem" ? data.__link : null,
   readerAst,
 };
 

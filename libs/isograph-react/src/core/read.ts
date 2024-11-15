@@ -163,6 +163,10 @@ function readData<TReadFromStore>(
         target[field.alias ?? field.fieldName] = value;
         break;
       }
+      case 'Link': {
+        target[field.alias] = root;
+        break;
+      }
       case 'Linked': {
         const storeRecordName = getParentRecordKey(field, variables);
         const value = storeRecord[storeRecordName];
@@ -605,6 +609,7 @@ function readData<TReadFromStore>(
         }
         break;
       }
+
       default: {
         // Ensure we have covered all variants
         let _: never = field;

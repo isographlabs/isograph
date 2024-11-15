@@ -133,6 +133,7 @@ pub fn get_artifact_path_and_content(
                 let encountered_client_field = schema.client_field(*encountered_client_field_id);
                 // Generate reader ASTs for all encountered client fields, which may be reader or refetch reader
                 match &encountered_client_field.variant {
+                    ClientFieldVariant::Link => (),
                     ClientFieldVariant::UserWritten(info) => {
                         path_and_contents.extend(generate_eager_reader_artifacts(
                             schema,
@@ -248,6 +249,7 @@ pub fn get_artifact_path_and_content(
 
     for user_written_client_field in schema.client_fields.iter().flat_map(|field| match field {
         ClientType::ClientField(field) => match field.variant {
+            ClientFieldVariant::Link => None,
             ClientFieldVariant::UserWritten(_) => Some(field),
             ClientFieldVariant::ImperativelyLoadedField(_) => None,
         },
@@ -283,20 +285,25 @@ pub fn get_artifact_path_and_content(
 
     for output_type_id in encountered_output_types {
         let client_field = schema.client_field(output_type_id);
-        let path_and_content = match client_field.variant {
-            ClientFieldVariant::UserWritten(info) => generate_eager_reader_output_type_artifact(
-                schema,
-                client_field,
-                project_root,
-                artifact_directory,
-                info,
-                file_extensions,
-            ),
+        let artifact_path_and_content = match client_field.variant {
+            ClientFieldVariant::Link => None,
+            ClientFieldVariant::UserWritten(info) => {
+                Some(generate_eager_reader_output_type_artifact(
+                    schema,
+                    client_field,
+                    project_root,
+                    artifact_directory,
+                    info,
+                    file_extensions,
+                ))
+            }
             ClientFieldVariant::ImperativelyLoadedField(_) => {
-                generate_refetch_output_type_artifact(schema, client_field)
+                Some(generate_refetch_output_type_artifact(schema, client_field))
             }
         };
-        path_and_contents.push(path_and_content);
+        if let Some(path_and_content) = artifact_path_and_content {
+            path_and_contents.push(path_and_content);
+        };
     }
 
     path_and_contents.push(build_iso_overload_artifact(
@@ -403,6 +410,7 @@ pub(crate) fn get_serialized_field_arguments(
 pub(crate) fn generate_output_type(client_field: &ValidatedClientField) -> ClientFieldOutputType {
     let variant = &client_field.variant;
     match variant {
+        ClientFieldVariant::Link => ClientFieldOutputType("Link".to_string()),
         ClientFieldVariant::UserWritten(info) => match info.user_written_component_variant {
             UserWrittenComponentVariant::Eager => {
                 ClientFieldOutputType("ReturnType<typeof resolver>".to_string())

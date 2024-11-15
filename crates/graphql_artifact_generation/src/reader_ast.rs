@@ -5,9 +5,9 @@ use isograph_lang_types::{
     LoadableDirectiveParameters, RefetchQueryIndex, SelectionType, ServerFieldSelection,
 };
 use isograph_schema::{
-    categorize_field_loadability, transform_arguments_with_child_context, FieldType, Loadability,
-    NameAndArguments, NormalizationKey, ObjectTypeAndFieldName, PathToRefetchField,
-    RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
+    categorize_field_loadability, transform_arguments_with_child_context, ClientFieldVariant,
+    FieldType, Loadability, NameAndArguments, NormalizationKey, ObjectTypeAndFieldName,
+    PathToRefetchField, RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
     ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
     ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSelection, VariableContext,
 };
@@ -204,18 +204,42 @@ fn scalar_client_defined_field_ast_node(
             indentation_level,
             scalar_field_selection,
         ),
-        None => user_written_variant_ast_node(
-            scalar_field_selection,
-            indentation_level,
-            client_field,
-            schema,
-            path,
-            root_refetched_paths,
-            reader_imports,
-            &client_field_variable_context,
-            parent_variable_context,
-        ),
+        None => match client_field.variant {
+            ClientFieldVariant::Link => {
+                link_variant_ast_node(scalar_field_selection, indentation_level)
+            }
+            ClientFieldVariant::UserWritten(_) | ClientFieldVariant::ImperativelyLoadedField(_) => {
+                user_written_variant_ast_node(
+                    scalar_field_selection,
+                    indentation_level,
+                    client_field,
+                    schema,
+                    path,
+                    root_refetched_paths,
+                    reader_imports,
+                    &client_field_variable_context,
+                    parent_variable_context,
+                )
+            }
+        },
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn link_variant_ast_node(
+    scalar_field_selection: &ValidatedScalarFieldSelection,
+    indentation_level: u8,
+) -> String {
+    let alias = scalar_field_selection.name_or_alias().item;
+    let indent_1 = "  ".repeat(indentation_level as usize);
+    let indent_2 = "  ".repeat((indentation_level + 1) as usize);
+
+    format!(
+        "{indent_1}{{\n\
+        {indent_2}kind: \"Link\",\n\
+        {indent_2}alias: \"{alias}\",\n\
+        {indent_1}}},\n",
+    )
 }
 
 #[allow(clippy::too_many_arguments)]

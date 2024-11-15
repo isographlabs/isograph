@@ -96,6 +96,7 @@ export function mergeObjectsUsingReaderAst(
         }
         break;
       }
+      case 'Link':
       case 'ImperativelyLoadedField':
       case 'LoadablySelectedField':
         break;
