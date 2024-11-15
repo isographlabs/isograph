@@ -106,9 +106,12 @@ export function useSkipLimitPagination<
         fragmentReference.readerWithRefetchQueries,
       );
 
+      // invariant: readOutDataAndRecords.length === completedReferences.length
       const data = readOutDataAndRecords[i]?.item;
       if (data == null) {
-        throw new Error('Parameter data is unexpectedly null');
+        throw new Error(
+          'Parameter data is unexpectedly null. This is indicative of a bug in Isograph.',
+        );
       }
 
       const firstParameter = {

@@ -342,12 +342,11 @@ function readData<TReadFromStore>(
           };
         } else {
           const refetchQueryIndex = field.refetchQuery;
-          if (refetchQueryIndex == null) {
-            throw new Error('refetchQueryIndex is null in RefetchField');
-          }
           const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
           if (refetchQuery == null) {
-            throw new Error('refetchQuery is null in RefetchField');
+            throw new Error(
+              'refetchQuery is null in RefetchField. This is indicative of a bug in Isograph.',
+            );
           }
           const refetchQueryArtifact = refetchQuery.artifact;
           const allowedVariables = refetchQuery.allowedVariables;
@@ -377,7 +376,9 @@ function readData<TReadFromStore>(
         const resolverRefetchQueries = usedRefetchQueries.map((index) => {
           const resolverRefetchQuery = nestedRefetchQueries[index];
           if (resolverRefetchQuery == null) {
-            throw new Error('resolverRefetchQuery is null in Resolver');
+            throw new Error(
+              'resolverRefetchQuery is null in Resolver. This is indicative of a bug in Isograph.',
+            );
           }
           return resolverRefetchQuery;
         });
@@ -644,10 +645,11 @@ function generateChildVariableMap(
   for (const [name, value] of fieldArguments) {
     if (value.kind === 'Variable') {
       const variable = variables[value.name];
-      if (variable == null) {
-        throw new Error('Variable ' + value.name + ' is not missing');
+      // Variable could be null if it was not provided but has a default case,
+      // so we allow the loop to continue rather than throwing an error.
+      if (variable != null) {
+        childVars[name] = variable;
       }
-      childVars[name] = variable;
     } else {
       childVars[name] = value.value;
     }
