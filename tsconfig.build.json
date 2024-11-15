@@ -15,6 +15,7 @@
     "noPropertyAccessFromIndexSignature": true,
     "noUnusedParameters": true,
     "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
     "paths": {
       "@isograph/*": ["./libs/*"]
     },
