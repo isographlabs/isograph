@@ -209,7 +209,7 @@ export function useSkipLimitPagination<
 
   const loadedReferences = state === UNASSIGNED_STATE ? [] : state;
 
-  const mostRecentItem: LoadedFragmentReference<TReadFromStore, TItem> | null =
+  const mostRecentItem: LoadedFragmentReference<TReadFromStore, TItem> | undefined =
     loadedReferences[loadedReferences.length - 1];
   const mostRecentFragmentReference =
     mostRecentItem?.[0].getItemIfNotDisposed();

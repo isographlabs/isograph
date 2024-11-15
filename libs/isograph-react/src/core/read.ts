@@ -343,9 +343,12 @@ function readData<TReadFromStore>(
         } else {
           const refetchQueryIndex = field.refetchQuery;
           if (refetchQueryIndex == null) {
-            throw new Error('refetchQuery is null in RefetchField');
+            throw new Error('refetchQueryIndex is null in RefetchField');
           }
           const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
+          if (refetchQuery == null) {
+            throw new Error('refetchQuery is null in RefetchField');
+          }
           const refetchQueryArtifact = refetchQuery.artifact;
           const allowedVariables = refetchQuery.allowedVariables;
 
@@ -372,7 +375,13 @@ function readData<TReadFromStore>(
       case 'Resolver': {
         const usedRefetchQueries = field.usedRefetchQueries;
         const resolverRefetchQueries = usedRefetchQueries.map(
-          (index) => nestedRefetchQueries[index],
+          (index) => {
+            const resolverRefetchQuery = nestedRefetchQueries[index];
+            if (resolverRefetchQuery == null) {
+                throw new Error('resolverRefetchQuery is null in Resolver');
+            }
+            return resolverRefetchQuery;
+          },
         );
 
         switch (field.readerArtifact.kind) {
