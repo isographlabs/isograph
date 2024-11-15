@@ -1,7 +1,7 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Query__Newsfeed__param } from './param_type';
 import { Newsfeed as resolver } from '../../../Newsfeed/NewsfeedRoute';
-import NewsfeedItem__NewsfeedAdOrBlog__resolver_reader from '../../NewsfeedItem/NewsfeedAdOrBlog/resolver_reader';
+import Viewer__NewsfeedPaginationComponent__resolver_reader from '../../Viewer/NewsfeedPaginationComponent/resolver_reader';
 import Viewer__NewsfeedPaginationComponent__entrypoint from '../../Viewer/NewsfeedPaginationComponent/entrypoint';
 
 const readerAst: ReaderAst<Query__Newsfeed__param> = [
@@ -13,9 +13,8 @@ const readerAst: ReaderAst<Query__Newsfeed__param> = [
     condition: null,
     selections: [
       {
-        kind: "Linked",
-        fieldName: "newsfeed",
-        alias: null,
+        kind: "Resolver",
+        alias: "initial",
         arguments: [
           [
             "skip",
@@ -27,16 +26,8 @@ const readerAst: ReaderAst<Query__Newsfeed__param> = [
             { kind: "Literal", value: 6 },
           ],
         ],
-        condition: null,
-        selections: [
-          {
-            kind: "Resolver",
-            alias: "NewsfeedAdOrBlog",
-            arguments: null,
-            readerArtifact: NewsfeedItem__NewsfeedAdOrBlog__resolver_reader,
-            usedRefetchQueries: [],
-          },
-        ],
+        readerArtifact: Viewer__NewsfeedPaginationComponent__resolver_reader,
+        usedRefetchQueries: [],
       },
       {
         kind: "LoadablySelectedField",
