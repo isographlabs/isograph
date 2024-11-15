@@ -129,6 +129,11 @@ export function makeNetworkRequest(
       } catch {}
     })
     .catch((e) => {
+      logMessage(environment, {
+        kind: 'ReceivedNetworkError',
+        networkRequestId: myNetworkRequestId,
+        error: e,
+      });
       try {
         fetchOptions?.onError?.();
       } catch {}
