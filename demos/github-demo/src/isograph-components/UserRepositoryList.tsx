@@ -43,19 +43,7 @@ export const RepositoryList = iso(`
               return null;
             }
             const { node } = data;
-            return (
-              <TableRow key={node.id}>
-                <TableCell>
-                  <node.RepositoryLink setRoute={setRoute}>
-                    {node.nameWithOwner}
-                  </node.RepositoryLink>
-                </TableCell>
-                <TableCell>{node.stargazerCount}</TableCell>
-                <TableCell>{node.forkCount}</TableCell>
-                <TableCell>{node.pullRequests?.totalCount}</TableCell>
-                <TableCell>{node.watchers?.totalCount}</TableCell>
-              </TableRow>
-            );
+            return <node.RepositoryRow setRoute={setRoute} key={node.id} />;
           })}
           <TableRow>
             <TableCell>
@@ -93,23 +81,46 @@ export const RepositoryConnection = iso(`
       }
       edges {
         node {
+          RepositoryRow
           id
-          RepositoryLink
-          name
-          nameWithOwner
-          description
-          forkCount
-          pullRequests {
-            totalCount
-          }
-          stargazerCount
-          watchers {
-            totalCount
-          }
         }
       }
     }
   }
 `)(function UserRepositoryConnectionComponent({ data }) {
   return data.repositories;
+});
+
+export const RepositoryRow = iso(`
+  field Repository.RepositoryRow @component {
+    RepositoryLink
+    name
+    nameWithOwner
+    description
+    forkCount
+    pullRequests {
+      totalCount
+    }
+    stargazerCount
+    watchers {
+      totalCount
+    }
+  }
+`)((
+  { data: repository },
+  { setRoute }: { setRoute: (route: Route) => void },
+) => {
+  return (
+    <TableRow>
+      <TableCell>
+        <repository.RepositoryLink setRoute={setRoute}>
+          {repository.nameWithOwner}
+        </repository.RepositoryLink>
+      </TableCell>
+      <TableCell>{repository.stargazerCount}</TableCell>
+      <TableCell>{repository.forkCount}</TableCell>
+      <TableCell>{repository.pullRequests?.totalCount}</TableCell>
+      <TableCell>{repository.watchers?.totalCount}</TableCell>
+    </TableRow>
+  );
 });

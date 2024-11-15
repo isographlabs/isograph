@@ -172,3 +172,7 @@ export const BlogPostDisplay = iso(`
 ## Pagination
 
 Pagination is also built on loadable fields. See [the pagination docs](../pagination).
+
+## Data-driven dependencies
+
+Check out the [data driven dependencies](/docs/data-driven-dependencies/) documentation to see how to combine `@loadable` fields, [pagination](/docs/pagination/) and [`asConcreteType` fields](/docs/abstract-types/) to fetch the minimal amount of data and JavaScript needed!
