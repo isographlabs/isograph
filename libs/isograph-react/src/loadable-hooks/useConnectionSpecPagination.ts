@@ -114,8 +114,13 @@ export function useConnectionSpecPagination<
         fragmentReference.readerWithRefetchQueries,
       );
 
+      const data = readOutDataAndRecords[i]?.item;
+      if (data == null) {
+        throw new Error('Parameter data is unexpectedly null');
+      }
+
       const firstParameter = {
-        data: readOutDataAndRecords[i].item,
+        data,
         parameters: fragmentReference.variables,
       };
 
@@ -165,10 +170,17 @@ export function useConnectionSpecPagination<
           fragmentReference.readerWithRefetchQueries,
         );
 
+        const records = readOutDataAndRecords[i];
+        if (records == null) {
+          throw new Error(
+            'subscribeCompletedFragmentReferences records is unexpectedly null',
+          );
+        }
+
         return {
           fragmentReference,
           readerAst: readerWithRefetchQueries.readerArtifact.readerAst,
-          records: readOutDataAndRecords[i],
+          records,
           callback(_data) {
             rerender({});
           },
@@ -224,10 +236,9 @@ export function useConnectionSpecPagination<
 
   const loadedReferences = state === UNASSIGNED_STATE ? [] : state;
 
-  const mostRecentItem: LoadedFragmentReference<
-    TReadFromStore,
-    Connection<TItem>
-  > | null = loadedReferences[loadedReferences.length - 1];
+  const mostRecentItem:
+    | LoadedFragmentReference<TReadFromStore, Connection<TItem>>
+    | undefined = loadedReferences[loadedReferences.length - 1];
   const mostRecentFragmentReference =
     mostRecentItem?.[0].getItemIfNotDisposed();
 

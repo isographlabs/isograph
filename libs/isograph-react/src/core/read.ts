@@ -374,15 +374,13 @@ function readData<TReadFromStore>(
       }
       case 'Resolver': {
         const usedRefetchQueries = field.usedRefetchQueries;
-        const resolverRefetchQueries = usedRefetchQueries.map(
-          (index) => {
-            const resolverRefetchQuery = nestedRefetchQueries[index];
-            if (resolverRefetchQuery == null) {
-                throw new Error('resolverRefetchQuery is null in Resolver');
-            }
-            return resolverRefetchQuery;
-          },
-        );
+        const resolverRefetchQueries = usedRefetchQueries.map((index) => {
+          const resolverRefetchQuery = nestedRefetchQueries[index];
+          if (resolverRefetchQuery == null) {
+            throw new Error('resolverRefetchQuery is null in Resolver');
+          }
+          return resolverRefetchQuery;
+        });
 
         switch (field.readerArtifact.kind) {
           case 'EagerReaderArtifact': {
@@ -645,7 +643,11 @@ function generateChildVariableMap(
   const childVars: Writable<Variables> = {};
   for (const [name, value] of fieldArguments) {
     if (value.kind === 'Variable') {
-      childVars[name] = variables[value.name];
+      const hting = variables[value.name];
+      if (hting == null) {
+        throw new Error('Variable ' + value.name + ' is not defined');
+      }
+      childVars[name] = hting;
     } else {
       childVars[name] = value.value;
     }
