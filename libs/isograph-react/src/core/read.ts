@@ -33,7 +33,7 @@ import { ReaderAst } from './reader';
 import { Arguments } from './util';
 import { logMessage } from './logging';
 import { CleanupFn } from '@isograph/disposable-types';
-import { DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
+import { FetchOptions } from './check';
 
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: EncounteredIds;
@@ -483,14 +483,12 @@ function readData<TReadFromStore>(
                 const fragmentReferenceAndDisposeFromEntrypoint = (
                   entrypoint: IsographEntrypoint<any, any>,
                 ): [FragmentReference<any, any>, CleanupFn] => {
-                  const shouldFetch =
-                    fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE;
                   const [networkRequest, disposeNetworkRequest] =
                     maybeMakeNetworkRequest(
                       environment,
                       entrypoint,
                       localVariables,
-                      shouldFetch,
+                      fetchOptions,
                     );
 
                   const fragmentReference: FragmentReference<any, any> = {
@@ -547,15 +545,12 @@ function readData<TReadFromStore>(
                           if (
                             entrypointLoaderState.kind === 'EntrypointNotLoaded'
                           ) {
-                            const shouldFetch =
-                              fetchOptions?.shouldFetch ??
-                              DEFAULT_SHOULD_FETCH_VALUE;
                             const [networkRequest, disposeNetworkRequest] =
                               maybeMakeNetworkRequest(
                                 environment,
                                 entrypoint,
                                 localVariables,
-                                shouldFetch,
+                                fetchOptions,
                               );
                             entrypointLoaderState = {
                               kind: 'NetworkRequestStarted',
