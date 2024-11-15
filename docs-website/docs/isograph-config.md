@@ -6,7 +6,7 @@ The file should be named `isograph.config.json` and located at the root of your 
 
 ## Config file contents
 
-An example (complete) Isograph config is as follows:
+An example (complete) Isograph config is as follows. It contains default `options`:
 
 ```json
 {
@@ -15,7 +15,9 @@ An example (complete) Isograph config is as follows:
   "schema": "./backend/schema.graphql",
   "schema_extensions": ["./backend/schema-extension.graphql"],
   "options": {
-    "on_invalid_id_type": "error"
+    "on_invalid_id_type": "error",
+    "on_missing_babel_transform": "error",
+    "include_file_extensions_in_import_statements": false
   }
 }
 ```
