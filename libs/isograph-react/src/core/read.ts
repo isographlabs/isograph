@@ -342,10 +342,12 @@ function readData<TReadFromStore>(
           };
         } else {
           const refetchQueryIndex = field.refetchQuery;
-          if (refetchQueryIndex == null) {
-            throw new Error('refetchQuery is null in RefetchField');
-          }
           const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
+          if (refetchQuery == null) {
+            throw new Error(
+              'refetchQuery is null in RefetchField. This is indicative of a bug in Isograph.',
+            );
+          }
           const refetchQueryArtifact = refetchQuery.artifact;
           const allowedVariables = refetchQuery.allowedVariables;
 
@@ -371,9 +373,15 @@ function readData<TReadFromStore>(
       }
       case 'Resolver': {
         const usedRefetchQueries = field.usedRefetchQueries;
-        const resolverRefetchQueries = usedRefetchQueries.map(
-          (index) => nestedRefetchQueries[index],
-        );
+        const resolverRefetchQueries = usedRefetchQueries.map((index) => {
+          const resolverRefetchQuery = nestedRefetchQueries[index];
+          if (resolverRefetchQuery == null) {
+            throw new Error(
+              'resolverRefetchQuery is null in Resolver. This is indicative of a bug in Isograph.',
+            );
+          }
+          return resolverRefetchQuery;
+        });
 
         switch (field.readerArtifact.kind) {
           case 'EagerReaderArtifact': {
@@ -636,7 +644,12 @@ function generateChildVariableMap(
   const childVars: Writable<Variables> = {};
   for (const [name, value] of fieldArguments) {
     if (value.kind === 'Variable') {
-      childVars[name] = variables[value.name];
+      const variable = variables[value.name];
+      // Variable could be null if it was not provided but has a default case,
+      // so we allow the loop to continue rather than throwing an error.
+      if (variable != null) {
+        childVars[name] = variable;
+      }
     } else {
       childVars[name] = value.value;
     }
