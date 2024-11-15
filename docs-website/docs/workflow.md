@@ -18,7 +18,7 @@ A babel plugin transforms your `iso` literals. For example, `iso` entrypoint lit
 ## Debugging
 
 - You can use React dev tools. In particular, searching for `@component` will show you where all of your resolvers defined with `@component` are rendered.
-- If you call `registerLogFunction` on your environment, you can get additional logs.
+- The environment constructor takes an optional logger. Pass `console.log` to have Isograph print out everything it is doing, if you're curious!
 
 ## Workflow for modifying Isograph
 
