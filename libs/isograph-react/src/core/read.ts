@@ -643,11 +643,11 @@ function generateChildVariableMap(
   const childVars: Writable<Variables> = {};
   for (const [name, value] of fieldArguments) {
     if (value.kind === 'Variable') {
-      const hting = variables[value.name];
-      if (hting == null) {
-        throw new Error('Variable ' + value.name + ' is not defined');
+      const variable = variables[value.name];
+      if (variable == null) {
+        throw new Error('Variable ' + value.name + ' is not missing');
       }
-      childVars[name] = hting;
+      childVars[name] = variable;
     } else {
       childVars[name] = value.value;
     }
