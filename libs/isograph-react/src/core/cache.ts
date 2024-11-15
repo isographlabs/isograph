@@ -516,7 +516,7 @@ function normalizeLinkedField(
     const dataIds: (Link | null)[] = [];
     for (let i = 0; i < networkResponseData.length; i++) {
       const networkResponseObject = networkResponseData[i];
-      if (networkResponseObject === null) {
+      if (networkResponseObject == null) {
         dataIds.push(null);
         continue;
       }
