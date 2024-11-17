@@ -17,7 +17,7 @@ impl UnvalidatedSchema {
     /// TODO confirm we don't do this for unions...
     pub fn add_link_fields(&mut self) -> ProcessTypeDefinitionResult<()> {
         for object in &mut self.server_field_data.server_objects {
-            let field_name = "__link".intern().into();
+            let field_name = "link".intern().into();
             let next_client_field_id = self.client_fields.len().into();
             self.client_fields
                 .push(ClientType::ClientField(ClientField {

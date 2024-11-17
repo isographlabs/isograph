@@ -36,7 +36,7 @@ use crate::{
         generate_entrypoint_artifacts_with_client_field_traversal_result,
     },
     format_parameter_type::format_parameter_type,
-    import_statements::ParamTypeImports,
+    import_statements::{LinkImports, ParamTypeImports},
     iso_overload_file::build_iso_overload_artifact,
     refetch_reader_artifact::{
         generate_refetch_output_type_artifact, generate_refetch_reader_artifact,
@@ -446,6 +446,7 @@ pub(crate) fn generate_client_field_parameter_type(
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
+    link_fields: &mut LinkImports,
 ) -> ClientFieldParameterType {
     // TODO use unwraps
     let mut client_field_parameter_type = "{\n".to_string();
@@ -458,6 +459,7 @@ pub(crate) fn generate_client_field_parameter_type(
             nested_client_field_imports,
             loadable_fields,
             indentation_level + 1,
+            link_fields,
         );
     }
     client_field_parameter_type.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
@@ -465,6 +467,7 @@ pub(crate) fn generate_client_field_parameter_type(
     ClientFieldParameterType(client_field_parameter_type)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn write_param_type_from_selection(
     schema: &ValidatedSchema,
     query_type_declaration: &mut String,
@@ -473,6 +476,7 @@ fn write_param_type_from_selection(
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
+    link_fields: &mut LinkImports,
 ) {
     match &selection.item {
         ServerFieldSelection::ScalarField(scalar_field_selection) => {
@@ -524,55 +528,71 @@ fn write_param_type_from_selection(
                     query_type_declaration
                         .push_str(&"  ".repeat(indentation_level as usize).to_string());
 
-                    nested_client_field_imports.insert(client_field.type_and_field);
-                    let inner_output_type = format!(
-                        "{}__output_type",
-                        client_field.type_and_field.underscore_separated()
-                    );
-
-                    let output_type = match scalar_field_selection.associated_data.selection_variant
-                    {
-                        ValidatedIsographSelectionVariant::Regular => inner_output_type,
-                        ValidatedIsographSelectionVariant::Loadable(_) => {
-                            loadable_fields.insert(client_field.type_and_field);
-                            let provided_arguments = get_provided_arguments(
-                                client_field.variable_definitions.iter().map(|x| &x.item),
-                                &scalar_field_selection.arguments,
+                    match client_field.variant {
+                        ClientFieldVariant::Link => {
+                            link_fields.insert(());
+                            let output_type = "Link";
+                            query_type_declaration.push_str(
+                                &(format!(
+                                    "readonly {}: {},\n",
+                                    scalar_field_selection.name_or_alias().item,
+                                    output_type
+                                )),
                             );
-
-                            let indent = "  ".repeat((indentation_level + 1) as usize);
-                            let provided_args_type = if provided_arguments.is_empty() {
-                                "".to_string()
-                            } else {
-                                format!(
-                                    ",\n{indent}Omit<ExtractParameters<{}__param>, keyof {}>",
-                                    client_field.type_and_field.underscore_separated(),
-                                    get_loadable_field_type_from_arguments(
-                                        schema,
-                                        provided_arguments
-                                    )
-                                )
-                            };
-
-                            format!(
-                                "LoadableField<\n\
-                                        {indent}{}__param,\n\
-                                        {indent}{inner_output_type}\
-                                        {provided_args_type}\n\
-                                        {}>",
-                                client_field.type_and_field.underscore_separated(),
-                                "  ".repeat(indentation_level as usize),
-                            )
                         }
-                    };
+                        ClientFieldVariant::UserWritten(_)
+                        | ClientFieldVariant::ImperativelyLoadedField(_) => {
+                            nested_client_field_imports.insert(client_field.type_and_field);
+                            let inner_output_type = format!(
+                                "{}__output_type",
+                                client_field.type_and_field.underscore_separated()
+                            );
+                            let output_type = match scalar_field_selection
+                                .associated_data
+                                .selection_variant
+                            {
+                                ValidatedIsographSelectionVariant::Regular => inner_output_type,
+                                ValidatedIsographSelectionVariant::Loadable(_) => {
+                                    loadable_fields.insert(client_field.type_and_field);
+                                    let provided_arguments = get_provided_arguments(
+                                        client_field.variable_definitions.iter().map(|x| &x.item),
+                                        &scalar_field_selection.arguments,
+                                    );
 
-                    query_type_declaration.push_str(
-                        &(format!(
-                            "readonly {}: {},\n",
-                            scalar_field_selection.name_or_alias().item,
-                            output_type
-                        )),
-                    );
+                                    let indent = "  ".repeat((indentation_level + 1) as usize);
+                                    let provided_args_type = if provided_arguments.is_empty() {
+                                        "".to_string()
+                                    } else {
+                                        format!(
+                                                ",\n{indent}Omit<ExtractParameters<{}__param>, keyof {}>",
+                                                client_field.type_and_field.underscore_separated(),
+                                                get_loadable_field_type_from_arguments(
+                                                    schema,
+                                                    provided_arguments
+                                                )
+                                            )
+                                    };
+
+                                    format!(
+                                        "LoadableField<\n\
+                                                    {indent}{}__param,\n\
+                                                    {indent}{inner_output_type}\
+                                                    {provided_args_type}\n\
+                                                    {}>",
+                                        client_field.type_and_field.underscore_separated(),
+                                        "  ".repeat(indentation_level as usize),
+                                    )
+                                }
+                            };
+                            query_type_declaration.push_str(
+                                &(format!(
+                                    "readonly {}: {},\n",
+                                    scalar_field_selection.name_or_alias().item,
+                                    output_type
+                                )),
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -611,6 +631,7 @@ fn write_param_type_from_selection(
                                 nested_client_field_imports,
                                 loadable_fields,
                                 indentation_level,
+                                link_fields,
                             )
                         }),
                 };

@@ -63,10 +63,10 @@ impl UnvalidatedSchema {
                             location: FieldType::ClientField(
                                 match *subtype
                                     .encountered_fields
-                                    .get(&"__link".intern().into())
-                                    .expect("Expected __link to exist")
+                                    .get(&"link".intern().into())
+                                    .expect("Expected link to exist")
                                     .as_client_field()
-                                    .expect("Expected __link to be client field")
+                                    .expect("Expected link to be client field")
                                 {
                                     ClientType::ClientField(client_field_id) => client_field_id,
                                 },
@@ -74,7 +74,7 @@ impl UnvalidatedSchema {
                             selection_variant: ValidatedIsographSelectionVariant::Regular,
                         },
                         directives: vec![],
-                        name: WithLocation::new("__link".intern().into(), Location::generated()),
+                        name: WithLocation::new("link".intern().into(), Location::generated()),
                         reader_alias: None,
                     }),
                     Span::todo_generated(),

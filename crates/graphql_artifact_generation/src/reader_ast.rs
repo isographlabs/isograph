@@ -225,7 +225,6 @@ fn scalar_client_defined_field_ast_node(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn link_variant_ast_node(
     scalar_field_selection: &ValidatedScalarFieldSelection,
     indentation_level: u8,

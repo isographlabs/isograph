@@ -156,10 +156,10 @@ pub(crate) fn generate_eager_reader_condition_artifact(
         reader_imports_to_import_statement(&reader_imports, file_extensions);
 
     let reader_param_type = "{ data: any, parameters: Record<PropertyKey, never> }";
-    let reader_output_type = "boolean";
+    let reader_output_type = "Link | null";
 
     let reader_content = format!(
-        "import type {{ EagerReaderArtifact, ReaderAst }} from '@isograph/react';\n\
+        "import type {{ EagerReaderArtifact, ReaderAst, Link }} from '@isograph/react';\n\
         {reader_import_statement}\n\
         const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
         const artifact: EagerReaderArtifact<\n\
@@ -167,7 +167,7 @@ pub(crate) fn generate_eager_reader_condition_artifact(
         {}{reader_output_type}\n\
         > = {{\n\
         {}kind: \"EagerReaderArtifact\",\n\
-        {}resolver: ({{ data }}) => data.__typename === \"{concrete_type}\" ? data.__link : null,\n\
+        {}resolver: ({{ data }}) => data.__typename === \"{concrete_type}\" ? data.link : null,\n\
         {}readerAst,\n\
         }};\n\n\
         export default artifact;\n",
@@ -196,6 +196,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
 
     let mut param_type_imports = BTreeSet::new();
     let mut loadable_fields = BTreeSet::new();
+    let mut link_fields = BTreeSet::new();
     let client_field_parameter_type = generate_client_field_parameter_type(
         schema,
         client_field.selection_set_for_parent_query(),
@@ -203,21 +204,45 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
         &mut param_type_imports,
         &mut loadable_fields,
         1,
+        &mut link_fields,
     );
 
     let param_type_import_statement =
         param_type_imports_to_import_statement(&param_type_imports, file_extensions);
     let reader_param_type = format!("{}__{}__param", parent_type.name, client_field.name);
 
+    let link_field_imports = if !link_fields.is_empty() {
+        Some("type Link")
+    } else {
+        None
+    };
+
     let loadable_field_imports = if !loadable_fields.is_empty() {
         let param_imports =
             param_type_imports_to_import_param_statement(&loadable_fields, file_extensions);
-        format!(
-            "import {{ type LoadableField, type ExtractParameters }} from '@isograph/react';\n\
-            {param_imports}"
-        )
+
+        Some(("type LoadableField, type ExtractParameters", param_imports))
     } else {
-        "".to_string()
+        None
+    };
+
+    let isograph_react_imports = match (link_field_imports, loadable_field_imports) {
+        (None, None) => "".to_string(),
+        (Some(link_field_import), None) => {
+            format!("import {{ {link_field_import} }} from '@isograph/react';\n")
+        }
+        (None, Some((loadable_field_imports, param_imports))) => {
+            format!(
+                "import {{ {loadable_field_imports} }} from '@isograph/react';\n\
+                {param_imports}"
+            )
+        }
+        (Some(link_field_import), Some((loadable_field_imports, param_imports))) => {
+            format!(
+                "import {{ {link_field_import}, {loadable_field_imports} }} from '@isograph/react';\n\
+                {param_imports}"
+            )
+        }
     };
 
     let (parameters_import, parameters_type) = if !client_field.variable_definitions.is_empty() {
@@ -234,7 +259,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
     let indent = "  ";
     let param_type_content = format!(
         "{param_type_import_statement}\
-        {loadable_field_imports}\
+        {isograph_react_imports}\
         {parameters_import}\n\
         export type {reader_param_type} = {{\n\
         {indent}readonly data: {client_field_parameter_type},\n\
