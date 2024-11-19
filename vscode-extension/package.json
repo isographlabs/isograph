@@ -65,11 +65,11 @@
     "prettier-check": "prettier -c .",
     "prettier-write": "prettier --write .",
     "lint": "eslint --max-warnings 0 .",
-    "vscode:prepublish": "rm -f tsconfig.tsbuildinfo && rm -rf out && pnpm run esbuild-base -- --minify",
+    "vscode:prepublish": "rm -f tsconfig.tsbuildinfo && rm -rf out && npm run esbuild-base -- --minify",
     "build-local": "vsce package",
     "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
-    "esbuild": "pnpm run esbuild-base --sourcemap",
-    "esbuild-watch": "pnpm run esbuild-base --sourcemap --watch"
+    "esbuild": "npm run esbuild-base --sourcemap",
+    "esbuild-watch": "npm run esbuild-base --sourcemap --watch"
   },
   "engines": {
     "node": "22.9.0",
