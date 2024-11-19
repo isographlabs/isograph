@@ -9,9 +9,9 @@ pub(crate) fn read_schema_file(path: &PathBuf) -> Result<String, BatchCompileErr
     let canonicalized_existing_path =
         joined
             .canonicalize()
-            .map_err(|message| BatchCompileError::UnableToLoadSchema {
+            .map_err(|e| BatchCompileError::UnableToLoadSchema {
                 path: joined,
-                message,
+                message: e.to_string(),
             })?;
 
     if !canonicalized_existing_path.is_file() {
@@ -20,10 +20,10 @@ pub(crate) fn read_schema_file(path: &PathBuf) -> Result<String, BatchCompileErr
         });
     }
 
-    let contents = std::fs::read(canonicalized_existing_path.clone()).map_err(|message| {
+    let contents = std::fs::read(canonicalized_existing_path.clone()).map_err(|e| {
         BatchCompileError::UnableToReadFile {
             path: canonicalized_existing_path.clone(),
-            message,
+            message: e.to_string(),
         }
     })?;
 
