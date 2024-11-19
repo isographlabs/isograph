@@ -16,7 +16,7 @@ The node.js and pnpm versions used by Isograph are specified in fields `engines.
 
 In order to ensure you are using the correct versions of these you should install `fnm` for your respective operating system by following [this](https://github.com/Schniz/fnm?tab=readme-ov-file#installation) guide. Optionally, configure fnm for your shell by following [this](https://github.com/Schniz/fnm?tab=readme-ov-file#shell-setup) guide.
 
-Now, navigate to the root directory of your Isograph repository and run the following commands one by one:
+Now, navigate to the root directory of your Isograph repository and run the following commands:
 
 ```bash
 fnm install --resolve-engines
@@ -111,7 +111,7 @@ pnpm i
 ### Build the Isograph JavaScript libraries for use in demos
 
 ```sh
-pnpm -r watch-libs
+pnpm watch-libs
 ```
 
 `watch-libs` will watch the source files for changes, and rebuild everything. If you only want to do it once, you can:
@@ -152,8 +152,29 @@ pnpm backend
 
 ### Starting
 
+- If you haven't yet, build the Isograph javascript libraries for the demos by running the following from root:
+
+```sh
+pnpm i
+pnpm watch-libs
+```
+
+or
+
+```sh
+pnpm i
+pnpm -r compile
+```
+
 - Open VSCode in `isograph/vscode-extension`
-- Open the "run and debug" sidebar, and click `Run and Debug`. If given a choice, select something related to "Extension development host".
+- Run the following in `isograph/vscode-extension`:
+
+```sh
+npm i
+npm run build-local
+```
+
+- Open `src/extension.ts` in your editor, then open the "run and debug" sidebar and click `Run and Debug`. If given a choice, select something related to "Extension development host".
 - In this new window, open `isograph/demos/pet-demo`.
 - The VSCode extension should start when you open a JS, JSX, TS or TSX file.
 
