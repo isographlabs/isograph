@@ -1,6 +1,6 @@
 use std::{
     fs::{self, File},
-    io::{self, Write},
+    io::Write,
     path::PathBuf,
 };
 
@@ -15,14 +15,14 @@ pub(crate) fn write_artifacts_to_disk(
         fs::remove_dir_all(artifact_directory).map_err(|e| {
             GenerateArtifactsError::UnableToDeleteDirectory {
                 path: artifact_directory.clone(),
-                message: e,
+                message: e.to_string(),
             }
         })?;
     }
     fs::create_dir_all(artifact_directory).map_err(|e| {
         GenerateArtifactsError::UnableToCreateDirectory {
             path: artifact_directory.clone(),
-            message: e,
+            message: e.to_string(),
         }
     })?;
 
@@ -35,7 +35,7 @@ pub(crate) fn write_artifacts_to_disk(
         fs::create_dir_all(&absolute_directory).map_err(|e| {
             GenerateArtifactsError::UnableToCreateDirectory {
                 path: absolute_directory.clone(),
-                message: e,
+                message: e.to_string(),
             }
         })?;
 
@@ -44,14 +44,14 @@ pub(crate) fn write_artifacts_to_disk(
         let mut file = File::create(&absolute_file_path).map_err(|e| {
             GenerateArtifactsError::UnableToWriteToArtifactFile {
                 path: absolute_file_path.clone(),
-                message: e,
+                message: e.to_string(),
             }
         })?;
 
         file.write(path_and_content.file_content.as_bytes())
             .map_err(|e| GenerateArtifactsError::UnableToWriteToArtifactFile {
                 path: absolute_file_path.clone(),
-                message: e,
+                message: e.to_string(),
             })?;
     }
     Ok(count)
@@ -65,19 +65,19 @@ pub enum GenerateArtifactsError {
         Is there another instance of the Isograph compiler running?\
         \nReason: {message:?}"
     )]
-    UnableToWriteToArtifactFile { path: PathBuf, message: io::Error },
+    UnableToWriteToArtifactFile { path: PathBuf, message: String },
 
     #[error(
         "Unable to create directory at path {path:?}. \
         Is there another instance of the Isograph compiler running?\
         \nReason: {message:?}"
     )]
-    UnableToCreateDirectory { path: PathBuf, message: io::Error },
+    UnableToCreateDirectory { path: PathBuf, message: String },
 
     #[error(
         "Unable to delete directory at path {path:?}. \
         Is there another instance of the Isograph compiler running?\
         \nReason: {message:?}"
     )]
-    UnableToDeleteDirectory { path: PathBuf, message: io::Error },
+    UnableToDeleteDirectory { path: PathBuf, message: String },
 }
