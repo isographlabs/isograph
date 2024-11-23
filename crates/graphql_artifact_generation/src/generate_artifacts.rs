@@ -131,7 +131,7 @@ pub fn get_artifact_path_and_content(
             }
             FieldType::ClientField(encountered_client_field_id) => {
                 let encountered_client_field = schema.client_field(*encountered_client_field_id);
-                // Generate reader ASTs for all encountered client fields, which may be reader or refetch reader
+
                 match &encountered_client_field.variant {
                     ClientFieldVariant::Link => (),
                     ClientFieldVariant::UserWritten(info) => {

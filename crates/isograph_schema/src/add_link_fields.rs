@@ -7,14 +7,6 @@ use crate::{
 };
 
 impl UnvalidatedSchema {
-    /// For each supertype (e.g. Node), add the fields defined on it (e.g. Node.MyComponent)
-    /// to subtypes (e.g. creating User.MyComponent).
-    ///
-    /// We do not transfer server fields (because that makes no sense in GraphQL, but does
-    /// it make sense otherwise??) and refetch fields (which are already defined on all valid
-    /// types.)
-    ///
-    /// TODO confirm we don't do this for unions...
     pub fn add_link_fields(&mut self) -> ProcessTypeDefinitionResult<()> {
         for object in &mut self.server_field_data.server_objects {
             let field_name = "link".intern().into();
