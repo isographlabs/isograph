@@ -262,6 +262,7 @@ fn user_written_fields(
         .client_fields
         .iter()
         .filter_map(|client_field| match client_field {
+            ClientType::ClientPointer(_) => todo!(),
             ClientType::ClientField(client_field) => match client_field.variant {
                 ClientFieldVariant::UserWritten(info) => {
                     Some((client_field, info.user_written_component_variant))

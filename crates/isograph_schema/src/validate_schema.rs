@@ -15,7 +15,7 @@ use thiserror::Error;
 use crate::{
     validate_client_field::validate_and_transform_client_fields,
     validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
-    FieldType, ImperativelyLoadedFieldVariant, Schema, SchemaIdField, SchemaObject,
+    ClientPointer, FieldType, ImperativelyLoadedFieldVariant, Schema, SchemaIdField, SchemaObject,
     SchemaServerField, SchemaValidationState, ServerFieldData, ServerFieldTypeAssociatedData,
     UnvalidatedSchema, UnvalidatedVariableDefinition, UseRefetchFieldRefetchStrategy,
     ValidateEntrypointDeclarationError,
@@ -41,6 +41,12 @@ pub type ValidatedScalarFieldSelection = ScalarFieldSelection<
 
 pub type ValidatedVariableDefinition = VariableDefinition<SelectableServerFieldId>;
 pub type ValidatedClientField = ClientField<
+    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+>;
+
+pub type ValidatedClientPointer = ClientPointer<
     <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,

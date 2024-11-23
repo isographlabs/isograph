@@ -1,9 +1,10 @@
 use std::fmt::Debug;
 
 use common_lang_types::{
-    ConstExportName, DescriptionValue, EnumLiteralValue, FieldArgumentName, FieldNameOrAlias,
-    FilePath, LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName,
-    StringLiteralValue, UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
+    ClientPointerFieldName, ConstExportName, DescriptionValue, EnumLiteralValue, FieldArgumentName,
+    FieldNameOrAlias, FilePath, LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias,
+    ScalarFieldName, StringLiteralValue, UnvalidatedTypeName, ValueKeyName, VariableName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{FloatValue, GraphQLTypeAnnotation, NameValuePair};
 use serde::Deserialize;
@@ -44,7 +45,8 @@ pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
 pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
     pub const_export_name: ConstExportName,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
-    pub client_pointer_name: WithSpan<ScalarFieldName>,
+    pub to_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    pub client_pointer_name: WithSpan<ClientPointerFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
@@ -57,8 +59,12 @@ pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
 }
 
 pub type ClientFieldDeclarationWithUnvalidatedDirectives = ClientFieldDeclaration<(), ()>;
+pub type ClientPointerDeclarationWithUnvalidatedDirectives = ClientPointerDeclaration<(), ()>;
 pub type ClientFieldDeclarationWithValidatedDirectives =
     ClientFieldDeclaration<IsographSelectionVariant, IsographSelectionVariant>;
+
+pub type ClientPointerDeclarationWithValidatedDirectives =
+    ClientPointerDeclaration<IsographSelectionVariant, IsographSelectionVariant>;
 
 // TODO we should not have an enum, but instead a struct with fields lazy_load_artifact_info
 // and loadable_info or something.

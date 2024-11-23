@@ -1,6 +1,6 @@
 use std::{fmt, ops::Deref};
 
-use common_lang_types::WithSpan;
+use common_lang_types::{Span, WithSpan};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum GraphQLTypeAnnotation<TValue> {
@@ -15,6 +15,14 @@ impl<TValue> GraphQLTypeAnnotation<TValue> {
             GraphQLTypeAnnotation::Named(named) => &named.0.item,
             GraphQLTypeAnnotation::List(list) => list.0.inner(),
             GraphQLTypeAnnotation::NonNull(non_null) => non_null.inner(),
+        }
+    }
+
+    pub fn span(&self) -> &Span {
+        match self {
+            GraphQLTypeAnnotation::Named(named) => &named.0.span,
+            GraphQLTypeAnnotation::List(list) => list.0.span(),
+            GraphQLTypeAnnotation::NonNull(non_null) => non_null.span(),
         }
     }
 
@@ -100,6 +108,13 @@ impl<TValue> GraphQLNonNullTypeAnnotation<TValue> {
         match self {
             GraphQLNonNullTypeAnnotation::Named(named) => &named.0.item,
             GraphQLNonNullTypeAnnotation::List(list) => list.0.inner(),
+        }
+    }
+
+    pub fn span(&self) -> &Span {
+        match self {
+            GraphQLNonNullTypeAnnotation::Named(named) => &named.0.span,
+            GraphQLNonNullTypeAnnotation::List(list) => list.0.span(),
         }
     }
 

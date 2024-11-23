@@ -14,7 +14,8 @@ use lazy_static::lazy_static;
 use regex::Regex;
 
 use crate::{
-    batch_compile::BatchCompileError, field_directives::validate_isograph_field_directives,
+    batch_compile::BatchCompileError,
+    field_directives::{validate_isograph_field_directives, validate_isograph_pointer_directives},
     source_files::ContainsIso,
 };
 
@@ -164,7 +165,22 @@ pub(crate) fn process_iso_literals(
                         Err(e) => errors.extend(e),
                     };
                 }
-                IsoLiteralExtractionResult::ClientPointerDeclaration(_) => todo!(),
+                IsoLiteralExtractionResult::ClientPointerDeclaration(
+                    client_pointer_declaration,
+                ) => {
+                    match validate_isograph_pointer_directives(client_pointer_declaration) {
+                        Ok(validated_client_pointer_declaration) => {
+                            if let Err(e) = schema.process_client_pointer_declaration(
+                                validated_client_pointer_declaration,
+                                text_source,
+                            ) {
+                                errors.push(e);
+                            }
+                        }
+                        Err(e) => errors.extend(e),
+                    };
+                }
+
                 IsoLiteralExtractionResult::EntrypointDeclaration(entrypoint_declaration) => schema
                     .entrypoints
                     .push((text_source, entrypoint_declaration)),
