@@ -331,6 +331,7 @@ pub fn categorize_field_loadability<'a>(
     selection_variant: &'a ValidatedIsographSelectionVariant,
 ) -> Option<Loadability<'a>> {
     match &client_field.variant {
+        ClientFieldVariant::Link => None,
         ClientFieldVariant::UserWritten(_) => match selection_variant {
             ValidatedIsographSelectionVariant::Regular => None,
             ValidatedIsographSelectionVariant::Loadable((l, _)) => {

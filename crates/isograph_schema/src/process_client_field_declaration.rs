@@ -199,6 +199,7 @@ pub struct UserWrittenClientFieldInfo {
 pub enum ClientFieldVariant {
     UserWritten(UserWrittenClientFieldInfo),
     ImperativelyLoadedField(ImperativelyLoadedFieldVariant),
+    Link,
 }
 
 lazy_static! {
