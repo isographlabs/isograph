@@ -530,7 +530,7 @@ fn write_param_type_from_selection(
 
                     match client_field.variant {
                         ClientFieldVariant::Link => {
-                            link_fields.insert(());
+                            *link_fields = true;
                             let output_type = "Link";
                             query_type_declaration.push_str(
                                 &(format!(

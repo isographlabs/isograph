@@ -196,7 +196,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
 
     let mut param_type_imports = BTreeSet::new();
     let mut loadable_fields = BTreeSet::new();
-    let mut link_fields = BTreeSet::new();
+    let mut link_fields = false;
     let client_field_parameter_type = generate_client_field_parameter_type(
         schema,
         client_field.selection_set_for_parent_query(),
@@ -211,7 +211,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
         param_type_imports_to_import_statement(&param_type_imports, file_extensions);
     let reader_param_type = format!("{}__{}__param", parent_type.name, client_field.name);
 
-    let link_field_imports = if !link_fields.is_empty() {
+    let link_field_imports = if link_fields {
         "import type { Link } from '@isograph/react';\n".to_string()
     } else {
         "".to_string()
