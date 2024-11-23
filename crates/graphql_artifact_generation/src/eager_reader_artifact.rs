@@ -212,37 +212,20 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
     let reader_param_type = format!("{}__{}__param", parent_type.name, client_field.name);
 
     let link_field_imports = if !link_fields.is_empty() {
-        Some("type Link")
+        "import type { Link } from '@isograph/react';\n".to_string()
     } else {
-        None
+        "".to_string()
     };
 
     let loadable_field_imports = if !loadable_fields.is_empty() {
         let param_imports =
             param_type_imports_to_import_param_statement(&loadable_fields, file_extensions);
-
-        Some(("type LoadableField, type ExtractParameters", param_imports))
+        format!(
+            "import {{ type LoadableField, type ExtractParameters }} from '@isograph/react';\n\
+            {param_imports}"
+        )
     } else {
-        None
-    };
-
-    let isograph_react_imports = match (link_field_imports, loadable_field_imports) {
-        (None, None) => "".to_string(),
-        (Some(link_field_import), None) => {
-            format!("import {{ {link_field_import} }} from '@isograph/react';\n")
-        }
-        (None, Some((loadable_field_imports, param_imports))) => {
-            format!(
-                "import {{ {loadable_field_imports} }} from '@isograph/react';\n\
-                {param_imports}"
-            )
-        }
-        (Some(link_field_import), Some((loadable_field_imports, param_imports))) => {
-            format!(
-                "import {{ {link_field_import}, {loadable_field_imports} }} from '@isograph/react';\n\
-                {param_imports}"
-            )
-        }
+        "".to_string()
     };
 
     let (parameters_import, parameters_type) = if !client_field.variable_definitions.is_empty() {
@@ -259,7 +242,8 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
     let indent = "  ";
     let param_type_content = format!(
         "{param_type_import_statement}\
-        {isograph_react_imports}\
+        {link_field_imports}\
+        {loadable_field_imports}\
         {parameters_import}\n\
         export type {reader_param_type} = {{\n\
         {indent}readonly data: {client_field_parameter_type},\n\
