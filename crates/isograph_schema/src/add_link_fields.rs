@@ -26,7 +26,7 @@ impl UnvalidatedSchema {
                     variant: ClientFieldVariant::Link,
                     type_and_field: ObjectTypeAndFieldName {
                         field_name,
-                        type_name: "ID".intern().into(),
+                        type_name: object.name,
                     },
                     refetch_strategy: None,
                 }));
