@@ -13,29 +13,45 @@ use crate::generate_artifacts::ISO_TS;
 fn build_iso_overload_for_entrypoint(
     validated_client_field: &ValidatedClientField,
     file_extensions: GenerateFileExtensionsOption,
-) -> (String, String) {
-    let mut s: String = "".to_string();
-    let import = format!(
-        "import entrypoint_{} from '../__isograph/{}/{}/entrypoint{}';\n",
-        validated_client_field.type_and_field.underscore_separated(),
-        validated_client_field.type_and_field.type_name,
-        validated_client_field.type_and_field.field_name,
-        file_extensions.ts()
-    );
+    on_missing_babel_transform: OptionalValidationLevel,
+) -> (Option<String>, String) {
     let formatted_field = format!(
         "entrypoint {}.{}",
         validated_client_field.type_and_field.type_name,
         validated_client_field.type_and_field.field_name
     );
-    s.push_str(&format!(
-        "
+    match on_missing_babel_transform {
+        OptionalValidationLevel::Ignore => (
+            None,
+            format!(
+                "
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
-): typeof entrypoint_{};\n",
-        formatted_field,
-        validated_client_field.type_and_field.underscore_separated(),
-    ));
-    (import, s)
+): void;\n",
+                formatted_field
+            ),
+        ),
+        OptionalValidationLevel::Error | OptionalValidationLevel::Warn => {
+            let mut s: String = "".to_string();
+            let import = format!(
+                "import entrypoint_{} from '../__isograph/{}/{}/entrypoint{}';\n",
+                validated_client_field.type_and_field.underscore_separated(),
+                validated_client_field.type_and_field.type_name,
+                validated_client_field.type_and_field.field_name,
+                file_extensions.ts()
+            );
+
+            s.push_str(&format!(
+                "
+        export function iso<T>(
+          param: T & MatchesWhitespaceAndString<'{}', T>
+        ): typeof entrypoint_{};\n",
+                formatted_field,
+                validated_client_field.type_and_field.underscore_separated(),
+            ));
+            (Some(import), s)
+        }
+    }
 }
 
 fn build_iso_overload_for_client_defined_field(
@@ -142,11 +158,13 @@ type MatchesWhitespaceAndString<
         content.push_str(&field_overload);
     }
 
-    let entrypoint_overloads = sorted_entrypoints(schema)
-        .into_iter()
-        .map(|field| build_iso_overload_for_entrypoint(field, file_extensions));
+    let entrypoint_overloads = sorted_entrypoints(schema).into_iter().map(|field| {
+        build_iso_overload_for_entrypoint(field, file_extensions, on_missing_babel_transform)
+    });
     for (import, entrypoint_overload) in entrypoint_overloads {
-        imports.push_str(&import);
+        if let Some(import) = import {
+            imports.push_str(&import);
+        }
         content.push_str(&entrypoint_overload);
     }
 
