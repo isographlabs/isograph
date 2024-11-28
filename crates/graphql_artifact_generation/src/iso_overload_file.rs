@@ -43,9 +43,9 @@ export function iso<T>(
 
             s.push_str(&format!(
                 "
-        export function iso<T>(
-          param: T & MatchesWhitespaceAndString<'{}', T>
-        ): typeof entrypoint_{};\n",
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'{}', T>
+): typeof entrypoint_{};\n",
                 formatted_field,
                 validated_client_field.type_and_field.underscore_separated(),
             ));
