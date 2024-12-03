@@ -19,7 +19,7 @@
     "iso-watch": "../../target/debug/isograph_cli --config ./isograph.config.json --watch"
   },
   "dependencies": {
-    "@isograph/disposable-types": "0.2.0",
+    "@isograph/disposable-types": "*",
     "@isograph/react-disposable-state": "*",
     "@isograph/reference-counted-pointer": "*"
   },
