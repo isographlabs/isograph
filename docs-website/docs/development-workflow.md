@@ -194,6 +194,7 @@ Every commit to `main` results in a build, which you can see in [npm](https://ww
 ## How to release a new "numbered" version of Isograph to npm
 
 - In all package.json files, bump the version number. Don't forget to bump the version number of imports.
+- `pnpm i`
 - `git add . && git commit -m 'v0.1.0' && git tag v0.1.0 && git push`
 - See [this commit releasing 0.2.0](https://github.com/isographlabs/isograph/commit/e36acab1a018e18bdae0558be08952693af3b6a8)
 
