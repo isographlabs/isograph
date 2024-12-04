@@ -54,8 +54,11 @@ export function PetDetailRouteLoader({ route }: { route: PetDetailRoute }) {
     iso(`entrypoint Query.PetDetailRoute`),
     { id: route.id },
     {
-      onComplete: () => {
-        console.log('The Query.PetDetailRoute network request has completed.');
+      onComplete: (data) => {
+        console.log(
+          'The Query.PetDetailRoute network request has completed.',
+          data,
+        );
       },
       onError: () => {
         console.log('The Query.PetDetailRoute network request errored out.');

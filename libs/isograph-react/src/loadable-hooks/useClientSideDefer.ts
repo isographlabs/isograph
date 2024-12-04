@@ -18,7 +18,7 @@ export function useClientSideDefer<
     ExtractParameters<TReadFromStore>
   >,
   args?: Record<PropertyKey, never>,
-  fetchOptions?: FetchOptions,
+  fetchOptions?: FetchOptions<TResult>,
 ): { fragmentReference: FragmentReference<TReadFromStore, TResult> };
 
 export function useClientSideDefer<
@@ -32,7 +32,7 @@ export function useClientSideDefer<
     Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
   >,
   args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>,
-  fetchOptions?: FetchOptions,
+  fetchOptions?: FetchOptions<TResult>,
 ): { fragmentReference: FragmentReference<TReadFromStore, TResult> };
 
 export function useClientSideDefer<
@@ -46,7 +46,7 @@ export function useClientSideDefer<
     Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
   >,
   args?: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>,
-  fetchOptions?: FetchOptions,
+  fetchOptions?: FetchOptions<TResult>,
 ): { fragmentReference: FragmentReference<TReadFromStore, TResult> } {
   const [id, loader] = loadableField(args, fetchOptions ?? {});
   const environment = useIsographEnvironment();
