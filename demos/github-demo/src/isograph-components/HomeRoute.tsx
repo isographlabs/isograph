@@ -1,5 +1,5 @@
 import React from 'react';
-import { useResult, useLazyReference, subscribe } from '@isograph/react';
+import { useResult, useLazyReference } from '@isograph/react';
 
 import { iso } from '@iso';
 import { Container } from '@mui/material';
