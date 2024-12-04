@@ -156,5 +156,5 @@ export type LoadableField<
   // user-facing API. Users should only interact with LoadableFields via APIs
   // like useClientSideDefer. These APIs should have a nullable fetchOptions
   // parameter, and provide a default value ({}) to the LoadableField.
-  fetchOptions: FetchOptions,
+  fetchOptions: FetchOptions<TResult>,
 ) => [StableId, Factory<FragmentReference<TReadFromStore, TResult>>];
