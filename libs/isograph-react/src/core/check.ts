@@ -13,9 +13,9 @@ export type ShouldFetch = 'Yes' | 'No' | 'IfNecessary';
 
 export const DEFAULT_SHOULD_FETCH_VALUE: ShouldFetch = 'IfNecessary';
 
-export type FetchOptions = {
+export type FetchOptions<TReadOutData> = {
   shouldFetch?: ShouldFetch;
-  onComplete?: () => void;
+  onComplete?: (data: TReadOutData) => void;
   onError?: () => void;
 };
 
