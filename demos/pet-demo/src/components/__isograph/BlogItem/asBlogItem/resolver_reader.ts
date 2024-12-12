@@ -1,4 +1,4 @@
-import type { EagerReaderArtifact, ReaderAst } from '@isograph/react';
+import type { EagerReaderArtifact, ReaderAst, Link } from '@isograph/react';
 
 const readerAst: ReaderAst<{ data: any, parameters: Record<PropertyKey, never> }> = [
   {
@@ -7,14 +7,18 @@ const readerAst: ReaderAst<{ data: any, parameters: Record<PropertyKey, never> }
     alias: null,
     arguments: null,
   },
+  {
+    kind: "Link",
+    alias: "link",
+  },
 ];
 
 const artifact: EagerReaderArtifact<
   { data: any, parameters: Record<PropertyKey, never> },
-  boolean
+  Link | null
 > = {
   kind: "EagerReaderArtifact",
-  resolver: ({ data }) => data.__typename === "BlogItem",
+  resolver: ({ data }) => data.__typename === "BlogItem" ? data.link : null,
   readerAst,
 };
 

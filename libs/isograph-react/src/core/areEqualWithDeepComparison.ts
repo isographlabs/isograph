@@ -1,3 +1,4 @@
+import type { Link } from './IsographEnvironment';
 import type { ReaderAst, ReaderLinkedField, ReaderScalarField } from './reader';
 export function mergeUsingReaderAst(
   field: ReaderScalarField | ReaderLinkedField,
@@ -93,6 +94,24 @@ export function mergeObjectsUsingReaderAst(
 
         if (oldValue !== newValue) {
           canRecycle = false;
+        }
+        break;
+      }
+      case 'Link': {
+        const key = field.alias;
+        // @ts-expect-error
+        const oldValue: Link = oldItemObject[key];
+        // @ts-expect-error
+        const newValue: Link = newItemObject[key];
+
+        if (
+          oldValue.__link !== newValue.__link ||
+          oldValue.__typename !== newValue.__typename
+        ) {
+          canRecycle = false;
+        } else {
+          // @ts-expect-error
+          newItemObject[key] = oldValue;
         }
         break;
       }
