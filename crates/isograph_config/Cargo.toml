@@ -8,6 +8,7 @@ license = { workspace = true}
 
 [dependencies]
 common_lang_types = { path = "../common_lang_types" }
+schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 colorize = { workspace = true }
