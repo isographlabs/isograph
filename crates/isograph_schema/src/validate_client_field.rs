@@ -900,33 +900,35 @@ pub fn get_missing_arguments_and_validate_types(
     include_optional_args: bool,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
 ) -> ValidateSchemaResult<Vec<ValidatedVariableDefinition>> {
-    (argument_definitions.iter().filter_map(|definition| {
-        if definition.default_value.is_some()
-            || definition.type_.is_nullable() && !include_optional_args
-        {
-            return None;
-        }
-
-        let user_supplied_argument = arguments
-            .iter()
-            // TODO do not call .lookup
-            .find(|arg| definition.name.item.lookup() == arg.item.name.item.lookup());
-
-        if let Some(user_supplied_argument) = user_supplied_argument {
-            match value_satisfies_type(
-                &user_supplied_argument.item.value,
-                &definition.type_,
-                variable_definitions,
-                schema_data,
-            ) {
-                Ok(_) => None,
-                Err(e) => Some(Err(e)),
+    argument_definitions
+        .iter()
+        .filter_map(|definition| {
+            if definition.default_value.is_some()
+                || definition.type_.is_nullable() && !include_optional_args
+            {
+                return None;
             }
-        } else {
-            Some(Ok((*definition).clone()))
-        }
-    }))
-    .collect()
+
+            let user_supplied_argument = arguments
+                .iter()
+                // TODO do not call .lookup
+                .find(|arg| definition.name.item.lookup() == arg.item.name.item.lookup());
+
+            if let Some(user_supplied_argument) = user_supplied_argument {
+                match value_satisfies_type(
+                    &user_supplied_argument.item.value,
+                    &definition.type_,
+                    variable_definitions,
+                    schema_data,
+                ) {
+                    Ok(_) => None,
+                    Err(e) => Some(Err(e)),
+                }
+            } else {
+                Some(Ok((*definition).clone()))
+            }
+        })
+        .collect()
 }
 
 fn validate_no_undefined_variables_and_get_reachable_variables(
