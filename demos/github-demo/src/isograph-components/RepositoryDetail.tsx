@@ -17,7 +17,7 @@ export const IsStarred = iso(`
 });
 
 export const RepositoryDetail = iso(`
-  field Query.RepositoryDetail($first: Int, $repositoryName: String, $repositoryOwner: String) @component {
+  field Query.RepositoryDetail($first: Int, $repositoryName: String!, $repositoryOwner: String!) @component {
     repository(name: $repositoryName, owner: $repositoryOwner) {
       IsStarred
       nameWithOwner
