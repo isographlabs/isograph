@@ -730,7 +730,8 @@ fn variable_type_satisfies_argument_type(
                 schema_data,
                 location,
             ),
-            // in other cases it's Value does not satisfy Value!
+            // Value does not satisfy Value!
+            // or [Value] does not satisfy Value!
             GraphQLTypeAnnotation::Named(_) | GraphQLTypeAnnotation::List(_) => {
                 let expected = argument_type.clone().map(|type_id| match type_id {
                     SelectionType::Scalar(scalar_id) => {
