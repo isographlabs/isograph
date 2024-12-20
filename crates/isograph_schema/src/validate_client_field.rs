@@ -1,14 +1,23 @@
-use std::collections::{BTreeSet, HashMap};
+use std::{
+    collections::{BTreeSet, HashMap},
+    vec,
+};
 
 use common_lang_types::{
-    FieldArgumentName, Location, SelectableFieldName, UnvalidatedTypeName, VariableName,
-    WithLocation, WithSpan,
+    EnumLiteralValue, FieldArgumentName, Location, SelectableFieldName, VariableName, WithLocation,
+    WithSpan,
+};
+
+use graphql_lang_types::{
+    GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
+    GraphQLTypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     reachable_variables, ClientFieldId, IsographSelectionVariant, LinkedFieldSelection,
-    ScalarFieldSelection, SelectionFieldArgument, SelectionType, UnvalidatedScalarFieldSelection,
-    UnvalidatedSelection, VariableDefinition,
+    NonConstantValue, ScalarFieldSelection, SelectableServerFieldId, SelectionFieldArgument,
+    SelectionType, ServerScalarId, UnvalidatedScalarFieldSelection, UnvalidatedSelection,
+    VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -75,17 +84,17 @@ pub(crate) fn validate_and_transform_client_fields(
 }
 
 fn validate_all_variables_are_used(
-    variable_definitions: Vec<WithSpan<UnvalidatedVariableDefinition>>,
+    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     used_variables: UsedVariables,
     top_level_client_field_info: &ValidateSchemaSharedInfo<'_>,
 ) -> ValidateSchemaResult<()> {
     let unused_variables: Vec<_> = variable_definitions
-        .into_iter()
+        .iter()
         .filter_map(|variable| {
             let is_used = used_variables.contains(&variable.item.name.item);
 
             if !is_used {
-                return Some(variable);
+                return Some(variable.clone());
             }
             None
         })
@@ -145,7 +154,7 @@ fn validate_client_field_selection_set(
         .map(|selection_set| {
             validate_client_field_definition_selections_exist_and_types_match(
                 selection_set,
-                top_level_client_field.variable_definitions,
+                &variable_definitions,
                 &top_level_client_field_info,
             )
         })
@@ -189,7 +198,7 @@ fn validate_use_refetch_field_strategy(
 ) -> Result<ValidatedRefetchFieldStrategy, Vec<WithLocation<ValidateSchemaError>>> {
     let refetch_selection_set = validate_client_field_definition_selections_exist_and_types_match(
         use_refetch_field_strategy.refetch_selection_set,
-        vec![],
+        &[],
         top_level_client_field_info,
     )?;
 
@@ -236,7 +245,7 @@ fn validate_variable_definitions(
 
 fn validate_client_field_definition_selections_exist_and_types_match(
     field_selection_set: Vec<WithSpan<UnvalidatedSelection>>,
-    field_variable_definitions: Vec<WithSpan<UnvalidatedVariableDefinition>>,
+    field_variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     top_level_client_field_info: &ValidateSchemaSharedInfo<'_>,
 ) -> Result<Vec<WithSpan<ValidatedSelection>>, Vec<WithLocation<ValidateSchemaError>>> {
     // Currently, we only check that each field exists and has an appropriate type, not that
@@ -250,7 +259,7 @@ fn validate_client_field_definition_selections_exist_and_types_match(
                 selection,
                 top_level_client_field_info.client_field_parent_object,
                 &mut used_variables,
-                &field_variable_definitions,
+                field_variable_definitions,
                 top_level_client_field_info,
             )
         }));
@@ -272,7 +281,7 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
     selection: WithSpan<UnvalidatedSelection>,
     field_parent_object: &SchemaObject,
     used_variables: &mut UsedVariables,
-    variable_definitions: &[WithSpan<UnvalidatedVariableDefinition>],
+    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     top_level_client_field_info: &ValidateSchemaSharedInfo<'_>,
 ) -> ValidateSchemaResult<WithSpan<ValidatedSelection>> {
     let mut used_variables2 = BTreeSet::new();
@@ -311,7 +320,7 @@ fn validate_field_type_exists_and_is_scalar(
     scalar_field_selection_parent_object: &SchemaObject,
     scalar_field_selection: UnvalidatedScalarFieldSelection,
     used_variables: &mut UsedVariables,
-    variable_definitions: &[WithSpan<UnvalidatedVariableDefinition>],
+    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     top_level_client_field_info: &ValidateSchemaSharedInfo<'_>,
 ) -> ValidateSchemaResult<ValidatedScalarFieldSelection> {
     let scalar_field_name = scalar_field_selection.name.item.into();
@@ -324,6 +333,7 @@ fn validate_field_type_exists_and_is_scalar(
                 let server_field =
                     &top_level_client_field_info.server_fields[server_field_id.as_usize()];
                 let missing_arguments = get_missing_arguments_and_validate_argument_types(
+                    top_level_client_field_info.schema_data,
                     server_field
                         .arguments
                         .iter()
@@ -415,7 +425,7 @@ fn validate_client_field(
     client_field_id: &ClientFieldId,
     scalar_field_selection: UnvalidatedScalarFieldSelection,
     used_variables: &mut UsedVariables,
-    variable_definitions: &[WithSpan<UnvalidatedVariableDefinition>],
+    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     top_level_client_field_info: &ValidateSchemaSharedInfo<'_>,
 ) -> ValidateSchemaResult<ValidatedScalarFieldSelection> {
     let argument_definitions = top_level_client_field_info
@@ -426,6 +436,7 @@ fn validate_client_field(
             This is indicative of a bug in Isograph.",
         );
     let missing_arguments = get_missing_arguments_and_validate_argument_types(
+        top_level_client_field_info.schema_data,
         argument_definitions
             .iter()
             .map(|variable_definition| &variable_definition.item),
@@ -465,7 +476,7 @@ fn validate_field_type_exists_and_is_linked(
     field_parent_object: &SchemaObject,
     linked_field_selection: UnvalidatedLinkedFieldSelection,
     used_variables: &mut UsedVariables,
-    variable_definitions: &[WithSpan<UnvalidatedVariableDefinition>],
+    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     top_level_client_field_info: &ValidateSchemaSharedInfo<'_>,
 ) -> ValidateSchemaResult<ValidatedLinkedFieldSelection> {
     let linked_field_name = linked_field_selection.name.item.into();
@@ -503,6 +514,7 @@ fn validate_field_type_exists_and_is_linked(
                             .unwrap();
 
                         let missing_arguments = get_missing_arguments_and_validate_argument_types(
+                            top_level_client_field_info.schema_data,
                             server_field
                                 .arguments
                                 .iter()
@@ -603,12 +615,13 @@ fn assert_no_missing_arguments(
 }
 
 fn get_missing_arguments_and_validate_argument_types<'a>(
+    schema_data: &ServerFieldData,
     argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
     arguments: &[WithLocation<SelectionFieldArgument>],
     include_optional_args: bool,
     location: Location,
     used_variables: &mut UsedVariables,
-    variable_definitions: &[WithSpan<UnvalidatedVariableDefinition>],
+    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
 ) -> ValidateSchemaResult<Vec<ValidatedVariableDefinition>> {
     let reachable_variables = validate_no_undefined_variables_and_get_reachable_variables(
         arguments,
@@ -619,43 +632,306 @@ fn get_missing_arguments_and_validate_argument_types<'a>(
     let argument_definitions_vec: Vec<_> = argument_definitions.collect();
     validate_no_extraneous_arguments(&argument_definitions_vec, arguments, location)?;
 
-    // TODO validate argument types
-    Ok(get_missing_arguments(
-        argument_definitions_vec.into_iter(),
+    get_missing_arguments_and_validate_types(
+        schema_data,
+        &argument_definitions_vec,
         arguments,
         include_optional_args,
-    ))
+        variable_definitions,
+    )
 }
 
-pub fn get_missing_arguments<'a>(
-    argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
+fn scalar_literal_satisfies_type(
+    scalar_literal: &ServerScalarId,
+    type_: &GraphQLTypeAnnotation<SelectableServerFieldId>,
+    schema_data: &ServerFieldData,
+    location: Location,
+) -> Result<(), WithLocation<ValidateSchemaError>> {
+    match type_.clone().into() {
+        GraphQLNonNullTypeAnnotation::List(_) => {
+            let actual = schema_data.scalar(*scalar_literal).name.item;
+
+            Err(WithLocation::new(
+                ValidateSchemaError::ExpectedTypeFoundScalar {
+                    expected: type_.clone().map(|type_id| match type_id {
+                        SelectionType::Scalar(scalar_id) => {
+                            schema_data.scalar(scalar_id).name.item.into()
+                        }
+                        SelectionType::Object(object_id) => {
+                            schema_data.object(object_id).name.into()
+                        }
+                    }),
+                    actual,
+                },
+                location,
+            ))
+        }
+        GraphQLNonNullTypeAnnotation::Named(named_type) => match named_type.item {
+            SelectionType::Scalar(expected_scalar_id) => {
+                if expected_scalar_id == *scalar_literal {
+                    return Ok(());
+                }
+                let actual = schema_data.scalar(*scalar_literal).name.item;
+
+                let expected = type_
+                    .clone()
+                    .map(|_| schema_data.scalar(expected_scalar_id).name.item.into());
+                Err(WithLocation::new(
+                    ValidateSchemaError::ExpectedTypeFoundScalar { expected, actual },
+                    location,
+                ))
+            }
+            SelectionType::Object(object_id) => {
+                let actual = schema_data.scalar(*scalar_literal).name.item;
+
+                let expected = type_
+                    .clone()
+                    .map(|_| schema_data.object(object_id).name.into());
+
+                Err(WithLocation::new(
+                    ValidateSchemaError::ExpectedTypeFoundScalar { expected, actual },
+                    location,
+                ))
+            }
+        },
+    }
+}
+
+fn variable_type_satisfies_argument_type(
+    variable_type: &GraphQLTypeAnnotation<SelectableServerFieldId>,
+    argument_type: &GraphQLTypeAnnotation<SelectableServerFieldId>,
+    schema_data: &ServerFieldData,
+    location: Location,
+) -> Result<(), WithLocation<ValidateSchemaError>> {
+    match (variable_type.clone().into(), argument_type) {
+        (
+            // [Value]! satisfies [Value]
+            // or [Value] satisfies [Value]
+            GraphQLNonNullTypeAnnotation::List(list_variable_type),
+            GraphQLTypeAnnotation::List(list_type),
+        ) => variable_type_satisfies_argument_type(
+            &list_variable_type,
+            &list_type.0,
+            schema_data,
+            location,
+        ),
+        (
+            // Value! satisfies Value
+            // or Value satisfies Value
+            GraphQLNonNullTypeAnnotation::Named(named_variable_type),
+            GraphQLTypeAnnotation::Named(named_type),
+        ) if named_variable_type.item == named_type.item => Ok(()),
+
+        (_, GraphQLTypeAnnotation::NonNull(non_null_argument_type)) => match variable_type {
+            // Value! satisfies Value!
+            GraphQLTypeAnnotation::NonNull(variable_type) => variable_type_satisfies_argument_type(
+                &GraphQLTypeAnnotation::from(*variable_type.clone()),
+                &GraphQLTypeAnnotation::from(*non_null_argument_type.clone()),
+                schema_data,
+                location,
+            ),
+            // in other cases it's Value does not satisfy Value!
+            GraphQLTypeAnnotation::Named(_) | GraphQLTypeAnnotation::List(_) => {
+                let expected = argument_type.clone().map(|type_id| match type_id {
+                    SelectionType::Scalar(scalar_id) => {
+                        schema_data.scalar(scalar_id).name.item.into()
+                    }
+                    SelectionType::Object(object_id) => schema_data.object(object_id).name.into(),
+                });
+
+                let actual = variable_type.clone().map(|type_id| match type_id {
+                    SelectionType::Scalar(scalar_id) => {
+                        schema_data.scalar(scalar_id).name.item.into()
+                    }
+                    SelectionType::Object(object_id) => schema_data.object(object_id).name.into(),
+                });
+
+                Err(WithLocation::new(
+                    ValidateSchemaError::ExpectedType { expected, actual },
+                    location,
+                ))
+            }
+        },
+        (_, _) => {
+            let expected = argument_type.clone().map(|type_id| match type_id {
+                SelectionType::Scalar(scalar_id) => schema_data.scalar(scalar_id).name.item.into(),
+                SelectionType::Object(object_id) => schema_data.object(object_id).name.into(),
+            });
+
+            let actual = variable_type.clone().map(|type_id| match type_id {
+                SelectionType::Scalar(scalar_id) => schema_data.scalar(scalar_id).name.item.into(),
+                SelectionType::Object(object_id) => schema_data.object(object_id).name.into(),
+            });
+
+            Err(WithLocation::new(
+                ValidateSchemaError::ExpectedType { expected, actual },
+                location,
+            ))
+        }
+    }
+}
+
+fn value_satisfies_type(
+    value: &WithLocation<NonConstantValue>,
+    type_: &GraphQLTypeAnnotation<SelectableServerFieldId>,
+    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
+    schema_data: &ServerFieldData,
+) -> ValidateSchemaResult<()> {
+    match &value.item {
+        NonConstantValue::Variable(variable_name) => variable_type_satisfies_argument_type(
+            get_variable_type(variable_name, variable_definitions, value.location)?,
+            type_,
+            schema_data,
+            value.location,
+        ),
+        NonConstantValue::Integer(_) => scalar_literal_satisfies_type(
+            &schema_data.int_type_id,
+            type_,
+            schema_data,
+            value.location,
+        ),
+        NonConstantValue::Boolean(_) => scalar_literal_satisfies_type(
+            &schema_data.boolean_type_id,
+            type_,
+            schema_data,
+            value.location,
+        ),
+        NonConstantValue::String(_) => scalar_literal_satisfies_type(
+            &schema_data.string_type_id,
+            type_,
+            schema_data,
+            value.location,
+        ),
+        NonConstantValue::Float(_) => scalar_literal_satisfies_type(
+            &schema_data.float_type_id,
+            type_,
+            schema_data,
+            value.location,
+        ),
+        NonConstantValue::Enum(enum_literal_value) => match type_.clone().into() {
+            GraphQLNonNullTypeAnnotation::List(_) => {
+                panic!("Expected list type, received enum literal");
+            }
+            GraphQLNonNullTypeAnnotation::Named(named_type) => {
+                enum_satisfies_type(enum_literal_value, &named_type, schema_data, value.location)
+            }
+        },
+        NonConstantValue::Null => match type_ {
+            GraphQLTypeAnnotation::NonNull(_) => {
+                panic!("Expected non null type, received null");
+            }
+            GraphQLTypeAnnotation::List(_) => Ok(()),
+            GraphQLTypeAnnotation::Named(_) => Ok(()),
+        },
+        NonConstantValue::List(list) => match type_.clone().into() {
+            GraphQLNonNullTypeAnnotation::List(list_type) => {
+                list_satisfies_type(list, list_type, variable_definitions, schema_data)
+            }
+            GraphQLNonNullTypeAnnotation::Named(_) => {
+                panic!("Expected named typed, received list literal");
+            }
+        },
+        NonConstantValue::Object(object) => todo!(),
+    }
+}
+
+fn enum_satisfies_type(
+    enum_literal_value: &EnumLiteralValue,
+    enum_type: &GraphQLNamedTypeAnnotation<SelectableServerFieldId>,
+    schema_data: &ServerFieldData,
+    location: Location,
+) -> ValidateSchemaResult<()> {
+    match enum_type.item {
+        SelectionType::Object(object_id) => {
+            let expected = GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
+                enum_type
+                    .clone()
+                    .map(|_| schema_data.object(object_id).name.into()),
+            ));
+
+            Err(WithLocation::new(
+                ValidateSchemaError::ExpectedTypeFoundEnum {
+                    expected,
+                    actual: *enum_literal_value,
+                },
+                location,
+            ))
+        }
+        SelectionType::Scalar(scalar_id) => {
+            todo!("Validate enum literal")
+        }
+    }
+}
+
+fn list_satisfies_type(
+    list: &[WithLocation<NonConstantValue>],
+    list_type: GraphQLListTypeAnnotation<SelectableServerFieldId>,
+    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
+    schema_data: &ServerFieldData,
+) -> ValidateSchemaResult<()> {
+    list.iter().try_for_each(|element| {
+        value_satisfies_type(element, &list_type.0, variable_definitions, schema_data)
+    })
+}
+
+fn get_variable_type<'a>(
+    variable_name: &'a VariableName,
+    variable_definitions: &'a [WithSpan<ValidatedVariableDefinition>],
+    location: Location,
+) -> ValidateSchemaResult<&'a GraphQLTypeAnnotation<SelectableServerFieldId>> {
+    match variable_definitions
+        .iter()
+        .find(|definition| definition.item.name.item == *variable_name)
+    {
+        Some(variable) => Ok(&variable.item.type_),
+        None => Err(WithLocation::new(
+            ValidateSchemaError::UsedUndefinedVariable {
+                undefined_variable: *variable_name,
+            },
+            location,
+        )),
+    }
+}
+
+pub fn get_missing_arguments_and_validate_types(
+    schema_data: &ServerFieldData,
+    argument_definitions: &[&ValidatedVariableDefinition],
     arguments: &[WithLocation<SelectionFieldArgument>],
     include_optional_args: bool,
-) -> Vec<ValidatedVariableDefinition> {
-    argument_definitions
-        .filter_map(|definition| {
-            if definition.default_value.is_some()
-                || definition.type_.is_nullable() && !include_optional_args
-            {
-                return None;
-            }
+    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
+) -> ValidateSchemaResult<Vec<ValidatedVariableDefinition>> {
+    (argument_definitions.iter().filter_map(|definition| {
+        if definition.default_value.is_some()
+            || definition.type_.is_nullable() && !include_optional_args
+        {
+            return None;
+        }
 
-            let user_has_supplied_argument = arguments
-                .iter()
-                // TODO do not call .lookup
-                .any(|arg| definition.name.item.lookup() == arg.item.name.item.lookup());
-            if user_has_supplied_argument {
-                None
-            } else {
-                Some(definition.clone())
+        let user_supplied_argument = arguments
+            .iter()
+            // TODO do not call .lookup
+            .find(|arg| definition.name.item.lookup() == arg.item.name.item.lookup());
+
+        if let Some(user_supplied_argument) = user_supplied_argument {
+            match value_satisfies_type(
+                &user_supplied_argument.item.value,
+                &definition.type_,
+                variable_definitions,
+                schema_data,
+            ) {
+                Ok(_) => None,
+                Err(e) => Some(Err(e)),
             }
-        })
-        .collect()
+        } else {
+            Some(Ok((*definition).clone()))
+        }
+    }))
+    .collect()
 }
 
 fn validate_no_undefined_variables_and_get_reachable_variables(
     arguments: &[WithLocation<SelectionFieldArgument>],
-    variable_definitions: &[WithSpan<VariableDefinition<UnvalidatedTypeName>>],
+    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
 ) -> ValidateSchemaResult<Vec<WithLocation<VariableName>>> {
     let mut all_reachable_variables = vec![];
     for argument in arguments {
