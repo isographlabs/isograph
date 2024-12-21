@@ -6,7 +6,8 @@ use isograph_schema::{
     generate_refetch_field_strategy, id_arguments, id_selection, id_top_level_arguments,
     ClientField, ClientFieldVariant, ClientType, FieldType, ImperativelyLoadedFieldVariant,
     ObjectTypeAndFieldName, RefetchStrategy, RequiresRefinement, SchemaObject,
-    UnvalidatedClientField, UnvalidatedSchema, NODE_FIELD_NAME, REFETCH_FIELD_NAME,
+    UnvalidatedClientField, UnvalidatedClientPointer, UnvalidatedSchema, NODE_FIELD_NAME,
+    REFETCH_FIELD_NAME,
 };
 
 use crate::batch_compile::BatchCompileError;
@@ -32,7 +33,7 @@ pub fn add_refetch_fields_to_objects(
 
 fn add_refetch_field_to_object(
     object: &mut SchemaObject,
-    client_fields: &mut Vec<ClientType<UnvalidatedClientField>>,
+    client_fields: &mut Vec<ClientType<UnvalidatedClientField, UnvalidatedClientPointer>>,
     query_id: ServerObjectId,
 ) -> Option<Result<(), BatchCompileError>> {
     match object

@@ -3,18 +3,20 @@ use common_lang_types::{
     Location, ScalarFieldName, SelectableFieldName, TextSource, UnvalidatedTypeName, WithLocation,
     WithSpan,
 };
+use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDeclarationWithValidatedDirectives,
-    DeserializationError, NonConstantValue, SelectableServerFieldId, ServerObjectId,
+    ClientPointerDeclarationWithValidatedDirectives, ClientPointerId, DeserializationError,
+    NonConstantValue, SelectableServerFieldId, ServerObjectId,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
-    ClientField, ClientType, FieldMapItem, FieldType, ObjectTypeAndFieldName, RequiresRefinement,
-    UnvalidatedSchema, UnvalidatedVariableDefinition, NODE_FIELD_NAME,
+    ClientField, ClientPointer, ClientType, FieldMapItem, FieldType, ObjectTypeAndFieldName,
+    RequiresRefinement, UnvalidatedSchema, UnvalidatedVariableDefinition, NODE_FIELD_NAME,
 };
 
 impl UnvalidatedSchema {
@@ -43,9 +45,82 @@ impl UnvalidatedSchema {
                 let scalar_name = self.server_field_data.scalar(*scalar_id).name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
+                        literal_type: "field".to_string(),
                         parent_type_name: scalar_name.item.into(),
                     },
                     Location::new(text_source, client_field_declaration.item.parent_type.span),
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn process_client_pointer_declaration(
+        &mut self,
+        client_pointer_declaration: WithSpan<ClientPointerDeclarationWithValidatedDirectives>,
+        text_source: TextSource,
+    ) -> Result<(), WithLocation<ProcessClientFieldDeclarationError>> {
+        let parent_type_id = self
+            .server_field_data
+            .defined_types
+            .get(&client_pointer_declaration.item.parent_type.item)
+            .ok_or(WithLocation::new(
+                ProcessClientFieldDeclarationError::ParentTypeNotDefined {
+                    parent_type_name: client_pointer_declaration.item.parent_type.item,
+                },
+                Location::new(
+                    text_source,
+                    client_pointer_declaration.item.parent_type.span,
+                ),
+            ))?;
+
+        let to_type_id = self
+            .server_field_data
+            .defined_types
+            .get(client_pointer_declaration.item.to_type.inner())
+            .ok_or(WithLocation::new(
+                ProcessClientFieldDeclarationError::ParentTypeNotDefined {
+                    parent_type_name: *client_pointer_declaration.item.to_type.inner(),
+                },
+                Location::new(text_source, *client_pointer_declaration.item.to_type.span()),
+            ))?;
+
+        match parent_type_id {
+            SelectableServerFieldId::Object(object_id) => match to_type_id {
+                SelectableServerFieldId::Object(to_object_id) => {
+                    self.add_client_pointer_to_object(
+                        *object_id,
+                        client_pointer_declaration
+                            .item
+                            .to_type
+                            .clone()
+                            .map(|_| *to_object_id),
+                        client_pointer_declaration,
+                    )
+                    .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?;
+                }
+                SelectableServerFieldId::Scalar(scalar_id) => {
+                    let scalar_name = self.server_field_data.scalar(*scalar_id).name;
+                    return Err(WithLocation::new(
+                        ProcessClientFieldDeclarationError::InvalidPointerType {
+                            to_type_name: scalar_name.item.into(),
+                        },
+                        Location::new(text_source, *client_pointer_declaration.item.to_type.span()),
+                    ));
+                }
+            },
+            SelectableServerFieldId::Scalar(scalar_id) => {
+                let scalar_name = self.server_field_data.scalar(*scalar_id).name;
+                return Err(WithLocation::new(
+                    ProcessClientFieldDeclarationError::InvalidParentType {
+                        literal_type: "pointer".to_string(),
+                        parent_type_name: scalar_name.item.into(),
+                    },
+                    Location::new(
+                        text_source,
+                        client_pointer_declaration.item.parent_type.span,
+                    ),
                 ));
             }
         }
@@ -118,6 +193,86 @@ impl UnvalidatedSchema {
             }));
         Ok(())
     }
+
+    fn add_client_pointer_to_object(
+        &mut self,
+        parent_object_id: ServerObjectId,
+        to_object_id: GraphQLTypeAnnotation<ServerObjectId>,
+        client_pointer_declaration: WithSpan<ClientPointerDeclarationWithValidatedDirectives>,
+    ) -> ProcessClientFieldDeclarationResult<()> {
+        let query_id = self.query_id();
+        let to_object = &self.server_field_data.server_objects[to_object_id.inner().as_usize()];
+        let object = &self.server_field_data.server_objects[parent_object_id.as_usize()];
+        let client_pointer_pointer_name_ws = client_pointer_declaration.item.client_pointer_name;
+        let client_pointer_name = client_pointer_pointer_name_ws.item;
+        let client_pointer_name_span = client_pointer_pointer_name_ws.span;
+
+        let next_client_pointer_id: ClientPointerId = self.client_fields.len().into();
+
+        let name = client_pointer_declaration.item.client_pointer_name.item;
+
+        self.client_fields
+            .push(ClientType::ClientPointer(ClientPointer {
+                description: client_pointer_declaration.item.description.map(|x| x.item),
+                name,
+                id: next_client_pointer_id,
+                condition_selection_set: client_pointer_declaration.item.selection_set,
+
+                variable_definitions: client_pointer_declaration.item.variable_definitions,
+                type_and_field: ObjectTypeAndFieldName {
+                    type_name: object.name,
+                    field_name: name.into(),
+                },
+
+                parent_object_id,
+                refetch_strategy: match to_object.id_field {
+                    None => Err(WithSpan::new(
+                        ProcessClientFieldDeclarationError::TypePointedToHasNoId {
+                            to_type_name: *client_pointer_declaration.item.to_type.inner(),
+                        },
+                        *client_pointer_declaration.item.to_type.span(),
+                    )),
+                    Some(_) => {
+                        // Assume that if we have an id field, this implements Node
+                        Ok(RefetchStrategy::UseRefetchField(
+                            generate_refetch_field_strategy(
+                                vec![id_selection()],
+                                query_id,
+                                format!("refetch__{}", to_object.name).intern().into(),
+                                *NODE_FIELD_NAME,
+                                id_top_level_arguments(),
+                                None,
+                                RequiresRefinement::Yes(to_object.name),
+                                None,
+                                None,
+                            ),
+                        ))
+                    }
+                }?,
+                to: to_object_id,
+            }));
+
+        let object = &mut self.server_field_data.server_objects[parent_object_id.as_usize()];
+        if object
+            .encountered_fields
+            .insert(
+                client_pointer_name.into(),
+                FieldType::ClientField(ClientType::ClientPointer(next_client_pointer_id)),
+            )
+            .is_some()
+        {
+            // Did not insert, so this object already has a field with the same name :(
+            return Err(WithSpan::new(
+                ProcessClientFieldDeclarationError::ParentAlreadyHasField {
+                    parent_type_name: object.name,
+                    client_field_name: client_pointer_name.into(),
+                },
+                client_pointer_name_span,
+            ));
+        }
+
+        Ok(())
+    }
 }
 
 type ProcessClientFieldDeclarationResult<T> =
@@ -130,11 +285,20 @@ pub enum ProcessClientFieldDeclarationError {
         parent_type_name: UnvalidatedTypeName,
     },
 
-    #[error("Invalid parent type. `{parent_type_name}` is a scalar. You are attempting to define a field on it. \
+    #[error("Invalid parent type. `{parent_type_name}` is a scalar. You are attempting to define a {literal_type} on it. \
         In order to do so, the parent object must be an object, interface or union.")]
     InvalidParentType {
+        literal_type: String,
         parent_type_name: UnvalidatedTypeName,
     },
+
+    #[error("Invalid type pointed to. `{to_type_name}` is a scalar. You are attempting to define a pointer on it. \
+        In order to do so, the type must be an object, interface or union.")]
+    InvalidPointerType { to_type_name: UnvalidatedTypeName },
+
+    #[error("Invalid type pointed to. `{to_type_name}` has no id field. You are attempting to define a pointer to it. \
+        In order to do so, the to object must be an object implementing Node interface.")]
+    TypePointedToHasNoId { to_type_name: UnvalidatedTypeName },
 
     #[error(
         "The Isograph object type \"{parent_type_name}\" already has a field named \"{client_field_name}\"."

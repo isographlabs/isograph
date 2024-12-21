@@ -1,4 +1,4 @@
-use common_lang_types::{FieldNameOrAlias, ScalarFieldName, WithLocation, WithSpan};
+use common_lang_types::{FieldNameOrAlias, SelectableFieldName, WithLocation, WithSpan};
 use thiserror::Error;
 
 use crate::IsographLangTokenKind;
@@ -27,11 +27,12 @@ pub enum IsographLiteralParseError {
     ExpectedFieldOrPointerOrEntrypoint,
 
     #[error(
-        "This isograph field literal must be exported as a named export, for example \
+        "This isograph {literal_type} literal must be exported as a named export, for example \
         as `export const {suggested_const_export_name}`"
     )]
     ExpectedLiteralToBeExported {
-        suggested_const_export_name: ScalarFieldName,
+        literal_type: String,
+        suggested_const_export_name: SelectableFieldName,
     },
 
     #[error("Expected a valid value, like $foo, 42, \"bar\", true or false")]

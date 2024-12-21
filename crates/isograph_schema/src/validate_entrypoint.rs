@@ -89,7 +89,8 @@ impl UnvalidatedSchema {
             .get(&field_name.item.into())
         {
             Some(defined_field) => match defined_field {
-                FieldType::ServerField(_) => Err(WithLocation::new(
+                FieldType::ClientField(ClientType::ClientPointer(_))
+                | FieldType::ServerField(_) => Err(WithLocation::new(
                     ValidateEntrypointDeclarationError::FieldMustBeClientField {
                         parent_type_name: parent_object.name,
                         client_field_name: field_name.item,
