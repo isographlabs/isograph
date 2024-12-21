@@ -1,5 +1,5 @@
 use intern::Lookup;
-use isograph_config::{GenerateFileExtensionsOption, OptionalValidationLevel};
+use isograph_config::GenerateFileExtensionsOption;
 use std::{cmp::Ordering, path::PathBuf};
 
 use common_lang_types::{ArtifactPathAndContent, SelectableFieldName};
@@ -13,15 +13,15 @@ use crate::generate_artifacts::ISO_TS;
 fn build_iso_overload_for_entrypoint(
     validated_client_field: &ValidatedClientField,
     file_extensions: GenerateFileExtensionsOption,
-    on_missing_babel_transform: OptionalValidationLevel,
+    no_babel_transform: bool,
 ) -> (Option<String>, String) {
     let formatted_field = format!(
         "entrypoint {}.{}",
         validated_client_field.type_and_field.type_name,
         validated_client_field.type_and_field.field_name
     );
-    match on_missing_babel_transform {
-        OptionalValidationLevel::Ignore => (
+    match no_babel_transform {
+        true => (
             None,
             format!(
                 "
@@ -31,7 +31,7 @@ export function iso<T>(
                 formatted_field
             ),
         ),
-        OptionalValidationLevel::Error | OptionalValidationLevel::Warn => {
+        false => {
             let mut s: String = "".to_string();
             let import = format!(
                 "import entrypoint_{} from '../__isograph/{}/{}/entrypoint{}';\n",
@@ -96,7 +96,7 @@ export function iso<T>(
 pub(crate) fn build_iso_overload_artifact(
     schema: &ValidatedSchema,
     file_extensions: GenerateFileExtensionsOption,
-    on_missing_babel_transform: OptionalValidationLevel,
+    no_babel_transform: bool,
 ) -> ArtifactPathAndContent {
     let mut imports = "import type { IsographEntrypoint } from '@isograph/react';\n".to_string();
     let mut content = String::from(
@@ -158,9 +158,9 @@ type MatchesWhitespaceAndString<
         content.push_str(&field_overload);
     }
 
-    let entrypoint_overloads = sorted_entrypoints(schema).into_iter().map(|field| {
-        build_iso_overload_for_entrypoint(field, file_extensions, on_missing_babel_transform)
-    });
+    let entrypoint_overloads = sorted_entrypoints(schema)
+        .into_iter()
+        .map(|field| build_iso_overload_for_entrypoint(field, file_extensions, no_babel_transform));
     for (import, entrypoint_overload) in entrypoint_overloads {
         if let Some(import) = import {
             imports.push_str(&import);
@@ -177,20 +177,13 @@ export function iso(_isographLiteralText: string):
 {\n",
     );
 
-    content.push_str(match on_missing_babel_transform {
-        OptionalValidationLevel::Error => {
+    content.push_str(match no_babel_transform {
+        false => {
 "  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
       'was not set up, or it failed to identify this call site. Make sure it ' +
       'is being used verbatim as `iso`.');"
         }
-        OptionalValidationLevel::Warn => {
-
-            "  console.warn('iso: Unexpected invocation at runtime. Either the Babel transform ' +
-      'was not set up, or it failed to identify this call site. Make sure it ' +
-      'is being used verbatim as `iso`.');
-  return (clientFieldResolver: any) => clientFieldResolver;"
-        }
-        OptionalValidationLevel::Ignore => {
+        true => {
             "  return (clientFieldResolver: any) => clientFieldResolver;"
         }
     });
