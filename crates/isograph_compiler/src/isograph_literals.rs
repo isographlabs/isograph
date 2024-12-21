@@ -57,9 +57,9 @@ pub fn read_file(
     let path_2 = path.clone();
 
     // N.B. we have previously ensured that path is a file
-    let contents = std::fs::read(&path).map_err(|message| BatchCompileError::UnableToReadFile {
+    let contents = std::fs::read(&path).map_err(|e| BatchCompileError::UnableToReadFile {
         path: path_2,
-        message,
+        message: e.to_string(),
     })?;
 
     let contents = std::str::from_utf8(&contents)
@@ -81,7 +81,9 @@ fn read_dir_recursive(root_js_path: &Path) -> Result<Vec<PathBuf>, BatchCompileE
     visit_dirs_skipping_isograph(root_js_path, &mut |dir_entry| {
         paths.push(dir_entry.path());
     })
-    .map_err(BatchCompileError::from)?;
+    .map_err(|e| BatchCompileError::UnableToTraverseDirectory {
+        message: e.to_string(),
+    })?;
 
     Ok(paths)
 }

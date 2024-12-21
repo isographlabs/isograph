@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "tsc": "echo TODO figure out why this fails in CI",
+    "tsc": "tsc -b",
     "iso": "../../target/debug/isograph_cli --config ./isograph.config.json",
     "iso-watch": "../../target/debug/isograph_cli --config ./isograph.config.json --watch"
   },

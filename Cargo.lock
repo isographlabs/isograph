@@ -306,7 +306,7 @@ dependencies = [
 
 [[package]]
 name = "common_lang_types"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "intern",
  "serde",
@@ -541,7 +541,7 @@ dependencies = [
 
 [[package]]
 name = "graphql_artifact_generation"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -555,7 +555,7 @@ dependencies = [
 
 [[package]]
 name = "graphql_lang_types"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "common_lang_types",
  "intern",
@@ -566,7 +566,7 @@ dependencies = [
 
 [[package]]
 name = "graphql_schema_parser"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "common_lang_types",
  "graphql-syntax",
@@ -731,7 +731,7 @@ checksum = "7943c866cc5cd64cbc25b2e01621d07fa8eb2a1a23160ee81ce38704e97b8ecf"
 
 [[package]]
 name = "isograph_cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "clap 4.5.18",
  "colored",
@@ -751,7 +751,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_compiler"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "colored",
  "common_lang_types",
@@ -775,7 +775,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_config"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "colorize",
  "common_lang_types",
@@ -787,7 +787,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_lang_parser"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -799,7 +799,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_lang_types"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -811,7 +811,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_lsp"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "common_lang_types",
  "crossbeam",
@@ -830,7 +830,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_schema"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "colorize",
  "common_lang_types",
@@ -1464,7 +1464,7 @@ dependencies = [
 
 [[package]]
 name = "string_key_newtype"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "intern",
 ]
@@ -1624,7 +1624,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "colorize",
  "common_lang_types",
@@ -1819,7 +1819,7 @@ dependencies = [
 
 [[package]]
 name = "u32_newtypes"
-version = "0.2.0"
+version = "0.3.0"
 
 [[package]]
 name = "unicase"

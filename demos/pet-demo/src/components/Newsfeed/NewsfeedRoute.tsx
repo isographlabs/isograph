@@ -1,4 +1,4 @@
-import React, { Suspense, useState } from 'react';
+import React, { Suspense } from 'react';
 import { iso } from '@iso';
 import { Card, CardContent, Container, Stack, Typography } from '@mui/material';
 import {
@@ -12,9 +12,7 @@ import { ErrorBoundary } from '../ErrorBoundary';
 export const Newsfeed = iso(`
   field Query.Newsfeed @component {
     viewer {
-      newsfeed(skip: 0, limit: 6) {
-        NewsfeedAdOrBlog
-      }
+      initial: NewsfeedPaginationComponent(skip: 0, limit: 6)
       NewsfeedPaginationComponent @loadable
     }
   }
@@ -23,10 +21,10 @@ export const Newsfeed = iso(`
 
   const paginationState = useSkipLimitPagination(
     viewer.NewsfeedPaginationComponent,
-    { skip: viewer.newsfeed.length },
+    { skip: viewer.initial.length },
   );
 
-  const newsfeedItems = viewer.newsfeed.concat(paginationState.results);
+  const newsfeedItems = viewer.initial.concat(paginationState.results);
 
   const loadMore = () => {
     if (paginationState.kind === 'Complete') {
