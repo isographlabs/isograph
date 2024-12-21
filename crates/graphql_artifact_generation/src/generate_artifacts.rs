@@ -185,7 +185,9 @@ pub fn get_artifact_path_and_content(
                                 type_: GraphQLTypeAnnotation::NonNull(Box::new(
                                     GraphQLNonNullTypeAnnotation::Named(
                                         GraphQLNamedTypeAnnotation(WithSpan::new(
-                                            SelectableServerFieldId::Scalar(schema.id_type_id),
+                                            SelectableServerFieldId::Scalar(
+                                                schema.server_field_data.id_type_id,
+                                            ),
                                             Span::todo_generated(),
                                         )),
                                     ),
