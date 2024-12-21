@@ -5,3 +5,4 @@
 **/.docusaurus/**
 **/dist/**
 **/relay-crates/**
+isograph-config-schema.json
