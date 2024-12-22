@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use schemars::schema_for;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use tracing::warn;
@@ -84,7 +83,7 @@ impl Default for OptionalValidationLevel {
 
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-struct ConfigFile {
+pub struct ConfigFile {
     /// The user may hard-code the JSON Schema for their version of the config.
     #[serde(rename = "$schema")]
     #[allow(dead_code)]
@@ -187,7 +186,7 @@ pub fn create_config(config_location: PathBuf) -> CompilerConfig {
 
 #[derive(Deserialize, Default, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
-struct ConfigFileOptions {
+pub struct ConfigFileOptions {
     on_invalid_id_type: ConfigFileOptionalValidationLevel,
     on_missing_babel_transform: ConfigFileOptionalValidationLevel,
     include_file_extensions_in_import_statements: bool,
@@ -195,7 +194,7 @@ struct ConfigFileOptions {
 
 #[derive(Deserialize, Debug, Clone, Copy, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-enum ConfigFileOptionalValidationLevel {
+pub enum ConfigFileOptionalValidationLevel {
     /// If this validation error is encountered, it will be ignored
     Ignore,
     /// If this validation error is encountered, a warning will be issued
@@ -208,10 +207,6 @@ impl Default for ConfigFileOptionalValidationLevel {
     fn default() -> Self {
         Self::Error
     }
-}
-pub fn generate_json_schema_config() {
-    let schema = schema_for!(ConfigFile);
-    println!("{}", serde_json::to_string_pretty(&schema).unwrap());
 }
 
 fn create_options(options: ConfigFileOptions) -> ConfigOptions {

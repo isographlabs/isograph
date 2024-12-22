@@ -1,5 +1,7 @@
-use isograph_config::generate_json_schema_config;
+use isograph_config::ConfigFile;
+use schemars::schema_for;
 
 fn main() {
-    generate_json_schema_config();
+    let schema = schema_for!(ConfigFile);
+    println!("{}", serde_json::to_string_pretty(&schema).unwrap());
 }
