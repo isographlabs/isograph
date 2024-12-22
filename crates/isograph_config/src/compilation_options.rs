@@ -99,7 +99,7 @@ pub struct ConfigFile {
     #[serde(default)]
     pub schema_extensions: Vec<PathBuf>,
 
-    /// Various that are of lesser importance
+    /// Various options of less importance
     #[serde(default)]
     pub options: ConfigFileOptions,
 }
