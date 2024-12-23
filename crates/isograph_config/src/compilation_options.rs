@@ -83,7 +83,7 @@ impl Default for OptionalValidationLevel {
 
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct ConfigFile {
+pub struct IsographProjectConfig {
     /// The user may hard-code the JSON Schema for their version of the config.
     #[serde(rename = "$schema")]
     #[allow(dead_code)]
@@ -117,7 +117,7 @@ pub fn create_config(config_location: PathBuf) -> CompilerConfig {
         },
     };
 
-    let config_parsed: ConfigFile = serde_json::from_str(&config_contents)
+    let config_parsed: IsographProjectConfig = serde_json::from_str(&config_contents)
         .unwrap_or_else(|e| panic!("Error parsing config. Error: {}", e));
 
     let mut config = config_location.clone();
