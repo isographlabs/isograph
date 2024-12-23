@@ -18,27 +18,19 @@ jobs:
             build-name: isograph_cli
             artifact-name: isograph_cli-bin-linux-arm64
             cross: true
-            json-schema-build-name: isograph_config
-            json-schema-artifact-name: isograph_config-linux-arm64
           - target: x86_64-apple-darwin
             os: macos-latest
             build-name: isograph_cli
             artifact-name: isograph_cli-macos-x64
-            json-schema-build-name: isograph_config
-            json-schema-artifact-name: isograph_config-macos-x64
           - target: aarch64-apple-darwin
             os: macos-latest
             build-name: isograph_cli
             artifact-name: isograph_cli-macos-arm64
-            json-schema-build-name: isograph_config
-            json-schema-artifact-name: isograph_config-macos-arm64
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             longpaths: true
             build-name: isograph_cli.exe
             artifact-name: isograph_cli-bin-win-x64
-            json-schema-build-name: isograph_config.exe
-            json-schema-artifact-name: isograph_config-bin-win-x64
     uses: ./.github/workflows/build-cli.yml
     with:
       target: ${{ matrix.target.target }}
@@ -47,8 +39,6 @@ jobs:
       artifact-name: ${{ matrix.target.artifact-name }}
       longpaths: ${{ matrix.target.longpaths || false }}
       cross: ${{ matrix.target.cross || false }}
-      json-schema-build-name: ${{ matrix.target.json-schema-build-name }}
-      json-schema-artifact-name: ${{ matrix.target.json-schema-artifact-name }}
 
   build-cli-linux:
     name: Build compiler (x86_64-unknown-linux-musl)
@@ -58,8 +48,6 @@ jobs:
       os: ubuntu-latest
       build-name: isograph_cli
       artifact-name: isograph_cli-linux-x64
-      json-schema-build-name: isograph_config
-      json-schema-artifact-name: isograph_config-linux-x64
 
   build-demos:
     name: Build demos

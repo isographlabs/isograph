@@ -19,12 +19,6 @@ on:
       cross:
         required: false
         type: boolean
-      json-schema-build-name:
-        required: true
-        type: string
-      json-schema-artifact-name:
-        required: true
-        type: string
 
 jobs:
   build-cli:
@@ -56,7 +50,8 @@ jobs:
           path: target/${{ inputs.target }}/release/${{ inputs.build-name }}
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
+        if: inputs.artifact-name == 'isograph_cli-linux-x64'
         with:
-          name: ${{ inputs.json-schema-artifact-name }}
-          path: target/${{ inputs.target }}/release/${{ inputs.json-schema-build-name }}
+          name: isograph_config-linux-x64
+          path: target/${{ inputs.target }}/release/isograph_config
           if-no-files-found: error
