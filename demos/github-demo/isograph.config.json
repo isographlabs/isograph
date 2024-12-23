@@ -1,4 +1,5 @@
 {
+  "$schema": "../../libs/isograph-compiler/isograph-config-schema.json",
   "project_root": "./src/isograph-components",
   "schema": "./schema.graphql",
   "options": {
