@@ -41,6 +41,7 @@ export const Newsfeed = iso(`
             index === newsfeedItems.length - 1 ? loadMore : null;
           return (
             <newsfeedItem.NewsfeedAdOrBlog
+              key={newsfeedItem.asAdItem?.id ?? newsfeedItem.asBlogItem?.id}
               onVisible={onVisible}
               index={index}
             />
