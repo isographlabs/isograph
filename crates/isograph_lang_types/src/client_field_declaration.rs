@@ -296,13 +296,13 @@ pub fn reachable_variables(
             vec![WithLocation::new(*name, non_constant_value.location)]
         }
         NonConstantValue::Object(object) => {
-            return object
+            object
                 .iter()
                 .flat_map(|pair| reachable_variables(&pair.value))
-                .collect();
+                .collect()
         }
         NonConstantValue::List(list) => {
-            return list.iter().flat_map(reachable_variables).collect();
+            list.iter().flat_map(reachable_variables).collect()
         }
         _ => vec![],
     }
