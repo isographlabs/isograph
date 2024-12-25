@@ -63,7 +63,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: 1.75.0
+          toolchain: stable
           override: true
           target: x86_64-apple-darwin
       - name: 'Download cli binary'
