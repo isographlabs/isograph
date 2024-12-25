@@ -87,13 +87,13 @@ jobs:
           toolchain: 1.75.0
           override: true
           target: x86_64-unknown-linux-musl
-      - name: 'Build isograph_config with cargo'
+      - name: Build isograph_config with cargo
         run: cargo build --bin isograph_config --target x86_64-unknown-linux-musl --release
       - name: Make artifact executable
         run: chmod +x ./target/x86_64-unknown-linux-musl/release/isograph_config
-      - name: 'Build json schema'
+      - name: Build json schema
         run: ./target/x86_64-unknown-linux-musl/release/isograph_config > ./libs/isograph-compiler/isograph-config-schema.json
-      - name: 'Check working directory status'
+      - name: Check working directory status
         run: './scripts/check-git-status.sh'
 
   typecheck-demos:
