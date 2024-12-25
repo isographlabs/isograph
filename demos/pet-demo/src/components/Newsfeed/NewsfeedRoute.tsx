@@ -40,9 +40,8 @@ export const Newsfeed = iso(`
           const onVisible =
             index === newsfeedItems.length - 1 ? loadMore : null;
           return (
-            // the key is not needed here!
-            // eslint-disable-next-line react/jsx-key
             <newsfeedItem.NewsfeedAdOrBlog
+              key={newsfeedItem.asAdItem?.id ?? newsfeedItem.asBlogItem?.id}
               onVisible={onVisible}
               index={index}
             />
