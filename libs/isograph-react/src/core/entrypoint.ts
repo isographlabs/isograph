@@ -25,7 +25,7 @@ export type NetworkRequestInfo<TNormalizationAst> = {
 export type IsographEntrypoint<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
-  TNormalizationAst = NormalizationAst
+  TNormalizationAst = NormalizationAst,
 > = {
   readonly kind: 'Entrypoint';
   readonly networkRequestInfo: NetworkRequestInfo<TNormalizationAst>;

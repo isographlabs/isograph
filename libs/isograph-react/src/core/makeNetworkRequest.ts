@@ -125,7 +125,8 @@ export function makeNetworkRequest<
           root,
         );
         const retainedQuery = {
-          normalizationAst: artifact.networkRequestInfo.normalizationAst.selections,
+          normalizationAst:
+            artifact.networkRequestInfo.normalizationAst.selections,
           variables,
           root,
         };
