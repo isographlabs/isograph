@@ -147,7 +147,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
         generate_refetch_query_artifact_import(&refetch_paths_with_variables, file_extensions);
 
     let normalization_ast_text =
-        generate_normalization_ast_text(schema, merged_selection_map.values(), 0);
+        generate_normalization_ast_text(schema, merged_selection_map.values(), 1);
 
     let concrete_type = schema.server_field_data.object(
         if schema
@@ -294,7 +294,10 @@ impl EntrypointArtifactInfo<'_> {
             import readerResolver from './{resolver_reader_file_name}{ts_file_extension}';\n\
             {refetch_query_artifact_import}\n\n\
             const queryText = '{query_text}';\n\n\
-            const normalizationAst: NormalizationAst = {normalization_ast_text};\n\
+            const normalizationAst: NormalizationAst = {{\n\
+            {}kind: \"NormalizationAst\",\n\
+            {}normalizationAst: {normalization_ast_text},\n\
+            }};\n\
             const artifact: IsographEntrypoint<\n\
             {}{entrypoint_params_typename},\n\
             {}{entrypoint_output_type_name}\n\
@@ -313,7 +316,7 @@ impl EntrypointArtifactInfo<'_> {
             {}}},\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
+            "  ","  ","  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     }
 }

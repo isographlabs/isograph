@@ -54,7 +54,10 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
         format!(
             "import type {{ IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact }} from '@isograph/react';\n\
             const queryText = '{query_text}';\n\n\
-            const normalizationAst: NormalizationAst = {normalization_ast};\n\
+            const normalizationAst: NormalizationAst = {{\n\
+            {}kind: \"NormalizationAst\",\n\
+            {}normalizationAst: {normalization_ast},\n\
+            }};\n\
             const artifact: RefetchQueryNormalizationArtifact = {{\n\
             {}kind: \"RefetchQuery\",\n\
             {}networkRequestInfo: {{\n\
@@ -65,6 +68,8 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
             {}concreteType: \"{concrete_type}\",\n\
             }};\n\n\
             export default artifact;\n",
+            "  ",
+            "  ",
             "  ",
             "  ",
             "  ",
@@ -103,7 +108,7 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field(
     );
 
     let normalization_ast_text =
-        generate_normalization_ast_text(schema, merged_selection_set.values(), 0);
+        generate_normalization_ast_text(schema, merged_selection_set.values(), 1);
 
     ImperativelyLoadedEntrypointArtifactInfo {
         normalization_ast_text,
