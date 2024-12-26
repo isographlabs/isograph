@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "IsographProjectConfig",
+  "type": "object",
+  "required": [
+    "project_root",
+    "schema"
+  ],
+  "properties": {
+    "$schema": {
+      "description": "The user may hard-code the JSON Schema for their version of the config.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "artifact_directory": {
+      "description": "The relative path to the folder where the compiler should create artifacts Defaults to the project_root directory.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "options": {
+      "description": "Various options of less importance",
+      "allOf": [
+        {
+          "$ref": "#/definitions/ConfigFileOptions"
+        }
+      ]
+    },
+    "project_root": {
+      "description": "The relative path to the folder where the compiler should look for Isograph literals",
+      "type": "string"
+    },
+    "schema": {
+      "description": "The relative path to the GraphQL schema",
+      "type": "string"
+    },
+    "schema_extensions": {
+      "description": "The relative path to schema extensions",
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "ConfigFileOptionalValidationLevel": {
+      "oneOf": [
+        {
+          "description": "If this validation error is encountered, it will be ignored",
+          "type": "string",
+          "enum": [
+            "ignore"
+          ]
+        },
+        {
+          "description": "If this validation error is encountered, a warning will be issued",
+          "type": "string",
+          "enum": [
+            "warn"
+          ]
+        },
+        {
+          "description": "If this validation error is encountered, the compilation will fail",
+          "type": "string",
+          "enum": [
+            "error"
+          ]
+        }
+      ]
+    },
+    "ConfigFileOptions": {
+      "type": "object",
+      "properties": {
+        "include_file_extensions_in_import_statements": {
+          "default": false,
+          "type": "boolean"
+        },
+        "on_invalid_id_type": {
+          "$ref": "#/definitions/ConfigFileOptionalValidationLevel"
+        },
+        "on_missing_babel_transform": {
+          "$ref": "#/definitions/ConfigFileOptionalValidationLevel"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

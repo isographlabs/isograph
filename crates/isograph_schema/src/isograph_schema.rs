@@ -287,7 +287,7 @@ impl ServerFieldData {
 
 pub type SchemaType<'a> = SelectionType<&'a SchemaObject, &'a SchemaScalar>;
 
-pub fn get_name<'a>(schema_type: SchemaType<'a>) -> UnvalidatedTypeName {
+pub fn get_name(schema_type: SchemaType<'_>) -> UnvalidatedTypeName {
     match schema_type {
         SelectionType::Object(object) => object.name.into(),
         SelectionType::Scalar(scalar) => scalar.name.item.into(),

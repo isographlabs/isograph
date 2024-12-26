@@ -249,7 +249,7 @@ fn generate_refetch_query_artifact_import(
     RefetchQueryArtifactImport(output)
 }
 
-impl<'schema> EntrypointArtifactInfo<'schema> {
+impl EntrypointArtifactInfo<'_> {
     fn path_and_content(
         self,
         file_extensions: GenerateFileExtensionsOption,
