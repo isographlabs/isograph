@@ -56,7 +56,7 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
             const queryText = '{query_text}';\n\n\
             const normalizationAst: NormalizationAst = {{\n\
             {}kind: \"NormalizationAst\",\n\
-            {}normalizationAst: {normalization_ast},\n\
+            {}selections: {normalization_ast},\n\
             }};\n\
             const artifact: RefetchQueryNormalizationArtifact = {{\n\
             {}kind: \"RefetchQuery\",\n\

@@ -56,7 +56,7 @@ export type NormalizationAstNodes = ReadonlyArray<NormalizationAstNode>;
 
 export type NormalizationAst = {
   kind: 'NormalizationAst';
-  normalizationAst: NormalizationAstNodes;
+  selections: NormalizationAstNodes;
 };
 
 export type NormalizationScalarField = {

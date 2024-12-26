@@ -21,70 +21,73 @@ const queryText = 'query PetCheckinsCard ($skip: Int, $limit: Int, $id: ID!) {\
   },\
 }';
 
-const normalizationAst: NormalizationAst = [
-  {
-    kind: "Linked",
-    fieldName: "node",
-    arguments: [
-      [
-        "id",
-        { kind: "Variable", name: "id" },
-      ],
-    ],
-    concreteType: null,
-    selections: [
-      {
-        kind: "InlineFragment",
-        type: "Pet",
-        selections: [
-          {
-            kind: "Scalar",
-            fieldName: "__typename",
-            arguments: null,
-          },
-          {
-            kind: "Scalar",
-            fieldName: "id",
-            arguments: null,
-          },
-          {
-            kind: "Linked",
-            fieldName: "checkins",
-            arguments: [
-              [
-                "skip",
-                { kind: "Variable", name: "skip" },
-              ],
-
-              [
-                "limit",
-                { kind: "Variable", name: "limit" },
-              ],
-            ],
-            concreteType: "Checkin",
-            selections: [
-              {
-                kind: "Scalar",
-                fieldName: "id",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "location",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "time",
-                arguments: null,
-              },
-            ],
-          },
+const normalizationAst: NormalizationAst = {
+  kind: "NormalizationAst",
+  selections: [
+    {
+      kind: "Linked",
+      fieldName: "node",
+      arguments: [
+        [
+          "id",
+          { kind: "Variable", name: "id" },
         ],
-      },
-    ],
-  },
-];
+      ],
+      concreteType: null,
+      selections: [
+        {
+          kind: "InlineFragment",
+          type: "Pet",
+          selections: [
+            {
+              kind: "Scalar",
+              fieldName: "__typename",
+              arguments: null,
+            },
+            {
+              kind: "Scalar",
+              fieldName: "id",
+              arguments: null,
+            },
+            {
+              kind: "Linked",
+              fieldName: "checkins",
+              arguments: [
+                [
+                  "skip",
+                  { kind: "Variable", name: "skip" },
+                ],
+
+                [
+                  "limit",
+                  { kind: "Variable", name: "limit" },
+                ],
+              ],
+              concreteType: "Checkin",
+              selections: [
+                {
+                  kind: "Scalar",
+                  fieldName: "id",
+                  arguments: null,
+                },
+                {
+                  kind: "Scalar",
+                  fieldName: "location",
+                  arguments: null,
+                },
+                {
+                  kind: "Scalar",
+                  fieldName: "time",
+                  arguments: null,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
 const artifact: IsographEntrypoint<
   Pet__PetCheckinsCard__param,
   Pet__PetCheckinsCard__output_type

@@ -296,7 +296,7 @@ impl EntrypointArtifactInfo<'_> {
             const queryText = '{query_text}';\n\n\
             const normalizationAst: NormalizationAst = {{\n\
             {}kind: \"NormalizationAst\",\n\
-            {}normalizationAst: {normalization_ast_text},\n\
+            {}selections: {normalization_ast_text},\n\
             }};\n\
             const artifact: IsographEntrypoint<\n\
             {}{entrypoint_params_typename},\n\
