@@ -89,7 +89,7 @@ export function getOrCreateCacheForArtifact<
   environment: IsographEnvironment,
   entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
   variables: ExtractParameters<TReadFromStore>,
-  fetchOptions?: FetchOptions,
+  fetchOptions?: FetchOptions<TClientFieldValue>,
 ): ParentCache<FragmentReference<TReadFromStore, TClientFieldValue>> {
   const cacheKey =
     entrypoint.networkRequestInfo.queryText +

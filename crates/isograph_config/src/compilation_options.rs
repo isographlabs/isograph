@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use schemars::JsonSchema;
 use serde::Deserialize;
 use tracing::warn;
 
@@ -80,9 +81,13 @@ impl Default for OptionalValidationLevel {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-struct ConfigFile {
+pub struct IsographProjectConfig {
+    /// The user may hard-code the JSON Schema for their version of the config.
+    #[serde(rename = "$schema")]
+    #[allow(dead_code)]
+    pub json_schema: Option<String>,
     /// The relative path to the folder where the compiler should look for Isograph literals
     pub project_root: PathBuf,
     /// The relative path to the folder where the compiler should create artifacts
@@ -94,8 +99,8 @@ struct ConfigFile {
     #[serde(default)]
     pub schema_extensions: Vec<PathBuf>,
 
-    /// Various that are of lesser importance
-    #[serde(default = "Default::default")]
+    /// Various options of less importance
+    #[serde(default)]
     pub options: ConfigFileOptions,
 }
 
@@ -112,7 +117,7 @@ pub fn create_config(config_location: PathBuf) -> CompilerConfig {
         },
     };
 
-    let config_parsed: ConfigFile = serde_json::from_str(&config_contents)
+    let config_parsed: IsographProjectConfig = serde_json::from_str(&config_contents)
         .unwrap_or_else(|e| panic!("Error parsing config. Error: {}", e));
 
     let mut config = config_location.clone();
@@ -179,17 +184,17 @@ pub fn create_config(config_location: PathBuf) -> CompilerConfig {
     }
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Deserialize, Default, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
-struct ConfigFileOptions {
+pub struct ConfigFileOptions {
     on_invalid_id_type: ConfigFileOptionalValidationLevel,
     no_babel_transform: bool,
     include_file_extensions_in_import_statements: bool,
 }
 
-#[derive(Deserialize, Debug, Clone, Copy)]
+#[derive(Deserialize, Debug, Clone, Copy, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-enum ConfigFileOptionalValidationLevel {
+pub enum ConfigFileOptionalValidationLevel {
     /// If this validation error is encountered, it will be ignored
     Ignore,
     /// If this validation error is encountered, a warning will be issued

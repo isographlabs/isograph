@@ -1,4 +1,4 @@
-import React, { Suspense, useState } from 'react';
+import React, { Suspense } from 'react';
 import { iso } from '@iso';
 import { Card, CardContent, Container, Stack, Typography } from '@mui/material';
 import {
@@ -40,9 +40,8 @@ export const Newsfeed = iso(`
           const onVisible =
             index === newsfeedItems.length - 1 ? loadMore : null;
           return (
-            // the key is not needed here!
-            // eslint-disable-next-line react/jsx-key
             <newsfeedItem.NewsfeedAdOrBlog
+              key={newsfeedItem.asAdItem?.id ?? newsfeedItem.asBlogItem?.id}
               onVisible={onVisible}
               index={index}
             />

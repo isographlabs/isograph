@@ -49,6 +49,7 @@ export function readButDoNotEvaluate<
 ): WithEncounteredRecords<TReadFromStore> {
   const mutableEncounteredRecords: EncounteredIds = new Map();
 
+  // TODO consider moving this to the outside
   const readerWithRefetchQueries = readPromise(
     fragmentReference.readerWithRefetchQueries,
   );
@@ -461,7 +462,11 @@ function readData<TReadFromStore>(
             recordLink: refetchReaderParams.recordLink,
           };
         } else {
-          target[field.alias] = (args: any, fetchOptions?: FetchOptions) => {
+          target[field.alias] = (
+            args: any,
+            // TODO get the associated type for FetchOptions from the loadably selected field
+            fetchOptions?: FetchOptions<any>,
+          ) => {
             // TODO we should use the reader AST for this
             const includeReadOutData = (variables: any, readOutData: any) => {
               variables.id = readOutData.id;

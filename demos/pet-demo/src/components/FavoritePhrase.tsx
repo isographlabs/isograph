@@ -21,8 +21,8 @@ export const FavoritePhraseLoader = iso(`
             loadFragmentReference(
               { id: pet.id },
               {
-                onComplete: () => {
-                  console.log('Successfully loaded favorite phrase');
+                onComplete: (data) => {
+                  console.log('Successfully loaded favorite phrase', data);
                 },
                 onError: () => {
                   console.log('Error when loading favorite phrase');
