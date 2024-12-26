@@ -4,7 +4,7 @@ use isograph_lang_types::{
     from_isograph_field_directive, ClientFieldDeclaration,
     ClientFieldDeclarationWithUnvalidatedDirectives, ClientFieldDeclarationWithValidatedDirectives,
     IsographFieldDirective, IsographSelectionVariant, LinkedFieldSelection, ScalarFieldSelection,
-    Selection, ServerFieldSelection,
+    ServerFieldSelection,
 };
 use isograph_schema::ProcessClientFieldDeclarationError;
 use lazy_static::lazy_static;
@@ -26,7 +26,6 @@ pub fn validate_isograph_field_directives(
         client_field_name,
         description,
         selection_set,
-        unwraps,
         directives,
         variable_definitions,
         definition_path,
@@ -65,7 +64,6 @@ pub fn validate_isograph_field_directives(
             client_field_name,
             description,
             selection_set: new_selecton_set,
-            unwraps,
             directives,
             variable_definitions,
             definition_path,
@@ -83,18 +81,18 @@ fn and_then_selection_set_and_collect_errors<
     TLinkedField2,
     E,
 >(
-    selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
+    selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
     and_then_scalar: &impl Fn(&ScalarFieldSelection<TScalarField>) -> Result<TScalarField2, E>,
     and_then_linked: &impl Fn(
         &LinkedFieldSelection<TScalarField, TLinkedField>,
     ) -> Result<TLinkedField2, E>,
-) -> Result<Vec<WithSpan<Selection<TScalarField2, TLinkedField2>>>, Vec<E>> {
+) -> Result<Vec<WithSpan<ServerFieldSelection<TScalarField2, TLinkedField2>>>, Vec<E>> {
     let mut errors = vec![];
     let mut transformed_selection_set = vec![];
 
     for with_span in selection_set {
         match with_span.item {
-            Selection::ServerField(ServerFieldSelection::LinkedField(l)) => {
+            ServerFieldSelection::LinkedField(l) => {
                 let new_linked_field_data = and_then_linked(&l);
                 match new_linked_field_data {
                     Ok(new_linked_field) => {
@@ -105,17 +103,14 @@ fn and_then_selection_set_and_collect_errors<
                         );
                         match sub_errors {
                             Ok(new_selection_set) => transformed_selection_set.push(WithSpan::new(
-                                Selection::ServerField(ServerFieldSelection::LinkedField(
-                                    LinkedFieldSelection {
-                                        name: l.name,
-                                        reader_alias: l.reader_alias,
-                                        associated_data: new_linked_field,
-                                        selection_set: new_selection_set,
-                                        unwraps: l.unwraps,
-                                        arguments: l.arguments,
-                                        directives: l.directives,
-                                    },
-                                )),
+                                ServerFieldSelection::LinkedField(LinkedFieldSelection {
+                                    name: l.name,
+                                    reader_alias: l.reader_alias,
+                                    associated_data: new_linked_field,
+                                    selection_set: new_selection_set,
+                                    arguments: l.arguments,
+                                    directives: l.directives,
+                                }),
                                 with_span.span,
                             )),
                             Err(e) => errors.extend(e),
@@ -124,19 +119,16 @@ fn and_then_selection_set_and_collect_errors<
                     Err(e) => errors.push(e),
                 }
             }
-            Selection::ServerField(ServerFieldSelection::ScalarField(s)) => {
+            ServerFieldSelection::ScalarField(s) => {
                 match and_then_scalar(&s) {
                     Ok(new_scalar_field_data) => transformed_selection_set.push(WithSpan::new(
-                        Selection::ServerField(ServerFieldSelection::ScalarField(
-                            ScalarFieldSelection {
-                                name: s.name,
-                                reader_alias: s.reader_alias,
-                                associated_data: new_scalar_field_data,
-                                unwraps: s.unwraps,
-                                arguments: s.arguments,
-                                directives: s.directives,
-                            },
-                        )),
+                        ServerFieldSelection::ScalarField(ScalarFieldSelection {
+                            name: s.name,
+                            reader_alias: s.reader_alias,
+                            associated_data: new_scalar_field_data,
+                            arguments: s.arguments,
+                            directives: s.directives,
+                        }),
                         with_span.span,
                     )),
                     Err(e) => errors.push(e),

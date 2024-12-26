@@ -53,6 +53,17 @@ export function PetDetailRouteLoader({ route }: { route: PetDetailRoute }) {
   const { fragmentReference } = useLazyReference(
     iso(`entrypoint Query.PetDetailRoute`),
     { id: route.id },
+    {
+      onComplete: (data) => {
+        console.log(
+          'The Query.PetDetailRoute network request has completed.',
+          data,
+        );
+      },
+      onError: () => {
+        console.log('The Query.PetDetailRoute network request errored out.');
+      },
+    },
   );
 
   return (

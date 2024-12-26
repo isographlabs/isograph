@@ -7,8 +7,8 @@ use common_lang_types::{
 use intern::Lookup;
 use isograph_lang_types::{
     ClientFieldId, LinkedFieldSelection, LoadableDirectiveParameters, ScalarFieldSelection,
-    SelectableServerFieldId, Selection, SelectionFieldArgument, SelectionType, ServerFieldId,
-    ServerObjectId, ServerScalarId, TypeAnnotation, VariableDefinition,
+    SelectableServerFieldId, SelectionFieldArgument, SelectionType, ServerFieldId,
+    ServerFieldSelection, ServerObjectId, ServerScalarId, TypeAnnotation, VariableDefinition,
 };
 use thiserror::Error;
 
@@ -26,7 +26,7 @@ pub type ValidatedSchemaServerField = SchemaServerField<
     <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
 >;
 
-pub type ValidatedSelection = Selection<
+pub type ValidatedSelection = ServerFieldSelection<
     <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
 >;

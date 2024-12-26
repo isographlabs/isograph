@@ -25,7 +25,10 @@ type UseSkipLimitReturnValue<
 > =
   | {
       readonly kind: 'Complete';
-      readonly fetchMore: (count: number, fetchOptions?: FetchOptions) => void;
+      readonly fetchMore: (
+        count: number,
+        fetchOptions?: FetchOptions<ReadonlyArray<TItem>>,
+      ) => void;
       readonly results: ReadonlyArray<TItem>;
     }
   | {
@@ -81,7 +84,7 @@ export function useSkipLimitPagination<
     ReadonlyArray<TItem>,
     UseSkipLimitPaginationArgs
   >,
-  initialArgs?: {
+  initialState?: {
     skip?: number | void | null;
   },
 ): UseSkipLimitReturnValue<TReadFromStore, TItem> {
@@ -106,8 +109,16 @@ export function useSkipLimitPagination<
         fragmentReference.readerWithRefetchQueries,
       );
 
+      // invariant: readOutDataAndRecords.length === completedReferences.length
+      const data = readOutDataAndRecords[i]?.item;
+      if (data == null) {
+        throw new Error(
+          'Parameter data is unexpectedly null. This is indicative of a bug in Isograph.',
+        );
+      }
+
       const firstParameter = {
-        data: readOutDataAndRecords[i].item,
+        data,
         parameters: fragmentReference.variables,
       };
 
@@ -150,10 +161,17 @@ export function useSkipLimitPagination<
           fragmentReference.readerWithRefetchQueries,
         );
 
+        const records = readOutDataAndRecords[i];
+        if (records == null) {
+          throw new Error(
+            'subscribeCompletedFragmentReferences records is unexpectedly null',
+          );
+        }
+
         return {
           fragmentReference,
           readerAst: readerWithRefetchQueries.readerArtifact.readerAst,
-          records: readOutDataAndRecords[i],
+          records,
           callback(_data) {
             rerender({});
           },
@@ -164,7 +182,10 @@ export function useSkipLimitPagination<
 
   const getFetchMore =
     (loadedSoFar: number) =>
-    (count: number, fetchOptions?: FetchOptions): void => {
+    (
+      count: number,
+      fetchOptions?: FetchOptions<ReadonlyArray<TItem>>,
+    ): void => {
       const loadedField = loadableField(
         {
           skip: loadedSoFar,
@@ -209,8 +230,9 @@ export function useSkipLimitPagination<
 
   const loadedReferences = state === UNASSIGNED_STATE ? [] : state;
 
-  const mostRecentItem: LoadedFragmentReference<TReadFromStore, TItem> | null =
-    loadedReferences[loadedReferences.length - 1];
+  const mostRecentItem:
+    | LoadedFragmentReference<TReadFromStore, TItem>
+    | undefined = loadedReferences[loadedReferences.length - 1];
   const mostRecentFragmentReference =
     mostRecentItem?.[0].getItemIfNotDisposed();
 
@@ -259,7 +281,7 @@ export function useSkipLimitPagination<
   if (!networkRequestStatus) {
     return {
       kind: 'Complete',
-      fetchMore: getFetchMore(initialArgs?.skip ?? 0),
+      fetchMore: getFetchMore(initialState?.skip ?? 0),
       results: [],
     };
   }

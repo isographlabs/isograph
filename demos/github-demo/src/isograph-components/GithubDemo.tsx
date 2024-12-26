@@ -77,7 +77,8 @@ function Router({
     case 'PullRequest':
       return <PullRequestRoute route={route} setRoute={setRoute} />;
     default:
-      const _exhaustiveCheck: never = route;
+      const _: never = route;
+      _;
       throw new Error('Unexpected route kind');
   }
 }
