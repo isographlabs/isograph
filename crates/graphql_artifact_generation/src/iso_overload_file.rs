@@ -181,7 +181,8 @@ export function iso(_isographLiteralText: string):
         false => {
 "  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
       'was not set up, or it failed to identify this call site. Make sure it ' +
-      'is being used verbatim as `iso`.');"
+      'is being used verbatim as `iso`. If you cannot use the babel transform, ' + 
+      'set options.no_babel_transform to true in your Isograph config. ');"
         }
         true => {
             "  return (clientFieldResolver: any) => clientFieldResolver;"
