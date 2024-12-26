@@ -44,6 +44,7 @@ lazy_static! {
     pub static ref REFETCH_FIELD_NAME: ScalarFieldName = "__refetch".intern().into();
     pub static ref NODE_FIELD_NAME: LinkedFieldName = "node".intern().into();
     pub static ref TYPENAME_FIELD_NAME: ScalarFieldName = "__typename".intern().into();
+    pub static ref LINK_FIELD_NAME: ScalarFieldName = "link".intern().into();
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

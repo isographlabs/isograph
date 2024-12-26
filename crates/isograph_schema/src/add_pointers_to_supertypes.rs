@@ -8,7 +8,7 @@ use crate::{
     SchemaServerField, SchemaServerFieldVariant, ServerFieldTypeAssociatedData,
     ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
     ValidatedIsographSelectionVariant, ValidatedScalarFieldAssociatedData,
-    ValidatedTypeRefinementMap,
+    ValidatedTypeRefinementMap, LINK_FIELD_NAME,
 };
 use common_lang_types::Location;
 impl UnvalidatedSchema {
@@ -63,7 +63,7 @@ impl UnvalidatedSchema {
                             location: FieldType::ClientField(
                                 match *subtype
                                     .encountered_fields
-                                    .get(&"link".intern().into())
+                                    .get(&(*LINK_FIELD_NAME).into())
                                     .expect("Expected link to exist")
                                     .as_client_field()
                                     .expect("Expected link to be client field")
@@ -74,7 +74,7 @@ impl UnvalidatedSchema {
                             selection_variant: ValidatedIsographSelectionVariant::Regular,
                         },
                         directives: vec![],
-                        name: WithLocation::new("link".intern().into(), Location::generated()),
+                        name: WithLocation::new(*LINK_FIELD_NAME, Location::generated()),
                         reader_alias: None,
                     }),
                     Span::todo_generated(),
