@@ -10,11 +10,16 @@ import {
 import { logMessage } from './logging';
 
 export type ShouldFetch = 'Yes' | 'No' | 'IfNecessary';
+export type RequiredShouldFetch = 'Yes' | 'No';
 
 export const DEFAULT_SHOULD_FETCH_VALUE: ShouldFetch = 'IfNecessary';
 
 export type FetchOptions = {
   shouldFetch?: ShouldFetch;
+};
+
+export type RequiredFetchOptions = {
+  shouldFetch: RequiredShouldFetch;
 };
 
 export type CheckResult =

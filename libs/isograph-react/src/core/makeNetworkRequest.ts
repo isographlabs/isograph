@@ -1,4 +1,4 @@
-import { ItemCleanupPair, type CleanupFn } from '@isograph/disposable-types';
+import { ItemCleanupPair } from '@isograph/disposable-types';
 import {
   IsographEntrypoint,
   RefetchQueryNormalizationArtifact,
@@ -33,21 +33,35 @@ export function maybeMakeNetworkRequest(
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
   switch (shouldFetch) {
     case 'Yes': {
-      return makeNetworkRequest(environment, artifact, variables, () =>
-        loadNormalizationAst(artifact.networkRequestInfo.normalizationAst),
-      );
+      return makeNetworkRequest(environment, artifact, variables);
     }
     case 'No': {
       return [wrapResolvedValue(undefined), () => {}];
     }
     case 'IfNecessary': {
-      return makeNetworkRequestIfNecessary(
+      if (
+        artifact.networkRequestInfo.normalizationAst.kind ===
+        'NormalizationAstLoader'
+      ) {
+        throw new Error(
+          'Using lazy loaded normalizationAst with shouldFetch: "IfNecessary" is not supported as it will lead to slower initial load time.',
+        );
+      }
+      const result = check(
         environment,
-        artifact,
+        artifact.networkRequestInfo.normalizationAst,
         variables,
-        () =>
-          loadNormalizationAst(artifact.networkRequestInfo.normalizationAst),
+        {
+          __link: ROOT_ID,
+          __typename: artifact.concreteType,
+        },
       );
+
+      if (result.kind === 'EnoughData') {
+        return [wrapResolvedValue(undefined), () => {}];
+      } else {
+        return makeNetworkRequest(environment, artifact, variables);
+      }
     }
   }
 }
@@ -57,7 +71,7 @@ function loadNormalizationAst(
 ) {
   switch (normalizationAst.kind) {
     case 'NormalizationAst': {
-      return Promise.resolve(normalizationAst);
+      return normalizationAst;
     }
     case 'NormalizationAstLoader': {
       return normalizationAst.loader();
@@ -69,7 +83,6 @@ export function makeNetworkRequest(
   environment: IsographEnvironment,
   artifact: RefetchQueryNormalizationArtifact | IsographEntrypoint<any, any>,
   variables: Variables,
-  normalizationAstLoader: () => Promise<NormalizationAst>,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
   // TODO this should be a DataId and stored in the store
   const myNetworkRequestId = networkRequestId + '';
@@ -91,7 +104,7 @@ export function makeNetworkRequest(
       artifact.networkRequestInfo.queryText,
       variables,
     ),
-    normalizationAstLoader(),
+    loadNormalizationAst(artifact.networkRequestInfo.normalizationAst),
   ]).then(([networkResponse, normalizationAst]) => {
     logMessage(environment, {
       kind: 'ReceivedNetworkResponse',
@@ -164,70 +177,3 @@ type NetworkRequestStatus =
       readonly kind: 'UndisposedComplete';
       readonly retainedQuery: RetainedQuery;
     };
-
-function makeNetworkRequestIfNecessary(
-  environment: IsographEnvironment,
-  artifact: RefetchQueryNormalizationArtifact | IsographEntrypoint<any, any>,
-  variables: Variables,
-  normalizationAstLoader: () => Promise<NormalizationAst>,
-) {
-  return flatMapNetworkRequest(
-    [wrapPromise(normalizationAstLoader()), () => {}],
-    (normalizationAst) => {
-      const result = check(environment, normalizationAst, variables, {
-        __link: ROOT_ID,
-        __typename: artifact.concreteType,
-      });
-
-      if (result.kind === 'EnoughData') {
-        return [wrapResolvedValue(undefined), () => {}];
-      } else {
-        return makeNetworkRequest(
-          environment,
-          artifact,
-          variables,
-          normalizationAstLoader,
-        );
-      }
-    },
-  );
-}
-
-function flatMapNetworkRequest<T, R, E>(
-  networkRequest: ItemCleanupPair<PromiseWrapper<T, E>>,
-  fn: (value: T) => ItemCleanupPair<PromiseWrapper<R, E>>,
-): ItemCleanupPair<PromiseWrapper<R, E>> {
-  let networkRequestState:
-    | {
-        kind: 'Pending';
-      }
-    | {
-        kind: 'NetworkRequestStarted';
-        disposeNetworkRequest: CleanupFn;
-      }
-    | { kind: 'Disposed' } = { kind: 'Pending' };
-
-  const promiseWrapper = wrapPromise(
-    networkRequest[0].promise.then((value) => {
-      if (networkRequestState.kind === 'Pending') {
-        const [networkRequest, disposeNetworkRequest] = fn(value);
-        networkRequestState = {
-          kind: 'NetworkRequestStarted',
-          disposeNetworkRequest,
-        };
-        return networkRequest.promise;
-      }
-      throw new Error('Expected network request to be pending');
-    }),
-  );
-
-  return [
-    promiseWrapper,
-    () => {
-      if (networkRequestState.kind === 'NetworkRequestStarted') {
-        networkRequestState.disposeNetworkRequest();
-      }
-      networkRequestState = { kind: 'Disposed' };
-    },
-  ];
-}
