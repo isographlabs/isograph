@@ -149,7 +149,8 @@ const normalizationAst: NormalizationAst = {
 };
 const artifact: IsographEntrypoint<
   Viewer__NewsfeedPaginationComponent__param,
-  Viewer__NewsfeedPaginationComponent__output_type
+  Viewer__NewsfeedPaginationComponent__output_type,
+  NormalizationAst
 > = {
   kind: "Entrypoint",
   networkRequestInfo: {

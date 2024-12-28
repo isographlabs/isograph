@@ -300,7 +300,8 @@ impl EntrypointArtifactInfo<'_> {
             }};\n\
             const artifact: IsographEntrypoint<\n\
             {}{entrypoint_params_typename},\n\
-            {}{entrypoint_output_type_name}\n\
+            {}{entrypoint_output_type_name},\n\
+            {}NormalizationAst\n\
             > = {{\n\
             {}kind: \"Entrypoint\",\n\
             {}networkRequestInfo: {{\n\
@@ -316,7 +317,7 @@ impl EntrypointArtifactInfo<'_> {
             {}}},\n\
             }};\n\n\
             export default artifact;\n",
-            "  ","  ","  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
+            "  ", "  ", "  ","  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     }
 }
