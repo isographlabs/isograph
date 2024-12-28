@@ -80,10 +80,11 @@
           "default": false,
           "type": "boolean"
         },
-        "on_invalid_id_type": {
-          "$ref": "#/definitions/ConfigFileOptionalValidationLevel"
+        "no_babel_transform": {
+          "default": false,
+          "type": "boolean"
         },
-        "on_missing_babel_transform": {
+        "on_invalid_id_type": {
           "$ref": "#/definitions/ConfigFileOptionalValidationLevel"
         }
       },
