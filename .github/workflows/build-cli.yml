@@ -27,6 +27,21 @@ jobs:
     runs-on: ${{ inputs.os }}
     steps:
       - uses: actions/checkout@v2
+      - name: Cache turbo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ inputs.artifact-name }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ inputs.artifact-name }}-
+      - uses: pnpm/action-setup@v2
+      - name: Use Node.js 22
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -44,7 +59,7 @@ jobs:
           command: install
           args: cross
       - name: 'Build isograph_cli with cargo (${{inputs.target}})'
-        run: ${{ inputs.cross && 'cross' || 'cargo' }} build --target ${{ inputs.target }} --release
+        run: pnpm exec turbo ${{ inputs.cross && 'cross' || 'build' }} -- --target ${{ inputs.target }} --release
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact-name }}
