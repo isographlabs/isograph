@@ -12,36 +12,39 @@ const queryText = 'query PetFavoritePhrase ($id: ID!) {\
   },\
 }';
 
-const normalizationAst: NormalizationAst = [
-  {
-    kind: "Linked",
-    fieldName: "pet",
-    arguments: [
-      [
-        "id",
-        { kind: "Variable", name: "id" },
+const normalizationAst: NormalizationAst = {
+  kind: "NormalizationAst",
+  selections: [
+    {
+      kind: "Linked",
+      fieldName: "pet",
+      arguments: [
+        [
+          "id",
+          { kind: "Variable", name: "id" },
+        ],
       ],
-    ],
-    concreteType: "Pet",
-    selections: [
-      {
-        kind: "Scalar",
-        fieldName: "id",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "favorite_phrase",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "name",
-        arguments: null,
-      },
-    ],
-  },
-];
+      concreteType: "Pet",
+      selections: [
+        {
+          kind: "Scalar",
+          fieldName: "id",
+          arguments: null,
+        },
+        {
+          kind: "Scalar",
+          fieldName: "favorite_phrase",
+          arguments: null,
+        },
+        {
+          kind: "Scalar",
+          fieldName: "name",
+          arguments: null,
+        },
+      ],
+    },
+  ],
+};
 const artifact: IsographEntrypoint<
   Query__PetFavoritePhrase__param,
   Query__PetFavoritePhrase__output_type

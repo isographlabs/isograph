@@ -57,9 +57,11 @@ export type NormalizationAstNode =
   | NormalizationLinkedField
   | NormalizationInlineFragment;
 
+export type NormalizationAstNodes = ReadonlyArray<NormalizationAstNode>;
+
 export type NormalizationAst = {
   kind: 'NormalizationAst';
-  normalizationAst: ReadonlyArray<NormalizationAstNode>;
+  selections: NormalizationAstNodes;
 };
 
 export type NormalizationScalarField = {
@@ -72,14 +74,14 @@ export type NormalizationLinkedField = {
   readonly kind: 'Linked';
   readonly fieldName: string;
   readonly arguments: Arguments | null;
-  readonly selections: NormalizationAst;
+  readonly selections: NormalizationAstNodes;
   readonly concreteType: TypeName | null;
 };
 
 export type NormalizationInlineFragment = {
   readonly kind: 'InlineFragment';
   readonly type: string;
-  readonly selections: NormalizationAst;
+  readonly selections: NormalizationAstNodes;
 };
 
 // This is more like an entrypoint, but one specifically for a refetch query/mutation

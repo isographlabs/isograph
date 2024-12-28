@@ -55,7 +55,8 @@ export const meNameField = iso(`
 import { meNameSuccessorRetainedQuery } from './meNameSuccessor';
 const meNameEntrypoint = iso(`entrypoint Query.meName`);
 const meNameRetainedQuery = {
-  normalizationAst: meNameEntrypoint.networkRequestInfo.normalizationAst,
+  normalizationAst:
+    meNameEntrypoint.networkRequestInfo.normalizationAst.selections,
   variables: {},
   root: { __link: ROOT_ID, __typename: 'Query' },
 };
