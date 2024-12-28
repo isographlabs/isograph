@@ -23,7 +23,7 @@ export function useLazyReference<
     NormalizationAstLoader
   >,
   variables: ExtractParameters<TReadFromStore>,
-  fetchOptions: RequiredFetchOptions,
+  fetchOptions: RequiredFetchOptions<TClientFieldValue>,
 ): {
   fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>;
 };
@@ -37,7 +37,7 @@ export function useLazyReference<
     NormalizationAst
   >,
   variables: ExtractParameters<TReadFromStore>,
-  fetchOptions?: FetchOptions,
+  fetchOptions?: FetchOptions<TClientFieldValue>,
 ): {
   fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>;
 };
@@ -47,7 +47,7 @@ export function useLazyReference<
 >(
   entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
   variables: ExtractParameters<TReadFromStore>,
-  fetchOptions?: RequiredFetchOptions | FetchOptions,
+  fetchOptions?: FetchOptions<TClientFieldValue>,
 ): {
   fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>;
 } {

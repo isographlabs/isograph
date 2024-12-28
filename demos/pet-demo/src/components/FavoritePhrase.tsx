@@ -16,7 +16,21 @@ export const FavoritePhraseLoader = iso(`
   return (
     <>
       {fragmentReference == UNASSIGNED_STATE ? (
-        <button onClick={() => loadFragmentReference({ id: pet.id })}>
+        <button
+          onClick={() =>
+            loadFragmentReference(
+              { id: pet.id },
+              {
+                onComplete: (data) => {
+                  console.log('Successfully loaded favorite phrase', data);
+                },
+                onError: () => {
+                  console.log('Error when loading favorite phrase');
+                },
+              },
+            )
+          }
+        >
           Reveal favorite phrase
         </button>
       ) : (

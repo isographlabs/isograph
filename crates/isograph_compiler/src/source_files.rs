@@ -303,9 +303,9 @@ fn get_canonicalized_root_path(project_root: &PathBuf) -> Result<PathBuf, BatchC
     let joined = current_dir.join(project_root);
     joined
         .canonicalize()
-        .map_err(|message| BatchCompileError::UnableToLoadSchema {
+        .map_err(|e| BatchCompileError::UnableToLoadSchema {
             path: joined.clone(),
-            message,
+            message: e.to_string(),
         })
 }
 

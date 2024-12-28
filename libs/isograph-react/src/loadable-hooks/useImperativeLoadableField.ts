@@ -21,7 +21,7 @@ type UseImperativeLoadableFieldReturn<
     // TODO this should be void iff all args are provided by the query, like in
     // useClientSideDefer.
     args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs> | void,
-    fetchOptions?: FetchOptions,
+    fetchOptions?: FetchOptions<TResult>,
   ) => void;
 };
 
@@ -42,7 +42,7 @@ export function useImperativeLoadableField<
   return {
     loadField: (
       args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs> | void,
-      fetchOptions?: FetchOptions,
+      fetchOptions?: FetchOptions<TResult>,
     ) => {
       const [_id, loader] = loadableField(args, fetchOptions ?? {});
       setState(loader());

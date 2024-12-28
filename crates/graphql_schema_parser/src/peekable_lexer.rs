@@ -46,7 +46,7 @@ impl<'source> PeekableLexer<'source> {
         self.end_index_of_last_parsed_token = self.current.span.end;
         let span = self.lexer_span();
         // TODO why does self.current = ... not work here?
-        return std::mem::replace(&mut self.current, WithSpan::new(kind, span));
+        std::mem::replace(&mut self.current, WithSpan::new(kind, span))
     }
 
     pub fn peek(&self) -> WithSpan<TokenKind> {

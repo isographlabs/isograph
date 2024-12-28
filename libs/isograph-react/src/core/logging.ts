@@ -61,6 +61,11 @@ export type LogMessage =
       networkRequestId: string;
     }
   | {
+      kind: 'ReceivedNetworkError';
+      error: any;
+      networkRequestId: string;
+    }
+  | {
       kind: 'MissingFieldHandlerCalled';
       root: Link;
       storeRecord: StoreRecord;

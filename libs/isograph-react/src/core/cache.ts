@@ -34,7 +34,7 @@ import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import { wrapResolvedValue } from './PromiseWrapper';
 import { logMessage } from './logging';
-import { DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
+import { FetchOptions } from './check';
 
 export const TYPENAME_FIELD_NAME = '__typename';
 
@@ -89,18 +89,17 @@ export function getOrCreateCacheForArtifact<
   environment: IsographEnvironment,
   entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
   variables: ExtractParameters<TReadFromStore>,
-  fetchOptions?: FetchOptions,
+  fetchOptions?: FetchOptions<TClientFieldValue>,
 ): ParentCache<FragmentReference<TReadFromStore, TClientFieldValue>> {
   const cacheKey =
     entrypoint.networkRequestInfo.queryText +
     JSON.stringify(stableCopy(variables));
   const factory = () => {
-    const shouldFetch = fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE;
     const [networkRequest, disposeNetworkRequest] = maybeMakeNetworkRequest(
       environment,
       entrypoint,
       variables,
-      shouldFetch,
+      fetchOptions,
     );
 
     const itemCleanupPair: ItemCleanupPair<
@@ -517,7 +516,7 @@ function normalizeLinkedField(
     const dataIds: (Link | null)[] = [];
     for (let i = 0; i < networkResponseData.length; i++) {
       const networkResponseObject = networkResponseData[i];
-      if (networkResponseObject === null) {
+      if (networkResponseObject == null) {
         dataIds.push(null);
         continue;
       }

@@ -14,13 +14,15 @@ export type RequiredShouldFetch = 'Yes' | 'No';
 
 export const DEFAULT_SHOULD_FETCH_VALUE: ShouldFetch = 'IfNecessary';
 
-export type FetchOptions = {
+export type FetchOptions<TReadOutData> = {
   shouldFetch?: ShouldFetch;
+  onComplete?: (data: TReadOutData) => void;
+  onError?: () => void;
 };
 
-export type RequiredFetchOptions = {
+export type RequiredFetchOptions<TReadOutData> = {
   shouldFetch: RequiredShouldFetch;
-};
+}  & FetchOptions<TReadOutData>;
 
 export type CheckResult =
   | {
