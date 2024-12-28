@@ -22,7 +22,7 @@ export type FetchOptions<TReadOutData> = {
 
 export type RequiredFetchOptions<TReadOutData> = {
   shouldFetch: RequiredShouldFetch;
-}  & FetchOptions<TReadOutData>;
+} & FetchOptions<TReadOutData>;
 
 export type CheckResult =
   | {
