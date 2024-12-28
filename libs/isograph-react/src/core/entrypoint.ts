@@ -36,11 +36,6 @@ export type IsographEntrypoint<
   readonly concreteType: TypeName;
 };
 
-export type NormalizationAstLoader = {
-  readonly kind: 'NormalizationAstLoader';
-  readonly loader: () => Promise<NormalizationAst>;
-};
-
 export type IsographEntrypointLoader<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
@@ -62,6 +57,11 @@ export type NormalizationAstNodes = ReadonlyArray<NormalizationAstNode>;
 export type NormalizationAst = {
   kind: 'NormalizationAst';
   selections: NormalizationAstNodes;
+};
+
+export type NormalizationAstLoader = {
+  readonly kind: 'NormalizationAstLoader';
+  readonly loader: () => Promise<NormalizationAst>;
 };
 
 export type NormalizationScalarField = {

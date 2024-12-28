@@ -91,19 +91,6 @@ function loadNormalizationAst(
   }
 }
 
-function loadNormalizationAst(
-  normalizationAst: NormalizationAstLoader | NormalizationAst,
-) {
-  switch (normalizationAst.kind) {
-    case 'NormalizationAst': {
-      return normalizationAst;
-    }
-    case 'NormalizationAstLoader': {
-      return normalizationAst.loader();
-    }
-  }
-}
-
 export function makeNetworkRequest<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
@@ -136,28 +123,29 @@ export function makeNetworkRequest<
       variables,
     ),
     loadNormalizationAst(artifact.networkRequestInfo.normalizationAst),
-  ]).then(([networkResponse, normalizationAst]) => {
-    logMessage(environment, {
-      kind: 'ReceivedNetworkResponse',
-      networkResponse,
-      networkRequestId: myNetworkRequestId,
-    });
+  ])
+    .then(([networkResponse, normalizationAst]) => {
+      logMessage(environment, {
+        kind: 'ReceivedNetworkResponse',
+        networkResponse,
+        networkRequestId: myNetworkRequestId,
+      });
 
-    if (networkResponse.errors != null) {
+      if (networkResponse.errors != null) {
         try {
           fetchOptions?.onError?.();
         } catch {}
-      // @ts-expect-error Why are we getting the wrong constructor here?
-      throw new Error('GraphQL network response had errors', {
-        cause: networkResponse,
-      });
-    }
+        // @ts-expect-error Why are we getting the wrong constructor here?
+        throw new Error('GraphQL network response had errors', {
+          cause: networkResponse,
+        });
+      }
 
       const root = { __link: ROOT_ID, __typename: artifact.concreteType };
       if (status.kind === 'UndisposedIncomplete') {
         normalizeData(
           environment,
-          artifact.networkRequestInfo.normalizationAst.selections,
+          normalizationAst.selections,
           networkResponse.data ?? {},
           variables,
           artifact.kind === 'Entrypoint'
@@ -166,8 +154,7 @@ export function makeNetworkRequest<
           root,
         );
         const retainedQuery = {
-          normalizationAst:
-            artifact.networkRequestInfo.normalizationAst.selections,
+          normalizationAst: normalizationAst.selections,
           variables,
           root,
         };

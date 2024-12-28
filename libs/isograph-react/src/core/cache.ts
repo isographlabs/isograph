@@ -385,7 +385,7 @@ function normalizeDataIntoRecord(
   mutableEncounteredIds: EncounteredIds,
 ): RecordHasBeenUpdated {
   let recordHasBeenUpdated = false;
-  for (const normalizationNode of normalizationAst.normalizationAst) {
+  for (const normalizationNode of normalizationAst) {
     switch (normalizationNode.kind) {
       case 'Scalar': {
         const scalarFieldResultedInChange = normalizeScalarField(
