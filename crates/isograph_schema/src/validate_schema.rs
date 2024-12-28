@@ -398,7 +398,22 @@ pub enum ValidateSchemaError {
         actual: GraphQLScalarTypeName,
     },
 
-    #[error("Expected input of type {expected}, found enum literal {actual}")]
+    #[error("Expected input of type {expected}, found object literal")]
+    ExpectedTypeFoundObject {
+        expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    },
+
+    #[error("Expected input of type {expected}, found list literal")]
+    ExpectedTypeFoundList {
+        expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    },
+
+    #[error("Expected non null input of type {expected}, found null")]
+    ExpectedNonNullTypeFoundNull {
+        expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    },
+
+    #[error("Expected input of type {expected}, found {actual} enum literal")]
     ExpectedTypeFoundEnum {
         expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
         actual: EnumLiteralValue,

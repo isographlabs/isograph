@@ -4,8 +4,8 @@ use std::{
 };
 
 use common_lang_types::{
-    EnumLiteralValue, FieldArgumentName, Location, SelectableFieldName, VariableName, WithLocation,
-    WithSpan,
+    EnumLiteralValue, FieldArgumentName, Location, SelectableFieldName, UnvalidatedTypeName,
+    VariableName, WithLocation, WithSpan,
 };
 
 use graphql_lang_types::{
@@ -653,14 +653,7 @@ fn scalar_literal_satisfies_type(
 
             Err(WithLocation::new(
                 ValidateSchemaError::ExpectedTypeFoundScalar {
-                    expected: type_.clone().map(|type_id| match type_id {
-                        SelectionType::Scalar(scalar_id) => {
-                            schema_data.scalar(scalar_id).name.item.into()
-                        }
-                        SelectionType::Object(object_id) => {
-                            schema_data.object(object_id).name.into()
-                        }
-                    }),
+                    expected: id_annotation_to_typename_annotation(type_, schema_data),
                     actual,
                 },
                 location,
@@ -673,20 +666,17 @@ fn scalar_literal_satisfies_type(
                 }
                 let actual = schema_data.scalar(*scalar_literal).name.item;
 
-                let expected = type_
-                    .clone()
-                    .map(|_| schema_data.scalar(expected_scalar_id).name.item.into());
+                let expected = id_annotation_to_typename_annotation(type_, schema_data);
+
                 Err(WithLocation::new(
                     ValidateSchemaError::ExpectedTypeFoundScalar { expected, actual },
                     location,
                 ))
             }
-            SelectionType::Object(object_id) => {
+            SelectionType::Object(_) => {
                 let actual = schema_data.scalar(*scalar_literal).name.item;
 
-                let expected = type_
-                    .clone()
-                    .map(|_| schema_data.object(object_id).name.into());
+                let expected = id_annotation_to_typename_annotation(type_, schema_data);
 
                 Err(WithLocation::new(
                     ValidateSchemaError::ExpectedTypeFoundScalar { expected, actual },
@@ -733,19 +723,8 @@ fn variable_type_satisfies_argument_type(
             // Value does not satisfy Value!
             // or [Value] does not satisfy Value!
             GraphQLTypeAnnotation::Named(_) | GraphQLTypeAnnotation::List(_) => {
-                let expected = argument_type.clone().map(|type_id| match type_id {
-                    SelectionType::Scalar(scalar_id) => {
-                        schema_data.scalar(scalar_id).name.item.into()
-                    }
-                    SelectionType::Object(object_id) => schema_data.object(object_id).name.into(),
-                });
-
-                let actual = variable_type.clone().map(|type_id| match type_id {
-                    SelectionType::Scalar(scalar_id) => {
-                        schema_data.scalar(scalar_id).name.item.into()
-                    }
-                    SelectionType::Object(object_id) => schema_data.object(object_id).name.into(),
-                });
+                let expected = id_annotation_to_typename_annotation(argument_type, schema_data);
+                let actual = id_annotation_to_typename_annotation(variable_type, schema_data);
 
                 Err(WithLocation::new(
                     ValidateSchemaError::ExpectedType { expected, actual },
@@ -754,15 +733,8 @@ fn variable_type_satisfies_argument_type(
             }
         },
         (_, _) => {
-            let expected = argument_type.clone().map(|type_id| match type_id {
-                SelectionType::Scalar(scalar_id) => schema_data.scalar(scalar_id).name.item.into(),
-                SelectionType::Object(object_id) => schema_data.object(object_id).name.into(),
-            });
-
-            let actual = variable_type.clone().map(|type_id| match type_id {
-                SelectionType::Scalar(scalar_id) => schema_data.scalar(scalar_id).name.item.into(),
-                SelectionType::Object(object_id) => schema_data.object(object_id).name.into(),
-            });
+            let expected = id_annotation_to_typename_annotation(argument_type, schema_data);
+            let actual = id_annotation_to_typename_annotation(variable_type, schema_data);
 
             Err(WithLocation::new(
                 ValidateSchemaError::ExpectedType { expected, actual },
@@ -810,17 +782,24 @@ fn value_satisfies_type(
             value.location,
         ),
         NonConstantValue::Enum(enum_literal_value) => match type_.clone().into() {
-            GraphQLNonNullTypeAnnotation::List(_) => {
-                panic!("Expected list type, received enum literal");
-            }
+            GraphQLNonNullTypeAnnotation::List(_) => Err(WithLocation::new(
+                ValidateSchemaError::ExpectedTypeFoundEnum {
+                    expected: id_annotation_to_typename_annotation(type_, schema_data),
+                    actual: *enum_literal_value,
+                },
+                value.location,
+            )),
             GraphQLNonNullTypeAnnotation::Named(named_type) => {
                 enum_satisfies_type(enum_literal_value, &named_type, schema_data, value.location)
             }
         },
         NonConstantValue::Null => match type_ {
-            GraphQLTypeAnnotation::NonNull(_) => {
-                panic!("Expected non null type, received null");
-            }
+            GraphQLTypeAnnotation::NonNull(_) => Err(WithLocation::new(
+                ValidateSchemaError::ExpectedNonNullTypeFoundNull {
+                    expected: id_annotation_to_typename_annotation(type_, schema_data),
+                },
+                value.location,
+            )),
             GraphQLTypeAnnotation::List(_) => Ok(()),
             GraphQLTypeAnnotation::Named(_) => Ok(()),
         },
@@ -828,12 +807,45 @@ fn value_satisfies_type(
             GraphQLNonNullTypeAnnotation::List(list_type) => {
                 list_satisfies_type(list, list_type, variable_definitions, schema_data)
             }
-            GraphQLNonNullTypeAnnotation::Named(_) => {
-                panic!("Expected named typed, received list literal");
-            }
+            GraphQLNonNullTypeAnnotation::Named(_) => Err(WithLocation::new(
+                ValidateSchemaError::ExpectedTypeFoundList {
+                    expected: id_annotation_to_typename_annotation(type_, schema_data),
+                },
+                value.location,
+            )),
         },
-        NonConstantValue::Object(object) => todo!(),
+        NonConstantValue::Object(_object_literal) => match type_.clone().into() {
+            GraphQLNonNullTypeAnnotation::List(_) => Err(WithLocation::new(
+                ValidateSchemaError::ExpectedTypeFoundObject {
+                    expected: id_annotation_to_typename_annotation(type_, schema_data),
+                },
+                value.location,
+            )),
+            GraphQLNonNullTypeAnnotation::Named(named_type) => match named_type.0.item {
+                SelectionType::Scalar(_) => Err(WithLocation::new(
+                    ValidateSchemaError::ExpectedTypeFoundObject {
+                        expected: id_annotation_to_typename_annotation(type_, schema_data),
+                    },
+                    value.location,
+                )),
+                SelectionType::Object(object_id) => {
+                    let _object = schema_data.object(object_id);
+
+                    todo!("Validate object literal. Parser doesn't support object literals yet");
+                }
+            },
+        },
     }
+}
+
+fn id_annotation_to_typename_annotation(
+    type_: &GraphQLTypeAnnotation<SelectableServerFieldId>,
+    schema_data: &ServerFieldData,
+) -> GraphQLTypeAnnotation<UnvalidatedTypeName> {
+    type_.clone().map(|type_id| match type_id {
+        SelectionType::Scalar(scalar_id) => schema_data.scalar(scalar_id).name.item.into(),
+        SelectionType::Object(object_id) => schema_data.object(object_id).name.into(),
+    })
 }
 
 fn enum_satisfies_type(
@@ -858,8 +870,8 @@ fn enum_satisfies_type(
                 location,
             ))
         }
-        SelectionType::Scalar(scalar_id) => {
-            todo!("Validate enum literal")
+        SelectionType::Scalar(_scalar_id) => {
+            todo!("Validate enum literal. Parser doesn't support enum literals yet")
         }
     }
 }

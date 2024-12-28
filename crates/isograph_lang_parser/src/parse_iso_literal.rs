@@ -286,7 +286,8 @@ fn parse_optional_selection_set(
     tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
 ) -> ParseResultWithSpan<Option<Vec<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>>>> {
-    let open_brace = tokens.parse_token_of_kind(IsographLangTokenKind::OpenBrace);
+    let open_brace: Result<WithSpan<IsographLangTokenKind>, WithSpan<crate::LowLevelParseError>> =
+        tokens.parse_token_of_kind(IsographLangTokenKind::OpenBrace);
     if open_brace.is_err() {
         return Ok(None);
     }
