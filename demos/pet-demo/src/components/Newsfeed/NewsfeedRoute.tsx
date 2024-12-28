@@ -27,6 +27,7 @@ export const Newsfeed = iso(`
   const newsfeedItems = viewer.initial.concat(paginationState.results);
 
   const loadMore = () => {
+    console.log('what');
     if (paginationState.kind === 'Complete') {
       paginationState.fetchMore(4);
     }
