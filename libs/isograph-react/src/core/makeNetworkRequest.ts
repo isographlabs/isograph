@@ -21,11 +21,42 @@ import {
 } from './PromiseWrapper';
 import { normalizeData } from './cache';
 import { logMessage } from './logging';
-import { check, DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
+import {
+  check,
+  DEFAULT_SHOULD_FETCH_VALUE,
+  FetchOptions,
+  type RequiredFetchOptions,
+} from './check';
 import { readButDoNotEvaluate } from './read';
 import { getOrCreateCachedComponent } from './componentCache';
 let networkRequestId = 0;
 
+export function maybeMakeNetworkRequest<
+  TReadFromStore extends { parameters: object; data: object },
+  TClientFieldValue,
+>(
+  environment: IsographEnvironment,
+  artifact:
+    | RefetchQueryNormalizationArtifact
+    | IsographEntrypoint<TReadFromStore, TClientFieldValue, NormalizationAst>,
+  variables: ExtractParameters<TReadFromStore>,
+  fetchOptions?: FetchOptions<TClientFieldValue>,
+): ItemCleanupPair<PromiseWrapper<void, AnyError>>;
+export function maybeMakeNetworkRequest<
+  TReadFromStore extends { parameters: object; data: object },
+  TClientFieldValue,
+>(
+  environment: IsographEnvironment,
+  artifact:
+    | RefetchQueryNormalizationArtifact
+    | IsographEntrypoint<
+        TReadFromStore,
+        TClientFieldValue,
+        NormalizationAstLoader
+      >,
+  variables: ExtractParameters<TReadFromStore>,
+  fetchOptions: RequiredFetchOptions<TClientFieldValue>,
+): ItemCleanupPair<PromiseWrapper<void, AnyError>>;
 export function maybeMakeNetworkRequest<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
