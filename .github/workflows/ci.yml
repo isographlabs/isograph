@@ -72,25 +72,12 @@ jobs:
         run: ./artifacts/linux-x64/isograph_cli --config ./demos/${{ matrix.target.folder }}/isograph.config.json
       - name: 'Check working directory status'
         run: './scripts/check-git-status.sh'
+
   build-json-schema:
     name: Build json schema
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          target: x86_64-unknown-linux-musl
-      - name: Build isograph_config with cargo
-        run: cargo build --bin isograph_config --target x86_64-unknown-linux-musl --release
-      - name: Make artifact executable
-        run: chmod +x ./target/x86_64-unknown-linux-musl/release/isograph_config
-      - name: Build json schema
-        run: ./target/x86_64-unknown-linux-musl/release/isograph_config
-      - name: Check working directory status
-        run: './scripts/check-git-status.sh'
+    uses: ./.github/workflows/run-cargo-bin-and-ensure-no-changes.yml
+    with:
+      binary: isograph_config
 
   typecheck-demos:
     name: Typecheck and Lint Demos
