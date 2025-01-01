@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-run-binary:
-    name: Build and run ${{ inputs.binary }} and ensure no files have been modified
+    name: Run ${{ inputs.binary }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
