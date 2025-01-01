@@ -2,7 +2,11 @@ import {
   UnassignedState,
   useUpdatableDisposableState,
 } from '@isograph/react-disposable-state';
-import { IsographEntrypoint } from '../core/entrypoint';
+import {
+  IsographEntrypoint,
+  type NormalizationAst,
+  type NormalizationAstLoader,
+} from '../core/entrypoint';
 import {
   FragmentReference,
   ExtractParameters,
@@ -11,16 +15,13 @@ import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import { ROOT_ID } from '../core/IsographEnvironment';
 import { maybeMakeNetworkRequest } from '../core/makeNetworkRequest';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
-import { FetchOptions } from '../core/check';
+import { FetchOptions, type RequiredFetchOptions } from '../core/check';
 
 // TODO rename this to useImperativelyLoadedEntrypoint
-
-export function useImperativeReference<
+type UseImperativeReferenceResult<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
->(
-  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
-): {
+> = {
   fragmentReference:
     | FragmentReference<TReadFromStore, TClientFieldValue>
     | UnassignedState;
@@ -28,7 +29,47 @@ export function useImperativeReference<
     variables: ExtractParameters<TReadFromStore>,
     fetchOptions?: FetchOptions<TClientFieldValue>,
   ) => void;
-} {
+};
+
+type RequiredUseImperativeReferenceResult<
+  TReadFromStore extends { parameters: object; data: object },
+  TClientFieldValue,
+> = {
+  fragmentReference:
+    | FragmentReference<TReadFromStore, TClientFieldValue>
+    | UnassignedState;
+  loadFragmentReference: (
+    variables: ExtractParameters<TReadFromStore>,
+    fetchOptions: RequiredFetchOptions<TClientFieldValue>,
+  ) => void;
+};
+
+export function useImperativeReference<
+  TReadFromStore extends { parameters: object; data: object },
+  TClientFieldValue,
+>(
+  entrypoint: IsographEntrypoint<
+    TReadFromStore,
+    TClientFieldValue,
+    NormalizationAstLoader
+  >,
+): UseImperativeReferenceResult<TReadFromStore, TClientFieldValue>;
+export function useImperativeReference<
+  TReadFromStore extends { parameters: object; data: object },
+  TClientFieldValue,
+>(
+  entrypoint: IsographEntrypoint<
+    TReadFromStore,
+    TClientFieldValue,
+    NormalizationAst
+  >,
+): RequiredUseImperativeReferenceResult<TReadFromStore, TClientFieldValue>;
+export function useImperativeReference<
+  TReadFromStore extends { parameters: object; data: object },
+  TClientFieldValue,
+>(
+  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
+): UseImperativeReferenceResult<TReadFromStore, TClientFieldValue> {
   const { state, setState } =
     useUpdatableDisposableState<
       FragmentReference<TReadFromStore, TClientFieldValue>
@@ -42,7 +83,7 @@ export function useImperativeReference<
     ) => {
       const [networkRequest, disposeNetworkRequest] = maybeMakeNetworkRequest(
         environment,
-        entrypoint,
+        entrypoint as IsographEntrypoint<any, any, NormalizationAst>,
         variables,
         fetchOptions,
       );

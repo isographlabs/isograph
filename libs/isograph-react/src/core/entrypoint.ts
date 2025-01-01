@@ -25,7 +25,7 @@ export type NetworkRequestInfo<TNormalizationAst> = {
 export type IsographEntrypoint<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
-  TNormalizationAst = NormalizationAst,
+  TNormalizationAst = NormalizationAst | NormalizationAstLoader,
 > = {
   readonly kind: 'Entrypoint';
   readonly networkRequestInfo: NetworkRequestInfo<TNormalizationAst>;
@@ -57,6 +57,11 @@ export type NormalizationAstNodes = ReadonlyArray<NormalizationAstNode>;
 export type NormalizationAst = {
   kind: 'NormalizationAst';
   selections: NormalizationAstNodes;
+};
+
+export type NormalizationAstLoader = {
+  readonly kind: 'NormalizationAstLoader';
+  readonly loader: () => Promise<NormalizationAst>;
 };
 
 export type NormalizationScalarField = {

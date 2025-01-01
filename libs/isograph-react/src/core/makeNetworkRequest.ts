@@ -2,6 +2,8 @@ import { ItemCleanupPair } from '@isograph/disposable-types';
 import {
   IsographEntrypoint,
   RefetchQueryNormalizationArtifact,
+  type NormalizationAst,
+  type NormalizationAstLoader,
 } from './entrypoint';
 import { ExtractParameters } from './FragmentReference';
 import {
@@ -19,12 +21,42 @@ import {
 } from './PromiseWrapper';
 import { normalizeData } from './cache';
 import { logMessage } from './logging';
-import { check, DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
+import {
+  check,
+  DEFAULT_SHOULD_FETCH_VALUE,
+  FetchOptions,
+  type RequiredFetchOptions,
+} from './check';
 import { readButDoNotEvaluate } from './read';
 import { getOrCreateCachedComponent } from './componentCache';
-
 let networkRequestId = 0;
 
+export function maybeMakeNetworkRequest<
+  TReadFromStore extends { parameters: object; data: object },
+  TClientFieldValue,
+>(
+  environment: IsographEnvironment,
+  artifact:
+    | RefetchQueryNormalizationArtifact
+    | IsographEntrypoint<TReadFromStore, TClientFieldValue, NormalizationAst>,
+  variables: ExtractParameters<TReadFromStore>,
+  fetchOptions?: FetchOptions<TClientFieldValue>,
+): ItemCleanupPair<PromiseWrapper<void, AnyError>>;
+export function maybeMakeNetworkRequest<
+  TReadFromStore extends { parameters: object; data: object },
+  TClientFieldValue,
+>(
+  environment: IsographEnvironment,
+  artifact:
+    | RefetchQueryNormalizationArtifact
+    | IsographEntrypoint<
+        TReadFromStore,
+        TClientFieldValue,
+        NormalizationAstLoader
+      >,
+  variables: ExtractParameters<TReadFromStore>,
+  fetchOptions: RequiredFetchOptions<TClientFieldValue>,
+): ItemCleanupPair<PromiseWrapper<void, AnyError>>;
 export function maybeMakeNetworkRequest<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
@@ -44,6 +76,14 @@ export function maybeMakeNetworkRequest<
       return [wrapResolvedValue(undefined), () => {}];
     }
     case 'IfNecessary': {
+      if (
+        artifact.networkRequestInfo.normalizationAst.kind ===
+        'NormalizationAstLoader'
+      ) {
+        throw new Error(
+          'Using lazy loaded normalizationAst with shouldFetch: "IfNecessary" is not supported as it will lead to slower initial load time.',
+        );
+      }
       const result = check(
         environment,
         artifact.networkRequestInfo.normalizationAst.selections,
@@ -53,6 +93,7 @@ export function maybeMakeNetworkRequest<
           __typename: artifact.concreteType,
         },
       );
+
       if (result.kind === 'EnoughData') {
         return [wrapResolvedValue(undefined), () => {}];
       } else {
@@ -63,6 +104,19 @@ export function maybeMakeNetworkRequest<
           fetchOptions,
         );
       }
+    }
+  }
+}
+
+function loadNormalizationAst(
+  normalizationAst: NormalizationAstLoader | NormalizationAst,
+) {
+  switch (normalizationAst.kind) {
+    case 'NormalizationAst': {
+      return normalizationAst;
+    }
+    case 'NormalizationAstLoader': {
+      return normalizationAst.loader();
     }
   }
 }
@@ -93,9 +147,14 @@ export function makeNetworkRequest<
     kind: 'UndisposedIncomplete',
   };
   // This should be an observable, not a promise
-  const promise = environment
-    .networkFunction(artifact.networkRequestInfo.queryText, variables)
-    .then((networkResponse) => {
+  const promise = Promise.all([
+    environment.networkFunction(
+      artifact.networkRequestInfo.queryText,
+      variables,
+    ),
+    loadNormalizationAst(artifact.networkRequestInfo.normalizationAst),
+  ])
+    .then(([networkResponse, normalizationAst]) => {
       logMessage(environment, {
         kind: 'ReceivedNetworkResponse',
         networkResponse,
@@ -116,7 +175,7 @@ export function makeNetworkRequest<
       if (status.kind === 'UndisposedIncomplete') {
         normalizeData(
           environment,
-          artifact.networkRequestInfo.normalizationAst.selections,
+          normalizationAst.selections,
           networkResponse.data ?? {},
           variables,
           artifact.kind === 'Entrypoint'
@@ -125,8 +184,7 @@ export function makeNetworkRequest<
           root,
         );
         const retainedQuery = {
-          normalizationAst:
-            artifact.networkRequestInfo.normalizationAst.selections,
+          normalizationAst: normalizationAst.selections,
           variables,
           root,
         };

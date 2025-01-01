@@ -90,7 +90,8 @@ const normalizationAst: NormalizationAst = {
 };
 const artifact: IsographEntrypoint<
   Pet__PetCheckinsCard__param,
-  Pet__PetCheckinsCard__output_type
+  Pet__PetCheckinsCard__output_type,
+  NormalizationAst
 > = {
   kind: "Entrypoint",
   networkRequestInfo: {
