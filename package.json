@@ -13,7 +13,7 @@
     "check-rs": "bacon -j check -p ./crates/",
     "build": "cargo build",
     "cross": "cross build",
-    "build-json-schema": "./target/debug/isograph_config",
+    "build-json-schema": "./target/debug/build_json_schema",
     "watch-pet-demo": "pnpm --filter=pet-demo iso-watch",
     "watch-github-demo": "pnpm --filter=github-demo iso-watch",
     "watch-isograph-react-demo": "pnpm --filter=@isograph/react iso-watch",

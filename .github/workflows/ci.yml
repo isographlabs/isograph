@@ -77,7 +77,7 @@ jobs:
     name: Build json schema
     uses: ./.github/workflows/run-cargo-bin-and-ensure-no-changes.yml
     with:
-      binary: isograph_config
+      binary: build_json_schema
 
   typecheck-demos:
     name: Typecheck and Lint Demos
