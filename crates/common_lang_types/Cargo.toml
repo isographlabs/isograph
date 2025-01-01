@@ -8,4 +8,4 @@ license = { workspace = true }
 [dependencies]
 intern = { path = "../../relay-crates/intern" }
 string_key_newtype = { path = "../string_key_newtype" }
-serde = { workspace = true } 
+serde = { workspace = true }
