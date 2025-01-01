@@ -1,0 +1,24 @@
+on:
+  workflow_call:
+
+jobs:
+  build-fixtures:
+    name: Build fixtures
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          target: x86_64-unknown-linux-musl
+      - name: Build isograph_fixtures_test with cargo
+        run: cargo build --bin isograph_fixtures_test --target x86_64-unknown-linux-musl --release
+      - name: Make artifact executable
+        run: chmod +x ./target/x86_64-unknown-linux-musl/release/isograph_fixtures_test
+      - name: Build fixtures
+        run: ./target/x86_64-unknown-linux-musl/release/isograph_fixtures_test
+      - name: Check working directory status
+        run: './scripts/check-git-status.sh'
