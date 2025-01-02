@@ -18,6 +18,7 @@ pub struct CompilationStats {
     pub total_artifacts_written: usize,
 }
 
+// 4.
 pub fn compile_and_print(config_location: PathBuf) -> Result<(), BatchCompileError> {
     info!("{}", "Starting to compile.".cyan());
     print_result(WithDuration::new(|| {

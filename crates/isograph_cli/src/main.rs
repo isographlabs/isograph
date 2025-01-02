@@ -9,12 +9,15 @@ use std::io;
 use tracing::{error, info, level_filters::LevelFilter};
 use tracing_subscriber::fmt::format::FmtSpan;
 
+
+// 1. Start here in this main file
 #[tokio::main]
 async fn main() {
     let opt = Opt::parse();
     let command = opt.command.unwrap_or(Command::Compile(opt.compile));
     match command {
         Command::Compile(compile_command) => {
+            // 2. start compiler is called
             start_compiler(compile_command).await;
         }
         Command::Lsp(lsp_command) => {
@@ -45,6 +48,7 @@ async fn start_compiler(compile_command: CompileCommand) {
                 std::process::exit(1);
             }
         };
+      // 3. Ultimately calls compile and print 
     } else if compile_and_print(config_location).is_err() {
         std::process::exit(1);
     }
