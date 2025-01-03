@@ -33,14 +33,14 @@ impl RelativeTextSource {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct EmbeddedLocation {
+pub struct EmbeddedRelativeLocation {
     pub text_source: RelativeTextSource,
     /// The span is relative to the Source's span, not to the
     /// entire source file.
     pub span: Span,
 }
 
-impl std::fmt::Display for EmbeddedLocation {
+impl std::fmt::Display for EmbeddedRelativeLocation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (file_path, read_out_text) = self.text_source.read_to_string();
         let text_with_carats = text_with_carats(&read_out_text, self.span);
@@ -49,15 +49,15 @@ impl std::fmt::Display for EmbeddedLocation {
     }
 }
 
-impl From<EmbeddedLocation> for Location {
-    fn from(value: EmbeddedLocation) -> Self {
+impl From<EmbeddedRelativeLocation> for Location {
+    fn from(value: EmbeddedRelativeLocation) -> Self {
         Location::Embedded(value)
     }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Location {
-    Embedded(EmbeddedLocation),
+    Embedded(EmbeddedRelativeLocation),
     Generated,
 }
 
@@ -66,7 +66,7 @@ impl Location {
         Location::Generated
     }
     pub fn new(text_source: RelativeTextSource, span: Span) -> Self {
-        Location::Embedded(EmbeddedLocation::new(text_source, span))
+        Location::Embedded(EmbeddedRelativeLocation::new(text_source, span))
     }
 
     pub fn span(&self) -> Option<Span> {
@@ -76,9 +76,9 @@ impl Location {
         }
     }
 }
-impl EmbeddedLocation {
+impl EmbeddedRelativeLocation {
     pub fn new(text_source: RelativeTextSource, span: Span) -> Self {
-        EmbeddedLocation { text_source, span }
+        EmbeddedRelativeLocation { text_source, span }
     }
 }
 
@@ -131,7 +131,7 @@ impl<T> WithLocation<T> {
     /// EmbeddedLocation or WithEmbeddedLocation
     pub fn hack_to_with_span(self) -> WithSpan<T> {
         let span = match self.location {
-            Location::Embedded(EmbeddedLocation { span, .. }) => span,
+            Location::Embedded(EmbeddedRelativeLocation { span, .. }) => span,
             Location::Generated => Span::todo_generated(),
         };
         WithSpan {
@@ -142,38 +142,41 @@ impl<T> WithLocation<T> {
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
-pub struct WithEmbeddedLocation<T> {
-    pub location: EmbeddedLocation,
+pub struct WithEmbeddedRelativeLocation<T> {
+    pub location: EmbeddedRelativeLocation,
     pub item: T,
 }
 
-impl<T: Error> Error for WithEmbeddedLocation<T> {
+impl<T: Error> Error for WithEmbeddedRelativeLocation<T> {
     fn description(&self) -> &str {
         #[allow(deprecated)]
         self.item.description()
     }
 }
 
-impl<T: fmt::Display> fmt::Display for WithEmbeddedLocation<T> {
+impl<T: fmt::Display> fmt::Display for WithEmbeddedRelativeLocation<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}\n{}", self.item, self.location)
     }
 }
 
-impl<T> WithEmbeddedLocation<T> {
-    pub fn new(item: T, location: EmbeddedLocation) -> Self {
-        WithEmbeddedLocation { item, location }
+impl<T> WithEmbeddedRelativeLocation<T> {
+    pub fn new(item: T, location: EmbeddedRelativeLocation) -> Self {
+        WithEmbeddedRelativeLocation { item, location }
     }
 
-    pub fn map<U>(self, map: impl FnOnce(T) -> U) -> WithEmbeddedLocation<U> {
-        WithEmbeddedLocation::new(map(self.item), self.location)
+    pub fn map<U>(self, map: impl FnOnce(T) -> U) -> WithEmbeddedRelativeLocation<U> {
+        WithEmbeddedRelativeLocation::new(map(self.item), self.location)
     }
 
     pub fn and_then<U, E>(
         self,
         map: impl FnOnce(T) -> Result<U, E>,
-    ) -> Result<WithEmbeddedLocation<U>, E> {
-        Ok(WithEmbeddedLocation::new(map(self.item)?, self.location))
+    ) -> Result<WithEmbeddedRelativeLocation<U>, E> {
+        Ok(WithEmbeddedRelativeLocation::new(
+            map(self.item)?,
+            self.location,
+        ))
     }
 
     pub fn into_with_location(self) -> WithLocation<T> {
@@ -181,8 +184,8 @@ impl<T> WithEmbeddedLocation<T> {
     }
 }
 
-impl<T> From<WithEmbeddedLocation<T>> for WithLocation<T> {
-    fn from(value: WithEmbeddedLocation<T>) -> Self {
+impl<T> From<WithEmbeddedRelativeLocation<T>> for WithLocation<T> {
+    fn from(value: WithEmbeddedRelativeLocation<T>) -> Self {
         WithLocation {
             location: Location::Embedded(value.location),
             item: value.item,
