@@ -4,7 +4,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use common_lang_types::{FilePath, Location, SourceFileName, Span, TextSource, WithLocation};
+use common_lang_types::{
+    FilePath, Location, RelativePathToSourceFile, RelativeTextSource, Span, WithLocation,
+};
 use intern::string_key::Intern;
 use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
@@ -110,8 +112,8 @@ pub(crate) fn read_and_parse_iso_literals(
     canonicalized_root_path: &Path,
 ) -> Result<
     (
-        SourceFileName,
-        Vec<(IsoLiteralExtractionResult, TextSource)>,
+        RelativePathToSourceFile,
+        Vec<(IsoLiteralExtractionResult, RelativeTextSource)>,
     ),
     Vec<WithLocation<IsographLiteralParseError>>,
 > {
@@ -180,9 +182,10 @@ pub(crate) fn process_iso_literals(
 
 pub fn process_iso_literal_extraction(
     iso_literal_extraction: IsoLiteralExtraction<'_>,
-    file_name: SourceFileName,
+    file_name: RelativePathToSourceFile,
     interned_file_path: FilePath,
-) -> Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>> {
+) -> Result<(IsoLiteralExtractionResult, RelativeTextSource), WithLocation<IsographLiteralParseError>>
+{
     let IsoLiteralExtraction {
         iso_literal_text,
         iso_literal_start_index,
@@ -190,7 +193,7 @@ pub fn process_iso_literal_extraction(
         const_export_name,
         iso_function_called_with_paren: has_paren,
     } = iso_literal_extraction;
-    let text_source = TextSource {
+    let text_source = RelativeTextSource {
         path: file_name,
         span: Some(Span::new(
             iso_literal_start_index as u32,

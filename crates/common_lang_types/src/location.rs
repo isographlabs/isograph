@@ -2,7 +2,7 @@ use std::{error::Error, fmt};
 
 use intern::Lookup;
 
-use crate::{text_with_carats::text_with_carats, SourceFileName, Span, WithSpan};
+use crate::{text_with_carats::text_with_carats, RelativePathToSourceFile, Span, WithSpan};
 
 /// A source, which consists of a filename, and an optional span
 /// indicating the subset of the file which corresponds to the
@@ -12,12 +12,12 @@ use crate::{text_with_carats::text_with_carats, SourceFileName, Span, WithSpan};
 /// as this will probably mean that sources are more reusable
 /// during watch mode.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct TextSource {
-    pub path: SourceFileName,
+pub struct RelativeTextSource {
+    pub path: RelativePathToSourceFile,
     pub span: Option<Span>,
 }
 
-impl TextSource {
+impl RelativeTextSource {
     pub fn read_to_string(&self) -> (&str, String) {
         // TODO maybe intern these or somehow avoid reading a bajillion times.
         // This is especially important for when we display many errors.
@@ -34,7 +34,7 @@ impl TextSource {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct EmbeddedLocation {
-    pub text_source: TextSource,
+    pub text_source: RelativeTextSource,
     /// The span is relative to the Source's span, not to the
     /// entire source file.
     pub span: Span,
@@ -65,7 +65,7 @@ impl Location {
     pub fn generated() -> Self {
         Location::Generated
     }
-    pub fn new(text_source: TextSource, span: Span) -> Self {
+    pub fn new(text_source: RelativeTextSource, span: Span) -> Self {
         Location::Embedded(EmbeddedLocation::new(text_source, span))
     }
 
@@ -77,7 +77,7 @@ impl Location {
     }
 }
 impl EmbeddedLocation {
-    pub fn new(text_source: TextSource, span: Span) -> Self {
+    pub fn new(text_source: RelativeTextSource, span: Span) -> Self {
         EmbeddedLocation { text_source, span }
     }
 }

@@ -1,7 +1,7 @@
 use common_lang_types::{
     ConstExportName, FilePath, IsographDirectiveName, IsographObjectTypeName, LinkedFieldName,
-    Location, ScalarFieldName, SelectableFieldName, TextSource, UnvalidatedTypeName, WithLocation,
-    WithSpan,
+    Location, RelativeTextSource, ScalarFieldName, SelectableFieldName, UnvalidatedTypeName,
+    WithLocation, WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -21,7 +21,7 @@ impl UnvalidatedSchema {
     pub fn process_client_field_declaration(
         &mut self,
         client_field_declaration: WithSpan<ClientFieldDeclarationWithValidatedDirectives>,
-        text_source: TextSource,
+        text_source: RelativeTextSource,
     ) -> Result<(), WithLocation<ProcessClientFieldDeclarationError>> {
         let parent_type_id = self
             .server_field_data

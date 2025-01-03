@@ -1,7 +1,7 @@
 use std::{collections::HashSet, ops::ControlFlow};
 
 use common_lang_types::{
-    FilePath, Location, ScalarFieldName, Span, TextSource, UnvalidatedTypeName, WithLocation,
+    FilePath, Location, ScalarFieldName, Span, RelativeTextSource, UnvalidatedTypeName, WithLocation,
     WithSpan,
 };
 use graphql_lang_types::{
@@ -32,7 +32,7 @@ pub fn parse_iso_literal(
     iso_literal_text: &str,
     definition_file_path: FilePath,
     const_export_name: Option<&str>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> Result<IsoLiteralExtractionResult, WithLocation<IsographLiteralParseError>> {
     let mut tokens = PeekableLexer::new(iso_literal_text);
     let discriminator = tokens
@@ -70,7 +70,7 @@ pub fn parse_iso_literal(
 
 fn parse_iso_entrypoint_declaration(
     tokens: &mut PeekableLexer<'_>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
     entrypoint_keyword: Span,
 ) -> ParseResultWithLocation<WithSpan<EntrypointTypeAndField>> {
     let entrypoint_declaration = tokens
@@ -108,7 +108,7 @@ fn parse_iso_client_field_declaration(
     tokens: &mut PeekableLexer<'_>,
     definition_file_path: FilePath,
     const_export_name: Option<&str>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
     field_keyword_span: Span,
 ) -> ParseResultWithLocation<WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>> {
     let client_field_declaration = parse_client_field_declaration_inner(
@@ -134,7 +134,7 @@ fn parse_client_field_declaration_inner(
     tokens: &mut PeekableLexer<'_>,
     definition_file_path: FilePath,
     const_export_name: Option<&str>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
     field_keyword_span: Span,
 ) -> ParseResultWithSpan<WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>> {
     tokens.with_span(|tokens| {
@@ -192,7 +192,7 @@ fn parse_iso_client_pointer_declaration(
     tokens: &mut PeekableLexer<'_>,
     definition_file_path: FilePath,
     const_export_name: Option<&str>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
     field_keyword_span: Span,
 ) -> ParseResultWithLocation<WithSpan<ClientPointerDeclaration<(), ()>>> {
     let client_pointer_declaration = parse_client_pointer_declaration_inner(
@@ -218,7 +218,7 @@ fn parse_client_pointer_declaration_inner(
     tokens: &mut PeekableLexer<'_>,
     definition_file_path: FilePath,
     const_export_name: Option<&str>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
     pointer_keyword_span: Span,
 ) -> ParseResultWithSpan<WithSpan<ClientPointerDeclaration<(), ()>>> {
     tokens.with_span(|tokens| {
@@ -269,7 +269,7 @@ fn parse_client_pointer_declaration_inner(
 #[allow(clippy::type_complexity)]
 fn parse_selection_set(
     tokens: &mut PeekableLexer<'_>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResultWithSpan<Vec<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>>> {
     let selection_set = parse_optional_selection_set(tokens, text_source)?;
     match selection_set {
@@ -284,7 +284,7 @@ fn parse_selection_set(
 // TODO this should not parse an optional selection set, but a required one
 fn parse_optional_selection_set(
     tokens: &mut PeekableLexer<'_>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResultWithSpan<Option<Vec<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>>>> {
     let open_brace = tokens.parse_token_of_kind(IsographLangTokenKind::OpenBrace);
     if open_brace.is_err() {
@@ -375,7 +375,7 @@ fn parse_comma_line_break_or_curly(tokens: &mut PeekableLexer<'_>) -> ParseResul
 
 fn parse_selection(
     tokens: &mut PeekableLexer<'_>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResultWithSpan<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>> {
     tokens.with_span(|tokens| {
         let (field_name, alias) = parse_optional_alias_and_field_name(tokens)?;
@@ -435,7 +435,7 @@ fn parse_optional_alias_and_field_name(
 
 fn parse_directives(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResultWithSpan<Vec<WithSpan<IsographFieldDirective>>> {
     let mut directives = vec![];
     while let Ok(token) = tokens.parse_token_of_kind(IsographLangTokenKind::At) {
@@ -456,7 +456,7 @@ fn parse_directives(
 
 fn parse_optional_arguments(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResultWithSpan<Vec<WithLocation<SelectionFieldArgument>>> {
     if tokens
         .parse_token_of_kind(IsographLangTokenKind::OpenParen)
@@ -477,7 +477,7 @@ fn parse_optional_arguments(
 
 fn parse_argument(
     tokens: &mut PeekableLexer<'_>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResultWithSpan<WithLocation<SelectionFieldArgument>> {
     let argument = tokens.with_span(|tokens| {
         let name = tokens
@@ -540,7 +540,7 @@ fn parse_non_constant_value(
 
 fn parse_variable_definitions(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResultWithSpan<Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>> {
     if tokens
         .parse_token_of_kind(IsographLangTokenKind::OpenParen)
@@ -561,7 +561,7 @@ fn parse_variable_definitions(
 
 fn parse_variable_definition(
     tokens: &mut PeekableLexer<'_>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResultWithSpan<WithSpan<VariableDefinition<UnvalidatedTypeName>>> {
     let variable_definition = tokens.with_span(|tokens| {
         let _dollar = tokens
@@ -589,7 +589,7 @@ fn parse_variable_definition(
 
 fn parse_optional_default_value(
     tokens: &mut PeekableLexer<'_>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResultWithSpan<Option<WithLocation<ConstantValue>>> {
     if tokens
         .parse_token_of_kind(IsographLangTokenKind::Equals)
