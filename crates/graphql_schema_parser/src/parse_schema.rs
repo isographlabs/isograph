@@ -1,8 +1,8 @@
 use std::{ops::ControlFlow, str::FromStr};
 
 use common_lang_types::{
-    DescriptionValue, EnumLiteralValue, GraphQLInterfaceTypeName, GraphQLObjectTypeName, Span,
-    StringLiteralValue, RelativeTextSource, WithLocation, WithSpan,
+    DescriptionValue, EnumLiteralValue, GraphQLInterfaceTypeName, GraphQLObjectTypeName,
+    RelativeTextSource, Span, StringLiteralValue, WithLocation, WithSpan,
 };
 use graphql_syntax::TokenKind;
 use intern::{

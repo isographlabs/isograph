@@ -1,4 +1,4 @@
-use common_lang_types::{SelectableFieldName, StringLiteralValue, RelativeTextSource};
+use common_lang_types::{RelativeTextSource, SelectableFieldName, StringLiteralValue};
 use graphql_lang_types::{
     from_graph_ql_directive, DeserializationError, GraphQLConstantValue, GraphQLDirective,
 };

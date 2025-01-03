@@ -1,5 +1,5 @@
 use common_lang_types::{
-    IsographObjectTypeName, Location, ScalarFieldName, RelativeTextSource, UnvalidatedTypeName,
+    IsographObjectTypeName, Location, RelativeTextSource, ScalarFieldName, UnvalidatedTypeName,
     WithLocation, WithSpan,
 };
 use isograph_lang_types::{

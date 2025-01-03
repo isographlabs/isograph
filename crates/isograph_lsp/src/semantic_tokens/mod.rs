@@ -9,7 +9,7 @@ use crate::{
     row_col_offset::{diff_to_end_of_slice, get_index_from_diff, RowColDiff},
 };
 use client_field::client_field_declaration_to_tokens;
-use common_lang_types::{Span, RelativeTextSource};
+use common_lang_types::{RelativeTextSource, Span};
 use entrypoint::entrypoint_declaration_to_tokens;
 use intern::string_key::Intern;
 use isograph_compiler::{extract_iso_literals_from_file_content, IsoLiteralExtraction};
