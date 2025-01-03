@@ -64,6 +64,10 @@ export function useCachedResponsivePrecommitValue<T>(
   }, []);
 
   useEffect(() => {
+    // react reruns all `useEffect` in HMR since it doesn't know if the
+    // code inside of useEffect has changed. Since this is a library
+    // user can't change this code so we are safe to skip this rerun.
+    // This also prevents `useEffect` from running twice in Strict Mode.
     if (lastCommittedParentCache.current === parentCache) {
       return;
     }
