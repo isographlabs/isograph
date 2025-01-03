@@ -1,0 +1,14 @@
+[package]
+name = "pico"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+string_key_newtype = { path = "../string_key_newtype" }
+intern = { path = "../../relay-crates/intern" }
+pico_macros = { path = "../pico_macros" }
+serde = { workspace = true } 
+thiserror = { workspace = true }
+tracing = { workspace = true }
+lru = "0.12.5"
