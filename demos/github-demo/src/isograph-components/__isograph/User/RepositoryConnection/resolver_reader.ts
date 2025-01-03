@@ -2,7 +2,7 @@ import type { EagerReaderArtifact, ReaderAst } from '@isograph/react';
 import { User__RepositoryConnection__param } from './param_type';
 import { User__RepositoryConnection__output_type } from './output_type';
 import { RepositoryConnection as resolver } from '../../../UserRepositoryList';
-import Repository__RepositoryLink__resolver_reader from '../../Repository/RepositoryLink/resolver_reader';
+import Repository__RepositoryRow__resolver_reader from '../../Repository/RepositoryRow/resolver_reader';
 
 const readerAst: ReaderAst<User__RepositoryConnection__param> = [
   {
@@ -58,77 +58,17 @@ const readerAst: ReaderAst<User__RepositoryConnection__param> = [
             condition: null,
             selections: [
               {
-                kind: "Scalar",
-                fieldName: "id",
-                alias: null,
-                arguments: null,
-              },
-              {
                 kind: "Resolver",
-                alias: "RepositoryLink",
+                alias: "RepositoryRow",
                 arguments: null,
-                readerArtifact: Repository__RepositoryLink__resolver_reader,
+                readerArtifact: Repository__RepositoryRow__resolver_reader,
                 usedRefetchQueries: [],
               },
               {
                 kind: "Scalar",
-                fieldName: "name",
+                fieldName: "id",
                 alias: null,
                 arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "nameWithOwner",
-                alias: null,
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "description",
-                alias: null,
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "forkCount",
-                alias: null,
-                arguments: null,
-              },
-              {
-                kind: "Linked",
-                fieldName: "pullRequests",
-                alias: null,
-                arguments: null,
-                condition: null,
-                selections: [
-                  {
-                    kind: "Scalar",
-                    fieldName: "totalCount",
-                    alias: null,
-                    arguments: null,
-                  },
-                ],
-              },
-              {
-                kind: "Scalar",
-                fieldName: "stargazerCount",
-                alias: null,
-                arguments: null,
-              },
-              {
-                kind: "Linked",
-                fieldName: "watchers",
-                alias: null,
-                arguments: null,
-                condition: null,
-                selections: [
-                  {
-                    kind: "Scalar",
-                    fieldName: "totalCount",
-                    alias: null,
-                    arguments: null,
-                  },
-                ],
               },
             ],
           },

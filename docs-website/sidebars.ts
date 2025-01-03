@@ -18,9 +18,11 @@ const sidebars: SidebarsConfig = {
     'isograph-config',
     'loadable-fields',
     'pagination',
-    'refetching',
-    'expose-field-directives',
-    'isograph-rules',
+    'mutation',
+    'conditional-fetching',
+    'abstract-types',
+    'data-driven-dependencies',
+    'parameters',
     'faq',
     {
       type: 'category',
@@ -37,8 +39,16 @@ const sidebars: SidebarsConfig = {
       label: 'Design docs',
       items: ['design-docs/incremental-compilation'],
     },
-    'development-workflow',
-    'backlog',
+    {
+      type: 'category',
+      label: 'Miscellaneous',
+      items: ['isograph-rules', 'development-workflow', 'backlog'],
+    },
+    {
+      type: 'category',
+      label: 'Deprecated features',
+      items: ['expose-field-directives', 'refetching'],
+    },
   ],
 };
 

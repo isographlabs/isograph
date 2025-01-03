@@ -16,7 +16,7 @@ The node.js and pnpm versions used by Isograph are specified in fields `engines.
 
 In order to ensure you are using the correct versions of these you should install `fnm` for your respective operating system by following [this](https://github.com/Schniz/fnm?tab=readme-ov-file#installation) guide. Optionally, configure fnm for your shell by following [this](https://github.com/Schniz/fnm?tab=readme-ov-file#shell-setup) guide.
 
-Now, navigate to the root directory of your Isograph repository and run the following commands one by one:
+Now, navigate to the root directory of your Isograph repository and run the following commands:
 
 ```bash
 fnm install --resolve-engines
@@ -31,7 +31,7 @@ These commands will install the appropriate node.js and pnpm version used by Iso
 
 ### Rust
 
-Isograph currently uses `rustc 1.81.0 (eeb90cda1 2024-09-04)`. Rust is fairly stable and we don't rely on anything crazy, so it should be safe to keep your `rustc` up-to-date.
+Isograph is built (in CI) using the latest stable version. Rust is fairly stable and we don't rely on anything crazy, so it should be safe to keep your `rustc` up-to-date.
 
 You should also install [`bacon`](https://dystroy.org/bacon/) via `cargo install --locked bacon`.
 
@@ -111,7 +111,7 @@ pnpm i
 ### Build the Isograph JavaScript libraries for use in demos
 
 ```sh
-pnpm -r watch-libs
+pnpm watch-libs
 ```
 
 `watch-libs` will watch the source files for changes, and rebuild everything. If you only want to do it once, you can:
@@ -152,8 +152,29 @@ pnpm backend
 
 ### Starting
 
+- If you haven't yet, build the Isograph javascript libraries for the demos by running the following from root:
+
+```sh
+pnpm i
+pnpm watch-libs
+```
+
+or
+
+```sh
+pnpm i
+pnpm -r compile
+```
+
 - Open VSCode in `isograph/vscode-extension`
-- Open the "run and debug" sidebar, and click `Run and Debug`. If given a choice, select something related to "Extension development host".
+- Run the following in `isograph/vscode-extension`:
+
+```sh
+npm i
+npm run build-local
+```
+
+- Open `src/extension.ts` in your editor, then open the "run and debug" sidebar and click `Run and Debug`. If given a choice, select something related to "Extension development host".
 - In this new window, open `isograph/demos/pet-demo`.
 - The VSCode extension should start when you open a JS, JSX, TS or TSX file.
 
@@ -173,6 +194,7 @@ Every commit to `main` results in a build, which you can see in [npm](https://ww
 ## How to release a new "numbered" version of Isograph to npm
 
 - In all package.json files, bump the version number. Don't forget to bump the version number of imports.
+- `pnpm i`
 - `git add . && git commit -m 'v0.1.0' && git tag v0.1.0 && git push`
 - See [this commit releasing 0.2.0](https://github.com/isographlabs/isograph/commit/e36acab1a018e18bdae0558be08952693af3b6a8)
 

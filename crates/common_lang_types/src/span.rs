@@ -1,6 +1,9 @@
 use std::{fmt, ops::Range};
 
-use crate::{EmbeddedLocation, Location, TextSource, WithEmbeddedLocation, WithLocation};
+use crate::{
+    EmbeddedRelativeLocation, Location, RelativeTextSource, WithEmbeddedRelativeLocation,
+    WithLocation,
+};
 
 // Invariant: end >= start
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -101,12 +104,18 @@ impl<T> WithSpan<T> {
         }
     }
 
-    pub fn to_with_location(self, text_source: TextSource) -> WithLocation<T> {
+    pub fn to_with_location(self, text_source: RelativeTextSource) -> WithLocation<T> {
         WithLocation::new(self.item, Location::new(text_source, self.span))
     }
 
-    pub fn to_with_embedded_location(self, text_source: TextSource) -> WithEmbeddedLocation<T> {
-        WithEmbeddedLocation::new(self.item, EmbeddedLocation::new(text_source, self.span))
+    pub fn to_with_embedded_location(
+        self,
+        text_source: RelativeTextSource,
+    ) -> WithEmbeddedRelativeLocation<T> {
+        WithEmbeddedRelativeLocation::new(
+            self.item,
+            EmbeddedRelativeLocation::new(text_source, self.span),
+        )
     }
 }
 

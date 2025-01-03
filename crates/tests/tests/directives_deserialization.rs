@@ -1,4 +1,4 @@
-use common_lang_types::{SelectableFieldName, StringLiteralValue, TextSource};
+use common_lang_types::{SelectableFieldName, StringLiteralValue, RelativeTextSource};
 use graphql_lang_types::{
     from_graph_ql_directive, DeserializationError, GraphQLConstantValue, GraphQLDirective,
 };
@@ -19,7 +19,7 @@ fn unwrap_directive(
 }
 
 fn parse_mutation(source: &str) -> Result<Vec<ExposeFieldDirective>, Box<dyn Error>> {
-    let text_source = TextSource {
+    let text_source = RelativeTextSource {
         path: "dummy".intern().into(),
         span: None,
     };

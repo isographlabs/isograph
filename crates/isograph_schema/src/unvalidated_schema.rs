@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use common_lang_types::{
-    IsographObjectTypeName, JavascriptName, Location, TextSource, UnvalidatedTypeName,
+    IsographObjectTypeName, JavascriptName, Location, RelativeTextSource, UnvalidatedTypeName,
     WithLocation, WithSpan,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
@@ -32,7 +32,7 @@ impl SchemaValidationState for UnvalidatedSchemaState {
     type ClientFieldSelectionScalarFieldAssociatedData = IsographSelectionVariant;
     type ClientFieldSelectionLinkedFieldAssociatedData = IsographSelectionVariant;
     type VariableDefinitionInnerType = UnvalidatedTypeName;
-    type Entrypoint = Vec<(TextSource, WithSpan<EntrypointTypeAndField>)>;
+    type Entrypoint = Vec<(RelativeTextSource, WithSpan<EntrypointTypeAndField>)>;
 }
 
 #[derive(Debug, Clone)]

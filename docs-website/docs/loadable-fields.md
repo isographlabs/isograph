@@ -2,11 +2,13 @@
 
 ## Overview
 
-Client fields can be selected loadably. If a client field is selected loadably, the resolver will not receive the client field result directly, but will instead receive a `LoadableField`.
+Loadable fields are a fundamental Isograph concept.
 
-The `LoadableField` is a wrapper around a function that, when called, will make a network request for the data needed by the client field. Making the network request creates a `FragmentReference` that must be disposed, in order to prevent memory leaks.
+Client fields can be selected loadably (e.g. `BlogBody @loadable`). This means that the data for that `BlogBody` client field will not be included in the parent network request. Instead, the outer client field (`BlogPostDisplay`) will receive a `LoadableField` in place of that loadably selected client field.
 
-As a result, usually, you should not call the `LoadableField` directly. Instead, pass it to a hook that knows what to do with it!
+This `LoadableField` is a wrapper around a function that, when called, will make a network request for the data needed by the `BlogPost` client field.
+
+You usually would not call the `LoadableField` yourself. Instead, pass it to a hook that knows what to do with it!
 
 ## Basic walk-through
 
@@ -169,4 +171,8 @@ export const BlogPostDisplay = iso(`
 
 ## Pagination
 
-See [the pagination docs](../pagination).
+Pagination is also built on loadable fields. See [the pagination docs](../pagination).
+
+## Data-driven dependencies
+
+Check out the [data driven dependencies](/docs/data-driven-dependencies/) documentation to see how to combine `@loadable` fields, [pagination](/docs/pagination/) and [`asConcreteType` fields](/docs/abstract-types/) to fetch the minimal amount of data and JavaScript needed!

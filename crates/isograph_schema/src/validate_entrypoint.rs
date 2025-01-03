@@ -1,5 +1,5 @@
 use common_lang_types::{
-    IsographObjectTypeName, Location, ScalarFieldName, TextSource, UnvalidatedTypeName,
+    IsographObjectTypeName, Location, ScalarFieldName, RelativeTextSource, UnvalidatedTypeName,
     WithLocation, WithSpan,
 };
 use isograph_lang_types::{
@@ -12,7 +12,7 @@ use crate::{ClientType, FieldType, UnvalidatedSchema};
 impl UnvalidatedSchema {
     pub fn validate_entrypoint_type_and_field(
         &self,
-        text_source: TextSource,
+        text_source: RelativeTextSource,
         entrypoint_type_and_field: WithSpan<EntrypointTypeAndField>,
     ) -> Result<ClientFieldId, WithLocation<ValidateEntrypointDeclarationError>> {
         let parent_object_id = self
@@ -29,7 +29,7 @@ impl UnvalidatedSchema {
     fn validate_parent_object_id(
         &self,
         parent_type: WithSpan<UnvalidatedTypeName>,
-        text_source: TextSource,
+        text_source: RelativeTextSource,
     ) -> Result<ServerObjectId, WithLocation<ValidateEntrypointDeclarationError>> {
         let parent_type_id = self
             .server_field_data
@@ -79,7 +79,7 @@ impl UnvalidatedSchema {
     fn validate_client_field(
         &self,
         field_name: WithSpan<ScalarFieldName>,
-        text_source: TextSource,
+        text_source: RelativeTextSource,
         parent_object_id: ServerObjectId,
     ) -> Result<ClientFieldId, WithLocation<ValidateEntrypointDeclarationError>> {
         let parent_object = self.server_field_data.object(parent_object_id);
