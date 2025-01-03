@@ -4,9 +4,9 @@ use intern::Lookup;
 
 use crate::{text_with_carats::text_with_carats, RelativePathToSourceFile, Span, WithSpan};
 
-/// A source, which consists of a filename, and an optional span
-/// indicating the subset of the file which corresponds to the
-/// source.
+/// A source, which consists of a path from the config's project root
+/// to the source file, and an optional span indicating the subset of
+/// the file which corresponds to the source.
 ///
 /// TODO consider whether to replace the span with an index,
 /// as this will probably mean that sources are more reusable
@@ -40,10 +40,23 @@ pub struct EmbeddedRelativeLocation {
     pub span: Span,
 }
 
-impl std::fmt::Display for EmbeddedRelativeLocation {
+/// What is happening here? EmbeddedRelativeLocation's only contain
+/// a path that is relative to the Isograph config's project_root
+/// field. Displaying the EmbeddedRelativeLocation involves reading the
+/// file and displaying a subset of it.
+///
+/// The AbsoluteEmbeddedLocation struct knows how to turn that relative
+/// path to an absolute path (i.e. it contains the absolute path to
+/// the project_root) for use when reading the file.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct AbsoluteEmbeddedLocation {
+    pub embedded_location: EmbeddedRelativeLocation,
+}
+
+impl std::fmt::Display for AbsoluteEmbeddedLocation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (file_path, read_out_text) = self.text_source.read_to_string();
-        let text_with_carats = text_with_carats(&read_out_text, self.span);
+        let (file_path, read_out_text) = self.embedded_location.text_source.read_to_string();
+        let text_with_carats = text_with_carats(&read_out_text, self.embedded_location.span);
 
         write!(f, "{}\n{}", file_path, text_with_carats)
     }
@@ -85,7 +98,12 @@ impl EmbeddedRelativeLocation {
 impl fmt::Display for Location {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Location::Embedded(e) => e.fmt(f),
+            Location::Embedded(embedded_location) => {
+                let wrapper = AbsoluteEmbeddedLocation {
+                    embedded_location: *embedded_location,
+                };
+                wrapper.fmt(f)
+            }
             Location::Generated => {
                 write!(f, "<generated>")
             }
@@ -156,7 +174,10 @@ impl<T: Error> Error for WithEmbeddedRelativeLocation<T> {
 
 impl<T: fmt::Display> fmt::Display for WithEmbeddedRelativeLocation<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}\n{}", self.item, self.location)
+        let wrapper = AbsoluteEmbeddedLocation {
+            embedded_location: self.location,
+        };
+        write!(f, "{}\n{}", self.item, wrapper)
     }
 }
 

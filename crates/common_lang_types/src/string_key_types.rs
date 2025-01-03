@@ -111,6 +111,7 @@ string_key_newtype!(IsographDirectiveName);
 
 string_key_newtype!(FieldArgumentName);
 
+// This path is from the config's project root to the source file.
 string_key_newtype!(RelativePathToSourceFile);
 
 string_key_newtype!(ArtifactFileType);
