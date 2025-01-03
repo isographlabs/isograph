@@ -23,16 +23,24 @@ export function useLazyDisposableState<T>(
   state: T;
 } {
   const itemCleanupPairRef = useRef<ItemCleanupPair<T> | null>(null);
-
   const preCommitItem = useCachedResponsivePrecommitValue(
     parentCache,
     (pair) => {
-      itemCleanupPairRef.current?.[1]();
       itemCleanupPairRef.current = pair;
     },
   );
 
+  const lastCommittedParentCache = useRef<ParentCache<T> | null>(null);
   useEffect(() => {
+    // react reruns all `useEffect` in HMR since it doesn't know if the
+    // code inside of useEffect has changed. Since this is a library
+    // user can't change this code so we are safe to skip this rerun.
+    // This also prevents `useEffect` from running twice in Strict Mode.
+    if (lastCommittedParentCache.current === parentCache) {
+      return;
+    }
+    lastCommittedParentCache.current = parentCache;
+
     return () => {
       const cleanupFn = itemCleanupPairRef.current?.[1];
       // TODO confirm useEffect is called in order.
@@ -43,7 +51,7 @@ export function useLazyDisposableState<T>(
       }
       return cleanupFn();
     };
-  }, []);
+  }, [parentCache]);
 
   const returnedItem = preCommitItem?.state ?? itemCleanupPairRef.current?.[0];
 
