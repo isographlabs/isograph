@@ -1,4 +1,9 @@
-export type ExtractSecondParam<T> = T extends (props: {
+export type ExtractSecondParam<
+  T extends (props: {
+    firstParameter: any;
+    additionalRuntimeProps: any;
+  }) => any,
+> = T extends (props: {
   firstParameter: any;
   additionalRuntimeProps: infer P;
 }) => any
