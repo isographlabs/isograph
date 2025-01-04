@@ -19,7 +19,7 @@ pub struct GraphQLDirective<T> {
 
 impl<T: fmt::Display> fmt::Display for GraphQLDirective<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "@{}", self.name)?;
+        write!(f, "@{}", self.name.item)?;
         write_arguments(f, &self.arguments)?;
         Ok(())
     }

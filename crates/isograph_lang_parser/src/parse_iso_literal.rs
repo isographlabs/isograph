@@ -1,8 +1,8 @@
 use std::{collections::HashSet, ops::ControlFlow};
 
 use common_lang_types::{
-    FilePath, Location, ScalarFieldName, Span, RelativeTextSource, UnvalidatedTypeName, WithLocation,
-    WithSpan,
+    FilePath, Location, RelativeTextSource, ScalarFieldName, Span, UnvalidatedTypeName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,

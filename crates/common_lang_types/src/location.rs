@@ -48,7 +48,7 @@ pub struct EmbeddedRelativeLocation {
 /// The AbsoluteEmbeddedLocation struct knows how to turn that relative
 /// path to an absolute path (i.e. it contains the absolute path to
 /// the project_root) for use when reading the file.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct AbsoluteEmbeddedLocation {
     pub embedded_location: EmbeddedRelativeLocation,
 }
@@ -95,13 +95,15 @@ impl EmbeddedRelativeLocation {
     }
 }
 
-impl fmt::Display for Location {
+struct AbsoluteLocation {
+    pub location: Location,
+}
+
+impl fmt::Display for AbsoluteLocation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
+        match self.location {
             Location::Embedded(embedded_location) => {
-                let wrapper = AbsoluteEmbeddedLocation {
-                    embedded_location: *embedded_location,
-                };
+                let wrapper = AbsoluteEmbeddedLocation { embedded_location };
                 wrapper.fmt(f)
             }
             Location::Generated => {
@@ -126,7 +128,10 @@ impl<T: Error> Error for WithLocation<T> {
 
 impl<T: fmt::Display> fmt::Display for WithLocation<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}\n{}", self.item, self.location)
+        let absolute_location = AbsoluteLocation {
+            location: self.location,
+        };
+        write!(f, "{}\n{}", self.item, absolute_location)
     }
 }
 
@@ -163,22 +168,6 @@ impl<T> WithLocation<T> {
 pub struct WithEmbeddedRelativeLocation<T> {
     pub location: EmbeddedRelativeLocation,
     pub item: T,
-}
-
-impl<T: Error> Error for WithEmbeddedRelativeLocation<T> {
-    fn description(&self) -> &str {
-        #[allow(deprecated)]
-        self.item.description()
-    }
-}
-
-impl<T: fmt::Display> fmt::Display for WithEmbeddedRelativeLocation<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let wrapper = AbsoluteEmbeddedLocation {
-            embedded_location: self.location,
-        };
-        write!(f, "{}\n{}", self.item, wrapper)
-    }
 }
 
 impl<T> WithEmbeddedRelativeLocation<T> {
