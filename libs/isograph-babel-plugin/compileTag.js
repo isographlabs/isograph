@@ -17,6 +17,7 @@ function compileTag(t, path, config) {
       // This throws if the tag is invalid
       compileImportStatement(t, path, type, field, 'entrypoint', config);
     } else if (keyword === 'field') {
+      // replace `iso("field ...")` with `iso`
       path.replaceWith(path.node.callee);
     } else {
       throw new Error(
