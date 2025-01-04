@@ -151,7 +151,7 @@ pub(crate) fn build_iso_overload_artifact<TCompilationProfile: CompilationProfil
 // of type TParam.
 type IdentityWithParam<TParam extends object, TReturnConstraint = unknown> = <TClientFieldReturn extends TReturnConstraint>(
   clientField: (param: TParam) => TClientFieldReturn
-) => (param: TParam) => TClientFieldReturn;
+) => (data: { firstParameter: TParam }) => TClientFieldReturn;
 
 // This is the type given it to client fields with @component.
 // This means that the type of the exported iso literal is exactly
@@ -165,7 +165,7 @@ type IdentityWithParamComponent<TParam extends object> = <
   TComponentProps = Record<PropertyKey, never>,
 >(
   clientComponentField: (data: TParam, componentProps: TComponentProps) => TClientFieldReturn
-) => (data: TParam, componentProps: TComponentProps) => TClientFieldReturn;
+) => (props: { firstParameter: TParam, additionalRuntimeProps: TComponentProps }) => TClientFieldReturn;
 
 type WhitespaceCharacter = ' ' | '\\t' | '\\n';
 type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
