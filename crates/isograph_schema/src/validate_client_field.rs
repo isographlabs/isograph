@@ -712,58 +712,58 @@ fn variable_type_satisfies_argument_type(
     schema_data: &ServerFieldData,
     location: Location,
 ) -> Result<(), WithLocation<ValidateSchemaError>> {
-    match (
-        graphql_type_to_non_null_type(variable_type.clone()),
-        argument_type,
-    ) {
-        (
-            // [Value]! satisfies [Value]
-            // or [Value] satisfies [Value]
-            GraphQLNonNullTypeAnnotation::List(list_variable_type),
-            GraphQLTypeAnnotation::List(list_type),
-        ) => variable_type_satisfies_argument_type(
-            &list_variable_type,
-            &list_type.0,
-            schema_data,
-            location,
-        ),
-        (
-            // Value! satisfies Value
-            // or Value satisfies Value
-            GraphQLNonNullTypeAnnotation::Named(named_variable_type),
-            GraphQLTypeAnnotation::Named(named_type),
-        ) if named_variable_type.item == named_type.item => Ok(()),
+    match argument_type {
+        GraphQLTypeAnnotation::List(list_type) => {
+            match graphql_type_to_non_null_type(variable_type.clone()) {
+                GraphQLNonNullTypeAnnotation::List(list_variable_type) => {
+                    // [Value]! satisfies [Value]
+                    // or [Value] satisfies [Value]
+                    return variable_type_satisfies_argument_type(
+                        &list_variable_type,
+                        &list_type.0,
+                        schema_data,
+                        location,
+                    );
+                }
+                GraphQLNonNullTypeAnnotation::Named(_) => (),
+            }
+        }
 
-        (_, GraphQLTypeAnnotation::NonNull(non_null_argument_type)) => match variable_type {
+        GraphQLTypeAnnotation::Named(named_type) => {
+            match graphql_type_to_non_null_type(variable_type.clone()) {
+                GraphQLNonNullTypeAnnotation::Named(named_variable_type) => {
+                    // Value! satisfies Value
+                    // or Value satisfies Value
+                    if named_variable_type.item == named_type.item {
+                        return Ok(());
+                    }
+                }
+                GraphQLNonNullTypeAnnotation::List(_) => (),
+            }
+        }
+        GraphQLTypeAnnotation::NonNull(non_null_argument_type) => match variable_type {
             // Value! satisfies Value!
-            GraphQLTypeAnnotation::NonNull(variable_type) => variable_type_satisfies_argument_type(
-                &graphql_type_to_nullable_type(*variable_type.clone()),
-                &graphql_type_to_nullable_type(*non_null_argument_type.clone()),
-                schema_data,
-                location,
-            ),
+            GraphQLTypeAnnotation::NonNull(variable_type) => {
+                return variable_type_satisfies_argument_type(
+                    &graphql_type_to_nullable_type(*variable_type.clone()),
+                    &graphql_type_to_nullable_type(*non_null_argument_type.clone()),
+                    schema_data,
+                    location,
+                );
+            }
             // Value does not satisfy Value!
             // or [Value] does not satisfy Value!
-            GraphQLTypeAnnotation::Named(_) | GraphQLTypeAnnotation::List(_) => {
-                let expected = id_annotation_to_typename_annotation(argument_type, schema_data);
-                let actual = id_annotation_to_typename_annotation(variable_type, schema_data);
-
-                Err(WithLocation::new(
-                    ValidateSchemaError::ExpectedType { expected, actual },
-                    location,
-                ))
-            }
+            GraphQLTypeAnnotation::Named(_) | GraphQLTypeAnnotation::List(_) => (),
         },
-        (_, _) => {
-            let expected = id_annotation_to_typename_annotation(argument_type, schema_data);
-            let actual = id_annotation_to_typename_annotation(variable_type, schema_data);
+    };
 
-            Err(WithLocation::new(
-                ValidateSchemaError::ExpectedType { expected, actual },
-                location,
-            ))
-        }
-    }
+    let expected = id_annotation_to_typename_annotation(argument_type, schema_data);
+    let actual = id_annotation_to_typename_annotation(variable_type, schema_data);
+
+    Err(WithLocation::new(
+        ValidateSchemaError::ExpectedType { expected, actual },
+        location,
+    ))
 }
 
 fn value_satisfies_type(
