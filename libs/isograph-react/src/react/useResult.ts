@@ -52,7 +52,9 @@ export function useResult<
         data: data,
         parameters: fragmentReference.variables,
       };
-      return readerWithRefetchQueries.readerArtifact.resolver(param);
+      return readerWithRefetchQueries.readerArtifact.resolver({
+        firstParameter: param,
+      });
     }
   }
 }

@@ -1,18 +1,26 @@
 import type { IsographEntrypoint } from '@isograph/react';
-import { type AdItem__AdItemDisplayWrapper__param } from './AdItem/AdItemDisplayWrapper/param_type';
+import entrypoint_Mutation__SetTagline from '../__isograph/Mutation/SetTagline/entrypoint';
+import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint';
+import entrypoint_Query__Newsfeed from '../__isograph/Query/Newsfeed/entrypoint';
+import entrypoint_Query__PetByName from '../__isograph/Query/PetByName/entrypoint';
+import entrypoint_Query__PetCheckinListRoute from '../__isograph/Query/PetCheckinListRoute/entrypoint';
+import entrypoint_Query__PetDetailDeferredRoute from '../__isograph/Query/PetDetailDeferredRoute/entrypoint';
+import entrypoint_Query__PetDetailRoute from '../__isograph/Query/PetDetailRoute/entrypoint';
+import entrypoint_Query__PetFavoritePhrase from '../__isograph/Query/PetFavoritePhrase/entrypoint';
 import { type AdItem__AdItemDisplay__param } from './AdItem/AdItemDisplay/param_type';
+import { type AdItem__AdItemDisplayWrapper__param } from './AdItem/AdItemDisplayWrapper/param_type';
 import { type BlogItem__BlogItemDisplay__param } from './BlogItem/BlogItemDisplay/param_type';
 import { type BlogItem__BlogItemMoreDetail__param } from './BlogItem/BlogItemMoreDetail/param_type';
 import { type Checkin__CheckinDisplay__param } from './Checkin/CheckinDisplay/param_type';
-import { type Image__ImageDisplayWrapper__param } from './Image/ImageDisplayWrapper/param_type';
 import { type Image__ImageDisplay__param } from './Image/ImageDisplay/param_type';
+import { type Image__ImageDisplayWrapper__param } from './Image/ImageDisplayWrapper/param_type';
 import { type Mutation__SetTagline__param } from './Mutation/SetTagline/param_type';
 import { type NewsfeedItem__NewsfeedAdOrBlog__param } from './NewsfeedItem/NewsfeedAdOrBlog/param_type';
 import { type Pet__FavoritePhraseLoader__param } from './Pet/FavoritePhraseLoader/param_type';
 import { type Pet__FirstCheckinMakeSuperButton__param } from './Pet/FirstCheckinMakeSuperButton/param_type';
 import { type Pet__PetBestFriendCard__param } from './Pet/PetBestFriendCard/param_type';
-import { type Pet__PetCheckinsCardList__param } from './Pet/PetCheckinsCardList/param_type';
 import { type Pet__PetCheckinsCard__param } from './Pet/PetCheckinsCard/param_type';
+import { type Pet__PetCheckinsCardList__param } from './Pet/PetCheckinsCardList/param_type';
 import { type Pet__PetDetailDeferredRouteInnerComponent__param } from './Pet/PetDetailDeferredRouteInnerComponent/param_type';
 import { type Pet__PetPhraseCard__param } from './Pet/PetPhraseCard/param_type';
 import { type Pet__PetStatsCard__param } from './Pet/PetStatsCard/param_type';
@@ -29,14 +37,6 @@ import { type Query__PetDetailDeferredRoute__param } from './Query/PetDetailDefe
 import { type Query__PetDetailRoute__param } from './Query/PetDetailRoute/param_type';
 import { type Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/param_type';
 import { type Viewer__NewsfeedPaginationComponent__param } from './Viewer/NewsfeedPaginationComponent/param_type';
-import entrypoint_Mutation__SetTagline from '../__isograph/Mutation/SetTagline/entrypoint';
-import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint';
-import entrypoint_Query__Newsfeed from '../__isograph/Query/Newsfeed/entrypoint';
-import entrypoint_Query__PetByName from '../__isograph/Query/PetByName/entrypoint';
-import entrypoint_Query__PetCheckinListRoute from '../__isograph/Query/PetCheckinListRoute/entrypoint';
-import entrypoint_Query__PetDetailDeferredRoute from '../__isograph/Query/PetDetailDeferredRoute/entrypoint';
-import entrypoint_Query__PetDetailRoute from '../__isograph/Query/PetDetailRoute/entrypoint';
-import entrypoint_Query__PetFavoritePhrase from '../__isograph/Query/PetFavoritePhrase/entrypoint';
 
 // This is the type given to regular client fields.
 // This means that the type of the exported iso literal is exactly
@@ -237,13 +237,12 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.PetFavoritePhrase', T>
 ): typeof entrypoint_Query__PetFavoritePhrase;
-
-export function iso(_isographLiteralText: string):
+export function iso(clientFieldResolver: any):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
   | IsographEntrypoint<any, any>
 {
-  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
-      'was not set up, or it failed to identify this call site. Make sure it ' +
-      'is being used verbatim as `iso`.');
+  return (props: any) => {
+    return clientFieldResolver(props.firstParameter, props.additionalRuntimeProps)
+  };
 }

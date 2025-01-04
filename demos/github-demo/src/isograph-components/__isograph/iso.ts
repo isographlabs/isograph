@@ -1,4 +1,8 @@
 import type { IsographEntrypoint } from '@isograph/react';
+import entrypoint_Query__HomePage from '../__isograph/Query/HomePage/entrypoint';
+import entrypoint_Query__PullRequest from '../__isograph/Query/PullRequest/entrypoint';
+import entrypoint_Query__RepositoryPage from '../__isograph/Query/RepositoryPage/entrypoint';
+import entrypoint_Query__UserPage from '../__isograph/Query/UserPage/entrypoint';
 import { type Actor__UserLink__param } from './Actor/UserLink/param_type';
 import { type IssueComment__formattedCommentCreationDate__param } from './IssueComment/formattedCommentCreationDate/param_type';
 import { type PullRequest__CommentList__param } from './PullRequest/CommentList/param_type';
@@ -6,10 +10,10 @@ import { type PullRequest__PullRequestLink__param } from './PullRequest/PullRequ
 import { type PullRequest__createdAtFormatted__param } from './PullRequest/createdAtFormatted/param_type';
 import { type PullRequestConnection__PullRequestTable__param } from './PullRequestConnection/PullRequestTable/param_type';
 import { type Query__Header__param } from './Query/Header/param_type';
-import { type Query__HomePageList__param } from './Query/HomePageList/param_type';
 import { type Query__HomePage__param } from './Query/HomePage/param_type';
-import { type Query__PullRequestDetail__param } from './Query/PullRequestDetail/param_type';
+import { type Query__HomePageList__param } from './Query/HomePageList/param_type';
 import { type Query__PullRequest__param } from './Query/PullRequest/param_type';
+import { type Query__PullRequestDetail__param } from './Query/PullRequestDetail/param_type';
 import { type Query__RepositoryDetail__param } from './Query/RepositoryDetail/param_type';
 import { type Query__RepositoryPage__param } from './Query/RepositoryPage/param_type';
 import { type Query__UserDetail__param } from './Query/UserDetail/param_type';
@@ -20,10 +24,6 @@ import { type Starrable__IsStarred__param } from './Starrable/IsStarred/param_ty
 import { type User__Avatar__param } from './User/Avatar/param_type';
 import { type User__RepositoryConnection__param } from './User/RepositoryConnection/param_type';
 import { type User__RepositoryList__param } from './User/RepositoryList/param_type';
-import entrypoint_Query__HomePage from '../__isograph/Query/HomePage/entrypoint';
-import entrypoint_Query__PullRequest from '../__isograph/Query/PullRequest/entrypoint';
-import entrypoint_Query__RepositoryPage from '../__isograph/Query/RepositoryPage/entrypoint';
-import entrypoint_Query__UserPage from '../__isograph/Query/UserPage/entrypoint';
 
 // This is the type given to regular client fields.
 // This means that the type of the exported iso literal is exactly
@@ -172,13 +172,12 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.UserPage', T>
 ): typeof entrypoint_Query__UserPage;
-
-export function iso(_isographLiteralText: string):
+export function iso(clientFieldResolver: any):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
   | IsographEntrypoint<any, any>
 {
-  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
-      'was not set up, or it failed to identify this call site. Make sure it ' +
-      'is being used verbatim as `iso`.');
+  return (props: any) => {
+    return clientFieldResolver(props.firstParameter, props.additionalRuntimeProps)
+  };
 }

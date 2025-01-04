@@ -62,13 +62,12 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.HomePage', T>
 ): typeof entrypoint_Query__HomePage;
-
-export function iso(_isographLiteralText: string):
+export function iso(clientFieldResolver: any):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
   | IsographEntrypoint<any, any>
 {
-  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
-      'was not set up, or it failed to identify this call site. Make sure it ' +
-      'is being used verbatim as `iso`.');
+  return (props: any) => {
+    return clientFieldResolver(props.firstParameter, props.additionalRuntimeProps)
+  };
 }
