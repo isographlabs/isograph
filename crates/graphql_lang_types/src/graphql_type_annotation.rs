@@ -9,25 +9,6 @@ pub enum GraphQLTypeAnnotation<TValue> {
     NonNull(Box<GraphQLNonNullTypeAnnotation<TValue>>),
 }
 
-impl<TValue> From<GraphQLTypeAnnotation<TValue>> for GraphQLNonNullTypeAnnotation<TValue> {
-    fn from(value: GraphQLTypeAnnotation<TValue>) -> Self {
-        match value {
-            GraphQLTypeAnnotation::Named(named) => GraphQLNonNullTypeAnnotation::Named(named),
-            GraphQLTypeAnnotation::List(list) => GraphQLNonNullTypeAnnotation::List(*list),
-            GraphQLTypeAnnotation::NonNull(non_null) => *non_null,
-        }
-    }
-}
-
-impl<TValue> From<GraphQLNonNullTypeAnnotation<TValue>> for GraphQLTypeAnnotation<TValue> {
-    fn from(value: GraphQLNonNullTypeAnnotation<TValue>) -> Self {
-        match value {
-            GraphQLNonNullTypeAnnotation::Named(named) => GraphQLTypeAnnotation::Named(named),
-            GraphQLNonNullTypeAnnotation::List(list) => GraphQLTypeAnnotation::List(Box::new(list)),
-        }
-    }
-}
-
 impl<TValue> GraphQLTypeAnnotation<TValue> {
     pub fn inner(&self) -> &TValue {
         match self {
