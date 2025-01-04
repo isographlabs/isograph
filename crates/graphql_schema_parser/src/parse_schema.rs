@@ -1,8 +1,8 @@
 use std::{ops::ControlFlow, str::FromStr};
 
 use common_lang_types::{
-    DescriptionValue, EnumLiteralValue, GraphQLInterfaceTypeName, GraphQLObjectTypeName, Span,
-    StringLiteralValue, TextSource, WithLocation, WithSpan,
+    DescriptionValue, EnumLiteralValue, GraphQLInterfaceTypeName, GraphQLObjectTypeName,
+    RelativeTextSource, Span, StringLiteralValue, WithLocation, WithSpan,
 };
 use graphql_syntax::TokenKind;
 use intern::{
@@ -31,7 +31,7 @@ use super::{
 
 pub fn parse_schema(
     source: &str,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<GraphQLTypeSystemDocument> {
     let mut tokens = PeekableLexer::new(source);
 
@@ -40,7 +40,7 @@ pub fn parse_schema(
 
 fn parse_type_system_document(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<GraphQLTypeSystemDocument> {
     let mut type_system_definitions = vec![];
     while !tokens.reached_eof() {
@@ -52,7 +52,7 @@ fn parse_type_system_document(
 
 pub fn parse_schema_extensions(
     source: &str,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<GraphQLTypeSystemExtensionDocument> {
     let mut tokens = PeekableLexer::new(source);
 
@@ -61,7 +61,7 @@ pub fn parse_schema_extensions(
 
 fn parse_type_system_extension_document(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<GraphQLTypeSystemExtensionDocument> {
     let mut definitions_or_extensions = vec![];
     while !tokens.reached_eof() {
@@ -92,7 +92,7 @@ fn parse_type_system_extension_document(
 
 fn parse_type_system_extension(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<WithLocation<GraphQLTypeSystemExtension>> {
     let extension = tokens.with_span(|tokens| {
         let identifier = tokens
@@ -123,7 +123,7 @@ fn parse_type_system_extension(
 
 fn parse_type_system_definition(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<WithLocation<GraphQLTypeSystemDefinition>> {
     let definition = tokens.with_span(|tokens| {
         let description = parse_optional_description(tokens);
@@ -163,7 +163,7 @@ fn parse_type_system_definition(
 fn parse_object_type_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<GraphQLObjectTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
@@ -186,7 +186,7 @@ fn parse_object_type_definition(
 /// The state of the PeekableLexer is that it has processed the "type" keyword
 fn parse_object_type_extension(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<GraphQLObjectTypeExtension> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
@@ -209,7 +209,7 @@ fn parse_object_type_extension(
 fn parse_interface_type_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<GraphQLInterfaceTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
@@ -232,7 +232,7 @@ fn parse_interface_type_definition(
 fn parse_input_object_type_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<GraphQLInputObjectTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
@@ -260,7 +260,7 @@ fn parse_input_object_type_definition(
 fn parse_directive_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<GraphQLDirectiveDefinition> {
     let _at = tokens.parse_token_of_kind(TokenKind::At);
     let name = tokens
@@ -337,7 +337,7 @@ fn parse_directive_location(
 fn parse_enum_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<GraphQLEnumDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
@@ -358,7 +358,7 @@ fn parse_enum_definition(
 
 fn parse_enum_value_definitions(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<Vec<WithLocation<GraphQLEnumValueDefinition>>> {
     parse_optional_enclosed_items(
         tokens,
@@ -371,7 +371,7 @@ fn parse_enum_value_definitions(
 
 fn parse_enum_value_definition(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<WithSpan<GraphQLEnumValueDefinition>> {
     tokens.with_span(|tokens| {
         let description = parse_optional_description(tokens);
@@ -404,7 +404,7 @@ fn parse_enum_value_definition(
 fn parse_union_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<GraphQLUnionTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
@@ -429,7 +429,7 @@ fn parse_union_definition(
 
 fn parse_union_member_types(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<Vec<WithLocation<GraphQLObjectTypeName>>> {
     // This is a no-op if the token kind doesn't match, so effectively
     // this is an optional pipe
@@ -456,7 +456,7 @@ fn parse_union_member_types(
 fn parse_schema_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<GraphQLSchemaDefinition> {
     let directives = parse_constant_directives(tokens, text_source)?;
 
@@ -515,7 +515,7 @@ fn reassign_or_error(
 
 fn parse_root_operation_type(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<(
     WithSpan<RootOperationKind>,
     WithLocation<GraphQLObjectTypeName>,
@@ -554,7 +554,7 @@ fn parse_root_operation_type(
 fn parse_scalar_type_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<GraphQLScalarTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
@@ -573,7 +573,7 @@ fn parse_scalar_type_definition(
 /// The state of the PeekableLexer is that we have not parsed the "implements" keyword.
 fn parse_implements_interfaces_if_present(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<Vec<WithLocation<GraphQLInterfaceTypeName>>> {
     if tokens.parse_matching_identifier("implements").is_ok() {
         let interfaces = parse_interfaces(tokens, text_source)?;
@@ -594,7 +594,7 @@ fn parse_implements_interfaces_if_present(
 /// with only "Foo", no directives and no fields was successfully parsed.
 fn parse_interfaces(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<Vec<WithLocation<GraphQLInterfaceTypeName>>> {
     let _optional_ampersand = tokens.parse_token_of_kind(TokenKind::Ampersand);
 
@@ -618,7 +618,7 @@ fn parse_interfaces(
 
 fn parse_constant_directives(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<Vec<GraphQLDirective<GraphQLConstantValue>>> {
     let mut directives = vec![];
     while tokens.parse_token_of_kind(TokenKind::At).is_ok() {
@@ -636,7 +636,7 @@ fn parse_constant_directives(
 // Parse constant arguments passed to a directive used in a schema definition.
 fn parse_optional_constant_arguments<T: From<StringKey>>(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<Vec<NameValuePair<T, GraphQLConstantValue>>> {
     if tokens.parse_token_of_kind(TokenKind::OpenParen).is_ok() {
         let first_name_value_pair = parse_constant_name_value_pair(
@@ -665,7 +665,7 @@ fn parse_optional_constant_arguments<T: From<StringKey>>(
 fn parse_constant_name_value_pair<T: From<StringKey>, TValue>(
     tokens: &mut PeekableLexer,
     parse_value: impl Fn(&mut PeekableLexer) -> ParseResult<WithLocation<TValue>>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<NameValuePair<T, TValue>> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
@@ -681,7 +681,7 @@ fn parse_constant_name_value_pair<T: From<StringKey>, TValue>(
 
 fn parse_constant_value(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<WithLocation<GraphQLConstantValue>> {
     from_control_flow(|| {
         to_control_flow(|| {
@@ -833,7 +833,7 @@ fn from_control_flow<T, E>(control_flow: impl FnOnce() -> ControlFlow<T, E>) -> 
 
 fn parse_optional_fields(
     tokens: &mut PeekableLexer<'_>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<Vec<WithLocation<GraphQLFieldDefinition>>> {
     let brace = tokens.parse_token_of_kind(TokenKind::OpenBrace);
     if brace.is_err() {
@@ -851,7 +851,7 @@ fn parse_optional_fields(
 
 fn parse_field(
     tokens: &mut PeekableLexer<'_>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<WithLocation<GraphQLFieldDefinition>> {
     let with_span = tokens.with_span(|tokens| {
         let description = parse_optional_description(tokens);
@@ -948,10 +948,10 @@ fn parse_type_annotation<T: From<StringKey>>(
 
 fn parse_optional_enclosed_items<'a, T>(
     tokens: &mut PeekableLexer<'a>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
     open_token: TokenKind,
     close_token: TokenKind,
-    mut parse: impl FnMut(&mut PeekableLexer<'a>, TextSource) -> ParseResult<WithSpan<T>>,
+    mut parse: impl FnMut(&mut PeekableLexer<'a>, RelativeTextSource) -> ParseResult<WithSpan<T>>,
 ) -> ParseResult<Vec<WithLocation<T>>> {
     let paren = tokens.parse_token_of_kind(open_token);
 
@@ -970,7 +970,7 @@ fn parse_optional_enclosed_items<'a, T>(
 
 fn parse_argument_definition(
     tokens: &mut PeekableLexer<'_>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<WithSpan<GraphQLInputValueDefinition>> {
     tokens.with_span(|tokens| {
         let description = parse_optional_description(tokens);
@@ -997,7 +997,7 @@ fn parse_argument_definition(
 
 fn parse_optional_constant_default_value(
     tokens: &mut PeekableLexer<'_>,
-    text_source: TextSource,
+    text_source: RelativeTextSource,
 ) -> ParseResult<Option<WithLocation<GraphQLConstantValue>>> {
     let equal = tokens.parse_token_of_kind(TokenKind::Equals);
     if equal.is_err() {

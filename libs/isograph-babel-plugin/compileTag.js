@@ -36,26 +36,28 @@ const typeAndFieldRegex = new RegExp(
  * @param {babel.NodePath<babel.types.CallExpression>} path
  *  */
 function getTypeAndField(path) {
-  if (path.node.arguments.length !== 1) {
+  const firstArg = path.node.arguments[0];
+  if (path.node.arguments.length !== 1 || firstArg == null) {
     throw new Error(
       `BabelPluginIsograph: Iso invocation require one parameter, found ${path.node.arguments.length}`,
     );
   }
 
-  if (path.node.arguments[0].type !== 'TemplateLiteral') {
+  if (firstArg.type !== 'TemplateLiteral') {
     throw new Error(
       'BabelPluginIsograph: Only template literals are allowed in iso fragments.',
     );
   }
 
-  const quasis = path.node.arguments[0].quasis;
-  if (quasis.length !== 1) {
+  const quasis = firstArg.quasis;
+  const firstQuasi = quasis[0];
+  if (quasis.length !== 1 || firstQuasi == null) {
     throw new Error(
       'BabelPluginIsograph: Substitutions are not allowed in iso fragments.',
     );
   }
 
-  const content = quasis[0].value.raw;
+  const content = firstQuasi.value.raw;
   const typeAndField = typeAndFieldRegex.exec(content);
 
   const keyword = typeAndField?.[1];

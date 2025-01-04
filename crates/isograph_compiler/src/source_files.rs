@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use common_lang_types::{SourceFileName, TextSource};
+use common_lang_types::{RelativePathToSourceFile, RelativeTextSource};
 use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
 use graphql_schema_parser::{parse_schema, parse_schema_extensions};
 use intern::string_key::Intern;
@@ -25,7 +25,7 @@ use crate::{
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub struct SourceFiles {
     pub schema: GraphQLTypeSystemDocument,
-    pub schema_extensions: HashMap<SourceFileName, GraphQLTypeSystemExtensionDocument>,
+    pub schema_extensions: HashMap<RelativePathToSourceFile, GraphQLTypeSystemExtensionDocument>,
     pub contains_iso: ContainsIso,
 }
 
@@ -262,7 +262,7 @@ fn read_and_parse_graphql_schema(
     schema_path: &PathBuf,
 ) -> Result<GraphQLTypeSystemDocument, BatchCompileError> {
     let content = read_schema_file(schema_path)?;
-    let schema_text_source = TextSource {
+    let schema_text_source = RelativeTextSource {
         path: schema_path
             .to_str()
             .expect("Expected schema to be valid string")
@@ -275,20 +275,20 @@ fn read_and_parse_graphql_schema(
     Ok(schema)
 }
 
-fn intern_file_path(path: &Path) -> SourceFileName {
+fn intern_file_path(path: &Path) -> RelativePathToSourceFile {
     path.to_string_lossy().into_owned().intern().into()
 }
 
 pub fn read_and_parse_schema_extensions(
     schema_extension_path: &PathBuf,
-) -> Result<(SourceFileName, GraphQLTypeSystemExtensionDocument), BatchCompileError> {
+) -> Result<(RelativePathToSourceFile, GraphQLTypeSystemExtensionDocument), BatchCompileError> {
     let file_path = schema_extension_path
         .to_str()
         .expect("Expected schema extension to be valid string")
         .intern()
         .into();
     let extension_content = read_schema_file(schema_extension_path)?;
-    let extension_text_source = TextSource {
+    let extension_text_source = RelativeTextSource {
         path: file_path,
         span: None,
     };
@@ -322,7 +322,9 @@ fn process_exposed_fields(schema: &mut UnvalidatedSchema) -> Result<(), BatchCom
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
-pub struct ContainsIso(pub HashMap<SourceFileName, Vec<(IsoLiteralExtractionResult, TextSource)>>);
+pub struct ContainsIso(
+    pub HashMap<RelativePathToSourceFile, Vec<(IsoLiteralExtractionResult, RelativeTextSource)>>,
+);
 
 impl ContainsIso {
     pub fn stats(&self) -> ContainsIsoStats {
@@ -351,7 +353,8 @@ impl ContainsIso {
 }
 
 impl Deref for ContainsIso {
-    type Target = HashMap<SourceFileName, Vec<(IsoLiteralExtractionResult, TextSource)>>;
+    type Target =
+        HashMap<RelativePathToSourceFile, Vec<(IsoLiteralExtractionResult, RelativeTextSource)>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0

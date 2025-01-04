@@ -2,7 +2,7 @@ use std::fmt;
 
 use super::{write::write_arguments, NameValuePair};
 use crate::GraphQLConstantValue;
-use common_lang_types::{DirectiveArgumentName, DirectiveName, WithEmbeddedLocation};
+use common_lang_types::{DirectiveArgumentName, DirectiveName, WithEmbeddedRelativeLocation};
 use intern::Lookup;
 use serde::{
     de::{self, value::SeqDeserializer, IntoDeserializer, MapAccess},
@@ -13,13 +13,13 @@ use thiserror::Error;
 // TODO maybe this should be NameAndArguments and a field should be the same thing...?
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct GraphQLDirective<T> {
-    pub name: WithEmbeddedLocation<DirectiveName>,
+    pub name: WithEmbeddedRelativeLocation<DirectiveName>,
     pub arguments: Vec<NameValuePair<DirectiveArgumentName, T>>,
 }
 
 impl<T: fmt::Display> fmt::Display for GraphQLDirective<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "@{}", self.name)?;
+        write!(f, "@{}", self.name.item)?;
         write_arguments(f, &self.arguments)?;
         Ok(())
     }

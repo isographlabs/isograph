@@ -9,7 +9,7 @@ use crate::{
     row_col_offset::{diff_to_end_of_slice, get_index_from_diff, RowColDiff},
 };
 use client_field::client_field_declaration_to_tokens;
-use common_lang_types::{Span, TextSource};
+use common_lang_types::{RelativeTextSource, Span};
 use entrypoint::entrypoint_declaration_to_tokens;
 use intern::string_key::Intern;
 use isograph_compiler::{extract_iso_literals_from_file_content, IsoLiteralExtraction};
@@ -56,7 +56,7 @@ pub fn on_semantic_token_full_request(
             diff_to_end_of_slice(&file_text[index_of_last_token..iso_literal_start_index]);
 
         let file_path = text_document.uri.path().intern();
-        let text_source = TextSource {
+        let text_source = RelativeTextSource {
             path: file_path.into(),
             span: Some(Span::new(
                 iso_literal_start_index as u32,

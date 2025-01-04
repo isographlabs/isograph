@@ -4,7 +4,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use common_lang_types::{FilePath, Location, SourceFileName, Span, TextSource, WithLocation};
+use common_lang_types::{
+    FilePath, Location, RelativePathToSourceFile, RelativeTextSource, Span, WithLocation,
+};
 use intern::string_key::Intern;
 use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
@@ -110,8 +112,8 @@ pub(crate) fn read_and_parse_iso_literals(
     canonicalized_root_path: &Path,
 ) -> Result<
     (
-        SourceFileName,
-        Vec<(IsoLiteralExtractionResult, TextSource)>,
+        RelativePathToSourceFile,
+        Vec<(IsoLiteralExtractionResult, RelativeTextSource)>,
     ),
     Vec<WithLocation<IsographLiteralParseError>>,
 > {
@@ -180,17 +182,18 @@ pub(crate) fn process_iso_literals(
 
 pub fn process_iso_literal_extraction(
     iso_literal_extraction: IsoLiteralExtraction<'_>,
-    file_name: SourceFileName,
+    file_name: RelativePathToSourceFile,
     interned_file_path: FilePath,
-) -> Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>> {
+) -> Result<(IsoLiteralExtractionResult, RelativeTextSource), WithLocation<IsographLiteralParseError>>
+{
     let IsoLiteralExtraction {
         iso_literal_text,
         iso_literal_start_index,
         has_associated_js_function,
         const_export_name,
-        has_paren,
+        iso_function_called_with_paren: has_paren,
     } = iso_literal_extraction;
-    let text_source = TextSource {
+    let text_source = RelativeTextSource {
         path: file_name,
         span: Some(Span::new(
             iso_literal_start_index as u32,
@@ -213,17 +216,15 @@ pub fn process_iso_literal_extraction(
         text_source,
     )?;
 
-    #[allow(clippy::collapsible_if)]
-    if matches!(
+    let is_client_field_declaration = matches!(
         &iso_literal_extraction_result,
         IsoLiteralExtractionResult::ClientFieldDeclaration(_)
-    ) {
-        if !has_associated_js_function {
-            return Err(WithLocation::new(
-                IsographLiteralParseError::ExpectedAssociatedJsFunction,
-                Location::new(text_source, Span::todo_generated()),
-            ));
-        }
+    );
+    if is_client_field_declaration && !has_associated_js_function {
+        return Err(WithLocation::new(
+            IsographLiteralParseError::ExpectedAssociatedJsFunction,
+            Location::new(text_source, Span::todo_generated()),
+        ));
     }
 
     Ok((iso_literal_extraction_result, text_source))
@@ -240,7 +241,12 @@ pub struct IsoLiteralExtraction<'a> {
     pub iso_literal_text: &'a str,
     pub iso_literal_start_index: usize,
     pub has_associated_js_function: bool,
-    pub has_paren: bool,
+    /// true if the iso function is called as iso(`...`), and false if it is
+    /// called as iso`...`. This is tracked as a separate field because some users
+    /// may assume that you write iso literals like you would graphql/gql literals
+    /// (which are written as graphql`...`), and having a separate field means
+    /// we can display a helpful error message (instead of silently ignoring.)
+    pub iso_function_called_with_paren: bool,
 }
 
 pub fn extract_iso_literals_from_file_content(
@@ -253,7 +259,7 @@ pub fn extract_iso_literals_from_file_content(
             iso_literal_text: iso_literal_match.as_str(),
             iso_literal_start_index: iso_literal_match.start(),
             has_associated_js_function: captures.get(6).is_some(),
-            has_paren: captures.get(3).is_some(),
+            iso_function_called_with_paren: captures.get(3).is_some(),
         }
     })
 }
