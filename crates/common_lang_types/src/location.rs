@@ -95,13 +95,15 @@ impl EmbeddedRelativeLocation {
     }
 }
 
-impl fmt::Display for Location {
+struct AbsoluteLocation {
+    pub location: Location,
+}
+
+impl fmt::Display for AbsoluteLocation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
+        match self.location {
             Location::Embedded(embedded_location) => {
-                let wrapper = AbsoluteEmbeddedLocation {
-                    embedded_location: *embedded_location,
-                };
+                let wrapper = AbsoluteEmbeddedLocation { embedded_location };
                 wrapper.fmt(f)
             }
             Location::Generated => {
@@ -126,7 +128,10 @@ impl<T: Error> Error for WithLocation<T> {
 
 impl<T: fmt::Display> fmt::Display for WithLocation<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}\n{}", self.item, self.location)
+        let absolute_location = AbsoluteLocation {
+            location: self.location,
+        };
+        write!(f, "{}\n{}", self.item, absolute_location)
     }
 }
 
