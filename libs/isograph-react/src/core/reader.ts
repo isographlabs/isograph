@@ -30,9 +30,9 @@ export type EagerReaderArtifact<
   readonly kind: 'EagerReaderArtifact';
   readonly fieldName: ComponentOrFieldName;
   readonly readerAst: ReaderAst<TReadFromStore>;
-  readonly resolver: (
-    data: ResolverFirstParameter<TReadFromStore>,
-  ) => TClientFieldValue;
+  readonly resolver: (data: {
+    firstParameter: ResolverFirstParameter<TReadFromStore>;
+  }) => TClientFieldValue;
   readonly hasUpdatable: boolean;
 };
 
@@ -43,10 +43,10 @@ export type ComponentReaderArtifact<
   readonly kind: 'ComponentReaderArtifact';
   readonly fieldName: ComponentOrFieldName;
   readonly readerAst: ReaderAst<TReadFromStore>;
-  readonly resolver: (
-    data: ResolverFirstParameter<TReadFromStore>,
-    runtimeProps: TComponentProps,
-  ) => React.ReactNode;
+  readonly resolver: (props: {
+    firstParameter: ResolverFirstParameter<TReadFromStore>;
+    additionalRuntimeProps: TComponentProps;
+  }) => React.ReactNode;
   readonly hasUpdatable: boolean;
 };
 

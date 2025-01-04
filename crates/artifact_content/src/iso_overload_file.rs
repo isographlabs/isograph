@@ -273,9 +273,10 @@ export function iso(isographLiteralText: string):
         for switch_case in switch_cases {
             content.push_str(&switch_case);
         }
+        // TODO: import { hmr } from '@isograph/react'
         content.push_str(
             "  }
-  return (clientFieldResolver: any) => clientFieldResolver;\n}",
+  return (clientFieldResolver: any) => (props: any) => clientFieldResolver(props.firstParameter, props.additionalRuntimeProps);\n}",
         )
     }
 

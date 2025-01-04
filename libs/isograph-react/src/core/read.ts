@@ -597,7 +597,9 @@ export function readResolverFieldData(
       };
       return {
         kind: 'Success',
-        data: readerWithRefetchQueries.readerArtifact.resolver(firstParameter),
+        data: readerWithRefetchQueries.readerArtifact.resolver({
+          firstParameter,
+        }),
       };
     }
     case 'ComponentReaderArtifact': {
@@ -689,17 +691,19 @@ export function readLinkedFieldData(
     } satisfies FragmentReference<any, any>;
 
     const link = condition.resolver({
-      data: data.data,
-      parameters: {},
-      ...(condition.hasUpdatable
-        ? {
-            startUpdate: getOrCreateCachedStartUpdate(
-              environment,
-              fragment,
-              networkRequestOptions,
-            ),
-          }
-        : undefined),
+      firstParameter: {
+        data: data.data,
+        parameters: {},
+        ...(condition.hasUpdatable
+          ? {
+              startUpdate: getOrCreateCachedStartUpdate(
+                environment,
+                fragment,
+                networkRequestOptions,
+              ),
+            }
+          : undefined),
+      },
     });
     value = link;
   }
@@ -938,7 +942,11 @@ export function readClientPointerData(
               kind: 'EagerReaderArtifact',
               fieldName: field.fieldName,
               readerAst: field.selections,
-              resolver: ({ data }: { data: any }) => data,
+              resolver: ({
+                firstParameter: { data },
+              }: {
+                firstParameter: any;
+              }) => data,
               hasUpdatable: false,
             },
             nestedRefetchQueries,
