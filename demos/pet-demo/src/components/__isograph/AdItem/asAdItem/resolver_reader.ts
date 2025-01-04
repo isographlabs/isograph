@@ -14,7 +14,7 @@ const artifact: EagerReaderArtifact<
   boolean
 > = {
   kind: "EagerReaderArtifact",
-  resolver: ({ data }) => data.__typename === "AdItem",
+  resolver: ({ firstParameter }) => firstParameter.data.__typename === "AdItem" ? firstParameter.data.link : null,
   readerAst,
 };
 
