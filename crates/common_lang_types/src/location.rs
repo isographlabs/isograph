@@ -48,7 +48,7 @@ pub struct EmbeddedRelativeLocation {
 /// The AbsoluteEmbeddedLocation struct knows how to turn that relative
 /// path to an absolute path (i.e. it contains the absolute path to
 /// the project_root) for use when reading the file.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct AbsoluteEmbeddedLocation {
     pub embedded_location: EmbeddedRelativeLocation,
 }
