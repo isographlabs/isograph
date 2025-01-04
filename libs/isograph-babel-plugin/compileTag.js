@@ -17,16 +17,7 @@ function compileTag(t, path, config) {
       // This throws if the tag is invalid
       compileImportStatement(t, path, type, field, 'entrypoint', config);
     } else if (keyword === 'field') {
-      if (
-        t.isCallExpression(path.parentPath.node) &&
-        path.parentPath.node.arguments.length === 1
-      ) {
-        path.parentPath.replaceWith(path.parentPath.node.arguments[0]);
-      } else {
-        path.replaceWith(
-          t.arrowFunctionExpression([t.identifier('x')], t.identifier('x')),
-        );
-      }
+      path.replaceWith(path.node.callee);
     } else {
       throw new Error(
         "Invalid iso tag usage. Expected 'entrypoint' or 'field'.",

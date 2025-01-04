@@ -247,8 +247,10 @@ function readData<TReadFromStore>(
             };
           }
           const condition = field.condition.resolver({
-            data: data.data,
-            parameters: {},
+            firstParameter: {
+              data: data.data,
+              parameters: {},
+            },
           });
           if (condition === true) {
             link = root;
@@ -413,8 +415,9 @@ function readData<TReadFromStore>(
                 data: data.data,
                 parameters: variables,
               };
-              target[field.alias] =
-                field.readerArtifact.resolver(firstParameter);
+              target[field.alias] = field.readerArtifact.resolver({
+                firstParameter,
+              });
             }
             break;
           }

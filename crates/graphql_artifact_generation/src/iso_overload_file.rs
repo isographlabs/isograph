@@ -168,24 +168,24 @@ type MatchesWhitespaceAndString<
         content.push_str(&entrypoint_overload);
     }
 
-    content.push_str(
-        "
-export function iso(_isographLiteralText: string):
+    content.push_str(match no_babel_transform {
+        false => {
+            "export function iso(clientFieldResolver: any):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
   | IsographEntrypoint<any, any>
-{\n",
-    );
-
-    content.push_str(match no_babel_transform {
-        false => {
-"  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
-      'was not set up, or it failed to identify this call site. Make sure it ' +
-      'is being used verbatim as `iso`. If you cannot use the babel transform, ' + 
-      'set options.no_babel_transform to true in your Isograph config. ');"
+{\n  return (props: any) => {
+    return clientFieldResolver(props.firstParameter, props.additionalRuntimeProps)
+  };"
         }
         true => {
-            "  return (clientFieldResolver: any) => clientFieldResolver;"
+            "export function iso(_isographLiteralText: string):
+  | IdentityWithParam<any>
+  | IdentityWithParamComponent<any>
+  | IsographEntrypoint<any, any>
+{\n  return (clientFieldResolver: any) => (props: any) => {
+    return clientFieldResolver(props.firstParameter, props.additionalRuntimeProps)
+  };"
         }
     });
 

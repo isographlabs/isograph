@@ -5,6 +5,7 @@ import { useReadAndSubscribe } from '../react/useReadAndSubscribe';
 import { NetworkRequestReaderOptions } from './read';
 import { readPromise } from './PromiseWrapper';
 import { logMessage } from './logging';
+import React from 'react';
 
 export function getOrCreateCachedComponent(
   environment: IsographEnvironment,
@@ -47,12 +48,14 @@ export function getOrCreateCachedComponent(
           rootLink: fragmentReference.root,
         });
 
-        return readerWithRefetchQueries.readerArtifact.resolver(
-          {
-            data,
-            parameters: fragmentReference.variables,
-          },
-          additionalRuntimeProps,
+        return (
+          <readerWithRefetchQueries.readerArtifact.resolver
+            firstParameter={{
+              data,
+              parameters: fragmentReference.variables,
+            }}
+            additionalRuntimeProps={additionalRuntimeProps}
+          />
         );
       }
       Component.displayName = `${componentName} (id: ${fragmentReference.root}) @component`;
