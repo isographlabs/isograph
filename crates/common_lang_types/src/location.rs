@@ -170,22 +170,6 @@ pub struct WithEmbeddedRelativeLocation<T> {
     pub item: T,
 }
 
-impl<T: Error> Error for WithEmbeddedRelativeLocation<T> {
-    fn description(&self) -> &str {
-        #[allow(deprecated)]
-        self.item.description()
-    }
-}
-
-impl<T: fmt::Display> fmt::Display for WithEmbeddedRelativeLocation<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let wrapper = AbsoluteEmbeddedLocation {
-            embedded_location: self.location,
-        };
-        write!(f, "{}\n{}", self.item, wrapper)
-    }
-}
-
 impl<T> WithEmbeddedRelativeLocation<T> {
     pub fn new(item: T, location: EmbeddedRelativeLocation) -> Self {
         WithEmbeddedRelativeLocation { item, location }
