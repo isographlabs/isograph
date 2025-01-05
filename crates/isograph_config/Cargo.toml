@@ -12,8 +12,10 @@ path = "src/main.rs"
 
 [dependencies]
 common_lang_types = { path = "../common_lang_types" }
+intern = { path = "../../relay-crates/intern" }
 schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 colorize = { workspace = true }
 tracing = { workspace = true }
+pathdiff = { workspace = true }

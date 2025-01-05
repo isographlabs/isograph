@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use common_lang_types::CurrentWorkingDirectory;
 use graphql_artifact_generation::get_artifact_path_and_content;
 use isograph_config::{create_config, CompilerConfig, GenerateFileExtensionsOption};
 use isograph_schema::{Schema, UnvalidatedSchema};
@@ -17,9 +18,12 @@ pub struct CompilerState {
 }
 
 impl CompilerState {
-    pub fn new(config_location: PathBuf) -> Self {
+    pub fn new(
+        config_location: PathBuf,
+        current_working_directory: CurrentWorkingDirectory,
+    ) -> Self {
         Self {
-            config: create_config(config_location),
+            config: create_config(config_location, current_working_directory),
             source_files: None,
         }
     }
@@ -165,11 +169,12 @@ pub fn validate_and_create_artifacts_from_source_files(
     let artifacts = get_artifact_path_and_content(
         &validated_schema,
         &config.project_root,
-        &config.artifact_directory,
+        &config.artifact_directory.absolute_path,
         file_extensions,
         no_babel_transform,
     );
 
-    let total_artifacts_written = write_artifacts_to_disk(artifacts, &config.artifact_directory)?;
+    let total_artifacts_written =
+        write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)?;
     Ok(total_artifacts_written)
 }

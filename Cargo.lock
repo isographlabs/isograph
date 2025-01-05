@@ -735,6 +735,8 @@ version = "0.3.0"
 dependencies = [
  "clap 4.5.18",
  "colored",
+ "common_lang_types",
+ "intern",
  "isograph_compiler",
  "isograph_config",
  "isograph_lsp",
@@ -779,6 +781,8 @@ version = "0.3.0"
 dependencies = [
  "colorize",
  "common_lang_types",
+ "intern",
+ "pathdiff",
  "schemars",
  "serde",
  "serde_json",

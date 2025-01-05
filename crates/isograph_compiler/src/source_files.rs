@@ -31,12 +31,12 @@ pub struct SourceFiles {
 
 impl SourceFiles {
     pub fn read_and_parse_all_files(config: &CompilerConfig) -> Result<Self, BatchCompileError> {
-        let schema = read_and_parse_graphql_schema(&config.schema)?;
+        let schema = read_and_parse_graphql_schema(&config.schema.absolute_path)?;
 
         let mut schema_extensions = HashMap::new();
         for schema_extension_path in config.schema_extensions.iter() {
             let (file_path, extensions_document) =
-                read_and_parse_schema_extensions(schema_extension_path)?;
+                read_and_parse_schema_extensions(&schema_extension_path.absolute_path)?;
             schema_extensions.insert(file_path, extensions_document);
         }
 
@@ -113,10 +113,10 @@ impl SourceFiles {
     ) -> Result<(), BatchCompileError> {
         match event_kind {
             SourceEventKind::CreateOrModify(_) => {
-                self.schema = read_and_parse_graphql_schema(&config.schema)?;
+                self.schema = read_and_parse_graphql_schema(&config.schema.absolute_path)?;
             }
             SourceEventKind::Rename((_, target_path)) => {
-                if config.schema != *target_path {
+                if config.schema.absolute_path != *target_path {
                     return Err(BatchCompileError::SchemaNotFound);
                 }
             }
@@ -135,7 +135,11 @@ impl SourceFiles {
                 self.create_or_update_schema_extension(path)?;
             }
             SourceEventKind::Rename((source_path, target_path)) => {
-                if config.schema_extensions.contains(target_path) {
+                if config
+                    .schema_extensions
+                    .iter()
+                    .any(|x| x.absolute_path == *target_path)
+                {
                     self.create_or_update_schema_extension(target_path)?;
                 } else {
                     let interned_file_path = intern_file_path(source_path);
