@@ -2,7 +2,7 @@ use std::{error::Error, fmt};
 
 use intern::Lookup;
 
-use crate::{text_with_carats::text_with_carats, SourceFileName, Span, WithSpan};
+use crate::{text_with_carats::text_with_carats, RelativePathToSourceFile, Span, WithSpan};
 
 /// A source, which consists of a filename, and an optional span
 /// indicating the subset of the file which corresponds to the
@@ -13,7 +13,7 @@ use crate::{text_with_carats::text_with_carats, SourceFileName, Span, WithSpan};
 /// during watch mode.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct TextSource {
-    pub path: SourceFileName,
+    pub relative_path_to_source_file: RelativePathToSourceFile,
     pub span: Option<Span>,
 }
 
@@ -21,7 +21,7 @@ impl TextSource {
     pub fn read_to_string(&self) -> (&str, String) {
         // TODO maybe intern these or somehow avoid reading a bajillion times.
         // This is especially important for when we display many errors.
-        let file_path = self.path.lookup();
+        let file_path = self.relative_path_to_source_file.lookup();
         let file_contents = std::fs::read_to_string(file_path).expect("file should exist");
         if let Some(span) = self.span {
             // TODO we're cloning here unnecessarily, I think!

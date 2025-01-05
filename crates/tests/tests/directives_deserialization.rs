@@ -20,7 +20,7 @@ fn unwrap_directive(
 
 fn parse_mutation(source: &str) -> Result<Vec<ExposeFieldDirective>, Box<dyn Error>> {
     let text_source = TextSource {
-        path: "dummy".intern().into(),
+        relative_path_to_source_file: "dummy".intern().into(),
         span: None,
     };
     let document =

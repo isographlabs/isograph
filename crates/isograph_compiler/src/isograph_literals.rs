@@ -4,7 +4,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use common_lang_types::{FilePath, Location, SourceFileName, Span, TextSource, WithLocation};
+use common_lang_types::{
+    FilePath, Location, RelativePathToSourceFile, Span, TextSource, WithLocation,
+};
 use intern::string_key::Intern;
 use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
@@ -110,7 +112,7 @@ pub(crate) fn read_and_parse_iso_literals(
     canonicalized_root_path: &Path,
 ) -> Result<
     (
-        SourceFileName,
+        RelativePathToSourceFile,
         Vec<(IsoLiteralExtractionResult, TextSource)>,
     ),
     Vec<WithLocation<IsographLiteralParseError>>,
@@ -180,7 +182,7 @@ pub(crate) fn process_iso_literals(
 
 pub fn process_iso_literal_extraction(
     iso_literal_extraction: IsoLiteralExtraction<'_>,
-    file_name: SourceFileName,
+    file_name: RelativePathToSourceFile,
     interned_file_path: FilePath,
 ) -> Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>> {
     let IsoLiteralExtraction {
@@ -191,7 +193,7 @@ pub fn process_iso_literal_extraction(
         iso_function_called_with_paren: has_paren,
     } = iso_literal_extraction;
     let text_source = TextSource {
-        path: file_name,
+        relative_path_to_source_file: file_name,
         span: Some(Span::new(
             iso_literal_start_index as u32,
             (iso_literal_start_index + iso_literal_text.len()) as u32,
