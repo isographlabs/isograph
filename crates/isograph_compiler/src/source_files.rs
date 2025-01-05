@@ -31,12 +31,12 @@ pub struct SourceFiles {
 
 impl SourceFiles {
     pub fn read_and_parse_all_files(config: &CompilerConfig) -> Result<Self, BatchCompileError> {
-        let schema = read_and_parse_graphql_schema(&config.schema.absolute_path)?;
+        let schema = read_and_parse_graphql_schema(&config)?;
 
         let mut schema_extensions = HashMap::new();
         for schema_extension_path in config.schema_extensions.iter() {
             let (file_path, extensions_document) =
-                read_and_parse_schema_extensions(&schema_extension_path.absolute_path)?;
+                read_and_parse_schema_extensions(&schema_extension_path.absolute_path, config)?;
             schema_extensions.insert(file_path, extensions_document);
         }
 
@@ -45,6 +45,7 @@ impl SourceFiles {
             &mut contains_iso,
             &config.project_root,
             &config.project_root,
+            config,
         )?;
 
         Ok(Self {
@@ -113,7 +114,7 @@ impl SourceFiles {
     ) -> Result<(), BatchCompileError> {
         match event_kind {
             SourceEventKind::CreateOrModify(_) => {
-                self.schema = read_and_parse_graphql_schema(&config.schema.absolute_path)?;
+                self.schema = read_and_parse_graphql_schema(&config)?;
             }
             SourceEventKind::Rename((_, target_path)) => {
                 if config.schema.absolute_path != *target_path {
@@ -132,7 +133,7 @@ impl SourceFiles {
     ) -> Result<(), BatchCompileError> {
         match event_kind {
             SourceEventKind::CreateOrModify(path) => {
-                self.create_or_update_schema_extension(path)?;
+                self.create_or_update_schema_extension(path, config)?;
             }
             SourceEventKind::Rename((source_path, target_path)) => {
                 if config
@@ -140,7 +141,7 @@ impl SourceFiles {
                     .iter()
                     .any(|x| x.absolute_path == *target_path)
                 {
-                    self.create_or_update_schema_extension(target_path)?;
+                    self.create_or_update_schema_extension(target_path, config)?;
                 } else {
                     let interned_file_path = intern_file_path(source_path);
                     self.schema_extensions.remove(&interned_file_path);
@@ -161,12 +162,12 @@ impl SourceFiles {
     ) -> Result<(), BatchCompileError> {
         match event_kind {
             SourceEventKind::CreateOrModify(path) => {
-                self.create_or_update_iso_literals(&config.project_root, path)?;
+                self.create_or_update_iso_literals(&config.project_root, path, config)?;
             }
             SourceEventKind::Rename((source_path, target_path)) => {
                 let source_file_path = intern_file_path(source_path);
                 if self.contains_iso.remove(&source_file_path).is_some() {
-                    self.create_or_update_iso_literals(&config.project_root, target_path)?
+                    self.create_or_update_iso_literals(&config.project_root, target_path, config)?
                 }
             }
             SourceEventKind::Remove(path) => {
@@ -188,6 +189,7 @@ impl SourceFiles {
                     &mut self.contains_iso,
                     path,
                     &config.project_root,
+                    config,
                 )?;
             }
             SourceEventKind::Rename((source_path, target_path)) => {
@@ -198,6 +200,7 @@ impl SourceFiles {
                     &mut self.contains_iso,
                     target_path,
                     &config.project_root,
+                    config,
                 )?;
             }
             SourceEventKind::Remove(path) => {
@@ -212,8 +215,9 @@ impl SourceFiles {
     fn create_or_update_schema_extension(
         &mut self,
         path: &PathBuf,
+        config: &CompilerConfig,
     ) -> Result<(), BatchCompileError> {
-        let (file_path, document) = read_and_parse_schema_extensions(path)?;
+        let (file_path, document) = read_and_parse_schema_extensions(path, config)?;
         self.schema_extensions.insert(file_path, document);
         Ok(())
     }
@@ -222,11 +226,12 @@ impl SourceFiles {
         &mut self,
         project_root: &PathBuf,
         path: &Path,
+        config: &CompilerConfig,
     ) -> Result<(), BatchCompileError> {
         let canonicalized_root_path = get_canonicalized_root_path(project_root)?;
         let (path_buf, file_content) = read_file(path.to_path_buf(), &canonicalized_root_path)?;
         let (file_path, iso_literals) =
-            read_and_parse_iso_literals(path_buf, file_content, &canonicalized_root_path)?;
+            read_and_parse_iso_literals(path_buf, file_content, &canonicalized_root_path, config)?;
         if iso_literals.is_empty() {
             self.contains_iso.remove(&file_path);
         } else {
@@ -240,11 +245,12 @@ fn read_and_parse_iso_literals_from_folder(
     contains_iso: &mut ContainsIso,
     folder: &Path,
     project_root: &PathBuf,
+    config: &CompilerConfig,
 ) -> Result<(), BatchCompileError> {
     let mut iso_literal_parse_errors = vec![];
     let canonicalized_root_path = get_canonicalized_root_path(project_root)?;
     for (path, file_content) in read_files_in_folder(folder, &canonicalized_root_path)? {
-        match read_and_parse_iso_literals(path, file_content, &canonicalized_root_path) {
+        match read_and_parse_iso_literals(path, file_content, &canonicalized_root_path, config) {
             Ok((file_path, iso_literals)) => {
                 if !iso_literals.is_empty() {
                     contains_iso.insert(file_path, iso_literals);
@@ -263,16 +269,19 @@ fn read_and_parse_iso_literals_from_folder(
 }
 
 fn read_and_parse_graphql_schema(
-    schema_path: &PathBuf,
+    config: &CompilerConfig,
 ) -> Result<GraphQLTypeSystemDocument, BatchCompileError> {
-    let content = read_schema_file(schema_path)?;
+    let content = read_schema_file(&config.schema.absolute_path)?;
     let schema_text_source = TextSource {
-        relative_path_to_source_file: schema_path
+        relative_path_to_source_file: config
+            .schema
+            .absolute_path
             .to_str()
             .expect("Expected schema to be valid string")
             .intern()
             .into(),
         span: None,
+        current_working_directory: config.current_working_directory,
     };
     let schema = parse_schema(&content, schema_text_source)
         .map_err(|with_span| with_span.to_with_location(schema_text_source))?;
@@ -285,6 +294,7 @@ fn intern_file_path(path: &Path) -> RelativePathToSourceFile {
 
 pub fn read_and_parse_schema_extensions(
     schema_extension_path: &PathBuf,
+    config: &CompilerConfig,
 ) -> Result<(RelativePathToSourceFile, GraphQLTypeSystemExtensionDocument), BatchCompileError> {
     let file_path = schema_extension_path
         .to_str()
@@ -295,6 +305,7 @@ pub fn read_and_parse_schema_extensions(
     let extension_text_source = TextSource {
         relative_path_to_source_file: file_path,
         span: None,
+        current_working_directory: config.current_working_directory,
     };
 
     let schema_extensions = parse_schema_extensions(&extension_content, extension_text_source)

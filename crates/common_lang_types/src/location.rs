@@ -2,7 +2,10 @@ use std::{error::Error, fmt};
 
 use intern::Lookup;
 
-use crate::{text_with_carats::text_with_carats, RelativePathToSourceFile, Span, WithSpan};
+use crate::{
+    text_with_carats::text_with_carats, CurrentWorkingDirectory, RelativePathToSourceFile, Span,
+    WithSpan,
+};
 
 /// A source, which consists of a filename, and an optional span
 /// indicating the subset of the file which corresponds to the
@@ -13,6 +16,7 @@ use crate::{text_with_carats::text_with_carats, RelativePathToSourceFile, Span, 
 /// during watch mode.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct TextSource {
+    pub current_working_directory: CurrentWorkingDirectory,
     pub relative_path_to_source_file: RelativePathToSourceFile,
     pub span: Option<Span>,
 }

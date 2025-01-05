@@ -8,6 +8,7 @@ use common_lang_types::{
     FilePath, Location, RelativePathToSourceFile, Span, TextSource, WithLocation,
 };
 use intern::string_key::Intern;
+use isograph_config::CompilerConfig;
 use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
 };
@@ -110,6 +111,7 @@ pub(crate) fn read_and_parse_iso_literals(
     file_path: PathBuf,
     file_content: String,
     canonicalized_root_path: &Path,
+    config: &CompilerConfig,
 ) -> Result<
     (
         RelativePathToSourceFile,
@@ -131,8 +133,12 @@ pub(crate) fn read_and_parse_iso_literals(
     let mut isograph_literal_parse_errors = vec![];
 
     for iso_literal_extraction in extract_iso_literals_from_file_content(&file_content) {
-        match process_iso_literal_extraction(iso_literal_extraction, file_name, interned_file_path)
-        {
+        match process_iso_literal_extraction(
+            iso_literal_extraction,
+            file_name,
+            interned_file_path,
+            config,
+        ) {
             Ok(result) => extraction_results.push(result),
             Err(e) => isograph_literal_parse_errors.push(e),
         }
@@ -184,6 +190,7 @@ pub fn process_iso_literal_extraction(
     iso_literal_extraction: IsoLiteralExtraction<'_>,
     file_name: RelativePathToSourceFile,
     interned_file_path: FilePath,
+    config: &CompilerConfig,
 ) -> Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>> {
     let IsoLiteralExtraction {
         iso_literal_text,
@@ -198,6 +205,7 @@ pub fn process_iso_literal_extraction(
             iso_literal_start_index as u32,
             (iso_literal_start_index + iso_literal_text.len()) as u32,
         )),
+        current_working_directory: config.current_working_directory,
     };
 
     if !has_paren {

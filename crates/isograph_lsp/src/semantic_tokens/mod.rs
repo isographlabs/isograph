@@ -62,6 +62,7 @@ pub fn on_semantic_token_full_request(
                 iso_literal_start_index as u32,
                 (iso_literal_start_index + iso_literal_text.len()) as u32,
             )),
+            current_working_directory: state.config.current_working_directory,
         };
         let iso_literal_extraction_result = parse_iso_literal(
             iso_literal_text,

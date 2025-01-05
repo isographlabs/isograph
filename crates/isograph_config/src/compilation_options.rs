@@ -16,6 +16,8 @@ pub struct AbsolutePathAndRelativePath {
     pub relative_path: RelativePathToSourceFile,
 }
 
+/// This struct is the internal representation of the schema. It
+/// is a transformed version of IsographProjectConfig.
 #[derive(Debug, Clone)]
 pub struct CompilerConfig {
     // The absolute path to the config file
@@ -91,6 +93,7 @@ impl Default for OptionalValidationLevel {
     }
 }
 
+/// This struct is deserialized from an isograph.config.json file.
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct IsographProjectConfig {
