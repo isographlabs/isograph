@@ -31,7 +31,7 @@ pub struct SourceFiles {
 
 impl SourceFiles {
     pub fn read_and_parse_all_files(config: &CompilerConfig) -> Result<Self, BatchCompileError> {
-        let schema = read_and_parse_graphql_schema(&config)?;
+        let schema = read_and_parse_graphql_schema(config)?;
 
         let mut schema_extensions = HashMap::new();
         for schema_extension_path in config.schema_extensions.iter() {
@@ -114,7 +114,7 @@ impl SourceFiles {
     ) -> Result<(), BatchCompileError> {
         match event_kind {
             SourceEventKind::CreateOrModify(_) => {
-                self.schema = read_and_parse_graphql_schema(&config)?;
+                self.schema = read_and_parse_graphql_schema(config)?;
             }
             SourceEventKind::Rename((_, target_path)) => {
                 if config.schema.absolute_path != *target_path {

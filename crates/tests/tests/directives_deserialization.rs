@@ -22,6 +22,7 @@ fn parse_mutation(source: &str) -> Result<Vec<ExposeFieldDirective>, Box<dyn Err
     let text_source = TextSource {
         relative_path_to_source_file: "dummy".intern().into(),
         span: None,
+        current_working_directory: "cwd".intern().into(),
     };
     let document =
         graphql_schema_parser::parse_schema_extensions(source, text_source).map_err(|e| e.item)?;
