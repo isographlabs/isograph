@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "IsographProjectConfig",
+  "description": "This struct is deserialized from an isograph.config.json file.",
   "type": "object",
   "required": [
     "project_root",
