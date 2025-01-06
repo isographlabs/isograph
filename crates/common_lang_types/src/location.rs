@@ -21,6 +21,8 @@ pub struct TextSource {
     pub span: Option<Span>,
 }
 
+const ISO_PRINT_ABSOLUTE_FILEPATH: &str = "ISO_PRINT_ABSOLUTE_FILEPATH";
+
 impl TextSource {
     pub fn read_to_string(&self) -> (String, String) {
         // TODO maybe intern these or somehow avoid reading a bajillion times.
@@ -29,16 +31,38 @@ impl TextSource {
         let relative_path = self.relative_path_to_source_file.lookup();
         file_path.push(relative_path);
 
-        let file_contents = std::fs::read_to_string(&file_path).expect("file should exist");
-        let file_path = file_path
-            .to_str()
-            .expect("Expected path to be able to be stringifie.")
-            .to_string();
+        // HACK
+        //
+        // When we run pnpm build-pet-demo (etc), then the terminal's working directory is
+        // the isograph folder. But the process thinks that the working directory is
+        // /demos/pet-demo. As a result, if we print relative paths, we can't command-click
+        // on them, leading to a worse developer experience when working on Isograph.
+        //
+        // On the other hand, printing relative paths (from the current working directory):
+        // - is a nice default
+        // - means that if we capture that output, e.g. for fixtures, we can have consistent
+        //   fixture output, no matter what machine the fixtures were generated on.
+        //
+        // So, we need both options. This can probably be improved somewhat.
+        let absolute_or_relative_file_path = if std::env::var(ISO_PRINT_ABSOLUTE_FILEPATH).is_ok() {
+            file_path
+                .to_str()
+                .expect("Expected path to be able to be stringifie.")
+                .to_string()
+        } else {
+            relative_path.to_string()
+        };
+
+        let file_contents =
+            std::fs::read_to_string(&absolute_or_relative_file_path).expect("file should exist");
         if let Some(span) = self.span {
             // TODO we're cloning here unnecessarily, I think!
-            (file_path, file_contents[span.as_usize_range()].to_string())
+            (
+                absolute_or_relative_file_path,
+                file_contents[span.as_usize_range()].to_string(),
+            )
         } else {
-            (file_path, file_contents)
+            (absolute_or_relative_file_path, file_contents)
         }
     }
 }
