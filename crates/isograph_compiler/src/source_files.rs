@@ -214,11 +214,11 @@ impl SourceFiles {
 
     fn create_or_update_schema_extension(
         &mut self,
-        path: &PathBuf,
+        path: &Path,
         config: &CompilerConfig,
     ) -> Result<(), BatchCompileError> {
         let absolute_and_relative =
-            absolute_and_relative_paths(config.current_working_directory, path.clone());
+            absolute_and_relative_paths(config.current_working_directory, path.to_path_buf());
         let (file_path, document) =
             read_and_parse_schema_extensions(&absolute_and_relative, config)?;
         self.schema_extensions.insert(file_path, document);

@@ -62,7 +62,7 @@ pub fn on_semantic_token_full_request(
             &PathBuf::from(text_document.uri.path()),
         );
         let text_source = TextSource {
-            relative_path_to_source_file: file_path.into(),
+            relative_path_to_source_file: file_path,
             span: Some(Span::new(
                 iso_literal_start_index as u32,
                 (iso_literal_start_index + iso_literal_text.len()) as u32,
