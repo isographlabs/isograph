@@ -13,7 +13,8 @@ export const nodeField = iso(`
 `)(() => {});
 const nodeFieldEntrypoint = iso(`entrypoint Query.nodeField`);
 export const nodeFieldRetainedQuery: RetainedQuery = {
-  normalizationAst: nodeFieldEntrypoint.networkRequestInfo.normalizationAst,
+  normalizationAst:
+    nodeFieldEntrypoint.networkRequestInfo.normalizationAst.selections,
   variables: { id: 0 },
   root: { __link: ROOT_ID, __typename: 'Query' },
 };

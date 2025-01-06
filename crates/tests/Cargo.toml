@@ -19,4 +19,4 @@ colorize = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
-graphql_schema_parser = { path  = "../graphql_schema_parser"}
+graphql_schema_parser = { path = "../graphql_schema_parser" }

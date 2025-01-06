@@ -7,8 +7,8 @@ license = { workspace = true }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-pathdiff = { workspace = true } 
-lazy_static = { workspace = true }  
+pathdiff = { workspace = true }
+lazy_static = { workspace = true }
 isograph_schema = { path = "../isograph_schema" }
 isograph_config = { path = "../isograph_config" }
 isograph_lang_types = { path = "../isograph_lang_types" }

@@ -4,11 +4,11 @@ use intern::string_key::Intern;
 use isograph_lang_types::{ScalarFieldSelection, ServerFieldSelection};
 
 use crate::{
-    FieldType, ProcessTypeDefinitionError, ProcessTypeDefinitionResult, SchemaObject,
+    ClientType, FieldType, ProcessTypeDefinitionError, ProcessTypeDefinitionResult, SchemaObject,
     SchemaServerField, SchemaServerFieldVariant, ServerFieldTypeAssociatedData,
     ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
     ValidatedIsographSelectionVariant, ValidatedScalarFieldAssociatedData,
-    ValidatedTypeRefinementMap,
+    ValidatedTypeRefinementMap, LINK_FIELD_NAME,
 };
 use common_lang_types::Location;
 impl UnvalidatedSchema {
@@ -56,7 +56,31 @@ impl UnvalidatedSchema {
                     Span::todo_generated(),
                 );
 
-                let condition_selection_set = vec![typename_selection];
+                let link_selection = WithSpan::new(
+                    ServerFieldSelection::ScalarField(ScalarFieldSelection {
+                        arguments: vec![],
+                        associated_data: ValidatedScalarFieldAssociatedData {
+                            location: FieldType::ClientField(
+                                match *subtype
+                                    .encountered_fields
+                                    .get(&(*LINK_FIELD_NAME).into())
+                                    .expect("Expected link to exist")
+                                    .as_client_field()
+                                    .expect("Expected link to be client field")
+                                {
+                                    ClientType::ClientField(client_field_id) => client_field_id,
+                                },
+                            ),
+                            selection_variant: ValidatedIsographSelectionVariant::Regular,
+                        },
+                        directives: vec![],
+                        name: WithLocation::new(*LINK_FIELD_NAME, Location::generated()),
+                        reader_alias: None,
+                    }),
+                    Span::todo_generated(),
+                );
+
+                let condition_selection_set = vec![typename_selection, link_selection];
 
                 let server_field = SchemaServerField {
                     description: Some(

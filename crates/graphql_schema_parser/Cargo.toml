@@ -9,5 +9,5 @@ graphql-syntax = { path = "../../relay-crates/graphql-syntax" }
 intern = { path = "../../relay-crates/intern" }
 graphql_lang_types = { path = "../graphql_lang_types" }
 common_lang_types = { path = "../common_lang_types" }
-logos = { workspace = true } 
+logos = { workspace = true }
 thiserror = { workspace = true }

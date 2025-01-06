@@ -11,26 +11,29 @@ const queryText = 'query meName  {\
   },\
 }';
 
-const normalizationAst: NormalizationAst = [
-  {
-    kind: "Linked",
-    fieldName: "me",
-    arguments: null,
-    concreteType: "Economist",
-    selections: [
-      {
-        kind: "Scalar",
-        fieldName: "id",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "name",
-        arguments: null,
-      },
-    ],
-  },
-];
+const normalizationAst: NormalizationAst = {
+  kind: "NormalizationAst",
+  selections: [
+    {
+      kind: "Linked",
+      fieldName: "me",
+      arguments: null,
+      concreteType: "Economist",
+      selections: [
+        {
+          kind: "Scalar",
+          fieldName: "id",
+          arguments: null,
+        },
+        {
+          kind: "Scalar",
+          fieldName: "name",
+          arguments: null,
+        },
+      ],
+    },
+  ],
+};
 const artifact: IsographEntrypoint<
   Query__meName__param,
   Query__meName__output_type

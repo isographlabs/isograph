@@ -1,8 +1,8 @@
 [package]
 name = "isograph_lang_parser"
-version =  { workspace = true }
-edition =  { workspace = true }
-license = { workspace = true}
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
 
 [dependencies]
 common_lang_types = { path = "../common_lang_types" }

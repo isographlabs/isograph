@@ -13,39 +13,42 @@ const queryText = 'query subquery ($id: ID!) {\
   },\
 }';
 
-const normalizationAst: NormalizationAst = [
-  {
-    kind: "Linked",
-    fieldName: "query",
-    arguments: null,
-    concreteType: "Query",
-    selections: [
-      {
-        kind: "Linked",
-        fieldName: "node",
-        arguments: [
-          [
-            "id",
-            { kind: "Variable", name: "id" },
+const normalizationAst: NormalizationAst = {
+  kind: "NormalizationAst",
+  selections: [
+    {
+      kind: "Linked",
+      fieldName: "query",
+      arguments: null,
+      concreteType: "Query",
+      selections: [
+        {
+          kind: "Linked",
+          fieldName: "node",
+          arguments: [
+            [
+              "id",
+              { kind: "Variable", name: "id" },
+            ],
           ],
-        ],
-        concreteType: null,
-        selections: [
-          {
-            kind: "Scalar",
-            fieldName: "__typename",
-            arguments: null,
-          },
-          {
-            kind: "Scalar",
-            fieldName: "id",
-            arguments: null,
-          },
-        ],
-      },
-    ],
-  },
-];
+          concreteType: null,
+          selections: [
+            {
+              kind: "Scalar",
+              fieldName: "__typename",
+              arguments: null,
+            },
+            {
+              kind: "Scalar",
+              fieldName: "id",
+              arguments: null,
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
 const artifact: IsographEntrypoint<
   Query__subquery__param,
   Query__subquery__output_type

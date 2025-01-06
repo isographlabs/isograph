@@ -1,9 +1,8 @@
 use std::path::PathBuf;
 
+use common_lang_types::CurrentWorkingDirectory;
 use graphql_artifact_generation::get_artifact_path_and_content;
-use isograph_config::{
-    create_config, CompilerConfig, GenerateFileExtensionsOption, OptionalValidationLevel,
-};
+use isograph_config::{create_config, CompilerConfig, GenerateFileExtensionsOption};
 use isograph_schema::{Schema, UnvalidatedSchema};
 
 use crate::{
@@ -19,9 +18,12 @@ pub struct CompilerState {
 }
 
 impl CompilerState {
-    pub fn new(config_location: PathBuf) -> Self {
+    pub fn new(
+        config_location: PathBuf,
+        current_working_directory: CurrentWorkingDirectory,
+    ) -> Self {
         Self {
-            config: create_config(config_location),
+            config: create_config(config_location, current_working_directory),
             source_files: None,
         }
     }
@@ -85,7 +87,7 @@ impl CompilerState {
             source_files,
             &self.config,
             self.config.options.generate_file_extensions,
-            self.config.options.on_missing_babel_transform,
+            self.config.options.no_babel_transform,
         )?;
         Ok(CompilationStats {
             client_field_count: stats.client_field_count,
@@ -102,7 +104,7 @@ impl CompilerState {
             source_files,
             &self.config,
             self.config.options.generate_file_extensions,
-            self.config.options.on_missing_babel_transform,
+            self.config.options.no_babel_transform,
         )?;
         Ok(CompilationStats {
             client_field_count: stats.client_field_count,
@@ -121,7 +123,7 @@ impl CompilerState {
             source_files,
             &self.config,
             self.config.options.generate_file_extensions,
-            self.config.options.on_missing_babel_transform,
+            self.config.options.no_babel_transform,
         )?;
         Ok(CompilationStats {
             client_field_count: stats.client_field_count,
@@ -152,7 +154,7 @@ pub fn validate_and_create_artifacts_from_source_files(
     source_files: SourceFiles,
     config: &CompilerConfig,
     file_extensions: GenerateFileExtensionsOption,
-    on_missing_babel_transform: OptionalValidationLevel,
+    no_babel_transform: bool,
 ) -> Result<usize, BatchCompileError> {
     // Create schema
     let mut unvalidated_schema = UnvalidatedSchema::new();
@@ -167,11 +169,12 @@ pub fn validate_and_create_artifacts_from_source_files(
     let artifacts = get_artifact_path_and_content(
         &validated_schema,
         &config.project_root,
-        &config.artifact_directory,
+        &config.artifact_directory.absolute_path,
         file_extensions,
-        on_missing_babel_transform,
+        no_babel_transform,
     );
 
-    let total_artifacts_written = write_artifacts_to_disk(artifacts, &config.artifact_directory)?;
+    let total_artifacts_written =
+        write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)?;
     Ok(total_artifacts_written)
 }

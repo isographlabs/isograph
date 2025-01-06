@@ -9,10 +9,10 @@ import {
   type TypeName,
 } from './IsographEnvironment';
 import { getParentRecordKey } from './cache';
-import { NormalizationAst } from './entrypoint';
+import { NormalizationAstNodes } from './entrypoint';
 
 export type RetainedQuery = {
-  readonly normalizationAst: NormalizationAst;
+  readonly normalizationAst: NormalizationAstNodes;
   readonly variables: {};
   readonly root: Link;
 };
@@ -108,7 +108,7 @@ function recordReachableIdsFromRecord(
   store: IsographStore,
   currentRecord: StoreRecord,
   mutableRetainedIds: RetainedIds,
-  selections: NormalizationAst,
+  selections: NormalizationAstNodes,
   variables: Variables | null,
 ) {
   for (const selection of selections) {

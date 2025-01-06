@@ -1,0 +1,9 @@
+[package]
+name = "isograph_fixture_tests"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+
+[[bin]]
+name = "generate_isograph_fixtures"
+path = "src/main.rs"

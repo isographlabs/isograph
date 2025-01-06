@@ -1,4 +1,5 @@
 use colored::Colorize;
+use common_lang_types::CurrentWorkingDirectory;
 use isograph_config::CompilerConfig;
 use notify::{
     event::{CreateKind, ModifyKind, RemoveKind, RenameMode},
@@ -19,8 +20,9 @@ const MAX_CHANGED_FILES: usize = 100;
 
 pub async fn handle_watch_command(
     config_location: PathBuf,
+    current_working_directory: CurrentWorkingDirectory,
 ) -> Result<Result<(), Vec<Error>>, JoinError> {
-    let mut state = CompilerState::new(config_location);
+    let mut state = CompilerState::new(config_location, current_working_directory);
     let (mut rx, mut watcher) = create_debounced_file_watcher(&state.config);
 
     info!("{}", "Starting to compile.".cyan());
@@ -36,7 +38,10 @@ pub async fn handle_watch_command(
                                 "{}",
                                 "Config change detected. Starting a full compilation.".cyan()
                             );
-                            state = CompilerState::new(state.config.config_location);
+                            state = CompilerState::new(
+                                state.config.config_location,
+                                current_working_directory,
+                            );
                             watcher.stop();
                             (rx, watcher) = create_debounced_file_watcher(&state.config);
                             WithDuration::new(|| state.compile())
@@ -195,16 +200,20 @@ fn categorize_changed_file_and_filter_changes_in_artifact_directory(
     config: &CompilerConfig,
     path: &PathBuf,
 ) -> Option<ChangedFileKind> {
-    if !path.starts_with(&config.artifact_directory) {
+    if !path.starts_with(&config.artifact_directory.absolute_path) {
         if path.starts_with(&config.project_root) {
             if path.is_file() {
                 return Some(ChangedFileKind::JavaScriptSourceFile);
             } else {
                 return Some(ChangedFileKind::JavaScriptSourceFolder);
             }
-        } else if path == &config.schema {
+        } else if path == &config.schema.absolute_path {
             return Some(ChangedFileKind::Schema);
-        } else if config.schema_extensions.contains(path) {
+        } else if config
+            .schema_extensions
+            .iter()
+            .any(|x| x.absolute_path == *path)
+        {
             return Some(ChangedFileKind::SchemaExtension);
         } else if path == &config.config_location {
             return Some(ChangedFileKind::Config);
@@ -246,11 +255,11 @@ fn create_debounced_file_watcher(
         .watch(&config.project_root, RecursiveMode::Recursive)
         .expect("Failure when watching project root");
     watcher
-        .watch(&config.schema, RecursiveMode::NonRecursive)
+        .watch(&config.schema.absolute_path, RecursiveMode::NonRecursive)
         .expect("Failing when watching schema");
     for extension in &config.schema_extensions {
         watcher
-            .watch(extension, RecursiveMode::NonRecursive)
+            .watch(&extension.absolute_path, RecursiveMode::NonRecursive)
             .expect("Failing when watching schema extension");
     }
 

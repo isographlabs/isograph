@@ -18,7 +18,7 @@ use lazy_static::lazy_static;
 use crate::{
     categorize_field_loadability, create_transformed_name_and_arguments,
     expose_field_directive::RequiresRefinement, transform_arguments_with_child_context,
-    transform_name_and_arguments_with_child_variable_context, FieldType,
+    transform_name_and_arguments_with_child_variable_context, ClientFieldVariant, FieldType,
     ImperativelyLoadedFieldVariant, Loadability, NameAndArguments, PathToRefetchField,
     RootOperationName, SchemaObject, SchemaServerFieldVariant, UnvalidatedVariableDefinition,
     ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedScalarFieldSelection,
@@ -44,6 +44,7 @@ lazy_static! {
     pub static ref REFETCH_FIELD_NAME: ScalarFieldName = "__refetch".intern().into();
     pub static ref NODE_FIELD_NAME: LinkedFieldName = "node".intern().into();
     pub static ref TYPENAME_FIELD_NAME: ScalarFieldName = "__typename".intern().into();
+    pub static ref LINK_FIELD_NAME: ScalarFieldName = "link".intern().into();
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -713,16 +714,22 @@ fn merge_validated_selections_into_selection_map(
                                     variant,
                                 );
                             }
-                            None => merge_non_loadable_scalar_client_field(
-                                parent_type,
-                                schema,
-                                parent_map,
-                                merge_traversal_state,
-                                newly_encountered_scalar_client_field,
-                                encountered_client_field_map,
-                                variable_context,
-                                &scalar_field_selection.arguments,
-                            ),
+                            None => match newly_encountered_scalar_client_field.variant {
+                                ClientFieldVariant::Link => {}
+                                ClientFieldVariant::ImperativelyLoadedField(_)
+                                | ClientFieldVariant::UserWritten(_) => {
+                                    merge_non_loadable_scalar_client_field(
+                                        parent_type,
+                                        schema,
+                                        parent_map,
+                                        merge_traversal_state,
+                                        newly_encountered_scalar_client_field,
+                                        encountered_client_field_map,
+                                        variable_context,
+                                        &scalar_field_selection.arguments,
+                                    )
+                                }
+                            },
                         }
 
                         merge_traversal_state

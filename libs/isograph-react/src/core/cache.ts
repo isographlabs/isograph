@@ -16,7 +16,7 @@ import {
 } from './IsographEnvironment';
 import {
   IsographEntrypoint,
-  NormalizationAst,
+  type NormalizationAstNodes,
   NormalizationInlineFragment,
   NormalizationLinkedField,
   NormalizationScalarField,
@@ -142,7 +142,7 @@ export type NetworkResponseObject = {
 
 export function normalizeData(
   environment: IsographEnvironment,
-  normalizationAst: NormalizationAst,
+  normalizationAst: NormalizationAstNodes,
   networkResponse: NetworkResponseObject,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
@@ -376,7 +376,7 @@ export type EncounteredIds = Map<TypeName, Set<DataId>>;
  */
 function normalizeDataIntoRecord(
   environment: IsographEnvironment,
-  normalizationAst: NormalizationAst,
+  normalizationAst: NormalizationAstNodes,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
   targetParentRecordLink: Link,

@@ -37,189 +37,192 @@ const queryText = 'mutation Query__set_best_friend ($id: ID!, $new_best_friend_i
   },\
 }';
 
-const normalizationAst: NormalizationAst = [
-  {
-    kind: "Linked",
-    fieldName: "set_pet_best_friend",
-    arguments: [
-      [
-        "id",
-        { kind: "Variable", name: "id" },
-      ],
-
-      [
-        "new_best_friend_id",
-        { kind: "Variable", name: "new_best_friend_id" },
-      ],
-    ],
-    concreteType: "SetBestFriendResponse",
-    selections: [
-      {
-        kind: "Linked",
-        fieldName: "pet",
-        arguments: null,
-        concreteType: "Pet",
-        selections: [
-          {
-            kind: "Scalar",
-            fieldName: "id",
-            arguments: null,
-          },
-          {
-            kind: "Scalar",
-            fieldName: "age",
-            arguments: null,
-          },
-          {
-            kind: "Linked",
-            fieldName: "best_friend_relationship",
-            arguments: null,
-            concreteType: "BestFriendRelationship",
-            selections: [
-              {
-                kind: "Linked",
-                fieldName: "best_friend",
-                arguments: null,
-                concreteType: "Pet",
-                selections: [
-                  {
-                    kind: "Scalar",
-                    fieldName: "id",
-                    arguments: null,
-                  },
-                  {
-                    kind: "Scalar",
-                    fieldName: "name",
-                    arguments: null,
-                  },
-                  {
-                    kind: "Scalar",
-                    fieldName: "picture",
-                    arguments: null,
-                  },
-                ],
-              },
-              {
-                kind: "Scalar",
-                fieldName: "picture_together",
-                arguments: null,
-              },
-            ],
-          },
-          {
-            kind: "Linked",
-            fieldName: "checkins",
-            arguments: [
-              [
-                "skip",
-                { kind: "Literal", value: null },
-              ],
-
-              [
-                "limit",
-                { kind: "Literal", value: null },
-              ],
-            ],
-            concreteType: "Checkin",
-            selections: [
-              {
-                kind: "Scalar",
-                fieldName: "id",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "location",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "time",
-                arguments: null,
-              },
-            ],
-          },
-          {
-            kind: "Scalar",
-            fieldName: "favorite_phrase",
-            arguments: null,
-          },
-          {
-            kind: "Scalar",
-            fieldName: "name",
-            arguments: null,
-          },
-          {
-            kind: "Scalar",
-            fieldName: "nickname",
-            arguments: null,
-          },
-          {
-            kind: "Linked",
-            fieldName: "potential_new_best_friends",
-            arguments: null,
-            concreteType: "Pet",
-            selections: [
-              {
-                kind: "Scalar",
-                fieldName: "id",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "name",
-                arguments: null,
-              },
-            ],
-          },
-          {
-            kind: "Linked",
-            fieldName: "stats",
-            arguments: null,
-            concreteType: "PetStats",
-            selections: [
-              {
-                kind: "Scalar",
-                fieldName: "cuteness",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "energy",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "hunger",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "intelligence",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "sociability",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "weight",
-                arguments: null,
-              },
-            ],
-          },
-          {
-            kind: "Scalar",
-            fieldName: "tagline",
-            arguments: null,
-          },
+const normalizationAst: NormalizationAst = {
+  kind: "NormalizationAst",
+  selections: [
+    {
+      kind: "Linked",
+      fieldName: "set_pet_best_friend",
+      arguments: [
+        [
+          "id",
+          { kind: "Variable", name: "id" },
         ],
-      },
-    ],
-  },
-];
+
+        [
+          "new_best_friend_id",
+          { kind: "Variable", name: "new_best_friend_id" },
+        ],
+      ],
+      concreteType: "SetBestFriendResponse",
+      selections: [
+        {
+          kind: "Linked",
+          fieldName: "pet",
+          arguments: null,
+          concreteType: "Pet",
+          selections: [
+            {
+              kind: "Scalar",
+              fieldName: "id",
+              arguments: null,
+            },
+            {
+              kind: "Scalar",
+              fieldName: "age",
+              arguments: null,
+            },
+            {
+              kind: "Linked",
+              fieldName: "best_friend_relationship",
+              arguments: null,
+              concreteType: "BestFriendRelationship",
+              selections: [
+                {
+                  kind: "Linked",
+                  fieldName: "best_friend",
+                  arguments: null,
+                  concreteType: "Pet",
+                  selections: [
+                    {
+                      kind: "Scalar",
+                      fieldName: "id",
+                      arguments: null,
+                    },
+                    {
+                      kind: "Scalar",
+                      fieldName: "name",
+                      arguments: null,
+                    },
+                    {
+                      kind: "Scalar",
+                      fieldName: "picture",
+                      arguments: null,
+                    },
+                  ],
+                },
+                {
+                  kind: "Scalar",
+                  fieldName: "picture_together",
+                  arguments: null,
+                },
+              ],
+            },
+            {
+              kind: "Linked",
+              fieldName: "checkins",
+              arguments: [
+                [
+                  "skip",
+                  { kind: "Literal", value: null },
+                ],
+
+                [
+                  "limit",
+                  { kind: "Literal", value: null },
+                ],
+              ],
+              concreteType: "Checkin",
+              selections: [
+                {
+                  kind: "Scalar",
+                  fieldName: "id",
+                  arguments: null,
+                },
+                {
+                  kind: "Scalar",
+                  fieldName: "location",
+                  arguments: null,
+                },
+                {
+                  kind: "Scalar",
+                  fieldName: "time",
+                  arguments: null,
+                },
+              ],
+            },
+            {
+              kind: "Scalar",
+              fieldName: "favorite_phrase",
+              arguments: null,
+            },
+            {
+              kind: "Scalar",
+              fieldName: "name",
+              arguments: null,
+            },
+            {
+              kind: "Scalar",
+              fieldName: "nickname",
+              arguments: null,
+            },
+            {
+              kind: "Linked",
+              fieldName: "potential_new_best_friends",
+              arguments: null,
+              concreteType: "Pet",
+              selections: [
+                {
+                  kind: "Scalar",
+                  fieldName: "id",
+                  arguments: null,
+                },
+                {
+                  kind: "Scalar",
+                  fieldName: "name",
+                  arguments: null,
+                },
+              ],
+            },
+            {
+              kind: "Linked",
+              fieldName: "stats",
+              arguments: null,
+              concreteType: "PetStats",
+              selections: [
+                {
+                  kind: "Scalar",
+                  fieldName: "cuteness",
+                  arguments: null,
+                },
+                {
+                  kind: "Scalar",
+                  fieldName: "energy",
+                  arguments: null,
+                },
+                {
+                  kind: "Scalar",
+                  fieldName: "hunger",
+                  arguments: null,
+                },
+                {
+                  kind: "Scalar",
+                  fieldName: "intelligence",
+                  arguments: null,
+                },
+                {
+                  kind: "Scalar",
+                  fieldName: "sociability",
+                  arguments: null,
+                },
+                {
+                  kind: "Scalar",
+                  fieldName: "weight",
+                  arguments: null,
+                },
+              ],
+            },
+            {
+              kind: "Scalar",
+              fieldName: "tagline",
+              arguments: null,
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
 const artifact: RefetchQueryNormalizationArtifact = {
   kind: "RefetchQuery",
   networkRequestInfo: {

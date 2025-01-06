@@ -46,7 +46,7 @@ export function maybeMakeNetworkRequest<
     case 'IfNecessary': {
       const result = check(
         environment,
-        artifact.networkRequestInfo.normalizationAst,
+        artifact.networkRequestInfo.normalizationAst.selections,
         variables,
         {
           __link: ROOT_ID,
@@ -116,7 +116,7 @@ export function makeNetworkRequest<
       if (status.kind === 'UndisposedIncomplete') {
         normalizeData(
           environment,
-          artifact.networkRequestInfo.normalizationAst,
+          artifact.networkRequestInfo.normalizationAst.selections,
           networkResponse.data ?? {},
           variables,
           artifact.kind === 'Entrypoint'
@@ -125,7 +125,8 @@ export function makeNetworkRequest<
           root,
         );
         const retainedQuery = {
-          normalizationAst: artifact.networkRequestInfo.normalizationAst,
+          normalizationAst:
+            artifact.networkRequestInfo.normalizationAst.selections,
           variables,
           root,
         };

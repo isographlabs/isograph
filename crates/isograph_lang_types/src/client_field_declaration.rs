@@ -295,15 +295,11 @@ pub fn reachable_variables(
         NonConstantValue::Variable(name) => {
             vec![WithLocation::new(*name, non_constant_value.location)]
         }
-        NonConstantValue::Object(object) => {
-            object
-                .iter()
-                .flat_map(|pair| reachable_variables(&pair.value))
-                .collect()
-        }
-        NonConstantValue::List(list) => {
-            list.iter().flat_map(reachable_variables).collect()
-        }
+        NonConstantValue::Object(object) => object
+            .iter()
+            .flat_map(|pair| reachable_variables(&pair.value))
+            .collect(),
+        NonConstantValue::List(list) => list.iter().flat_map(reachable_variables).collect(),
         _ => vec![],
     }
 }
