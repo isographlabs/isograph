@@ -138,5 +138,10 @@ impl std::fmt::Display for CurrentWorkingDirectory {
         write!(f, "CurrentWorkingDirectory")
     }
 }
+impl std::fmt::Debug for CurrentWorkingDirectory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CurrentWorkingDirectory")
+    }
+}
 
 string_key_newtype!(RelativePathToSourceFile);

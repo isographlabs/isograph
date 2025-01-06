@@ -48,7 +48,7 @@ macro_rules! string_key_newtype {
 #[macro_export]
 macro_rules! string_key_newtype_no_display {
     ($named:ident) => {
-        #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+        #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
         pub struct $named(intern::string_key::StringKey);
 
         impl string_key_newtype::StringKeyNewtype for $named {}
