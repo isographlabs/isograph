@@ -3,13 +3,15 @@ mod entrypoint;
 mod semantic_token_generator;
 pub(crate) mod semantic_token_legend;
 
+use std::path::PathBuf;
+
 use crate::{
     lsp_runtime_error::LSPRuntimeResult,
     lsp_state::LSPState,
     row_col_offset::{diff_to_end_of_slice, get_index_from_diff, RowColDiff},
 };
 use client_field::client_field_declaration_to_tokens;
-use common_lang_types::{Span, TextSource};
+use common_lang_types::{relative_path_from_absolute_and_working_directory, Span, TextSource};
 use entrypoint::entrypoint_declaration_to_tokens;
 use intern::string_key::Intern;
 use isograph_compiler::{extract_iso_literals_from_file_content, IsoLiteralExtraction};
@@ -55,17 +57,21 @@ pub fn on_semantic_token_full_request(
         let initial_diff =
             diff_to_end_of_slice(&file_text[index_of_last_token..iso_literal_start_index]);
 
-        let file_path = text_document.uri.path().intern();
+        let file_path = relative_path_from_absolute_and_working_directory(
+            state.config.current_working_directory,
+            &PathBuf::from(text_document.uri.path()),
+        );
         let text_source = TextSource {
-            path: file_path.into(),
+            relative_path_to_source_file: file_path,
             span: Some(Span::new(
                 iso_literal_start_index as u32,
                 (iso_literal_start_index + iso_literal_text.len()) as u32,
             )),
+            current_working_directory: state.config.current_working_directory,
         };
         let iso_literal_extraction_result = parse_iso_literal(
             iso_literal_text,
-            file_path.into(),
+            text_document.uri.path().intern().into(),
             const_export_name,
             text_source,
         );

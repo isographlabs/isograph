@@ -5,9 +5,11 @@ edition = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+common_lang_types = { path = "../common_lang_types" }
+intern = { path = "../../relay-crates/intern" }
 isograph_compiler = { path = "../isograph_compiler" }
 isograph_config = { path = "../isograph_config" }
-isograph_lsp= { path = "../isograph_lsp"}
+isograph_lsp = { path = "../isograph_lsp" }
 colored = { workspace = true }
 clap = { workspace = true }
 thiserror = { workspace = true }
