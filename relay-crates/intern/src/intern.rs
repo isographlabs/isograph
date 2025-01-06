@@ -242,7 +242,7 @@ impl<Id, Type> InternTable<Id, Type> {
 
 impl<Id: InternId> InternTable<Id, Id::Intern> {
     /// The methods from here on are internal and private.
-    fn shards(&'static self) -> &Shards<Id> {
+    fn shards(&'static self) -> &'static Shards<Id> {
         self.shards.get_or_init(|| {
             let shards: Shards<Id> = ShardedSet::default();
             if !self.arena.is_empty() {
@@ -291,7 +291,7 @@ impl<Id: InternId> InternTable<Id, Id::Intern> {
     /// Get a shared reference to the underlying `Id::Intern`.
     /// Usually you can rely on `deref` to do this implicitly.
     #[inline]
-    fn get(&'static self, r: Id) -> &Id::Intern {
+    fn get(&'static self, r: Id) -> &'static Id::Intern {
         &*self.arena.get(r.unwrap())
     }
 

@@ -1,5 +1,5 @@
 import { getParentRecordKey } from './cache';
-import { NormalizationAst } from './entrypoint';
+import { NormalizationAstNodes } from './entrypoint';
 import { Variables } from './FragmentReference';
 import {
   getLink,
@@ -13,9 +13,9 @@ export type ShouldFetch = 'Yes' | 'No' | 'IfNecessary';
 
 export const DEFAULT_SHOULD_FETCH_VALUE: ShouldFetch = 'IfNecessary';
 
-export type FetchOptions = {
+export type FetchOptions<TReadOutData> = {
   shouldFetch?: ShouldFetch;
-  onComplete?: () => void;
+  onComplete?: (data: TReadOutData) => void;
   onError?: () => void;
 };
 
@@ -30,7 +30,7 @@ export type CheckResult =
 
 export function check(
   environment: IsographEnvironment,
-  normalizationAst: NormalizationAst,
+  normalizationAst: NormalizationAstNodes,
   variables: Variables,
   root: Link,
 ): CheckResult {
@@ -53,7 +53,7 @@ export function check(
 
 function checkFromRecord(
   environment: IsographEnvironment,
-  normalizationAst: NormalizationAst,
+  normalizationAst: NormalizationAstNodes,
   variables: Variables,
   record: StoreRecord,
   recordLink: Link,

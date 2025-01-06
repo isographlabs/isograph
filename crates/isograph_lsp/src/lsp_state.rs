@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crossbeam::channel::Sender;
+use isograph_config::CompilerConfig;
 use lsp_server::Message;
 use lsp_types::Url;
 
@@ -10,13 +11,15 @@ use crate::lsp_runtime_error::LSPRuntimeResult;
 pub struct LSPState {
     open_docs: HashMap<Url, String>,
     sender: Sender<Message>,
+    pub config: CompilerConfig,
 }
 
 impl LSPState {
-    pub fn new(sender: Sender<Message>) -> Self {
+    pub fn new(sender: Sender<Message>, config: CompilerConfig) -> Self {
         LSPState {
             open_docs: HashMap::new(),
             sender,
+            config,
         }
     }
 

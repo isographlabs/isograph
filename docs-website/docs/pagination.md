@@ -113,3 +113,7 @@ export const Newsfeed = iso(`
   // ...
 });
 ```
+
+## Data-driven dependencies
+
+Check out the [data driven dependencies](/docs/data-driven-dependencies/) documentation to see how to combine [`@loadable` fields](/docs/loadable-fields/), pagination and [`asConcreteType` fields](/docs/abstract-types/) to fetch the minimal amount of data and JavaScript needed!

@@ -26,7 +26,7 @@ export function useImperativeReference<
     | UnassignedState;
   loadFragmentReference: (
     variables: ExtractParameters<TReadFromStore>,
-    fetchOptions?: FetchOptions,
+    fetchOptions?: FetchOptions<TClientFieldValue>,
   ) => void;
 } {
   const { state, setState } =
@@ -38,7 +38,7 @@ export function useImperativeReference<
     fragmentReference: state,
     loadFragmentReference: (
       variables: ExtractParameters<TReadFromStore>,
-      fetchOptions?: FetchOptions,
+      fetchOptions?: FetchOptions<TClientFieldValue>,
     ) => {
       const [networkRequest, disposeNetworkRequest] = maybeMakeNetworkRequest(
         environment,

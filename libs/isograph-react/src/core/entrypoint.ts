@@ -16,18 +16,19 @@ export type ReaderWithRefetchQueries<
   readonly nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[];
 };
 
-export type NetworkRequestInfo = {
+export type NetworkRequestInfo<TNormalizationAst> = {
   readonly kind: 'NetworkRequestInfo';
   readonly queryText: string;
-  readonly normalizationAst: NormalizationAst;
+  readonly normalizationAst: TNormalizationAst;
 };
 // This type should be treated as an opaque type.
 export type IsographEntrypoint<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
+  TNormalizationAst = NormalizationAst,
 > = {
   readonly kind: 'Entrypoint';
-  readonly networkRequestInfo: NetworkRequestInfo;
+  readonly networkRequestInfo: NetworkRequestInfo<TNormalizationAst>;
   readonly readerWithRefetchQueries: ReaderWithRefetchQueries<
     TReadFromStore,
     TClientFieldValue
@@ -50,7 +51,13 @@ export type NormalizationAstNode =
   | NormalizationScalarField
   | NormalizationLinkedField
   | NormalizationInlineFragment;
-export type NormalizationAst = ReadonlyArray<NormalizationAstNode>;
+
+export type NormalizationAstNodes = ReadonlyArray<NormalizationAstNode>;
+
+export type NormalizationAst = {
+  kind: 'NormalizationAst';
+  selections: NormalizationAstNodes;
+};
 
 export type NormalizationScalarField = {
   readonly kind: 'Scalar';
@@ -62,20 +69,20 @@ export type NormalizationLinkedField = {
   readonly kind: 'Linked';
   readonly fieldName: string;
   readonly arguments: Arguments | null;
-  readonly selections: NormalizationAst;
+  readonly selections: NormalizationAstNodes;
   readonly concreteType: TypeName | null;
 };
 
 export type NormalizationInlineFragment = {
   readonly kind: 'InlineFragment';
   readonly type: string;
-  readonly selections: NormalizationAst;
+  readonly selections: NormalizationAstNodes;
 };
 
 // This is more like an entrypoint, but one specifically for a refetch query/mutation
 export type RefetchQueryNormalizationArtifact = {
   readonly kind: 'RefetchQuery';
-  readonly networkRequestInfo: NetworkRequestInfo;
+  readonly networkRequestInfo: NetworkRequestInfo<NormalizationAst>;
   readonly concreteType: TypeName;
 };
 

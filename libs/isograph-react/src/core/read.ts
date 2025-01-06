@@ -49,6 +49,7 @@ export function readButDoNotEvaluate<
 ): WithEncounteredRecords<TReadFromStore> {
   const mutableEncounteredRecords: EncounteredIds = new Map();
 
+  // TODO consider moving this to the outside
   const readerWithRefetchQueries = readPromise(
     fragmentReference.readerWithRefetchQueries,
   );
@@ -161,6 +162,10 @@ function readData<TReadFromStore>(
           };
         }
         target[field.alias ?? field.fieldName] = value;
+        break;
+      }
+      case 'Link': {
+        target[field.alias] = root;
         break;
       }
       case 'Linked': {
@@ -342,10 +347,12 @@ function readData<TReadFromStore>(
           };
         } else {
           const refetchQueryIndex = field.refetchQuery;
-          if (refetchQueryIndex == null) {
-            throw new Error('refetchQuery is null in RefetchField');
-          }
           const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
+          if (refetchQuery == null) {
+            throw new Error(
+              'refetchQuery is null in RefetchField. This is indicative of a bug in Isograph.',
+            );
+          }
           const refetchQueryArtifact = refetchQuery.artifact;
           const allowedVariables = refetchQuery.allowedVariables;
 
@@ -371,9 +378,15 @@ function readData<TReadFromStore>(
       }
       case 'Resolver': {
         const usedRefetchQueries = field.usedRefetchQueries;
-        const resolverRefetchQueries = usedRefetchQueries.map(
-          (index) => nestedRefetchQueries[index],
-        );
+        const resolverRefetchQueries = usedRefetchQueries.map((index) => {
+          const resolverRefetchQuery = nestedRefetchQueries[index];
+          if (resolverRefetchQuery == null) {
+            throw new Error(
+              'resolverRefetchQuery is null in Resolver. This is indicative of a bug in Isograph.',
+            );
+          }
+          return resolverRefetchQuery;
+        });
 
         switch (field.readerArtifact.kind) {
           case 'EagerReaderArtifact': {
@@ -453,7 +466,11 @@ function readData<TReadFromStore>(
             recordLink: refetchReaderParams.recordLink,
           };
         } else {
-          target[field.alias] = (args: any, fetchOptions?: FetchOptions) => {
+          target[field.alias] = (
+            args: any,
+            // TODO get the associated type for FetchOptions from the loadably selected field
+            fetchOptions?: FetchOptions<any>,
+          ) => {
             // TODO we should use the reader AST for this
             const includeReadOutData = (variables: any, readOutData: any) => {
               variables.id = readOutData.id;
@@ -597,6 +614,7 @@ function readData<TReadFromStore>(
         }
         break;
       }
+
       default: {
         // Ensure we have covered all variants
         let _: never = field;
@@ -636,7 +654,12 @@ function generateChildVariableMap(
   const childVars: Writable<Variables> = {};
   for (const [name, value] of fieldArguments) {
     if (value.kind === 'Variable') {
-      childVars[name] = variables[value.name];
+      const variable = variables[value.name];
+      // Variable could be null if it was not provided but has a default case,
+      // so we allow the loop to continue rather than throwing an error.
+      if (variable != null) {
+        childVars[name] = variable;
+      }
     } else {
       childVars[name] = value.value;
     }

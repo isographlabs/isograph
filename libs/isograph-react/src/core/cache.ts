@@ -16,7 +16,7 @@ import {
 } from './IsographEnvironment';
 import {
   IsographEntrypoint,
-  NormalizationAst,
+  type NormalizationAstNodes,
   NormalizationInlineFragment,
   NormalizationLinkedField,
   NormalizationScalarField,
@@ -89,7 +89,7 @@ export function getOrCreateCacheForArtifact<
   environment: IsographEnvironment,
   entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
   variables: ExtractParameters<TReadFromStore>,
-  fetchOptions?: FetchOptions,
+  fetchOptions?: FetchOptions<TClientFieldValue>,
 ): ParentCache<FragmentReference<TReadFromStore, TClientFieldValue>> {
   const cacheKey =
     entrypoint.networkRequestInfo.queryText +
@@ -142,7 +142,7 @@ export type NetworkResponseObject = {
 
 export function normalizeData(
   environment: IsographEnvironment,
-  normalizationAst: NormalizationAst,
+  normalizationAst: NormalizationAstNodes,
   networkResponse: NetworkResponseObject,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
@@ -376,7 +376,7 @@ export type EncounteredIds = Map<TypeName, Set<DataId>>;
  */
 function normalizeDataIntoRecord(
   environment: IsographEnvironment,
-  normalizationAst: NormalizationAst,
+  normalizationAst: NormalizationAstNodes,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
   targetParentRecordLink: Link,
@@ -516,7 +516,7 @@ function normalizeLinkedField(
     const dataIds: (Link | null)[] = [];
     for (let i = 0; i < networkResponseData.length; i++) {
       const networkResponseObject = networkResponseData[i];
-      if (networkResponseObject === null) {
+      if (networkResponseObject == null) {
         dataIds.push(null);
         continue;
       }

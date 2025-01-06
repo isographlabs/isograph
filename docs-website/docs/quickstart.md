@@ -32,6 +32,10 @@ yarn add --dev @isograph/babel-plugin
 yarn add @isograph/react
 ```
 
+:::tip
+For each of these packages, you should install the latest `main` version, which can be found [here](https://www.npmjs.com/package/@isograph/react?activeTab=versions). So e.g. `yarn add --dev @isograph/compiler@0.0.0-main-c8c7d9f2`. Lots of great features have shipped since we cut a release!
+:::
+
 Installing the compiler also adds the command `yarn iso` and `yarn iso --watch`. But hang tight — before this command works, you'll need to create a folder, download your schema and create an `isograph.config.json` file!
 
 ## Create an `isograph.config.json`
@@ -146,6 +150,11 @@ function makeNetworkRequest<T>(
     const json = await response.json();
 
     if (response.ok) {
+      if (json.errors != null) {
+        throw new Error('GraphQLError', {
+          cause: json.errors,
+        });
+      }
       return json;
     } else {
       throw new Error('NetworkError', {

@@ -16,7 +16,7 @@ export const meNameField = iso(`
 const meNameSuccessorEntrypoint = iso(`entrypoint Query.meNameSuccessor`);
 export const meNameSuccessorRetainedQuery = {
   normalizationAst:
-    meNameSuccessorEntrypoint.networkRequestInfo.normalizationAst,
+    meNameSuccessorEntrypoint.networkRequestInfo.normalizationAst.selections,
   variables: {},
   root: {
     __link: ROOT_ID,

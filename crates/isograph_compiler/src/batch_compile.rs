@@ -2,7 +2,7 @@ use std::{path::PathBuf, str::Utf8Error};
 
 use crate::{with_duration::WithDuration, write_artifacts::GenerateArtifactsError};
 use colored::Colorize;
-use common_lang_types::WithLocation;
+use common_lang_types::{CurrentWorkingDirectory, WithLocation};
 use graphql_schema_parser::SchemaParseError;
 use isograph_lang_parser::IsographLiteralParseError;
 use isograph_schema::{ProcessClientFieldDeclarationError, ValidateSchemaError};
@@ -18,10 +18,13 @@ pub struct CompilationStats {
     pub total_artifacts_written: usize,
 }
 
-pub fn compile_and_print(config_location: PathBuf) -> Result<(), BatchCompileError> {
+pub fn compile_and_print(
+    config_location: PathBuf,
+    current_working_directory: CurrentWorkingDirectory,
+) -> Result<(), BatchCompileError> {
     info!("{}", "Starting to compile.".cyan());
     print_result(WithDuration::new(|| {
-        CompilerState::new(config_location).batch_compile()
+        CompilerState::new(config_location, current_working_directory).batch_compile()
     }))
 }
 
@@ -59,10 +62,7 @@ pub fn print_result(
 #[derive(Error, Debug)]
 pub enum BatchCompileError {
     #[error("Unable to load schema file at path {path:?}.\nReason: {message}")]
-    UnableToLoadSchema {
-        path: PathBuf,
-        message: std::io::Error,
-    },
+    UnableToLoadSchema { path: PathBuf, message: String },
 
     #[error("Attempted to load the graphql schema at the following path: {path:?}, but that is not a file.")]
     SchemaNotAFile { path: PathBuf },
@@ -74,13 +74,10 @@ pub enum BatchCompileError {
     ProjectRootNotADirectory { path: PathBuf },
 
     #[error("Unable to read the file at the following path: {path:?}.\nReason: {message}")]
-    UnableToReadFile {
-        path: PathBuf,
-        message: std::io::Error,
-    },
+    UnableToReadFile { path: PathBuf, message: String },
 
-    #[error("Unable to traverse directory.\nReason: {0}")]
-    UnableToTraverseDirectory(#[from] std::io::Error),
+    #[error("Unable to traverse directory.\nReason: {message}")]
+    UnableToTraverseDirectory { message: String },
 
     #[error("Unable to parse schema.\n\n{0}")]
     UnableToParseSchema(#[from] WithLocation<SchemaParseError>),
