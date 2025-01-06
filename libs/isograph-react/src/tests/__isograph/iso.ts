@@ -1,12 +1,12 @@
 import type { IsographEntrypoint } from '@isograph/react';
-import entrypoint_Query__meName from '../__isograph/Query/meName/entrypoint';
-import entrypoint_Query__meNameSuccessor from '../__isograph/Query/meNameSuccessor/entrypoint';
-import entrypoint_Query__nodeField from '../__isograph/Query/nodeField/entrypoint';
-import entrypoint_Query__subquery from '../__isograph/Query/subquery/entrypoint';
-import { type Query__meName__param } from './Query/meName/param_type';
 import { type Query__meNameSuccessor__param } from './Query/meNameSuccessor/param_type';
+import { type Query__meName__param } from './Query/meName/param_type';
 import { type Query__nodeField__param } from './Query/nodeField/param_type';
 import { type Query__subquery__param } from './Query/subquery/param_type';
+import entrypoint_Query__meNameSuccessor from '../__isograph/Query/meNameSuccessor/entrypoint';
+import entrypoint_Query__meName from '../__isograph/Query/meName/entrypoint';
+import entrypoint_Query__nodeField from '../__isograph/Query/nodeField/entrypoint';
+import entrypoint_Query__subquery from '../__isograph/Query/subquery/entrypoint';
 
 // This is the type given to regular client fields.
 // This means that the type of the exported iso literal is exactly

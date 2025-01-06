@@ -1,7 +1,7 @@
 import type { IsographEntrypoint } from '@isograph/react';
-import entrypoint_Query__HomePage from '../__isograph/Query/HomePage/entrypoint';
 import { type Pokemon__Pokemon__param } from './Pokemon/Pokemon/param_type';
 import { type Query__HomePage__param } from './Query/HomePage/param_type';
+import entrypoint_Query__HomePage from '../__isograph/Query/HomePage/entrypoint';
 
 // This is the type given to regular client fields.
 // This means that the type of the exported iso literal is exactly
