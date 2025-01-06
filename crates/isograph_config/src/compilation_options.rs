@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 
-use common_lang_types::{CurrentWorkingDirectory, RelativePathToSourceFile};
-use intern::string_key::{Intern, Lookup};
+use common_lang_types::{
+    relative_path_from_absolute_and_working_directory, CurrentWorkingDirectory,
+    RelativePathToSourceFile,
+};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use tracing::warn;
@@ -265,16 +267,14 @@ fn create_generate_file_extensions(
     }
 }
 
-fn absolute_and_relative_paths(
+pub fn absolute_and_relative_paths(
     current_working_directory: CurrentWorkingDirectory,
     absolute_path: PathBuf,
 ) -> AbsolutePathAndRelativePath {
-    let relative_path = pathdiff::diff_paths(&absolute_path, current_working_directory.lookup())
-        .expect("Expected to be able to create relative path")
-        .to_str()
-        .expect("Expected to be able to stringify.")
-        .intern()
-        .into();
+    let relative_path = relative_path_from_absolute_and_working_directory(
+        current_working_directory,
+        &absolute_path,
+    );
 
     AbsolutePathAndRelativePath {
         absolute_path,

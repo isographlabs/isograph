@@ -1,6 +1,6 @@
-use std::{error::Error, fmt};
+use std::{error::Error, fmt, path::PathBuf};
 
-use intern::Lookup;
+use intern::string_key::{Intern, Lookup};
 
 use crate::{
     text_with_carats::text_with_carats, CurrentWorkingDirectory, RelativePathToSourceFile, Span,
@@ -22,11 +22,18 @@ pub struct TextSource {
 }
 
 impl TextSource {
-    pub fn read_to_string(&self) -> (&str, String) {
+    pub fn read_to_string(&self) -> (String, String) {
         // TODO maybe intern these or somehow avoid reading a bajillion times.
         // This is especially important for when we display many errors.
-        let file_path = self.relative_path_to_source_file.lookup();
-        let file_contents = std::fs::read_to_string(file_path).expect("file should exist");
+        let mut file_path = PathBuf::from(self.current_working_directory.lookup());
+        let relative_path = self.relative_path_to_source_file.lookup();
+        file_path.push(relative_path);
+
+        let file_contents = std::fs::read_to_string(&file_path).expect("file should exist");
+        let file_path = file_path
+            .to_str()
+            .expect("Expected path to be able to be stringifie.")
+            .to_string();
         if let Some(span) = self.span {
             // TODO we're cloning here unnecessarily, I think!
             (file_path, file_contents[span.as_usize_range()].to_string())
@@ -192,4 +199,19 @@ impl<T> From<WithEmbeddedLocation<T>> for WithLocation<T> {
             item: value.item,
         }
     }
+}
+
+pub fn relative_path_from_absolute_and_working_directory(
+    current_working_directory: CurrentWorkingDirectory,
+    absolute_path: &PathBuf,
+) -> RelativePathToSourceFile {
+    pathdiff::diff_paths(
+        absolute_path,
+        PathBuf::from(current_working_directory.lookup()),
+    )
+    .expect("Expected path to be diffable")
+    .to_str()
+    .expect("Expected path to be able to be stringified")
+    .intern()
+    .into()
 }

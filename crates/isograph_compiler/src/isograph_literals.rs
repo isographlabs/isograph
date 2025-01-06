@@ -5,7 +5,8 @@ use std::{
 };
 
 use common_lang_types::{
-    FilePath, Location, RelativePathToSourceFile, Span, TextSource, WithLocation,
+    relative_path_from_absolute_and_working_directory, FilePath, Location,
+    RelativePathToSourceFile, Span, TextSource, WithLocation,
 };
 use intern::string_key::Intern;
 use isograph_config::CompilerConfig;
@@ -122,12 +123,11 @@ pub(crate) fn read_and_parse_iso_literals(
     // TODO don't intern unless there's a match
     let interned_file_path = file_path.to_string_lossy().into_owned().intern().into();
 
-    let file_name = canonicalized_root_path
-        .join(file_path)
-        .to_str()
-        .expect("file_path should be a valid string")
-        .intern()
-        .into();
+    let absolute_path = canonicalized_root_path.join(&file_path);
+    let relative_path_to_source_file = relative_path_from_absolute_and_working_directory(
+        config.current_working_directory,
+        &absolute_path,
+    );
 
     let mut extraction_results = vec![];
     let mut isograph_literal_parse_errors = vec![];
@@ -135,7 +135,7 @@ pub(crate) fn read_and_parse_iso_literals(
     for iso_literal_extraction in extract_iso_literals_from_file_content(&file_content) {
         match process_iso_literal_extraction(
             iso_literal_extraction,
-            file_name,
+            relative_path_to_source_file,
             interned_file_path,
             config,
         ) {
@@ -145,7 +145,7 @@ pub(crate) fn read_and_parse_iso_literals(
     }
 
     if isograph_literal_parse_errors.is_empty() {
-        Ok((file_name, extraction_results))
+        Ok((relative_path_to_source_file, extraction_results))
     } else {
         Err(isograph_literal_parse_errors)
     }

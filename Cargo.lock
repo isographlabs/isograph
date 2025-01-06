@@ -309,6 +309,7 @@ name = "common_lang_types"
 version = "0.3.0"
 dependencies = [
  "intern",
+ "pathdiff",
  "serde",
  "string_key_newtype",
 ]
@@ -782,7 +783,6 @@ dependencies = [
  "colorize",
  "common_lang_types",
  "intern",
- "pathdiff",
  "schemars",
  "serde",
  "serde_json",
