@@ -53,7 +53,7 @@ export function useImperativeReference<
     TClientFieldValue,
     NormalizationAstLoader
   >,
-): UseImperativeReferenceResult<TReadFromStore, TClientFieldValue>;
+): RequiredUseImperativeReferenceResult<TReadFromStore, TClientFieldValue>;
 export function useImperativeReference<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
@@ -63,7 +63,7 @@ export function useImperativeReference<
     TClientFieldValue,
     NormalizationAst
   >,
-): RequiredUseImperativeReferenceResult<TReadFromStore, TClientFieldValue>;
+): UseImperativeReferenceResult<TReadFromStore, TClientFieldValue>;
 export function useImperativeReference<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
