@@ -7,7 +7,7 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 
-use isograph_config::{GenerateFileExtensionsOption, OptionalValidationLevel};
+use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, NonConstantValue, SelectableServerFieldId, SelectionType,
     ServerFieldSelection, TypeAnnotation, UnionVariant, VariableDefinition,
@@ -36,7 +36,7 @@ use crate::{
         generate_entrypoint_artifacts_with_client_field_traversal_result,
     },
     format_parameter_type::format_parameter_type,
-    import_statements::ParamTypeImports,
+    import_statements::{LinkImports, ParamTypeImports},
     iso_overload_file::build_iso_overload_artifact,
     refetch_reader_artifact::{
         generate_refetch_output_type_artifact, generate_refetch_reader_artifact,
@@ -79,7 +79,7 @@ pub fn get_artifact_path_and_content(
     project_root: &Path,
     artifact_directory: &Path,
     file_extensions: GenerateFileExtensionsOption,
-    on_missing_babel_transform: OptionalValidationLevel,
+    no_babel_transform: bool,
 ) -> Vec<ArtifactPathAndContent> {
     let mut encountered_client_field_map = BTreeMap::new();
     let mut path_and_contents = vec![];
@@ -131,8 +131,9 @@ pub fn get_artifact_path_and_content(
             }
             FieldType::ClientField(encountered_client_field_id) => {
                 let encountered_client_field = schema.client_field(*encountered_client_field_id);
-                // Generate reader ASTs for all encountered client fields, which may be reader or refetch reader
+
                 match &encountered_client_field.variant {
+                    ClientFieldVariant::Link => (),
                     ClientFieldVariant::UserWritten(info) => {
                         path_and_contents.extend(generate_eager_reader_artifacts(
                             schema,
@@ -250,6 +251,7 @@ pub fn get_artifact_path_and_content(
 
     for user_written_client_field in schema.client_fields.iter().flat_map(|field| match field {
         ClientType::ClientField(field) => match field.variant {
+            ClientFieldVariant::Link => None,
             ClientFieldVariant::UserWritten(_) => Some(field),
             ClientFieldVariant::ImperativelyLoadedField(_) => None,
         },
@@ -285,26 +287,31 @@ pub fn get_artifact_path_and_content(
 
     for output_type_id in encountered_output_types {
         let client_field = schema.client_field(output_type_id);
-        let path_and_content = match client_field.variant {
-            ClientFieldVariant::UserWritten(info) => generate_eager_reader_output_type_artifact(
-                schema,
-                client_field,
-                project_root,
-                artifact_directory,
-                info,
-                file_extensions,
-            ),
+        let artifact_path_and_content = match client_field.variant {
+            ClientFieldVariant::Link => None,
+            ClientFieldVariant::UserWritten(info) => {
+                Some(generate_eager_reader_output_type_artifact(
+                    schema,
+                    client_field,
+                    project_root,
+                    artifact_directory,
+                    info,
+                    file_extensions,
+                ))
+            }
             ClientFieldVariant::ImperativelyLoadedField(_) => {
-                generate_refetch_output_type_artifact(schema, client_field)
+                Some(generate_refetch_output_type_artifact(schema, client_field))
             }
         };
-        path_and_contents.push(path_and_content);
+        if let Some(path_and_content) = artifact_path_and_content {
+            path_and_contents.push(path_and_content);
+        };
     }
 
     path_and_contents.push(build_iso_overload_artifact(
         schema,
         file_extensions,
-        on_missing_babel_transform,
+        no_babel_transform,
     ));
 
     path_and_contents
@@ -405,6 +412,7 @@ pub(crate) fn get_serialized_field_arguments(
 pub(crate) fn generate_output_type(client_field: &ValidatedClientField) -> ClientFieldOutputType {
     let variant = &client_field.variant;
     match variant {
+        ClientFieldVariant::Link => ClientFieldOutputType("Link".to_string()),
         ClientFieldVariant::UserWritten(info) => match info.user_written_component_variant {
             UserWrittenComponentVariant::Eager => {
                 ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
@@ -440,6 +448,7 @@ pub(crate) fn generate_client_field_parameter_type(
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
+    link_fields: &mut LinkImports,
 ) -> ClientFieldParameterType {
     // TODO use unwraps
     let mut client_field_parameter_type = "{\n".to_string();
@@ -452,6 +461,7 @@ pub(crate) fn generate_client_field_parameter_type(
             nested_client_field_imports,
             loadable_fields,
             indentation_level + 1,
+            link_fields,
         );
     }
     client_field_parameter_type.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
@@ -459,6 +469,7 @@ pub(crate) fn generate_client_field_parameter_type(
     ClientFieldParameterType(client_field_parameter_type)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn write_param_type_from_selection(
     schema: &ValidatedSchema,
     query_type_declaration: &mut String,
@@ -467,6 +478,7 @@ fn write_param_type_from_selection(
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
+    link_fields: &mut LinkImports,
 ) {
     match &selection.item {
         ServerFieldSelection::ScalarField(scalar_field_selection) => {
@@ -518,55 +530,71 @@ fn write_param_type_from_selection(
                     query_type_declaration
                         .push_str(&"  ".repeat(indentation_level as usize).to_string());
 
-                    nested_client_field_imports.insert(client_field.type_and_field);
-                    let inner_output_type = format!(
-                        "{}__output_type",
-                        client_field.type_and_field.underscore_separated()
-                    );
-
-                    let output_type = match scalar_field_selection.associated_data.selection_variant
-                    {
-                        ValidatedIsographSelectionVariant::Regular => inner_output_type,
-                        ValidatedIsographSelectionVariant::Loadable(_) => {
-                            loadable_fields.insert(client_field.type_and_field);
-                            let provided_arguments = get_provided_arguments(
-                                client_field.variable_definitions.iter().map(|x| &x.item),
-                                &scalar_field_selection.arguments,
+                    match client_field.variant {
+                        ClientFieldVariant::Link => {
+                            *link_fields = true;
+                            let output_type = "Link";
+                            query_type_declaration.push_str(
+                                &(format!(
+                                    "readonly {}: {},\n",
+                                    scalar_field_selection.name_or_alias().item,
+                                    output_type
+                                )),
                             );
-
-                            let indent = "  ".repeat((indentation_level + 1) as usize);
-                            let provided_args_type = if provided_arguments.is_empty() {
-                                "".to_string()
-                            } else {
-                                format!(
-                                    ",\n{indent}Omit<ExtractParameters<{}__param>, keyof {}>",
-                                    client_field.type_and_field.underscore_separated(),
-                                    get_loadable_field_type_from_arguments(
-                                        schema,
-                                        provided_arguments
-                                    )
-                                )
-                            };
-
-                            format!(
-                                "LoadableField<\n\
-                                        {indent}{}__param,\n\
-                                        {indent}{inner_output_type}\
-                                        {provided_args_type}\n\
-                                        {}>",
-                                client_field.type_and_field.underscore_separated(),
-                                "  ".repeat(indentation_level as usize),
-                            )
                         }
-                    };
+                        ClientFieldVariant::UserWritten(_)
+                        | ClientFieldVariant::ImperativelyLoadedField(_) => {
+                            nested_client_field_imports.insert(client_field.type_and_field);
+                            let inner_output_type = format!(
+                                "{}__output_type",
+                                client_field.type_and_field.underscore_separated()
+                            );
+                            let output_type = match scalar_field_selection
+                                .associated_data
+                                .selection_variant
+                            {
+                                ValidatedIsographSelectionVariant::Regular => inner_output_type,
+                                ValidatedIsographSelectionVariant::Loadable(_) => {
+                                    loadable_fields.insert(client_field.type_and_field);
+                                    let provided_arguments = get_provided_arguments(
+                                        client_field.variable_definitions.iter().map(|x| &x.item),
+                                        &scalar_field_selection.arguments,
+                                    );
 
-                    query_type_declaration.push_str(
-                        &(format!(
-                            "readonly {}: {},\n",
-                            scalar_field_selection.name_or_alias().item,
-                            output_type
-                        )),
-                    );
+                                    let indent = "  ".repeat((indentation_level + 1) as usize);
+                                    let provided_args_type = if provided_arguments.is_empty() {
+                                        "".to_string()
+                                    } else {
+                                        format!(
+                                                ",\n{indent}Omit<ExtractParameters<{}__param>, keyof {}>",
+                                                client_field.type_and_field.underscore_separated(),
+                                                get_loadable_field_type_from_arguments(
+                                                    schema,
+                                                    provided_arguments
+                                                )
+                                            )
+                                    };
+
+                                    format!(
+                                        "LoadableField<\n\
+                                                    {indent}{}__param,\n\
+                                                    {indent}{inner_output_type}\
+                                                    {provided_args_type}\n\
+                                                    {}>",
+                                        client_field.type_and_field.underscore_separated(),
+                                        "  ".repeat(indentation_level as usize),
+                                    )
+                                }
+                            };
+                            query_type_declaration.push_str(
+                                &(format!(
+                                    "readonly {}: {},\n",
+                                    scalar_field_selection.name_or_alias().item,
+                                    output_type
+                                )),
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -605,6 +633,7 @@ fn write_param_type_from_selection(
                                 nested_client_field_imports,
                                 loadable_fields,
                                 indentation_level,
+                                link_fields,
                             )
                         }),
                 };

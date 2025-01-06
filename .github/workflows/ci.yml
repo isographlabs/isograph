@@ -72,25 +72,12 @@ jobs:
         run: ./artifacts/linux-x64/isograph_cli --config ./demos/${{ matrix.target.folder }}/isograph.config.json
       - name: 'Check working directory status'
         run: './scripts/check-git-status.sh'
+
   build-json-schema:
     name: Build json schema
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          target: x86_64-unknown-linux-musl
-      - name: Build isograph_config with cargo
-        run: cargo build --bin isograph_config --target x86_64-unknown-linux-musl --release
-      - name: Make artifact executable
-        run: chmod +x ./target/x86_64-unknown-linux-musl/release/isograph_config
-      - name: Build json schema
-        run: ./target/x86_64-unknown-linux-musl/release/isograph_config
-      - name: Check working directory status
-        run: './scripts/check-git-status.sh'
+    uses: ./.github/workflows/run-cargo-bin-and-ensure-no-changes.yml
+    with:
+      binary: build_json_schema
 
   typecheck-demos:
     name: Typecheck and Lint Demos
@@ -189,8 +176,8 @@ jobs:
       - name: 'Check working directory status'
         run: './scripts/check-git-status.sh'
 
-  rustfmt:
-    name: Run cargo fmt and clippy
+  cargo-fmt:
+    name: cargo fmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -201,10 +188,21 @@ jobs:
           components: rustfmt
       - name: Run cargo fmt
         run: cargo fmt
-      - name: Run cargo clippy
-        run: cargo clippy
       - name: 'Check working directory status'
         run: './scripts/check-git-status.sh'
+
+  cargo-clippy:
+    name: cargo clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: Run cargo clippy
+        run: cargo clippy
 
   cargo-test:
     name: Run cargo test (excluding relay tests)
@@ -219,11 +217,18 @@ jobs:
       - name: Run cargo test
         run: cargo test
 
+  build-fixtures:
+    name: Build fixtures
+    uses: ./.github/workflows/run-cargo-bin-and-ensure-no-changes.yml
+    with:
+      binary: generate_isograph_fixtures
+
   all-checks-passed:
     name: All checks passed
     runs-on: ubuntu-latest
     needs:
       [
+        build-fixtures,
         build-js-packages,
         build-cli,
         build-cli-linux,
@@ -231,7 +236,8 @@ jobs:
         build-demos,
         build-website,
         prettier,
-        rustfmt,
+        cargo-fmt,
+        cargo-clippy,
         cargo-test,
         typecheck-demos,
       ]

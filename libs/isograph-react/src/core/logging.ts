@@ -7,7 +7,7 @@ import {
 } from './IsographEnvironment';
 import {
   IsographEntrypoint,
-  NormalizationAst,
+  type NormalizationAstNodes,
   RefetchQueryNormalizationArtifact,
 } from './entrypoint';
 import { FragmentReference, Variables } from './FragmentReference';
@@ -25,7 +25,7 @@ export type LogMessage =
     }
   | {
       kind: 'AboutToNormalize';
-      normalizationAst: NormalizationAst;
+      normalizationAst: NormalizationAstNodes;
       networkResponse: NetworkResponseObject;
       variables: Variables;
     }

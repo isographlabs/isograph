@@ -35,7 +35,7 @@ describe('normalizeData', () => {
 
     normalizeData(
       environment,
-      entrypoint.networkRequestInfo.normalizationAst,
+      entrypoint.networkRequestInfo.normalizationAst.selections,
       {
         query: { node____id___v_id: { __typename: 'Economist', id: '1' } },
       },
