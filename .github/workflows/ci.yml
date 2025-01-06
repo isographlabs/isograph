@@ -176,8 +176,8 @@ jobs:
       - name: 'Check working directory status'
         run: './scripts/check-git-status.sh'
 
-  rustfmt:
-    name: Run cargo fmt and clippy
+  cargo-fmt:
+    name: cargo fmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -188,10 +188,21 @@ jobs:
           components: rustfmt
       - name: Run cargo fmt
         run: cargo fmt
-      - name: Run cargo clippy
-        run: cargo clippy
       - name: 'Check working directory status'
         run: './scripts/check-git-status.sh'
+
+  cargo-clippy:
+    name: cargo clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: Run cargo clippy
+        run: cargo clippy
 
   cargo-test:
     name: Run cargo test (excluding relay tests)
@@ -225,7 +236,8 @@ jobs:
         build-demos,
         build-website,
         prettier,
-        rustfmt,
+        cargo-fmt,
+        cargo-clippy,
         cargo-test,
         typecheck-demos,
       ]

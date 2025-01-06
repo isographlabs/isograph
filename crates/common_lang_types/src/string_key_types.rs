@@ -1,5 +1,7 @@
 pub use string_key_newtype::StringKeyNewtype;
-use string_key_newtype::{string_key_conversion, string_key_newtype};
+use string_key_newtype::{
+    string_key_conversion, string_key_newtype, string_key_newtype_no_display,
+};
 
 string_key_newtype!(DirectiveName);
 string_key_newtype!(DirectiveArgumentName);
@@ -111,9 +113,35 @@ string_key_newtype!(IsographDirectiveName);
 
 string_key_newtype!(FieldArgumentName);
 
-// This path is from the config's project root to the source file.
-string_key_newtype!(RelativePathToSourceFile);
-
 string_key_newtype!(ArtifactFileType);
 
 string_key_newtype!(JavascriptVariableName);
+
+// HACK:
+// Locations contain two paths:
+// - The absolute path to where the compiler is executed (i.e. the current
+//   working directory)
+// - The relative path from the working directory to the source file
+//
+// These are separate paths because the CurrentWorkingDirectory has a
+// std::fmt::Display impl that prints the hard-coded string
+// "CurrentWorkingDirectory", so that generated fixtures (which include
+// debug output of the CurrentWorkingDirectory) are consistent when we
+// generated from multiple machines (including on arbitrary CI machines).
+//
+// We print the relative path in error messages, but use the full path
+// (i.e. cwd + relative path) for reading the content of the source file
+// for printing errors.
+string_key_newtype_no_display!(CurrentWorkingDirectory);
+impl std::fmt::Display for CurrentWorkingDirectory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CurrentWorkingDirectory")
+    }
+}
+impl std::fmt::Debug for CurrentWorkingDirectory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CurrentWorkingDirectory")
+    }
+}
+
+string_key_newtype!(RelativePathToSourceFile);
