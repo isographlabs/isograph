@@ -47,7 +47,7 @@ impl TextSource {
         let absolute_or_relative_file_path = if std::env::var(ISO_PRINT_ABSOLUTE_FILEPATH).is_ok() {
             file_path
                 .to_str()
-                .expect("Expected path to be able to be stringifie.")
+                .expect("Expected path to be able to be stringified.")
                 .to_string()
         } else {
             relative_path.to_string()
