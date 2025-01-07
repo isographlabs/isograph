@@ -1,5 +1,5 @@
 [package]
-name = "pico"
+name = "pico_core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -7,9 +7,5 @@ license.workspace = true
 [dependencies]
 string_key_newtype = { path = "../string_key_newtype" }
 intern = { path = "../../relay-crates/intern" }
-pico_macros = { path = "../pico_macros" }
-pico_core = { path = "../pico_core" }
 serde = { workspace = true } 
 thiserror = { workspace = true }
-tracing = { workspace = true }
-lru = "0.12.5"

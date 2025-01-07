@@ -5,9 +5,11 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+pico_core = { path = "../pico_core" }
 proc-macro2 = "1.0"
 syn = "2.0.87"
 quote = "1.0"
+darling = "0.20.10"
 
 [lib]
 proc-macro = true
