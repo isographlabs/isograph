@@ -107,7 +107,7 @@ fn visit_dirs_skipping_isograph(dir: &Path, cb: &mut dyn FnMut(&DirEntry)) -> io
 }
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn read_and_parse_iso_literals(
+pub fn parse_iso_literals_in_file_content(
     file_path: PathBuf,
     file_content: String,
     canonicalized_root_path: &Path,

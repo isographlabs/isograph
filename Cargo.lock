@@ -792,6 +792,14 @@ dependencies = [
 [[package]]
 name = "isograph_fixture_tests"
 version = "0.3.0"
+dependencies = [
+ "clap 4.5.18",
+ "intern",
+ "isograph_compiler",
+ "isograph_config",
+ "lazy_static",
+ "regex",
+]
 
 [[package]]
 name = "isograph_lang_parser"
