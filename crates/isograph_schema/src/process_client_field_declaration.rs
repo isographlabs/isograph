@@ -1,7 +1,7 @@
 use common_lang_types::{
-    ConstExportName, FilePath, IsographDirectiveName, IsographObjectTypeName, LinkedFieldName,
-    Location, ScalarFieldName, SelectableFieldName, TextSource, UnvalidatedTypeName, WithLocation,
-    WithSpan,
+    ConstExportName, IsographDirectiveName, IsographObjectTypeName, LinkedFieldName, Location,
+    RelativePathToSourceFile, ScalarFieldName, SelectableFieldName, TextSource,
+    UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -191,7 +191,7 @@ pub enum UserWrittenComponentVariant {
 pub struct UserWrittenClientFieldInfo {
     // TODO use a shared struct
     pub const_export_name: ConstExportName,
-    pub file_path: FilePath,
+    pub file_path: RelativePathToSourceFile,
     pub user_written_component_variant: UserWrittenComponentVariant,
 }
 
