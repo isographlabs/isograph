@@ -1,0 +1,61 @@
+use intern::string_key::Intern;
+use std::fmt;
+use std::hash::Hash;
+use string_key_newtype::string_key_newtype;
+
+use crate::database::Database;
+use crate::dyn_eq::DynEq;
+use crate::epoch::Epoch;
+use crate::params::ParamId;
+use crate::source::SourceKey;
+
+string_key_newtype!(NodeKey);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct NodeId {
+    pub key: NodeKey,
+    pub param_id: ParamId,
+}
+
+impl NodeId {
+    pub fn new(key: &'static str, param_id: ParamId) -> Self {
+        Self {
+            key: key.intern().into(),
+            param_id,
+        }
+    }
+}
+
+pub struct DerivedNode<Db: Database> {
+    pub time_verified: Epoch,
+    pub time_calculated: Epoch,
+    pub dependencies: Vec<Dependency>,
+    pub inner_fn: fn(&mut Db, ParamId) -> Box<dyn DynEq>,
+}
+
+impl<Db: Database> fmt::Debug for DerivedNode<Db> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("DerivedNode")
+            .field("time_verified", &self.time_verified)
+            .field("time_calculated", &self.time_calculated)
+            .field("dependencies", &self.dependencies)
+            .finish()
+    }
+}
+
+#[derive(Debug)]
+pub struct SourceNode {
+    pub time_calculated: Epoch,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Dependency {
+    pub node_to: NodeKind,
+    pub time_verified_or_calculated: Epoch,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum NodeKind {
+    Source(SourceKey),
+    Derived(NodeId),
+}
