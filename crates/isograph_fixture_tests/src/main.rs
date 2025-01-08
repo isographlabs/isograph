@@ -101,13 +101,17 @@ fn process_input_file(input_file: PathBuf, output_file: PathBuf, config: &Compil
     // validate and generate artifacts, or something else entirely.
     //
     // So, we will need to make this a bit more flexible.
-    let results = parse_file_content(input_file, file_content, config);
+    let results = generate_content_for_output_file(input_file, file_content, config);
 
     fs::write(output_file.clone(), results)
         .unwrap_or_else(|_| panic!("Failed to write to {:?}", output_file));
 }
 
-fn parse_file_content(input_file: PathBuf, content: String, config: &CompilerConfig) -> String {
+fn generate_content_for_output_file(
+    input_file: PathBuf,
+    content: String,
+    config: &CompilerConfig,
+) -> String {
     match parse_iso_literals_in_file_content(
         input_file,
         content,
