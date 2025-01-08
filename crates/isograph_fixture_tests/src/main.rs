@@ -108,13 +108,24 @@ fn process_input_file(input_file: PathBuf, output_file: PathBuf, config: &Compil
 }
 
 fn parse_file_content(input_file: PathBuf, content: String, config: &CompilerConfig) -> String {
-    format!(
-        "{:#?}",
-        parse_iso_literals_in_file_content(
-            input_file,
-            content,
-            &PathBuf::from(config.current_working_directory.lookup()),
-            config
-        )
-    )
+    match parse_iso_literals_in_file_content(
+        input_file,
+        content,
+        &PathBuf::from(config.current_working_directory.lookup()),
+        config,
+    ) {
+        Ok(item) => {
+            let item: Result<_, ()> = Ok(item);
+            format!("{:#?}", item)
+        }
+        Err(errs) => {
+            let mut s = String::new();
+            for err in errs {
+                let err_printed = format!("{}", err);
+                let wrapped_err: Result<(), _> = Err(err);
+                s.push_str(&format!("{:#?}\n\n{}\n---\n", wrapped_err, err_printed));
+            }
+            s
+        }
+    }
 }

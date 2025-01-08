@@ -1,27 +1,35 @@
 Err(
-    [
-        WithLocation {
-            location: Embedded(
-                EmbeddedLocation {
-                    text_source: TextSource {
-                        current_working_directory: CurrentWorkingDirectory,
-                        relative_path_to_source_file: RelativePathToSourceFile(
-                            "crates/isograph_lang_parser/fixtures/field-directives-on-linked.input.js",
-                        ),
-                        span: Some(
-                            Span {
-                                start: 31,
-                                end: 89,
-                            },
-                        ),
-                    },
-                    span: Span {
-                        start: 46,
-                        end: 47,
-                    },
+    WithLocation {
+        location: Embedded(
+            EmbeddedLocation {
+                text_source: TextSource {
+                    current_working_directory: CurrentWorkingDirectory,
+                    relative_path_to_source_file: RelativePathToSourceFile(
+                        "crates/isograph_lang_parser/fixtures/field-directives-on-linked.input.js",
+                    ),
+                    span: Some(
+                        Span {
+                            start: 31,
+                            end: 89,
+                        },
+                    ),
                 },
-            ),
-            item: ExpectedCommaOrLineBreak,
-        },
-    ],
+                span: Span {
+                    start: 46,
+                    end: 47,
+                },
+            },
+        ),
+        item: ExpectedCommaOrLineBreak,
+    },
 )
+
+Expected a comma, linebreak or closing curly brace
+crates/isograph_lang_parser/fixtures/field-directives-on-linked.input.js
+
+  field Type.Name {
+    linked @hello @there {
+                         ^
+    }
+  }
+---
