@@ -16,19 +16,12 @@ async fn main() {
     let opt = Opt::parse();
     let command = opt.command.unwrap_or(Command::Compile(opt.compile));
 
-    let current_working_directory = std::env::current_dir()
-        .expect("Expected current working to exist")
-        .to_str()
-        .expect("Expected current working directory to be able to be stringified.")
-        .intern()
-        .into();
-
     match command {
         Command::Compile(compile_command) => {
-            start_compiler(compile_command, current_working_directory).await;
+            start_compiler(compile_command, current_working_directory()).await;
         }
         Command::Lsp(lsp_command) => {
-            start_language_server(lsp_command, current_working_directory).await;
+            start_language_server(lsp_command, current_working_directory()).await;
         }
     }
 }
@@ -102,4 +95,13 @@ fn configure_logger(log_level: LevelFilter) {
         }
     }
     collector.init();
+}
+
+fn current_working_directory() -> CurrentWorkingDirectory {
+    std::env::current_dir()
+        .expect("Expected current working to exist")
+        .to_str()
+        .expect("Expected current working directory to be able to be stringified.")
+        .intern()
+        .into()
 }
