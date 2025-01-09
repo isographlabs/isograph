@@ -1,6 +1,6 @@
 use common_lang_types::{
-    ArtifactFileType, ArtifactPathAndContent, DescriptionValue, IsographObjectTypeName, Location,
-    SelectableFieldName, Span, WithLocation, WithSpan,
+    ArtifactFileType, ArtifactPathAndContent, DescriptionValue, Location, Span, WithLocation,
+    WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -23,7 +23,6 @@ use lazy_static::lazy_static;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::{self, Debug, Display},
-    path::PathBuf,
 };
 
 use crate::{
@@ -427,13 +426,6 @@ pub(crate) fn generate_output_type(client_field: &ValidatedClientField) -> Clien
             }
         }
     }
-}
-
-pub fn generate_path(
-    object_name: IsographObjectTypeName,
-    field_name: SelectableFieldName,
-) -> PathBuf {
-    PathBuf::from(object_name.lookup()).join(field_name.lookup())
 }
 
 pub(crate) fn generate_client_field_parameter_type(

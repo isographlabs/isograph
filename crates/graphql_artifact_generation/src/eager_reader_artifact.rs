@@ -1,4 +1,4 @@
-use common_lang_types::ArtifactPathAndContent;
+use common_lang_types::{ArtifactPathAndContent, ObjectTypeAndFieldName};
 use intern::Lookup;
 
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
@@ -11,8 +11,8 @@ use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 use crate::{
     generate_artifacts::{
         generate_client_field_parameter_type, generate_output_type, generate_parameters,
-        generate_path, ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE,
-        RESOLVER_PARAMETERS_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
+        ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAMETERS_TYPE,
+        RESOLVER_PARAM_TYPE, RESOLVER_READER,
     },
     import_statements::{
         param_type_imports_to_import_param_statement, param_type_imports_to_import_statement,
@@ -45,8 +45,6 @@ pub(crate) fn generate_eager_reader_artifacts(
 
     let function_import_statement =
         generate_function_import_statement(config, info, file_extensions);
-
-    let relative_directory = generate_path(parent_type.name, client_field.name);
 
     let reader_import_statement =
         reader_imports_to_import_statement(&reader_imports, file_extensions);
@@ -102,9 +100,12 @@ pub(crate) fn generate_eager_reader_artifacts(
     };
 
     let mut path_and_contents = vec![ArtifactPathAndContent {
-        relative_directory: relative_directory.clone(),
         file_name_prefix: *RESOLVER_READER,
         file_content: reader_content,
+        type_and_field: Some(ObjectTypeAndFieldName {
+            type_name: parent_type.name,
+            field_name: client_field.name,
+        }),
     }];
 
     if !client_field.variable_definitions.is_empty() {
@@ -115,9 +116,12 @@ pub(crate) fn generate_eager_reader_artifacts(
         let parameters_content =
             format!("export type {reader_parameters_type} = {parameters_types}\n");
         path_and_contents.push(ArtifactPathAndContent {
-            relative_directory,
             file_name_prefix: *RESOLVER_PARAMETERS_TYPE,
             file_content: parameters_content,
+            type_and_field: Some(ObjectTypeAndFieldName {
+                type_name: parent_type.name,
+                field_name: client_field.name,
+            }),
         });
     }
 
@@ -168,12 +172,13 @@ pub(crate) fn generate_eager_reader_condition_artifact(
         "  ", "  ", "  ", "  ", "  ",
     );
 
-    let relative_directory = generate_path(parent_type.name, field_name);
-
     ArtifactPathAndContent {
-        relative_directory: relative_directory.clone(),
         file_name_prefix: *RESOLVER_READER,
         file_content: reader_content,
+        type_and_field: Some(ObjectTypeAndFieldName {
+            type_name: parent_type.name,
+            field_name,
+        }),
     }
 }
 
@@ -186,7 +191,6 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
     let parent_type = schema
         .server_field_data
         .object(client_field.parent_object_id);
-    let relative_directory = generate_path(parent_type.name, client_field.name);
 
     let mut param_type_imports = BTreeSet::new();
     let mut loadable_fields = BTreeSet::new();
@@ -245,9 +249,12 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
         }};\n",
     );
     ArtifactPathAndContent {
-        relative_directory: relative_directory.clone(),
         file_name_prefix: *RESOLVER_PARAM_TYPE,
         file_content: param_type_content,
+        type_and_field: Some(ObjectTypeAndFieldName {
+            type_name: parent_type.name,
+            field_name: client_field.name,
+        }),
     }
 }
 
@@ -261,7 +268,6 @@ pub(crate) fn generate_eager_reader_output_type_artifact(
     let parent_type = schema
         .server_field_data
         .object(client_field.parent_object_id);
-    let relative_directory = generate_path(parent_type.name, client_field.name);
 
     let function_import_statement =
         generate_function_import_statement(config, info, file_extensions);
@@ -287,9 +293,12 @@ pub(crate) fn generate_eager_reader_output_type_artifact(
         };
 
     ArtifactPathAndContent {
-        relative_directory: relative_directory.clone(),
         file_name_prefix: *RESOLVER_OUTPUT_TYPE,
         file_content: final_output_type_text,
+        type_and_field: Some(ObjectTypeAndFieldName {
+            type_name: parent_type.name,
+            field_name: client_field.name,
+        }),
     }
 }
 
