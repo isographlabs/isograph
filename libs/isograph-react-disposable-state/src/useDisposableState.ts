@@ -34,11 +34,6 @@ export function useDisposableState<T = never>(
         if (itemCleanupPairRef.current != null) {
           itemCleanupPairRef.current[1]();
           itemCleanupPairRef.current = null;
-        } else {
-          throw new Error(
-            'itemCleanupPairRef.current is unexpectedly null. ' +
-              'This indicates a bug in react-disposable-state.',
-          );
         }
       }
     },
