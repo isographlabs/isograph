@@ -168,8 +168,7 @@ pub fn validate_and_create_artifacts_from_source_files(
     // system occur while we're writing and we get unpredictable results.
     let artifacts = get_artifact_path_and_content(
         &validated_schema,
-        &config.project_root,
-        &config.artifact_directory.absolute_path,
+        config,
         file_extensions,
         no_babel_transform,
     );

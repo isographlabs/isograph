@@ -1,0 +1,39 @@
+Err(
+    WithLocation {
+        location: Embedded(
+            EmbeddedLocation {
+                text_source: TextSource {
+                    current_working_directory: CurrentWorkingDirectory,
+                    relative_path_to_source_file: RelativePathToSourceFile(
+                        "crates/isograph_lang_parser/fixtures/field-no-type-name.input.js",
+                    ),
+                    span: Some(
+                        Span {
+                            start: 31,
+                            end: 52,
+                        },
+                    ),
+                },
+                span: Span {
+                    start: 9,
+                    end: 10,
+                },
+            },
+        ),
+        item: ParseError {
+            error: ParseTokenKindError {
+                expected_kind: Identifier,
+                found_kind: Period,
+            },
+        },
+    },
+)
+
+Expected non-variable identifier (e.g. 'x' or 'Foo'), found period ('.').
+crates/isograph_lang_parser/fixtures/field-no-type-name.input.js
+
+  field .Name {
+        ^      
+  }
+
+---
