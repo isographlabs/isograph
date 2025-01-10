@@ -1,8 +1,8 @@
 use std::collections::{BTreeSet, HashMap};
 
 use common_lang_types::{
-    FieldArgumentName, Location, SelectableFieldName, UnvalidatedTypeName, VariableName,
-    WithLocation, WithSpan,
+    FieldArgumentName, Location, ObjectTypeAndFieldName, SelectableFieldName, UnvalidatedTypeName,
+    VariableName, WithLocation, WithSpan,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -14,14 +14,14 @@ use lazy_static::lazy_static;
 
 use crate::{
     get_all_errors_or_all_ok, get_all_errors_or_all_ok_as_hashmap, get_all_errors_or_all_ok_iter,
-    get_all_errors_or_tuple_ok, ClientField, ClientType, FieldType, ObjectTypeAndFieldName,
-    RefetchStrategy, SchemaObject, ServerFieldData, UnvalidatedClientField,
-    UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
-    UnvalidatedVariableDefinition, ValidateSchemaError, ValidateSchemaResult, ValidatedClientField,
-    ValidatedIsographSelectionVariant, ValidatedLinkedFieldAssociatedData,
-    ValidatedLinkedFieldSelection, ValidatedRefetchFieldStrategy,
-    ValidatedScalarFieldAssociatedData, ValidatedScalarFieldSelection, ValidatedSchemaServerField,
-    ValidatedSelection, ValidatedVariableDefinition,
+    get_all_errors_or_tuple_ok, ClientField, ClientType, FieldType, RefetchStrategy, SchemaObject,
+    ServerFieldData, UnvalidatedClientField, UnvalidatedLinkedFieldSelection,
+    UnvalidatedRefetchFieldStrategy, UnvalidatedVariableDefinition, ValidateSchemaError,
+    ValidateSchemaResult, ValidatedClientField, ValidatedIsographSelectionVariant,
+    ValidatedLinkedFieldAssociatedData, ValidatedLinkedFieldSelection,
+    ValidatedRefetchFieldStrategy, ValidatedScalarFieldAssociatedData,
+    ValidatedScalarFieldSelection, ValidatedSchemaServerField, ValidatedSelection,
+    ValidatedVariableDefinition,
 };
 
 type UsedVariables = BTreeSet<VariableName>;

@@ -5,6 +5,7 @@ use std::{
 };
 
 use common_lang_types::ArtifactPathAndContent;
+use intern::string_key::Lookup;
 use thiserror::Error;
 
 pub(crate) fn write_artifacts_to_disk(
@@ -31,7 +32,12 @@ pub(crate) fn write_artifacts_to_disk(
         // Is this better than materializing paths_and_contents sooner?
         count += 1;
 
-        let absolute_directory = artifact_directory.join(path_and_content.relative_directory);
+        let absolute_directory = match path_and_content.type_and_field {
+            Some(type_and_field) => artifact_directory
+                .join(type_and_field.type_name.lookup())
+                .join(type_and_field.field_name.lookup()),
+            None => artifact_directory.clone(),
+        };
         fs::create_dir_all(&absolute_directory).map_err(|e| {
             GenerateArtifactsError::UnableToCreateDirectory {
                 path: absolute_directory.clone(),

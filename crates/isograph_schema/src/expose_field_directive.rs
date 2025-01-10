@@ -1,6 +1,7 @@
 use common_lang_types::{
     DirectiveArgumentName, DirectiveName, IsographObjectTypeName, LinkedFieldName, Location,
-    SelectableFieldName, Span, StringLiteralValue, ValueKeyName, WithLocation, WithSpan,
+    ObjectTypeAndFieldName, SelectableFieldName, Span, StringLiteralValue, ValueKeyName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     from_graph_ql_directive, DeserializationError, GraphQLConstantValue, GraphQLDirective,
@@ -15,9 +16,9 @@ use serde::Deserialize;
 
 use crate::{
     generate_refetch_field_strategy, ArgumentMap, ClientField, ClientFieldVariant, ClientType,
-    FieldMapItem, FieldType, ImperativelyLoadedFieldVariant, ObjectTypeAndFieldName,
-    PrimaryFieldInfo, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
-    ProcessedFieldMapItem, UnvalidatedSchema, UnvalidatedVariableDefinition,
+    FieldMapItem, FieldType, ImperativelyLoadedFieldVariant, PrimaryFieldInfo,
+    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
+    UnvalidatedSchema, UnvalidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 

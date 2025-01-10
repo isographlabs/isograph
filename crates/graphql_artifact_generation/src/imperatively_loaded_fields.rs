@@ -1,10 +1,12 @@
-use common_lang_types::{ArtifactPathAndContent, IsographObjectTypeName, SelectableFieldName};
+use common_lang_types::{
+    ArtifactPathAndContent, IsographObjectTypeName, ObjectTypeAndFieldName, SelectableFieldName,
+};
 use intern::string_key::Intern;
 use isograph_lang_types::RefetchQueryIndex;
 use isograph_schema::{ImperativelyLoadedFieldArtifactInfo, ValidatedSchema, REFETCH_FIELD_NAME};
 
 use crate::{
-    generate_artifacts::{generate_path, NormalizationAstText, QueryText},
+    generate_artifacts::{NormalizationAstText, QueryText},
     normalization_ast_text::generate_normalization_ast_text,
     query_text::generate_query_text,
 };
@@ -28,16 +30,20 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
             ..
         } = &self;
 
-        let relative_directory =
-            generate_path(*root_fetchable_field_parent_object, *root_fetchable_field);
         let file_name_prefix = format!("{}__{}", *REFETCH_FIELD_NAME, refetch_query_index.0)
             .intern()
             .into();
 
+        let type_name = *root_fetchable_field_parent_object;
+        let field_name = *root_fetchable_field;
+
         ArtifactPathAndContent {
             file_content: self.file_contents(),
-            relative_directory,
             file_name_prefix,
+            type_and_field: Some(ObjectTypeAndFieldName {
+                type_name,
+                field_name,
+            }),
         }
     }
 }

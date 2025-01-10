@@ -7,3 +7,11 @@ license = { workspace = true }
 [[bin]]
 name = "generate_isograph_fixtures"
 path = "src/main.rs"
+
+[dependencies]
+clap = { workspace = true }
+regex = { workspace = true }
+lazy_static = { workspace = true }
+intern = { path = "../../relay-crates/intern" }
+isograph_compiler = { path = "../isograph_compiler" }
+isograph_config = { path = "../isograph_config" }

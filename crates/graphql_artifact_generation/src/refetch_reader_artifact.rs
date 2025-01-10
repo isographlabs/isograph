@@ -1,4 +1,4 @@
-use common_lang_types::ArtifactPathAndContent;
+use common_lang_types::{ArtifactPathAndContent, ObjectTypeAndFieldName};
 use intern::string_key::Intern;
 
 use isograph_config::GenerateFileExtensionsOption;
@@ -8,7 +8,7 @@ use isograph_schema::{
 
 use crate::{
     generate_artifacts::{
-        generate_output_type, generate_path, ClientFieldFunctionImportStatement, REFETCH_READER,
+        generate_output_type, ClientFieldFunctionImportStatement, REFETCH_READER,
         RESOLVER_OUTPUT_TYPE,
     },
     import_statements::reader_imports_to_import_statement,
@@ -53,8 +53,6 @@ pub(crate) fn generate_refetch_reader_artifact(
         &client_field.initial_variable_context(),
     );
 
-    let relative_directory = generate_path(parent_type.name, client_field.name);
-
     let reader_import_statement =
         reader_imports_to_import_statement(&reader_imports, file_extensions);
 
@@ -74,9 +72,12 @@ pub(crate) fn generate_refetch_reader_artifact(
         );
 
     ArtifactPathAndContent {
-        relative_directory: relative_directory.clone(),
         file_name_prefix: *REFETCH_READER,
         file_content: reader_content,
+        type_and_field: Some(ObjectTypeAndFieldName {
+            type_name: parent_type.name,
+            field_name: client_field.name,
+        }),
     }
 }
 
@@ -87,7 +88,6 @@ pub(crate) fn generate_refetch_output_type_artifact(
     let parent_type = schema
         .server_field_data
         .object(client_field.parent_object_id);
-    let relative_directory = generate_path(parent_type.name, client_field.name);
 
     let client_field_output_type = generate_output_type(client_field);
 
@@ -105,9 +105,12 @@ pub(crate) fn generate_refetch_output_type_artifact(
         {output_type_text}"
     );
     ArtifactPathAndContent {
-        relative_directory: relative_directory.clone(),
         file_name_prefix: *RESOLVER_OUTPUT_TYPE,
         file_content: output_type_text,
+        type_and_field: Some(ObjectTypeAndFieldName {
+            type_name: parent_type.name,
+            field_name: client_field.name,
+        }),
     }
 }
 
