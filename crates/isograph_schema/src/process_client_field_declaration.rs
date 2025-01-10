@@ -1,7 +1,7 @@
 use common_lang_types::{
-    ConstExportName, FilePath, IsographDirectiveName, IsographObjectTypeName, LinkedFieldName,
-    Location, ScalarFieldName, SelectableFieldName, TextSource, UnvalidatedTypeName, WithLocation,
-    WithSpan,
+    ConstExportName, IsographDirectiveName, IsographObjectTypeName, LinkedFieldName, Location,
+    ObjectTypeAndFieldName, RelativePathToSourceFile, ScalarFieldName, SelectableFieldName,
+    TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -13,8 +13,8 @@ use thiserror::Error;
 
 use crate::{
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
-    ClientField, ClientType, FieldMapItem, FieldType, ObjectTypeAndFieldName, RequiresRefinement,
-    UnvalidatedSchema, UnvalidatedVariableDefinition, NODE_FIELD_NAME,
+    ClientField, ClientType, FieldMapItem, FieldType, RequiresRefinement, UnvalidatedSchema,
+    UnvalidatedVariableDefinition, NODE_FIELD_NAME,
 };
 
 impl UnvalidatedSchema {
@@ -191,7 +191,7 @@ pub enum UserWrittenComponentVariant {
 pub struct UserWrittenClientFieldInfo {
     // TODO use a shared struct
     pub const_export_name: ConstExportName,
-    pub file_path: FilePath,
+    pub file_path: RelativePathToSourceFile,
     pub user_written_component_variant: UserWrittenComponentVariant,
 }
 

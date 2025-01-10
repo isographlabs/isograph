@@ -91,7 +91,6 @@ string_key_conversion!(from: ScalarFieldAlias, to: FieldNameOrAlias);
 string_key_conversion!(from: LinkedFieldAlias, to: FieldNameOrAlias);
 string_key_conversion!(from: SelectableFieldName, to: FieldNameOrAlias);
 
-string_key_newtype!(FilePath);
 string_key_newtype!(ConstExportName);
 
 // Operations

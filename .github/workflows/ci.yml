@@ -222,6 +222,7 @@ jobs:
     uses: ./.github/workflows/run-cargo-bin-and-ensure-no-changes.yml
     with:
       binary: generate_isograph_fixtures
+      params: --dir ./crates/isograph_lang_parser/fixtures/
 
   all-checks-passed:
     name: All checks passed
