@@ -8,20 +8,12 @@ pub fn derive_storage(input: TokenStream) -> TokenStream {
 
     let output = quote! {
         impl<Db: ::pico_core::database::Database> ::pico_core::storage::Storage<Db> for #struct_name<Db> {
-            fn nodes(&self) -> &impl ::pico_core::container::Container<NodeId, DerivedNode<Db>> {
-                &self.nodes
+            fn derived_nodes(&self) -> &impl ::pico_core::container::Container<DerivedNodeId, DerivedNode<Db>> {
+                &self.derived_nodes
             }
 
-            fn values(&self) -> &impl ::pico_core::container::Container<NodeId, Box<dyn DynEq>> {
-                &self.values
-            }
-
-            fn sources(&self) -> &impl ::pico_core::container::Container<Key, SourceNode> {
-                &self.sources
-            }
-
-            fn source_values(&self) -> &impl ::pico_core::container::Container<Key, Box<dyn DynEq>> {
-                &self.source_values
+            fn source_nodes(&self) -> &impl ::pico_core::container::Container<Key, SourceNode> {
+                &self.source_nodes
             }
 
             fn params(&self) -> &impl ::pico_core::container::Container<ParamId, Box<dyn Any>> {
@@ -34,20 +26,12 @@ pub fn derive_storage(input: TokenStream) -> TokenStream {
         }
 
         impl<Db: ::pico_core::database::Database> ::pico_core::storage::StorageMut<Db> for #struct_name<Db> {
-            fn nodes(&mut self) -> &mut impl ::pico_core::container::Container<NodeId, DerivedNode<Db>> {
-                &mut self.nodes
+            fn derived_nodes(&mut self) -> &mut impl ::pico_core::container::Container<DerivedNodeId, DerivedNode<Db>> {
+                &mut self.derived_nodes
             }
 
-            fn values(&mut self) -> &mut impl ::pico_core::container::Container<NodeId, Box<dyn DynEq>> {
-                &mut self.values
-            }
-
-            fn sources(&mut self) -> &mut impl ::pico_core::container::Container<Key, SourceNode> {
-                &mut self.sources
-            }
-
-            fn source_values(&mut self) -> &mut impl ::pico_core::container::Container<Key, Box<dyn DynEq>> {
-                &mut self.source_values
+            fn source_nodes(&mut self) -> &mut impl ::pico_core::container::Container<Key, SourceNode> {
+                &mut self.source_nodes
             }
 
             fn params(&mut self) -> &mut impl ::pico_core::container::Container<ParamId, Box<dyn Any>> {

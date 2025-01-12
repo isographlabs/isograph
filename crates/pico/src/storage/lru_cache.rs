@@ -4,10 +4,9 @@ use pico_macros::Storage;
 
 use pico_core::{
     database::Database,
-    dyn_eq::DynEq,
     epoch::Epoch,
     key::Key,
-    node::{Dependency, DerivedNode, NodeId, SourceNode},
+    node::{Dependency, DerivedNode, DerivedNodeId, SourceNode},
     params::ParamId,
 };
 
@@ -17,10 +16,8 @@ use crate::container::LruCacheContainer;
 pub struct LruCacheStorage<Db: Database> {
     pub current_epoch: Epoch,
     pub dependency_stack: Vec<Vec<(Epoch, Dependency)>>,
-    pub nodes: LruCacheContainer<NodeId, DerivedNode<Db>>,
-    pub values: LruCacheContainer<NodeId, Box<dyn DynEq>>,
-    pub sources: LruCacheContainer<Key, SourceNode>,
-    pub source_values: LruCacheContainer<Key, Box<dyn DynEq>>,
+    pub derived_nodes: LruCacheContainer<DerivedNodeId, DerivedNode<Db>>,
+    pub source_nodes: LruCacheContainer<Key, SourceNode>,
     pub params: LruCacheContainer<ParamId, Box<dyn Any>>,
 }
 
@@ -29,11 +26,9 @@ impl<Db: Database> LruCacheStorage<Db> {
         Self {
             current_epoch: Epoch::new(),
             dependency_stack: vec![],
-            nodes: LruCacheContainer::new(cache_size),
-            sources: LruCacheContainer::new(cache_size),
+            derived_nodes: LruCacheContainer::new(cache_size),
+            source_nodes: LruCacheContainer::new(cache_size),
             params: LruCacheContainer::new(cache_size),
-            values: LruCacheContainer::new(cache_size),
-            source_values: LruCacheContainer::new(cache_size),
         }
     }
 }
