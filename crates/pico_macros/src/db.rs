@@ -28,17 +28,18 @@ pub fn derive_db(input: TokenStream) -> TokenStream {
 
             fn get<T: Clone + 'static>(&mut self, id: ::pico_core::source::SourceId<T>) -> T {
                 use ::pico_core::{storage::Storage, container::Container};
+                let current_epoch = self.current_epoch();
                 let time_calculated = self.storage()
-                    .sources()
+                    .source_nodes()
                     .get(&id.key)
                     .expect("node should exist. This is indicative of a bug in Pico.")
                     .time_calculated;
-                let current_epoch = self.current_epoch();
                 ::pico::memo::register_dependency(self, ::pico_core::node::NodeKind::Source(id.key), time_calculated, current_epoch);
                 self.storage()
-                    .source_values()
+                    .source_nodes()
                     .get(&id.key)
                     .expect("value should exist. This is indicative of a bug in Pico.")
+                    .value
                     .as_any()
                     .downcast_ref::<T>()
                     .expect("unexpected struct type. This is indicative of a bug in Pico.")
@@ -51,18 +52,17 @@ pub fn derive_db(input: TokenStream) -> TokenStream {
                 use ::pico_core::{storage::StorageMut, container::Container};
                 let current_epoch = self.increment_epoch();
                 let id = ::pico_core::source::SourceId::new(&source);
-                self.storage_mut().sources().insert(id.key, ::pico_core::node::SourceNode {
+                self.storage_mut().source_nodes().insert(id.key, ::pico_core::node::SourceNode {
                     time_calculated: current_epoch,
+                    value: Box::new(source),
                 });
-                self.storage_mut().source_values().insert(id.key, Box::new(source));
                 id
             }
 
             fn remove<T>(&mut self, id: ::pico_core::source::SourceId<T>) {
                 use ::pico_core::{storage::StorageMut, container::Container};
                 self.increment_epoch();
-                self.storage_mut().sources().remove(&id.key);
-                self.storage_mut().source_values().remove(&id.key);
+                self.storage_mut().source_nodes().remove(&id.key);
             }
         }
     };

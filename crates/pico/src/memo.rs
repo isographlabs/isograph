@@ -4,7 +4,7 @@ use pico_core::{
     dyn_eq::DynEq,
     epoch::Epoch,
     key::Key,
-    node::{Dependency, DerivedNode, NodeId, NodeKind},
+    node::{Dependency, DerivedNode, DerivedNodeId, NodeKind},
     params::ParamId,
     storage::{Storage, StorageMut},
 };
@@ -17,36 +17,41 @@ pub enum MemoState {
 #[allow(clippy::map_entry)]
 pub fn memo<Db: Database>(
     db: &mut Db,
-    node_id: NodeId,
+    node_id: DerivedNodeId,
     inner_fn: fn(&mut Db, ParamId) -> Box<dyn DynEq>,
 ) -> MemoState {
     let mut state = MemoState::Memoized;
     let current_epoch = db.current_epoch();
-    let time_calculated = if db.storage().nodes().contains_key(&node_id)
-        && db.storage().values().contains_key(&node_id)
-    {
+    let time_calculated = if db.storage().derived_nodes().contains_key(&node_id) {
         if any_dependency_changed(db, &node_id, current_epoch) {
-            let (new_value, dependencies, time_calculated) =
+            let (value, dependencies, time_calculated) =
                 call_inner_fn_and_collect_dependencies(db, node_id.param_id, inner_fn);
-            if let Some(value) = db.storage_mut().values().get_mut(&node_id) {
-                if *value != new_value {
-                    *value = new_value;
+            if let Some(node) = db.storage_mut().derived_nodes().get_mut(&node_id) {
+                if node.value != value {
+                    node.value = value;
                     state = MemoState::Computed;
                 }
-            } else {
-                db.storage_mut().values().insert(node_id, new_value);
-                state = MemoState::Computed;
-            }
-            if let Some(node) = db.storage_mut().nodes().get_mut(&node_id) {
                 node.dependencies = dependencies;
                 node.time_calculated = time_calculated;
                 node.time_verified = current_epoch;
+            } else {
+                db.storage_mut().derived_nodes().insert(
+                    node_id,
+                    DerivedNode {
+                        time_verified: current_epoch,
+                        time_calculated,
+                        dependencies,
+                        inner_fn,
+                        value,
+                    },
+                );
+                state = MemoState::Computed;
             }
             time_calculated
         } else {
             let node = db
                 .storage_mut()
-                .nodes()
+                .derived_nodes()
                 .get_mut(&node_id)
                 .expect("node should exist. This is indicative of a bug in Pico.");
             node.time_verified = current_epoch;
@@ -55,16 +60,16 @@ pub fn memo<Db: Database>(
     } else {
         let (value, dependencies, time_calculated) =
             call_inner_fn_and_collect_dependencies(db, node_id.param_id, inner_fn);
-        db.storage_mut().nodes().insert(
+        db.storage_mut().derived_nodes().insert(
             node_id,
             DerivedNode {
                 time_verified: current_epoch,
                 time_calculated,
                 dependencies,
                 inner_fn,
+                value,
             },
         );
-        db.storage_mut().values().insert(node_id, value);
         state = MemoState::Computed;
         time_calculated
     };
@@ -79,12 +84,12 @@ pub fn memo<Db: Database>(
 
 fn any_dependency_changed<Db: Database>(
     db: &mut Db,
-    node_id: &NodeId,
+    node_id: &DerivedNodeId,
     current_epoch: Epoch,
 ) -> bool {
     let dependencies = db
         .storage()
-        .nodes()
+        .derived_nodes()
         .get(node_id)
         .expect("node should exist. This is indicative of a bug in Pico.")
         .dependencies
@@ -107,14 +112,14 @@ fn any_dependency_changed<Db: Database>(
 }
 
 fn source_node_changed<Db: Database>(db: &Db, key: &Key, time_verified: Epoch) -> bool {
-    match db.storage().sources().get(key) {
+    match db.storage().source_nodes().get(key) {
         Some(source) => source.time_calculated > time_verified,
         None => true,
     }
 }
 
-fn derived_node_changed<Db: Database>(db: &mut Db, node_id: NodeId) -> bool {
-    let inner_fn = if let Some(node) = db.storage().nodes().get(&node_id) {
+fn derived_node_changed<Db: Database>(db: &mut Db, node_id: DerivedNodeId) -> bool {
+    let inner_fn = if let Some(node) = db.storage().derived_nodes().get(&node_id) {
         node.inner_fn
     } else {
         return true;

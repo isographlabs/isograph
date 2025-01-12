@@ -3,27 +3,22 @@ use std::any::Any;
 use crate::{
     container::Container,
     database::Database,
-    dyn_eq::DynEq,
     epoch::Epoch,
     key::Key,
-    node::{Dependency, DerivedNode, NodeId, SourceNode},
+    node::{Dependency, DerivedNode, DerivedNodeId, SourceNode},
     params::ParamId,
 };
 
 pub trait Storage<Db: Database + ?Sized> {
-    fn nodes(&self) -> &impl Container<NodeId, DerivedNode<Db>>;
-    fn values(&self) -> &impl Container<NodeId, Box<dyn DynEq>>;
-    fn sources(&self) -> &impl Container<Key, SourceNode>;
-    fn source_values(&self) -> &impl Container<Key, Box<dyn DynEq>>;
+    fn derived_nodes(&self) -> &impl Container<DerivedNodeId, DerivedNode<Db>>;
+    fn source_nodes(&self) -> &impl Container<Key, SourceNode>;
     fn params(&self) -> &impl Container<ParamId, Box<dyn Any>>;
     fn current_epoch(&self) -> Epoch;
 }
 
 pub trait StorageMut<Db: Database + ?Sized> {
-    fn nodes(&mut self) -> &mut impl Container<NodeId, DerivedNode<Db>>;
-    fn values(&mut self) -> &mut impl Container<NodeId, Box<dyn DynEq>>;
-    fn sources(&mut self) -> &mut impl Container<Key, SourceNode>;
-    fn source_values(&mut self) -> &mut impl Container<Key, Box<dyn DynEq>>;
+    fn derived_nodes(&mut self) -> &mut impl Container<DerivedNodeId, DerivedNode<Db>>;
+    fn source_nodes(&mut self) -> &mut impl Container<Key, SourceNode>;
     fn params(&mut self) -> &mut impl Container<ParamId, Box<dyn Any>>;
     fn increment_epoch(&mut self) -> Epoch;
     fn dependency_stack(&mut self) -> &mut Vec<Vec<(Epoch, Dependency)>>;

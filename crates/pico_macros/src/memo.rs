@@ -68,9 +68,10 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
 
     let mut return_expr = quote! {
         #db_arg.storage()
-            .values()
+            .derived_nodes()
             .get(&node_id)
             .expect("value should exist. This is indicative of a bug in Pico.")
+            .value
             .as_any()
             .downcast_ref::<#return_type>()
             .expect("unexpected return type. This is indicative of a bug in Pico.")
@@ -114,7 +115,7 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
         #vis #new_sig {
             use ::pico_core::{storage::Storage, container::Container, database::Database};
             let param_id = ::pico_core::params::ParamId::intern(#db_arg, (#(#other_args.clone(),)*));
-            let node_id = ::pico_core::node::NodeId::new(#fn_hash.into(), param_id);
+            let node_id = ::pico_core::node::DerivedNodeId::new(#fn_hash.into(), param_id);
             ::pico::memo::memo(#db_arg, node_id, |#db_arg, param_id| {
                 let (#(#unpacked_args,)*) = param_id.get::<(#(#argument_types,)*), _>(#db_arg)
                     .expect("parameter should exist. This is indicative of a bug in Pico.");

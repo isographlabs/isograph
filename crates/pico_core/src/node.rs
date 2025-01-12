@@ -8,12 +8,12 @@ use crate::key::Key;
 use crate::params::ParamId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct NodeId {
+pub struct DerivedNodeId {
     pub key: Key,
     pub param_id: ParamId,
 }
 
-impl NodeId {
+impl DerivedNodeId {
     pub fn new(key: Key, param_id: ParamId) -> Self {
         Self { key, param_id }
     }
@@ -24,6 +24,7 @@ pub struct DerivedNode<Db: Database + ?Sized> {
     pub time_calculated: Epoch,
     pub dependencies: Vec<Dependency>,
     pub inner_fn: fn(&mut Db, ParamId) -> Box<dyn DynEq>,
+    pub value: Box<dyn DynEq>,
 }
 
 impl<Db: Database> fmt::Debug for DerivedNode<Db> {
@@ -32,6 +33,7 @@ impl<Db: Database> fmt::Debug for DerivedNode<Db> {
             .field("time_verified", &self.time_verified)
             .field("time_calculated", &self.time_calculated)
             .field("dependencies", &self.dependencies)
+            .field("value", &self.value)
             .finish()
     }
 }
@@ -39,6 +41,7 @@ impl<Db: Database> fmt::Debug for DerivedNode<Db> {
 #[derive(Debug)]
 pub struct SourceNode {
     pub time_calculated: Epoch,
+    pub value: Box<dyn DynEq>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -50,5 +53,5 @@ pub struct Dependency {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum NodeKind {
     Source(Key),
-    Derived(NodeId),
+    Derived(DerivedNodeId),
 }
