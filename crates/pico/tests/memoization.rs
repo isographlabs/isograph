@@ -49,7 +49,7 @@ fn memoization() {
     assert_eq!(result, 14);
     assert_eq!(state.storage().current_epoch(), 4.into());
 
-    // "left" must be called again becaulse the input value has been changed
+    // "left" must be called again because the input value has been changed
     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 2);
     // "right" must not be called again
     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 1);
