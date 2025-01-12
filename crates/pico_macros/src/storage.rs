@@ -16,11 +16,11 @@ pub fn derive_storage(input: TokenStream) -> TokenStream {
                 &self.values
             }
 
-            fn sources(&self) -> &impl ::pico_core::container::Container<SourceKey, SourceNode> {
+            fn sources(&self) -> &impl ::pico_core::container::Container<Key, SourceNode> {
                 &self.sources
             }
 
-            fn source_values(&self) -> &impl ::pico_core::container::Container<SourceKey, Box<dyn DynEq>> {
+            fn source_values(&self) -> &impl ::pico_core::container::Container<Key, Box<dyn DynEq>> {
                 &self.source_values
             }
 
@@ -42,11 +42,11 @@ pub fn derive_storage(input: TokenStream) -> TokenStream {
                 &mut self.values
             }
 
-            fn sources(&mut self) -> &mut impl ::pico_core::container::Container<SourceKey, SourceNode> {
+            fn sources(&mut self) -> &mut impl ::pico_core::container::Container<Key, SourceNode> {
                 &mut self.sources
             }
 
-            fn source_values(&mut self) -> &mut impl ::pico_core::container::Container<SourceKey, Box<dyn DynEq>> {
+            fn source_values(&mut self) -> &mut impl ::pico_core::container::Container<Key, Box<dyn DynEq>> {
                 &mut self.source_values
             }
 

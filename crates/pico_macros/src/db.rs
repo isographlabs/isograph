@@ -31,16 +31,17 @@ pub fn derive_db(input: TokenStream) -> TokenStream {
                 let time_calculated = self.storage()
                     .sources()
                     .get(&id.key)
-                    .expect("node should exist. This is indicative of a bug in Isograph.")
+                    .expect("node should exist. This is indicative of a bug in Pico.")
                     .time_calculated;
-                ::pico::memo::register_dependency(self, ::pico_core::node::NodeKind::Source(id.key), time_calculated);
+                let current_epoch = self.current_epoch();
+                ::pico::memo::register_dependency(self, ::pico_core::node::NodeKind::Source(id.key), time_calculated, current_epoch);
                 self.storage()
                     .source_values()
                     .get(&id.key)
-                    .expect("value should exist. This is indicative of a bug in Isograph.")
+                    .expect("value should exist. This is indicative of a bug in Pico.")
                     .as_any()
                     .downcast_ref::<T>()
-                    .expect("unexpected struct type. This is indicative of a bug in Isograph.")
+                    .expect("unexpected struct type. This is indicative of a bug in Pico.")
                     .clone()
             }
 

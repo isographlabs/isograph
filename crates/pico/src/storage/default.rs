@@ -6,9 +6,9 @@ use pico_core::{
     database::Database,
     dyn_eq::DynEq,
     epoch::Epoch,
+    key::Key,
     node::{Dependency, DerivedNode, NodeId, SourceNode},
     params::ParamId,
-    source::SourceKey,
 };
 
 use crate::container::DefaultContainer;
@@ -19,8 +19,8 @@ pub struct DefaultStorage<Db: Database> {
     pub dependency_stack: Vec<Vec<(Epoch, Dependency)>>,
     pub nodes: DefaultContainer<NodeId, DerivedNode<Db>>,
     pub values: DefaultContainer<NodeId, Box<dyn DynEq>>,
-    pub sources: DefaultContainer<SourceKey, SourceNode>,
-    pub source_values: DefaultContainer<SourceKey, Box<dyn DynEq>>,
+    pub sources: DefaultContainer<Key, SourceNode>,
+    pub source_values: DefaultContainer<Key, Box<dyn DynEq>>,
     pub params: DefaultContainer<ParamId, Box<dyn Any>>,
 }
 

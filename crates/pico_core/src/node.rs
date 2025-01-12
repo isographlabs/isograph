@@ -1,32 +1,25 @@
-use intern::string_key::Intern;
 use std::fmt;
 use std::hash::Hash;
-use string_key_newtype::string_key_newtype;
 
 use crate::database::Database;
 use crate::dyn_eq::DynEq;
 use crate::epoch::Epoch;
+use crate::key::Key;
 use crate::params::ParamId;
-use crate::source::SourceKey;
-
-string_key_newtype!(NodeKey);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NodeId {
-    pub key: NodeKey,
+    pub key: Key,
     pub param_id: ParamId,
 }
 
 impl NodeId {
-    pub fn new(key: &'static str, param_id: ParamId) -> Self {
-        Self {
-            key: key.intern().into(),
-            param_id,
-        }
+    pub fn new(key: Key, param_id: ParamId) -> Self {
+        Self { key, param_id }
     }
 }
 
-pub struct DerivedNode<Db: Database> {
+pub struct DerivedNode<Db: Database + ?Sized> {
     pub time_verified: Epoch,
     pub time_calculated: Epoch,
     pub dependencies: Vec<Dependency>,
@@ -56,6 +49,6 @@ pub struct Dependency {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum NodeKind {
-    Source(SourceKey),
+    Source(Key),
     Derived(NodeId),
 }

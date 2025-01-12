@@ -12,4 +12,5 @@ pico_core = { path = "../pico_core" }
 serde = { workspace = true } 
 thiserror = { workspace = true }
 tracing = { workspace = true }
-lru = "0.12.5"
+lru = { workspace = true }
+once_cell = "1.12"

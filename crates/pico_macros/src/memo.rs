@@ -1,6 +1,12 @@
+use std::hash::DefaultHasher;
+use std::hash::Hash;
+use std::hash::Hasher;
+
 use darling::{ast::NestedMeta, FromMeta};
 use proc_macro::TokenStream;
 use quote::quote;
+use quote::ToTokens;
+use syn::Signature;
 use syn::{
     parse_macro_input, parse_quote, Error, FnArg, GenericParam, ItemFn, PatType, ReturnType,
 };
@@ -19,7 +25,7 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
         attrs,
     } = parse_macro_input!(item as ItemFn);
 
-    let fn_name = sig.ident.clone().to_string();
+    let fn_hash = hash(&sig);
 
     if sig.inputs.is_empty() {
         return Error::new_spanned(
@@ -64,10 +70,10 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
         #db_arg.storage()
             .values()
             .get(&node_id)
-            .expect("value should exist. This is indicative of a bug in Isograph.")
+            .expect("value should exist. This is indicative of a bug in Pico.")
             .as_any()
             .downcast_ref::<#return_type>()
-            .expect("unexpected return type. This is indicative of a bug in Isograph.")
+            .expect("unexpected return type. This is indicative of a bug in Pico.")
     };
 
     let mut new_sig = sig.clone();
@@ -108,9 +114,10 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
         #vis #new_sig {
             use ::pico_core::{storage::Storage, container::Container, database::Database};
             let param_id = ::pico_core::params::ParamId::intern(#db_arg, (#(#other_args.clone(),)*));
-            let node_id = ::pico::memo::memo(#db_arg, #fn_name, param_id, |#db_arg, param_id| {
+            let node_id = ::pico_core::node::NodeId::new(#fn_hash.into(), param_id);
+            ::pico::memo::memo(#db_arg, node_id, |#db_arg, param_id| {
                 let (#(#unpacked_args,)*) = param_id.get::<(#(#argument_types,)*), _>(#db_arg)
-                    .expect("parameter should exist. This is indicative of a bug in Isograph.");
+                    .expect("parameter should exist. This is indicative of a bug in Pico.");
                 let value: #return_type = (|| #block)();
                 Box::new(value)
             });
@@ -119,4 +126,10 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     output.into()
+}
+
+fn hash(input: &Signature) -> u64 {
+    let mut s = DefaultHasher::new();
+    input.to_token_stream().to_string().hash(&mut s);
+    s.finish()
 }
