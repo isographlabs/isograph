@@ -1,10 +1,10 @@
 use std::io;
 
 use common::{
-    database::Database,
     owned::{evaluate_input, Input},
+    state::State,
 };
-use pico_core::database::Database as Db;
+use pico_core::database::Database;
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
 
@@ -18,7 +18,7 @@ fn main() {
         .with_writer(io::stderr)
         .init();
 
-    let mut db = Database::new();
+    let mut db = State::new();
     let key = "expr1";
 
     let mut input = Input {

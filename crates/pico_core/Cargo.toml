@@ -5,7 +5,4 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-string_key_newtype = { path = "../string_key_newtype" }
-intern = { path = "../../relay-crates/intern" }
-serde = { workspace = true } 
 thiserror = { workspace = true }

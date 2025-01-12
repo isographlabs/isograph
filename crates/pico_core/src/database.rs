@@ -6,7 +6,7 @@ use crate::{
     storage::{Storage, StorageMut},
 };
 
-pub trait Database: Sized {
+pub trait Database {
     fn storage(&self) -> &impl Storage<Self>;
     fn storage_mut(&mut self) -> &mut impl StorageMut<Self>;
     fn current_epoch(&self) -> Epoch;

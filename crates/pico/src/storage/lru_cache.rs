@@ -6,9 +6,9 @@ use pico_core::{
     database::Database,
     dyn_eq::DynEq,
     epoch::Epoch,
+    key::Key,
     node::{Dependency, DerivedNode, NodeId, SourceNode},
     params::ParamId,
-    source::SourceKey,
 };
 
 use crate::container::LruCacheContainer;
@@ -19,8 +19,8 @@ pub struct LruCacheStorage<Db: Database> {
     pub dependency_stack: Vec<Vec<(Epoch, Dependency)>>,
     pub nodes: LruCacheContainer<NodeId, DerivedNode<Db>>,
     pub values: LruCacheContainer<NodeId, Box<dyn DynEq>>,
-    pub sources: LruCacheContainer<SourceKey, SourceNode>,
-    pub source_values: LruCacheContainer<SourceKey, Box<dyn DynEq>>,
+    pub sources: LruCacheContainer<Key, SourceNode>,
+    pub source_values: LruCacheContainer<Key, Box<dyn DynEq>>,
     pub params: LruCacheContainer<ParamId, Box<dyn Any>>,
 }
 
