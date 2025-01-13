@@ -45,7 +45,6 @@ export function useDisposableState<T = never>(
       return () => {
         if (itemCleanupPairRef.current !== null) {
           itemCleanupPairRef.current[1]();
-          itemCleanupPairRef.current = null;
         }
       };
     },
