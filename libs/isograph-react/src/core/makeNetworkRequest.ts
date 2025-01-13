@@ -106,7 +106,6 @@ export function makeNetworkRequest<
         try {
           fetchOptions?.onError?.();
         } catch {}
-        // @ts-expect-error Why are we getting the wrong constructor here?
         throw new Error('GraphQL network response had errors', {
           cause: networkResponse,
         });

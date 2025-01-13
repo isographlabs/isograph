@@ -53,13 +53,13 @@ fn clean_block_string_literal(source: &str) -> String {
 
     while formatted_lines
         .front()
-        .map_or(false, |line| line_is_whitespace(line))
+        .is_some_and(|line| line_is_whitespace(line))
     {
         formatted_lines.pop_front();
     }
     while formatted_lines
         .back()
-        .map_or(false, |line| line_is_whitespace(line))
+        .is_some_and(|line| line_is_whitespace(line))
     {
         formatted_lines.pop_back();
     }
