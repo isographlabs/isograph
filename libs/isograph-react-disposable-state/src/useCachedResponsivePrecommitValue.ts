@@ -64,16 +64,6 @@ export function useCachedResponsivePrecommitValue<T>(
   }, []);
 
   useEffect(() => {
-    return () => {
-      // Attempt to detect if the component was
-      // hidden (by Offscreen API), or fast refresh occured;
-      // Only in these situations would the effect cleanup
-      // for "unmounting" run multiple times.
-      lastCommittedParentCache.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
     lastCommittedParentCache.current = parentCache;
     // On commit, cacheItem may be disposed, because during the render phase,
     // we only temporarily retained the item, and the temporary retain could have
