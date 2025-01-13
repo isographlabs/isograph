@@ -14,7 +14,7 @@ import entrypoint_Query__subquery from '../__isograph/Query/subquery/entrypoint'
 // of type TParam.
 type IdentityWithParam<TParam extends object> = <TClientFieldReturn>(
   clientField: (param: TParam) => TClientFieldReturn
-) => (param: TParam) => TClientFieldReturn;
+) => (data: { firstParameter: TParam }) => TClientFieldReturn;
 
 // This is the type given it to client fields with @component.
 // This means that the type of the exported iso literal is exactly
@@ -28,7 +28,7 @@ type IdentityWithParamComponent<TParam extends object> = <
   TComponentProps = Record<PropertyKey, never>,
 >(
   clientComponentField: (data: TParam, componentProps: TComponentProps) => TClientFieldReturn
-) => (data: TParam, componentProps: TComponentProps) => TClientFieldReturn;
+) => (props: { firstParameter: TParam, additionalRuntimeProps: TComponentProps }) => TClientFieldReturn;
 
 type WhitespaceCharacter = ' ' | '\t' | '\n';
 type Whitespace<In> = In extends `${WhitespaceCharacter}${infer In}`
@@ -87,14 +87,12 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.subquery', T>
 ): typeof entrypoint_Query__subquery;
-
-export function iso(_isographLiteralText: string):
+export function iso(clientFieldResolver: any):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
   | IsographEntrypoint<any, any>
 {
-  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
-      'was not set up, or it failed to identify this call site. Make sure it ' +
-      'is being used verbatim as `iso`. If you cannot use the babel transform, ' + 
-      'set options.no_babel_transform to true in your Isograph config. ');
+  return (props: any) => {
+    return clientFieldResolver(props.firstParameter, props.additionalRuntimeProps)
+  };
 }

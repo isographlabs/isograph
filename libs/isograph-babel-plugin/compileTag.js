@@ -17,20 +17,8 @@ function compileTag(t, path, config) {
       // This throws if the tag is invalid
       compileImportStatement(t, path, type, field, 'entrypoint', config);
     } else if (keyword === 'field') {
-      if (t.isCallExpression(path.parentPath.node)) {
-        const firstArg = path.parentPath.node.arguments[0];
-        if (path.parentPath.node.arguments.length === 1 && firstArg != null) {
-          path.parentPath.replaceWith(firstArg);
-        } else {
-          throw new Error(
-            'Invalid iso tag usage. The iso function should be passed at most one argument.',
-          );
-        }
-      } else {
-        path.replaceWith(
-          t.arrowFunctionExpression([t.identifier('x')], t.identifier('x')),
-        );
-      }
+      // replace `iso("field ...")` with `iso`
+      path.replaceWith(path.node.callee);
     } else {
       throw new Error(
         "Invalid iso tag usage. Expected 'entrypoint' or 'field'.",

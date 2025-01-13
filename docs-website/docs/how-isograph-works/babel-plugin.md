@@ -16,6 +16,8 @@ It is then used via adding the following to your `.babelrc.js`:
 }
 ```
 
+For HMR to work `@isograph/babel-plugin` must run before `react-refresh/babel`.
+
 ## Behavior
 
 The babel plugin will replace calls to `iso` entrypoint with require calls to the appropriate `entrypoint.js` file.
@@ -28,7 +30,7 @@ export const foo = iso(`field Query.Foo { whatever }`)(({ data }) => {
   doStuff();
 });
 // and this is transformed into
-export const foo = ({ data }) => doStuff();
+export const foo = iso(({ data }) => doStuff());
 ```
 
 ## Requirements
