@@ -37,7 +37,7 @@ export function useLazyDisposableState<T>(
           'cleanupFn unexpectedly null. This indicates a bug in react-disposable-state.',
         );
       }
-      return cleanupFn();
+      cleanupFn();
     };
   }, [parentCache]);
 
