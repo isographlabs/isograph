@@ -64,15 +64,16 @@ export function useCachedResponsivePrecommitValue<T>(
   }, []);
 
   useEffect(() => {
-    // react reruns all `useEffect` in HMR since it doesn't know if the
-    // code inside of useEffect has changed. Since this is a library
-    // user can't change this code so we are safe to skip this rerun.
-    // This also prevents `useEffect` from running twice in Strict Mode.
-    if (lastCommittedParentCache.current === parentCache) {
-      return;
-    }
+    return () => {
+      // Attempt to detect if the component was
+      // hidden (by Offscreen API), or fast refresh occured;
+      // Only in these situations would the effect cleanup
+      // for "unmounting" run multiple times.
+      lastCommittedParentCache.current = null;
+    };
+  }, []);
 
-    lastCommittedParentCache.current = parentCache;
+  useEffect(() => {
     // On commit, cacheItem may be disposed, because during the render phase,
     // we only temporarily retained the item, and the temporary retain could have
     // expired by the time of the commit.
