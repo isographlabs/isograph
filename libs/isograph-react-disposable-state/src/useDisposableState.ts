@@ -40,18 +40,12 @@ export function useDisposableState<T = never>(
     [stateFromDisposableStateHook],
   );
 
-  const lastCommittedParentCache = useRef<ParentCache<T> | null>(null);
-
   useEffect(
     function cleanupItemCleanupPairRefIfSetStateNotCalled() {
-      if (lastCommittedParentCache.current === parentCache) {
-        return;
-      }
-      lastCommittedParentCache.current = parentCache;
-
       return () => {
         if (itemCleanupPairRef.current !== null) {
           itemCleanupPairRef.current[1]();
+          itemCleanupPairRef.current = null;
         }
       };
     },
