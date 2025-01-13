@@ -38,7 +38,6 @@ export function useLazyDisposableState<T>(
         );
       }
       cleanupFn();
-      itemCleanupPairRef.current = null;
     };
   }, [parentCache]);
 
