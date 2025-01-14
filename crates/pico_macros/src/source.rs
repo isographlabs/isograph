@@ -29,7 +29,7 @@ pub(crate) fn source(item: TokenStream) -> TokenStream {
                 attr.path()
                     .segments
                     .last()
-                    .map_or(false, |segment| segment.ident == "key")
+                    .is_some_and(|segment| segment.ident == "key")
             })
         })
         .and_then(|field| field.ident.clone());
