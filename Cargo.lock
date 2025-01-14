@@ -1221,7 +1221,6 @@ version = "0.3.0"
 dependencies = [
  "intern",
  "lru",
- "once_cell",
  "pico_core",
  "pico_macros",
  "serde",

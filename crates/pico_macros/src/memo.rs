@@ -61,9 +61,9 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
         Err(e) => return e.with_span(&sig).write_errors().into(),
     };
 
-    let (return_type, default) = match &sig.output {
-        ReturnType::Type(_, ty) => (ty.clone(), false),
-        ReturnType::Default => (parse_quote!(()), true),
+    let return_type = match &sig.output {
+        ReturnType::Type(_, ty) => ty.clone(),
+        ReturnType::Default => parse_quote!(()),
     };
 
     let mut return_expr = quote! {
@@ -79,7 +79,7 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
 
     let mut new_sig = sig.clone();
 
-    if args_.reference && !default {
+    if args_.reference {
         let lifetime = new_sig.generics.params.iter().find_map(|param| {
             if let GenericParam::Lifetime(lt) = param {
                 Some(&lt.lifetime)
