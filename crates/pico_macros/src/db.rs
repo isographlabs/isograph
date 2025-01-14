@@ -29,12 +29,17 @@ pub fn derive_db(input: TokenStream) -> TokenStream {
             fn get<T: Clone + 'static>(&mut self, id: ::pico_core::source::SourceId<T>) -> T {
                 use ::pico_core::{storage::Storage, container::Container};
                 let current_epoch = self.current_epoch();
-                let time_calculated = self.storage()
+                let time_updated = self.storage()
                     .source_nodes()
                     .get(&id.key)
                     .expect("node should exist. This is indicative of a bug in Pico.")
-                    .time_calculated;
-                ::pico::memo::register_dependency(self, ::pico_core::node::NodeKind::Source(id.key), time_calculated, current_epoch);
+                    .time_updated;
+                ::pico::memo::register_dependency_in_parent_memoized_fn(
+                    self,
+                    ::pico_core::node::NodeKind::Source(id.key),
+                    time_updated,
+                    current_epoch,
+                );
                 self.storage()
                     .source_nodes()
                     .get(&id.key)
@@ -53,7 +58,7 @@ pub fn derive_db(input: TokenStream) -> TokenStream {
                 let current_epoch = self.increment_epoch();
                 let id = ::pico_core::source::SourceId::new(&source);
                 self.storage_mut().source_nodes().insert(id.key, ::pico_core::node::SourceNode {
-                    time_calculated: current_epoch,
+                    time_updated: current_epoch,
                     value: Box::new(source),
                 });
                 id

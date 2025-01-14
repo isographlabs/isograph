@@ -8,7 +8,7 @@ use std::{
 
 use calc::{ast::Program, error::Result, eval::eval, lexer::Lexer, parser::Parser};
 use pico::storage::DefaultStorage;
-use pico_core::{database::Database, source::SourceId};
+use pico_core::{container::Container, database::Database, dyn_eq::DynEq, source::SourceId};
 use pico_macros::{memo, Db, Source};
 
 mod calc;
@@ -34,40 +34,62 @@ fn memoization() {
     let result = sum(&mut state, left, right);
     assert_eq!(result, 14);
 
-    // every functions has been called once on the first run
-    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 1);
-    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 1);
-    assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 1);
-
-    // change "left" input with the same eval result
-    let left = state.set(Input {
-        key: "left",
-        value: "3 * 2".to_string(),
-    });
+    // it must be safe to remove a root derived_node, it should be recalculeted
+    let derived_nodes_count = state.storage.derived_nodes.iter().count();
+    state.storage.derived_nodes = state
+        .storage
+        .derived_nodes
+        .into_iter()
+        .filter(|(_id, node)| node.value != Box::new(result) as Box<dyn DynEq>)
+        .collect();
+    // derived_node should be removed
+    assert_ne!(
+        derived_nodes_count,
+        state.storage.derived_nodes.iter().count()
+    );
     let result = sum(&mut state, left, right);
     assert_eq!(result, 14);
+    // removed derived_node should be restored
+    assert_eq!(
+        derived_nodes_count,
+        state.storage.derived_nodes.iter().count()
+    );
 
-    // "left" must be called again because the input value has been changed
-    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 2);
-    // "right" must not be called again
-    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 1);
-    // "left" and "right" values are the same, so no call
-    assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 1);
+    // it must be also safe to remove any intermediate derived_node
+    let derived_nodes_count = state.storage.derived_nodes.iter().count();
+    state.storage.derived_nodes = state
+        .storage
+        .derived_nodes
+        .into_iter()
+        // remove "right" evaluate_input node by its value (8)
+        .filter(|(_id, node)| node.value != Box::new(8i64) as Box<dyn DynEq>)
+        .collect();
+    // node should be removed
+    assert_ne!(
+        derived_nodes_count,
+        state.storage.derived_nodes.iter().count()
+    );
+    let result = sum(&mut state, left, right);
+    assert_eq!(result, 14);
+    // but we didn't increase current_epoch! So we've got the result from cache
+    // and node was not restored
+    assert_ne!(
+        derived_nodes_count,
+        state.storage.derived_nodes.iter().count()
+    );
 
-    // change "left" input to produce a new value
+    // now update "left" input to force dependencies to be recalculated
     let left = state.set(Input {
         key: "left",
         value: "3 * 3".to_string(),
     });
     let result = sum(&mut state, left, right);
     assert_eq!(result, 17);
-
-    // "left" must be called again because the input value has been changed
-    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 3);
-    // "right" must not be called again
-    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 1);
-    // "right" value is different now, so "sum" must be called
-    assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 2);
+    // removed derived_node should be restored now
+    assert_eq!(
+        derived_nodes_count,
+        state.storage.derived_nodes.iter().count()
+    );
 }
 
 #[derive(Debug, Default, Db)]
