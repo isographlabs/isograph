@@ -129,7 +129,7 @@ export type ReaderLinkedField = {
   readonly selections: ReaderAst<unknown>;
   readonly arguments: Arguments | null;
   readonly condition: EagerReaderArtifact<
-    { data: object; parameters: any; updatableData?: object },
+    { data: object; parameters: any; startUpdate?: StartUpdate<object> },
     boolean | Link | null
   > | null;
 };
