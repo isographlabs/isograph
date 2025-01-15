@@ -1,7 +1,7 @@
 use std::{collections::HashSet, ops::ControlFlow};
 
 use common_lang_types::{
-    ClientPointerFieldName, FilePath, Location, ScalarFieldName, Span, TextSource,
+    ClientPointerFieldName, Location, RelativePathToSourceFile, ScalarFieldName, Span, TextSource,
     UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
@@ -31,7 +31,7 @@ pub enum IsoLiteralExtractionResult {
 
 pub fn parse_iso_literal(
     iso_literal_text: &str,
-    definition_file_path: FilePath,
+    definition_file_path: RelativePathToSourceFile,
     const_export_name: Option<&str>,
     text_source: TextSource,
 ) -> Result<IsoLiteralExtractionResult, WithLocation<IsographLiteralParseError>> {
@@ -107,7 +107,7 @@ fn parse_iso_entrypoint_declaration(
 
 fn parse_iso_client_field_declaration(
     tokens: &mut PeekableLexer<'_>,
-    definition_file_path: FilePath,
+    definition_file_path: RelativePathToSourceFile,
     const_export_name: Option<&str>,
     text_source: TextSource,
     field_keyword_span: Span,
@@ -133,7 +133,7 @@ fn parse_iso_client_field_declaration(
 
 fn parse_client_field_declaration_inner(
     tokens: &mut PeekableLexer<'_>,
-    definition_file_path: FilePath,
+    definition_file_path: RelativePathToSourceFile,
     const_export_name: Option<&str>,
     text_source: TextSource,
     field_keyword_span: Span,
@@ -192,7 +192,7 @@ fn parse_client_field_declaration_inner(
 
 fn parse_iso_client_pointer_declaration(
     tokens: &mut PeekableLexer<'_>,
-    definition_file_path: FilePath,
+    definition_file_path: RelativePathToSourceFile,
     const_export_name: Option<&str>,
     text_source: TextSource,
     field_keyword_span: Span,
@@ -218,7 +218,7 @@ fn parse_iso_client_pointer_declaration(
 
 fn parse_client_pointer_declaration_inner(
     tokens: &mut PeekableLexer<'_>,
-    definition_file_path: FilePath,
+    definition_file_path: RelativePathToSourceFile,
     const_export_name: Option<&str>,
     text_source: TextSource,
     pointer_keyword_span: Span,

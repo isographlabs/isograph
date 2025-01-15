@@ -3,7 +3,7 @@ export type AnyError = any;
 const NOT_SET: Symbol = Symbol('NOT_SET');
 type NotSet = typeof NOT_SET;
 
-type Result<T, E> =
+export type Result<T, E> =
   | {
       kind: 'Ok';
       value: T;

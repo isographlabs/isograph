@@ -1,13 +1,13 @@
 use common_lang_types::{
-    ArtifactFileType, ArtifactPathAndContent, DescriptionValue, IsographObjectTypeName, Location,
-    SelectableFieldName, Span, WithLocation, WithSpan,
+    ArtifactFileType, ArtifactPathAndContent, DescriptionValue, Location, Span, WithLocation,
+    WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
 
-use isograph_config::GenerateFileExtensionsOption;
+use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, NonConstantValue, SelectableServerFieldId, SelectionType,
     ServerFieldSelection, TypeAnnotation, UnionVariant, VariableDefinition,
@@ -23,7 +23,6 @@ use lazy_static::lazy_static;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::{self, Debug, Display},
-    path::{Path, PathBuf},
 };
 
 use crate::{
@@ -76,8 +75,7 @@ lazy_static! {
 /// output_type artifact.
 pub fn get_artifact_path_and_content(
     schema: &ValidatedSchema,
-    project_root: &Path,
-    artifact_directory: &Path,
+    config: &CompilerConfig,
     file_extensions: GenerateFileExtensionsOption,
     no_babel_transform: bool,
 ) -> Vec<ArtifactPathAndContent> {
@@ -138,8 +136,7 @@ pub fn get_artifact_path_and_content(
                         path_and_contents.extend(generate_eager_reader_artifacts(
                             schema,
                             encountered_client_field,
-                            project_root,
-                            artifact_directory,
+                            config,
                             *info,
                             &traversal_state.refetch_paths,
                             file_extensions,
@@ -292,8 +289,7 @@ pub fn get_artifact_path_and_content(
                 Some(generate_eager_reader_output_type_artifact(
                     schema,
                     client_field,
-                    project_root,
-                    artifact_directory,
+                    config,
                     info,
                     file_extensions,
                 ))
@@ -431,13 +427,6 @@ pub(crate) fn generate_output_type(client_field: &ValidatedClientField) -> Clien
             }
         }
     }
-}
-
-pub fn generate_path(
-    object_name: IsographObjectTypeName,
-    field_name: SelectableFieldName,
-) -> PathBuf {
-    PathBuf::from(object_name.lookup()).join(field_name.lookup())
 }
 
 pub(crate) fn generate_client_field_parameter_type(

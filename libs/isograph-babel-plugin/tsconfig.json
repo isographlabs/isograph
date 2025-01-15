@@ -3,8 +3,7 @@
   "compilerOptions": {
     "allowJs": true,
     "checkJs": true,
-    "noEmit": true,
-    "lib": ["es2017", "DOM"]
+    "noEmit": true
   },
   "include": ["./**/*.ts", "./**/*.js"]
 }

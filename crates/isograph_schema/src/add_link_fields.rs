@@ -1,8 +1,8 @@
 use crate::{
-    ClientField, ClientFieldVariant, ClientType, FieldType, ObjectTypeAndFieldName,
-    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, UnvalidatedSchema, LINK_FIELD_NAME,
+    ClientField, ClientFieldVariant, ClientType, FieldType, ProcessTypeDefinitionError,
+    ProcessTypeDefinitionResult, UnvalidatedSchema, LINK_FIELD_NAME,
 };
-use common_lang_types::{Location, WithLocation};
+use common_lang_types::{Location, ObjectTypeAndFieldName, WithLocation};
 use intern::string_key::Intern;
 
 impl UnvalidatedSchema {

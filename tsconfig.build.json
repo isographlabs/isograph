@@ -5,6 +5,7 @@
     "module": "commonjs",
     "strict": true,
     "esModuleInterop": true,
+    "lib": ["dom", "dom.iterable", "esnext"],
     "skipLibCheck": true,
     "jsx": "react",
     "forceConsistentCasingInFileNames": true,
