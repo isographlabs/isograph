@@ -540,7 +540,8 @@ fn write_param_type_from_selection(
                                 .associated_data
                                 .selection_variant
                             {
-                                ValidatedIsographSelectionVariant::Regular => inner_output_type,
+                                ValidatedIsographSelectionVariant::Updatable
+                                | ValidatedIsographSelectionVariant::Regular => inner_output_type,
                                 ValidatedIsographSelectionVariant::Loadable(_) => {
                                     loadable_fields.insert(client_field.type_and_field);
                                     let provided_arguments = get_provided_arguments(

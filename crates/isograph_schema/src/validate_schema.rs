@@ -82,6 +82,7 @@ pub enum ValidatedIsographSelectionVariant {
             MissingArguments,
         ),
     ),
+    Updatable,
 }
 
 pub type MissingArguments = Vec<ValidatedVariableDefinition>;
@@ -334,6 +335,7 @@ pub fn categorize_field_loadability<'a>(
         ClientFieldVariant::Link => None,
         ClientFieldVariant::UserWritten(_) => match selection_variant {
             ValidatedIsographSelectionVariant::Regular => None,
+            ValidatedIsographSelectionVariant::Updatable => None,
             ValidatedIsographSelectionVariant::Loadable((l, _)) => {
                 Some(Loadability::LoadablySelectedField(l))
             }

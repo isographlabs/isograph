@@ -348,6 +348,13 @@ fn validate_field_type_exists_and_is_scalar(
                                     )?;
                                     ValidatedIsographSelectionVariant::Regular
                                 }
+                                IsographSelectionVariant::Updatable => {
+                                    assert_no_missing_arguments(
+                                        missing_arguments,
+                                        scalar_field_selection.name.location,
+                                    )?;
+                                    ValidatedIsographSelectionVariant::Updatable
+                                }
                                 IsographSelectionVariant::Loadable(l) => {
                                     server_field_cannot_be_selected_loadably(
                                         scalar_field_name,
@@ -449,6 +456,13 @@ fn validate_client_field(
                     )?;
                     ValidatedIsographSelectionVariant::Regular
                 }
+                IsographSelectionVariant::Updatable => {
+                    assert_no_missing_arguments(
+                        missing_arguments,
+                        scalar_field_selection.name.location,
+                    )?;
+                    ValidatedIsographSelectionVariant::Updatable
+                }
                 IsographSelectionVariant::Loadable(l) => {
                     ValidatedIsographSelectionVariant::Loadable((l, missing_arguments))
                 }
@@ -536,6 +550,10 @@ fn validate_field_type_exists_and_is_linked(
                                     IsographSelectionVariant::Regular => {
                                         assert_no_missing_arguments(missing_arguments, linked_field_selection.name.location)?;
                                         ValidatedIsographSelectionVariant::Regular
+                                    },
+                                    IsographSelectionVariant::Updatable => {
+                                        assert_no_missing_arguments(missing_arguments, linked_field_selection.name.location)?;
+                                        ValidatedIsographSelectionVariant::Updatable
                                     },
                                     IsographSelectionVariant::Loadable(l) => {
                                         server_field_cannot_be_selected_loadably(linked_field_name, linked_field_selection.name.location)?;
