@@ -11,13 +11,12 @@ import {
   PromiseWrapper,
   readPromise,
 } from '../core/PromiseWrapper';
-import type { StartUpdate } from '../core/reader';
 
 export function useResult<
   TReadFromStore extends {
     parameters: object;
     data: object;
-    startUpdate?: StartUpdate<object>;
+    updatableData?: object;
   },
   TClientFieldValue,
 >(

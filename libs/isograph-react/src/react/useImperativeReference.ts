@@ -12,7 +12,6 @@ import { ROOT_ID } from '../core/IsographEnvironment';
 import { maybeMakeNetworkRequest } from '../core/makeNetworkRequest';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
 import { FetchOptions } from '../core/check';
-import type { StartUpdate } from '../core/reader';
 
 // TODO rename this to useImperativelyLoadedEntrypoint
 
@@ -20,7 +19,7 @@ export function useImperativeReference<
   TReadFromStore extends {
     parameters: object;
     data: object;
-    startUpdate?: StartUpdate<object>;
+    updatableData?: object;
   },
   TClientFieldValue,
 >(

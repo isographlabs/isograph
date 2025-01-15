@@ -30,7 +30,7 @@ import {
   wrapPromise,
   wrapResolvedValue,
 } from './PromiseWrapper';
-import { ReaderAst, type StartUpdate } from './reader';
+import { ReaderAst } from './reader';
 import { Arguments } from './util';
 import { logMessage } from './logging';
 import { CleanupFn } from '@isograph/disposable-types';
@@ -45,7 +45,7 @@ export function readButDoNotEvaluate<
   TReadFromStore extends {
     parameters: object;
     data: object;
-    startUpdate?: StartUpdate<object>;
+    updatableData?: object;
   },
 >(
   environment: IsographEnvironment,

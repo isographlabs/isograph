@@ -1,8 +1,4 @@
-import {
-  LoadableField,
-  type ReaderAst,
-  type StartUpdate,
-} from '../core/reader';
+import { LoadableField, type ReaderAst } from '../core/reader';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { ItemCleanupPair } from '@isograph/disposable-types';
 import { FragmentReference } from '../core/FragmentReference';
@@ -27,7 +23,7 @@ type UseSkipLimitReturnValue<
   TReadFromStore extends {
     data: object;
     parameters: object;
-    startUpdate?: StartUpdate<object>;
+    updatableData?: object;
   },
   TItem,
 > =
@@ -52,7 +48,7 @@ type ArrayFragmentReference<
   TReadFromStore extends {
     parameters: object;
     data: object;
-    startUpdate?: StartUpdate<object>;
+    updatableData?: object;
   },
   TItem,
 > = FragmentReference<TReadFromStore, ReadonlyArray<TItem>>;
@@ -89,7 +85,7 @@ export function useSkipLimitPagination<
   TReadFromStore extends {
     parameters: object;
     data: object;
-    startUpdate?: StartUpdate<object>;
+    updatableData?: object;
   },
 >(
   loadableField: LoadableField<

@@ -2,7 +2,7 @@ import { Factory } from '@isograph/disposable-types';
 import {
   FragmentReference,
   ExtractParameters,
-  type ExtractStartUpdate,
+  type ExtractStartUpdate as ExtractUpdatableData,
   type ExtractData,
 } from './FragmentReference';
 import {
@@ -23,7 +23,7 @@ export type TopLevelReaderArtifact<
   TReadFromStore extends {
     parameters: object;
     data: object;
-    startUpdate?: StartUpdate<object>;
+    updatableData?: object;
   },
   TClientFieldValue,
   TComponentProps extends Record<PropertyKey, never>,
@@ -35,7 +35,7 @@ export type EagerReaderArtifact<
   TReadFromStore extends {
     parameters: object;
     data: object;
-    startUpdate?: StartUpdate<object>;
+    updatableData?: object;
   },
   TClientFieldValue,
 > = {
@@ -50,7 +50,7 @@ export type ComponentReaderArtifact<
   TReadFromStore extends {
     parameters: object;
     data: object;
-    startUpdate?: StartUpdate<object>;
+    updatableData?: object;
   },
   TComponentProps extends Record<string, unknown> = Record<PropertyKey, never>,
 > = {
@@ -67,13 +67,16 @@ export type ResolverFirstParameter<
   TReadFromStore extends {
     data: object;
     parameters: object;
-    startUpdate?: StartUpdate<object>;
+    updatableData?: object;
   },
 > = {
   data: ExtractData<TReadFromStore>;
   parameters: ExtractParameters<TReadFromStore>;
-  startUpdate: ExtractStartUpdate<TReadFromStore>;
-};
+} & (ExtractUpdatableData<TReadFromStore> extends undefined
+  ? {}
+  : {
+      startUpdate: StartUpdate<ExtractUpdatableData<TReadFromStore>>;
+    });
 
 export type StartUpdate<UpdatableData> = (
   updater: (updatableData: UpdatableData) => void,
@@ -126,7 +129,7 @@ export type ReaderLinkedField = {
   readonly selections: ReaderAst<unknown>;
   readonly arguments: Arguments | null;
   readonly condition: EagerReaderArtifact<
-    { data: object; parameters: object; startUpdate?: StartUpdate<object> },
+    { data: object; parameters: any; updatableData?: object },
     boolean | Link | null
   > | null;
 };
@@ -179,7 +182,7 @@ export type LoadableField<
   TReadFromStore extends {
     data: object;
     parameters: object;
-    startUpdate?: StartUpdate<object>;
+    updatableData?: object;
   },
   TResult,
   TArgs = ExtractParameters<TReadFromStore>,
