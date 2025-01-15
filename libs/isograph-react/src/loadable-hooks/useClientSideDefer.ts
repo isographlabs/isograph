@@ -5,14 +5,14 @@ import {
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { getOrCreateItemInSuspenseCache } from '../core/cache';
 import { useLazyDisposableState } from '@isograph/react-disposable-state';
-import { LoadableField } from '../core/reader';
+import { LoadableField, type StartUpdate } from '../core/reader';
 import { FetchOptions } from '../core/check';
 
 export function useClientSideDefer<
   TReadFromStore extends {
     data: object;
     parameters: object;
-    updatableData?: object;
+    startUpdate?: StartUpdate<object>;
   },
   TResult,
 >(
@@ -29,7 +29,7 @@ export function useClientSideDefer<
   TReadFromStore extends {
     data: object;
     parameters: object;
-    updatableData?: object;
+    startUpdate?: StartUpdate<object>;
   },
   TResult,
   TProvidedArgs extends object,
@@ -47,7 +47,7 @@ export function useClientSideDefer<
   TReadFromStore extends {
     data: object;
     parameters: object;
-    updatableData?: object;
+    startUpdate?: StartUpdate<object>;
   },
   TResult,
   TProvidedArgs extends object,

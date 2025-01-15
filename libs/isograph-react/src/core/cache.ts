@@ -22,7 +22,12 @@ import {
   NormalizationScalarField,
   RefetchQueryNormalizationArtifactWrapper,
 } from '../core/entrypoint';
-import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
+import {
+  ReaderLinkedField,
+  ReaderScalarField,
+  type ReaderAst,
+  type StartUpdate,
+} from './reader';
 import { Argument, ArgumentValue } from './util';
 import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
 import {
@@ -42,7 +47,7 @@ export function getOrCreateItemInSuspenseCache<
   TReadFromStore extends {
     parameters: object;
     data: object;
-    updatableData?: object;
+    startUpdate?: StartUpdate<object>;
   },
   TClientFieldValue,
 >(
@@ -90,7 +95,7 @@ export function getOrCreateCacheForArtifact<
   TReadFromStore extends {
     parameters: object;
     data: object;
-    updatableData?: object;
+    startUpdate?: StartUpdate<object>;
   },
   TClientFieldValue,
 >(
@@ -220,7 +225,7 @@ export function subscribe<
   TReadFromStore extends {
     parameters: object;
     data: object;
-    updatableData?: object;
+    startUpdate?: StartUpdate<object>;
   },
 >(
   environment: IsographEnvironment,

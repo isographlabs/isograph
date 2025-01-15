@@ -2,7 +2,7 @@ import { Factory } from '@isograph/disposable-types';
 import {
   FragmentReference,
   ExtractParameters,
-  type ExtractStartUpdate as ExtractUpdatableData,
+  type ExtractStartUpdate,
   type ExtractData,
 } from './FragmentReference';
 import {
@@ -23,7 +23,7 @@ export type TopLevelReaderArtifact<
   TReadFromStore extends {
     parameters: object;
     data: object;
-    updatableData?: object;
+    startUpdate?: StartUpdate<object>;
   },
   TClientFieldValue,
   TComponentProps extends Record<PropertyKey, never>,
@@ -35,7 +35,7 @@ export type EagerReaderArtifact<
   TReadFromStore extends {
     parameters: object;
     data: object;
-    updatableData?: object;
+    startUpdate?: StartUpdate<object>;
   },
   TClientFieldValue,
 > = {
@@ -50,7 +50,7 @@ export type ComponentReaderArtifact<
   TReadFromStore extends {
     parameters: object;
     data: object;
-    updatableData?: object;
+    startUpdate?: StartUpdate<object>;
   },
   TComponentProps extends Record<string, unknown> = Record<PropertyKey, never>,
 > = {
@@ -67,15 +67,15 @@ export type ResolverFirstParameter<
   TReadFromStore extends {
     data: object;
     parameters: object;
-    updatableData?: object;
+    startUpdate?: StartUpdate<object>;
   },
 > = {
   data: ExtractData<TReadFromStore>;
   parameters: ExtractParameters<TReadFromStore>;
-} & (ExtractUpdatableData<TReadFromStore> extends undefined
+} & (ExtractStartUpdate<TReadFromStore> extends undefined
   ? {}
   : {
-      startUpdate: StartUpdate<ExtractUpdatableData<TReadFromStore>>;
+      startUpdate: ExtractStartUpdate<TReadFromStore>;
     });
 
 export type StartUpdate<UpdatableData> = (
@@ -182,7 +182,7 @@ export type LoadableField<
   TReadFromStore extends {
     data: object;
     parameters: object;
-    updatableData?: object;
+    startUpdate?: StartUpdate<object>;
   },
   TResult,
   TArgs = ExtractParameters<TReadFromStore>,

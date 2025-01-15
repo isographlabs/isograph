@@ -22,6 +22,7 @@ import { logMessage } from './logging';
 import { check, DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
 import { readButDoNotEvaluate } from './read';
 import { getOrCreateCachedComponent } from './componentCache';
+import type { StartUpdate } from './reader';
 
 let networkRequestId = 0;
 
@@ -29,7 +30,7 @@ export function maybeMakeNetworkRequest<
   TReadFromStore extends {
     parameters: object;
     data: object;
-    updatableData?: object;
+    startUpdate?: StartUpdate<object>;
   },
   TClientFieldValue,
 >(
@@ -75,7 +76,7 @@ export function makeNetworkRequest<
   TReadFromStore extends {
     parameters: object;
     data: object;
-    updatableData?: object;
+    startUpdate?: StartUpdate<object>;
   },
   TClientFieldValue,
 >(
@@ -212,7 +213,7 @@ function readDataForOnComplete<
   TReadFromStore extends {
     parameters: object;
     data: object;
-    updatableData?: object;
+    startUpdate?: StartUpdate<object>;
   },
   TClientFieldValue,
 >(

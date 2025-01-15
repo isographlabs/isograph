@@ -12,7 +12,7 @@ import {
 import { useRerenderOnChange } from './useRerenderOnChange';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import { subscribe } from '../core/cache';
-import type { ReaderAst } from '../core/reader';
+import type { ReaderAst, StartUpdate } from '../core/reader';
 
 /**
  * Read the data from a fragment reference and subscribe to updates.
@@ -21,7 +21,7 @@ export function useReadAndSubscribe<
   TReadFromStore extends {
     parameters: object;
     data: object;
-    updatableData?: object;
+    startUpdate?: StartUpdate<object>;
   },
 >(
   fragmentReference: FragmentReference<TReadFromStore, any>,
@@ -45,7 +45,7 @@ export function useSubscribeToMultiple<
   TReadFromStore extends {
     parameters: object;
     data: object;
-    updatableData?: object;
+    startUpdate?: StartUpdate<object>;
   },
 >(
   items: ReadonlyArray<{
