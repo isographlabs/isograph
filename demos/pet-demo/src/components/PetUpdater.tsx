@@ -18,22 +18,17 @@ export const PetUpdater = iso(`
     },
 
     set_pet_tagline
-    tagline @updatable
+    tagline
 
     __refetch
   }
-`)(function PetUpdaterComponent({ data: pet, startUpdate }) {
+`)(function PetUpdaterComponent({ data: pet }) {
   const [selected, setSelected] = useState<PetId | 'NONE'>('NONE');
   const [tagline, setTagline] = useState<string>(pet.tagline);
   // TODO the tagline can change. But we're storing a stale one in state.
   // We should find a way to work around this.
 
-  const updateTagline = () => {
-    startUpdate((pet) => {
-      pet.tagline = tagline;
-    });
-    pet.set_pet_tagline({ input: { tagline } })[1]();
-  };
+  const updateTagline = () => pet.set_pet_tagline({ input: { tagline } })[1]();
 
   return (
     <>
