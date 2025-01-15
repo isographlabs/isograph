@@ -15,14 +15,22 @@ import {
   readButDoNotEvaluate,
   type WithEncounteredRecords,
 } from '../core/read';
-import { LoadableField, type ReaderAst } from '../core/reader';
+import {
+  LoadableField,
+  type ReaderAst,
+  type StartUpdate,
+} from '../core/reader';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 import { maybeUnwrapNetworkRequest } from '../react/useResult';
 import { FetchOptions } from '../core/check';
 
 type UsePaginationReturnValue<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TItem,
 > =
   | {
@@ -86,6 +94,7 @@ export function useConnectionSpecPagination<
   TReadFromStore extends {
     parameters: object;
     data: object;
+    startUpdate?: StartUpdate<object>;
   },
   TItem,
 >(
@@ -128,6 +137,7 @@ export function useConnectionSpecPagination<
       const firstParameter = {
         data,
         parameters: fragmentReference.variables,
+        startUpdate: () => {},
       };
 
       if (

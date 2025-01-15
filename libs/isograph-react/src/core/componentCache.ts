@@ -51,6 +51,7 @@ export function getOrCreateCachedComponent(
           {
             data,
             parameters: fragmentReference.variables,
+            startUpdate: () => {},
           },
           additionalRuntimeProps,
         );

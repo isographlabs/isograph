@@ -22,11 +22,16 @@ import { logMessage } from './logging';
 import { check, DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
 import { readButDoNotEvaluate } from './read';
 import { getOrCreateCachedComponent } from './componentCache';
+import type { StartUpdate } from './reader';
 
 let networkRequestId = 0;
 
 export function maybeMakeNetworkRequest<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
 >(
   environment: IsographEnvironment,
@@ -68,7 +73,11 @@ export function maybeMakeNetworkRequest<
 }
 
 export function makeNetworkRequest<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
 >(
   environment: IsographEnvironment,
@@ -201,7 +210,11 @@ type NetworkRequestStatus =
     };
 
 function readDataForOnComplete<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
 >(
   artifact:
@@ -269,6 +282,7 @@ function readDataForOnComplete<
         return readerArtifact.resolver({
           data: fragmentResult,
           parameters: variables,
+          startUpdate: () => {},
         });
       }
       default: {

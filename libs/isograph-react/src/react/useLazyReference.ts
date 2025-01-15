@@ -8,9 +8,14 @@ import { getOrCreateCacheForArtifact } from '../core/cache';
 import { useLazyDisposableState } from '@isograph/react-disposable-state';
 import { logMessage } from '../core/logging';
 import { FetchOptions } from '../core/check';
+import type { StartUpdate } from '../core/reader';
 
 export function useLazyReference<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
 >(
   entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,

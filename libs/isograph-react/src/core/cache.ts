@@ -22,7 +22,7 @@ import {
   NormalizationScalarField,
   RefetchQueryNormalizationArtifactWrapper,
 } from '../core/entrypoint';
-import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
+import { ReaderLinkedField, ReaderScalarField, type ReaderAst, type StartUpdate } from './reader';
 import { Argument, ArgumentValue } from './util';
 import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
 import {
@@ -39,7 +39,11 @@ import { FetchOptions } from './check';
 export const TYPENAME_FIELD_NAME = '__typename';
 
 export function getOrCreateItemInSuspenseCache<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
 >(
   environment: IsographEnvironment,
@@ -83,7 +87,11 @@ export function stableCopy<T>(value: T): T {
 }
 
 export function getOrCreateCacheForArtifact<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
 >(
   environment: IsographEnvironment,
@@ -209,7 +217,11 @@ export function subscribeToAnyChangesToRecord(
 
 // TODO we should re-read and call callback if the value has changed
 export function subscribe<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
 >(
   environment: IsographEnvironment,
   encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
