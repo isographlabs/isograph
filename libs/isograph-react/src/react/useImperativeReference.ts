@@ -11,7 +11,7 @@ import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import { ROOT_ID } from '../core/IsographEnvironment';
 import { maybeMakeNetworkRequest } from '../core/makeNetworkRequest';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
-import { DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from '../core/check';
+import { FetchOptions } from '../core/check';
 
 // TODO rename this to useImperativelyLoadedEntrypoint
 
@@ -26,7 +26,7 @@ export function useImperativeReference<
     | UnassignedState;
   loadFragmentReference: (
     variables: ExtractParameters<TReadFromStore>,
-    fetchOptions?: FetchOptions,
+    fetchOptions?: FetchOptions<TClientFieldValue>,
   ) => void;
 } {
   const { state, setState } =
@@ -38,15 +38,13 @@ export function useImperativeReference<
     fragmentReference: state,
     loadFragmentReference: (
       variables: ExtractParameters<TReadFromStore>,
-      fetchOptions?: FetchOptions,
+      fetchOptions?: FetchOptions<TClientFieldValue>,
     ) => {
-      const shouldFetch =
-        fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE;
       const [networkRequest, disposeNetworkRequest] = maybeMakeNetworkRequest(
         environment,
         entrypoint,
         variables,
-        shouldFetch,
+        fetchOptions,
       );
       setState([
         {
@@ -57,7 +55,7 @@ export function useImperativeReference<
             nestedRefetchQueries:
               entrypoint.readerWithRefetchQueries.nestedRefetchQueries,
           }),
-          root: { __link: ROOT_ID },
+          root: { __link: ROOT_ID, __typename: entrypoint.concreteType },
           variables,
           networkRequest,
         },

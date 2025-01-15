@@ -1,14 +1,14 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { iso } from '@iso';
 import { Button, Card, CardContent } from '@mui/material';
-import { useImperativeReference } from '@isograph/react';
+import { FragmentReader, useImperativeReference } from '@isograph/react';
 import { UNASSIGNED_STATE } from '@isograph/react-disposable-state';
 
 export const PetTaglineCard = iso(`
-field Pet.PetTaglineCard @component {
-  id
-  tagline
-}
+  field Pet.PetTaglineCard @component {
+    id
+    tagline
+  }
 `)(function PetTaglineCardComponent({ data: pet }) {
   const {
     fragmentReference: mutationRef,
@@ -23,7 +23,7 @@ field Pet.PetTaglineCard @component {
       <CardContent>
         <h2>Tagline</h2>
         <p>&quot;{pet.tagline}&quot;</p>
-        {mutationRef == UNASSIGNED_STATE ? (
+        {mutationRef === UNASSIGNED_STATE ? (
           <Button
             onClick={() => {
               loadMutation({
@@ -37,18 +37,29 @@ field Pet.PetTaglineCard @component {
           >
             Set tagline to SUPER DOG
           </Button>
-        ) : null}
+        ) : (
+          <Suspense fallback="Mutation in flight">
+            <FragmentReader fragmentReference={mutationRef} />
+          </Suspense>
+        )}
       </CardContent>
     </Card>
   );
 });
 
 export const setTagline = iso(`
-  field Mutation.SetTagline($input: SetPetTaglineParams!) {
+  field Mutation.SetTagline($input: SetPetTaglineParams!) @component {
     set_pet_tagline(input: $input) {
       pet {
         tagline
       }
     }
   }
-`)(() => {});
+`)(({ data }) => {
+  return (
+    <>
+      Nice! You updated the pet&apos;s tagline to{' '}
+      {data.set_pet_tagline?.pet?.tagline}!
+    </>
+  );
+});

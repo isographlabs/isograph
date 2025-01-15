@@ -2,9 +2,11 @@ import type { IsographEntrypoint } from '@isograph/react';
 import { type Query__meNameSuccessor__param } from './Query/meNameSuccessor/param_type';
 import { type Query__meName__param } from './Query/meName/param_type';
 import { type Query__nodeField__param } from './Query/nodeField/param_type';
+import { type Query__subquery__param } from './Query/subquery/param_type';
 import entrypoint_Query__meNameSuccessor from '../__isograph/Query/meNameSuccessor/entrypoint';
 import entrypoint_Query__meName from '../__isograph/Query/meName/entrypoint';
 import entrypoint_Query__nodeField from '../__isograph/Query/nodeField/entrypoint';
+import entrypoint_Query__subquery from '../__isograph/Query/subquery/entrypoint';
 
 // This is the type given to regular client fields.
 // This means that the type of the exported iso literal is exactly
@@ -67,6 +69,10 @@ export function iso<T>(
 ): IdentityWithParam<Query__nodeField__param>;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.subquery', T>
+): IdentityWithParam<Query__subquery__param>;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.meNameSuccessor', T>
 ): typeof entrypoint_Query__meNameSuccessor;
 
@@ -78,6 +84,10 @@ export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.nodeField', T>
 ): typeof entrypoint_Query__nodeField;
 
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.subquery', T>
+): typeof entrypoint_Query__subquery;
+
 export function iso(_isographLiteralText: string):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
@@ -85,5 +95,6 @@ export function iso(_isographLiteralText: string):
 {
   throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
       'was not set up, or it failed to identify this call site. Make sure it ' +
-      'is being used verbatim as `iso`.');
+      'is being used verbatim as `iso`. If you cannot use the babel transform, ' + 
+      'set options.no_babel_transform to true in your Isograph config. ');
 }

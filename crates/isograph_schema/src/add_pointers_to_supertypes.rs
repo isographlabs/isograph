@@ -1,13 +1,14 @@
 use common_lang_types::{SelectableFieldName, Span, UnvalidatedTypeName, WithLocation, WithSpan};
 use graphql_lang_types::{GraphQLNamedTypeAnnotation, GraphQLTypeAnnotation};
 use intern::string_key::Intern;
-use isograph_lang_types::{ScalarFieldSelection, Selection, ServerFieldSelection};
+use isograph_lang_types::{ScalarFieldSelection, ServerFieldSelection};
 
 use crate::{
-    FieldType, ProcessTypeDefinitionError, ProcessTypeDefinitionResult, SchemaObject,
-    SchemaServerField, SchemaServerFieldInlineFragmentVariant, SchemaServerFieldVariant,
-    UnvalidatedSchema, ValidatedIsographSelectionVariant, ValidatedScalarFieldAssociatedData,
-    ValidatedTypeRefinementMap,
+    ClientType, FieldType, ProcessTypeDefinitionError, ProcessTypeDefinitionResult, SchemaObject,
+    SchemaServerField, SchemaServerFieldVariant, ServerFieldTypeAssociatedData,
+    ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
+    ValidatedIsographSelectionVariant, ValidatedScalarFieldAssociatedData,
+    ValidatedTypeRefinementMap, LINK_FIELD_NAME,
 };
 use common_lang_types::Location;
 impl UnvalidatedSchema {
@@ -32,33 +33,54 @@ impl UnvalidatedSchema {
                     }));
 
                 let typename_selection = WithSpan::new(
-                    Selection::ServerField(ServerFieldSelection::ScalarField(
-                        ScalarFieldSelection {
-                            arguments: vec![],
-                            associated_data: ValidatedScalarFieldAssociatedData {
-                                location: FieldType::ServerField(
-                                    *subtype
-                                        .encountered_fields
-                                        .get(&"__typename".intern().into())
-                                        .expect("Expected __typename to exist")
-                                        .as_server_field()
-                                        .expect("Expected __typename to be server field"),
-                                ),
-                                selection_variant: ValidatedIsographSelectionVariant::Regular,
-                            },
-                            directives: vec![],
-                            name: WithLocation::new(
-                                "__typename".intern().into(),
-                                Location::generated(),
+                    ServerFieldSelection::ScalarField(ScalarFieldSelection {
+                        arguments: vec![],
+                        associated_data: ValidatedScalarFieldAssociatedData {
+                            location: FieldType::ServerField(
+                                *subtype
+                                    .encountered_fields
+                                    .get(&"__typename".intern().into())
+                                    .expect("Expected __typename to exist")
+                                    .as_server_field()
+                                    .expect("Expected __typename to be server field"),
                             ),
-                            reader_alias: None,
-                            unwraps: vec![],
+                            selection_variant: ValidatedIsographSelectionVariant::Regular,
                         },
-                    )),
+                        directives: vec![],
+                        name: WithLocation::new(
+                            "__typename".intern().into(),
+                            Location::generated(),
+                        ),
+                        reader_alias: None,
+                    }),
                     Span::todo_generated(),
                 );
 
-                let condition_selection_set = vec![typename_selection];
+                let link_selection = WithSpan::new(
+                    ServerFieldSelection::ScalarField(ScalarFieldSelection {
+                        arguments: vec![],
+                        associated_data: ValidatedScalarFieldAssociatedData {
+                            location: FieldType::ClientField(
+                                match *subtype
+                                    .encountered_fields
+                                    .get(&(*LINK_FIELD_NAME).into())
+                                    .expect("Expected link to exist")
+                                    .as_client_field()
+                                    .expect("Expected link to be client field")
+                                {
+                                    ClientType::ClientField(client_field_id) => client_field_id,
+                                },
+                            ),
+                            selection_variant: ValidatedIsographSelectionVariant::Regular,
+                        },
+                        directives: vec![],
+                        name: WithLocation::new(*LINK_FIELD_NAME, Location::generated()),
+                        reader_alias: None,
+                    }),
+                    Span::todo_generated(),
+                );
+
+                let condition_selection_set = vec![typename_selection, link_selection];
 
                 let server_field = SchemaServerField {
                     description: Some(
@@ -70,15 +92,17 @@ impl UnvalidatedSchema {
                     name: WithLocation::new(field_name, Location::generated()),
                     parent_type_id: subtype.id,
                     arguments: vec![],
-                    associated_data,
+                    associated_data: ServerFieldTypeAssociatedData {
+                        type_name: associated_data,
+                        variant: SchemaServerFieldVariant::InlineFragment(
+                            ServerFieldTypeAssociatedDataInlineFragment {
+                                server_field_id: next_server_field_id,
+                                concrete_type,
+                                condition_selection_set,
+                            },
+                        ),
+                    },
                     is_discriminator: false,
-                    variant: SchemaServerFieldVariant::InlineFragment(
-                        SchemaServerFieldInlineFragmentVariant {
-                            server_field_id: next_server_field_id,
-                            concrete_type,
-                            condition_selection_set,
-                        },
-                    ),
                 };
 
                 self.server_fields.push(server_field);

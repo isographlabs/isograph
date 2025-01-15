@@ -1,0 +1,30 @@
+on:
+  workflow_call:
+    inputs:
+      binary:
+        required: true
+        type: string
+      params:
+        required: false
+        type: string
+
+jobs:
+  build-and-run-binary:
+    name: Run ${{ inputs.binary }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          target: x86_64-unknown-linux-musl
+      - name: Build ${{ inputs.binary }} with cargo
+        run: cargo build --bin ${{ inputs.binary }} --target x86_64-unknown-linux-musl --release
+      - name: Make artifact executable
+        run: chmod +x ./target/x86_64-unknown-linux-musl/release/${{ inputs.binary }}
+      - name: Run ${{ inputs.binary }}
+        run: ./target/x86_64-unknown-linux-musl/release/${{ inputs.binary }} ${{ inputs.params }}
+      - name: Check working directory status
+        run: './scripts/check-git-status.sh'

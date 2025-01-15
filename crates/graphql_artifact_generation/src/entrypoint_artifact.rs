@@ -1,9 +1,12 @@
 use std::collections::BTreeSet;
 
-use common_lang_types::{ArtifactPathAndContent, QueryOperationName, VariableName};
+use common_lang_types::{
+    ArtifactPathAndContent, IsographObjectTypeName, ObjectTypeAndFieldName, QueryOperationName,
+    VariableName,
+};
 use intern::{string_key::Intern, Lookup};
 use isograph_config::GenerateFileExtensionsOption;
-use isograph_lang_types::{ClientFieldId, IsographSelectionVariant};
+use isograph_lang_types::{ClientFieldId, IsographSelectionVariant, ServerObjectId};
 use isograph_schema::{
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
@@ -15,7 +18,7 @@ use isograph_schema::{
 
 use crate::{
     generate_artifacts::{
-        generate_path, NormalizationAstText, QueryText, RefetchQueryArtifactImport, ENTRYPOINT,
+        NormalizationAstText, QueryText, RefetchQueryArtifactImport, ENTRYPOINT,
         RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
     },
     imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
@@ -30,6 +33,7 @@ struct EntrypointArtifactInfo<'schema> {
     query_text: QueryText,
     normalization_ast_text: NormalizationAstText,
     refetch_query_artifact_import: RefetchQueryArtifactImport,
+    concrete_type: IsographObjectTypeName,
 }
 
 pub(crate) fn generate_entrypoint_artifacts(
@@ -63,7 +67,7 @@ pub(crate) fn generate_entrypoint_artifacts(
             .variable_definitions
             .iter()
             .map(|variable_definition| &variable_definition.item),
-        &schema.mutation_root_operation_name(),
+        &schema.find_mutation(),
         file_extensions,
     )
 }
@@ -76,7 +80,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
     traversal_state: &ScalarClientFieldTraversalState,
     encountered_client_field_map: &ClientFieldToCompletedMergeTraversalStateMap,
     variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
-    default_root_operation_name: &Option<&RootOperationName>,
+    default_root_operation: &Option<(&ServerObjectId, &RootOperationName)>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> Vec<ArtifactPathAndContent> {
     let query_name = entrypoint.name.into();
@@ -88,14 +92,16 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
         .fetchable_types
         .get(&entrypoint.parent_object_id)
         .unwrap_or_else(|| {
-            default_root_operation_name.unwrap_or_else(|| {
-                schema
-                    .fetchable_types
-                    .iter()
-                    .next()
-                    .expect("Expected at least one fetchable type to exist")
-                    .1
-            })
+            default_root_operation
+                .map(|(_, operation_name)| operation_name)
+                .unwrap_or_else(|| {
+                    schema
+                        .fetchable_types
+                        .iter()
+                        .next()
+                        .expect("Expected at least one fetchable type to exist")
+                        .1
+                })
         });
 
     let parent_object = schema.server_field_data.object(entrypoint.parent_object_id);
@@ -142,7 +148,27 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
         generate_refetch_query_artifact_import(&refetch_paths_with_variables, file_extensions);
 
     let normalization_ast_text =
-        generate_normalization_ast_text(schema, merged_selection_map.values(), 0);
+        generate_normalization_ast_text(schema, merged_selection_map.values(), 1);
+
+    let concrete_type = schema.server_field_data.object(
+        if schema
+            .fetchable_types
+            .contains_key(&entrypoint.parent_object_id)
+        {
+            entrypoint.parent_object_id
+        } else {
+            *default_root_operation
+                .map(|(operation_id, _)| operation_id)
+                .unwrap_or_else(|| {
+                    schema
+                        .fetchable_types
+                        .iter()
+                        .next()
+                        .expect("Expected at least one fetchable type to exist")
+                        .0
+                })
+        },
+    );
 
     let mut paths_and_contents = vec![EntrypointArtifactInfo {
         query_text,
@@ -150,6 +176,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
         parent_type: parent_object,
         normalization_ast_text,
         refetch_query_artifact_import,
+        concrete_type: concrete_type.name,
     }
     .path_and_content(file_extensions)];
 
@@ -223,7 +250,7 @@ fn generate_refetch_query_artifact_import(
     RefetchQueryArtifactImport(output)
 }
 
-impl<'schema> EntrypointArtifactInfo<'schema> {
+impl EntrypointArtifactInfo<'_> {
     fn path_and_content(
         self,
         file_extensions: GenerateFileExtensionsOption,
@@ -233,13 +260,16 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             parent_type,
             ..
         } = &self;
-
-        let directory = generate_path(parent_type.name, (*query_name).into());
+        let field_name = (*query_name).into();
+        let type_name = parent_type.name;
 
         ArtifactPathAndContent {
-            relative_directory: directory,
             file_content: self.file_contents(file_extensions),
             file_name_prefix: *ENTRYPOINT,
+            type_and_field: Some(ObjectTypeAndFieldName {
+                type_name,
+                field_name,
+            }),
         }
     }
 
@@ -250,6 +280,7 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             refetch_query_artifact_import,
             query_name,
             parent_type,
+            concrete_type,
         } = self;
         let ts_file_extension = file_extensions.ts();
         let entrypoint_params_typename = format!("{}__{}__param", parent_type.name, query_name);
@@ -267,7 +298,10 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             import readerResolver from './{resolver_reader_file_name}{ts_file_extension}';\n\
             {refetch_query_artifact_import}\n\n\
             const queryText = '{query_text}';\n\n\
-            const normalizationAst: NormalizationAst = {normalization_ast_text};\n\
+            const normalizationAst: NormalizationAst = {{\n\
+            {}kind: \"NormalizationAst\",\n\
+            {}selections: {normalization_ast_text},\n\
+            }};\n\
             const artifact: IsographEntrypoint<\n\
             {}{entrypoint_params_typename},\n\
             {}{entrypoint_output_type_name}\n\
@@ -278,6 +312,7 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             {}  queryText,\n\
             {}  normalizationAst,\n\
             {}}},\n\
+            {}concreteType: \"{concrete_type}\",\n\
             {}readerWithRefetchQueries: {{\n\
             {}  kind: \"ReaderWithRefetchQueries\",\n\
             {}  nestedRefetchQueries,\n\
@@ -285,7 +320,7 @@ impl<'schema> EntrypointArtifactInfo<'schema> {
             {}}},\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  "
+            "  ","  ","  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     }
 }

@@ -4,6 +4,14 @@
     "compile": {
       "dependsOn": ["^compile"],
       "outputs": ["dist/**"]
+    },
+    "//#build": {
+      "inputs": ["crates/**", "relay-crates/**", "Cargo.*"],
+      "outputs": ["**/release/isograph_cli*", "**/debug/isograph_cli*"]
+    },
+    "//#cross": {
+      "inputs": ["crates/**", "relay-crates/**", "Cargo.*"],
+      "outputs": ["**/release/isograph_cli*", "**/debug/isograph_cli*"]
     }
   }
 }

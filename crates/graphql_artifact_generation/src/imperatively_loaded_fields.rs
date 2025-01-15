@@ -1,10 +1,12 @@
-use common_lang_types::{ArtifactPathAndContent, IsographObjectTypeName, SelectableFieldName};
+use common_lang_types::{
+    ArtifactPathAndContent, IsographObjectTypeName, ObjectTypeAndFieldName, SelectableFieldName,
+};
 use intern::string_key::Intern;
 use isograph_lang_types::RefetchQueryIndex;
 use isograph_schema::{ImperativelyLoadedFieldArtifactInfo, ValidatedSchema, REFETCH_FIELD_NAME};
 
 use crate::{
-    generate_artifacts::{generate_path, NormalizationAstText, QueryText},
+    generate_artifacts::{NormalizationAstText, QueryText},
     normalization_ast_text::generate_normalization_ast_text,
     query_text::generate_query_text,
 };
@@ -16,6 +18,7 @@ pub(crate) struct ImperativelyLoadedEntrypointArtifactInfo {
     pub root_fetchable_field: SelectableFieldName,
     pub root_fetchable_field_parent_object: IsographObjectTypeName,
     pub refetch_query_index: RefetchQueryIndex,
+    pub concrete_type: IsographObjectTypeName,
 }
 
 impl ImperativelyLoadedEntrypointArtifactInfo {
@@ -27,16 +30,20 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
             ..
         } = &self;
 
-        let relative_directory =
-            generate_path(*root_fetchable_field_parent_object, *root_fetchable_field);
         let file_name_prefix = format!("{}__{}", *REFETCH_FIELD_NAME, refetch_query_index.0)
             .intern()
             .into();
 
+        let type_name = *root_fetchable_field_parent_object;
+        let field_name = *root_fetchable_field;
+
         ArtifactPathAndContent {
             file_content: self.file_contents(),
-            relative_directory,
             file_name_prefix,
+            type_and_field: Some(ObjectTypeAndFieldName {
+                type_name,
+                field_name,
+            }),
         }
     }
 }
@@ -46,13 +53,17 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
         let ImperativelyLoadedEntrypointArtifactInfo {
             normalization_ast_text: normalization_ast,
             query_text,
+            concrete_type,
             ..
         } = self;
 
         format!(
             "import type {{ IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact }} from '@isograph/react';\n\
             const queryText = '{query_text}';\n\n\
-            const normalizationAst: NormalizationAst = {normalization_ast};\n\
+            const normalizationAst: NormalizationAst = {{\n\
+            {}kind: \"NormalizationAst\",\n\
+            {}selections: {normalization_ast},\n\
+            }};\n\
             const artifact: RefetchQueryNormalizationArtifact = {{\n\
             {}kind: \"RefetchQuery\",\n\
             {}networkRequestInfo: {{\n\
@@ -60,8 +71,12 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
             {}  queryText,\n\
             {}  normalizationAst,\n\
             {}}},\n\
+            {}concreteType: \"{concrete_type}\",\n\
             }};\n\n\
             export default artifact;\n",
+            "  ",
+            "  ",
+            "  ",
             "  ",
             "  ",
             "  ",
@@ -85,6 +100,7 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field(
         variable_definitions,
         root_operation_name,
         query_name,
+        concrete_type,
     } = imperatively_loaded_field_artifact_info;
 
     let query_text = generate_query_text(
@@ -98,7 +114,7 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field(
     );
 
     let normalization_ast_text =
-        generate_normalization_ast_text(schema, merged_selection_set.values(), 0);
+        generate_normalization_ast_text(schema, merged_selection_set.values(), 1);
 
     ImperativelyLoadedEntrypointArtifactInfo {
         normalization_ast_text,
@@ -106,6 +122,7 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field(
         root_fetchable_field,
         root_fetchable_field_parent_object: root_parent_object,
         refetch_query_index,
+        concrete_type,
     }
     .path_and_content()
 }

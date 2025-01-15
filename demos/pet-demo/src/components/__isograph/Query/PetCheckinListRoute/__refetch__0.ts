@@ -11,50 +11,53 @@ const queryText = 'mutation Query__make_super ($checkin_id: ID!) {\
   },\
 }';
 
-const normalizationAst: NormalizationAst = [
-  {
-    kind: "Linked",
-    fieldName: "make_checkin_super",
-    arguments: [
-      [
-        "checkin_id",
-        { kind: "Variable", name: "checkin_id" },
-      ],
-    ],
-    concreteType: "MakeCheckinSuperResponse",
-    selections: [
-      {
-        kind: "Linked",
-        fieldName: "checkin",
-        arguments: null,
-        concreteType: null,
-        selections: [
-          {
-            kind: "InlineFragment",
-            type: "Checkin",
-            selections: [
-              {
-                kind: "Scalar",
-                fieldName: "__typename",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "id",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "location",
-                arguments: null,
-              },
-            ],
-          },
+const normalizationAst: NormalizationAst = {
+  kind: "NormalizationAst",
+  selections: [
+    {
+      kind: "Linked",
+      fieldName: "make_checkin_super",
+      arguments: [
+        [
+          "checkin_id",
+          { kind: "Variable", name: "checkin_id" },
         ],
-      },
-    ],
-  },
-];
+      ],
+      concreteType: "MakeCheckinSuperResponse",
+      selections: [
+        {
+          kind: "Linked",
+          fieldName: "checkin",
+          arguments: null,
+          concreteType: null,
+          selections: [
+            {
+              kind: "InlineFragment",
+              type: "Checkin",
+              selections: [
+                {
+                  kind: "Scalar",
+                  fieldName: "__typename",
+                  arguments: null,
+                },
+                {
+                  kind: "Scalar",
+                  fieldName: "id",
+                  arguments: null,
+                },
+                {
+                  kind: "Scalar",
+                  fieldName: "location",
+                  arguments: null,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
 const artifact: RefetchQueryNormalizationArtifact = {
   kind: "RefetchQuery",
   networkRequestInfo: {
@@ -62,6 +65,7 @@ const artifact: RefetchQueryNormalizationArtifact = {
     queryText,
     normalizationAst,
   },
+  concreteType: "Mutation",
 };
 
 export default artifact;

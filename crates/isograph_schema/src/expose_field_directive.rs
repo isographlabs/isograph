@@ -1,6 +1,7 @@
 use common_lang_types::{
     DirectiveArgumentName, DirectiveName, IsographObjectTypeName, LinkedFieldName, Location,
-    SelectableFieldName, Span, StringLiteralValue, ValueKeyName, WithLocation, WithSpan,
+    ObjectTypeAndFieldName, SelectableFieldName, Span, StringLiteralValue, ValueKeyName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     from_graph_ql_directive, DeserializationError, GraphQLConstantValue, GraphQLDirective,
@@ -8,14 +9,14 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, IsographSelectionVariant, NonConstantValue,
-    ScalarFieldSelection, SelectableServerFieldId, Selection, ServerFieldId, ServerFieldSelection,
+    ScalarFieldSelection, SelectableServerFieldId, ServerFieldId, ServerFieldSelection,
     ServerObjectId,
 };
 use serde::Deserialize;
 
 use crate::{
-    generate_refetch_field_strategy, ArgumentMap, ClientField, ClientFieldVariant, FieldMapItem,
-    FieldType, ImperativelyLoadedFieldVariant, ObjectTypeAndFieldName, PrimaryFieldInfo,
+    generate_refetch_field_strategy, ArgumentMap, ClientField, ClientFieldVariant, ClientType,
+    FieldMapItem, FieldType, ImperativelyLoadedFieldVariant, PrimaryFieldInfo,
     ProcessTypeDefinitionError, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
     UnvalidatedSchema, UnvalidatedVariableDefinition,
 };
@@ -121,7 +122,7 @@ impl UnvalidatedSchema {
 
         // TODO do not use mutation naming here
         let mutation_field = self.server_field(mutation_subfield_id);
-        let mutation_field_payload_type_name = *mutation_field.associated_data.inner();
+        let mutation_field_payload_type_name = *mutation_field.associated_data.type_name.inner();
         let client_field_scalar_selection_name = expose_as.unwrap_or(mutation_field.name.item);
         // TODO what is going on here. Should mutation_field have a checked way of converting to LinkedField?
         let top_level_schema_field_name = mutation_field.name.item.lookup().intern().into();
@@ -163,7 +164,7 @@ impl UnvalidatedSchema {
                         let server_field = self.server_field(*server_field_id);
 
                         // This is the parent type name (Pet)
-                        let inner = server_field.associated_data.inner();
+                        let inner = server_field.associated_data.type_name.inner();
 
                         // TODO validate that the payload object has no plural fields in between
 
@@ -199,16 +200,13 @@ impl UnvalidatedSchema {
                         ),
                         reader_alias: None,
                         associated_data: IsographSelectionVariant::Regular,
-                        unwraps: vec![],
                         // TODO what about arguments? How would we handle them?
                         arguments: vec![],
                         directives: vec![],
                     };
 
                     WithSpan::new(
-                        Selection::ServerField(ServerFieldSelection::ScalarField(
-                            scalar_field_selection,
-                        )),
+                        ServerFieldSelection::ScalarField(scalar_field_selection),
                         Span::todo_generated(),
                     )
                 })
@@ -239,7 +237,6 @@ impl UnvalidatedSchema {
                 id: mutation_field_client_field_id,
                 reader_selection_set: None,
 
-                unwraps: vec![],
                 variant: ClientFieldVariant::ImperativelyLoadedField(
                     ImperativelyLoadedFieldVariant {
                         client_field_scalar_selection_name: client_field_scalar_selection_name
@@ -289,7 +286,8 @@ impl UnvalidatedSchema {
                     ),
                 )),
             };
-            self.client_fields.push(mutation_client_field);
+            self.client_fields
+                .push(ClientType::ClientField(mutation_client_field));
 
             self.insert_client_field_on_object(
                 client_field_scalar_selection_name,
@@ -314,7 +312,10 @@ impl UnvalidatedSchema {
             .object_mut(client_field_parent_object_id);
         if client_field_parent
             .encountered_fields
-            .insert(mutation_field_name, FieldType::ClientField(client_field_id))
+            .insert(
+                mutation_field_name,
+                FieldType::ClientField(ClientType::ClientField(client_field_id)),
+            )
             .is_some()
         {
             return Err(WithLocation::new(

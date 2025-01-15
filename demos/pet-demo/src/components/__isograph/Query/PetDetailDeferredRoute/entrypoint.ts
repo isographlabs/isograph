@@ -11,31 +11,34 @@ const queryText = 'query PetDetailDeferredRoute ($id: ID!) {\
   },\
 }';
 
-const normalizationAst: NormalizationAst = [
-  {
-    kind: "Linked",
-    fieldName: "pet",
-    arguments: [
-      [
-        "id",
-        { kind: "Variable", name: "id" },
+const normalizationAst: NormalizationAst = {
+  kind: "NormalizationAst",
+  selections: [
+    {
+      kind: "Linked",
+      fieldName: "pet",
+      arguments: [
+        [
+          "id",
+          { kind: "Variable", name: "id" },
+        ],
       ],
-    ],
-    concreteType: "Pet",
-    selections: [
-      {
-        kind: "Scalar",
-        fieldName: "id",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "name",
-        arguments: null,
-      },
-    ],
-  },
-];
+      concreteType: "Pet",
+      selections: [
+        {
+          kind: "Scalar",
+          fieldName: "id",
+          arguments: null,
+        },
+        {
+          kind: "Scalar",
+          fieldName: "name",
+          arguments: null,
+        },
+      ],
+    },
+  ],
+};
 const artifact: IsographEntrypoint<
   Query__PetDetailDeferredRoute__param,
   Query__PetDetailDeferredRoute__output_type
@@ -46,6 +49,7 @@ const artifact: IsographEntrypoint<
     queryText,
     normalizationAst,
   },
+  concreteType: "Query",
   readerWithRefetchQueries: {
     kind: "ReaderWithRefetchQueries",
     nestedRefetchQueries,

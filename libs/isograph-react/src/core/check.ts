@@ -1,11 +1,10 @@
 import { getParentRecordKey } from './cache';
-import { NormalizationAst } from './entrypoint';
+import { NormalizationAstNodes } from './entrypoint';
 import { Variables } from './FragmentReference';
 import {
   getLink,
   IsographEnvironment,
   Link,
-  ROOT_ID,
   StoreRecord,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
@@ -14,8 +13,10 @@ export type ShouldFetch = 'Yes' | 'No' | 'IfNecessary';
 
 export const DEFAULT_SHOULD_FETCH_VALUE: ShouldFetch = 'IfNecessary';
 
-export type FetchOptions = {
+export type FetchOptions<TReadOutData> = {
   shouldFetch?: ShouldFetch;
+  onComplete?: (data: TReadOutData) => void;
+  onError?: () => void;
 };
 
 export type CheckResult =
@@ -29,15 +30,19 @@ export type CheckResult =
 
 export function check(
   environment: IsographEnvironment,
-  normalizationAst: NormalizationAst,
+  normalizationAst: NormalizationAstNodes,
   variables: Variables,
+  root: Link,
 ): CheckResult {
+  const recordsById = (environment.store[root.__typename] ??= {});
+  const newStoreRecord = (recordsById[root.__link] ??= {});
+
   const checkResult = checkFromRecord(
     environment,
     normalizationAst,
     variables,
-    environment.store[ROOT_ID],
-    { __link: ROOT_ID },
+    newStoreRecord,
+    root,
   );
   logMessage(environment, {
     kind: 'EnvironmentCheck',
@@ -48,7 +53,7 @@ export function check(
 
 function checkFromRecord(
   environment: IsographEnvironment,
-  normalizationAst: NormalizationAst,
+  normalizationAst: NormalizationAstNodes,
   variables: Variables,
   record: StoreRecord,
   recordLink: Link,
@@ -97,7 +102,8 @@ function checkFromRecord(
               );
             }
 
-            const linkedRecord = environment.store[link.__link];
+            const linkedRecord =
+              environment.store[link.__typename]?.[link.__link];
 
             if (linkedRecord === undefined) {
               return {
@@ -130,7 +136,8 @@ function checkFromRecord(
             );
           }
 
-          const linkedRecord = environment.store[link.__link];
+          const linkedRecord =
+            environment.store[link.__typename]?.[link.__link];
 
           if (linkedRecord === undefined) {
             return {

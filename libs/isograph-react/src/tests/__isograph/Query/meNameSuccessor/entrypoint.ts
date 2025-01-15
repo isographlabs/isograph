@@ -18,57 +18,60 @@ const queryText = 'query meNameSuccessor  {\
   },\
 }';
 
-const normalizationAst: NormalizationAst = [
-  {
-    kind: "Linked",
-    fieldName: "me",
-    arguments: null,
-    concreteType: "Economist",
-    selections: [
-      {
-        kind: "Scalar",
-        fieldName: "id",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "name",
-        arguments: null,
-      },
-      {
-        kind: "Linked",
-        fieldName: "successor",
-        arguments: null,
-        concreteType: "Economist",
-        selections: [
-          {
-            kind: "Scalar",
-            fieldName: "id",
-            arguments: null,
-          },
-          {
-            kind: "Linked",
-            fieldName: "successor",
-            arguments: null,
-            concreteType: "Economist",
-            selections: [
-              {
-                kind: "Scalar",
-                fieldName: "id",
-                arguments: null,
-              },
-              {
-                kind: "Scalar",
-                fieldName: "name",
-                arguments: null,
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  },
-];
+const normalizationAst: NormalizationAst = {
+  kind: "NormalizationAst",
+  selections: [
+    {
+      kind: "Linked",
+      fieldName: "me",
+      arguments: null,
+      concreteType: "Economist",
+      selections: [
+        {
+          kind: "Scalar",
+          fieldName: "id",
+          arguments: null,
+        },
+        {
+          kind: "Scalar",
+          fieldName: "name",
+          arguments: null,
+        },
+        {
+          kind: "Linked",
+          fieldName: "successor",
+          arguments: null,
+          concreteType: "Economist",
+          selections: [
+            {
+              kind: "Scalar",
+              fieldName: "id",
+              arguments: null,
+            },
+            {
+              kind: "Linked",
+              fieldName: "successor",
+              arguments: null,
+              concreteType: "Economist",
+              selections: [
+                {
+                  kind: "Scalar",
+                  fieldName: "id",
+                  arguments: null,
+                },
+                {
+                  kind: "Scalar",
+                  fieldName: "name",
+                  arguments: null,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
 const artifact: IsographEntrypoint<
   Query__meNameSuccessor__param,
   Query__meNameSuccessor__output_type
@@ -79,6 +82,7 @@ const artifact: IsographEntrypoint<
     queryText,
     normalizationAst,
   },
+  concreteType: "Query",
   readerWithRefetchQueries: {
     kind: "ReaderWithRefetchQueries",
     nestedRefetchQueries,

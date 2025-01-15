@@ -32,6 +32,10 @@ yarn add --dev @isograph/babel-plugin
 yarn add @isograph/react
 ```
 
+:::tip
+For each of these packages, you should install the latest `main` version, which can be found [here](https://www.npmjs.com/package/@isograph/react?activeTab=versions). So e.g. `yarn add --dev @isograph/compiler@0.0.0-main-c8c7d9f2`. Lots of great features have shipped since we cut a release!
+:::
+
 Installing the compiler also adds the command `yarn iso` and `yarn iso --watch`. But hang tight — before this command works, you'll need to create a folder, download your schema and create an `isograph.config.json` file!
 
 ## Create an `isograph.config.json`
@@ -146,6 +150,11 @@ function makeNetworkRequest<T>(
     const json = await response.json();
 
     if (response.ok) {
+      if (json.errors != null) {
+        throw new Error('GraphQLError', {
+          cause: json.errors,
+        });
+      }
       return json;
     } else {
       throw new Error('NetworkError', {
@@ -190,6 +199,12 @@ When React re-renders the children of a suspense boundary, their hooks lose all 
 ## Create the `Root.HomePage` component
 
 **Finally**, we can get to building our first client field, the `Root.HomePage` component!
+
+:::note
+In the Star Wars API, the query object is `Root` (i.e. the Star Wars schema contains `schema { query: Root }`). That's why in this quickstart, we define a client field on the `Root` object: `Root.HomePage`.
+
+**If you're following along with this quickstart, but using a different schema, then you most likely will want to define a client field on a different object, such as `Query.HomePage`!**
+:::
 
 An Isograph app will be almost entirely made up of client fields. There are two important important facts about client fields that you should know:
 
@@ -456,6 +471,6 @@ Now, if you refresh, the UI will be divided into subcomponents and look exactly 
 
 Congratulations! You just built your first Isograph app.
 
-Want more? Try extracting the sorted list of films into its own client field (no need to use `@component` for this one.) Use hooks in your components (they work!) Check out the [magic mutation fields](/docs/expose-field-directives/) documentation to learn about how Isograph lets you update your data.
+Want more? Try extracting the sorted list of films into its own client field (no need to use `@component` for this one.) Use hooks in your components (they work!) Check out the [mutation](/docs/mutation/), [pagination](/docs/pagination/), and the [loadable fields](/docs/loadable-fields/) documentation!
 
 Or, [join the Discord](https://discord.gg/qcHUxb6deQ)!

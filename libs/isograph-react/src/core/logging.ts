@@ -7,11 +7,11 @@ import {
 } from './IsographEnvironment';
 import {
   IsographEntrypoint,
-  NormalizationAst,
+  type NormalizationAstNodes,
   RefetchQueryNormalizationArtifact,
 } from './entrypoint';
 import { FragmentReference, Variables } from './FragmentReference';
-import { NetworkResponseObject } from './cache';
+import { NetworkResponseObject, type EncounteredIds } from './cache';
 import { Arguments } from './util';
 import { ReadDataResult } from './read';
 import { CheckResult } from './check';
@@ -25,14 +25,14 @@ export type LogMessage =
     }
   | {
       kind: 'AboutToNormalize';
-      normalizationAst: NormalizationAst;
+      normalizationAst: NormalizationAstNodes;
       networkResponse: NetworkResponseObject;
       variables: Variables;
     }
   | {
       kind: 'AfterNormalization';
       store: IsographStore;
-      encounteredIds: Set<string>;
+      encounteredIds: EncounteredIds;
     }
   | {
       kind: 'DeepEqualityCheck';
@@ -58,6 +58,11 @@ export type LogMessage =
       kind: 'ReceivedNetworkResponse';
       // TODO should be object
       networkResponse: any;
+      networkRequestId: string;
+    }
+  | {
+      kind: 'ReceivedNetworkError';
+      error: any;
       networkRequestId: string;
     }
   | {

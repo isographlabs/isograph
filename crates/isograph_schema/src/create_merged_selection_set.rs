@@ -10,15 +10,15 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, IsographSelectionVariant, NonConstantValue,
-    RefetchQueryIndex, SelectableServerFieldId, Selection, SelectionFieldArgument, ServerFieldId,
-    ServerFieldSelection, ServerObjectId, VariableDefinition,
+    RefetchQueryIndex, SelectableServerFieldId, SelectionFieldArgument, SelectionType,
+    ServerFieldId, ServerFieldSelection, ServerObjectId, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
 use crate::{
     categorize_field_loadability, create_transformed_name_and_arguments,
     expose_field_directive::RequiresRefinement, transform_arguments_with_child_context,
-    transform_name_and_arguments_with_child_variable_context, FieldType,
+    transform_name_and_arguments_with_child_variable_context, ClientFieldVariant, FieldType,
     ImperativelyLoadedFieldVariant, Loadability, NameAndArguments, PathToRefetchField,
     RootOperationName, SchemaObject, SchemaServerFieldVariant, UnvalidatedVariableDefinition,
     ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedScalarFieldSelection,
@@ -44,6 +44,7 @@ lazy_static! {
     pub static ref REFETCH_FIELD_NAME: ScalarFieldName = "__refetch".intern().into();
     pub static ref NODE_FIELD_NAME: LinkedFieldName = "node".intern().into();
     pub static ref TYPENAME_FIELD_NAME: ScalarFieldName = "__typename".intern().into();
+    pub static ref LINK_FIELD_NAME: ScalarFieldName = "link".intern().into();
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -178,6 +179,7 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
 
     pub root_operation_name: RootOperationName,
     pub query_name: QueryOperationName,
+    pub concrete_type: IsographObjectTypeName,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -592,6 +594,7 @@ fn process_imperatively_loaded_field(
         refetch_query_index: RefetchQueryIndex(index as u32),
         root_operation_name,
         query_name,
+        concrete_type: schema.server_field_data.object(root_object_id).name,
     }
 }
 
@@ -660,56 +663,62 @@ fn merge_validated_selections_into_selection_map(
 ) {
     for validated_selection in validated_selections.iter().filter(filter_id_fields) {
         match &validated_selection.item {
-            Selection::ServerField(validated_server_field) => {
-                match validated_server_field {
-                    ServerFieldSelection::ScalarField(scalar_field_selection) => {
-                        match &scalar_field_selection.associated_data.location {
-                            FieldType::ServerField(_) => {
-                                merge_scalar_server_field(
-                                    scalar_field_selection,
-                                    parent_map,
-                                    variable_context,
+            ServerFieldSelection::ScalarField(scalar_field_selection) => {
+                match &scalar_field_selection.associated_data.location {
+                    FieldType::ServerField(_) => {
+                        merge_scalar_server_field(
+                            scalar_field_selection,
+                            parent_map,
+                            variable_context,
+                        );
+                    }
+                    FieldType::ClientField(client_field_id) => {
+                        let newly_encountered_scalar_client_field =
+                            schema.client_field(*client_field_id);
+
+                        // If the field is selected loadably or is imperative, we must note the refetch path,
+                        // because this results in an artifact being generated.
+                        match categorize_field_loadability(
+                            newly_encountered_scalar_client_field,
+                            &scalar_field_selection.associated_data.selection_variant,
+                        ) {
+                            Some(Loadability::LoadablySelectedField(_loadable_variant)) => {
+                                create_merged_selection_map_for_field_and_insert_into_global_map(
+                                    schema,
+                                    parent_type,
+                                    newly_encountered_scalar_client_field
+                                        .selection_set_for_parent_query(),
+                                    encountered_client_field_map,
+                                    FieldType::ClientField(
+                                        newly_encountered_scalar_client_field.id,
+                                    ),
+                                    &newly_encountered_scalar_client_field
+                                        .initial_variable_context(),
+                                );
+
+                                let state = encountered_client_field_map
+                                    .get_mut(&FieldType::ClientField(*client_field_id))
+                                    .expect(
+                                        "Expected field to exist when \
+                                                it is encountered loadably",
+                                    );
+                                state.was_ever_selected_loadably = true;
+                            }
+                            Some(Loadability::ImperativelyLoadedField(variant)) => {
+                                insert_imperative_field_into_refetch_paths(
+                                    schema,
+                                    encountered_client_field_map,
+                                    merge_traversal_state,
+                                    newly_encountered_scalar_client_field,
+                                    parent_type,
+                                    variant,
                                 );
                             }
-                            FieldType::ClientField(client_field_id) => {
-                                let newly_encountered_scalar_client_field =
-                                    schema.client_field(*client_field_id);
-
-                                // If the field is selected loadably or is imperative, we must note the refetch path,
-                                // because this results in an artifact being generated.
-                                match categorize_field_loadability(
-                                    newly_encountered_scalar_client_field,
-                                    &scalar_field_selection.associated_data.selection_variant,
-                                ) {
-                                    Some(Loadability::LoadablySelectedField(_loadable_variant)) => {
-                                        create_merged_selection_map_for_field_and_insert_into_global_map(
-                                            schema,
-                                            parent_type,
-                                            newly_encountered_scalar_client_field.selection_set_for_parent_query(),
-                                            encountered_client_field_map,
-                                            FieldType::ClientField(newly_encountered_scalar_client_field.id),
-                                            &newly_encountered_scalar_client_field.initial_variable_context(),
-                                        );
-
-                                        let state = encountered_client_field_map
-                                            .get_mut(&FieldType::ClientField(*client_field_id))
-                                            .expect(
-                                                "Expected field to exist when \
-                                                it is encountered loadably",
-                                            );
-                                        state.was_ever_selected_loadably = true;
-                                    }
-                                    Some(Loadability::ImperativelyLoadedField(variant)) => {
-                                        insert_imperative_field_into_refetch_paths(
-                                            schema,
-                                            encountered_client_field_map,
-                                            merge_traversal_state,
-                                            newly_encountered_scalar_client_field,
-                                            parent_type,
-                                            variant,
-                                        );
-                                    }
-                                    None => merge_non_loadable_scalar_client_field(
+                            None => match newly_encountered_scalar_client_field.variant {
+                                ClientFieldVariant::Link => {}
+                                ClientFieldVariant::ImperativelyLoadedField(_)
+                                | ClientFieldVariant::UserWritten(_) => {
+                                    merge_non_loadable_scalar_client_field(
                                         parent_type,
                                         schema,
                                         parent_map,
@@ -718,78 +727,93 @@ fn merge_validated_selections_into_selection_map(
                                         encountered_client_field_map,
                                         variable_context,
                                         &scalar_field_selection.arguments,
-                                    ),
+                                    )
                                 }
+                            },
+                        }
 
-                                merge_traversal_state
-                                    .accessible_client_fields
-                                    .insert(*client_field_id);
-                            }
-                        };
+                        merge_traversal_state
+                            .accessible_client_fields
+                            .insert(*client_field_id);
                     }
-                    ServerFieldSelection::LinkedField(linked_field_selection) => {
-                        let type_id = linked_field_selection.associated_data.parent_object_id;
-                        let linked_field_parent_type = schema.server_field_data.object(type_id);
+                };
+            }
+            ServerFieldSelection::LinkedField(linked_field_selection) => {
+                let type_id = linked_field_selection.associated_data.parent_object_id;
+                let linked_field_parent_type = schema.server_field_data.object(type_id);
 
-                        match &linked_field_selection.associated_data.variant {
-                            SchemaServerFieldVariant::InlineFragment(inline_fragment_variant) => {
-                                let type_to_refine_to = linked_field_parent_type.name;
-                                let normalization_key =
-                                    NormalizationKey::InlineFragment(type_to_refine_to);
+                match linked_field_selection.associated_data.field_id {
+                    FieldType::ClientField(_client_pointer_id) => todo!(),
+                    FieldType::ServerField(server_field_id) => {
+                        let server_field = schema.server_field(server_field_id);
 
-                                let inline_fragment =
-                                    parent_map.entry(normalization_key).or_insert_with(|| {
-                                        MergedServerSelection::InlineFragment(
-                                            MergedInlineFragmentSelection {
-                                                type_to_refine_to,
-                                                selection_map: BTreeMap::new(),
-                                            },
-                                        )
-                                    });
-
-                                match inline_fragment {
-                                    MergedServerSelection::ScalarField(_) => {
-                                        panic!(
-                                            "Expected inline fragment, but encountered scalar. \
-                                                This is indicative of a bug in Isograph."
-                                        )
-                                    }
-                                    MergedServerSelection::LinkedField(_) => {
-                                        panic!(
-                                            "Expected inline fragment, but encountered linked field. \
-                                            This is indicative of a bug in Isograph."
-                                        )
-                                    }
-                                    MergedServerSelection::InlineFragment(
-                                        existing_inline_fragment,
+                        match &server_field.associated_data {
+                            SelectionType::Scalar(_) => {}
+                            SelectionType::Object(object) => {
+                                match &object.variant {
+                                    SchemaServerFieldVariant::InlineFragment(
+                                        inline_fragment_variant,
                                     ) => {
-                                        let linked_field_parent_type = schema
-                                            .server_field_data
-                                            .object(linked_field_parent_type.id);
+                                        let type_to_refine_to = linked_field_parent_type.name;
+                                        let normalization_key =
+                                            NormalizationKey::InlineFragment(type_to_refine_to);
 
-                                        merge_validated_selections_into_selection_map(
-                                            schema,
-                                            &mut existing_inline_fragment.selection_map,
-                                            linked_field_parent_type,
-                                            &inline_fragment_variant.condition_selection_set,
-                                            merge_traversal_state,
-                                            encountered_client_field_map,
-                                            variable_context,
-                                        );
-                                        merge_validated_selections_into_selection_map(
-                                            schema,
-                                            &mut existing_inline_fragment.selection_map,
-                                            linked_field_parent_type,
-                                            &linked_field_selection.selection_set,
-                                            merge_traversal_state,
-                                            encountered_client_field_map,
-                                            variable_context,
-                                        );
+                                        let inline_fragment = parent_map
+                                            .entry(normalization_key)
+                                            .or_insert_with(|| {
+                                                MergedServerSelection::InlineFragment(
+                                                    MergedInlineFragmentSelection {
+                                                        type_to_refine_to,
+                                                        selection_map: BTreeMap::new(),
+                                                    },
+                                                )
+                                            });
 
-                                        let server_field = schema
-                                            .server_field(inline_fragment_variant.server_field_id);
+                                        match inline_fragment {
+                                            MergedServerSelection::ScalarField(_) => {
+                                                panic!(
+                                                    "Expected inline fragment, but encountered scalar. \
+                                                    This is indicative of a bug in Isograph."
+                                                )
+                                            }
+                                            MergedServerSelection::LinkedField(_) => {
+                                                panic!(
+                                                    "Expected inline fragment, but encountered linked field. \
+                                                    This is indicative of a bug in Isograph."
+                                                )
+                                            }
+                                            MergedServerSelection::InlineFragment(
+                                                existing_inline_fragment,
+                                            ) => {
+                                                let linked_field_parent_type = schema
+                                                    .server_field_data
+                                                    .object(linked_field_parent_type.id);
 
-                                        create_merged_selection_map_for_field_and_insert_into_global_map(
+                                                merge_validated_selections_into_selection_map(
+                                                    schema,
+                                                    &mut existing_inline_fragment.selection_map,
+                                                    linked_field_parent_type,
+                                                    &inline_fragment_variant
+                                                        .condition_selection_set,
+                                                    merge_traversal_state,
+                                                    encountered_client_field_map,
+                                                    variable_context,
+                                                );
+                                                merge_validated_selections_into_selection_map(
+                                                    schema,
+                                                    &mut existing_inline_fragment.selection_map,
+                                                    linked_field_parent_type,
+                                                    &linked_field_selection.selection_set,
+                                                    merge_traversal_state,
+                                                    encountered_client_field_map,
+                                                    variable_context,
+                                                );
+
+                                                let server_field = schema.server_field(
+                                                    inline_fragment_variant.server_field_id,
+                                                );
+
+                                                create_merged_selection_map_for_field_and_insert_into_global_map(
                                             schema,
                                             parent_type,
                                             &linked_field_selection.selection_set,
@@ -797,77 +821,87 @@ fn merge_validated_selections_into_selection_map(
                                             FieldType::ServerField(inline_fragment_variant.server_field_id),
                                             &server_field.initial_variable_context()
                                         );
+                                            }
+                                        }
                                     }
-                                }
-                            }
-                            SchemaServerFieldVariant::LinkedField => {
-                                let normalization_key = create_transformed_name_and_arguments(
-                                    linked_field_selection.name.item.into(),
-                                    &linked_field_selection.arguments,
-                                    variable_context,
-                                )
-                                .normalization_key();
+                                    SchemaServerFieldVariant::LinkedField => {
+                                        let normalization_key =
+                                            create_transformed_name_and_arguments(
+                                                linked_field_selection.name.item.into(),
+                                                &linked_field_selection.arguments,
+                                                variable_context,
+                                            )
+                                            .normalization_key();
 
-                                merge_traversal_state
-                                    .traversal_path
-                                    .push(normalization_key.clone());
+                                        merge_traversal_state
+                                            .traversal_path
+                                            .push(normalization_key.clone());
 
-                                // We are creating the linked field, and inserting it into the parent object
-                                // first, because otherwise, when we try to merge the results into the parent
-                                // selection_map, we find that the linked field we are about to insert is
-                                // missing, and panic.
-                                //
-                                // This might be indicative of poor modeling.
-                                let linked_field =
-                                    parent_map.entry(normalization_key).or_insert_with(|| {
-                                        MergedServerSelection::LinkedField(
-                                            MergedLinkedFieldSelection {
-                                                concrete_type: linked_field_selection
-                                                    .associated_data
-                                                    .concrete_type,
-                                                name: linked_field_selection.name.item,
-                                                selection_map: BTreeMap::new(),
-                                                arguments: transform_arguments_with_child_context(
-                                                    linked_field_selection
-                                                        .arguments
-                                                        .iter()
-                                                        .map(|arg| arg.item.into_key_and_value()),
+                                        // We are creating the linked field, and inserting it into the parent object
+                                        // first, because otherwise, when we try to merge the results into the parent
+                                        // selection_map, we find that the linked field we are about to insert is
+                                        // missing, and panic.
+                                        //
+                                        // This might be indicative of poor modeling.
+                                        let linked_field = parent_map
+                                            .entry(normalization_key)
+                                            .or_insert_with(|| {
+                                                MergedServerSelection::LinkedField(
+                                                    MergedLinkedFieldSelection {
+                                                        concrete_type: linked_field_selection
+                                                            .associated_data
+                                                            .concrete_type,
+                                                        name: linked_field_selection.name.item,
+                                                        selection_map: BTreeMap::new(),
+                                                        arguments:
+                                                            transform_arguments_with_child_context(
+                                                                linked_field_selection
+                                                                    .arguments
+                                                                    .iter()
+                                                                    .map(|arg| {
+                                                                        arg.item
+                                                                            .into_key_and_value()
+                                                                    }),
+                                                                variable_context,
+                                                            ),
+                                                    },
+                                                )
+                                            });
+                                        match linked_field {
+                                            MergedServerSelection::ScalarField(_) => {
+                                                panic!(
+                                                    "Expected linked field, but encountered scalar. \
+                                                    This is indicative of a bug in Isograph."
+                                                )
+                                            }
+                                            MergedServerSelection::LinkedField(
+                                                existing_linked_field,
+                                            ) => {
+                                                merge_validated_selections_into_selection_map(
+                                                    schema,
+                                                    &mut existing_linked_field.selection_map,
+                                                    linked_field_parent_type,
+                                                    &linked_field_selection.selection_set,
+                                                    merge_traversal_state,
+                                                    encountered_client_field_map,
                                                     variable_context,
-                                                ),
-                                            },
-                                        )
-                                    });
-                                match linked_field {
-                                    MergedServerSelection::ScalarField(_) => {
-                                        panic!(
-                                            "Expected linked field, but encountered scalar. \
-                                            This is indicative of a bug in Isograph."
-                                        )
-                                    }
-                                    MergedServerSelection::LinkedField(existing_linked_field) => {
-                                        merge_validated_selections_into_selection_map(
-                                            schema,
-                                            &mut existing_linked_field.selection_map,
-                                            linked_field_parent_type,
-                                            &linked_field_selection.selection_set,
-                                            merge_traversal_state,
-                                            encountered_client_field_map,
-                                            variable_context,
-                                        );
-                                    }
-                                    MergedServerSelection::InlineFragment(_) => {
-                                        panic!(
-                                            "Expected linked field, but encountered inline fragment. \
-                                            This is indicative of a bug in Isograph."
-                                        )
+                                                );
+                                            }
+                                            MergedServerSelection::InlineFragment(_) => {
+                                                panic!(
+                                                    "Expected linked field, but encountered inline fragment. \
+                                                    This is indicative of a bug in Isograph."
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
-
-                        merge_traversal_state.traversal_path.pop();
                     }
                 }
+
+                merge_traversal_state.traversal_path.pop();
             }
         }
     }
@@ -922,17 +956,15 @@ fn insert_imperative_field_into_refetch_paths(
 fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
     // filter out id fields, and eventually other always-selected fields like __typename
     match &field.item {
-        Selection::ServerField(server_field) => match server_field {
-            ServerFieldSelection::ScalarField(scalar_field) => {
-                // -------- HACK --------
-                // Here, we check whether the field is named "id", but we should really
-                // know whether it is an id field in some other way. There can be non-id fields
-                // named id and id fields not named "id".
-                scalar_field.name.item != "id".intern().into()
-                // ------ END HACK ------
-            }
-            ServerFieldSelection::LinkedField(_) => true,
-        },
+        ServerFieldSelection::ScalarField(scalar_field) => {
+            // -------- HACK --------
+            // Here, we check whether the field is named "id", but we should really
+            // know whether it is an id field in some other way. There can be non-id fields
+            // named id and id fields not named "id".
+            scalar_field.name.item != "id".intern().into()
+            // ------ END HACK ------
+        }
+        ServerFieldSelection::LinkedField(_) => true,
     }
 }
 

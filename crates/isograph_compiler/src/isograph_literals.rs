@@ -4,8 +4,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use common_lang_types::{FilePath, Location, SourceFileName, Span, TextSource, WithLocation};
-use intern::string_key::Intern;
+use common_lang_types::{
+    relative_path_from_absolute_and_working_directory, Location, RelativePathToSourceFile, Span,
+    TextSource, WithLocation,
+};
+use isograph_config::CompilerConfig;
 use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
 };
@@ -56,9 +59,9 @@ pub fn read_file(
     let path_2 = path.clone();
 
     // N.B. we have previously ensured that path is a file
-    let contents = std::fs::read(&path).map_err(|message| BatchCompileError::UnableToReadFile {
+    let contents = std::fs::read(&path).map_err(|e| BatchCompileError::UnableToReadFile {
         path: path_2,
-        message,
+        message: e.to_string(),
     })?;
 
     let contents = std::str::from_utf8(&contents)
@@ -80,7 +83,9 @@ fn read_dir_recursive(root_js_path: &Path) -> Result<Vec<PathBuf>, BatchCompileE
     visit_dirs_skipping_isograph(root_js_path, &mut |dir_entry| {
         paths.push(dir_entry.path());
     })
-    .map_err(BatchCompileError::from)?;
+    .map_err(|e| BatchCompileError::UnableToTraverseDirectory {
+        message: e.to_string(),
+    })?;
 
     Ok(paths)
 }
@@ -102,40 +107,41 @@ fn visit_dirs_skipping_isograph(dir: &Path, cb: &mut dyn FnMut(&DirEntry)) -> io
 }
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn read_and_parse_iso_literals(
+pub fn parse_iso_literals_in_file_content(
     file_path: PathBuf,
     file_content: String,
     canonicalized_root_path: &Path,
+    config: &CompilerConfig,
 ) -> Result<
     (
-        SourceFileName,
+        RelativePathToSourceFile,
         Vec<(IsoLiteralExtractionResult, TextSource)>,
     ),
     Vec<WithLocation<IsographLiteralParseError>>,
 > {
-    // TODO don't intern unless there's a match
-    let interned_file_path = file_path.to_string_lossy().into_owned().intern().into();
-
-    let file_name = canonicalized_root_path
-        .join(file_path)
-        .to_str()
-        .expect("file_path should be a valid string")
-        .intern()
-        .into();
+    let absolute_path = canonicalized_root_path.join(&file_path);
+    let relative_path_to_source_file = relative_path_from_absolute_and_working_directory(
+        config.current_working_directory,
+        &absolute_path,
+    );
 
     let mut extraction_results = vec![];
     let mut isograph_literal_parse_errors = vec![];
 
     for iso_literal_extraction in extract_iso_literals_from_file_content(&file_content) {
-        match process_iso_literal_extraction(iso_literal_extraction, file_name, interned_file_path)
-        {
+        match process_iso_literal_extraction(
+            iso_literal_extraction,
+            relative_path_to_source_file,
+            relative_path_to_source_file,
+            config,
+        ) {
             Ok(result) => extraction_results.push(result),
             Err(e) => isograph_literal_parse_errors.push(e),
         }
     }
 
     if isograph_literal_parse_errors.is_empty() {
-        Ok((file_name, extraction_results))
+        Ok((relative_path_to_source_file, extraction_results))
     } else {
         Err(isograph_literal_parse_errors)
     }
@@ -178,22 +184,24 @@ pub(crate) fn process_iso_literals(
 
 pub fn process_iso_literal_extraction(
     iso_literal_extraction: IsoLiteralExtraction<'_>,
-    file_name: SourceFileName,
-    interned_file_path: FilePath,
+    file_name: RelativePathToSourceFile,
+    interned_file_path: RelativePathToSourceFile,
+    config: &CompilerConfig,
 ) -> Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>> {
     let IsoLiteralExtraction {
         iso_literal_text,
         iso_literal_start_index,
         has_associated_js_function,
         const_export_name,
-        has_paren,
+        iso_function_called_with_paren: has_paren,
     } = iso_literal_extraction;
     let text_source = TextSource {
-        path: file_name,
+        relative_path_to_source_file: file_name,
         span: Some(Span::new(
             iso_literal_start_index as u32,
             (iso_literal_start_index + iso_literal_text.len()) as u32,
         )),
+        current_working_directory: config.current_working_directory,
     };
 
     if !has_paren {
@@ -211,17 +219,15 @@ pub fn process_iso_literal_extraction(
         text_source,
     )?;
 
-    #[allow(clippy::collapsible_if)]
-    if matches!(
+    let is_client_field_declaration = matches!(
         &iso_literal_extraction_result,
         IsoLiteralExtractionResult::ClientFieldDeclaration(_)
-    ) {
-        if !has_associated_js_function {
-            return Err(WithLocation::new(
-                IsographLiteralParseError::ExpectedAssociatedJsFunction,
-                Location::new(text_source, Span::todo_generated()),
-            ));
-        }
+    );
+    if is_client_field_declaration && !has_associated_js_function {
+        return Err(WithLocation::new(
+            IsographLiteralParseError::ExpectedAssociatedJsFunction,
+            Location::new(text_source, Span::todo_generated()),
+        ));
     }
 
     Ok((iso_literal_extraction_result, text_source))
@@ -238,7 +244,12 @@ pub struct IsoLiteralExtraction<'a> {
     pub iso_literal_text: &'a str,
     pub iso_literal_start_index: usize,
     pub has_associated_js_function: bool,
-    pub has_paren: bool,
+    /// true if the iso function is called as iso(`...`), and false if it is
+    /// called as iso`...`. This is tracked as a separate field because some users
+    /// may assume that you write iso literals like you would graphql/gql literals
+    /// (which are written as graphql`...`), and having a separate field means
+    /// we can display a helpful error message (instead of silently ignoring.)
+    pub iso_function_called_with_paren: bool,
 }
 
 pub fn extract_iso_literals_from_file_content(
@@ -251,7 +262,7 @@ pub fn extract_iso_literals_from_file_content(
             iso_literal_text: iso_literal_match.as_str(),
             iso_literal_start_index: iso_literal_match.start(),
             has_associated_js_function: captures.get(6).is_some(),
-            has_paren: captures.get(3).is_some(),
+            iso_function_called_with_paren: captures.get(3).is_some(),
         }
     })
 }

@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
+use common_lang_types::ObjectTypeAndFieldName;
 use isograph_config::GenerateFileExtensionsOption;
-use isograph_schema::ObjectTypeAndFieldName;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum ImportedFileCategory {
@@ -22,6 +22,7 @@ impl ImportedFileCategory {
 
 pub(crate) type ReaderImports = BTreeSet<(ObjectTypeAndFieldName, ImportedFileCategory)>;
 pub(crate) type ParamTypeImports = BTreeSet<ObjectTypeAndFieldName>;
+pub(crate) type LinkImports = bool;
 
 pub(crate) fn reader_imports_to_import_statement(
     reader_imports: &ReaderImports,

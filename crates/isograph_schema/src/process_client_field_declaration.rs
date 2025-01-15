@@ -1,7 +1,7 @@
 use common_lang_types::{
-    ConstExportName, FilePath, IsographDirectiveName, IsographObjectTypeName, LinkedFieldName,
-    Location, ScalarFieldName, SelectableFieldName, TextSource, UnvalidatedTypeName, WithLocation,
-    WithSpan,
+    ConstExportName, IsographDirectiveName, IsographObjectTypeName, LinkedFieldName, Location,
+    ObjectTypeAndFieldName, RelativePathToSourceFile, ScalarFieldName, SelectableFieldName,
+    TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -13,8 +13,8 @@ use thiserror::Error;
 
 use crate::{
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
-    ClientField, FieldMapItem, FieldType, ObjectTypeAndFieldName, RequiresRefinement,
-    UnvalidatedSchema, UnvalidatedVariableDefinition, NODE_FIELD_NAME,
+    ClientField, ClientType, FieldMapItem, FieldType, RequiresRefinement, UnvalidatedSchema,
+    UnvalidatedVariableDefinition, NODE_FIELD_NAME,
 };
 
 impl UnvalidatedSchema {
@@ -70,7 +70,7 @@ impl UnvalidatedSchema {
             .encountered_fields
             .insert(
                 client_field_name.into(),
-                FieldType::ClientField(next_client_field_id),
+                FieldType::ClientField(ClientType::ClientField(next_client_field_id)),
             )
             .is_some()
         {
@@ -87,35 +87,35 @@ impl UnvalidatedSchema {
         let name = client_field_declaration.item.client_field_name.item.into();
         let variant = get_client_variant(&client_field_declaration.item);
 
-        self.client_fields.push(ClientField {
-            description: client_field_declaration.item.description.map(|x| x.item),
-            name,
-            id: next_client_field_id,
-            reader_selection_set: Some(client_field_declaration.item.selection_set),
-            unwraps: client_field_declaration.item.unwraps,
-            variant,
-            variable_definitions: client_field_declaration.item.variable_definitions,
-            type_and_field: ObjectTypeAndFieldName {
-                type_name: object.name,
-                field_name: name,
-            },
+        self.client_fields
+            .push(ClientType::ClientField(ClientField {
+                description: client_field_declaration.item.description.map(|x| x.item),
+                name,
+                id: next_client_field_id,
+                reader_selection_set: Some(client_field_declaration.item.selection_set),
+                variant,
+                variable_definitions: client_field_declaration.item.variable_definitions,
+                type_and_field: ObjectTypeAndFieldName {
+                    type_name: object.name,
+                    field_name: name,
+                },
 
-            parent_object_id,
-            refetch_strategy: object.id_field.map(|_| {
-                // Assume that if we have an id field, this implements Node
-                RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
-                    vec![id_selection()],
-                    query_id,
-                    format!("refetch__{}", object.name).intern().into(),
-                    *NODE_FIELD_NAME,
-                    id_top_level_arguments(),
-                    None,
-                    RequiresRefinement::Yes(object.name),
-                    None,
-                    None,
-                ))
-            }),
-        });
+                parent_object_id,
+                refetch_strategy: object.id_field.map(|_| {
+                    // Assume that if we have an id field, this implements Node
+                    RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
+                        vec![id_selection()],
+                        query_id,
+                        format!("refetch__{}", object.name).intern().into(),
+                        *NODE_FIELD_NAME,
+                        id_top_level_arguments(),
+                        None,
+                        RequiresRefinement::Yes(object.name),
+                        None,
+                        None,
+                    ))
+                }),
+            }));
         Ok(())
     }
 }
@@ -191,7 +191,7 @@ pub enum UserWrittenComponentVariant {
 pub struct UserWrittenClientFieldInfo {
     // TODO use a shared struct
     pub const_export_name: ConstExportName,
-    pub file_path: FilePath,
+    pub file_path: RelativePathToSourceFile,
     pub user_written_component_variant: UserWrittenComponentVariant,
 }
 
@@ -199,6 +199,7 @@ pub struct UserWrittenClientFieldInfo {
 pub enum ClientFieldVariant {
     UserWritten(UserWrittenClientFieldInfo),
     ImperativelyLoadedField(ImperativelyLoadedFieldVariant),
+    Link,
 }
 
 lazy_static! {

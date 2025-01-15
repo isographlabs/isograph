@@ -7,8 +7,8 @@ use common_lang_types::{
 use intern::Lookup;
 use isograph_lang_types::{
     ClientFieldId, LinkedFieldSelection, LoadableDirectiveParameters, ScalarFieldSelection,
-    SelectableServerFieldId, Selection, SelectionFieldArgument, ServerFieldId, ServerObjectId,
-    ServerScalarId, TypeAnnotation, VariableDefinition,
+    SelectableServerFieldId, SelectionFieldArgument, SelectionType, ServerFieldId,
+    ServerFieldSelection, ServerObjectId, ServerScalarId, TypeAnnotation, VariableDefinition,
 };
 use thiserror::Error;
 
@@ -16,7 +16,7 @@ use crate::{
     validate_client_field::validate_and_transform_client_fields,
     validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
     FieldType, ImperativelyLoadedFieldVariant, Schema, SchemaIdField, SchemaObject,
-    SchemaServerField, SchemaServerFieldVariant, SchemaValidationState, ServerFieldData,
+    SchemaServerField, SchemaValidationState, ServerFieldData, ServerFieldTypeAssociatedData,
     UnvalidatedSchema, UnvalidatedVariableDefinition, UseRefetchFieldRefetchStrategy,
     ValidateEntrypointDeclarationError,
 };
@@ -26,7 +26,7 @@ pub type ValidatedSchemaServerField = SchemaServerField<
     <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
 >;
 
-pub type ValidatedSelection = Selection<
+pub type ValidatedSelection = ServerFieldSelection<
     <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
 >;
@@ -59,12 +59,11 @@ pub type ValidatedSchemaIdField = SchemaIdField<ServerScalarId>;
 #[derive(Debug, Clone)]
 pub struct ValidatedLinkedFieldAssociatedData {
     pub parent_object_id: ServerObjectId,
+    pub field_id: FieldType<ServerFieldId, ()>,
     // N.B. we don't actually support loadable linked fields
     pub selection_variant: ValidatedIsographSelectionVariant,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
-
-    pub variant: SchemaServerFieldVariant,
 }
 
 #[derive(Debug, Clone)]
@@ -87,10 +86,15 @@ pub enum ValidatedIsographSelectionVariant {
 
 pub type MissingArguments = Vec<ValidatedVariableDefinition>;
 
+pub type ValidatedServerFieldTypeAssociatedData = SelectionType<
+    ServerFieldTypeAssociatedData<TypeAnnotation<ServerObjectId>>,
+    TypeAnnotation<ServerScalarId>,
+>;
+
 #[derive(Debug)]
 pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
-    type ServerFieldTypeAssociatedData = TypeAnnotation<SelectableServerFieldId>;
+    type ServerFieldTypeAssociatedData = ValidatedServerFieldTypeAssociatedData;
     type ClientFieldSelectionScalarFieldAssociatedData = ValidatedScalarFieldAssociatedData;
     type ClientFieldSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
     type VariableDefinitionInnerType = SelectableServerFieldId;
@@ -327,6 +331,7 @@ pub fn categorize_field_loadability<'a>(
     selection_variant: &'a ValidatedIsographSelectionVariant,
 ) -> Option<Loadability<'a>> {
     match &client_field.variant {
+        ClientFieldVariant::Link => None,
         ClientFieldVariant::UserWritten(_) => match selection_variant {
             ValidatedIsographSelectionVariant::Regular => None,
             ValidatedIsographSelectionVariant::Loadable((l, _)) => {

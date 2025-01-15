@@ -1,4 +1,9 @@
-import { getParentRecordKey, onNextChangeToRecord } from './cache';
+import {
+  getParentRecordKey,
+  insertIfNotExists,
+  onNextChangeToRecord,
+  type EncounteredIds,
+} from './cache';
 import { getOrCreateCachedComponent } from './componentCache';
 import {
   IsographEntrypoint,
@@ -12,8 +17,6 @@ import {
 } from './FragmentReference';
 import {
   assertLink,
-  DataId,
-  defaultMissingFieldHandler,
   getOrLoadIsographArtifact,
   IsographEnvironment,
   type Link,
@@ -23,6 +26,7 @@ import {
   getPromiseState,
   PromiseWrapper,
   readPromise,
+  Result,
   wrapPromise,
   wrapResolvedValue,
 } from './PromiseWrapper';
@@ -30,10 +34,10 @@ import { ReaderAst } from './reader';
 import { Arguments } from './util';
 import { logMessage } from './logging';
 import { CleanupFn } from '@isograph/disposable-types';
-import { DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
+import { FetchOptions } from './check';
 
 export type WithEncounteredRecords<T> = {
-  readonly encounteredRecords: Set<DataId>;
+  readonly encounteredRecords: EncounteredIds;
   readonly item: ExtractData<T>;
 };
 
@@ -44,8 +48,9 @@ export function readButDoNotEvaluate<
   fragmentReference: FragmentReference<TReadFromStore, unknown>,
   networkRequestOptions: NetworkRequestReaderOptions,
 ): WithEncounteredRecords<TReadFromStore> {
-  const mutableEncounteredRecords = new Set<DataId>();
+  const mutableEncounteredRecords: EncounteredIds = new Map();
 
+  // TODO consider moving this to the outside
   const readerWithRefetchQueries = readPromise(
     fragmentReference.readerWithRefetchQueries,
   );
@@ -68,7 +73,7 @@ export function readButDoNotEvaluate<
 
   if (response.kind === 'MissingData') {
     // There are two cases here that we care about:
-    // 1. the network request is in flight, we haven't suspend on it, and we want
+    // 1. the network request is in flight, we haven't suspended on it, and we want
     //    to throw if it errors out. So, networkRequestOptions.suspendIfInFlight === false
     //    and networkRequestOptions.throwOnNetworkError === true.
     // 2. everything else
@@ -80,7 +85,21 @@ export function readButDoNotEvaluate<
       !networkRequestOptions.suspendIfInFlight &&
       networkRequestOptions.throwOnNetworkError
     ) {
-      // TODO assert that the network request state is not Err
+      // What are we doing here? If the network response has errored out, we can do
+      // two things: throw a rejected promise, or throw an error. Both work identically
+      // in the browser. However, during initial SSR on NextJS, throwing a rejected
+      // promise results in an infinite loop (including re-issuing the query until the
+      // process OOM's or something.) Hence, we throw an error.
+
+      // TODO investigate why we cannot check against NOT_SET here and we have to cast
+      const result = fragmentReference.networkRequest.result as Result<
+        any,
+        any
+      >;
+      if (result.kind === 'Err') {
+        throw new Error('NetworkError', { cause: result.error });
+      }
+
       throw new Promise((resolve, reject) => {
         onNextChangeToRecord(environment, response.recordLink).then(resolve);
         fragmentReference.networkRequest.promise.catch(reject);
@@ -99,7 +118,7 @@ export type ReadDataResult<TReadFromStore> =
   | {
       readonly kind: 'Success';
       readonly data: ExtractData<TReadFromStore>;
-      readonly encounteredRecords: Set<DataId>;
+      readonly encounteredRecords: EncounteredIds;
     }
   | {
       readonly kind: 'MissingData';
@@ -116,10 +135,14 @@ function readData<TReadFromStore>(
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
-  mutableEncounteredRecords: Set<DataId>,
+  mutableEncounteredRecords: EncounteredIds,
 ): ReadDataResult<TReadFromStore> {
-  mutableEncounteredRecords.add(root.__link);
-  let storeRecord = environment.store[root.__link];
+  const encounteredIds = insertIfNotExists(
+    mutableEncounteredRecords,
+    root.__typename,
+  );
+  encounteredIds.add(root.__link);
+  let storeRecord = environment.store[root.__typename]?.[root.__link];
   if (storeRecord === undefined) {
     return {
       kind: 'MissingData',
@@ -156,6 +179,10 @@ function readData<TReadFromStore>(
         target[field.alias ?? field.fieldName] = value;
         break;
       }
+      case 'Link': {
+        target[field.alias] = root;
+        break;
+      }
       case 'Linked': {
         const storeRecordName = getParentRecordKey(field, variables);
         const value = storeRecord[storeRecordName];
@@ -179,6 +206,7 @@ function readData<TReadFromStore>(
               results.push(null);
               continue;
             }
+
             const result = readData(
               environment,
               field.selections,
@@ -248,10 +276,9 @@ function readData<TReadFromStore>(
 
         if (link === undefined) {
           // TODO make this configurable, and also generated and derived from the schema
-          const missingFieldHandler =
-            environment.missingFieldHandler ?? defaultMissingFieldHandler;
+          const missingFieldHandler = environment.missingFieldHandler;
 
-          const altLink = missingFieldHandler(
+          const altLink = missingFieldHandler?.(
             storeRecord,
             root,
             field.fieldName,
@@ -335,10 +362,12 @@ function readData<TReadFromStore>(
           };
         } else {
           const refetchQueryIndex = field.refetchQuery;
-          if (refetchQueryIndex == null) {
-            throw new Error('refetchQuery is null in RefetchField');
-          }
           const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
+          if (refetchQuery == null) {
+            throw new Error(
+              'refetchQuery is null in RefetchField. This is indicative of a bug in Isograph.',
+            );
+          }
           const refetchQueryArtifact = refetchQuery.artifact;
           const allowedVariables = refetchQuery.allowedVariables;
 
@@ -364,9 +393,15 @@ function readData<TReadFromStore>(
       }
       case 'Resolver': {
         const usedRefetchQueries = field.usedRefetchQueries;
-        const resolverRefetchQueries = usedRefetchQueries.map(
-          (index) => nestedRefetchQueries[index],
-        );
+        const resolverRefetchQueries = usedRefetchQueries.map((index) => {
+          const resolverRefetchQuery = nestedRefetchQueries[index];
+          if (resolverRefetchQuery == null) {
+            throw new Error(
+              'resolverRefetchQuery is null in Resolver. This is indicative of a bug in Isograph.',
+            );
+          }
+          return resolverRefetchQuery;
+        });
 
         switch (field.readerArtifact.kind) {
           case 'EagerReaderArtifact': {
@@ -446,7 +481,11 @@ function readData<TReadFromStore>(
             recordLink: refetchReaderParams.recordLink,
           };
         } else {
-          target[field.alias] = (args: any, fetchOptions?: FetchOptions) => {
+          target[field.alias] = (
+            args: any,
+            // TODO get the associated type for FetchOptions from the loadably selected field
+            fetchOptions?: FetchOptions<any>,
+          ) => {
             // TODO we should use the reader AST for this
             const includeReadOutData = (variables: any, readOutData: any) => {
               variables.id = readOutData.id;
@@ -464,7 +503,9 @@ function readData<TReadFromStore>(
 
             return [
               // Stable id
-              root.__link +
+              root.__typename +
+                ':' +
+                root.__link +
                 '/' +
                 field.name +
                 '/' +
@@ -474,14 +515,12 @@ function readData<TReadFromStore>(
                 const fragmentReferenceAndDisposeFromEntrypoint = (
                   entrypoint: IsographEntrypoint<any, any>,
                 ): [FragmentReference<any, any>, CleanupFn] => {
-                  const shouldFetch =
-                    fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE;
                   const [networkRequest, disposeNetworkRequest] =
                     maybeMakeNetworkRequest(
                       environment,
                       entrypoint,
                       localVariables,
-                      shouldFetch,
+                      fetchOptions,
                     );
 
                   const fragmentReference: FragmentReference<any, any> = {
@@ -496,7 +535,7 @@ function readData<TReadFromStore>(
                     } as const),
 
                     // TODO localVariables is not guaranteed to have an id field
-                    root: { __link: localVariables.id },
+                    root,
                     variables: localVariables,
                     networkRequest,
                   };
@@ -538,15 +577,12 @@ function readData<TReadFromStore>(
                           if (
                             entrypointLoaderState.kind === 'EntrypointNotLoaded'
                           ) {
-                            const shouldFetch =
-                              fetchOptions?.shouldFetch ??
-                              DEFAULT_SHOULD_FETCH_VALUE;
                             const [networkRequest, disposeNetworkRequest] =
                               maybeMakeNetworkRequest(
                                 environment,
                                 entrypoint,
                                 localVariables,
-                                shouldFetch,
+                                fetchOptions,
                               );
                             entrypointLoaderState = {
                               kind: 'NetworkRequestStarted',
@@ -569,7 +605,7 @@ function readData<TReadFromStore>(
                       ),
 
                       // TODO localVariables is not guaranteed to have an id field
-                      root: { __link: localVariables.id },
+                      root,
                       variables: localVariables,
                       networkRequest,
                     };
@@ -593,6 +629,7 @@ function readData<TReadFromStore>(
         }
         break;
       }
+
       default: {
         // Ensure we have covered all variants
         let _: never = field;
@@ -632,7 +669,12 @@ function generateChildVariableMap(
   const childVars: Writable<Variables> = {};
   for (const [name, value] of fieldArguments) {
     if (value.kind === 'Variable') {
-      childVars[name] = variables[value.name];
+      const variable = variables[value.name];
+      // Variable could be null if it was not provided but has a default case,
+      // so we allow the loop to continue rather than throwing an error.
+      if (variable != null) {
+        childVars[name] = variable;
+      }
     } else {
       childVars[name] = value.value;
     }
@@ -693,7 +735,7 @@ export function getNetworkRequestOptionsWithDefaults(
 // TODO call stableStringifyArgs on the variable values, as well.
 // This doesn't matter for now, since we are just using primitive values
 // in the demo.
-function stableStringifyArgs(args: Object) {
+function stableStringifyArgs(args: object) {
   const keys = Object.keys(args);
   keys.sort();
   let s = '';

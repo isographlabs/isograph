@@ -79,7 +79,8 @@ export type ReaderAstNode =
   | ReaderLinkedField
   | ReaderNonLoadableResolverField
   | ReaderImperativelyLoadedField
-  | ReaderLoadableField;
+  | ReaderLoadableField
+  | ReaderLinkeField;
 
 // @ts-ignore
 export type ReaderAst<TReadFromStore> = ReadonlyArray<ReaderAstNode>;
@@ -90,6 +91,12 @@ export type ReaderScalarField = {
   readonly alias: string | null;
   readonly arguments: Arguments | null;
 };
+
+export type ReaderLinkeField = {
+  readonly kind: 'Link';
+  readonly alias: string;
+};
+
 export type ReaderLinkedField = {
   readonly kind: 'Linked';
   readonly fieldName: string;
@@ -156,5 +163,5 @@ export type LoadableField<
   // user-facing API. Users should only interact with LoadableFields via APIs
   // like useClientSideDefer. These APIs should have a nullable fetchOptions
   // parameter, and provide a default value ({}) to the LoadableField.
-  fetchOptions: FetchOptions,
+  fetchOptions: FetchOptions<TResult>,
 ) => [StableId, Factory<FragmentReference<TReadFromStore, TResult>>];

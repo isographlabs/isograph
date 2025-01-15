@@ -1,12 +1,13 @@
 use std::collections::btree_map::Entry;
 
+use common_lang_types::ObjectTypeAndFieldName;
 use intern::string_key::Intern;
 use isograph_lang_types::ServerObjectId;
 use isograph_schema::{
     generate_refetch_field_strategy, id_arguments, id_selection, id_top_level_arguments,
-    ClientField, ClientFieldVariant, FieldType, ImperativelyLoadedFieldVariant,
-    ObjectTypeAndFieldName, RefetchStrategy, RequiresRefinement, SchemaObject,
-    UnvalidatedClientField, UnvalidatedSchema, NODE_FIELD_NAME, REFETCH_FIELD_NAME,
+    ClientField, ClientFieldVariant, ClientType, FieldType, ImperativelyLoadedFieldVariant,
+    RefetchStrategy, RequiresRefinement, SchemaObject, UnvalidatedClientField, UnvalidatedSchema,
+    NODE_FIELD_NAME, REFETCH_FIELD_NAME,
 };
 
 use crate::batch_compile::BatchCompileError;
@@ -32,7 +33,7 @@ pub fn add_refetch_fields_to_objects(
 
 fn add_refetch_field_to_object(
     object: &mut SchemaObject,
-    client_fields: &mut Vec<UnvalidatedClientField>,
+    client_fields: &mut Vec<ClientType<UnvalidatedClientField>>,
     query_id: ServerObjectId,
 ) -> Option<Result<(), BatchCompileError>> {
     match object
@@ -43,9 +44,11 @@ fn add_refetch_field_to_object(
         Entry::Vacant(vacant_entry) => {
             let next_client_field_id = client_fields.len().into();
 
-            vacant_entry.insert(FieldType::ClientField(next_client_field_id));
+            vacant_entry.insert(FieldType::ClientField(ClientType::ClientField(
+                next_client_field_id,
+            )));
 
-            client_fields.push(ClientField {
+            client_fields.push(ClientType::ClientField(ClientField {
                 description: Some(
                     format!("A refetch field for the {} type.", object.name)
                         .intern()
@@ -54,7 +57,6 @@ fn add_refetch_field_to_object(
                 name: (*REFETCH_FIELD_NAME).into(),
                 id: next_client_field_id,
                 reader_selection_set: None,
-                unwraps: vec![],
                 variant: ClientFieldVariant::ImperativelyLoadedField(
                     ImperativelyLoadedFieldVariant {
                         client_field_scalar_selection_name: *REFETCH_FIELD_NAME,
@@ -86,7 +88,7 @@ fn add_refetch_field_to_object(
                         None,
                     ))
                 }),
-            });
+            }));
         }
     }
     None

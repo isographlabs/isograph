@@ -15,6 +15,7 @@ import { type Query__RepositoryPage__param } from './Query/RepositoryPage/param_
 import { type Query__UserDetail__param } from './Query/UserDetail/param_type';
 import { type Query__UserPage__param } from './Query/UserPage/param_type';
 import { type Repository__RepositoryLink__param } from './Repository/RepositoryLink/param_type';
+import { type Repository__RepositoryRow__param } from './Repository/RepositoryRow/param_type';
 import { type Starrable__IsStarred__param } from './Starrable/IsStarred/param_type';
 import { type User__Avatar__param } from './User/Avatar/param_type';
 import { type User__RepositoryConnection__param } from './User/RepositoryConnection/param_type';
@@ -137,6 +138,10 @@ export function iso<T>(
 ): IdentityWithParamComponent<Repository__RepositoryLink__param>;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Repository.RepositoryRow', T>
+): IdentityWithParamComponent<Repository__RepositoryRow__param>;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Starrable.IsStarred', T>
 ): IdentityWithParamComponent<Starrable__IsStarred__param>;
 
@@ -175,5 +180,6 @@ export function iso(_isographLiteralText: string):
 {
   throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
       'was not set up, or it failed to identify this call site. Make sure it ' +
-      'is being used verbatim as `iso`.');
+      'is being used verbatim as `iso`. If you cannot use the babel transform, ' + 
+      'set options.no_babel_transform to true in your Isograph config. ');
 }

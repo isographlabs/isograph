@@ -11,31 +11,34 @@ const queryText = 'query nodeField ($id: ID!) {\
   },\
 }';
 
-const normalizationAst: NormalizationAst = [
-  {
-    kind: "Linked",
-    fieldName: "node",
-    arguments: [
-      [
-        "id",
-        { kind: "Variable", name: "id" },
+const normalizationAst: NormalizationAst = {
+  kind: "NormalizationAst",
+  selections: [
+    {
+      kind: "Linked",
+      fieldName: "node",
+      arguments: [
+        [
+          "id",
+          { kind: "Variable", name: "id" },
+        ],
       ],
-    ],
-    concreteType: null,
-    selections: [
-      {
-        kind: "Scalar",
-        fieldName: "__typename",
-        arguments: null,
-      },
-      {
-        kind: "Scalar",
-        fieldName: "id",
-        arguments: null,
-      },
-    ],
-  },
-];
+      concreteType: null,
+      selections: [
+        {
+          kind: "Scalar",
+          fieldName: "__typename",
+          arguments: null,
+        },
+        {
+          kind: "Scalar",
+          fieldName: "id",
+          arguments: null,
+        },
+      ],
+    },
+  ],
+};
 const artifact: IsographEntrypoint<
   Query__nodeField__param,
   Query__nodeField__output_type
@@ -46,6 +49,7 @@ const artifact: IsographEntrypoint<
     queryText,
     normalizationAst,
   },
+  concreteType: "Query",
   readerWithRefetchQueries: {
     kind: "ReaderWithRefetchQueries",
     nestedRefetchQueries,

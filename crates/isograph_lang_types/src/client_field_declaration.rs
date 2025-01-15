@@ -2,18 +2,17 @@ use std::fmt::Debug;
 
 use common_lang_types::{
     ConstExportName, DescriptionValue, EnumLiteralValue, FieldArgumentName, FieldNameOrAlias,
-    FilePath, HasName, LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName,
-    SelectableFieldName, StringLiteralValue, UnvalidatedTypeName, ValueKeyName, VariableName,
-    WithLocation, WithSpan,
+    LinkedFieldAlias, LinkedFieldName, RelativePathToSourceFile, ScalarFieldAlias, ScalarFieldName,
+    StringLiteralValue, UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{FloatValue, GraphQLTypeAnnotation, NameValuePair};
 use serde::Deserialize;
 
 use crate::IsographFieldDirective;
 
-pub type UnvalidatedSelectionWithUnvalidatedDirectives = Selection<(), ()>;
+pub type UnvalidatedSelectionWithUnvalidatedDirectives = ServerFieldSelection<(), ()>;
 
-pub type UnvalidatedSelection = Selection<
+pub type UnvalidatedSelection = ServerFieldSelection<
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
     IsographSelectionVariant,
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
@@ -30,11 +29,10 @@ pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub client_field_name: WithSpan<ScalarFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
-    pub unwraps: Vec<WithSpan<Unwrap>>,
+    pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
-    pub definition_path: FilePath,
+    pub definition_path: RelativePathToSourceFile,
 
     // TODO consider making these behind a cfg flag, since they're only used
     // by the LSP
@@ -48,10 +46,9 @@ pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub client_pointer_name: WithSpan<ScalarFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
-    pub unwraps: Vec<WithSpan<Unwrap>>,
+    pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
-    pub definition_path: FilePath,
+    pub definition_path: RelativePathToSourceFile,
 
     // TODO consider making these behind a cfg flag, since they're only used
     // by the LSP
@@ -78,39 +75,6 @@ pub struct LoadableDirectiveParameters {
     complete_selection_set: bool,
     #[serde(default)]
     pub lazy_load_artifact: bool,
-}
-
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub enum Selection<TScalarField, TLinkedField> {
-    ServerField(ServerFieldSelection<TScalarField, TLinkedField>),
-    // FieldGroup(FieldGroupSelection),
-}
-
-impl<TScalarField, TLinkedField> Selection<TScalarField, TLinkedField> {
-    pub fn map<TNewScalarField, TNewLinkedField>(
-        self,
-        map: &mut impl FnMut(
-            ServerFieldSelection<TScalarField, TLinkedField>,
-        ) -> ServerFieldSelection<TNewScalarField, TNewLinkedField>,
-    ) -> Selection<TNewScalarField, TNewLinkedField> {
-        match self {
-            Selection::ServerField(field_selection) => Selection::ServerField(map(field_selection)),
-        }
-    }
-
-    pub fn and_then<TNewScalarField, TNewLinkedField, E>(
-        self,
-        map: &mut impl FnMut(
-            ServerFieldSelection<TScalarField, TLinkedField>,
-        )
-            -> Result<ServerFieldSelection<TNewScalarField, TNewLinkedField>, E>,
-    ) -> Result<Selection<TNewScalarField, TNewLinkedField>, E> {
-        match self {
-            Selection::ServerField(field_selection) => {
-                Ok(Selection::ServerField(map(field_selection)?))
-            }
-        }
-    }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
@@ -186,23 +150,11 @@ impl<TScalarField, TLinkedField> ServerFieldSelection<TScalarField, TLinkedField
     }
 }
 
-impl<TScalarField, TLinkedField> HasName for ServerFieldSelection<TScalarField, TLinkedField> {
-    type Name = SelectableFieldName;
-    fn name(&self) -> Self::Name {
-        match self {
-            ServerFieldSelection::ScalarField(s) => s.name.item.into(),
-            ServerFieldSelection::LinkedField(l) => l.name.item.into(),
-        }
-    }
-}
-
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct ScalarFieldSelection<TScalarField> {
     pub name: WithLocation<ScalarFieldName>,
     pub reader_alias: Option<WithLocation<ScalarFieldAlias>>,
     pub associated_data: TScalarField,
-    // TODO remove until we are ready for this :/
-    pub unwraps: Vec<WithSpan<Unwrap>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
 }
@@ -213,7 +165,6 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
             name: self.name,
             reader_alias: self.reader_alias,
             associated_data: map(self.associated_data),
-            unwraps: self.unwraps,
             arguments: self.arguments,
             directives: self.directives,
         }
@@ -227,7 +178,6 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
             name: self.name,
             reader_alias: self.reader_alias,
             associated_data: map(self.associated_data)?,
-            unwraps: self.unwraps,
             arguments: self.arguments,
             directives: self.directives,
         })
@@ -246,8 +196,7 @@ pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
     // pub alias
     pub reader_alias: Option<WithLocation<LinkedFieldAlias>>,
     pub associated_data: TLinkedField,
-    pub selection_set: Vec<WithSpan<Selection<TScalarField, TLinkedField>>>,
-    pub unwraps: Vec<WithSpan<Unwrap>>,
+    pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
 }
@@ -267,20 +216,15 @@ impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField
                 .into_iter()
                 .map(|with_span| {
                     with_span.map(|selection| {
-                        selection.map(&mut |server_field_selection| {
-                            server_field_selection.map(
-                                &mut |scalar_field_selection| {
-                                    scalar_field_selection.map(map_scalar)
-                                },
-                                &mut |linked_field_selection| {
-                                    linked_field_selection.map(map_scalar, map_linked)
-                                },
-                            )
-                        })
+                        selection.map(
+                            &mut |scalar_field_selection| scalar_field_selection.map(map_scalar),
+                            &mut |linked_field_selection| {
+                                linked_field_selection.map(map_scalar, map_linked)
+                            },
+                        )
                     })
                 })
                 .collect(),
-            unwraps: self.unwraps,
             arguments: self.arguments,
             directives: self.directives,
         }
@@ -291,13 +235,6 @@ impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField
             .map(|item| item.map(FieldNameOrAlias::from))
             .unwrap_or_else(|| self.name.map(FieldNameOrAlias::from))
     }
-}
-
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub enum Unwrap {
-    ActualUnwrap,
-    SkippedUnwrap,
-    // FakeUnwrap?
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
@@ -358,15 +295,11 @@ pub fn reachable_variables(
         NonConstantValue::Variable(name) => {
             vec![WithLocation::new(*name, non_constant_value.location)]
         }
-        NonConstantValue::Object(object) => {
-            return object
-                .iter()
-                .flat_map(|pair| reachable_variables(&pair.value))
-                .collect();
-        }
-        NonConstantValue::List(list) => {
-            return list.iter().flat_map(reachable_variables).collect();
-        }
+        NonConstantValue::Object(object) => object
+            .iter()
+            .flat_map(|pair| reachable_variables(&pair.value))
+            .collect(),
+        NonConstantValue::List(list) => list.iter().flat_map(reachable_variables).collect(),
         _ => vec![],
     }
 }

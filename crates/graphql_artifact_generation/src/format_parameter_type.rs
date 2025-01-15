@@ -2,9 +2,10 @@ use common_lang_types::SelectableFieldName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
 use isograph_lang_types::{
-    ClientFieldId, SelectableServerFieldId, ServerFieldId, TypeAnnotation, UnionVariant,
+    ClientFieldId, SelectableServerFieldId, SelectionType, ServerFieldId, TypeAnnotation,
+    UnionVariant,
 };
-use isograph_schema::{FieldType, ValidatedSchema};
+use isograph_schema::{ClientType, FieldType, ValidatedSchema};
 
 pub(crate) fn format_parameter_type(
     schema: &ValidatedSchema,
@@ -74,17 +75,25 @@ fn format_server_field_type(
 fn format_field_definition(
     schema: &ValidatedSchema,
     name: &SelectableFieldName,
-    type_: &FieldType<ServerFieldId, ClientFieldId>,
+    type_: &FieldType<ServerFieldId, ClientType<ClientFieldId>>,
     indentation_level: u8,
 ) -> String {
     match type_ {
         FieldType::ServerField(server_field_id) => {
-            let type_annotation = &schema.server_field(*server_field_id).associated_data;
+            let type_annotation = match &schema.server_field(*server_field_id).associated_data {
+                SelectionType::Object(associated_data) => associated_data
+                    .type_name
+                    .clone()
+                    .map(&mut SelectionType::Object),
+                SelectionType::Scalar(type_name) => {
+                    type_name.clone().map(&mut SelectionType::Scalar)
+                }
+            };
             format!(
                 "{}readonly {}: {},\n",
                 "  ".repeat(indentation_level as usize),
                 name,
-                format_type_annotation(schema, type_annotation, indentation_level + 1),
+                format_type_annotation(schema, &type_annotation, indentation_level + 1),
             )
         }
         FieldType::ClientField(_) => {
