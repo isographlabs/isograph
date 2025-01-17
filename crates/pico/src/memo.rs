@@ -112,7 +112,7 @@ fn any_dependency_changed<Db: Database>(
 fn source_node_changed_since<Db: Database>(db: &Db, key: Key, since: Epoch) -> bool {
     match db.storage().source_nodes().get(&key) {
         Some(source) => source.time_updated > since,
-        None => true,
+        None => panic!("Source node not found. This indicates a bug in Pico."),
     }
 }
 

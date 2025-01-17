@@ -7,13 +7,19 @@ pub trait Source {
     fn get_key(&self) -> Key;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct SourceId<T> {
     pub key: Key,
     phantom: PhantomData<T>,
 }
 
-impl<T: Clone> Copy for SourceId<T> {}
+impl<T> Clone for SourceId<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T> Copy for SourceId<T> {}
 
 impl<T> Hash for SourceId<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
