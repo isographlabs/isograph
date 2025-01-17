@@ -54,11 +54,15 @@ pub fn derive_db(input: TokenStream) -> TokenStream {
             fn set<T>(&mut self, source: T) -> ::pico_core::source::SourceId<T>
             where T: ::pico_core::source::Source + ::pico_core::dyn_eq::DynEq
             {
-                use ::pico_core::{storage::StorageMut, container::Container};
-                let current_epoch = self.increment_epoch();
+                use ::pico_core::{storage::{Storage, StorageMut}, container::Container};
                 let id = ::pico_core::source::SourceId::new(&source);
+                let time_updated = if self.storage().source_nodes().contains_key(&id.key) {
+                    self.increment_epoch()
+                } else {
+                    self.current_epoch()
+                };
                 self.storage_mut().source_nodes().insert(id.key, ::pico_core::node::SourceNode {
-                    time_updated: current_epoch,
+                    time_updated,
                     value: Box::new(source),
                 });
                 id
