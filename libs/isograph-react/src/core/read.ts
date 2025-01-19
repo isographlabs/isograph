@@ -8,6 +8,7 @@ import { getOrCreateCachedComponent } from './componentCache';
 import {
   IsographEntrypoint,
   RefetchQueryNormalizationArtifactWrapper,
+  type NormalizationAst,
 } from './entrypoint';
 import {
   FragmentReference,
@@ -518,7 +519,11 @@ function readData<TReadFromStore>(
                   const [networkRequest, disposeNetworkRequest] =
                     maybeMakeNetworkRequest(
                       environment,
-                      entrypoint,
+                      entrypoint as IsographEntrypoint<
+                        any,
+                        any,
+                        NormalizationAst
+                      >,
                       localVariables,
                       fetchOptions,
                     );
@@ -580,7 +585,11 @@ function readData<TReadFromStore>(
                             const [networkRequest, disposeNetworkRequest] =
                               maybeMakeNetworkRequest(
                                 environment,
-                                entrypoint,
+                                entrypoint as IsographEntrypoint<
+                                  any,
+                                  any,
+                                  NormalizationAst
+                                >,
                                 localVariables,
                                 fetchOptions,
                               );

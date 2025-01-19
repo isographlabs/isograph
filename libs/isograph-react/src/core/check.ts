@@ -9,7 +9,8 @@ import {
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 
-export type ShouldFetch = 'Yes' | 'No' | 'IfNecessary';
+export type ShouldFetch = RequiredShouldFetch | 'IfNecessary';
+export type RequiredShouldFetch = 'Yes' | 'No';
 
 export const DEFAULT_SHOULD_FETCH_VALUE: ShouldFetch = 'IfNecessary';
 
@@ -18,6 +19,10 @@ export type FetchOptions<TReadOutData> = {
   onComplete?: (data: TReadOutData) => void;
   onError?: () => void;
 };
+
+export type RequiredFetchOptions<TReadOutData> = {
+  shouldFetch: RequiredShouldFetch;
+} & FetchOptions<TReadOutData>;
 
 export type CheckResult =
   | {

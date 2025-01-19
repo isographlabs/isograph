@@ -16,6 +16,7 @@ import {
 } from './IsographEnvironment';
 import {
   IsographEntrypoint,
+  type NormalizationAst,
   type NormalizationAstNodes,
   NormalizationInlineFragment,
   NormalizationLinkedField,
@@ -97,7 +98,7 @@ export function getOrCreateCacheForArtifact<
   const factory = () => {
     const [networkRequest, disposeNetworkRequest] = maybeMakeNetworkRequest(
       environment,
-      entrypoint,
+      entrypoint as IsographEntrypoint<any, any, NormalizationAst>,
       variables,
       fetchOptions,
     );

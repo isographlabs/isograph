@@ -51,7 +51,8 @@ const normalizationAst: NormalizationAst = {
 };
 const artifact: IsographEntrypoint<
   Mutation__SetTagline__param,
-  Mutation__SetTagline__output_type
+  Mutation__SetTagline__output_type,
+  NormalizationAst
 > = {
   kind: "Entrypoint",
   networkRequestInfo: {

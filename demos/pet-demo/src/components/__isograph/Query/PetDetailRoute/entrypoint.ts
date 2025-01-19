@@ -226,7 +226,8 @@ const normalizationAst: NormalizationAst = {
 };
 const artifact: IsographEntrypoint<
   Query__PetDetailRoute__param,
-  Query__PetDetailRoute__output_type
+  Query__PetDetailRoute__output_type,
+  NormalizationAst
 > = {
   kind: "Entrypoint",
   networkRequestInfo: {

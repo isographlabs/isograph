@@ -130,7 +130,8 @@ const normalizationAst: NormalizationAst = {
 };
 const artifact: IsographEntrypoint<
   Query__Newsfeed__param,
-  Query__Newsfeed__output_type
+  Query__Newsfeed__output_type,
+  NormalizationAst
 > = {
   kind: "Entrypoint",
   networkRequestInfo: {
