@@ -11,6 +11,7 @@ use lazy_static::lazy_static;
 
 lazy_static! {
     static ref LOADABLE_DIRECTIVE_NAME: IsographDirectiveName = "loadable".intern().into();
+    static ref UPDATABLE_DIRECTIVE_NAME: IsographDirectiveName = "updatable".intern().into();
 }
 
 #[allow(clippy::complexity)]
@@ -35,9 +36,20 @@ pub fn validate_isograph_field_directives(
     let new_selecton_set = and_then_selection_set_and_collect_errors(
         selection_set,
         &|scalar_field_selection| {
+            let updatable_directive = find_directive_named(
+                &scalar_field_selection.directives,
+                *UPDATABLE_DIRECTIVE_NAME,
+            );
+
             if let Some(directive) =
                 find_directive_named(&scalar_field_selection.directives, *LOADABLE_DIRECTIVE_NAME)
             {
+                if updatable_directive.is_some() {
+                    return Err(WithLocation::new(
+                        ProcessClientFieldDeclarationError::LoadableAndUpdatableAreMutuallyExclusive,
+                        Location::generated(),
+                    ));
+                }
                 let loadable_variant =
                     from_isograph_field_directive(&directive.item).map_err(|message| {
                         WithLocation::new(
@@ -51,6 +63,8 @@ pub fn validate_isograph_field_directives(
                 // TODO validate that the field is actually loadable (i.e. implements Node or
                 // whatnot)
                 Ok(IsographSelectionVariant::Loadable(loadable_variant))
+            } else if updatable_directive.is_some() {
+                Ok(IsographSelectionVariant::Updatable)
             } else {
                 Ok(IsographSelectionVariant::Regular)
             }

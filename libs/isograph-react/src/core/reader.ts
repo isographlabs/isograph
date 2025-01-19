@@ -57,6 +57,10 @@ export type ResolverFirstParameter<
   parameters: ExtractParameters<TReadFromStore>;
 };
 
+export type StartUpdate<UpdatableData> = (
+  updater: (updatableData: UpdatableData) => void,
+) => void;
+
 export type RefetchReaderArtifact = {
   readonly kind: 'RefetchReaderArtifact';
   readonly readerAst: ReaderAst<unknown>;

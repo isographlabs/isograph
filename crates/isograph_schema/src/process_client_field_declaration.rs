@@ -149,6 +149,9 @@ pub enum ProcessClientFieldDeclarationError {
         directive_name: IsographDirectiveName,
         message: DeserializationError,
     },
+
+    #[error("The directive \"@loadable\" and \"@updatable\" are mutually exclusive.")]
+    LoadableAndUpdatableAreMutuallyExclusive,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

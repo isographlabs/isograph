@@ -37,6 +37,7 @@ export {
   type TopLevelReaderArtifact,
   type LoadableField,
   type ResolverFirstParameter,
+  type StartUpdate,
 } from './core/reader';
 export {
   type NormalizationAst,

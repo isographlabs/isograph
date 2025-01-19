@@ -35,7 +35,7 @@ use crate::{
         generate_entrypoint_artifacts_with_client_field_traversal_result,
     },
     format_parameter_type::format_parameter_type,
-    import_statements::{LinkImports, ParamTypeImports},
+    import_statements::{LinkImports, ParamTypeImports, UpdatableImports},
     iso_overload_file::build_iso_overload_artifact,
     refetch_reader_artifact::{
         generate_refetch_output_type_artifact, generate_refetch_reader_artifact,
@@ -428,6 +428,7 @@ pub(crate) fn generate_output_type(client_field: &ValidatedClientField) -> Clien
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn generate_client_field_parameter_type(
     schema: &ValidatedSchema,
     selection_map: &[WithSpan<ValidatedSelection>],
@@ -436,37 +437,70 @@ pub(crate) fn generate_client_field_parameter_type(
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
     link_fields: &mut LinkImports,
-) -> ClientFieldParameterType {
+    updatable_fields: &mut UpdatableImports,
+) -> (ClientFieldParameterType, ClientFieldUpdatableDataType) {
     // TODO use unwraps
     let mut client_field_parameter_type = "{\n".to_string();
+    let mut client_field_updatable_data_type = "{\n".to_string();
     for selection in selection_map.iter() {
         write_param_type_from_selection(
             schema,
             &mut client_field_parameter_type,
+            &mut client_field_updatable_data_type,
             selection,
             parent_type,
             nested_client_field_imports,
             loadable_fields,
             indentation_level + 1,
             link_fields,
+            updatable_fields,
         );
     }
     client_field_parameter_type.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
+    client_field_updatable_data_type
+        .push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
 
-    ClientFieldParameterType(client_field_parameter_type)
+    (
+        ClientFieldParameterType(client_field_parameter_type),
+        ClientFieldUpdatableDataType(client_field_updatable_data_type),
+    )
+}
+
+pub struct DualStringProxy<'a> {
+    left: &'a mut String,
+    right: &'a mut String,
+}
+
+impl<'a> DualStringProxy<'a> {
+    pub fn new(left: &'a mut String, right: &'a mut String) -> Self {
+        Self { left, right }
+    }
+
+    pub fn push_str(&mut self, s: &str) {
+        self.left.push_str(s);
+        self.right.push_str(s);
+    }
+    pub fn push(&mut self, ch: char) {
+        self.left.push(ch);
+        self.right.push(ch);
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
 fn write_param_type_from_selection(
     schema: &ValidatedSchema,
-    query_type_declaration: &mut String,
+    readonly_data_type: &mut String,
+    updatable_data_type: &mut String,
     selection: &WithSpan<ValidatedSelection>,
     parent_type: &SchemaObject,
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
     link_fields: &mut LinkImports,
+    updatable_fields: &mut UpdatableImports,
 ) {
+    let mut query_type_declaration = DualStringProxy::new(readonly_data_type, updatable_data_type);
+
     match &selection.item {
         ServerFieldSelection::ScalarField(scalar_field_selection) => {
             match scalar_field_selection.associated_data.location {
@@ -481,7 +515,7 @@ fn write_param_type_from_selection(
 
                     write_optional_description(
                         field.description,
-                        query_type_declaration,
+                        &mut query_type_declaration,
                         indentation_level,
                     );
 
@@ -500,18 +534,40 @@ fn write_param_type_from_selection(
                         }
                     };
 
-                    query_type_declaration.push_str(&format!(
-                        "{}readonly {}: {},\n",
-                        "  ".repeat(indentation_level as usize),
-                        name_or_alias,
-                        print_javascript_type_declaration(&output_type)
-                    ));
+                    match scalar_field_selection.associated_data.selection_variant {
+                        ValidatedIsographSelectionVariant::Updatable => {
+                            *updatable_fields = true;
+                            updatable_data_type.push_str(&format!(
+                                "{}{}: {},\n",
+                                "  ".repeat(indentation_level as usize),
+                                name_or_alias,
+                                print_javascript_type_declaration(&output_type)
+                            ));
+                            readonly_data_type.push_str(&format!(
+                                "{}readonly {}: {},\n",
+                                "  ".repeat(indentation_level as usize),
+                                name_or_alias,
+                                print_javascript_type_declaration(&output_type)
+                            ));
+                        }
+                        ValidatedIsographSelectionVariant::Loadable(_) => {
+                            panic!("@loadble server fields are not supported")
+                        }
+                        ValidatedIsographSelectionVariant::Regular => {
+                            query_type_declaration.push_str(&format!(
+                                "{}readonly {}: {},\n",
+                                "  ".repeat(indentation_level as usize),
+                                name_or_alias,
+                                print_javascript_type_declaration(&output_type)
+                            ));
+                        }
+                    }
                 }
                 FieldType::ClientField(client_field_id) => {
                     let client_field = schema.client_field(client_field_id);
                     write_optional_description(
                         client_field.description,
-                        query_type_declaration,
+                        &mut query_type_declaration,
                         indentation_level,
                     );
                     query_type_declaration
@@ -596,40 +652,55 @@ fn write_param_type_from_selection(
             let field = schema.server_field(*parent_field);
             write_optional_description(
                 field.description,
-                query_type_declaration,
+                &mut query_type_declaration,
                 indentation_level,
             );
             query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
             let name_or_alias = linked_field.name_or_alias().item;
 
-            let type_annotation =
-                match &field.associated_data {
-                    SelectionType::Scalar(_) => panic!(
-                        "output_type_id should be an object. \
+            let (type_annotation, updatable_data_type_annotation) = match &field.associated_data {
+                SelectionType::Scalar(_) => panic!(
+                    "output_type_id should be an object. \
                             This is indicative of a bug in Isograph.",
-                    ),
-                    SelectionType::Object(associated_data) => associated_data
-                        .type_name
-                        .clone()
-                        .map(&mut |output_type_id| {
-                            let object_id = output_type_id;
-                            let object = schema.server_field_data.object(object_id);
-                            generate_client_field_parameter_type(
-                                schema,
-                                &linked_field.selection_set,
-                                object,
-                                nested_client_field_imports,
-                                loadable_fields,
-                                indentation_level,
-                                link_fields,
-                            )
-                        }),
-                };
+                ),
+                SelectionType::Object(associated_data) => {
+                    let output_type_id = associated_data.type_name.inner();
+                    let object_id = output_type_id;
+                    let object = schema.server_field_data.object(object_id);
+                    let (parameter_type, updatable_data_type) =
+                        generate_client_field_parameter_type(
+                            schema,
+                            &linked_field.selection_set,
+                            object,
+                            nested_client_field_imports,
+                            loadable_fields,
+                            indentation_level,
+                            link_fields,
+                            updatable_fields,
+                        );
 
-            query_type_declaration.push_str(&format!(
+                    (
+                        associated_data
+                            .type_name
+                            .clone()
+                            .map(&mut |_| parameter_type.0.clone()),
+                        associated_data
+                            .type_name
+                            .clone()
+                            .map(&mut |_| updatable_data_type.0.clone()),
+                    )
+                }
+            };
+
+            readonly_data_type.push_str(&format!(
                 "readonly {}: {},\n",
                 name_or_alias,
                 print_javascript_type_declaration(&type_annotation),
+            ));
+            updatable_data_type.push_str(&format!(
+                "readonly {}: {},\n",
+                name_or_alias,
+                print_javascript_type_declaration(&updatable_data_type_annotation),
             ));
         }
     }
@@ -721,7 +792,7 @@ pub(crate) fn generate_parameters<'a>(
 
 fn write_optional_description(
     description: Option<DescriptionValue>,
-    query_type_declaration: &mut String,
+    query_type_declaration: &mut DualStringProxy,
     indentation_level: u8,
 ) {
     if let Some(description) = description {
@@ -815,6 +886,10 @@ macro_rules! derive_display {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct ClientFieldParameterType(pub String);
 derive_display!(ClientFieldParameterType);
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct ClientFieldUpdatableDataType(pub String);
+derive_display!(ClientFieldUpdatableDataType);
 
 #[derive(Debug)]
 pub(crate) struct QueryText(pub String);
