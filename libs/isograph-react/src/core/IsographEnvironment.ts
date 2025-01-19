@@ -127,6 +127,9 @@ export function createIsographEnvironment(
   missingFieldHandler?: MissingFieldHandler | null,
   logFunction?: LogFunction | null,
 ): IsographEnvironment {
+  logFunction?.({
+    kind: 'EnvironmentCreated',
+  });
   return {
     store,
     networkFunction,

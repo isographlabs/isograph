@@ -84,6 +84,9 @@ export type LogMessage =
   | {
       kind: 'EnvironmentCheck';
       result: CheckResult;
+    }
+  | {
+      kind: 'EnvironmentCreated';
     };
 
 export type LogFunction = (logMessage: LogMessage) => void;
