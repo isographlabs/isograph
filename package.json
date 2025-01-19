@@ -12,6 +12,7 @@
     "watch-rs": "bacon -j build -p ./crates/",
     "check-rs": "bacon -j check -p ./crates/",
     "build": "cargo build",
+    "compile-typescript": "pnpm turbo compile-typescript --log-order=grouped",
     "cross": "cross build",
     "build-json-schema": "./target/debug/build_json_schema",
     "watch-pet-demo": "ISO_PRINT_ABSOLUTE_FILEPATH=1 pnpm --filter=pet-demo iso-watch",
