@@ -820,16 +820,18 @@ fn value_satisfies_type(
                 ),
             }
         }
-        NonConstantValue::Null => match type_ {
-            GraphQLTypeAnnotation::NonNull(_) => Err(WithLocation::new(
-                ValidateSchemaError::ExpectedNonNullTypeFoundNull {
-                    expected: id_annotation_to_typename_annotation(type_, schema_data),
-                },
-                value.location,
-            )),
-            GraphQLTypeAnnotation::List(_) => Ok(()),
-            GraphQLTypeAnnotation::Named(_) => Ok(()),
-        },
+        NonConstantValue::Null => {
+            if type_.is_nullable() {
+                Ok(())
+            } else {
+                Err(WithLocation::new(
+                    ValidateSchemaError::ExpectedNonNullTypeFoundNull {
+                        expected: id_annotation_to_typename_annotation(type_, schema_data),
+                    },
+                    value.location,
+                ))
+            }
+        }
         NonConstantValue::List(list) => match graphql_type_to_non_null_type(type_.clone()) {
             GraphQLNonNullTypeAnnotation::List(list_type) => {
                 list_satisfies_type(list, list_type, variable_definitions, schema_data)
