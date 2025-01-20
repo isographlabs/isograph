@@ -646,12 +646,6 @@ pub fn get_missing_arguments_and_validate_types(
     argument_definitions
         .iter()
         .filter_map(|definition| {
-            if definition.default_value.is_some()
-                || definition.type_.is_nullable() && !include_optional_args
-            {
-                return None;
-            }
-
             let user_supplied_argument = arguments
                 .iter()
                 // TODO do not call .lookup
@@ -667,6 +661,10 @@ pub fn get_missing_arguments_and_validate_types(
                     Ok(_) => None,
                     Err(e) => Some(Err(e)),
                 }
+            } else if definition.default_value.is_some()
+                || definition.type_.is_nullable() && !include_optional_args
+            {
+                None
             } else {
                 Some(Ok((*definition).clone()))
             }
