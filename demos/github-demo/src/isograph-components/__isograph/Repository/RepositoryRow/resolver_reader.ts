@@ -81,6 +81,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Repository.RepositoryRow",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

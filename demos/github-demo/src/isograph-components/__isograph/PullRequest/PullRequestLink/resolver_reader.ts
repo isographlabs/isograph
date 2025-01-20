@@ -49,6 +49,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "PullRequest.PullRequestLink",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

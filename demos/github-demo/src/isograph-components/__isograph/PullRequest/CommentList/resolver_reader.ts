@@ -80,6 +80,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "PullRequest.CommentList",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

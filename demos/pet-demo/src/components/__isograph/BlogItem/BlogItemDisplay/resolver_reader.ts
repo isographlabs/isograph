@@ -67,6 +67,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "BlogItem.BlogItemDisplay",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

@@ -33,6 +33,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Checkin.CheckinDisplay",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

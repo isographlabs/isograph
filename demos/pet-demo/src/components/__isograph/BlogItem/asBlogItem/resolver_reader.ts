@@ -20,6 +20,7 @@ const artifact: EagerReaderArtifact<
   kind: "EagerReaderArtifact",
   resolver: ({ data }) => data.__typename === "BlogItem" ? data.link : null,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

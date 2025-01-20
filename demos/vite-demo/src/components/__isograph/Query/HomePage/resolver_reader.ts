@@ -52,6 +52,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.HomePage",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

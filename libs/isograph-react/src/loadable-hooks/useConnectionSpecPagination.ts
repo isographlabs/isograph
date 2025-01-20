@@ -24,6 +24,7 @@ import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 import { maybeUnwrapNetworkRequest } from '../react/useResult';
 import { FetchOptions } from '../core/check';
+import { startUpdate } from '../core/startUpdate';
 
 type UsePaginationReturnValue<
   TReadFromStore extends {
@@ -137,7 +138,9 @@ export function useConnectionSpecPagination<
       const firstParameter = {
         data,
         parameters: fragmentReference.variables,
-        startUpdate: () => {},
+        startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
+          ? startUpdate(environment, data)
+          : undefined,
       };
 
       if (

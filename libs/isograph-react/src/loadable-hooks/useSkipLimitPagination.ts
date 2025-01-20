@@ -22,6 +22,7 @@ import { getPromiseState, readPromise } from '../core/PromiseWrapper';
 import { type WithEncounteredRecords } from '../core/read';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 import { FetchOptions } from '../core/check';
+import { startUpdate } from '../core/startUpdate';
 
 type UseSkipLimitReturnValue<
   TReadFromStore extends {
@@ -133,7 +134,9 @@ export function useSkipLimitPagination<
       const firstParameter = {
         data,
         parameters: fragmentReference.variables,
-        startUpdate: () => {},
+        startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
+          ? startUpdate(environment, data)
+          : undefined,
       };
 
       if (

@@ -12,6 +12,7 @@ import {
   readPromise,
 } from '../core/PromiseWrapper';
 import type { StartUpdate } from '../core/reader';
+import { startUpdate } from '../core/startUpdate';
 
 export function useResult<
   TReadFromStore extends {
@@ -56,7 +57,9 @@ export function useResult<
       const param = {
         data: data,
         parameters: fragmentReference.variables,
-        startUpdate: () => {},
+        startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
+          ? startUpdate(environment, data)
+          : undefined,
       };
       return readerWithRefetchQueries.readerArtifact.resolver(param);
     }

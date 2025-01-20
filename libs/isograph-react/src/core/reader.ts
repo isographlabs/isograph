@@ -44,6 +44,7 @@ export type EagerReaderArtifact<
   readonly resolver: (
     data: ResolverFirstParameter<TReadFromStore>,
   ) => TClientFieldValue;
+  readonly hasUpdatable: boolean;
 };
 
 export type ComponentReaderArtifact<
@@ -61,6 +62,7 @@ export type ComponentReaderArtifact<
     data: ResolverFirstParameter<TReadFromStore>,
     runtimeProps: TComponentProps,
   ) => React.ReactNode;
+  readonly hasUpdatable: boolean;
 };
 
 export type ResolverFirstParameter<
@@ -72,11 +74,8 @@ export type ResolverFirstParameter<
 > = {
   data: ExtractData<TReadFromStore>;
   parameters: ExtractParameters<TReadFromStore>;
-} & (ExtractStartUpdate<TReadFromStore> extends undefined
-  ? {}
-  : {
-      startUpdate: ExtractStartUpdate<TReadFromStore>;
-    });
+  startUpdate: undefined | ExtractStartUpdate<TReadFromStore>;
+};
 
 export type StartUpdate<UpdatableData> = (
   updater: (updatableData: UpdatableData) => void,

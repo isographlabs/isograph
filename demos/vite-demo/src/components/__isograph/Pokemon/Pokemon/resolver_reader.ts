@@ -37,6 +37,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Pokemon.Pokemon",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

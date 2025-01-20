@@ -5,6 +5,7 @@ import { useReadAndSubscribe } from '../react/useReadAndSubscribe';
 import { NetworkRequestReaderOptions } from './read';
 import { readPromise } from './PromiseWrapper';
 import { logMessage } from './logging';
+import { startUpdate } from './startUpdate';
 
 export function getOrCreateCachedComponent(
   environment: IsographEnvironment,
@@ -51,7 +52,9 @@ export function getOrCreateCachedComponent(
           {
             data,
             parameters: fragmentReference.variables,
-            startUpdate: () => {},
+            startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
+              ? startUpdate(environment, data)
+              : undefined,
           },
           additionalRuntimeProps,
         );

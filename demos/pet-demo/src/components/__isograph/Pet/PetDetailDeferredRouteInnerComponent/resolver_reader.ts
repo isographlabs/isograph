@@ -35,6 +35,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Pet.PetDetailDeferredRouteInnerComponent",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

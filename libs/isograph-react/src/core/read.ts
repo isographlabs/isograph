@@ -35,6 +35,7 @@ import { Arguments } from './util';
 import { logMessage } from './logging';
 import { CleanupFn } from '@isograph/disposable-types';
 import { FetchOptions } from './check';
+import { startUpdate } from './startUpdate';
 
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: EncounteredIds;
@@ -268,7 +269,9 @@ function readData<TReadFromStore>(
           const condition = field.condition.resolver({
             data: data.data,
             parameters: {},
-            startUpdate: () => {},
+            startUpdate: field.condition.hasUpdatable
+              ? startUpdate(environment, data)
+              : undefined,
           });
           if (condition === true) {
             link = root;

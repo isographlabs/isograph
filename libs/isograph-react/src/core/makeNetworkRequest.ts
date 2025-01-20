@@ -3,7 +3,7 @@ import {
   IsographEntrypoint,
   RefetchQueryNormalizationArtifact,
 } from './entrypoint';
-import { ExtractParameters } from './FragmentReference';
+import { ExtractParameters, type FragmentReference } from './FragmentReference';
 import {
   garbageCollectEnvironment,
   RetainedQuery,
@@ -23,6 +23,7 @@ import { check, DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
 import { readButDoNotEvaluate } from './read';
 import { getOrCreateCachedComponent } from './componentCache';
 import type { StartUpdate } from './reader';
+import { startUpdate } from './startUpdate';
 
 let networkRequestId = 0;
 
@@ -240,18 +241,19 @@ function readDataForOnComplete<
       throwOnNetworkError: false,
     };
 
+    const fragment: FragmentReference<TReadFromStore, TClientFieldValue> = {
+      kind: 'FragmentReference',
+      // TODO this smells.
+      readerWithRefetchQueries: wrapResolvedValue(
+        artifact.readerWithRefetchQueries,
+      ),
+      root,
+      variables,
+      networkRequest: fakeNetworkRequest,
+    };
     const fragmentResult = readButDoNotEvaluate(
       environment,
-      {
-        kind: 'FragmentReference',
-        // TODO this smells.
-        readerWithRefetchQueries: wrapResolvedValue(
-          artifact.readerWithRefetchQueries,
-        ),
-        root,
-        variables,
-        networkRequest: fakeNetworkRequest,
-      },
+      fragment,
       fakeNetworkRequestOptions,
     ).item;
     const readerArtifact = artifact.readerWithRefetchQueries.readerArtifact;
@@ -282,7 +284,9 @@ function readDataForOnComplete<
         return readerArtifact.resolver({
           data: fragmentResult,
           parameters: variables,
-          startUpdate: () => {},
+          startUpdate: readerArtifact.hasUpdatable
+            ? startUpdate(environment, fragmentResult)
+            : undefined,
         });
       }
       default: {

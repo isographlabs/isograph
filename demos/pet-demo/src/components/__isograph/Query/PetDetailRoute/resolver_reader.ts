@@ -78,6 +78,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.PetDetailRoute",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

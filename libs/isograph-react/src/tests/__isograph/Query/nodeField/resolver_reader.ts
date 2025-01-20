@@ -33,6 +33,7 @@ const artifact: EagerReaderArtifact<
   kind: "EagerReaderArtifact",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;
