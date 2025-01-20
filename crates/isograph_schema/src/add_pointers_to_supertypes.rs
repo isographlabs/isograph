@@ -69,6 +69,9 @@ impl UnvalidatedSchema {
                                     .expect("Expected link to be client field")
                                 {
                                     ClientType::ClientField(client_field_id) => client_field_id,
+                                    ClientType::ClientPointer(_) => {
+                                        panic!("Expected link to be client field")
+                                    }
                                 },
                             ),
                             selection_variant: ValidatedIsographSelectionVariant::Regular,
