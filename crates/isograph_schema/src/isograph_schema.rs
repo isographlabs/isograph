@@ -89,16 +89,6 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
     pub entrypoints: TSchemaValidationState::Entrypoint,
     pub server_field_data: ServerFieldData,
 
-    // Well known types
-    pub id_type_id: ServerScalarId,
-    pub string_type_id: ServerScalarId,
-    pub float_type_id: ServerScalarId,
-    pub boolean_type_id: ServerScalarId,
-    pub int_type_id: ServerScalarId,
-    // TODO restructure UnionTypeAnnotation to not have a nullable field, but to instead
-    // include null in its variants.
-    pub null_type_id: ServerScalarId,
-
     /// These are root types like Query, Mutation, Subscription
     pub fetchable_types: BTreeMap<ServerObjectId, RootOperationName>,
 }
@@ -185,6 +175,16 @@ pub struct ServerFieldData {
     pub server_objects: Vec<SchemaObject>,
     pub server_scalars: Vec<SchemaScalar>,
     pub defined_types: HashMap<UnvalidatedTypeName, SelectableServerFieldId>,
+
+    // Well known types
+    pub id_type_id: ServerScalarId,
+    pub string_type_id: ServerScalarId,
+    pub float_type_id: ServerScalarId,
+    pub boolean_type_id: ServerScalarId,
+    pub int_type_id: ServerScalarId,
+    // TODO restructure UnionTypeAnnotation to not have a nullable field, but to instead
+    // include null in its variants.
+    pub null_type_id: ServerScalarId,
 }
 
 impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationState> {

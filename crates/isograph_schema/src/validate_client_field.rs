@@ -1,9 +1,13 @@
-use std::collections::{BTreeSet, HashMap};
+use std::{
+    collections::{BTreeSet, HashMap},
+    vec,
+};
 
 use common_lang_types::{
-    FieldArgumentName, Location, ObjectTypeAndFieldName, SelectableFieldName, UnvalidatedTypeName,
-    VariableName, WithLocation, WithSpan,
+    FieldArgumentName, Location, ObjectTypeAndFieldName, SelectableFieldName, VariableName,
+    WithLocation, WithSpan,
 };
+
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     reachable_variables, ClientFieldId, IsographSelectionVariant, LinkedFieldSelection,
@@ -14,14 +18,14 @@ use lazy_static::lazy_static;
 
 use crate::{
     get_all_errors_or_all_ok, get_all_errors_or_all_ok_as_hashmap, get_all_errors_or_all_ok_iter,
-    get_all_errors_or_tuple_ok, ClientField, ClientType, FieldType, RefetchStrategy, SchemaObject,
-    ServerFieldData, UnvalidatedClientField, UnvalidatedLinkedFieldSelection,
-    UnvalidatedRefetchFieldStrategy, UnvalidatedVariableDefinition, ValidateSchemaError,
-    ValidateSchemaResult, ValidatedClientField, ValidatedIsographSelectionVariant,
-    ValidatedLinkedFieldAssociatedData, ValidatedLinkedFieldSelection,
-    ValidatedRefetchFieldStrategy, ValidatedScalarFieldAssociatedData,
-    ValidatedScalarFieldSelection, ValidatedSchemaServerField, ValidatedSelection,
-    ValidatedVariableDefinition,
+    get_all_errors_or_tuple_ok, validate_argument_types::value_satisfies_type, ClientField,
+    ClientType, FieldType, RefetchStrategy, SchemaObject, ServerFieldData, UnvalidatedClientField,
+    UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
+    UnvalidatedVariableDefinition, ValidateSchemaError, ValidateSchemaResult, ValidatedClientField,
+    ValidatedIsographSelectionVariant, ValidatedLinkedFieldAssociatedData,
+    ValidatedLinkedFieldSelection, ValidatedRefetchFieldStrategy,
+    ValidatedScalarFieldAssociatedData, ValidatedScalarFieldSelection, ValidatedSchemaServerField,
+    ValidatedSelection, ValidatedVariableDefinition,
 };
 
 type UsedVariables = BTreeSet<VariableName>;
@@ -75,17 +79,17 @@ pub(crate) fn validate_and_transform_client_fields(
 }
 
 fn validate_all_variables_are_used(
-    variable_definitions: Vec<WithSpan<UnvalidatedVariableDefinition>>,
+    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     used_variables: UsedVariables,
     top_level_client_field_info: &ValidateSchemaSharedInfo<'_>,
 ) -> ValidateSchemaResult<()> {
     let unused_variables: Vec<_> = variable_definitions
-        .into_iter()
+        .iter()
         .filter_map(|variable| {
             let is_used = used_variables.contains(&variable.item.name.item);
 
             if !is_used {
-                return Some(variable);
+                return Some(variable.clone());
             }
             None
         })
@@ -145,7 +149,7 @@ fn validate_client_field_selection_set(
         .map(|selection_set| {
             validate_client_field_definition_selections_exist_and_types_match(
                 selection_set,
-                top_level_client_field.variable_definitions,
+                &variable_definitions,
                 &top_level_client_field_info,
             )
         })
@@ -189,7 +193,7 @@ fn validate_use_refetch_field_strategy(
 ) -> Result<ValidatedRefetchFieldStrategy, Vec<WithLocation<ValidateSchemaError>>> {
     let refetch_selection_set = validate_client_field_definition_selections_exist_and_types_match(
         use_refetch_field_strategy.refetch_selection_set,
-        vec![],
+        &[],
         top_level_client_field_info,
     )?;
 
@@ -236,7 +240,7 @@ fn validate_variable_definitions(
 
 fn validate_client_field_definition_selections_exist_and_types_match(
     field_selection_set: Vec<WithSpan<UnvalidatedSelection>>,
-    field_variable_definitions: Vec<WithSpan<UnvalidatedVariableDefinition>>,
+    field_variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     top_level_client_field_info: &ValidateSchemaSharedInfo<'_>,
 ) -> Result<Vec<WithSpan<ValidatedSelection>>, Vec<WithLocation<ValidateSchemaError>>> {
     // Currently, we only check that each field exists and has an appropriate type, not that
@@ -250,7 +254,7 @@ fn validate_client_field_definition_selections_exist_and_types_match(
                 selection,
                 top_level_client_field_info.client_field_parent_object,
                 &mut used_variables,
-                &field_variable_definitions,
+                field_variable_definitions,
                 top_level_client_field_info,
             )
         }));
@@ -272,7 +276,7 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
     selection: WithSpan<UnvalidatedSelection>,
     field_parent_object: &SchemaObject,
     used_variables: &mut UsedVariables,
-    variable_definitions: &[WithSpan<UnvalidatedVariableDefinition>],
+    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     top_level_client_field_info: &ValidateSchemaSharedInfo<'_>,
 ) -> ValidateSchemaResult<WithSpan<ValidatedSelection>> {
     let mut used_variables2 = BTreeSet::new();
@@ -311,7 +315,7 @@ fn validate_field_type_exists_and_is_scalar(
     scalar_field_selection_parent_object: &SchemaObject,
     scalar_field_selection: UnvalidatedScalarFieldSelection,
     used_variables: &mut UsedVariables,
-    variable_definitions: &[WithSpan<UnvalidatedVariableDefinition>],
+    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     top_level_client_field_info: &ValidateSchemaSharedInfo<'_>,
 ) -> ValidateSchemaResult<ValidatedScalarFieldSelection> {
     let scalar_field_name = scalar_field_selection.name.item.into();
@@ -324,6 +328,7 @@ fn validate_field_type_exists_and_is_scalar(
                 let server_field =
                     &top_level_client_field_info.server_fields[server_field_id.as_usize()];
                 let missing_arguments = get_missing_arguments_and_validate_argument_types(
+                    top_level_client_field_info.schema_data,
                     server_field
                         .arguments
                         .iter()
@@ -415,7 +420,7 @@ fn validate_client_field(
     client_field_id: &ClientFieldId,
     scalar_field_selection: UnvalidatedScalarFieldSelection,
     used_variables: &mut UsedVariables,
-    variable_definitions: &[WithSpan<UnvalidatedVariableDefinition>],
+    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     top_level_client_field_info: &ValidateSchemaSharedInfo<'_>,
 ) -> ValidateSchemaResult<ValidatedScalarFieldSelection> {
     let argument_definitions = top_level_client_field_info
@@ -426,6 +431,7 @@ fn validate_client_field(
             This is indicative of a bug in Isograph.",
         );
     let missing_arguments = get_missing_arguments_and_validate_argument_types(
+        top_level_client_field_info.schema_data,
         argument_definitions
             .iter()
             .map(|variable_definition| &variable_definition.item),
@@ -465,7 +471,7 @@ fn validate_field_type_exists_and_is_linked(
     field_parent_object: &SchemaObject,
     linked_field_selection: UnvalidatedLinkedFieldSelection,
     used_variables: &mut UsedVariables,
-    variable_definitions: &[WithSpan<UnvalidatedVariableDefinition>],
+    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     top_level_client_field_info: &ValidateSchemaSharedInfo<'_>,
 ) -> ValidateSchemaResult<ValidatedLinkedFieldSelection> {
     let linked_field_name = linked_field_selection.name.item.into();
@@ -503,6 +509,7 @@ fn validate_field_type_exists_and_is_linked(
                             .unwrap();
 
                         let missing_arguments = get_missing_arguments_and_validate_argument_types(
+                            top_level_client_field_info.schema_data,
                             server_field
                                 .arguments
                                 .iter()
@@ -603,12 +610,13 @@ fn assert_no_missing_arguments(
 }
 
 fn get_missing_arguments_and_validate_argument_types<'a>(
+    schema_data: &ServerFieldData,
     argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
     arguments: &[WithLocation<SelectionFieldArgument>],
     include_optional_args: bool,
     location: Location,
     used_variables: &mut UsedVariables,
-    variable_definitions: &[WithSpan<UnvalidatedVariableDefinition>],
+    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
 ) -> ValidateSchemaResult<Vec<ValidatedVariableDefinition>> {
     let reachable_variables = validate_no_undefined_variables_and_get_reachable_variables(
         arguments,
@@ -619,35 +627,46 @@ fn get_missing_arguments_and_validate_argument_types<'a>(
     let argument_definitions_vec: Vec<_> = argument_definitions.collect();
     validate_no_extraneous_arguments(&argument_definitions_vec, arguments, location)?;
 
-    // TODO validate argument types
-    Ok(get_missing_arguments(
-        argument_definitions_vec.into_iter(),
+    get_missing_arguments_and_validate_types(
+        schema_data,
+        &argument_definitions_vec,
         arguments,
         include_optional_args,
-    ))
+        variable_definitions,
+    )
 }
 
-pub fn get_missing_arguments<'a>(
-    argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
+pub fn get_missing_arguments_and_validate_types(
+    schema_data: &ServerFieldData,
+    argument_definitions: &[&ValidatedVariableDefinition],
     arguments: &[WithLocation<SelectionFieldArgument>],
     include_optional_args: bool,
-) -> Vec<ValidatedVariableDefinition> {
+    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
+) -> ValidateSchemaResult<Vec<ValidatedVariableDefinition>> {
     argument_definitions
+        .iter()
         .filter_map(|definition| {
-            if definition.default_value.is_some()
-                || definition.type_.is_nullable() && !include_optional_args
-            {
-                return None;
-            }
-
-            let user_has_supplied_argument = arguments
+            let user_supplied_argument = arguments
                 .iter()
                 // TODO do not call .lookup
-                .any(|arg| definition.name.item.lookup() == arg.item.name.item.lookup());
-            if user_has_supplied_argument {
+                .find(|arg| definition.name.item.lookup() == arg.item.name.item.lookup());
+
+            if let Some(user_supplied_argument) = user_supplied_argument {
+                match value_satisfies_type(
+                    &user_supplied_argument.item.value,
+                    &definition.type_,
+                    variable_definitions,
+                    schema_data,
+                ) {
+                    Ok(_) => None,
+                    Err(e) => Some(Err(e)),
+                }
+            } else if definition.default_value.is_some()
+                || definition.type_.is_nullable() && !include_optional_args
+            {
                 None
             } else {
-                Some(definition.clone())
+                Some(Ok((*definition).clone()))
             }
         })
         .collect()
@@ -655,7 +674,7 @@ pub fn get_missing_arguments<'a>(
 
 fn validate_no_undefined_variables_and_get_reachable_variables(
     arguments: &[WithLocation<SelectionFieldArgument>],
-    variable_definitions: &[WithSpan<VariableDefinition<UnvalidatedTypeName>>],
+    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
 ) -> ValidateSchemaResult<Vec<WithLocation<VariableName>>> {
     let mut all_reachable_variables = vec![];
     for argument in arguments {
