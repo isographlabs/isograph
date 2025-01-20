@@ -11,9 +11,14 @@ import {
   PromiseWrapper,
   readPromise,
 } from '../core/PromiseWrapper';
+import type { StartUpdate } from '../core/reader';
 
 export function useResult<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
 >(
   fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>,
@@ -51,6 +56,7 @@ export function useResult<
       const param = {
         data: data,
         parameters: fragmentReference.variables,
+        startUpdate: () => {},
       };
       return readerWithRefetchQueries.readerArtifact.resolver(param);
     }
