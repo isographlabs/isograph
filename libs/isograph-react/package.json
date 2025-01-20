@@ -13,7 +13,7 @@
     "test": "vitest run",
     "test-watch": "vitest watch",
     "coverage": "vitest run --coverage",
-    "prepack": "pnpm run test && pnpm run compile",
+    "prepack": "pnpm run test && pnpm run compile-typescript",
     "tsc": "tsc",
     "iso": "../../target/debug/isograph_cli --config ./isograph.config.json",
     "iso-watch": "../../target/debug/isograph_cli --config ./isograph.config.json --watch"
