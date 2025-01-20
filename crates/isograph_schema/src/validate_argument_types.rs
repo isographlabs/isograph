@@ -141,97 +141,118 @@ fn variable_type_satisfies_argument_type(
 }
 
 pub fn value_satisfies_type(
-    value: &WithLocation<NonConstantValue>,
-    type_: &GraphQLTypeAnnotation<SelectableServerFieldId>,
+    selection_supplied_argument_value: &WithLocation<NonConstantValue>,
+    field_argument_definition_type: &GraphQLTypeAnnotation<SelectableServerFieldId>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     schema_data: &ServerFieldData,
 ) -> ValidateSchemaResult<()> {
-    match &value.item {
+    match &selection_supplied_argument_value.item {
         NonConstantValue::Variable(variable_name) => variable_type_satisfies_argument_type(
-            get_variable_type(variable_name, variable_definitions, value.location)?,
-            type_,
+            get_variable_type(
+                variable_name,
+                variable_definitions,
+                selection_supplied_argument_value.location,
+            )?,
+            field_argument_definition_type,
             schema_data,
-            value.location,
+            selection_supplied_argument_value.location,
         ),
         NonConstantValue::Integer(_) => scalar_literal_satisfies_type(
             &schema_data.int_type_id,
-            type_,
+            field_argument_definition_type,
             schema_data,
-            value.location,
+            selection_supplied_argument_value.location,
         ),
         NonConstantValue::Boolean(_) => scalar_literal_satisfies_type(
             &schema_data.boolean_type_id,
-            type_,
+            field_argument_definition_type,
             schema_data,
-            value.location,
+            selection_supplied_argument_value.location,
         ),
         NonConstantValue::String(_) => scalar_literal_satisfies_type(
             &schema_data.string_type_id,
-            type_,
+            field_argument_definition_type,
             schema_data,
-            value.location,
+            selection_supplied_argument_value.location,
         ),
         NonConstantValue::Float(_) => scalar_literal_satisfies_type(
             &schema_data.float_type_id,
-            type_,
+            field_argument_definition_type,
             schema_data,
-            value.location,
+            selection_supplied_argument_value.location,
         ),
         NonConstantValue::Enum(enum_literal_value) => {
-            match graphql_type_to_non_null_type(type_.clone()) {
+            match graphql_type_to_non_null_type(field_argument_definition_type.clone()) {
                 GraphQLNonNullTypeAnnotation::List(_) => Err(WithLocation::new(
                     ValidateSchemaError::ExpectedTypeFoundEnum {
-                        expected: id_annotation_to_typename_annotation(type_, schema_data),
+                        expected: id_annotation_to_typename_annotation(
+                            field_argument_definition_type,
+                            schema_data,
+                        ),
                         actual: *enum_literal_value,
                     },
-                    value.location,
+                    selection_supplied_argument_value.location,
                 )),
                 GraphQLNonNullTypeAnnotation::Named(named_type) => enum_satisfies_type(
                     enum_literal_value,
                     &named_type,
                     schema_data,
-                    value.location,
+                    selection_supplied_argument_value.location,
                 ),
             }
         }
         NonConstantValue::Null => {
-            if type_.is_nullable() {
+            if field_argument_definition_type.is_nullable() {
                 Ok(())
             } else {
                 Err(WithLocation::new(
                     ValidateSchemaError::ExpectedNonNullTypeFoundNull {
-                        expected: id_annotation_to_typename_annotation(type_, schema_data),
+                        expected: id_annotation_to_typename_annotation(
+                            field_argument_definition_type,
+                            schema_data,
+                        ),
                     },
-                    value.location,
+                    selection_supplied_argument_value.location,
                 ))
             }
         }
-        NonConstantValue::List(list) => match graphql_type_to_non_null_type(type_.clone()) {
-            GraphQLNonNullTypeAnnotation::List(list_type) => {
-                list_satisfies_type(list, list_type, variable_definitions, schema_data)
+        NonConstantValue::List(list) => {
+            match graphql_type_to_non_null_type(field_argument_definition_type.clone()) {
+                GraphQLNonNullTypeAnnotation::List(list_type) => {
+                    list_satisfies_type(list, list_type, variable_definitions, schema_data)
+                }
+                GraphQLNonNullTypeAnnotation::Named(_) => Err(WithLocation::new(
+                    ValidateSchemaError::ExpectedTypeFoundList {
+                        expected: id_annotation_to_typename_annotation(
+                            field_argument_definition_type,
+                            schema_data,
+                        ),
+                    },
+                    selection_supplied_argument_value.location,
+                )),
             }
-            GraphQLNonNullTypeAnnotation::Named(_) => Err(WithLocation::new(
-                ValidateSchemaError::ExpectedTypeFoundList {
-                    expected: id_annotation_to_typename_annotation(type_, schema_data),
-                },
-                value.location,
-            )),
-        },
+        }
         NonConstantValue::Object(_object_literal) => {
-            match graphql_type_to_non_null_type(type_.clone()) {
+            match graphql_type_to_non_null_type(field_argument_definition_type.clone()) {
                 GraphQLNonNullTypeAnnotation::List(_) => Err(WithLocation::new(
                     ValidateSchemaError::ExpectedTypeFoundObject {
-                        expected: id_annotation_to_typename_annotation(type_, schema_data),
+                        expected: id_annotation_to_typename_annotation(
+                            field_argument_definition_type,
+                            schema_data,
+                        ),
                     },
-                    value.location,
+                    selection_supplied_argument_value.location,
                 )),
                 GraphQLNonNullTypeAnnotation::Named(named_type) => {
                     match named_type.0.item {
                         SelectionType::Scalar(_) => Err(WithLocation::new(
                             ValidateSchemaError::ExpectedTypeFoundObject {
-                                expected: id_annotation_to_typename_annotation(type_, schema_data),
+                                expected: id_annotation_to_typename_annotation(
+                                    field_argument_definition_type,
+                                    schema_data,
+                                ),
                             },
-                            value.location,
+                            selection_supplied_argument_value.location,
                         )),
                         SelectionType::Object(object_id) => {
                             let _object = schema_data.object(object_id);
