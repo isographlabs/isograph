@@ -636,7 +636,7 @@ fn get_missing_arguments_and_validate_argument_types<'a>(
     )
 }
 
-pub fn get_missing_arguments_and_validate_types(
+fn get_missing_arguments_and_validate_types(
     schema_data: &ServerFieldData,
     argument_definitions: &[&ValidatedVariableDefinition],
     arguments: &[WithLocation<SelectionFieldArgument>],
@@ -662,7 +662,7 @@ pub fn get_missing_arguments_and_validate_types(
                     Err(e) => Some(Err(e)),
                 }
             } else if definition.default_value.is_some()
-                || definition.type_.is_nullable() && !include_optional_args
+                || (definition.type_.is_nullable() && !include_optional_args)
             {
                 None
             } else {
