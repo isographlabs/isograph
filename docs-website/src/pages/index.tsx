@@ -1,13 +1,12 @@
 import Layout from '@theme/Layout';
-
-import YoutubeEmbed from '../components/YoutubeEmbed';
-import ProblemStatement from '../components/ProblemStatement';
-import IsographFeatures from '../components/IsographFeatures';
-import HomepageHeader from '../components/Header';
 import Components from '../components/Components';
 import Fetching from '../components/Fetching';
-import IsIsographRightForMe from '../components/IsIsographRightForMe';
+import HomepageHeader from '../components/Header';
 import IntroducingIsograph from '../components/IntroducingIsograph';
+import IsIsographRightForMe from '../components/IsIsographRightForMe';
+import IsographFeatures from '../components/IsographFeatures';
+import ProblemStatement from '../components/ProblemStatement';
+import YoutubeEmbed from '../components/YoutubeEmbed';
 
 export default function Home(): JSX.Element {
   return (

@@ -1,8 +1,8 @@
-import React, { Suspense } from 'react';
 import { iso } from '@iso';
-import { Button, Card, CardContent } from '@mui/material';
 import { FragmentReader, useImperativeReference } from '@isograph/react';
 import { UNASSIGNED_STATE } from '@isograph/react-disposable-state';
+import { Button, Card, CardContent } from '@mui/material';
+import React, { Suspense } from 'react';
 
 export const PetTaglineCard = iso(`
   field Pet.PetTaglineCard @component {

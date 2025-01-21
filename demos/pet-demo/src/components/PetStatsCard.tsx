@@ -1,6 +1,6 @@
-import React from 'react';
 import { iso } from '@iso';
 import { Button, Card, CardContent } from '@mui/material';
+import React from 'react';
 
 export const PetStatsCard = iso(`
   field Pet.PetStatsCard($id: ID!) @component {

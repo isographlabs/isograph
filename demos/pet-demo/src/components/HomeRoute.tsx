@@ -1,9 +1,9 @@
-import React from 'react';
 import { iso } from '@iso';
-import { Container, Stack } from '@mui/material';
 import { FragmentReader, useLazyReference } from '@isograph/react';
-import { FullPageLoading } from './routes';
+import { Container, Stack } from '@mui/material';
+import React from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
+import { FullPageLoading } from './routes';
 
 export const HomeRoute = iso(`
   field Query.HomeRoute @component {

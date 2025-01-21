@@ -1,6 +1,6 @@
+import clsx from 'clsx';
 import Buttons from '../Buttons';
 import styles from './styles.module.css';
-import clsx from 'clsx';
 
 export default function HomepageHeader() {
   return (

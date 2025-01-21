@@ -1,7 +1,7 @@
 import { iso } from '@iso';
-import React from 'react';
-import { UNASSIGNED_STATE } from '@isograph/react-disposable-state';
 import { FragmentReader, useImperativeReference } from '@isograph/react';
+import { UNASSIGNED_STATE } from '@isograph/react-disposable-state';
+import React from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
 
 export const FavoritePhraseLoader = iso(`

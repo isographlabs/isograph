@@ -13,17 +13,19 @@ Consider using `useUpdatableDisposableState` state to manage an array of disposa
 The behavior of `useUpdatableDisposableState` is to entirely dispose of all previously-held items after a new item is set in state. So, if we had
 
 ```js
-const { state, setState } = useUpdatableDisposableState();
-// assume state === [item1], and the cleanup function will dispose item1
+const component = () => {
+  const { state, setState } = useUpdatableDisposableState();
+  // assume state === [item1], and the cleanup function will dispose item1
 
-const addItem2ToState = () => {
-  setState([item1, item2], () => {
-    disposeItem1();
-    disposeItem2();
-  });
+  const addItem2ToState = () => {
+    setState([item1, item2], () => {
+      disposeItem1();
+      disposeItem2();
+    });
+  };
+
+  return makePrettyJSX(state[0]);
 };
-
-return makePrettyJSX(state[0]);
 ```
 
 In the above, `item1` would be disposed after the state was updated to be `[item1, item2]`. Meaning, the hook returns an item that has already been disposed. Clearly, this will not do.
@@ -51,25 +53,27 @@ Given an undisposed active reference `r1`, one can get a new active reference `r
 Let's use reference counted pointers in the example.
 
 ```js
-const { state, setState } = useUpdatableDisposableState();
-// assume state === [item1activeReference], and the cleanup function will dispose that active reference
+const component = () => {
+  const { state, setState } = useUpdatableDisposableState();
+  // assume state === [item1activeReference], and the cleanup function will dispose that active reference
 
-const addItem2ToState = () => {
-  const [item2, disposeItem2] = createDisposeItem2();
-  const [item2ActiveReference, disposeItem2ActiveReference] =
-    createReferenceCountedPointer([item2, disposeItem2]);
+  const addItem2ToState = () => {
+    const [item2, disposeItem2] = createDisposeItem2();
+    const [item2ActiveReference, disposeItem2ActiveReference] =
+      createReferenceCountedPointer([item2, disposeItem2]);
 
-  // get a new active reference to the existing item1
-  const [item1ActiveReference, disposeItem1ActiveReference] = nullthrows(
-    state[0].cloneIfNotDisposed(),
-  );
-  setState([item1ActiveReference, item2ActiveReference], () => {
-    disposeItem1ActiveReference();
-    disposeItem2ActiveReference();
-  });
+    // get a new active reference to the existing item1
+    const [item1ActiveReference, disposeItem1ActiveReference] = nullthrows(
+      state[0].cloneIfNotDisposed(),
+    );
+    setState([item1ActiveReference, item2ActiveReference], () => {
+      disposeItem1ActiveReference();
+      disposeItem2ActiveReference();
+    });
+  };
+
+  return makePrettyJSX(nullthrows(state[0].getItemIfNotDisposed()));
 };
-
-return makePrettyJSX(nullthrows(state[0].getItemIfNotDisposed()));
 ```
 
 Not the most ergonomic, but it does the job.

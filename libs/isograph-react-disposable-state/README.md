@@ -84,9 +84,9 @@ A hook that:
 
 ```typescript
 const { state }: { state: T } = useLazyDisposableState<T>(
-  parentCache: ParentCache<T>,
-  factory: Loader<T>,
-  options: ?Options,
+  parentCache,
+  factory,
+  options,
 );
 ```
 
@@ -105,11 +105,9 @@ const {
   state,
   setState,
 }: {
-  state: T | null,
-  setState: (ItemCleanupPair<T>) => void,
-} = useUpdatableDisposableState<T>(
-  options: ?Options,
-);
+  state: T | null;
+  setState: (pair: ItemCleanupPair<T>) => void;
+} = useUpdatableDisposableState<T>(options);
 ```
 
 ### `useDisposableState`
@@ -123,13 +121,9 @@ const {
   state,
   setState,
 }: {
-  state: T,
-  setState: (ItemCleanupPair<T>) => void,
-} = useDisposableState<T>(
-  parentCache: ParentCache<T>,
-  factory: Loader<T>,
-  options: ?Options,
-);
+  state: T;
+  setState: (pair: ItemCleanupPair<T>) => void;
+} = useDisposableState<T>(parentCache, factory, options);
 ```
 
 ## Miscellaneous notes

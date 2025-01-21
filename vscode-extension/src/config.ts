@@ -1,4 +1,4 @@
-import { workspace, ConfigurationScope } from 'vscode';
+import { ConfigurationScope, workspace } from 'vscode';
 
 export type Config = {
   rootDirectory: string | null;

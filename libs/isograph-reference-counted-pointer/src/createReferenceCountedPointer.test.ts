@@ -1,4 +1,4 @@
-import { describe, test, vi, expect, assert } from 'vitest';
+import { assert, describe, expect, test, vi } from 'vitest';
 import { createReferenceCountedPointer } from './createReferenceCountedPointer';
 
 describe('createReferenceCountedPointer', () => {

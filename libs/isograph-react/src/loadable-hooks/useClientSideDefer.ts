@@ -1,12 +1,12 @@
+import { useLazyDisposableState } from '@isograph/react-disposable-state';
+import { getOrCreateItemInSuspenseCache } from '../core/cache';
+import { FetchOptions } from '../core/check';
 import {
   ExtractParameters,
   FragmentReference,
 } from '../core/FragmentReference';
-import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
-import { getOrCreateItemInSuspenseCache } from '../core/cache';
-import { useLazyDisposableState } from '@isograph/react-disposable-state';
 import { LoadableField } from '../core/reader';
-import { FetchOptions } from '../core/check';
+import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 
 export function useClientSideDefer<
   TReadFromStore extends { data: object; parameters: object },

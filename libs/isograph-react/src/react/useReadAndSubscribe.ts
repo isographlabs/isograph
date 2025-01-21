@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
+import { subscribe } from '../core/cache';
 import {
+  ExtractData,
   FragmentReference,
   stableIdForFragmentReference,
-  ExtractData,
 } from '../core/FragmentReference';
 import {
   NetworkRequestReaderOptions,
   readButDoNotEvaluate,
   WithEncounteredRecords,
 } from '../core/read';
-import { useRerenderOnChange } from './useRerenderOnChange';
-import { useIsographEnvironment } from './IsographEnvironmentProvider';
-import { subscribe } from '../core/cache';
 import type { ReaderAst } from '../core/reader';
+import { useIsographEnvironment } from './IsographEnvironmentProvider';
+import { useRerenderOnChange } from './useRerenderOnChange';
 
 /**
  * Read the data from a fragment reference and subscribe to updates.

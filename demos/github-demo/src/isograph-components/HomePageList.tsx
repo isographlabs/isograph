@@ -1,7 +1,7 @@
 import { iso } from '@iso';
-import { RepoGitHubLink } from './RepoGitHubLink';
 import { Button } from '@mui/material';
 import { Route } from './GithubDemo';
+import { RepoGitHubLink } from './RepoGitHubLink';
 
 export const HomePageList = iso(`
   field Query.HomePageList @component {

@@ -1,5 +1,6 @@
 import type { Link } from './IsographEnvironment';
 import type { ReaderAst, ReaderLinkedField, ReaderScalarField } from './reader';
+
 export function mergeUsingReaderAst(
   field: ReaderScalarField | ReaderLinkedField,
   oldItem: unknown,

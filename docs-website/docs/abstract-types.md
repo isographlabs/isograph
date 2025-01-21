@@ -12,14 +12,15 @@ export const UserLink = iso(`
       twitterUsername
     }
   }
-`)(function UserLinkComponent(
-  { data },
-) {
-  return <>Hello <b>{data.login}</b>{
-    data.asUser != null
-      ? ` (who goes by ${data.asUser.twitterUsername ?? ''} on Twitter!)`
-      : null
-  }
+`)(function UserLinkComponent({ data }) {
+  return (
+    <>
+      Hello <b>{data.login}</b>
+      {data.asUser != null
+        ? ` (who goes by ${data.asUser.twitterUsername ?? ''} on Twitter!)`
+        : null}
+    </>
+  );
 });
 ```
 
