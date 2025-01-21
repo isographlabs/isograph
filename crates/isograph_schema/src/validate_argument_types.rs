@@ -90,12 +90,9 @@ fn variable_type_satisfies_argument_type(
                 GraphQLNonNullTypeAnnotation::List(list_variable_type) => {
                     // [Value]! satisfies [Value]
                     // or [Value] satisfies [Value]
-                    return variable_type_satisfies_argument_type(
-                        &list_variable_type,
-                        &list_type.0,
-                    );
+                    variable_type_satisfies_argument_type(&list_variable_type, &list_type.0)
                 }
-                GraphQLNonNullTypeAnnotation::Named(_) => (),
+                GraphQLNonNullTypeAnnotation::Named(_) => false,
             }
         }
 
@@ -104,28 +101,22 @@ fn variable_type_satisfies_argument_type(
                 GraphQLNonNullTypeAnnotation::Named(named_variable_type) => {
                     // Value! satisfies Value
                     // or Value satisfies Value
-                    if named_variable_type.item == named_type.item {
-                        return true;
-                    }
+                    named_variable_type.item == named_type.item
                 }
-                GraphQLNonNullTypeAnnotation::List(_) => (),
+                GraphQLNonNullTypeAnnotation::List(_) => false,
             }
         }
         GraphQLTypeAnnotation::NonNull(non_null_argument_type) => match variable_type {
             // Value! satisfies Value!
-            GraphQLTypeAnnotation::NonNull(variable_type) => {
-                return variable_type_satisfies_argument_type(
-                    &graphql_type_to_nullable_type(*variable_type.clone()),
-                    &graphql_type_to_nullable_type(*non_null_argument_type.clone()),
-                );
-            }
+            GraphQLTypeAnnotation::NonNull(variable_type) => variable_type_satisfies_argument_type(
+                &graphql_type_to_nullable_type(*variable_type.clone()),
+                &graphql_type_to_nullable_type(*non_null_argument_type.clone()),
+            ),
             // Value does not satisfy Value!
             // or [Value] does not satisfy Value!
-            GraphQLTypeAnnotation::Named(_) | GraphQLTypeAnnotation::List(_) => (),
+            GraphQLTypeAnnotation::Named(_) | GraphQLTypeAnnotation::List(_) => false,
         },
-    };
-
-    false
+    }
 }
 
 pub fn value_satisfies_type(
