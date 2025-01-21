@@ -629,11 +629,13 @@ fn get_missing_arguments_and_validate_argument_types<'a>(
 
     get_missing_and_provided_arguments(&argument_definitions_vec, arguments, include_optional_args)
         .filter_map(|argument| match argument {
-            ArgumentType::Missing(definition) => Some(Ok(definition.clone())),
-            ArgumentType::Provided(definition, user_supplied_argument) => {
+            ArgumentType::Missing(field_argument_definition) => {
+                Some(Ok(field_argument_definition.clone()))
+            }
+            ArgumentType::Provided(field_argument_definition, selection_supplied_argument) => {
                 match value_satisfies_type(
-                    &user_supplied_argument.item.value,
-                    &definition.type_,
+                    &selection_supplied_argument.item.value,
+                    &field_argument_definition.type_,
                     variable_definitions,
                     schema_data,
                 ) {
@@ -668,10 +670,10 @@ fn get_missing_and_provided_arguments<'a>(
                     field_argument_definition.name.item.lookup() == arg.item.name.item.lookup()
                 });
 
-            if let Some(user_supplied_argument) = selection_supplied_argument {
+            if let Some(selection_supplied_argument) = selection_supplied_argument {
                 Some(ArgumentType::Provided(
                     field_argument_definition,
-                    user_supplied_argument,
+                    selection_supplied_argument,
                 ))
             } else if field_argument_definition.default_value.is_some()
                 || (field_argument_definition.type_.is_nullable() && !(include_optional_args))
