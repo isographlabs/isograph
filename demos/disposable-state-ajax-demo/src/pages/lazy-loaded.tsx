@@ -1,6 +1,5 @@
-import Head from 'next/head';
-
 import { LazyLoadPostsWrapper } from '@/components/LazyLoadPostsPage';
+import Head from 'next/head';
 
 export default function Home() {
   return (

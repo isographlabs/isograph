@@ -1,6 +1,6 @@
-import React from 'react';
 import { iso } from '@iso';
 import { useLazyReference, useResult } from '@isograph/react';
+import React from 'react';
 import { PetByNameRoute } from './routes';
 
 export const PetByNameRouteComponent = iso(`

@@ -1,10 +1,10 @@
-import type { AppProps } from 'next/app';
-import { useMemo } from 'react';
 import {
   createIsographEnvironment,
   createIsographStore,
   IsographEnvironmentProvider,
 } from '@isograph/react';
+import type { AppProps } from 'next/app';
+import { useMemo } from 'react';
 
 function makeNetworkRequest<T>(
   queryText: string,

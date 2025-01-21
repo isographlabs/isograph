@@ -1,9 +1,9 @@
-import { Suspense, useMemo } from 'react';
 import {
   createIsographEnvironment,
   createIsographStore,
   IsographEnvironmentProvider,
 } from '@isograph/react';
+import { Suspense, useMemo } from 'react';
 import HomePageRoute from './components/HomePageRoute';
 
 function makeNetworkRequest<T>(

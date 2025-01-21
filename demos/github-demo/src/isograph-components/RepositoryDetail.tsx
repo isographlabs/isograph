@@ -1,6 +1,6 @@
 import { iso } from '@iso';
-import { RepoGitHubLink } from './RepoGitHubLink';
 import { Route } from './GithubDemo';
+import { RepoGitHubLink } from './RepoGitHubLink';
 
 export const IsStarred = iso(`
   field Starrable.IsStarred @component {

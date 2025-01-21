@@ -10,7 +10,7 @@ yarn add --dev @isograph/babel-plugin
 
 It is then used via adding the following to your `.babelrc.js`:
 
-```js
+```json
 {
   "plugins": ["@isograph"]
 }
@@ -27,6 +27,9 @@ It will transform `iso` field definitions as follows:
 export const foo = iso(`field Query.Foo { whatever }`)(({ data }) => {
   doStuff();
 });
+```
+
+```ts
 // and this is transformed into
 export const foo = ({ data }) => doStuff();
 ```

@@ -1,14 +1,13 @@
-import React, { useEffect } from 'react';
-import NoSSR from 'react-no-ssr';
-
 import {
   UNASSIGNED_STATE,
   useUpdatableDisposableState,
 } from '@isograph/react-disposable-state';
+import React, { useEffect } from 'react';
+import NoSSR from 'react-no-ssr';
 import { makeNetworkRequest } from './api';
+import { Card } from './Card';
 import { Comment, Post, User } from './networkTypes';
 import { PromiseWrapper, useReadPromise } from './PromiseWrapper';
-import { Card } from './Card';
 
 /**
  * Preloading demo

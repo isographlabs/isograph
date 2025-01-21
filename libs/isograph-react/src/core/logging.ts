@@ -1,20 +1,20 @@
 import { CleanupFn } from '@isograph/disposable-types';
+import { NetworkResponseObject, type EncounteredIds } from './cache';
+import { CheckResult } from './check';
+import {
+  IsographEntrypoint,
+  RefetchQueryNormalizationArtifact,
+  type NormalizationAstNodes,
+} from './entrypoint';
+import { FragmentReference, Variables } from './FragmentReference';
 import {
   IsographEnvironment,
   IsographStore,
   StoreRecord,
   type Link,
 } from './IsographEnvironment';
-import {
-  IsographEntrypoint,
-  type NormalizationAstNodes,
-  RefetchQueryNormalizationArtifact,
-} from './entrypoint';
-import { FragmentReference, Variables } from './FragmentReference';
-import { NetworkResponseObject, type EncounteredIds } from './cache';
-import { Arguments } from './util';
 import { ReadDataResult } from './read';
-import { CheckResult } from './check';
+import { Arguments } from './util';
 
 export type LogMessage =
   | {
