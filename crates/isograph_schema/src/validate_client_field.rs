@@ -627,31 +627,10 @@ fn get_missing_arguments_and_validate_argument_types<'a>(
     let argument_definitions_vec: Vec<_> = argument_definitions.collect();
     validate_no_extraneous_arguments(&argument_definitions_vec, arguments, location)?;
 
-    get_missing_arguments_and_validate_types(
-        schema_data,
-        &argument_definitions_vec,
-        arguments,
-        include_optional_args,
-        variable_definitions,
-    )
-}
-
-fn get_missing_arguments_and_validate_types(
-    schema_data: &ServerFieldData,
-    argument_definitions: &[&ValidatedVariableDefinition],
-    arguments: &[WithLocation<SelectionFieldArgument>],
-    include_optional_args: bool,
-    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-) -> ValidateSchemaResult<Vec<ValidatedVariableDefinition>> {
-    argument_definitions
-        .iter()
-        .filter_map(|definition| {
-            let user_supplied_argument = arguments
-                .iter()
-                // TODO do not call .lookup
-                .find(|arg| definition.name.item.lookup() == arg.item.name.item.lookup());
-
-            if let Some(user_supplied_argument) = user_supplied_argument {
+    get_missing_and_provided_arguments(&argument_definitions_vec, arguments, include_optional_args)
+        .filter_map(|argument| match argument {
+            ArgumentType::Missing(definition) => Some(Ok(definition.clone())),
+            ArgumentType::Provided(definition, user_supplied_argument) => {
                 match value_satisfies_type(
                     &user_supplied_argument.item.value,
                     &definition.type_,
@@ -661,15 +640,47 @@ fn get_missing_arguments_and_validate_types(
                     Ok(_) => None,
                     Err(e) => Some(Err(e)),
                 }
-            } else if definition.default_value.is_some()
-                || (definition.type_.is_nullable() && !include_optional_args)
-            {
-                None
-            } else {
-                Some(Ok((*definition).clone()))
             }
         })
         .collect()
+}
+
+enum ArgumentType<'a> {
+    Missing(&'a ValidatedVariableDefinition),
+    Provided(
+        &'a ValidatedVariableDefinition,
+        &'a WithLocation<SelectionFieldArgument>,
+    ),
+}
+
+fn get_missing_and_provided_arguments<'a>(
+    field_argument_definitions: &'a [&'a ValidatedVariableDefinition],
+    selection_supplied_arguments: &'a [WithLocation<SelectionFieldArgument>],
+    include_optional_args: bool,
+) -> impl Iterator<Item = ArgumentType<'a>> {
+    field_argument_definitions
+        .iter()
+        .filter_map(move |field_argument_definition| {
+            let selection_supplied_argument = selection_supplied_arguments
+                .iter()
+                // TODO do not call .lookup
+                .find(|arg| {
+                    field_argument_definition.name.item.lookup() == arg.item.name.item.lookup()
+                });
+
+            if let Some(user_supplied_argument) = selection_supplied_argument {
+                Some(ArgumentType::Provided(
+                    field_argument_definition,
+                    user_supplied_argument,
+                ))
+            } else if field_argument_definition.default_value.is_some()
+                || (field_argument_definition.type_.is_nullable() && !(include_optional_args))
+            {
+                None
+            } else {
+                Some(ArgumentType::Missing(field_argument_definition))
+            }
+        })
 }
 
 fn validate_no_undefined_variables_and_get_reachable_variables(
