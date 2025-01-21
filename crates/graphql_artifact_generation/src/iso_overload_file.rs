@@ -1,6 +1,6 @@
 use intern::Lookup;
 use isograph_config::GenerateFileExtensionsOption;
-use std::{cmp::Ordering, path::PathBuf};
+use std::cmp::Ordering;
 
 use common_lang_types::{ArtifactPathAndContent, SelectableFieldName};
 use isograph_schema::{
@@ -194,8 +194,8 @@ export function iso(_isographLiteralText: string):
     imports.push_str(&content);
     ArtifactPathAndContent {
         file_content: imports,
-        relative_directory: PathBuf::new(),
         file_name_prefix: *ISO_TS,
+        type_and_field: None,
     }
 }
 

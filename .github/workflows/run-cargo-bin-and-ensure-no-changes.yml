@@ -4,6 +4,9 @@ on:
       binary:
         required: true
         type: string
+      params:
+        required: false
+        type: string
 
 jobs:
   build-and-run-binary:
@@ -22,6 +25,6 @@ jobs:
       - name: Make artifact executable
         run: chmod +x ./target/x86_64-unknown-linux-musl/release/${{ inputs.binary }}
       - name: Run ${{ inputs.binary }}
-        run: ./target/x86_64-unknown-linux-musl/release/${{ inputs.binary }}
+        run: ./target/x86_64-unknown-linux-musl/release/${{ inputs.binary }} ${{ inputs.params }}
       - name: Check working directory status
         run: './scripts/check-git-status.sh'

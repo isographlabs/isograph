@@ -1,8 +1,8 @@
-import Head from 'next/head';
-import ThemeProvider from '@/src/theme';
-import { Suspense } from 'react';
-import { FullPageLoading } from '@/src/components/routes';
 import { NewsfeedLoader } from '@/src/components/Newsfeed/NewsfeedRoute';
+import { FullPageLoading } from '@/src/components/routes';
+import ThemeProvider from '@/src/theme';
+import Head from 'next/head';
+import { Suspense } from 'react';
 
 export default function Newsfeed() {
   return (

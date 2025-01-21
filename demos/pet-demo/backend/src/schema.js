@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { createSchema } from 'graphql-yoga';
 import {
   getAdItem,
@@ -6,7 +7,6 @@ import {
   getNewsfeedItems,
   newsfeedResolvers,
 } from './newsfeed.js';
-import fs from 'fs';
 
 const schemaContents = fs.readFileSync('./schema.graphql').toString();
 

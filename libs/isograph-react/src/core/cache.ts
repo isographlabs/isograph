@@ -4,38 +4,38 @@ import {
   ParentCache,
 } from '@isograph/react-disposable-state';
 import {
-  DataId,
-  Link,
-  ROOT_ID,
-  StoreRecord,
-  type IsographEnvironment,
-  DataTypeValue,
-  getLink,
-  FragmentSubscription,
-  type TypeName,
-} from './IsographEnvironment';
-import {
   IsographEntrypoint,
-  type NormalizationAst,
-  type NormalizationAstNodes,
   NormalizationInlineFragment,
   NormalizationLinkedField,
   NormalizationScalarField,
   RefetchQueryNormalizationArtifactWrapper,
+  type NormalizationAst,
+  type NormalizationAstNodes,
 } from '../core/entrypoint';
-import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
-import { Argument, ArgumentValue } from './util';
-import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
+import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
+import { FetchOptions } from './check';
 import {
+  ExtractParameters,
   FragmentReference,
   Variables,
-  ExtractParameters,
 } from './FragmentReference';
-import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
+import {
+  DataId,
+  DataTypeValue,
+  FragmentSubscription,
+  getLink,
+  Link,
+  ROOT_ID,
+  StoreRecord,
+  type IsographEnvironment,
+  type TypeName,
+} from './IsographEnvironment';
+import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import { wrapResolvedValue } from './PromiseWrapper';
-import { logMessage } from './logging';
-import { FetchOptions } from './check';
+import { readButDoNotEvaluate, WithEncounteredRecords } from './read';
+import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
+import { Argument, ArgumentValue } from './util';
 
 export const TYPENAME_FIELD_NAME = '__typename';
 

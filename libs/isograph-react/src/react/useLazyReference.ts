@@ -1,17 +1,17 @@
-import {
-  FragmentReference,
-  ExtractParameters,
-} from '../core/FragmentReference';
-import { useIsographEnvironment } from './IsographEnvironmentProvider';
+import { useLazyDisposableState } from '@isograph/react-disposable-state';
+import { getOrCreateCacheForArtifact } from '../core/cache';
+import { FetchOptions, type RequiredFetchOptions } from '../core/check';
 import {
   IsographEntrypoint,
   type NormalizationAst,
   type NormalizationAstLoader,
 } from '../core/entrypoint';
-import { getOrCreateCacheForArtifact } from '../core/cache';
-import { useLazyDisposableState } from '@isograph/react-disposable-state';
+import {
+  ExtractParameters,
+  FragmentReference,
+} from '../core/FragmentReference';
 import { logMessage } from '../core/logging';
-import { FetchOptions, type RequiredFetchOptions } from '../core/check';
+import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
 export function useLazyReference<
   TReadFromStore extends { parameters: object; data: object },

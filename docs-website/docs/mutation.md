@@ -12,7 +12,7 @@ Examples in this document are taken from [this file](https://github.com/isograph
 
 First, define a client field on the `Mutation` object that calls the mutation you care about:
 
-```js
+```jsx
 export const setTagline = iso(`
   field Mutation.SetTagline($input: SetPetTaglineParams!) {
     set_pet_tagline(input: $input) {
@@ -21,7 +21,7 @@ export const setTagline = iso(`
       }
     }
   }
-`)((()) => {});
+`)(() => {});
 ```
 
 Make sure you select the fields that you want refetched and written into the store. In this case, we want to see the updated pet's tagline. We also return the data.
@@ -49,14 +49,20 @@ export const PetTaglineCard = iso(`
     loadFragmentReference: loadMutation,
   } = useImperativeReference(iso(`entrypoint Mutation.SetTagline`));
   // ...
-}
+});
 ```
 
 Next, call `loadFragmentReference` (`loadMutation` in this example) when a user clicks!
 
 ```jsx
-{
-  mutationRef === UNASSIGNED_STATE ? (
+export const PetTaglineCard = iso(`
+  field Pet.PetTaglineCard @component {
+    id
+    tagline
+  }
+`)(function PetTaglineCardComponent({ data: pet }) {
+  // ...
+  return mutationRef === UNASSIGNED_STATE ? (
     <Button
       onClick={() => {
         loadMutation({
@@ -71,7 +77,7 @@ Next, call `loadFragmentReference` (`loadMutation` in this example) when a user 
       Set tagline to SUPER DOG
     </Button>
   ) : null;
-}
+});
 ```
 
 Since we only want to set the tagline once, we check that `mutation === UNASSIGNED_STATE` before showing the button.
@@ -84,7 +90,7 @@ First, we can wait until the network response completes and see the component re
 
 For the second method, we can modify the mutation field as follows:
 
-```js
+```jsx
 export const setTagline = iso(`
   field Mutation.SetTagline($input: SetPetTaglineParams!) @component {
     set_pet_tagline(input: $input) {
@@ -93,7 +99,7 @@ export const setTagline = iso(`
       }
     }
   }
-`)((({data})) => {
+`)(({ data }) => {
   return (
     <>
       Nice! You updated the pet's tagline to{' '}
@@ -107,9 +113,17 @@ Here, we add the `@component` annotation and return some JSX.
 
 Now, we can use this! Modify the `PetTaglineCardComponent` component as follows:
 
-```js
-{
-  mutationRef === UNASSIGNED_STATE ? (
+```jsx
+export const setTagline = iso(`
+  field Mutation.SetTagline($input: SetPetTaglineParams!) @component {
+    set_pet_tagline(input: $input) {
+      pet {
+        tagline
+      }
+    }
+  }
+`)(({ data }) => {
+  return mutationRef === UNASSIGNED_STATE ? (
     <Button
       onClick={() => {
         loadMutation({
@@ -128,7 +142,7 @@ Now, we can use this! Modify the `PetTaglineCardComponent` component as follows:
       <FragmentReader fragmentReference={mutationRef} />
     </Suspense>
   );
-}
+});
 ```
 
 #### Future methods

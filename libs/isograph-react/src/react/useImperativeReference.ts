@@ -2,20 +2,20 @@ import {
   UnassignedState,
   useUpdatableDisposableState,
 } from '@isograph/react-disposable-state';
+import { FetchOptions, type RequiredFetchOptions } from '../core/check';
 import {
   IsographEntrypoint,
   type NormalizationAst,
   type NormalizationAstLoader,
 } from '../core/entrypoint';
 import {
-  FragmentReference,
   ExtractParameters,
+  FragmentReference,
 } from '../core/FragmentReference';
-import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import { ROOT_ID } from '../core/IsographEnvironment';
 import { maybeMakeNetworkRequest } from '../core/makeNetworkRequest';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
-import { FetchOptions, type RequiredFetchOptions } from '../core/check';
+import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
 // TODO rename this to useImperativelyLoadedEntrypoint
 type UseImperativeReferenceResult<

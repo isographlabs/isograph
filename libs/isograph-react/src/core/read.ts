@@ -1,9 +1,11 @@
+import { CleanupFn } from '@isograph/disposable-types';
 import {
   getParentRecordKey,
   insertIfNotExists,
   onNextChangeToRecord,
   type EncounteredIds,
 } from './cache';
+import { FetchOptions } from './check';
 import { getOrCreateCachedComponent } from './componentCache';
 import {
   IsographEntrypoint,
@@ -11,10 +13,10 @@ import {
   type NormalizationAst,
 } from './entrypoint';
 import {
-  FragmentReference,
-  Variables,
   ExtractData,
   ExtractParameters,
+  FragmentReference,
+  Variables,
 } from './FragmentReference';
 import {
   assertLink,
@@ -22,19 +24,18 @@ import {
   IsographEnvironment,
   type Link,
 } from './IsographEnvironment';
+import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import {
   getPromiseState,
   PromiseWrapper,
   readPromise,
+  Result,
   wrapPromise,
   wrapResolvedValue,
 } from './PromiseWrapper';
 import { ReaderAst } from './reader';
 import { Arguments } from './util';
-import { logMessage } from './logging';
-import { CleanupFn } from '@isograph/disposable-types';
-import { FetchOptions } from './check';
 
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: EncounteredIds;
@@ -73,7 +74,7 @@ export function readButDoNotEvaluate<
 
   if (response.kind === 'MissingData') {
     // There are two cases here that we care about:
-    // 1. the network request is in flight, we haven't suspend on it, and we want
+    // 1. the network request is in flight, we haven't suspended on it, and we want
     //    to throw if it errors out. So, networkRequestOptions.suspendIfInFlight === false
     //    and networkRequestOptions.throwOnNetworkError === true.
     // 2. everything else
@@ -85,7 +86,21 @@ export function readButDoNotEvaluate<
       !networkRequestOptions.suspendIfInFlight &&
       networkRequestOptions.throwOnNetworkError
     ) {
-      // TODO assert that the network request state is not Err
+      // What are we doing here? If the network response has errored out, we can do
+      // two things: throw a rejected promise, or throw an error. Both work identically
+      // in the browser. However, during initial SSR on NextJS, throwing a rejected
+      // promise results in an infinite loop (including re-issuing the query until the
+      // process OOM's or something.) Hence, we throw an error.
+
+      // TODO investigate why we cannot check against NOT_SET here and we have to cast
+      const result = fragmentReference.networkRequest.result as Result<
+        any,
+        any
+      >;
+      if (result.kind === 'Err') {
+        throw new Error('NetworkError', { cause: result.error });
+      }
+
       throw new Promise((resolve, reject) => {
         onNextChangeToRecord(environment, response.recordLink).then(resolve);
         fragmentReference.networkRequest.promise.catch(reject);

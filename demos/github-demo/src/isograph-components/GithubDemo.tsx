@@ -1,9 +1,9 @@
+import { Container } from '@mui/material';
 import React from 'react';
 import { HomeRoute } from './HomeRoute';
-import { RepositoryRoute } from './RepositoryRoute';
-import { Container } from '@mui/material';
-import { UserRoute } from './UserRoute';
 import { PullRequestRoute } from './PullRequestRoute';
+import { RepositoryRoute } from './RepositoryRoute';
+import { UserRoute } from './UserRoute';
 
 export type Route =
   | {

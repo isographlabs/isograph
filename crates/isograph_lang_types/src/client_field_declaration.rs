@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use common_lang_types::{
     ConstExportName, DescriptionValue, EnumLiteralValue, FieldArgumentName, FieldNameOrAlias,
-    FilePath, LinkedFieldAlias, LinkedFieldName, ScalarFieldAlias, ScalarFieldName,
+    LinkedFieldAlias, LinkedFieldName, RelativePathToSourceFile, ScalarFieldAlias, ScalarFieldName,
     StringLiteralValue, UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{FloatValue, GraphQLTypeAnnotation, NameValuePair};
@@ -32,7 +32,7 @@ pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
     pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
-    pub definition_path: FilePath,
+    pub definition_path: RelativePathToSourceFile,
 
     // TODO consider making these behind a cfg flag, since they're only used
     // by the LSP
@@ -48,7 +48,7 @@ pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
-    pub definition_path: FilePath,
+    pub definition_path: RelativePathToSourceFile,
 
     // TODO consider making these behind a cfg flag, since they're only used
     // by the LSP
