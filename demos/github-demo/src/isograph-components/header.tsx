@@ -1,10 +1,8 @@
-import Image from 'next/image';
 import { iso } from '@iso';
-
-import { AppBar, Button, Grid, Container } from '@mui/material';
+import { AppBar, Button, Container, Grid } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
+import Image from 'next/image';
 import { Route } from './GithubDemo';
-
 // @ts-ignore on CI, this fails to typecheck
 import logo from './svgs/dark-logo.svg';
 

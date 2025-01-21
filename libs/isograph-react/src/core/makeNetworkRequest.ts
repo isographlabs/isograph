@@ -1,4 +1,7 @@
 import { ItemCleanupPair } from '@isograph/disposable-types';
+import { normalizeData } from './cache';
+import { check, DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
+import { getOrCreateCachedComponent } from './componentCache';
 import {
   IsographEntrypoint,
   RefetchQueryNormalizationArtifact,
@@ -11,17 +14,14 @@ import {
   unretainQuery,
 } from './garbageCollection';
 import { IsographEnvironment, Link, ROOT_ID } from './IsographEnvironment';
+import { logMessage } from './logging';
 import {
   AnyError,
   PromiseWrapper,
   wrapPromise,
   wrapResolvedValue,
 } from './PromiseWrapper';
-import { normalizeData } from './cache';
-import { logMessage } from './logging';
-import { check, DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
 import { readButDoNotEvaluate } from './read';
-import { getOrCreateCachedComponent } from './componentCache';
 
 let networkRequestId = 0;
 
@@ -106,7 +106,6 @@ export function makeNetworkRequest<
         try {
           fetchOptions?.onError?.();
         } catch {}
-        // @ts-expect-error Why are we getting the wrong constructor here?
         throw new Error('GraphQL network response had errors', {
           cause: networkResponse,
         });

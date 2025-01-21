@@ -1,9 +1,10 @@
 import { ExtensionContext, window, workspace } from 'vscode';
 import { getConfig } from './config';
 import { IsographExtensionContext } from './context';
-import { findIsographBinaryWithWarnings } from './utils/findIsographBinary';
-import path = require('path');
 import { createAndStartLanguageClient } from './languageClient';
+import { findIsographBinaryWithWarnings } from './utils/findIsographBinary';
+
+import path = require('path');
 
 let isographExtensionContext: IsographExtensionContext | null = null;
 

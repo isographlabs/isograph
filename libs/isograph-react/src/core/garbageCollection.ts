@@ -1,15 +1,15 @@
+import { getParentRecordKey } from './cache';
+import { NormalizationAstNodes } from './entrypoint';
 import { Variables } from './FragmentReference';
 import {
+  assertLink,
   DataId,
   IsographEnvironment,
   IsographStore,
   StoreRecord,
-  assertLink,
   type Link,
   type TypeName,
 } from './IsographEnvironment';
-import { getParentRecordKey } from './cache';
-import { NormalizationAstNodes } from './entrypoint';
 
 export type RetainedQuery = {
   readonly normalizationAst: NormalizationAstNodes;

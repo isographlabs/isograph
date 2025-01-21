@@ -1,9 +1,9 @@
-import { Suspense, useMemo } from 'react';
 import {
   createIsographEnvironment,
   createIsographStore,
   IsographEnvironmentProvider,
 } from '@isograph/react';
+import { Suspense, useMemo } from 'react';
 import HomePageRoute from './components/HomePageRoute';
 
 function makeNetworkRequest<T>(
@@ -21,11 +21,15 @@ function makeNetworkRequest<T>(
 
     if (response.ok) {
       if (json.errors != null) {
-        throw new Error('GraphQLError');
+        throw new Error('GraphQLError', {
+          cause: json.errors,
+        });
       }
       return json;
     } else {
-      throw new Error('NetworkError');
+      throw new Error('NetworkError', {
+        cause: json,
+      });
     }
   });
   return promise;
