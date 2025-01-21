@@ -150,15 +150,14 @@ impl UnvalidatedSchema {
                 server_objects: objects,
                 server_scalars: scalars,
                 defined_types,
+
+                id_type_id,
+                string_type_id,
+                int_type_id,
+                float_type_id,
+                boolean_type_id,
+                null_type_id,
             },
-
-            id_type_id,
-            string_type_id,
-            int_type_id,
-            float_type_id,
-            boolean_type_id,
-            null_type_id,
-
             fetchable_types: BTreeMap::new(),
         }
     }

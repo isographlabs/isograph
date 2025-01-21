@@ -371,7 +371,7 @@ impl UnvalidatedSchema {
             ..
         } = self;
         let next_object_id = schema_data.server_objects.len().into();
-        let string_type_for_typename = schema_data.scalar(self.string_type_id).name;
+        let string_type_for_typename = schema_data.scalar(schema_data.string_type_id).name;
         let type_names = &mut schema_data.defined_types;
         let objects = &mut schema_data.server_objects;
         let encountered_root_kind = match type_names.entry(object_type_definition.name.item.into())
