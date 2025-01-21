@@ -15,7 +15,7 @@ use isograph_schema::UnvalidatedSchema;
 use crate::{
     batch_compile::BatchCompileError,
     isograph_literals::{
-        process_iso_literals, read_and_parse_iso_literals, read_file, read_files_in_folder,
+        parse_iso_literals_in_file_content, process_iso_literals, read_file, read_files_in_folder,
     },
     refetch_fields::add_refetch_fields_to_objects,
     schema::read_schema_file,
@@ -233,8 +233,12 @@ impl SourceFiles {
     ) -> Result<(), BatchCompileError> {
         let canonicalized_root_path = get_canonicalized_root_path(project_root)?;
         let (path_buf, file_content) = read_file(path.to_path_buf(), &canonicalized_root_path)?;
-        let (file_path, iso_literals) =
-            read_and_parse_iso_literals(path_buf, file_content, &canonicalized_root_path, config)?;
+        let (file_path, iso_literals) = parse_iso_literals_in_file_content(
+            path_buf,
+            file_content,
+            &canonicalized_root_path,
+            config,
+        )?;
         if iso_literals.is_empty() {
             self.contains_iso.remove(&file_path);
         } else {
@@ -253,7 +257,12 @@ fn read_and_parse_iso_literals_from_folder(
     let mut iso_literal_parse_errors = vec![];
     let canonicalized_root_path = get_canonicalized_root_path(project_root)?;
     for (path, file_content) in read_files_in_folder(folder, &canonicalized_root_path)? {
-        match read_and_parse_iso_literals(path, file_content, &canonicalized_root_path, config) {
+        match parse_iso_literals_in_file_content(
+            path,
+            file_content,
+            &canonicalized_root_path,
+            config,
+        ) {
             Ok((file_path, iso_literals)) => {
                 if !iso_literals.is_empty() {
                     contains_iso.insert(file_path, iso_literals);

@@ -8,12 +8,12 @@
   "author": "Isograph Labs",
   "license": "MIT",
   "scripts": {
-    "compile": "rm -rf dist/* && tsc -p tsconfig.pkg.json",
+    "compile-typescript": "rm -rf dist/* && tsc -p tsconfig.pkg.json",
     "compile-watch": "tsc -p tsconfig.pkg.json --watch",
     "test": "vitest run",
     "test-watch": "vitest watch",
     "coverage": "vitest run --coverage",
-    "prepack": "pnpm run test && pnpm run compile",
+    "prepack": "pnpm run test && pnpm run compile-typescript",
     "tsc": "tsc",
     "iso": "../../target/debug/isograph_cli --config ./isograph.config.json",
     "iso-watch": "../../target/debug/isograph_cli --config ./isograph.config.json --watch"

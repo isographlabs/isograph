@@ -1,22 +1,22 @@
 import { Factory } from '@isograph/disposable-types';
-import {
-  FragmentReference,
-  ExtractParameters,
-  ExtractData,
-} from './FragmentReference';
-import {
-  ComponentOrFieldName,
-  IsographEnvironment,
-  type Link,
-} from './IsographEnvironment';
+import { FetchOptions } from './check';
 import {
   IsographEntrypoint,
   IsographEntrypointLoader,
   RefetchQueryNormalizationArtifact,
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
+import {
+  ExtractData,
+  ExtractParameters,
+  FragmentReference,
+} from './FragmentReference';
+import {
+  ComponentOrFieldName,
+  IsographEnvironment,
+  type Link,
+} from './IsographEnvironment';
 import { Arguments } from './util';
-import { FetchOptions } from './check';
 
 export type TopLevelReaderArtifact<
   TReadFromStore extends { parameters: object; data: object },

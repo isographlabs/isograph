@@ -1,11 +1,10 @@
+import { useLazyDisposableState } from '@isograph/react-disposable-state';
 import React, { useState } from 'react';
 import NoSSR from 'react-no-ssr';
-
-import { useLazyDisposableState } from '@isograph/react-disposable-state';
 import { getOrCreateCacheForUrl } from './api';
+import { Card } from './Card';
 import { Comment, Post, User } from './networkTypes';
 import { useReadPromise } from './PromiseWrapper';
-import { Card } from './Card';
 
 /**
  * Lazy loading demo

@@ -1,18 +1,18 @@
+import { ItemCleanupPair } from '@isograph/disposable-types';
 import {
-  describe,
+  afterEach,
   assert,
+  beforeEach,
+  describe,
+  expect,
   test,
   vi,
-  beforeEach,
-  afterEach,
-  expect,
 } from 'vitest';
 import {
   CacheItem,
   CacheItemState,
   createTemporarilyRetainedCacheItem,
 } from './CacheItem';
-import { ItemCleanupPair } from '@isograph/disposable-types';
 
 function getState<T>(cacheItem: CacheItem<T>): CacheItemState<T> {
   return (cacheItem as any).__state as CacheItemState<T>;

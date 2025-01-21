@@ -1,10 +1,10 @@
+import * as path from 'path';
+import { window } from 'vscode';
 import {
   LanguageClientOptions,
   RevealOutputChannelOn,
 } from 'vscode-languageclient';
-import { ServerOptions, LanguageClient } from 'vscode-languageclient/node';
-import { window } from 'vscode';
-import * as path from 'path';
+import { LanguageClient, ServerOptions } from 'vscode-languageclient/node';
 import { getConfig } from './config';
 import { IsographExtensionContext } from './context';
 

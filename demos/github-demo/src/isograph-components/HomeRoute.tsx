@@ -1,9 +1,7 @@
-import React from 'react';
-import { useResult, useLazyReference } from '@isograph/react';
-
 import { iso } from '@iso';
+import { useLazyReference, useResult } from '@isograph/react';
 import { Container } from '@mui/material';
-
+import React from 'react';
 import { FullPageLoading, Route } from './GithubDemo';
 import { RepoGitHubLink } from './RepoGitHubLink';
 

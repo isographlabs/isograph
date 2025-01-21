@@ -1,7 +1,8 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{
-    ArtifactPathAndContent, IsographObjectTypeName, QueryOperationName, VariableName,
+    ArtifactPathAndContent, IsographObjectTypeName, ObjectTypeAndFieldName, QueryOperationName,
+    VariableName,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_config::GenerateFileExtensionsOption;
@@ -17,7 +18,7 @@ use isograph_schema::{
 
 use crate::{
     generate_artifacts::{
-        generate_path, NormalizationAstText, QueryText, RefetchQueryArtifactImport, ENTRYPOINT,
+        NormalizationAstText, QueryText, RefetchQueryArtifactImport, ENTRYPOINT,
         RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
     },
     imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
@@ -259,13 +260,16 @@ impl EntrypointArtifactInfo<'_> {
             parent_type,
             ..
         } = &self;
-
-        let directory = generate_path(parent_type.name, (*query_name).into());
+        let field_name = (*query_name).into();
+        let type_name = parent_type.name;
 
         ArtifactPathAndContent {
-            relative_directory: directory,
             file_content: self.file_contents(file_extensions),
             file_name_prefix: *ENTRYPOINT,
+            type_and_field: Some(ObjectTypeAndFieldName {
+                type_name,
+                field_name,
+            }),
         }
     }
 

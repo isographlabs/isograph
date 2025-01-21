@@ -1,8 +1,6 @@
-import React from 'react';
-
 import { iso } from '@iso';
-
 import { Card, CardContent } from '@mui/material';
+import React from 'react';
 import { RepoGitHubLink } from './RepoGitHubLink';
 
 export const PullRequestDetail = iso(`

@@ -1,9 +1,9 @@
-import Head from 'next/head';
+import { PetDetailRouteLoader } from '@/src/components/PetDetailRoute';
+import { FullPageLoading } from '@/src/components/routes';
 import ThemeProvider from '@/src/theme';
+import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { Suspense } from 'react';
-import { FullPageLoading } from '@/src/components/routes';
-import { PetDetailRouteLoader } from '@/src/components/PetDetailRoute';
 
 export default function PetDetail() {
   const router = useRouter();

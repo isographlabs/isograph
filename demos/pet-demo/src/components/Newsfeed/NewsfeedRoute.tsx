@@ -1,13 +1,13 @@
-import React, { Suspense } from 'react';
 import { iso } from '@iso';
-import { Card, CardContent, Container, Stack, Typography } from '@mui/material';
 import {
   FragmentReader,
   useLazyReference,
   useSkipLimitPagination,
 } from '@isograph/react';
-import { FullPageLoading } from '../routes';
+import { Card, CardContent, Container, Stack, Typography } from '@mui/material';
+import React, { Suspense } from 'react';
 import { ErrorBoundary } from '../ErrorBoundary';
+import { FullPageLoading } from '../routes';
 
 export const Newsfeed = iso(`
   field Query.Newsfeed @component {

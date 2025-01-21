@@ -1,23 +1,18 @@
-use common_lang_types::ArtifactPathAndContent;
+use common_lang_types::{ArtifactPathAndContent, ObjectTypeAndFieldName};
 use intern::Lookup;
 
-use isograph_config::GenerateFileExtensionsOption;
+use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 use isograph_schema::{
     RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientFieldInfo,
     UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema, ValidatedSchemaServerField,
 };
-use std::{
-    borrow::Cow,
-    collections::BTreeSet,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
 use crate::{
     generate_artifacts::{
         generate_client_field_parameter_type, generate_output_type, generate_parameters,
-        generate_path, ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE,
-        RESOLVER_PARAMETERS_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
+        ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAMETERS_TYPE,
+        RESOLVER_PARAM_TYPE, RESOLVER_READER,
     },
     import_statements::{
         param_type_imports_to_import_param_statement, param_type_imports_to_import_statement,
@@ -29,8 +24,7 @@ use crate::{
 pub(crate) fn generate_eager_reader_artifacts(
     schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
-    project_root: &Path,
-    artifact_directory: &Path,
+    config: &CompilerConfig,
     info: UserWrittenClientFieldInfo,
     refetched_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,
@@ -50,9 +44,7 @@ pub(crate) fn generate_eager_reader_artifacts(
     );
 
     let function_import_statement =
-        generate_function_import_statement(project_root, artifact_directory, info, file_extensions);
-
-    let relative_directory = generate_path(parent_type.name, client_field.name);
+        generate_function_import_statement(config, info, file_extensions);
 
     let reader_import_statement =
         reader_imports_to_import_statement(&reader_imports, file_extensions);
@@ -108,9 +100,12 @@ pub(crate) fn generate_eager_reader_artifacts(
     };
 
     let mut path_and_contents = vec![ArtifactPathAndContent {
-        relative_directory: relative_directory.clone(),
         file_name_prefix: *RESOLVER_READER,
         file_content: reader_content,
+        type_and_field: Some(ObjectTypeAndFieldName {
+            type_name: parent_type.name,
+            field_name: client_field.name,
+        }),
     }];
 
     if !client_field.variable_definitions.is_empty() {
@@ -121,9 +116,12 @@ pub(crate) fn generate_eager_reader_artifacts(
         let parameters_content =
             format!("export type {reader_parameters_type} = {parameters_types}\n");
         path_and_contents.push(ArtifactPathAndContent {
-            relative_directory,
             file_name_prefix: *RESOLVER_PARAMETERS_TYPE,
             file_content: parameters_content,
+            type_and_field: Some(ObjectTypeAndFieldName {
+                type_name: parent_type.name,
+                field_name: client_field.name,
+            }),
         });
     }
 
@@ -174,12 +172,13 @@ pub(crate) fn generate_eager_reader_condition_artifact(
         "  ", "  ", "  ", "  ", "  ",
     );
 
-    let relative_directory = generate_path(parent_type.name, field_name);
-
     ArtifactPathAndContent {
-        relative_directory: relative_directory.clone(),
         file_name_prefix: *RESOLVER_READER,
         file_content: reader_content,
+        type_and_field: Some(ObjectTypeAndFieldName {
+            type_name: parent_type.name,
+            field_name,
+        }),
     }
 }
 
@@ -192,7 +191,6 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
     let parent_type = schema
         .server_field_data
         .object(client_field.parent_object_id);
-    let relative_directory = generate_path(parent_type.name, client_field.name);
 
     let mut param_type_imports = BTreeSet::new();
     let mut loadable_fields = BTreeSet::new();
@@ -251,27 +249,28 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
         }};\n",
     );
     ArtifactPathAndContent {
-        relative_directory: relative_directory.clone(),
         file_name_prefix: *RESOLVER_PARAM_TYPE,
         file_content: param_type_content,
+        type_and_field: Some(ObjectTypeAndFieldName {
+            type_name: parent_type.name,
+            field_name: client_field.name,
+        }),
     }
 }
 
 pub(crate) fn generate_eager_reader_output_type_artifact(
     schema: &ValidatedSchema,
     client_field: &ValidatedClientField,
-    project_root: &Path,
-    artifact_directory: &Path,
+    config: &CompilerConfig,
     info: UserWrittenClientFieldInfo,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
     let parent_type = schema
         .server_field_data
         .object(client_field.parent_object_id);
-    let relative_directory = generate_path(parent_type.name, client_field.name);
 
     let function_import_statement =
-        generate_function_import_statement(project_root, artifact_directory, info, file_extensions);
+        generate_function_import_statement(config, info, file_extensions);
 
     let client_field_output_type = generate_output_type(client_field);
 
@@ -294,38 +293,41 @@ pub(crate) fn generate_eager_reader_output_type_artifact(
         };
 
     ArtifactPathAndContent {
-        relative_directory: relative_directory.clone(),
         file_name_prefix: *RESOLVER_OUTPUT_TYPE,
         file_content: final_output_type_text,
+        type_and_field: Some(ObjectTypeAndFieldName {
+            type_name: parent_type.name,
+            field_name: client_field.name,
+        }),
     }
 }
 
 /// Example: import { PetUpdater as resolver } from '../../../PetUpdater';
 fn generate_function_import_statement(
-    project_root: &Path,
-    artifact_directory: &Path,
-    user_written_client_field_info: UserWrittenClientFieldInfo,
+    config: &CompilerConfig,
+    target_field_info: UserWrittenClientFieldInfo,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ClientFieldFunctionImportStatement {
-    let const_export_name = user_written_client_field_info.const_export_name;
-    let path_to_client_field = project_root.join(
-        PathBuf::from_str(user_written_client_field_info.file_path.lookup())
-            .expect("paths should be legal here. This is indicative of a bug in Isograph."),
-    );
-    let relative_path =
-        // artifact directory includes __isograph, so artifact_directory.join("Type/Field")
-        // is a directory "two levels deep" within the artifact_directory.
-        //
-        // So diff_paths(path_to_client_field, artifact_directory.join("Type/Field"))
-        // is a lazy way of saying "make a relative path from two levels deep in the artifact
-        // dir to the client field".
-        //
-        // Since we will always go ../../../ the Type/Field part will never show up
-        // in the output.
-        //
-        // Anyway, TODO do better.
-        pathdiff::diff_paths(path_to_client_field, artifact_directory.join("Type/Field"))
-            .expect("Relative path should work");
+    // artifact directory includes __isograph, so artifact_directory.join("Type/Field")
+    // is a directory "two levels deep" within the artifact_directory.
+    //
+    // So diff_paths(path_to_client_field, artifact_directory.join("Type/Field"))
+    // is a lazy way of saying "make a relative path from two levels deep in the artifact
+    // dir to the client field".
+    //
+    // Since we will always go ../../../ the Type/Field part will never show up
+    // in the output.
+    //
+    // Anyway, TODO do better.
+    let relative_path_to_current_artifact =
+        PathBuf::from(config.artifact_directory.relative_path.lookup()).join("Type/Field");
+    let relative_path_to_client_field = target_field_info.file_path.lookup();
+
+    let relative_path = pathdiff::diff_paths(
+        relative_path_to_client_field,
+        relative_path_to_current_artifact,
+    )
+    .expect("Relative path should work");
     let complete_file_name = relative_path.to_str().expect(
         "This path should be stringifiable. This probably is indicative of a bug in Isograph.",
     );
@@ -346,6 +348,7 @@ fn generate_function_import_statement(
         GenerateFileExtensionsOption::IncludeExtensionsInFileImports => &normalized_file_name,
     };
 
+    let const_export_name = target_field_info.const_export_name;
     ClientFieldFunctionImportStatement(format!(
         "import {{ {const_export_name} as resolver }} from '{}';",
         file_name

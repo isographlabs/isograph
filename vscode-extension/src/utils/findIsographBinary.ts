@@ -1,5 +1,5 @@
-import * as path from 'path';
 import * as fs from 'fs/promises';
+import * as path from 'path';
 import * as semver from 'semver';
 import { OutputChannel, window, workspace } from 'vscode';
 import { getConfig } from '../config';

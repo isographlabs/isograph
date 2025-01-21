@@ -1,8 +1,7 @@
 import { iso } from '@iso';
-
 import { Link } from '@mui/material';
-import { Route } from './GithubDemo';
 import { ReactNode } from 'react';
+import { Route } from './GithubDemo';
 
 export const RepositoryLink = iso(`
   field Repository.RepositoryLink @component {

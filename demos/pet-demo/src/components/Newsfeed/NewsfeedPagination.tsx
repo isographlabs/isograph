@@ -1,5 +1,5 @@
-import React from 'react';
 import { iso } from '@iso';
+import React from 'react';
 
 export const NewsfeedPaginationComponent = iso(`
   field Viewer.NewsfeedPaginationComponent($skip: Int!, $limit: Int!) {

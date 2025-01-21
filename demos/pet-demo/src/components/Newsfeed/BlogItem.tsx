@@ -1,13 +1,13 @@
-import React, { Suspense, useRef } from 'react';
 import { iso } from '@iso';
-import { Button, Card, CardContent, Typography } from '@mui/material';
-import { useOnScreen } from './useIntersection';
 import {
   FragmentReader,
   useClientSideDefer,
   useImperativeLoadableField,
 } from '@isograph/react';
 import { UNASSIGNED_STATE } from '@isograph/react-disposable-state';
+import { Button, Card, CardContent, Typography } from '@mui/material';
+import React, { Suspense, useRef } from 'react';
+import { useOnScreen } from './useIntersection';
 
 function capitalize(str: string) {
   return str.replace(/(^\w|\s\w)/g, (m) => m.toUpperCase());
