@@ -1,14 +1,15 @@
-import { describe, test, expect } from 'vitest';
-import {
-  ROOT_ID,
-  createIsographEnvironment,
-  type IsographStore,
-} from '../core/IsographEnvironment';
+import { describe, expect, test } from 'vitest';
 import {
   garbageCollectEnvironment,
   retainQuery,
 } from '../core/garbageCollection';
+import {
+  createIsographEnvironment,
+  ROOT_ID,
+  type IsographStore,
+} from '../core/IsographEnvironment';
 import { iso } from './__isograph/iso';
+import { meNameSuccessorRetainedQuery } from './meNameSuccessor';
 import { nodeFieldRetainedQuery } from './nodeQuery';
 
 const getDefaultStore = (): IsographStore => ({
@@ -52,7 +53,7 @@ export const meNameField = iso(`
     }
   }
 `)(() => {});
-import { meNameSuccessorRetainedQuery } from './meNameSuccessor';
+
 const meNameEntrypoint = iso(`entrypoint Query.meName`);
 const meNameRetainedQuery = {
   normalizationAst:

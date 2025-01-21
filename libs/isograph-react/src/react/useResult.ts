@@ -1,11 +1,5 @@
-import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
-import { FragmentReference } from '../core/FragmentReference';
 import { getOrCreateCachedComponent } from '../core/componentCache';
-import { useReadAndSubscribe } from './useReadAndSubscribe';
-import {
-  getNetworkRequestOptionsWithDefaults,
-  NetworkRequestReaderOptions,
-} from '../core/read';
+import { FragmentReference } from '../core/FragmentReference';
 import {
   getPromiseState,
   PromiseWrapper,
@@ -13,6 +7,12 @@ import {
 } from '../core/PromiseWrapper';
 import type { StartUpdate } from '../core/reader';
 import { startUpdate } from '../core/startUpdate';
+import {
+  getNetworkRequestOptionsWithDefaults,
+  NetworkRequestReaderOptions,
+} from '../core/read';
+import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
+import { useReadAndSubscribe } from './useReadAndSubscribe';
 
 export function useResult<
   TReadFromStore extends {

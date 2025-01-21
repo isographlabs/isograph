@@ -1,15 +1,4 @@
-import {
-  LoadableField,
-  type ReaderAst,
-  type StartUpdate,
-} from '../core/reader';
-import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { ItemCleanupPair } from '@isograph/disposable-types';
-import { FragmentReference } from '../core/FragmentReference';
-import { maybeUnwrapNetworkRequest } from '../react/useResult';
-import { readButDoNotEvaluate } from '../core/read';
-import { subscribeToAnyChange } from '../core/cache';
-import { useState } from 'react';
 import {
   UNASSIGNED_STATE,
   useUpdatableDisposableState,
@@ -18,10 +7,19 @@ import {
   createReferenceCountedPointer,
   ReferenceCountedPointer,
 } from '@isograph/reference-counted-pointer';
-import { getPromiseState, readPromise } from '../core/PromiseWrapper';
-import { type WithEncounteredRecords } from '../core/read';
-import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
+import { useState } from 'react';
+import { subscribeToAnyChange } from '../core/cache';
 import { FetchOptions } from '../core/check';
+import { FragmentReference } from '../core/FragmentReference';
+import { getPromiseState, readPromise } from '../core/PromiseWrapper';
+import {
+  readButDoNotEvaluate,
+  type WithEncounteredRecords,
+} from '../core/read';
+import { LoadableField, type ReaderAst, type StartUpdate } from '../core/reader';
+import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
+import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
+import { maybeUnwrapNetworkRequest } from '../react/useResult';
 import { startUpdate } from '../core/startUpdate';
 
 type UseSkipLimitReturnValue<

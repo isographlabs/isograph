@@ -1,13 +1,13 @@
-import {
-  FragmentReference,
-  ExtractParameters,
-} from '../core/FragmentReference';
-import { useIsographEnvironment } from './IsographEnvironmentProvider';
-import { IsographEntrypoint } from '../core/entrypoint';
-import { getOrCreateCacheForArtifact } from '../core/cache';
 import { useLazyDisposableState } from '@isograph/react-disposable-state';
-import { logMessage } from '../core/logging';
+import { getOrCreateCacheForArtifact } from '../core/cache';
 import { FetchOptions } from '../core/check';
+import { IsographEntrypoint } from '../core/entrypoint';
+import {
+  ExtractParameters,
+  FragmentReference,
+} from '../core/FragmentReference';
+import { logMessage } from '../core/logging';
+import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import type { StartUpdate } from '../core/reader';
 
 export function useLazyReference<

@@ -1,5 +1,5 @@
-import { type Link } from './IsographEnvironment';
 import { ReaderWithRefetchQueries } from '../core/entrypoint';
+import { type Link } from './IsographEnvironment';
 import { PromiseWrapper } from './PromiseWrapper';
 import type { StartUpdate } from './reader';
 

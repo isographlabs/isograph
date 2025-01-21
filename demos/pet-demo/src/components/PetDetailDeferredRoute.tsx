@@ -1,17 +1,17 @@
-import React from 'react';
 import { iso } from '@iso';
-import { Container, Stack } from '@mui/material';
 import {
   FragmentReader,
   useClientSideDefer,
   useLazyReference,
 } from '@isograph/react';
+import { Container, Stack } from '@mui/material';
+import React from 'react';
+import { ErrorBoundary } from './ErrorBoundary';
 import {
   FullPageLoading,
   PetDetailDeferredRoute,
   useNavigateTo,
 } from './routes';
-import { ErrorBoundary } from './ErrorBoundary';
 
 export const PetDetailDeferredRouteComponent = iso(`
   field Query.PetDetailDeferredRoute($id: ID!) @component {

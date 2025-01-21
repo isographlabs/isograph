@@ -1,9 +1,9 @@
-import { describe, test, vi, expect } from 'vitest';
 import React from 'react';
 import { create } from 'react-test-renderer';
+import { describe, expect, test, vi } from 'vitest';
 import {
-  useUpdatableDisposableState,
   UNASSIGNED_STATE,
+  useUpdatableDisposableState,
 } from './useUpdatableDisposableState';
 
 function Suspender({ promise, isResolvedRef }) {

@@ -9,6 +9,7 @@ import {
 } from '@isograph/reference-counted-pointer';
 import { useState } from 'react';
 import { subscribeToAnyChange } from '../core/cache';
+import { FetchOptions } from '../core/check';
 import { FragmentReference } from '../core/FragmentReference';
 import { getPromiseState, readPromise } from '../core/PromiseWrapper';
 import {
@@ -23,7 +24,6 @@ import {
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 import { maybeUnwrapNetworkRequest } from '../react/useResult';
-import { FetchOptions } from '../core/check';
 import { startUpdate } from '../core/startUpdate';
 
 type UsePaginationReturnValue<
