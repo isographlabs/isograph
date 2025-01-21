@@ -33,7 +33,12 @@ import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import { wrapResolvedValue } from './PromiseWrapper';
 import { readButDoNotEvaluate, WithEncounteredRecords } from './read';
-import { ReaderLinkedField, ReaderScalarField, type ReaderAst, type StartUpdate } from './reader';
+import {
+  ReaderLinkedField,
+  ReaderScalarField,
+  type ReaderAst,
+  type StartUpdate,
+} from './reader';
 import { Argument, ArgumentValue } from './util';
 
 export const TYPENAME_FIELD_NAME = '__typename';

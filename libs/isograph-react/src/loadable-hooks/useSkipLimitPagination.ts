@@ -16,11 +16,15 @@ import {
   readButDoNotEvaluate,
   type WithEncounteredRecords,
 } from '../core/read';
-import { LoadableField, type ReaderAst, type StartUpdate } from '../core/reader';
+import {
+  LoadableField,
+  type ReaderAst,
+  type StartUpdate,
+} from '../core/reader';
+import { startUpdate } from '../core/startUpdate';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 import { maybeUnwrapNetworkRequest } from '../react/useResult';
-import { startUpdate } from '../core/startUpdate';
 
 type UseSkipLimitReturnValue<
   TReadFromStore extends {

@@ -21,10 +21,10 @@ import {
   type ReaderAst,
   type StartUpdate,
 } from '../core/reader';
+import { startUpdate } from '../core/startUpdate';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 import { maybeUnwrapNetworkRequest } from '../react/useResult';
-import { startUpdate } from '../core/startUpdate';
 
 type UsePaginationReturnValue<
   TReadFromStore extends {

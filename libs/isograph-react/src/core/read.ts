@@ -34,8 +34,8 @@ import {
   wrapResolvedValue,
 } from './PromiseWrapper';
 import { ReaderAst, type StartUpdate } from './reader';
-import { Arguments } from './util';
 import { startUpdate } from './startUpdate';
+import { Arguments } from './util';
 
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: EncounteredIds;

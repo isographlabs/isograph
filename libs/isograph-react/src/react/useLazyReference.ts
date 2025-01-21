@@ -7,8 +7,8 @@ import {
   FragmentReference,
 } from '../core/FragmentReference';
 import { logMessage } from '../core/logging';
-import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import type { StartUpdate } from '../core/reader';
+import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
 export function useLazyReference<
   TReadFromStore extends {

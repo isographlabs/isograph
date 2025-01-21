@@ -5,12 +5,12 @@ import {
   PromiseWrapper,
   readPromise,
 } from '../core/PromiseWrapper';
-import type { StartUpdate } from '../core/reader';
-import { startUpdate } from '../core/startUpdate';
 import {
   getNetworkRequestOptionsWithDefaults,
   NetworkRequestReaderOptions,
 } from '../core/read';
+import type { StartUpdate } from '../core/reader';
+import { startUpdate } from '../core/startUpdate';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useReadAndSubscribe } from './useReadAndSubscribe';
 
