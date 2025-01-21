@@ -1,6 +1,5 @@
-import Head from 'next/head';
-
 import { PreloadedPostsWrapper } from '@/components/PreloadedPostsPage';
+import Head from 'next/head';
 
 export default function Home() {
   return (

@@ -1,7 +1,6 @@
-import Head from 'next/head';
-import { createTheme, ThemeProvider } from '@mui/material/styles';
-
 import { GithubDemo } from '@/isograph-components/GithubDemo';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
+import Head from 'next/head';
 
 const theme = createTheme({
   palette: {
