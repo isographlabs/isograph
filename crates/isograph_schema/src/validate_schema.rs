@@ -387,10 +387,11 @@ pub enum ValidateSchemaError {
         argument_type: UnvalidatedTypeName,
     },
 
-    #[error("Expected input of type {expected}, found input of type {actual}")]
-    ExpectedType {
-        expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
-        actual: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    #[error("Expected input of type {expected_type}, found variable {variable_name} of type {variable_type}")]
+    ExpectedTypeFoundVariable {
+        expected_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+        variable_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+        variable_name: VariableName,
     },
 
     #[error("Expected input of type {expected}, found {actual} scalar literal")]

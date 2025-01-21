@@ -83,9 +83,7 @@ fn scalar_literal_satisfies_type(
 fn variable_type_satisfies_argument_type(
     variable_type: &GraphQLTypeAnnotation<SelectableServerFieldId>,
     argument_type: &GraphQLTypeAnnotation<SelectableServerFieldId>,
-    schema_data: &ServerFieldData,
-    location: Location,
-) -> Result<(), WithLocation<ValidateSchemaError>> {
+) -> bool {
     match argument_type {
         GraphQLTypeAnnotation::List(list_type) => {
             match graphql_type_to_non_null_type(variable_type.clone()) {
@@ -95,8 +93,6 @@ fn variable_type_satisfies_argument_type(
                     return variable_type_satisfies_argument_type(
                         &list_variable_type,
                         &list_type.0,
-                        schema_data,
-                        location,
                     );
                 }
                 GraphQLNonNullTypeAnnotation::Named(_) => (),
@@ -109,7 +105,7 @@ fn variable_type_satisfies_argument_type(
                     // Value! satisfies Value
                     // or Value satisfies Value
                     if named_variable_type.item == named_type.item {
-                        return Ok(());
+                        return true;
                     }
                 }
                 GraphQLNonNullTypeAnnotation::List(_) => (),
@@ -121,8 +117,6 @@ fn variable_type_satisfies_argument_type(
                 return variable_type_satisfies_argument_type(
                     &graphql_type_to_nullable_type(*variable_type.clone()),
                     &graphql_type_to_nullable_type(*non_null_argument_type.clone()),
-                    schema_data,
-                    location,
                 );
             }
             // Value does not satisfy Value!
@@ -131,13 +125,7 @@ fn variable_type_satisfies_argument_type(
         },
     };
 
-    let expected = id_annotation_to_typename_annotation(argument_type, schema_data);
-    let actual = id_annotation_to_typename_annotation(variable_type, schema_data);
-
-    Err(WithLocation::new(
-        ValidateSchemaError::ExpectedType { expected, actual },
-        location,
-    ))
+    false
 }
 
 pub fn value_satisfies_type(
@@ -147,16 +135,32 @@ pub fn value_satisfies_type(
     schema_data: &ServerFieldData,
 ) -> ValidateSchemaResult<()> {
     match &selection_supplied_argument_value.item {
-        NonConstantValue::Variable(variable_name) => variable_type_satisfies_argument_type(
-            get_variable_type(
+        NonConstantValue::Variable(variable_name) => {
+            let variable_type = get_variable_type(
                 variable_name,
                 variable_definitions,
                 selection_supplied_argument_value.location,
-            )?,
-            field_argument_definition_type,
-            schema_data,
-            selection_supplied_argument_value.location,
-        ),
+            )?;
+            if variable_type_satisfies_argument_type(variable_type, field_argument_definition_type)
+            {
+                Ok(())
+            } else {
+                let expected = id_annotation_to_typename_annotation(
+                    field_argument_definition_type,
+                    schema_data,
+                );
+                let actual = id_annotation_to_typename_annotation(variable_type, schema_data);
+
+                Err(WithLocation::new(
+                    ValidateSchemaError::ExpectedTypeFoundVariable {
+                        expected_type: expected,
+                        variable_type: actual,
+                        variable_name: *variable_name,
+                    },
+                    selection_supplied_argument_value.location,
+                ))
+            }
+        }
         NonConstantValue::Integer(_) => scalar_literal_satisfies_type(
             &schema_data.int_type_id,
             field_argument_definition_type,
