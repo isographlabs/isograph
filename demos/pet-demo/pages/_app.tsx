@@ -1,8 +1,8 @@
 import {
-  IsographEnvironmentProvider,
-  StoreRecord,
   createIsographEnvironment,
   createIsographStore,
+  IsographEnvironmentProvider,
+  StoreRecord,
   type Link,
 } from '@isograph/react';
 import type { AppProps } from 'next/app';

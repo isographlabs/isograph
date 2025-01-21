@@ -1,8 +1,8 @@
-import Head from 'next/head';
-import ThemeProvider from '@/src/theme';
-import { useRouter } from 'next/router';
 import { PetCheckinListLoader } from '@/src/components/PetCheckinListRoute';
 import { FullPageLoading } from '@/src/components/routes';
+import ThemeProvider from '@/src/theme';
+import Head from 'next/head';
+import { useRouter } from 'next/router';
 import { Suspense } from 'react';
 
 export default function PetDetail() {
