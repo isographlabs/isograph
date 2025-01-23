@@ -49,6 +49,13 @@
   },
   "additionalProperties": false,
   "definitions": {
+    "ConfigFileJavascriptModule": {
+      "type": "string",
+      "enum": [
+        "commonjs",
+        "esmodule"
+      ]
+    },
     "ConfigFileOptionalValidationLevel": {
       "oneOf": [
         {
@@ -80,6 +87,9 @@
         "include_file_extensions_in_import_statements": {
           "default": false,
           "type": "boolean"
+        },
+        "module": {
+          "$ref": "#/definitions/ConfigFileJavascriptModule"
         },
         "no_babel_transform": {
           "default": false,
