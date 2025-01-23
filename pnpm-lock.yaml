@@ -241,9 +241,6 @@ importers:
       vite-plugin-babel:
         specifier: ^1.2.0
         version: 1.2.0(@babel/core@7.25.2)(vite@5.4.8(@types/node@22.7.5)(terser@5.32.0))
-      vite-plugin-commonjs:
-        specifier: ^0.10.1
-        version: 0.10.1
 
   docs-website:
     dependencies:
