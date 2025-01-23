@@ -297,7 +297,7 @@ jobs:
         uses: actions/deploy-pages@v4
 
   main-release:
-    name: Release packages to NPM (main or deploy)
+    name: Main NPM release
     runs-on: macos-latest
     if: >-
       github.event_name == 'push' &&
@@ -375,7 +375,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
 
   versioned-release:
-    name: Release packages to NPM (versioned release)
+    name: Versioned NPM release
     runs-on: macos-latest
     if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
     needs: [all-checks-passed]
