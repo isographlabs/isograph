@@ -423,7 +423,7 @@ fn validate_client_field(
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     top_level_client_field_info: &ValidateSchemaSharedInfo<'_>,
 ) -> ValidateSchemaResult<ValidatedScalarFieldSelection> {
-    let argument_definitions = top_level_client_field_info
+    let field_argument_definitions = top_level_client_field_info
         .client_field_args
         .get(&ClientType::ClientField(*client_field_id))
         .expect(
@@ -432,7 +432,7 @@ fn validate_client_field(
         );
     let missing_arguments = get_missing_arguments_and_validate_argument_types(
         top_level_client_field_info.schema_data,
-        argument_definitions
+        field_argument_definitions
             .iter()
             .map(|variable_definition| &variable_definition.item),
         &scalar_field_selection.arguments,
@@ -611,40 +611,48 @@ fn assert_no_missing_arguments(
 
 fn get_missing_arguments_and_validate_argument_types<'a>(
     schema_data: &ServerFieldData,
-    argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
-    arguments: &[WithLocation<SelectionFieldArgument>],
+    field_argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
+    selection_supplied_arguments: &[WithLocation<SelectionFieldArgument>],
     include_optional_args: bool,
     location: Location,
     used_variables: &mut UsedVariables,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
 ) -> ValidateSchemaResult<Vec<ValidatedVariableDefinition>> {
     let reachable_variables = validate_no_undefined_variables_and_get_reachable_variables(
-        arguments,
+        selection_supplied_arguments,
         variable_definitions,
     )?;
     used_variables.extend(reachable_variables.iter().map(|x| x.item));
 
-    let argument_definitions_vec: Vec<_> = argument_definitions.collect();
-    validate_no_extraneous_arguments(&argument_definitions_vec, arguments, location)?;
+    let field_argument_definitions_vec: Vec<_> = field_argument_definitions.collect();
+    validate_no_extraneous_arguments(
+        &field_argument_definitions_vec,
+        selection_supplied_arguments,
+        location,
+    )?;
 
-    get_missing_and_provided_arguments(&argument_definitions_vec, arguments, include_optional_args)
-        .filter_map(|argument| match argument {
-            ArgumentType::Missing(field_argument_definition) => {
-                Some(Ok(field_argument_definition.clone()))
+    get_missing_and_provided_arguments(
+        &field_argument_definitions_vec,
+        selection_supplied_arguments,
+        include_optional_args,
+    )
+    .filter_map(|argument| match argument {
+        ArgumentType::Missing(field_argument_definition) => {
+            Some(Ok(field_argument_definition.clone()))
+        }
+        ArgumentType::Provided(field_argument_definition, selection_supplied_argument) => {
+            match value_satisfies_type(
+                &selection_supplied_argument.item.value,
+                &field_argument_definition.type_,
+                variable_definitions,
+                schema_data,
+            ) {
+                Ok(_) => None,
+                Err(e) => Some(Err(e)),
             }
-            ArgumentType::Provided(field_argument_definition, selection_supplied_argument) => {
-                match value_satisfies_type(
-                    &selection_supplied_argument.item.value,
-                    &field_argument_definition.type_,
-                    variable_definitions,
-                    schema_data,
-                ) {
-                    Ok(_) => None,
-                    Err(e) => Some(Err(e)),
-                }
-            }
-        })
-        .collect()
+        }
+    })
+    .collect()
 }
 
 enum ArgumentType<'a> {
@@ -686,12 +694,12 @@ fn get_missing_and_provided_arguments<'a>(
 }
 
 fn validate_no_undefined_variables_and_get_reachable_variables(
-    arguments: &[WithLocation<SelectionFieldArgument>],
+    selection_supplied_arguments: &[WithLocation<SelectionFieldArgument>],
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
 ) -> ValidateSchemaResult<Vec<WithLocation<VariableName>>> {
     let mut all_reachable_variables = vec![];
-    for argument in arguments {
-        let reachable_variables = reachable_variables(&argument.item.value);
+    for selection_supplied_argument in selection_supplied_arguments {
+        let reachable_variables = reachable_variables(&selection_supplied_argument.item.value);
         for reachable_variable in reachable_variables.iter() {
             if variable_definitions.iter().all(|variable_definition| {
                 variable_definition.item.name.item != reachable_variable.item
@@ -700,7 +708,7 @@ fn validate_no_undefined_variables_and_get_reachable_variables(
                     ValidateSchemaError::UsedUndefinedVariable {
                         undefined_variable: reachable_variable.item,
                     },
-                    argument.location,
+                    selection_supplied_argument.location,
                 ));
             }
         }
@@ -711,11 +719,11 @@ fn validate_no_undefined_variables_and_get_reachable_variables(
 }
 
 fn validate_no_extraneous_arguments(
-    argument_definitions: &[&ValidatedVariableDefinition],
-    arguments: &[WithLocation<SelectionFieldArgument>],
+    field_argument_definitions: &[&ValidatedVariableDefinition],
+    selection_supplied_arguments: &[WithLocation<SelectionFieldArgument>],
     location: Location,
 ) -> ValidateSchemaResult<()> {
-    let extra_arguments: Vec<_> = arguments
+    let extra_arguments: Vec<_> = selection_supplied_arguments
         .iter()
         .filter_map(|arg| {
             // TODO remove this
@@ -727,7 +735,7 @@ fn validate_no_extraneous_arguments(
                 return None;
             }
 
-            let is_defined = argument_definitions
+            let is_defined = field_argument_definitions
                 .iter()
                 .any(|definition| definition.name.item.lookup() == arg.item.name.item.lookup());
 
