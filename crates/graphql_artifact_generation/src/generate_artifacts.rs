@@ -140,6 +140,7 @@ pub fn get_artifact_path_and_content(
                             *info,
                             &traversal_state.refetch_paths,
                             file_extensions,
+                            traversal_state.has_updatable,
                         ));
 
                         if *was_ever_selected_loadably {

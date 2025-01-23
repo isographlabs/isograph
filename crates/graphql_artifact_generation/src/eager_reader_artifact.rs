@@ -28,6 +28,7 @@ pub(crate) fn generate_eager_reader_artifacts(
     info: UserWrittenClientFieldInfo,
     refetched_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,
+    has_updatable: bool,
 ) -> Vec<ArtifactPathAndContent> {
     let ts_file_extension = file_extensions.ts();
     let user_written_component_variant = info.user_written_component_variant;
@@ -71,9 +72,10 @@ pub(crate) fn generate_eager_reader_artifacts(
             {}kind: \"EagerReaderArtifact\",\n\
             {}resolver,\n\
             {}readerAst,\n\
+            {}hasUpdatable: {has_updatable},\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ",
+            "  ", "  ", "  ", "  ", "  ", "  ",
         )
     } else {
         let component_name = format!("{}.{}", parent_type.name, client_field.name);
@@ -93,9 +95,10 @@ pub(crate) fn generate_eager_reader_artifacts(
             {}componentName: \"{component_name}\",\n\
             {}resolver,\n\
             {}readerAst,\n\
+            {}hasUpdatable: {has_updatable},\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ",
+            "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     };
 
@@ -167,9 +170,10 @@ pub(crate) fn generate_eager_reader_condition_artifact(
         {}kind: \"EagerReaderArtifact\",\n\
         {}resolver: ({{ data }}) => data.__typename === \"{concrete_type}\" ? data.link : null,\n\
         {}readerAst,\n\
+        {}hasUpdatable: false,\n\
         }};\n\n\
         export default artifact;\n",
-        "  ", "  ", "  ", "  ", "  ",
+        "  ", "  ", "  ", "  ", "  ", "  ",
     );
 
     ArtifactPathAndContent {
