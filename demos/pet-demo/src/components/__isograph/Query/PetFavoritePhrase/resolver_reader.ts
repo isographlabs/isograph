@@ -39,6 +39,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.PetFavoritePhrase",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

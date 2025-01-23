@@ -25,6 +25,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Starrable.IsStarred",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

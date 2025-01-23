@@ -41,6 +41,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Actor.UserLink",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

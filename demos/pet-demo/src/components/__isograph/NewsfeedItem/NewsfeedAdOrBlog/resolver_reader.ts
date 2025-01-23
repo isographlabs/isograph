@@ -49,6 +49,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "NewsfeedItem.NewsfeedAdOrBlog",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

@@ -91,6 +91,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.RepositoryDetail",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

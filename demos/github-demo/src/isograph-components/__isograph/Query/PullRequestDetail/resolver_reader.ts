@@ -71,6 +71,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.PullRequestDetail",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

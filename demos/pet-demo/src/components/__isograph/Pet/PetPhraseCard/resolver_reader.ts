@@ -25,6 +25,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Pet.PetPhraseCard",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;
