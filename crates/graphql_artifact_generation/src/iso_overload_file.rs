@@ -178,21 +178,32 @@ type MatchesWhitespaceAndString<
         content.push_str(&entrypoint_overload);
     }
 
-    content.push_str(
-        "
-export function iso(_isographLiteralText: string): any
-{\n",
-    );
-
     (match no_babel_transform {
         false => {
+            content.push_str(
+                "
+export function iso(_isographLiteralText: string):
+  | IdentityWithParam<any>
+  | IdentityWithParamComponent<any>
+  | IsographEntrypoint<any, any>
+{\n",
+            );
             content.push_str("  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
       'was not set up, or it failed to identify this call site. Make sure it ' +
       'is being used verbatim as `iso`. If you cannot use the babel transform, ' + 
       'set options.no_babel_transform to true in your Isograph config. ');\n}")
         }
         true => {
-            content.push_str(&format!("  const {{ keyword, type, field }} = getTypeAndField(_isographLiteralText);
+            content.push_str(
+                "
+export function iso(_isographLiteralText: string):
+  | IdentityWithParam<any>
+  | IdentityWithParamComponent<any>
+  | Promise<IsographEntrypoint<any, any>>
+{\n",
+            );
+            content.push_str(&format!(
+                "  const {{ keyword, type, field }} = getTypeAndField(_isographLiteralText);
   if (keyword === 'entrypoint') {{
     return import(`./${{type}}/${{field}}/entrypoint{}`);
   }} 
@@ -216,7 +227,9 @@ function getTypeAndField(isographLiteralText: string) {{
   return {{ keyword, type, field }};
 }}
        
-  ", file_extensions.ts()))
+  ",
+                file_extensions.ts()
+            ))
         }
     });
 
