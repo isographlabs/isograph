@@ -220,8 +220,6 @@ function getTypeAndField(isographLiteralText: string) {{
         }
     });
 
- 
-
     imports.push_str(&content);
     ArtifactPathAndContent {
         file_content: imports,
