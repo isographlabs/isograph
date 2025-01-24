@@ -35,39 +35,16 @@ let networkRequestId = 0;
 export function maybeMakeNetworkRequest<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
+  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 >(
   environment: IsographEnvironment,
   artifact:
     | RefetchQueryNormalizationArtifact
-    | IsographEntrypoint<TReadFromStore, TClientFieldValue, NormalizationAst>,
+    | IsographEntrypoint<TReadFromStore, TClientFieldValue, TNormalizationAst>,
   variables: ExtractParameters<TReadFromStore>,
-  fetchOptions?: FetchOptions<TClientFieldValue>,
-): ItemCleanupPair<PromiseWrapper<void, AnyError>>;
-export function maybeMakeNetworkRequest<
-  TReadFromStore extends { parameters: object; data: object },
-  TClientFieldValue,
->(
-  environment: IsographEnvironment,
-  artifact:
-    | RefetchQueryNormalizationArtifact
-    | IsographEntrypoint<
-        TReadFromStore,
-        TClientFieldValue,
-        NormalizationAstLoader
-      >,
-  variables: ExtractParameters<TReadFromStore>,
-  fetchOptions: RequiredFetchOptions<TClientFieldValue>,
-): ItemCleanupPair<PromiseWrapper<void, AnyError>>;
-export function maybeMakeNetworkRequest<
-  TReadFromStore extends { parameters: object; data: object },
-  TClientFieldValue,
->(
-  environment: IsographEnvironment,
-  artifact:
-    | RefetchQueryNormalizationArtifact
-    | IsographEntrypoint<TReadFromStore, TClientFieldValue>,
-  variables: ExtractParameters<TReadFromStore>,
-  fetchOptions?: FetchOptions<TClientFieldValue>,
+  ...[fetchOptions]: NormalizationAstLoader extends TNormalizationAst
+    ? [fetchOptions: RequiredFetchOptions<TClientFieldValue>]
+    : [fetchOptions?: FetchOptions<TClientFieldValue>]
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
   switch (fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE) {
     case 'Yes': {

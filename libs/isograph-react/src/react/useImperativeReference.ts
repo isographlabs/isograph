@@ -21,55 +21,34 @@ import { useIsographEnvironment } from './IsographEnvironmentProvider';
 type UseImperativeReferenceResult<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
+  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 > = {
   fragmentReference:
     | FragmentReference<TReadFromStore, TClientFieldValue>
     | UnassignedState;
   loadFragmentReference: (
     variables: ExtractParameters<TReadFromStore>,
-    fetchOptions?: FetchOptions<TClientFieldValue>,
-  ) => void;
-};
-
-type RequiredUseImperativeReferenceResult<
-  TReadFromStore extends { parameters: object; data: object },
-  TClientFieldValue,
-> = {
-  fragmentReference:
-    | FragmentReference<TReadFromStore, TClientFieldValue>
-    | UnassignedState;
-  loadFragmentReference: (
-    variables: ExtractParameters<TReadFromStore>,
-    fetchOptions: RequiredFetchOptions<TClientFieldValue>,
+    ...[fetchOptions]: NormalizationAstLoader extends TNormalizationAst
+      ? [fetchOptions: RequiredFetchOptions<TClientFieldValue>]
+      : [fetchOptions?: FetchOptions<TClientFieldValue>]
   ) => void;
 };
 
 export function useImperativeReference<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
+  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 >(
   entrypoint: IsographEntrypoint<
     TReadFromStore,
     TClientFieldValue,
-    NormalizationAstLoader
+    TNormalizationAst
   >,
-): RequiredUseImperativeReferenceResult<TReadFromStore, TClientFieldValue>;
-export function useImperativeReference<
-  TReadFromStore extends { parameters: object; data: object },
+): UseImperativeReferenceResult<
+  TReadFromStore,
   TClientFieldValue,
->(
-  entrypoint: IsographEntrypoint<
-    TReadFromStore,
-    TClientFieldValue,
-    NormalizationAst
-  >,
-): UseImperativeReferenceResult<TReadFromStore, TClientFieldValue>;
-export function useImperativeReference<
-  TReadFromStore extends { parameters: object; data: object },
-  TClientFieldValue,
->(
-  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
-): UseImperativeReferenceResult<TReadFromStore, TClientFieldValue> {
+  TNormalizationAst
+> {
   const { state, setState } =
     useUpdatableDisposableState<
       FragmentReference<TReadFromStore, TClientFieldValue>
