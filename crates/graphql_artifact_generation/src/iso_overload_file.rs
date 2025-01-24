@@ -21,16 +21,26 @@ fn build_iso_overload_for_entrypoint(
         validated_client_field.type_and_field.field_name
     );
     match no_babel_transform {
-        true => (
-            None,
-            format!(
-                "
+        true => {
+            let mut s: String = "".to_string();
+            let import = format!(
+                "import entrypoint_{} from '../__isograph/{}/{}/entrypoint{}';\n",
+                validated_client_field.type_and_field.underscore_separated(),
+                validated_client_field.type_and_field.type_name,
+                validated_client_field.type_and_field.field_name,
+                file_extensions.ts()
+            );
+
+            s.push_str(&format!(
+                " 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
-): void;\n",
-                formatted_field
-            ),
-        ),
+): Promise<typeof entrypoint_{}>;\n",
+                formatted_field,
+                validated_client_field.type_and_field.underscore_separated(),
+            ));
+            (Some(import), s)
+        }
         false => {
             let mut s: String = "".to_string();
             let import = format!(
@@ -170,26 +180,47 @@ type MatchesWhitespaceAndString<
 
     content.push_str(
         "
-export function iso(_isographLiteralText: string):
-  | IdentityWithParam<any>
-  | IdentityWithParamComponent<any>
-  | IsographEntrypoint<any, any>
+export function iso(_isographLiteralText: string): any
 {\n",
     );
 
-    content.push_str(match no_babel_transform {
+    (match no_babel_transform {
         false => {
-"  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
+            content.push_str("  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
       'was not set up, or it failed to identify this call site. Make sure it ' +
       'is being used verbatim as `iso`. If you cannot use the babel transform, ' + 
-      'set options.no_babel_transform to true in your Isograph config. ');"
+      'set options.no_babel_transform to true in your Isograph config. ');\n}")
         }
         true => {
-            "  return (clientFieldResolver: any) => clientFieldResolver;"
+            content.push_str(&format!("  const {{ keyword, type, field }} = getTypeAndField(_isographLiteralText);
+  if (keyword === 'entrypoint') {{
+    return import(`./${{type}}/${{field}}/entrypoint{}`);
+  }} 
+  return (clientFieldResolver: any) => clientFieldResolver;\n}}
+
+const typeAndFieldRegex = new RegExp(
+  '\\s*(entrypoint|field)\\s*([^\\.\\s]+)\\.([^\\s\\(]+)',
+  'm',
+);
+
+function getTypeAndField(isographLiteralText: string) {{
+  const typeAndField = typeAndFieldRegex.exec(isographLiteralText);
+  const keyword = typeAndField?.[1];
+  const type = typeAndField?.[2];
+  const field = typeAndField?.[3];
+  if (keyword == null || type == null || field == null) {{
+    throw new Error(
+      'Malformed iso literal. I hope the iso compiler failed to accept this literal!',
+    );
+  }}
+  return {{ keyword, type, field }};
+}}
+       
+  ", file_extensions.ts()))
         }
     });
 
-    content.push_str("\n}");
+ 
 
     imports.push_str(&content);
     ArtifactPathAndContent {
