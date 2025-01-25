@@ -2,7 +2,7 @@ use intern::Lookup;
 use isograph_config::GenerateFileExtensionsOption;
 use std::cmp::Ordering;
 
-use common_lang_types::{ArtifactPathAndContent, SelectableFieldName};
+use common_lang_types::{ArtifactPathAndContent, IsoLiteralText, SelectableFieldName};
 use isograph_schema::{
     ClientFieldVariant, ClientType, UserWrittenComponentVariant, ValidatedClientField,
     ValidatedSchema,
@@ -168,9 +168,9 @@ type MatchesWhitespaceAndString<
         content.push_str(&field_overload);
     }
 
-    let entrypoint_overloads = sorted_entrypoints(schema)
-        .into_iter()
-        .map(|field| build_iso_overload_for_entrypoint(field, file_extensions, no_babel_transform));
+    let entrypoint_overloads = sorted_entrypoints(schema).into_iter().map(|(field, _)| {
+        build_iso_overload_for_entrypoint(field, file_extensions, no_babel_transform)
+    });
     for (import, entrypoint_overload) in entrypoint_overloads {
         if let Some(import) = import {
             imports.push_str(&import);
@@ -194,42 +194,37 @@ export function iso(_isographLiteralText: string):
       'set options.no_babel_transform to true in your Isograph config. ');\n}")
         }
         true => {
+            let switch_cases =
+                sorted_entrypoints(schema)
+                    .into_iter()
+                    .map(|(field, iso_literal_text)| {
+                        format!(
+                            "    case '{}':
+      return import('./{}/{}/entrypoint{}').then(module => module.default);\n",
+                            iso_literal_text,
+                            field.type_and_field.type_name,
+                            field.type_and_field.field_name,
+                            file_extensions.ts()
+                        )
+                    });
+
             content.push_str(
                 "
-export function iso(_isographLiteralText: string):
+export function iso(isographLiteralText: string):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
   | Promise<IsographEntrypoint<any, any>>
-{\n",
+{
+  switch (isographLiteralText) {\n",
             );
-            content.push_str(&format!(
-                "  const {{ keyword, type, field }} = getTypeAndField(_isographLiteralText);
-  if (keyword === 'entrypoint') {{
-    return import(`./${{type}}/${{field}}/entrypoint{}`);
-  }} 
-  return (clientFieldResolver: any) => clientFieldResolver;\n}}
 
-const typeAndFieldRegex = new RegExp(
-  '\\s*(entrypoint|field)\\s*([^\\.\\s]+)\\.([^\\s\\(]+)',
-  'm',
-);
-
-function getTypeAndField(isographLiteralText: string) {{
-  const typeAndField = typeAndFieldRegex.exec(isographLiteralText);
-  const keyword = typeAndField?.[1];
-  const type = typeAndField?.[2];
-  const field = typeAndField?.[3];
-  if (keyword == null || type == null || field == null) {{
-    throw new Error(
-      'Malformed iso literal. I hope the iso compiler failed to accept this literal!',
-    );
-  }}
-  return {{ keyword, type, field }};
-}}
-       
-  ",
-                file_extensions.ts()
-            ))
+            for switch_case in switch_cases {
+                content.push_str(&switch_case);
+            }
+            content.push_str(
+                "  } 
+  return (clientFieldResolver: any) => clientFieldResolver;\n}",
+            )
         }
     });
 
@@ -263,13 +258,15 @@ fn sorted_user_written_fields(
     fields
 }
 
-fn sorted_entrypoints(schema: &ValidatedSchema) -> Vec<&ValidatedClientField> {
+fn sorted_entrypoints(schema: &ValidatedSchema) -> Vec<(&ValidatedClientField, &IsoLiteralText)> {
     let mut entrypoints = schema
         .entrypoints
         .iter()
-        .map(|client_field_id| schema.client_field(*client_field_id))
+        .map(|(client_field_id, iso_literal_text)| {
+            (schema.client_field(*client_field_id), iso_literal_text)
+        })
         .collect::<Vec<_>>();
-    entrypoints.sort_by(|client_field_1, client_field_2| {
+    entrypoints.sort_by(|(client_field_1, _), (client_field_2, _)| {
         match client_field_1
             .type_and_field
             .type_name

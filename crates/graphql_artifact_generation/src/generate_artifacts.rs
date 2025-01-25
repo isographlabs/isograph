@@ -84,7 +84,7 @@ pub fn get_artifact_path_and_content(
     let mut encountered_output_types = HashSet::<ClientFieldId>::new();
 
     // For each entrypoint, generate an entrypoint artifact and refetch artifacts
-    for entrypoint_id in schema.entrypoints.iter() {
+    for entrypoint_id in schema.entrypoints.keys() {
         let entrypoint_path_and_content = generate_entrypoint_artifacts(
             schema,
             *entrypoint_id,

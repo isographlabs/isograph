@@ -144,3 +144,5 @@ impl std::fmt::Debug for CurrentWorkingDirectory {
 }
 
 string_key_newtype!(RelativePathToSourceFile);
+
+string_key_newtype!(IsoLiteralText);

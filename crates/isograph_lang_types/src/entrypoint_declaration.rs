@@ -1,4 +1,4 @@
-use common_lang_types::{ScalarFieldName, UnvalidatedTypeName, WithSpan};
+use common_lang_types::{IsoLiteralText, ScalarFieldName, UnvalidatedTypeName, WithSpan};
 
 // TODO should this be ObjectTypeAndFieldNames?
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -11,4 +11,5 @@ pub struct EntrypointTypeAndField {
     // by the language server.
     pub entrypoint_keyword: WithSpan<()>,
     pub dot: WithSpan<()>,
+    pub iso_literal_text: IsoLiteralText,
 }
