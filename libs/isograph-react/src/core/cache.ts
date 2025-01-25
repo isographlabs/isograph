@@ -104,7 +104,7 @@ export function getOrCreateCacheForArtifact<
   const factory = () => {
     const [networkRequest, disposeNetworkRequest] = maybeMakeNetworkRequest(
       environment,
-      entrypoint as IsographEntrypoint<any, any, NormalizationAst>,
+      entrypoint,
       variables,
       fetchOptions,
     );

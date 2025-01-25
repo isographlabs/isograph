@@ -62,7 +62,7 @@ export function useImperativeReference<
     ) => {
       const [networkRequest, disposeNetworkRequest] = maybeMakeNetworkRequest(
         environment,
-        entrypoint as IsographEntrypoint<any, any, NormalizationAst>,
+        entrypoint,
         variables,
         fetchOptions,
       );

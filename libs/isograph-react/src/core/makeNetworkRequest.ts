@@ -1,11 +1,6 @@
 import { ItemCleanupPair } from '@isograph/disposable-types';
 import { normalizeData } from './cache';
-import {
-  check,
-  DEFAULT_SHOULD_FETCH_VALUE,
-  FetchOptions,
-  type RequiredFetchOptions,
-} from './check';
+import { check, DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
 import { getOrCreateCachedComponent } from './componentCache';
 import {
   IsographEntrypoint,
@@ -42,9 +37,7 @@ export function maybeMakeNetworkRequest<
     | RefetchQueryNormalizationArtifact
     | IsographEntrypoint<TReadFromStore, TClientFieldValue, TNormalizationAst>,
   variables: ExtractParameters<TReadFromStore>,
-  ...[fetchOptions]: NormalizationAstLoader extends TNormalizationAst
-    ? [fetchOptions: RequiredFetchOptions<TClientFieldValue>]
-    : [fetchOptions?: FetchOptions<TClientFieldValue>]
+  fetchOptions?: FetchOptions<TClientFieldValue>,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
   switch (fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE) {
     case 'Yes': {
