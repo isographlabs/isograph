@@ -173,7 +173,7 @@ type MatchesWhitespaceAndString<
 export function iso(_isographLiteralText: string):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
-  | IsographEntrypoint<any, any>
+  | IsographEntrypoint<any, any, any>
 {\n",
     );
 
