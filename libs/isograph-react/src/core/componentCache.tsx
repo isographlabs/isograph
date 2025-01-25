@@ -1,3 +1,4 @@
+import React from 'react';
 import { useReadAndSubscribe } from '../react/useReadAndSubscribe';
 import { stableCopy } from './cache';
 import { FragmentReference } from './FragmentReference';
@@ -47,12 +48,14 @@ export function getOrCreateCachedComponent(
           rootLink: fragmentReference.root,
         });
 
-        return readerWithRefetchQueries.readerArtifact.resolver(
-          {
-            data,
-            parameters: fragmentReference.variables,
-          },
-          additionalRuntimeProps,
+        return (
+          <readerWithRefetchQueries.readerArtifact.resolver
+            firstParameter={{
+              data,
+              parameters: fragmentReference.variables,
+            }}
+            additionalRuntimeProps={additionalRuntimeProps}
+          />
         );
       }
       Component.displayName = `${componentName} (id: ${fragmentReference.root}) @component`;

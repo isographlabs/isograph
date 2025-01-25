@@ -267,8 +267,10 @@ function readDataForOnComplete<
       }
       case 'EagerReaderArtifact': {
         return readerArtifact.resolver({
-          data: fragmentResult,
-          parameters: variables,
+          firstParameter: {
+            data: fragmentResult,
+            parameters: variables,
+          },
         });
       }
       default: {
