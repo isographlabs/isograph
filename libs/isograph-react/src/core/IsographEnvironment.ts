@@ -59,7 +59,7 @@ export type IsographEnvironment = {
   // TODO make this a CacheMap and add GC
   readonly entrypointArtifactCache: Map<
     string,
-    PromiseWrapper<IsographEntrypoint<any, any>>
+    PromiseWrapper<IsographEntrypoint<any, any, any>>
   >;
   readonly retainedQueries: Set<RetainedQuery>;
   readonly gcBuffer: Array<RetainedQuery>;
@@ -183,8 +183,8 @@ export function getLink(maybeLink: DataTypeValue): Link | null {
 export function getOrLoadIsographArtifact(
   environment: IsographEnvironment,
   key: string,
-  loader: () => Promise<IsographEntrypoint<any, any>>,
-): PromiseWrapper<IsographEntrypoint<any, any>> {
+  loader: () => Promise<IsographEntrypoint<any, any, any>>,
+): PromiseWrapper<IsographEntrypoint<any, any, any>> {
   const value = environment.entrypointArtifactCache.get(key);
   if (value != null) {
     return value;

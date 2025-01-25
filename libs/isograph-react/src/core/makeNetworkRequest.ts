@@ -102,11 +102,12 @@ function loadNormalizationAst(
 export function makeNetworkRequest<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
+  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 >(
   environment: IsographEnvironment,
   artifact:
     | RefetchQueryNormalizationArtifact
-    | IsographEntrypoint<TReadFromStore, TClientFieldValue>,
+    | IsographEntrypoint<TReadFromStore, TClientFieldValue, TNormalizationAst>,
   variables: ExtractParameters<TReadFromStore>,
   fetchOptions?: FetchOptions<TClientFieldValue>,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
@@ -239,10 +240,11 @@ type NetworkRequestStatus =
 function readDataForOnComplete<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
+  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 >(
   artifact:
     | RefetchQueryNormalizationArtifact
-    | IsographEntrypoint<TReadFromStore, TClientFieldValue>,
+    | IsographEntrypoint<TReadFromStore, TClientFieldValue, TNormalizationAst>,
   environment: IsographEnvironment,
   root: Link,
   variables: ExtractParameters<TReadFromStore>,

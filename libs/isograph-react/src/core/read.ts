@@ -514,7 +514,7 @@ function readData<TReadFromStore>(
               // Fetcher
               () => {
                 const fragmentReferenceAndDisposeFromEntrypoint = (
-                  entrypoint: IsographEntrypoint<any, any>,
+                  entrypoint: IsographEntrypoint<any, any, any>,
                 ): [FragmentReference<any, any>, CleanupFn] => {
                   const [networkRequest, disposeNetworkRequest] =
                     maybeMakeNetworkRequest(

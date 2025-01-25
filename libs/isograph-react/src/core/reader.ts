@@ -139,7 +139,7 @@ export type ReaderLoadableField = {
 
   // TODO we should not type these as any
   readonly entrypoint:
-    | IsographEntrypoint<any, any>
+    | IsographEntrypoint<any, any, any>
     | IsographEntrypointLoader<any, any>;
 };
 

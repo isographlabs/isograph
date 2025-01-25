@@ -10,6 +10,7 @@ import {
   NormalizationScalarField,
   RefetchQueryNormalizationArtifactWrapper,
   type NormalizationAst,
+  type NormalizationAstLoader,
   type NormalizationAstNodes,
 } from '../core/entrypoint';
 import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
@@ -86,9 +87,14 @@ export function stableCopy<T>(value: T): T {
 export function getOrCreateCacheForArtifact<
   TReadFromStore extends { parameters: object; data: object },
   TClientFieldValue,
+  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 >(
   environment: IsographEnvironment,
-  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
+  entrypoint: IsographEntrypoint<
+    TReadFromStore,
+    TClientFieldValue,
+    TNormalizationAst
+  >,
   variables: ExtractParameters<TReadFromStore>,
   fetchOptions?: FetchOptions<TClientFieldValue>,
 ): ParentCache<FragmentReference<TReadFromStore, TClientFieldValue>> {
