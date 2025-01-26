@@ -467,6 +467,9 @@ pub(crate) fn generate_client_field_parameter_type(
     )
 }
 
+// DualStringProxy allows us to write to two strings simultaneously.
+// This is useful when we need to generate both readonly and updatable
+// versions of type declarations that share most of their content.
 pub struct DualStringProxy<'a> {
     left: &'a mut String,
     right: &'a mut String,
