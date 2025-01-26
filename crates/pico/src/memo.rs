@@ -9,26 +9,26 @@ use pico_core::{
     storage::{Storage, StorageMut},
 };
 
-pub enum MemoState {
-    Memoized,
-    Computed,
+pub enum DidRecalculate {
+    ReusedMemoizedValue,
+    Recalculated,
 }
 
 pub fn memo<Db: Database>(
     db: &mut Db,
     node_id: DerivedNodeId,
     inner_fn: fn(&mut Db, ParamId) -> Box<dyn DynEq>,
-) -> MemoState {
+) -> DidRecalculate {
     let current_epoch = db.current_epoch();
-    let (time_updated, state) = if db.storage().derived_nodes().contains_key(&node_id) {
+    let (time_updated, did_recalculate) = if db.storage().derived_nodes().contains_key(&node_id) {
         if any_dependency_changed(db, node_id, current_epoch) {
-            let mut state = MemoState::Memoized;
+            let mut state = DidRecalculate::ReusedMemoizedValue;
             let (value, dependencies, time_updated) =
                 call_inner_fn_and_collect_dependencies(db, node_id.param_id, inner_fn);
             if let Some(node) = db.storage_mut().derived_nodes().get_mut(&node_id) {
                 if node.value != value {
                     node.value = value;
-                    state = MemoState::Computed;
+                    state = DidRecalculate::Recalculated;
                 }
                 node.dependencies = dependencies;
                 node.time_updated = time_updated;
@@ -44,7 +44,7 @@ pub fn memo<Db: Database>(
                         value,
                     },
                 );
-                state = MemoState::Computed;
+                state = DidRecalculate::Recalculated;
             }
             (time_updated, state)
         } else {
@@ -54,7 +54,7 @@ pub fn memo<Db: Database>(
                 .get_mut(&node_id)
                 .expect("node should exist. This is indicative of a bug in Pico.");
             node.time_verified = current_epoch;
-            (node.time_updated, MemoState::Memoized)
+            (node.time_updated, DidRecalculate::ReusedMemoizedValue)
         }
     } else {
         let (value, dependencies, time_updated) =
@@ -69,7 +69,7 @@ pub fn memo<Db: Database>(
                 value,
             },
         );
-        (time_updated, MemoState::Computed)
+        (time_updated, DidRecalculate::Recalculated)
     };
     register_dependency_in_parent_memoized_fn(
         db,
@@ -77,7 +77,7 @@ pub fn memo<Db: Database>(
         time_updated,
         current_epoch,
     );
-    state
+    did_recalculate
 }
 
 fn any_dependency_changed<Db: Database>(
@@ -85,7 +85,7 @@ fn any_dependency_changed<Db: Database>(
     node_id: DerivedNodeId,
     current_epoch: Epoch,
 ) -> bool {
-    let dependencies = db
+    let potentially_changed_dependencies = db
         .storage()
         .derived_nodes()
         .get(&node_id)
@@ -94,17 +94,19 @@ fn any_dependency_changed<Db: Database>(
         .iter()
         .filter_map(|dep| {
             if dep.time_verified_or_updated != current_epoch {
-                Some((dep.node_to, dep.time_verified_or_updated))
+                Some(*dep)
             } else {
                 None
             }
         })
         .collect::<Vec<_>>();
 
-    dependencies
+    potentially_changed_dependencies
         .into_iter()
-        .any(|(dep_node, time_verified)| match dep_node {
-            NodeKind::Source(key) => source_node_changed_since(db, key, time_verified),
+        .any(|dependency| match dependency.node_to {
+            NodeKind::Source(key) => {
+                source_node_changed_since(db, key, dependency.time_verified_or_updated)
+            }
             NodeKind::Derived(dep_node_id) => derived_node_changed(db, dep_node_id),
         })
 }
@@ -126,7 +128,7 @@ fn derived_node_changed<Db: Database>(db: &mut Db, node_id: DerivedNodeId) -> bo
         return true;
     }
     let state = memo(db, node_id, inner_fn);
-    matches!(state, MemoState::Computed)
+    matches!(state, DidRecalculate::Recalculated)
 }
 
 fn call_inner_fn_and_collect_dependencies<Db: Database>(
