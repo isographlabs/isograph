@@ -28,10 +28,10 @@ pub fn memo<Db: Database>(
             if let Some(node) = db.storage_mut().derived_nodes().get_mut(&node_id) {
                 if node.value != value {
                     node.value = value;
+                    node.time_updated = time_updated;
                     state = DidRecalculate::Recalculated;
                 }
                 node.dependencies = dependencies;
-                node.time_updated = time_updated;
                 node.time_verified = current_epoch;
             } else {
                 db.storage_mut().derived_nodes().insert(
@@ -107,7 +107,9 @@ fn any_dependency_changed<Db: Database>(
             NodeKind::Source(key) => {
                 source_node_changed_since(db, key, dependency.time_verified_or_updated)
             }
-            NodeKind::Derived(dep_node_id) => derived_node_changed(db, dep_node_id),
+            NodeKind::Derived(dep_node_id) => {
+                derived_node_changed_since(db, dep_node_id, dependency.time_verified_or_updated)
+            }
         })
 }
 
@@ -118,17 +120,24 @@ fn source_node_changed_since<Db: Database>(db: &Db, key: Key, since: Epoch) -> b
     }
 }
 
-fn derived_node_changed<Db: Database>(db: &mut Db, node_id: DerivedNodeId) -> bool {
+fn derived_node_changed_since<Db: Database>(
+    db: &mut Db,
+    node_id: DerivedNodeId,
+    since: Epoch,
+) -> bool {
+    if !db.storage().params().contains_key(&node_id.param_id) {
+        return true;
+    }
     let inner_fn = if let Some(node) = db.storage().derived_nodes().get(&node_id) {
+        if node.time_updated > since {
+            return true;
+        }
         node.inner_fn
     } else {
         return true;
     };
-    if !db.storage().params().contains_key(&node_id.param_id) {
-        return true;
-    }
-    let state = memo(db, node_id, inner_fn);
-    matches!(state, DidRecalculate::Recalculated)
+    let did_recalculate = memo(db, node_id, inner_fn);
+    matches!(did_recalculate, DidRecalculate::Recalculated)
 }
 
 fn call_inner_fn_and_collect_dependencies<Db: Database>(
