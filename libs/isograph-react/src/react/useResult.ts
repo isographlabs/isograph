@@ -1,19 +1,25 @@
-import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
-import { FragmentReference } from '../core/FragmentReference';
 import { getOrCreateCachedComponent } from '../core/componentCache';
-import { useReadAndSubscribe } from './useReadAndSubscribe';
-import {
-  getNetworkRequestOptionsWithDefaults,
-  NetworkRequestReaderOptions,
-} from '../core/read';
+import { FragmentReference } from '../core/FragmentReference';
 import {
   getPromiseState,
   PromiseWrapper,
   readPromise,
 } from '../core/PromiseWrapper';
+import {
+  getNetworkRequestOptionsWithDefaults,
+  NetworkRequestReaderOptions,
+} from '../core/read';
+import type { StartUpdate } from '../core/reader';
+import { startUpdate } from '../core/startUpdate';
+import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
+import { useReadAndSubscribe } from './useReadAndSubscribe';
 
 export function useResult<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
 >(
   fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>,
@@ -51,6 +57,9 @@ export function useResult<
       const param = {
         data: data,
         parameters: fragmentReference.variables,
+        startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
+          ? startUpdate(environment, data)
+          : undefined,
       };
       return readerWithRefetchQueries.readerArtifact.resolver(param);
     }

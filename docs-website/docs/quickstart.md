@@ -125,13 +125,13 @@ Isograph requires some initial setup to teach it how to make API calls to your G
 In our case, we can do that by changing our `src/pages/_app.tsx` file to look like:
 
 ```tsx
-import { useMemo, Suspense } from 'react';
-import type { AppProps } from 'next/app';
 import {
   createIsographEnvironment,
   createIsographStore,
   IsographEnvironmentProvider,
 } from '@isograph/react';
+import type { AppProps } from 'next/app';
+import { Suspense, useMemo } from 'react';
 
 function makeNetworkRequest<T>(
   queryText: string,
@@ -150,17 +150,24 @@ function makeNetworkRequest<T>(
     const json = await response.json();
 
     if (response.ok) {
-      if (json.errors != null) {
+      /**
+       * Enforce that the network response follows the specification:: {@link https://spec.graphql.org/draft/#sec-Errors}.
+       */
+      if (Object.hasOwn(json, 'errors')) {
+        if (!Array.isArray(json.errors) || json.errors.length === 0) {
+          throw new Error('GraphQLSpecificationViolationError', {
+            cause: json,
+          });
+        }
         throw new Error('GraphQLError', {
           cause: json.errors,
         });
       }
       return json;
-    } else {
-      throw new Error('NetworkError', {
-        cause: json,
-      });
     }
+    throw new Error('NetworkError', {
+      cause: json,
+    });
   });
   return promise;
 }
@@ -214,8 +221,8 @@ An Isograph app will be almost entirely made up of client fields. There are two 
 So, let's define our first field, `Root.HomePage`, by making sure that `yarn iso --watch` is running and then creating a file (e.g. `src/components/HomePage.tsx`) containing the following:
 
 ```tsx
-import React from 'react';
 import { iso } from '@iso';
+import React from 'react';
 
 export const HomePage = iso(`
   field Root.HomePage @component {}
@@ -269,8 +276,8 @@ Every time you save, the Isograph compiler will recompile everything, including 
 Let's complete this component by returning a list of the films, their titles and episode names. The entire file should now look like:
 
 ```tsx
-import React, { useMemo } from 'react';
 import { iso } from '@iso';
+import React, { useMemo } from 'react';
 
 function nonNullable<T>(value: T): value is NonNullable<T> {
   return value != null;
@@ -340,9 +347,9 @@ query HomePage {
 So, create a file at `src/components/HomePageRoute.tsx`, and make its contents:
 
 ```tsx
-import React from 'react';
-import { useLazyReference } from '@isograph/react';
 import { iso } from '@iso';
+import { useLazyReference } from '@isograph/react';
+import React from 'react';
 
 export default function HomePageRoute() {
   const { fragmentReference } = useLazyReference(
@@ -374,9 +381,9 @@ So, whenever we render the `HomePageRoute` component, the Isograph runtime will 
 Now, we still need to render our `Query.HomePage` component. In order to do this, we call `useResult` to read the query reference. This gives us the value of that field (i.e. a component), which we can render.
 
 ```tsx
-import React from 'react';
-import { useLazyReference, useResult } from '@isograph/react';
 import { iso } from '@iso';
+import { useLazyReference, useResult } from '@isograph/react';
+import React from 'react';
 
 export default function HomePageRoute() {
   const { fragmentReference } = useLazyReference(
@@ -397,8 +404,8 @@ Nice! Look at that beautiful list of Star Wars episodes!
 A key principle of React is that you can divide your components into subcomponents. Let's do that! For example, create `src/components/EpisodeTitle.tsx` containing:
 
 ```tsx
-import React from 'react';
 import { iso } from '@iso';
+import React from 'react';
 
 export const EpisodeTitle = iso(`
   field Film.EpisodeTitle @component {
@@ -417,8 +424,8 @@ export const EpisodeTitle = iso(`
 Let's use this component by modifying `HomePage.tsx` to be the following. Note the two new sections:
 
 ```tsx
-import React, { useMemo } from 'react';
 import { iso } from '@iso';
+import React, { useMemo } from 'react';
 
 function nonNullable<T>(value: T): value is NonNullable<T> {
   return value != null;

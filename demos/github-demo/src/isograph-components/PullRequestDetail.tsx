@@ -1,12 +1,10 @@
-import React from 'react';
-
 import { iso } from '@iso';
-
 import { Card, CardContent } from '@mui/material';
+import React from 'react';
 import { RepoGitHubLink } from './RepoGitHubLink';
 
 export const PullRequestDetail = iso(`
-  field Query.PullRequestDetail($repositoryOwner: String, $repositoryName: String, $pullRequestNumber: Int) @component {
+  field Query.PullRequestDetail($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!) @component {
     repository(owner: $repositoryOwner, name: $repositoryName) {
       pullRequest(number: $pullRequestNumber) {
         title

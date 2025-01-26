@@ -2,21 +2,26 @@ import {
   UnassignedState,
   useUpdatableDisposableState,
 } from '@isograph/react-disposable-state';
+import { FetchOptions } from '../core/check';
 import { IsographEntrypoint } from '../core/entrypoint';
 import {
-  FragmentReference,
   ExtractParameters,
+  FragmentReference,
 } from '../core/FragmentReference';
-import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import { ROOT_ID } from '../core/IsographEnvironment';
 import { maybeMakeNetworkRequest } from '../core/makeNetworkRequest';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
-import { FetchOptions } from '../core/check';
+import type { StartUpdate } from '../core/reader';
+import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
 // TODO rename this to useImperativelyLoadedEntrypoint
 
 export function useImperativeReference<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
 >(
   entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,

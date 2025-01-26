@@ -4,42 +4,51 @@ import {
   ParentCache,
 } from '@isograph/react-disposable-state';
 import {
-  DataId,
-  Link,
-  ROOT_ID,
-  StoreRecord,
-  type IsographEnvironment,
-  DataTypeValue,
-  getLink,
-  FragmentSubscription,
-  type TypeName,
-} from './IsographEnvironment';
-import {
   IsographEntrypoint,
-  type NormalizationAstNodes,
   NormalizationInlineFragment,
   NormalizationLinkedField,
   NormalizationScalarField,
   RefetchQueryNormalizationArtifactWrapper,
+  type NormalizationAstNodes,
 } from '../core/entrypoint';
-import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
-import { Argument, ArgumentValue } from './util';
-import { WithEncounteredRecords, readButDoNotEvaluate } from './read';
+import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
+import { FetchOptions } from './check';
 import {
+  ExtractParameters,
   FragmentReference,
   Variables,
-  ExtractParameters,
 } from './FragmentReference';
-import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
+import {
+  DataId,
+  DataTypeValue,
+  FragmentSubscription,
+  getLink,
+  Link,
+  ROOT_ID,
+  StoreRecord,
+  type IsographEnvironment,
+  type TypeName,
+} from './IsographEnvironment';
+import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import { wrapResolvedValue } from './PromiseWrapper';
-import { logMessage } from './logging';
-import { FetchOptions } from './check';
+import { readButDoNotEvaluate, WithEncounteredRecords } from './read';
+import {
+  ReaderLinkedField,
+  ReaderScalarField,
+  type ReaderAst,
+  type StartUpdate,
+} from './reader';
+import { Argument, ArgumentValue } from './util';
 
 export const TYPENAME_FIELD_NAME = '__typename';
 
 export function getOrCreateItemInSuspenseCache<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
 >(
   environment: IsographEnvironment,
@@ -83,7 +92,11 @@ export function stableCopy<T>(value: T): T {
 }
 
 export function getOrCreateCacheForArtifact<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
 >(
   environment: IsographEnvironment,
@@ -209,7 +222,11 @@ export function subscribeToAnyChangesToRecord(
 
 // TODO we should re-read and call callback if the value has changed
 export function subscribe<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
 >(
   environment: IsographEnvironment,
   encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,

@@ -89,7 +89,7 @@ export const AGAIN_ANYTHING = iso(`
 - Do not import useClientSideDefer or FragmentReader from '@iso', but from '@isograph/react'!
 
 ```tsx
-import { useClientSideDefer, FragmentReader } from '@isograph/react';
+import { FragmentReader, useClientSideDefer } from '@isograph/react';
 
 export const SomeComponent = iso(`
   field PARENT_TYPE.SomeComponent @component {
@@ -153,11 +153,9 @@ export const SomeComponent = iso(`
   }
 `)(({ data }) => {
   const { loadField, fragmentReference } = useImperativeExposedMutationField(
-    data.reExposedMutationField
-  )
-  return (
-    <button onClick={() => loadField(OPTIONAL_REMAINING_ARGUMENTS)}>
+    data.reExposedMutationField,
   );
+  return <button onClick={() => loadField(OPTIONAL_REMAINING_ARGUMENTS)} />;
 });
 ```
 

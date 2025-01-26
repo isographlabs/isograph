@@ -1,9 +1,12 @@
 import { ItemCleanupPair } from '@isograph/disposable-types';
+import { normalizeData } from './cache';
+import { check, DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
+import { getOrCreateCachedComponent } from './componentCache';
 import {
   IsographEntrypoint,
   RefetchQueryNormalizationArtifact,
 } from './entrypoint';
-import { ExtractParameters } from './FragmentReference';
+import { ExtractParameters, type FragmentReference } from './FragmentReference';
 import {
   garbageCollectEnvironment,
   RetainedQuery,
@@ -11,22 +14,25 @@ import {
   unretainQuery,
 } from './garbageCollection';
 import { IsographEnvironment, Link, ROOT_ID } from './IsographEnvironment';
+import { logMessage } from './logging';
 import {
   AnyError,
   PromiseWrapper,
   wrapPromise,
   wrapResolvedValue,
 } from './PromiseWrapper';
-import { normalizeData } from './cache';
-import { logMessage } from './logging';
-import { check, DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
 import { readButDoNotEvaluate } from './read';
-import { getOrCreateCachedComponent } from './componentCache';
+import type { StartUpdate } from './reader';
+import { startUpdate } from './startUpdate';
 
 let networkRequestId = 0;
 
 export function maybeMakeNetworkRequest<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
 >(
   environment: IsographEnvironment,
@@ -68,7 +74,11 @@ export function maybeMakeNetworkRequest<
 }
 
 export function makeNetworkRequest<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
 >(
   environment: IsographEnvironment,
@@ -201,7 +211,11 @@ type NetworkRequestStatus =
     };
 
 function readDataForOnComplete<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
 >(
   artifact:
@@ -227,18 +241,19 @@ function readDataForOnComplete<
       throwOnNetworkError: false,
     };
 
+    const fragment: FragmentReference<TReadFromStore, TClientFieldValue> = {
+      kind: 'FragmentReference',
+      // TODO this smells.
+      readerWithRefetchQueries: wrapResolvedValue(
+        artifact.readerWithRefetchQueries,
+      ),
+      root,
+      variables,
+      networkRequest: fakeNetworkRequest,
+    };
     const fragmentResult = readButDoNotEvaluate(
       environment,
-      {
-        kind: 'FragmentReference',
-        // TODO this smells.
-        readerWithRefetchQueries: wrapResolvedValue(
-          artifact.readerWithRefetchQueries,
-        ),
-        root,
-        variables,
-        networkRequest: fakeNetworkRequest,
-      },
+      fragment,
       fakeNetworkRequestOptions,
     ).item;
     const readerArtifact = artifact.readerWithRefetchQueries.readerArtifact;
@@ -269,6 +284,9 @@ function readDataForOnComplete<
         return readerArtifact.resolver({
           data: fragmentResult,
           parameters: variables,
+          startUpdate: readerArtifact.hasUpdatable
+            ? startUpdate(environment, fragmentResult)
+            : undefined,
         });
       }
       default: {

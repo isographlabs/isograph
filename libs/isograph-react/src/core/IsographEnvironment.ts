@@ -1,11 +1,11 @@
 import { ParentCache } from '@isograph/react-disposable-state';
-import { RetainedQuery } from './garbageCollection';
-import { WithEncounteredRecords } from './read';
-import { FragmentReference, Variables } from './FragmentReference';
-import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { IsographEntrypoint } from './entrypoint';
-import type { ReaderAst } from './reader';
+import { FragmentReference, Variables } from './FragmentReference';
+import { RetainedQuery } from './garbageCollection';
 import { LogFunction, WrappedLogFunction } from './logging';
+import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
+import { WithEncounteredRecords } from './read';
+import type { ReaderAst, StartUpdate } from './reader';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -16,7 +16,11 @@ type ComponentCache = {
 };
 
 export type FragmentSubscription<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
 > = {
   readonly kind: 'FragmentSubscription';
   readonly callback: (
@@ -40,7 +44,7 @@ type AnyRecordSubscription = {
 };
 
 type Subscription =
-  | FragmentSubscription<{ parameters: object; data: object }>
+  | FragmentSubscription<any>
   | AnyChangesToRecordSubscription
   | AnyRecordSubscription;
 type Subscriptions = Set<Subscription>;
@@ -127,6 +131,9 @@ export function createIsographEnvironment(
   missingFieldHandler?: MissingFieldHandler | null,
   logFunction?: LogFunction | null,
 ): IsographEnvironment {
+  logFunction?.({
+    kind: 'EnvironmentCreated',
+  });
   return {
     store,
     networkFunction,

@@ -8,20 +8,20 @@
   "author": "Isograph Labs",
   "license": "MIT",
   "scripts": {
-    "compile": "rm -rf dist/* && tsc -p tsconfig.pkg.json",
+    "compile-typescript": "rm -rf dist/* && tsc -p tsconfig.pkg.json",
     "compile-watch": "tsc -p tsconfig.pkg.json --watch",
     "test": "vitest run",
     "test-watch": "vitest watch",
     "coverage": "vitest run --coverage",
     "note": "WE SHOULD ALSO TEST HERE",
-    "prepack": "pnpm run compile",
+    "prepack": "pnpm run compile-typescript",
     "tsc": "tsc"
   },
   "dependencies": {
     "@isograph/disposable-types": "*"
   },
   "peerDependencies": {
-    "react": "18.3.1"
+    "react": "^18.0.0 || ^19.0.0"
   },
   "devDependencies": {
     "@types/react": "18.3.1",

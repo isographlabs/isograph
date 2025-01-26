@@ -90,6 +90,13 @@ jobs:
           - folder: vite-demo
     steps:
       - uses: actions/checkout@v2
+      - name: Cache turbo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
       - uses: pnpm/action-setup@v2
       - name: Use Node.js 22
         uses: actions/setup-node@v3
@@ -98,9 +105,8 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
-      # TODO reuse some artifacts or something, we're doing this in multiple steps
       - name: Build JS files
-        run: pnpm -r compile
+        run: pnpm compile-typescript
       - name: Typecheck
         run: cd ./demos/${{ matrix.target.folder }} && pnpm tsc
       - name: Lint
@@ -111,6 +117,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - name: Cache turbo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
       - uses: pnpm/action-setup@v2
       - name: Use Node.js 22
         uses: actions/setup-node@v3
@@ -120,7 +133,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Build
-        run: pnpm -r compile
+        run: pnpm compile-typescript
       - name: Run unit tests
         # Note: unit tests have to run after building, because the unit tests
         # rely on Isograph, which relies on @isograph/react being a valid input
@@ -284,12 +297,26 @@ jobs:
         uses: actions/deploy-pages@v4
 
   main-release:
-    name: Release packages to NPM
+    name: Main NPM release
     runs-on: macos-latest
-    if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref == 'refs/heads/main' || github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'isographlabs/isograph' &&
+      (
+        github.ref == 'refs/heads/main' ||
+        (github.ref_type == 'tag' && startsWith(github.ref_name, 'v')) ||
+        startsWith(github.ref, 'refs/heads/deploy/')
+      )
     needs: [all-checks-passed]
     steps:
       - uses: actions/checkout@v2
+      - name: Cache turbo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
       - uses: pnpm/action-setup@v2
       - uses: actions/setup-node@v2
         with:
@@ -302,9 +329,8 @@ jobs:
         run: pnpm gulp setMainVersion
         env:
           RELEASE_COMMIT_SHA: ${{ github.sha }}
-      # TODO reuse this somehow?
       - name: Build
-        run: pnpm -r compile
+        run: pnpm compile-typescript
       - name: Download artifact isograph_cli-linux-x64
         uses: actions/download-artifact@v4
         with:
@@ -342,19 +368,26 @@ jobs:
           for pkg in libs/*; do
             echo PUBLISHING $pkg
             cd $pkg
-            npm publish --tag main
+            npm publish --tag ${{ startsWith(github.ref, 'refs/heads/deploy/') && 'deploy' || 'main' }}
             cd ../..
           done
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
 
   versioned-release:
-    name: Release packages to NPM (latest)
+    name: Versioned NPM release
     runs-on: macos-latest
     if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
     needs: [all-checks-passed]
     steps:
       - uses: actions/checkout@v2
+      - name: Cache turbo
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
       - uses: pnpm/action-setup@v2
       - uses: actions/setup-node@v2
         with:
@@ -367,7 +400,7 @@ jobs:
       #   run: pnpm gulp setMainVersion
       #   # TODO do this less hackily
       - name: Build
-        run: pnpm -r compile
+        run: pnpm compile-typescript
       - name: Download artifact isograph_cli-linux-x64
         uses: actions/download-artifact@v4
         with:

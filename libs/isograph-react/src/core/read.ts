@@ -1,19 +1,21 @@
+import { CleanupFn } from '@isograph/disposable-types';
 import {
   getParentRecordKey,
   insertIfNotExists,
   onNextChangeToRecord,
   type EncounteredIds,
 } from './cache';
+import { FetchOptions } from './check';
 import { getOrCreateCachedComponent } from './componentCache';
 import {
   IsographEntrypoint,
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
 import {
-  FragmentReference,
-  Variables,
   ExtractData,
   ExtractParameters,
+  FragmentReference,
+  Variables,
 } from './FragmentReference';
 import {
   assertLink,
@@ -21,6 +23,7 @@ import {
   IsographEnvironment,
   type Link,
 } from './IsographEnvironment';
+import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import {
   getPromiseState,
@@ -30,11 +33,9 @@ import {
   wrapPromise,
   wrapResolvedValue,
 } from './PromiseWrapper';
-import { ReaderAst } from './reader';
+import { ReaderAst, type StartUpdate } from './reader';
+import { startUpdate } from './startUpdate';
 import { Arguments } from './util';
-import { logMessage } from './logging';
-import { CleanupFn } from '@isograph/disposable-types';
-import { FetchOptions } from './check';
 
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: EncounteredIds;
@@ -42,7 +43,11 @@ export type WithEncounteredRecords<T> = {
 };
 
 export function readButDoNotEvaluate<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
 >(
   environment: IsographEnvironment,
   fragmentReference: FragmentReference<TReadFromStore, unknown>,
@@ -264,6 +269,9 @@ function readData<TReadFromStore>(
           const condition = field.condition.resolver({
             data: data.data,
             parameters: {},
+            startUpdate: field.condition.hasUpdatable
+              ? startUpdate(environment, data)
+              : undefined,
           });
           if (condition === true) {
             link = root;
@@ -427,6 +435,7 @@ function readData<TReadFromStore>(
               const firstParameter = {
                 data: data.data,
                 parameters: variables,
+                startUpdate: () => {},
               };
               target[field.alias] =
                 field.readerArtifact.resolver(firstParameter);

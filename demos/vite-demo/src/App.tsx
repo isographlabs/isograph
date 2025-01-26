@@ -1,9 +1,9 @@
-import { Suspense, useMemo } from 'react';
 import {
   createIsographEnvironment,
   createIsographStore,
   IsographEnvironmentProvider,
 } from '@isograph/react';
+import { Suspense, useMemo } from 'react';
 import HomePageRoute from './components/HomePageRoute';
 
 function makeNetworkRequest<T>(
@@ -20,13 +20,24 @@ function makeNetworkRequest<T>(
     const json = await response.json();
 
     if (response.ok) {
-      if (json.errors != null) {
-        throw new Error('GraphQLError');
+      /**
+       * Enforce that the network response follows the specification:: {@link https://spec.graphql.org/draft/#sec-Errors}.
+       */
+      if (Object.hasOwn(json, 'errors')) {
+        if (!Array.isArray(json.errors) || json.errors.length === 0) {
+          throw new Error('GraphQLSpecificationViolationError', {
+            cause: json,
+          });
+        }
+        throw new Error('GraphQLError', {
+          cause: json.errors,
+        });
       }
       return json;
-    } else {
-      throw new Error('NetworkError');
     }
+    throw new Error('NetworkError', {
+      cause: json,
+    });
   });
   return promise;
 }

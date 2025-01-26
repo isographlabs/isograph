@@ -1,10 +1,10 @@
-import type { AppProps } from 'next/app';
-import { useMemo } from 'react';
 import {
   createIsographEnvironment,
   createIsographStore,
   IsographEnvironmentProvider,
 } from '@isograph/react';
+import type { AppProps } from 'next/app';
+import { useMemo } from 'react';
 
 function makeNetworkRequest<T>(
   queryText: string,
@@ -21,17 +21,24 @@ function makeNetworkRequest<T>(
     const json = await response.json();
 
     if (response.ok) {
-      if (json.errors != null) {
+      /**
+       * Enforce that the network response follows the specification:: {@link https://spec.graphql.org/draft/#sec-Errors}.
+       */
+      if (Object.hasOwn(json, 'errors')) {
+        if (!Array.isArray(json.errors) || json.errors.length === 0) {
+          throw new Error('GraphQLSpecificationViolationError', {
+            cause: json,
+          });
+        }
         throw new Error('GraphQLError', {
           cause: json.errors,
         });
       }
       return json;
-    } else {
-      throw new Error('NetworkError', {
-        cause: json,
-      });
     }
+    throw new Error('NetworkError', {
+      cause: json,
+    });
   });
   return promise;
 }

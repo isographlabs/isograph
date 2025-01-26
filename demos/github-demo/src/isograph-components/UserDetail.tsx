@@ -1,9 +1,9 @@
 import { iso } from '@iso';
-import { RepoGitHubLink } from './RepoGitHubLink';
 import { Route } from './GithubDemo';
+import { RepoGitHubLink } from './RepoGitHubLink';
 
 export const UserDetail = iso(`
-  field Query.UserDetail($userLogin: String) @component {
+  field Query.UserDetail($userLogin: String!) @component {
     user(login: $userLogin) {
       name
       RepositoryList

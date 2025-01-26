@@ -1,15 +1,19 @@
+import { useLazyDisposableState } from '@isograph/react-disposable-state';
+import { getOrCreateItemInSuspenseCache } from '../core/cache';
+import { FetchOptions } from '../core/check';
 import {
   ExtractParameters,
   FragmentReference,
 } from '../core/FragmentReference';
+import { LoadableField, type StartUpdate } from '../core/reader';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
-import { getOrCreateItemInSuspenseCache } from '../core/cache';
-import { useLazyDisposableState } from '@isograph/react-disposable-state';
-import { LoadableField } from '../core/reader';
-import { FetchOptions } from '../core/check';
 
 export function useClientSideDefer<
-  TReadFromStore extends { data: object; parameters: object },
+  TReadFromStore extends {
+    data: object;
+    parameters: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TResult,
 >(
   loadableField: LoadableField<
@@ -22,7 +26,11 @@ export function useClientSideDefer<
 ): { fragmentReference: FragmentReference<TReadFromStore, TResult> };
 
 export function useClientSideDefer<
-  TReadFromStore extends { data: object; parameters: object },
+  TReadFromStore extends {
+    data: object;
+    parameters: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TResult,
   TProvidedArgs extends object,
 >(
@@ -36,7 +44,11 @@ export function useClientSideDefer<
 ): { fragmentReference: FragmentReference<TReadFromStore, TResult> };
 
 export function useClientSideDefer<
-  TReadFromStore extends { data: object; parameters: object },
+  TReadFromStore extends {
+    data: object;
+    parameters: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TResult,
   TProvidedArgs extends object,
 >(

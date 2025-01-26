@@ -1,6 +1,6 @@
-import React from 'react';
 import { iso } from '@iso';
 import { FragmentReader, useClientSideDefer } from '@isograph/react';
+import React from 'react';
 
 export const AdItemDisplayWrapper = iso(`
   field AdItem.AdItemDisplayWrapper @component {
