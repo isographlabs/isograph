@@ -32,6 +32,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Image.ImageDisplayWrapper",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

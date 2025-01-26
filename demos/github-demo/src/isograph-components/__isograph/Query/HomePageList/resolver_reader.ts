@@ -50,6 +50,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.HomePageList",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;
