@@ -57,9 +57,9 @@ export function useResult<
       const param = {
         data: data,
         parameters: fragmentReference.variables,
-        startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
-          ? startUpdate(environment, data)
-          : undefined,
+        ...(readerWithRefetchQueries.readerArtifact.hasUpdatable
+          ? { startUpdate: startUpdate(environment, data) }
+          : undefined),
       };
       return readerWithRefetchQueries.readerArtifact.resolver(param);
     }

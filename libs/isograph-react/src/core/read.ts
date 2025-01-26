@@ -269,9 +269,9 @@ function readData<TReadFromStore>(
           const condition = field.condition.resolver({
             data: data.data,
             parameters: {},
-            startUpdate: field.condition.hasUpdatable
-              ? startUpdate(environment, data)
-              : undefined,
+            ...(field.condition.hasUpdatable
+              ? { startUpdate: startUpdate(environment, data) }
+              : undefined),
           });
           if (condition === true) {
             link = root;

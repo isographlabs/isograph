@@ -6,12 +6,7 @@ import {
   RefetchQueryNormalizationArtifact,
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
-import {
-  ExtractData,
-  ExtractParameters,
-  FragmentReference,
-  type ExtractStartUpdate,
-} from './FragmentReference';
+import { ExtractParameters, FragmentReference } from './FragmentReference';
 import {
   ComponentOrFieldName,
   IsographEnvironment,
@@ -71,11 +66,7 @@ export type ResolverFirstParameter<
     parameters: object;
     startUpdate?: StartUpdate<object>;
   },
-> = {
-  data: ExtractData<TReadFromStore>;
-  parameters: ExtractParameters<TReadFromStore>;
-  startUpdate: undefined | ExtractStartUpdate<TReadFromStore>;
-};
+> = Pick<TReadFromStore, 'data' | 'parameters' | 'startUpdate'>;
 
 export type StartUpdate<UpdatableData> = (
   updater: (updatableData: UpdatableData) => void,

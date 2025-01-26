@@ -284,9 +284,9 @@ function readDataForOnComplete<
         return readerArtifact.resolver({
           data: fragmentResult,
           parameters: variables,
-          startUpdate: readerArtifact.hasUpdatable
-            ? startUpdate(environment, fragmentResult)
-            : undefined,
+          ...(readerArtifact.hasUpdatable
+            ? { startUpdate: startUpdate(environment, fragmentResult) }
+            : undefined),
         });
       }
       default: {
