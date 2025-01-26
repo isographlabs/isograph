@@ -102,7 +102,7 @@ pub fn validate_isograph_pointer_directives(
             definition_path,
             dot,
             pointer_keyword,
-            to_type,
+            target_type,
         } = client_pointer;
 
         Ok(ClientPointerDeclarationWithValidatedDirectives {
@@ -115,7 +115,7 @@ pub fn validate_isograph_pointer_directives(
             definition_path,
             dot,
             pointer_keyword,
-            to_type,
+            target_type,
         })
     })
 }

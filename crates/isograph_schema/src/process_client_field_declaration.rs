@@ -74,26 +74,29 @@ impl UnvalidatedSchema {
                 ),
             ))?;
 
-        let to_type_id = self
+        let target_type_id = self
             .server_field_data
             .defined_types
-            .get(client_pointer_declaration.item.to_type.inner())
+            .get(client_pointer_declaration.item.target_type.inner())
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
-                    parent_type_name: *client_pointer_declaration.item.to_type.inner(),
+                    parent_type_name: *client_pointer_declaration.item.target_type.inner(),
                 },
-                Location::new(text_source, *client_pointer_declaration.item.to_type.span()),
+                Location::new(
+                    text_source,
+                    *client_pointer_declaration.item.target_type.span(),
+                ),
             ))?;
 
         match parent_type_id {
-            SelectableServerFieldId::Object(object_id) => match to_type_id {
+            SelectableServerFieldId::Object(object_id) => match target_type_id {
                 SelectableServerFieldId::Object(to_object_id) => {
                     self.add_client_pointer_to_object(
                         *object_id,
                         TypeAnnotation::from_graphql_type_annotation(
                             client_pointer_declaration
                                 .item
-                                .to_type
+                                .target_type
                                 .clone()
                                 .map(|_| *to_object_id),
                         ),
@@ -104,10 +107,13 @@ impl UnvalidatedSchema {
                 SelectableServerFieldId::Scalar(scalar_id) => {
                     let scalar_name = self.server_field_data.scalar(*scalar_id).name;
                     return Err(WithLocation::new(
-                        ProcessClientFieldDeclarationError::InvalidPointerType {
-                            to_type_name: scalar_name.item.into(),
+                        ProcessClientFieldDeclarationError::ClientPointerInvalidTargetType {
+                            target_type_name: scalar_name.item.into(),
                         },
-                        Location::new(text_source, *client_pointer_declaration.item.to_type.span()),
+                        Location::new(
+                            text_source,
+                            *client_pointer_declaration.item.target_type.span(),
+                        ),
                     ));
                 }
             },
@@ -228,10 +234,10 @@ impl UnvalidatedSchema {
                 parent_object_id,
                 refetch_strategy: match to_object.id_field {
                     None => Err(WithSpan::new(
-                        ProcessClientFieldDeclarationError::TypePointedToHasNoId {
-                            to_type_name: *client_pointer_declaration.item.to_type.inner(),
+                        ProcessClientFieldDeclarationError::ClientPointerTargetTypeHasNoId {
+                            target_type_name: *client_pointer_declaration.item.target_type.inner(),
                         },
-                        *client_pointer_declaration.item.to_type.span(),
+                        *client_pointer_declaration.item.target_type.span(),
                     )),
                     Some(_) => {
                         // Assume that if we have an id field, this implements Node
@@ -293,13 +299,17 @@ pub enum ProcessClientFieldDeclarationError {
         parent_type_name: UnvalidatedTypeName,
     },
 
-    #[error("Invalid type pointed to. `{to_type_name}` is a scalar. You are attempting to define a pointer on it. \
+    #[error("Invalid client pointer target type. `{target_type_name}` is a scalar. You are attempting to define a pointer to it. \
         In order to do so, the type must be an object, interface or union.")]
-    InvalidPointerType { to_type_name: UnvalidatedTypeName },
+    ClientPointerInvalidTargetType {
+        target_type_name: UnvalidatedTypeName,
+    },
 
-    #[error("Invalid type pointed to. `{to_type_name}` has no id field. You are attempting to define a pointer to it. \
-        In order to do so, the to object must be an object implementing Node interface.")]
-    TypePointedToHasNoId { to_type_name: UnvalidatedTypeName },
+    #[error("Invalid client pointer target type. `{target_type_name}` has no id field. You are attempting to define a pointer to it. \
+        In order to do so, the target must be an object implementing Node interface.")]
+    ClientPointerTargetTypeHasNoId {
+        target_type_name: UnvalidatedTypeName,
+    },
 
     #[error(
         "The Isograph object type \"{parent_type_name}\" already has a field named \"{client_field_name}\"."
