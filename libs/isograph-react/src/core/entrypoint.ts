@@ -55,8 +55,8 @@ export type NormalizationAstNode =
 export type NormalizationAstNodes = ReadonlyArray<NormalizationAstNode>;
 
 export type NormalizationAst = {
-  kind: 'NormalizationAst';
-  selections: NormalizationAstNodes;
+  readonly kind: 'NormalizationAst';
+  readonly selections: NormalizationAstNodes;
 };
 
 export type NormalizationAstLoader = {
