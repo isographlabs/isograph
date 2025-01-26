@@ -482,7 +482,7 @@ pub struct ClientPointer<
     pub id: ClientPointerId,
     pub to: TypeAnnotation<ServerObjectId>,
 
-    pub condition_selection_set: Vec<
+    pub reader_selection_set: Vec<
         WithSpan<
             ServerFieldSelection<
                 TClientFieldSelectionScalarFieldAssociatedData,

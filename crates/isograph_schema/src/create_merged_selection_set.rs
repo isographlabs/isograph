@@ -793,8 +793,7 @@ fn merge_validated_selections_into_selection_map(
                                                     schema,
                                                     &mut existing_inline_fragment.selection_map,
                                                     linked_field_parent_type,
-                                                    &inline_fragment_variant
-                                                        .condition_selection_set,
+                                                    &inline_fragment_variant.reader_selection_set,
                                                     merge_traversal_state,
                                                     encountered_client_field_map,
                                                     variable_context,

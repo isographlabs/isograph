@@ -53,7 +53,7 @@ pub enum SchemaServerFieldVariant {
 pub struct ServerFieldTypeAssociatedDataInlineFragment {
     pub server_field_id: ServerFieldId,
     pub concrete_type: IsographObjectTypeName,
-    pub condition_selection_set: Vec<WithSpan<ValidatedSelection>>,
+    pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 }
 
 pub type UnvalidatedSchema = Schema<UnvalidatedSchemaState>;

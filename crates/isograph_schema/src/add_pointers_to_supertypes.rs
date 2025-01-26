@@ -83,7 +83,7 @@ impl UnvalidatedSchema {
                     Span::todo_generated(),
                 );
 
-                let condition_selection_set = vec![typename_selection, link_selection];
+                let reader_selection_set = vec![typename_selection, link_selection];
 
                 let server_field = SchemaServerField {
                     description: Some(
@@ -101,7 +101,7 @@ impl UnvalidatedSchema {
                             ServerFieldTypeAssociatedDataInlineFragment {
                                 server_field_id: next_server_field_id,
                                 concrete_type,
-                                condition_selection_set,
+                                reader_selection_set,
                             },
                         ),
                     },

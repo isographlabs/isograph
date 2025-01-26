@@ -236,7 +236,7 @@ impl UnvalidatedSchema {
                 description: client_pointer_declaration.item.description.map(|x| x.item),
                 name,
                 id: next_client_pointer_id,
-                condition_selection_set: client_pointer_declaration.item.selection_set,
+                reader_selection_set: client_pointer_declaration.item.selection_set,
 
                 variable_definitions: client_pointer_declaration.item.variable_definitions,
                 type_and_field: ObjectTypeAndFieldName {
