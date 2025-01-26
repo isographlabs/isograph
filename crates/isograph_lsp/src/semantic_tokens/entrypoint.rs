@@ -1,5 +1,5 @@
 use common_lang_types::WithSpan;
-use isograph_lang_types::EntrypointTypeAndField;
+use isograph_lang_types::EntrypointDeclaration;
 use lsp_types::SemanticToken;
 
 use crate::row_col_offset::RowColDiff;
@@ -13,7 +13,7 @@ use super::{
 };
 
 pub(crate) fn entrypoint_declaration_to_tokens(
-    entrypoint_declaration: WithSpan<EntrypointTypeAndField>,
+    entrypoint_declaration: WithSpan<EntrypointDeclaration>,
     iso_literal_text: &str,
     initial_diff: RowColDiff,
 ) -> (Vec<SemanticToken>, RowColDiff) {
