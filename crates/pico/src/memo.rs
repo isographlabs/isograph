@@ -23,16 +23,32 @@ pub fn memo<Db: Database>(
     let (time_updated, did_recalculate) = if db.storage().derived_nodes().contains_key(&node_id) {
         if any_dependency_changed(db, node_id, current_epoch) {
             let mut state = DidRecalculate::ReusedMemoizedValue;
+            let mut alt_updated_time = None;
             let (value, dependencies, time_updated) =
                 call_inner_fn_and_collect_dependencies(db, node_id.param_id, inner_fn);
             if let Some(node) = db.storage_mut().derived_nodes().get_mut(&node_id) {
+                eprintln!(
+                    "eq {} original updated {:?} new updated {:?}",
+                    node.value == value,
+                    node.time_updated,
+                    time_updated
+                );
+
+                if node.value == value && (node.time_updated != time_updated) {
+                    eprintln!("WRONG");
+                    // panic!("asdf");
+                }
+
                 if node.value != value {
                     node.value = value;
                     node.time_updated = time_updated;
                     state = DidRecalculate::Recalculated;
                 }
+                // sum -> (left dependency) -> left -> (source dep) -> source
+                //        time updated: t0     tU: t1
                 node.dependencies = dependencies;
                 node.time_verified = current_epoch;
+                alt_updated_time = Some(node.time_updated);
             } else {
                 db.storage_mut().derived_nodes().insert(
                     node_id,
@@ -46,7 +62,14 @@ pub fn memo<Db: Database>(
                 );
                 state = DidRecalculate::Recalculated;
             }
-            (time_updated, state)
+            (
+                if let Some(alt_time_updated) = alt_updated_time {
+                    alt_time_updated
+                } else {
+                    time_updated
+                },
+                state,
+            )
         } else {
             let node = db
                 .storage_mut()
@@ -123,13 +146,13 @@ fn source_node_changed_since<Db: Database>(db: &Db, key: Key, since: Epoch) -> b
 fn derived_node_changed_since<Db: Database>(
     db: &mut Db,
     node_id: DerivedNodeId,
-    since: Epoch,
+    dependency_time_verified: Epoch,
 ) -> bool {
     if !db.storage().params().contains_key(&node_id.param_id) {
         return true;
     }
     let inner_fn = if let Some(node) = db.storage().derived_nodes().get(&node_id) {
-        if node.time_updated > since {
+        if node.time_updated > dependency_time_verified {
             return true;
         }
         node.inner_fn
