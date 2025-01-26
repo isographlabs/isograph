@@ -132,7 +132,6 @@ In addition to fetching during render, you can also pass the loadable field to `
 ```tsx
 import { iso } from '@iso';
 import { FragmentReader, useImperativeLoadableField } from '@isograph/react';
-import { UNASSIGNED_STATE } from '@isograph/react-disposable-state';
 
 export const BlogPostDisplay = iso(`
   field BlogPost.BlogPostDisplay {
@@ -146,7 +145,7 @@ export const BlogPostDisplay = iso(`
   return (
     <>
       <blogPost.BlogHeader />
-      {fragmentReference != UNASSIGNED_STATE ? (
+      {fragmentReference !== null ? (
         <button
           onClick={() =>
             loadField(
