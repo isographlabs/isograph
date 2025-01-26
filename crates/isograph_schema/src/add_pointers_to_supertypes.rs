@@ -65,7 +65,7 @@ impl UnvalidatedSchema {
                                     .encountered_fields
                                     .get(&(*LINK_FIELD_NAME).into())
                                     .expect("Expected link to exist")
-                                    .as_client_field()
+                                    .as_client_type()
                                     .expect("Expected link to be client field")
                                 {
                                     ClientType::ClientField(client_field_id) => client_field_id,

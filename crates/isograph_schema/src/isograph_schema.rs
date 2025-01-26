@@ -167,7 +167,7 @@ impl<TFieldAssociatedData, TClientFieldType> FieldType<TFieldAssociatedData, TCl
         }
     }
 
-    pub fn as_client_field(&self) -> Option<&TClientFieldType> {
+    pub fn as_client_type(&self) -> Option<&TClientFieldType> {
         match self {
             FieldType::ServerField(_) => None,
             FieldType::ClientField(client_field) => Some(client_field),
