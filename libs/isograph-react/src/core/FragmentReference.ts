@@ -1,6 +1,7 @@
 import { ReaderWithRefetchQueries } from '../core/entrypoint';
 import { type Link } from './IsographEnvironment';
 import { PromiseWrapper } from './PromiseWrapper';
+import type { StartUpdate } from './reader';
 
 // TODO type this better
 export type VariableValue = string | number | boolean | null | object;
@@ -19,8 +20,18 @@ export type ExtractParameters<T> = T extends {
   ? P
   : Variables;
 
+export type ExtractStartUpdate<
+  T extends {
+    startUpdate?: StartUpdate<object>;
+  },
+> = T['startUpdate'];
+
 export type FragmentReference<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
 > = {
   readonly kind: 'FragmentReference';

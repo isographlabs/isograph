@@ -297,9 +297,16 @@ jobs:
         uses: actions/deploy-pages@v4
 
   main-release:
-    name: Release packages to NPM
+    name: Main NPM release
     runs-on: macos-latest
-    if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref == 'refs/heads/main' || github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    if: >-
+      github.event_name == 'push' &&
+      github.repository == 'isographlabs/isograph' &&
+      (
+        github.ref == 'refs/heads/main' ||
+        (github.ref_type == 'tag' && startsWith(github.ref_name, 'v')) ||
+        startsWith(github.ref, 'refs/heads/deploy/')
+      )
     needs: [all-checks-passed]
     steps:
       - uses: actions/checkout@v2
@@ -361,14 +368,14 @@ jobs:
           for pkg in libs/*; do
             echo PUBLISHING $pkg
             cd $pkg
-            npm publish --tag main
+            npm publish --tag ${{ startsWith(github.ref, 'refs/heads/deploy/') && 'deploy' || 'main' }}
             cd ../..
           done
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
 
   versioned-release:
-    name: Release packages to NPM (latest)
+    name: Versioned NPM release
     runs-on: macos-latest
     if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
     needs: [all-checks-passed]

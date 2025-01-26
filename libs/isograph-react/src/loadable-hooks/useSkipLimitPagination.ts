@@ -16,13 +16,22 @@ import {
   readButDoNotEvaluate,
   type WithEncounteredRecords,
 } from '../core/read';
-import { LoadableField, type ReaderAst } from '../core/reader';
+import {
+  LoadableField,
+  type ReaderAst,
+  type StartUpdate,
+} from '../core/reader';
+import { startUpdate } from '../core/startUpdate';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 import { maybeUnwrapNetworkRequest } from '../react/useResult';
 
 type UseSkipLimitReturnValue<
-  TReadFromStore extends { data: object; parameters: object },
+  TReadFromStore extends {
+    data: object;
+    parameters: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TItem,
 > =
   | {
@@ -43,7 +52,11 @@ type UseSkipLimitReturnValue<
     };
 
 type ArrayFragmentReference<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TItem,
 > = FragmentReference<TReadFromStore, ReadonlyArray<TItem>>;
 
@@ -79,6 +92,7 @@ export function useSkipLimitPagination<
   TReadFromStore extends {
     parameters: object;
     data: object;
+    startUpdate?: StartUpdate<object>;
   },
 >(
   loadableField: LoadableField<
@@ -122,6 +136,9 @@ export function useSkipLimitPagination<
       const firstParameter = {
         data,
         parameters: fragmentReference.variables,
+        startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
+          ? startUpdate(environment, data)
+          : undefined,
       };
 
       if (

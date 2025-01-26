@@ -45,6 +45,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Pet.PetSummaryCard",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

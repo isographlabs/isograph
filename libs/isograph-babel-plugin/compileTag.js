@@ -1,5 +1,6 @@
 'use strict';
 
+const { addDefault } = require('@babel/helper-module-imports');
 const pathModule = require('path');
 const os = require('os');
 
@@ -101,6 +102,7 @@ function compileImportStatement(t, path, type, field, artifactType, config) {
     cwd,
     config.config['artifact_directory'] ?? config.config['project_root'],
   );
+  const module = config.config['options']?.['module'];
 
   const fileToArtifactDir = pathModule.relative(folder, artifactDirectory);
   const artifactDirToArtifact = `/__isograph/${type}/${field}/${artifactType}.ts`;
@@ -121,14 +123,29 @@ function compileImportStatement(t, path, type, field, artifactType, config) {
     fileToArtifact = '.' + fileToArtifact;
   }
 
-  path.replaceWith(
-    t.memberExpression(
-      t.callExpression(t.identifier('require'), [
-        t.stringLiteral(fileToArtifact),
-      ]),
-      t.identifier('default'),
-    ),
-  );
+  if (module === 'esmodule') {
+    const program = path.scope.getProgramParent();
+    const imports = /** @type {Map<string, string>} */ (
+      program.data['imports'] ??= new Map()
+    );
+
+    let id = imports.get(fileToArtifact);
+    if (id == null) {
+      id = addDefault(path, fileToArtifact, { nameHint: field }).name;
+      imports.set(fileToArtifact, id);
+    }
+
+    path.replaceWith(t.identifier(id));
+  } else {
+    path.replaceWith(
+      t.memberExpression(
+        t.callExpression(t.identifier('require'), [
+          t.stringLiteral(fileToArtifact),
+        ]),
+        t.identifier('default'),
+      ),
+    );
+  }
 }
 
 module.exports = compileTag;

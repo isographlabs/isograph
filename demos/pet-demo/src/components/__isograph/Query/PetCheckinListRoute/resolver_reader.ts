@@ -60,6 +60,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.PetCheckinListRoute",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

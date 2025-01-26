@@ -15,8 +15,8 @@
     "coverage": "vitest run --coverage",
     "prepack": "pnpm run test && pnpm run compile-typescript",
     "tsc": "tsc",
-    "iso": "../../target/debug/isograph_cli --config ./isograph.config.json",
-    "iso-watch": "../../target/debug/isograph_cli --config ./isograph.config.json --watch"
+    "iso": "cross-env ../../target/debug/isograph_cli --config ./isograph.config.json",
+    "iso-watch": "cross-env ../../target/debug/isograph_cli --config ./isograph.config.json --watch"
   },
   "dependencies": {
     "@isograph/disposable-types": "*",
@@ -24,7 +24,7 @@
     "@isograph/reference-counted-pointer": "*"
   },
   "peerDependencies": {
-    "react": "18.3.1"
+    "react": "^18.0.0 || ^19.0.0"
   },
   "devDependencies": {
     "@babel/preset-typescript": "^7.24.7",

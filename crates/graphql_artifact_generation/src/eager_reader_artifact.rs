@@ -71,9 +71,10 @@ pub(crate) fn generate_eager_reader_artifacts(
             {}kind: \"EagerReaderArtifact\",\n\
             {}resolver,\n\
             {}readerAst,\n\
+            {}hasUpdatable: false,\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ",
+            "  ", "  ", "  ", "  ", "  ", "  ",
         )
     } else {
         let component_name = format!("{}.{}", parent_type.name, client_field.name);
@@ -93,9 +94,10 @@ pub(crate) fn generate_eager_reader_artifacts(
             {}componentName: \"{component_name}\",\n\
             {}resolver,\n\
             {}readerAst,\n\
+            {}hasUpdatable: false,\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ",
+            "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     };
 
@@ -167,9 +169,10 @@ pub(crate) fn generate_eager_reader_condition_artifact(
         {}kind: \"EagerReaderArtifact\",\n\
         {}resolver: ({{ data }}) => data.__typename === \"{concrete_type}\" ? data.link : null,\n\
         {}readerAst,\n\
+        {}hasUpdatable: false,\n\
         }};\n\n\
         export default artifact;\n",
-        "  ", "  ", "  ", "  ", "  ",
+        "  ", "  ", "  ", "  ", "  ", "  ",
     );
 
     ArtifactPathAndContent {

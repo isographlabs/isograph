@@ -44,6 +44,7 @@ pub struct ConfigOptions {
     pub on_invalid_id_type: OptionalValidationLevel,
     pub no_babel_transform: bool,
     pub generate_file_extensions: GenerateFileExtensionsOption,
+    pub module: JavascriptModule,
 }
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -93,6 +94,13 @@ impl Default for OptionalValidationLevel {
     fn default() -> Self {
         Self::Ignore
     }
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+pub enum JavascriptModule {
+    CommonJs,
+    #[default]
+    EsModule,
 }
 
 /// This struct is deserialized from an isograph.config.json file.
@@ -219,6 +227,7 @@ pub struct ConfigFileOptions {
     on_invalid_id_type: ConfigFileOptionalValidationLevel,
     no_babel_transform: bool,
     include_file_extensions_in_import_statements: bool,
+    module: ConfigFileJavascriptModule,
 }
 
 #[derive(Deserialize, Debug, Clone, Copy, JsonSchema)]
@@ -238,6 +247,14 @@ impl Default for ConfigFileOptionalValidationLevel {
     }
 }
 
+#[derive(Deserialize, Default, Debug, Clone, Copy, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ConfigFileJavascriptModule {
+    CommonJs,
+    #[default]
+    EsModule,
+}
+
 fn create_options(options: ConfigFileOptions) -> ConfigOptions {
     ConfigOptions {
         on_invalid_id_type: create_optional_validation_level(options.on_invalid_id_type),
@@ -245,6 +262,7 @@ fn create_options(options: ConfigFileOptions) -> ConfigOptions {
         generate_file_extensions: create_generate_file_extensions(
             options.include_file_extensions_in_import_statements,
         ),
+        module: create_module(options.module),
     }
 }
 
@@ -264,6 +282,13 @@ fn create_generate_file_extensions(
     match optional_generate_file_extensions {
         true => GenerateFileExtensionsOption::IncludeExtensionsInFileImports,
         false => GenerateFileExtensionsOption::ExcludeExtensionsInFileImports,
+    }
+}
+
+fn create_module(module: ConfigFileJavascriptModule) -> JavascriptModule {
+    match module {
+        ConfigFileJavascriptModule::CommonJs => JavascriptModule::CommonJs,
+        ConfigFileJavascriptModule::EsModule => JavascriptModule::EsModule,
     }
 }
 

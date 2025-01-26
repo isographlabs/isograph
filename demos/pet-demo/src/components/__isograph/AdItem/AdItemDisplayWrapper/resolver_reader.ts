@@ -32,6 +32,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "AdItem.AdItemDisplayWrapper",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;
