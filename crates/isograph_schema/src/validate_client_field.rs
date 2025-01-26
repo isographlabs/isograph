@@ -52,8 +52,8 @@ pub(crate) fn validate_and_transform_client_fields(
     // For now, we'll make a new datastructure containing all of the client field's arguments,
     // cloned.
     let client_field_args =
-        get_all_errors_or_all_ok_as_hashmap(client_fields.iter().map(|unvalidated_client| {
-            match unvalidated_client {
+        get_all_errors_or_all_ok_as_hashmap(client_fields.iter().map(|unvalidated_client_type| {
+            match unvalidated_client_type {
                 ClientType::ClientPointer(unvalidated_client_pointer) => {
                     let validated_variable_definitions = validate_variable_definitions(
                         schema_data,
