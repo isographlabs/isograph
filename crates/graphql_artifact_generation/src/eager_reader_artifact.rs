@@ -76,7 +76,6 @@ pub(crate) fn generate_eager_reader_artifacts(
             }};\n\n\
             export default artifact;\n",
             "  ", "  ", "  ", "  ", "  ", "  ",
-            "  ", "  ", "  ", "  ", "  ", "  ",
         )
     } else {
         let component_name = format!("{}.{}", parent_type.name, client_field.name);
@@ -99,7 +98,7 @@ pub(crate) fn generate_eager_reader_artifacts(
             {}hasUpdatable: {has_updatable},\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
+            "  ", "  ", "  ", "  ", "  ", "  ", "  "
         )
     };
 
