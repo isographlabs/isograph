@@ -8,8 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "tsc": "tsc",
-    "iso": "../../target/debug/isograph_cli --config ./isograph.config.json",
-    "iso-watch": "../../target/debug/isograph_cli --config ./isograph.config.json --watch"
+    "iso": "cross-env ../../target/debug/isograph_cli --config ./isograph.config.json",
+    "iso-watch": "cross-env ../../target/debug/isograph_cli --config ./isograph.config.json --watch"
   },
   "dependencies": {
     "@isograph/react": "*",

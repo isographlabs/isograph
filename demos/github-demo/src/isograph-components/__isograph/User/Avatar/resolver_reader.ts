@@ -25,6 +25,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "User.Avatar",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

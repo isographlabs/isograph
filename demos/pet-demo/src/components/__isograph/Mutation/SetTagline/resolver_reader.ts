@@ -42,6 +42,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Mutation.SetTagline",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

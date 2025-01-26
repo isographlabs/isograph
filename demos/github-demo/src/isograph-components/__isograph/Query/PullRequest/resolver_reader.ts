@@ -44,6 +44,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.PullRequest",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

@@ -1,9 +1,13 @@
 import type { TypeName } from './IsographEnvironment';
-import { TopLevelReaderArtifact } from './reader';
+import { TopLevelReaderArtifact, type StartUpdate } from './reader';
 import { Arguments } from './util';
 
 export type ReaderWithRefetchQueries<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
 > = {
   readonly kind: 'ReaderWithRefetchQueries';
@@ -23,7 +27,11 @@ export type NetworkRequestInfo<TNormalizationAst> = {
 };
 // This type should be treated as an opaque type.
 export type IsographEntrypoint<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 > = {
@@ -37,7 +45,11 @@ export type IsographEntrypoint<
 };
 
 export type IsographEntrypointLoader<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
 > = {
   readonly kind: 'EntrypointLoader';
@@ -98,7 +110,11 @@ export type RefetchQueryNormalizationArtifactWrapper = {
 };
 
 export function assertIsEntrypoint<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 >(

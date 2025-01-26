@@ -33,7 +33,8 @@ import {
   wrapPromise,
   wrapResolvedValue,
 } from './PromiseWrapper';
-import { ReaderAst } from './reader';
+import { ReaderAst, type StartUpdate } from './reader';
+import { startUpdate } from './startUpdate';
 import { Arguments } from './util';
 
 export type WithEncounteredRecords<T> = {
@@ -42,7 +43,11 @@ export type WithEncounteredRecords<T> = {
 };
 
 export function readButDoNotEvaluate<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
 >(
   environment: IsographEnvironment,
   fragmentReference: FragmentReference<TReadFromStore, unknown>,
@@ -264,6 +269,9 @@ function readData<TReadFromStore>(
           const condition = field.condition.resolver({
             data: data.data,
             parameters: {},
+            startUpdate: field.condition.hasUpdatable
+              ? startUpdate(environment, data)
+              : undefined,
           });
           if (condition === true) {
             link = root;
@@ -427,6 +435,7 @@ function readData<TReadFromStore>(
               const firstParameter = {
                 data: data.data,
                 parameters: variables,
+                startUpdate: () => {},
               };
               target[field.alias] =
                 field.readerArtifact.resolver(firstParameter);

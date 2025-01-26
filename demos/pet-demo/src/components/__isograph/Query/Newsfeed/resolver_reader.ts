@@ -56,6 +56,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.Newsfeed",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

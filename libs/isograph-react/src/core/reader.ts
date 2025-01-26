@@ -10,6 +10,7 @@ import {
   ExtractData,
   ExtractParameters,
   FragmentReference,
+  type ExtractStartUpdate,
 } from './FragmentReference';
 import {
   ComponentOrFieldName,
@@ -19,7 +20,11 @@ import {
 import { Arguments } from './util';
 
 export type TopLevelReaderArtifact<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
   TComponentProps extends Record<PropertyKey, never>,
 > =
@@ -27,7 +32,11 @@ export type TopLevelReaderArtifact<
   | ComponentReaderArtifact<TReadFromStore, TComponentProps>;
 
 export type EagerReaderArtifact<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TClientFieldValue,
 > = {
   readonly kind: 'EagerReaderArtifact';
@@ -35,10 +44,15 @@ export type EagerReaderArtifact<
   readonly resolver: (
     data: ResolverFirstParameter<TReadFromStore>,
   ) => TClientFieldValue;
+  readonly hasUpdatable: boolean;
 };
 
 export type ComponentReaderArtifact<
-  TReadFromStore extends { parameters: object; data: object },
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TComponentProps extends Record<string, unknown> = Record<PropertyKey, never>,
 > = {
   readonly kind: 'ComponentReaderArtifact';
@@ -48,14 +62,24 @@ export type ComponentReaderArtifact<
     data: ResolverFirstParameter<TReadFromStore>,
     runtimeProps: TComponentProps,
   ) => React.ReactNode;
+  readonly hasUpdatable: boolean;
 };
 
 export type ResolverFirstParameter<
-  TReadFromStore extends { data: object; parameters: object },
+  TReadFromStore extends {
+    data: object;
+    parameters: object;
+    startUpdate?: StartUpdate<object>;
+  },
 > = {
   data: ExtractData<TReadFromStore>;
   parameters: ExtractParameters<TReadFromStore>;
+  startUpdate: undefined | ExtractStartUpdate<TReadFromStore>;
 };
+
+export type StartUpdate<UpdatableData> = (
+  updater: (updatableData: UpdatableData) => void,
+) => void;
 
 export type RefetchReaderArtifact = {
   readonly kind: 'RefetchReaderArtifact';
@@ -104,7 +128,7 @@ export type ReaderLinkedField = {
   readonly selections: ReaderAst<unknown>;
   readonly arguments: Arguments | null;
   readonly condition: EagerReaderArtifact<
-    { data: object; parameters: object },
+    { data: object; parameters: any; startUpdate?: StartUpdate<object> },
     boolean | Link | null
   > | null;
 };
@@ -154,7 +178,11 @@ type StableId = string;
 /// except to stringify the args or whatnot. Calling the factory can be
 /// expensive. For example, doing so will probably trigger a network request.
 export type LoadableField<
-  TReadFromStore extends { data: object; parameters: object },
+  TReadFromStore extends {
+    data: object;
+    parameters: object;
+    startUpdate?: StartUpdate<object>;
+  },
   TResult,
   TArgs = ExtractParameters<TReadFromStore>,
 > = (

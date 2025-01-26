@@ -1,9 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
 use common_lang_types::{
-    IsographObjectTypeName, SelectableFieldName, UnvalidatedTypeName, VariableName, WithLocation,
-    WithSpan,
+    EnumLiteralValue, GraphQLScalarTypeName, IsographObjectTypeName, SelectableFieldName,
+    UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
+use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
 use isograph_lang_types::{
     ClientFieldId, LinkedFieldSelection, LoadableDirectiveParameters, ScalarFieldSelection,
@@ -17,8 +18,7 @@ use crate::{
     validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
     FieldType, ImperativelyLoadedFieldVariant, Schema, SchemaIdField, SchemaObject,
     SchemaServerField, SchemaValidationState, ServerFieldData, ServerFieldTypeAssociatedData,
-    UnvalidatedSchema, UnvalidatedVariableDefinition, UseRefetchFieldRefetchStrategy,
-    ValidateEntrypointDeclarationError,
+    UnvalidatedSchema, UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
 };
 
 pub type ValidatedSchemaServerField = SchemaServerField<
@@ -133,12 +133,6 @@ impl ValidatedSchema {
             client_fields,
             entrypoints: _,
             server_field_data: schema_data,
-            id_type_id: id_type,
-            string_type_id: string_type,
-            float_type_id,
-            boolean_type_id,
-            int_type_id,
-            null_type_id,
             fetchable_types: root_types,
         } = unvalidated_schema;
 
@@ -171,6 +165,12 @@ impl ValidatedSchema {
             server_objects,
             server_scalars,
             defined_types,
+            id_type_id: id_type,
+            string_type_id: string_type,
+            float_type_id,
+            boolean_type_id,
+            int_type_id,
+            null_type_id,
         } = schema_data;
 
         if errors.is_empty() {
@@ -187,14 +187,15 @@ impl ValidatedSchema {
                     server_objects,
                     server_scalars,
                     defined_types,
+
+                    id_type_id: id_type,
+                    string_type_id: string_type,
+                    float_type_id,
+                    boolean_type_id,
+                    int_type_id,
+                    null_type_id,
                 },
-                id_type_id: id_type,
-                string_type_id: string_type,
-                float_type_id,
-                boolean_type_id,
-                int_type_id,
                 fetchable_types: root_types,
-                null_type_id,
             })
         } else {
             Err(errors)
@@ -386,6 +387,40 @@ pub enum ValidateSchemaError {
         argument_type: UnvalidatedTypeName,
     },
 
+    #[error("Expected input of type {expected_type}, found variable {variable_name} of type {variable_type}")]
+    ExpectedTypeFoundVariable {
+        expected_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+        variable_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+        variable_name: VariableName,
+    },
+
+    #[error("Expected input of type {expected}, found {actual} scalar literal")]
+    ExpectedTypeFoundScalar {
+        expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+        actual: GraphQLScalarTypeName,
+    },
+
+    #[error("Expected input of type {expected}, found object literal")]
+    ExpectedTypeFoundObject {
+        expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    },
+
+    #[error("Expected input of type {expected}, found list literal")]
+    ExpectedTypeFoundList {
+        expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    },
+
+    #[error("Expected non null input of type {expected}, found null")]
+    ExpectedNonNullTypeFoundNull {
+        expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    },
+
+    #[error("Expected input of type {expected}, found {actual} enum literal")]
+    ExpectedTypeFoundEnum {
+        expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+        actual: EnumLiteralValue,
+    },
+
     #[error(
         "In the client field `{client_field_parent_type_name}.{client_field_name}`, \
         the field `{field_parent_type_name}.{field_name}` is selected, but that \
@@ -477,7 +512,7 @@ pub enum ValidateSchemaError {
         unused_variables.iter().map(|variable| format!("${}", variable.item.name.item)).collect::<Vec<_>>().join(", ")
     )]
     UnusedVariables {
-        unused_variables: Vec<WithSpan<UnvalidatedVariableDefinition>>,
+        unused_variables: Vec<WithSpan<ValidatedVariableDefinition>>,
         type_name: IsographObjectTypeName,
         field_name: SelectableFieldName,
     },
