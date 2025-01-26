@@ -44,6 +44,12 @@ fn memoization() {
         key: "left",
         value: "3 * 2".to_string(),
     });
+
+    // changing source doesn't cause any recalculation
+    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 1);
+    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 1);
+    assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 1);
+
     let result = sum(&mut state, left, right);
     assert_eq!(result, 14);
 
@@ -66,7 +72,7 @@ fn memoization() {
     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 3);
     // "right" must not be called again
     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 1);
-    // "right" value is different now, so "sum" must be called
+    // "left" value is different now, so "sum" must be called
     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 2);
 }
 
@@ -102,5 +108,6 @@ pub fn sum(db: &mut TestDatabase, left: SourceId<Input>, right: SourceId<Input>)
     SUM_COUNTER.fetch_add(1, Ordering::SeqCst);
     let left = evaluate_input(db, left);
     let right = evaluate_input(db, right);
+
     left + right
 }
