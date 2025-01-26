@@ -274,7 +274,7 @@ fn user_written_fields(
         .client_fields
         .iter()
         .filter_map(|client_field| match client_field {
-            ClientType::ClientPointer(_) => todo!(),
+            ClientType::ClientPointer(_) => None,
             ClientType::ClientField(client_field) => match client_field.variant {
                 ClientFieldVariant::Link => None,
                 ClientFieldVariant::UserWritten(info) => {
