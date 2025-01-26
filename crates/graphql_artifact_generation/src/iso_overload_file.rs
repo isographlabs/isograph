@@ -13,55 +13,30 @@ use crate::generate_artifacts::ISO_TS;
 fn build_iso_overload_for_entrypoint(
     validated_client_field: &ValidatedClientField,
     file_extensions: GenerateFileExtensionsOption,
-    no_babel_transform: bool,
-) -> (Option<String>, String) {
+) -> (String, String) {
     let formatted_field = format!(
         "entrypoint {}.{}",
         validated_client_field.type_and_field.type_name,
         validated_client_field.type_and_field.field_name
     );
-    match no_babel_transform {
-        true => {
-            let mut s: String = "".to_string();
-            let import = format!(
-                "import entrypoint_{} from '../__isograph/{}/{}/entrypoint{}';\n",
-                validated_client_field.type_and_field.underscore_separated(),
-                validated_client_field.type_and_field.type_name,
-                validated_client_field.type_and_field.field_name,
-                file_extensions.ts()
-            );
+    let mut s: String = "".to_string();
+    let import = format!(
+        "import entrypoint_{} from '../__isograph/{}/{}/entrypoint{}';\n",
+        validated_client_field.type_and_field.underscore_separated(),
+        validated_client_field.type_and_field.type_name,
+        validated_client_field.type_and_field.field_name,
+        file_extensions.ts()
+    );
 
-            s.push_str(&format!(
-                " 
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'{}', T>
-): Promise<typeof entrypoint_{}>;\n",
-                formatted_field,
-                validated_client_field.type_and_field.underscore_separated(),
-            ));
-            (Some(import), s)
-        }
-        false => {
-            let mut s: String = "".to_string();
-            let import = format!(
-                "import entrypoint_{} from '../__isograph/{}/{}/entrypoint{}';\n",
-                validated_client_field.type_and_field.underscore_separated(),
-                validated_client_field.type_and_field.type_name,
-                validated_client_field.type_and_field.field_name,
-                file_extensions.ts()
-            );
-
-            s.push_str(&format!(
-                "
+    s.push_str(&format!(
+        "
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
 ): typeof entrypoint_{};\n",
-                formatted_field,
-                validated_client_field.type_and_field.underscore_separated(),
-            ));
-            (Some(import), s)
-        }
-    }
+        formatted_field,
+        validated_client_field.type_and_field.underscore_separated(),
+    ));
+    (import, s)
 }
 
 fn build_iso_overload_for_client_defined_field(
@@ -168,13 +143,11 @@ type MatchesWhitespaceAndString<
         content.push_str(&field_overload);
     }
 
-    let entrypoint_overloads = sorted_entrypoints(schema).into_iter().map(|(field, _)| {
-        build_iso_overload_for_entrypoint(field, file_extensions, no_babel_transform)
-    });
+    let entrypoint_overloads = sorted_entrypoints(schema)
+        .into_iter()
+        .map(|(field, _)| build_iso_overload_for_entrypoint(field, file_extensions));
     for (import, entrypoint_overload) in entrypoint_overloads {
-        if let Some(import) = import {
-            imports.push_str(&import);
-        }
+        imports.push_str(&import);
         content.push_str(&entrypoint_overload);
     }
 
@@ -200,11 +173,9 @@ export function iso(_isographLiteralText: string):
                     .map(|(field, iso_literal_text)| {
                         format!(
                             "    case '{}':
-      return import('./{}/{}/entrypoint{}').then(module => module.default);\n",
+      return entrypoint_{};\n",
                             iso_literal_text,
-                            field.type_and_field.type_name,
-                            field.type_and_field.field_name,
-                            file_extensions.ts()
+                            field.type_and_field.underscore_separated()
                         )
                     });
 
@@ -213,7 +184,7 @@ export function iso(_isographLiteralText: string):
 export function iso(isographLiteralText: string):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
-  | Promise<IsographEntrypoint<any, any>>
+  | IsographEntrypoint<any, any>
 {
   switch (isographLiteralText) {\n",
             );
