@@ -43,6 +43,7 @@ pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
+    pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub const_export_name: ConstExportName,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub target_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,

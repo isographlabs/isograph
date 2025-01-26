@@ -17,7 +17,15 @@ use isograph_lang_types::{
 use lazy_static::lazy_static;
 
 use crate::{
-    get_all_errors_or_all_ok, get_all_errors_or_all_ok_as_hashmap, get_all_errors_or_all_ok_iter, get_all_errors_or_tuple_ok, validate_argument_types::value_satisfies_type, ClientField, ClientType, FieldType, RefetchStrategy, SchemaObject, ServerFieldData, UnvalidatedClientField, UnvalidatedClientPointer, UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy, UnvalidatedVariableDefinition, ValidateSchemaError, ValidateSchemaResult, ValidatedClientField, ValidatedClientPointer, ValidatedIsographSelectionVariant, ValidatedLinkedFieldAssociatedData, ValidatedLinkedFieldSelection, ValidatedRefetchFieldStrategy, ValidatedScalarFieldAssociatedData, ValidatedScalarFieldSelection, ValidatedSchemaServerField, ValidatedSelection, ValidatedVariableDefinition
+    get_all_errors_or_all_ok, get_all_errors_or_all_ok_as_hashmap, get_all_errors_or_all_ok_iter,
+    get_all_errors_or_tuple_ok, validate_argument_types::value_satisfies_type, ClientField,
+    ClientType, FieldType, RefetchStrategy, SchemaObject, ServerFieldData, UnvalidatedClientField,
+    UnvalidatedClientPointer, UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
+    UnvalidatedVariableDefinition, ValidateSchemaError, ValidateSchemaResult, ValidatedClientField,
+    ValidatedClientPointer, ValidatedIsographSelectionVariant, ValidatedLinkedFieldAssociatedData,
+    ValidatedLinkedFieldSelection, ValidatedRefetchFieldStrategy,
+    ValidatedScalarFieldAssociatedData, ValidatedScalarFieldSelection, ValidatedSchemaServerField,
+    ValidatedSelection, ValidatedVariableDefinition,
 };
 
 type UsedVariables = BTreeSet<VariableName>;
@@ -71,7 +79,9 @@ pub(crate) fn validate_and_transform_client_fields(
 
     get_all_errors_or_all_ok_iter(client_fields.into_iter().map(|client_field| {
         match client_field {
-            ClientType::ClientPointer(_) => todo!("validating client pointer selection sets is not implemented yet"),
+            ClientType::ClientPointer(_) => {
+                todo!("validating client pointer selection sets is not implemented yet")
+            }
             ClientType::ClientField(client_field) => validate_client_field_selection_set(
                 schema_data,
                 client_field,
@@ -396,7 +406,9 @@ fn validate_field_type_exists_and_is_scalar(
                     )),
                 }
             }
-            FieldType::ClientField(ClientType::ClientPointer(_)) => todo!("validating client pointers is not yet implemented"),
+            FieldType::ClientField(ClientType::ClientPointer(_)) => {
+                todo!("validating client pointers is not yet implemented")
+            }
             FieldType::ClientField(ClientType::ClientField(client_field_id)) => {
                 validate_client_field(
                     client_field_id,

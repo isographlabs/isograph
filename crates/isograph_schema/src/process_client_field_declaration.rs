@@ -218,6 +218,19 @@ impl UnvalidatedSchema {
 
         let name = client_pointer_declaration.item.client_pointer_name.item;
 
+        if let Some(directive) = client_pointer_declaration
+            .item
+            .directives
+            .into_iter()
+            .next()
+        {
+            return Err(directive.map(|directive| {
+                ProcessClientFieldDeclarationError::DirectiveNotSupportedOnClientPointer {
+                    directive_name: directive.name.item,
+                }
+            }));
+        }
+
         self.client_fields
             .push(ClientType::ClientPointer(ClientPointer {
                 description: client_pointer_declaration.item.description.map(|x| x.item),
@@ -290,6 +303,11 @@ pub enum ProcessClientFieldDeclarationError {
     #[error("`{parent_type_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {
         parent_type_name: UnvalidatedTypeName,
+    },
+
+    #[error("Directive {directive_name} is not supported on client pointers.")]
+    DirectiveNotSupportedOnClientPointer {
+        directive_name: IsographDirectiveName,
     },
 
     #[error("Invalid parent type. `{parent_type_name}` is a scalar. You are attempting to define a {literal_type} on it. \

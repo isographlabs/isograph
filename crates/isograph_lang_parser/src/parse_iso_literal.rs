@@ -238,6 +238,8 @@ fn parse_client_pointer_declaration_inner(
 
         let variable_definitions = parse_variable_definitions(tokens, text_source)?;
 
+        let directives = parse_directives(tokens, text_source)?;
+
         let description = parse_optional_description(tokens);
 
         let selection_set = parse_selection_set(tokens, text_source)?;
@@ -253,6 +255,7 @@ fn parse_client_pointer_declaration_inner(
         })?;
 
         Ok(ClientPointerDeclaration {
+            directives,
             parent_type,
             client_pointer_name,
             target_type: GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(parent_type)),
