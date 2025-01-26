@@ -555,7 +555,7 @@ fn write_param_type_from_selection(
                             ));
                         }
                         ValidatedIsographSelectionVariant::Loadable(_) => {
-                            panic!("@loadble server fields are not supported")
+                            panic!("@loadable server fields are not supported")
                         }
                         ValidatedIsographSelectionVariant::Regular => {
                             query_type_declaration.push_str(&format!(
