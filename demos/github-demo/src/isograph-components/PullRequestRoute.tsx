@@ -1,13 +1,12 @@
-import React from 'react';
-import { useLazyReference, useResult } from '@isograph/react';
 import { iso } from '@iso';
+import { useLazyReference, useResult } from '@isograph/react';
+import { Container } from '@mui/material';
+import React from 'react';
 import {
   FullPageLoading,
-  type PullRequestRoute as PullRequestRouteType,
   Route,
+  type PullRequestRoute as PullRequestRouteType,
 } from './GithubDemo';
-
-import { Container } from '@mui/material';
 
 export const PullRequest = iso(`
   field Query.PullRequest($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!) @component {

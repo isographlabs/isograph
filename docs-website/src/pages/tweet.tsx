@@ -1,5 +1,4 @@
 import Layout from '@theme/Layout';
-
 import { TwitterTweetEmbed } from 'react-twitter-embed';
 
 export default function Home(): JSX.Element {

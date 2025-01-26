@@ -1,11 +1,11 @@
 import { ParentCache } from '@isograph/react-disposable-state';
-import { RetainedQuery } from './garbageCollection';
-import { WithEncounteredRecords } from './read';
-import { FragmentReference, Variables } from './FragmentReference';
-import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { IsographEntrypoint } from './entrypoint';
-import type { ReaderAst } from './reader';
+import { FragmentReference, Variables } from './FragmentReference';
+import { RetainedQuery } from './garbageCollection';
 import { LogFunction, WrappedLogFunction } from './logging';
+import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
+import { WithEncounteredRecords } from './read';
+import type { ReaderAst } from './reader';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -127,6 +127,9 @@ export function createIsographEnvironment(
   missingFieldHandler?: MissingFieldHandler | null,
   logFunction?: LogFunction | null,
 ): IsographEnvironment {
+  logFunction?.({
+    kind: 'EnvironmentCreated',
+  });
   return {
     store,
     networkFunction,
