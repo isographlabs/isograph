@@ -1,0 +1,31 @@
+Err(
+    WithLocation {
+        location: Embedded(
+            EmbeddedLocation {
+                text_source: TextSource {
+                    current_working_directory: CurrentWorkingDirectory,
+                    relative_path_to_source_file: RelativePathToSourceFile(
+                        "crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js",
+                    ),
+                    span: Some(
+                        Span {
+                            start: 5,
+                            end: 30,
+                        },
+                    ),
+                },
+                span: Span {
+                    start: 21,
+                    end: 25,
+                },
+            },
+        ),
+        item: LeftoverTokens,
+    },
+)
+
+Unparsed tokens remaining
+crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js
+entrypoint Type.Name @foo
+                     ^^^^
+---
