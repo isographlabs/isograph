@@ -12,7 +12,7 @@ use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
     ClientFieldDeclaration, ClientFieldDeclarationWithUnvalidatedDirectives,
     ClientPointerDeclaration, ClientPointerDeclarationWithUnvalidatedDirectives, ConstantValue,
-    EntrypointTypeAndField, IsographFieldDirective, LinkedFieldSelection, NonConstantValue,
+    EntrypointDeclaration, IsographFieldDirective, LinkedFieldSelection, NonConstantValue,
     ScalarFieldSelection, SelectionFieldArgument, ServerFieldSelection,
     UnvalidatedSelectionWithUnvalidatedDirectives, VariableDefinition,
 };
@@ -26,7 +26,7 @@ use crate::{
 pub enum IsoLiteralExtractionResult {
     ClientPointerDeclaration(WithSpan<ClientPointerDeclarationWithUnvalidatedDirectives>),
     ClientFieldDeclaration(WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>),
-    EntrypointDeclaration(WithSpan<EntrypointTypeAndField>),
+    EntrypointDeclaration(WithSpan<EntrypointDeclaration>),
 }
 
 pub fn parse_iso_literal(
@@ -73,7 +73,7 @@ fn parse_iso_entrypoint_declaration(
     tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
     entrypoint_keyword: Span,
-) -> ParseResultWithLocation<WithSpan<EntrypointTypeAndField>> {
+) -> ParseResultWithLocation<WithSpan<EntrypointDeclaration>> {
     let entrypoint_declaration = tokens
         .with_span(|tokens| {
             let parent_type = tokens
@@ -86,7 +86,7 @@ fn parse_iso_entrypoint_declaration(
                 .parse_string_key_type(IsographLangTokenKind::Identifier)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-            Ok(EntrypointTypeAndField {
+            Ok(EntrypointDeclaration {
                 parent_type,
                 client_field_name,
                 entrypoint_keyword: WithSpan::new((), entrypoint_keyword),

@@ -15,7 +15,7 @@ export const FavoritePhraseLoader = iso(`
 
   return (
     <>
-      {fragmentReference == UNASSIGNED_STATE ? (
+      {fragmentReference == null ? (
         <button
           onClick={() =>
             loadFragmentReference(

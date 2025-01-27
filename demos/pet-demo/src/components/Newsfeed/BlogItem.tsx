@@ -46,7 +46,7 @@ export const BlogItem = iso(`
           <p key={index}>{paragraph}</p>
         ))}
         <Suspense fallback={<p>Loading more...</p>}>
-          {fragmentReference !== UNASSIGNED_STATE ? (
+          {fragmentReference !== null ? (
             <FragmentReader fragmentReference={fragmentReference} />
           ) : (
             <Button variant="contained" onClick={() => loadField()}>
