@@ -26,15 +26,15 @@ pub fn derive_storage(input: TokenStream) -> TokenStream {
         }
 
         impl<Db: ::pico_core::database::Database> ::pico_core::storage::StorageMut<Db> for #struct_name<Db> {
-            fn derived_nodes(&mut self) -> &mut impl ::pico_core::container::Container<DerivedNodeId, DerivedNode<Db>> {
+            fn derived_nodes_mut(&mut self) -> &mut impl ::pico_core::container::Container<DerivedNodeId, DerivedNode<Db>> {
                 &mut self.derived_nodes
             }
 
-            fn source_nodes(&mut self) -> &mut impl ::pico_core::container::Container<Key, SourceNode> {
+            fn source_nodes_mut(&mut self) -> &mut impl ::pico_core::container::Container<Key, SourceNode> {
                 &mut self.source_nodes
             }
 
-            fn params(&mut self) -> &mut impl ::pico_core::container::Container<ParamId, Box<dyn Any>> {
+            fn params_mut(&mut self) -> &mut impl ::pico_core::container::Container<ParamId, Box<dyn Any>> {
                 &mut self.params
             }
 
@@ -42,7 +42,7 @@ pub fn derive_storage(input: TokenStream) -> TokenStream {
                 self.current_epoch.increment()
             }
 
-            fn dependency_stack(&mut self) ->&mut Vec<Vec<(Epoch, Dependency)>> {
+            fn dependency_stack_mut(&mut self) ->&mut Vec<Vec<(Epoch, Dependency)>> {
                 &mut self.dependency_stack
             }
         }

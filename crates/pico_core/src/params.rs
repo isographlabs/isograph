@@ -18,7 +18,9 @@ impl ParamId {
         let mut s = DefaultHasher::new();
         param.hash(&mut s);
         let param_id = Self(s.finish());
-        db.storage_mut().params().insert(param_id, Box::new(param));
+        db.storage_mut()
+            .params_mut()
+            .insert(param_id, Box::new(param));
         param_id
     }
 
@@ -35,6 +37,6 @@ impl ParamId {
         T: Hash + Clone + 'static,
         Db: Database,
     {
-        db.storage_mut().params().get(self)?.downcast_ref::<T>()
+        db.storage_mut().params_mut().get(self)?.downcast_ref::<T>()
     }
 }

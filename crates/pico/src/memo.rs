@@ -63,7 +63,11 @@ pub fn memo<Db: Database>(
                 let mut state = DidRecalculate::ReusedMemoizedValue;
                 let (value, dependencies, time_updated) =
                     call_inner_fn_and_collect_dependencies(db, derived_node_id.param_id, inner_fn);
-                if let Some(node) = db.storage_mut().derived_nodes().get_mut(&derived_node_id) {
+                if let Some(node) = db
+                    .storage_mut()
+                    .derived_nodes_mut()
+                    .get_mut(&derived_node_id)
+                {
                     if node.value != value {
                         node.value = value;
                         node.time_updated = time_updated;
@@ -72,7 +76,7 @@ pub fn memo<Db: Database>(
                     node.dependencies = dependencies;
                     node.time_verified = current_epoch;
                 } else {
-                    db.storage_mut().derived_nodes().insert(
+                    db.storage_mut().derived_nodes_mut().insert(
                         derived_node_id,
                         DerivedNode {
                             time_verified: current_epoch,
@@ -88,7 +92,7 @@ pub fn memo<Db: Database>(
             } else {
                 let node = db
                     .storage_mut()
-                    .derived_nodes()
+                    .derived_nodes_mut()
                     .get_mut(&derived_node_id)
                     .expect("node should exist. This is indicative of a bug in Pico.");
                 node.time_verified = current_epoch;
@@ -97,7 +101,7 @@ pub fn memo<Db: Database>(
         } else {
             let (value, dependencies, time_updated) =
                 call_inner_fn_and_collect_dependencies(db, derived_node_id.param_id, inner_fn);
-            db.storage_mut().derived_nodes().insert(
+            db.storage_mut().derived_nodes_mut().insert(
                 derived_node_id,
                 DerivedNode {
                     time_verified: current_epoch,
@@ -205,7 +209,7 @@ pub fn register_dependency_in_parent_memoized_fn<Db: Database>(
     time_updated: Epoch,
     current_epoch: Epoch,
 ) {
-    if let Some(dependencies) = db.storage_mut().dependency_stack().last_mut() {
+    if let Some(dependencies) = db.storage_mut().dependency_stack_mut().last_mut() {
         dependencies.push((
             time_updated,
             Dependency {
@@ -227,11 +231,11 @@ fn with_dependency_tracking<Db>(
 where
     Db: Database,
 {
-    db.storage_mut().dependency_stack().push(vec![]);
+    db.storage_mut().dependency_stack_mut().push(vec![]);
     let value = inner_fn(db, param_id);
     let registered_dependencies = db
         .storage_mut()
-        .dependency_stack()
+        .dependency_stack_mut()
         .pop()
         .expect("Dependency stack should not be empty. This indicates a bug in Pico.");
     (value, registered_dependencies)
