@@ -5,7 +5,7 @@ Err(
                 text_source: TextSource {
                     current_working_directory: CurrentWorkingDirectory,
                     relative_path_to_source_file: RelativePathToSourceFile(
-                        "\\\\?\\E:\\projekty-next\\isograph\\crates\\isograph_lang_parser\\fixtures\\entrypoint-with-selection-set.input.js",
+                        "crates/isograph_lang_parser/fixtures/entrypoint-with-selection-set.input.js",
                     ),
                     span: Some(
                         Span {
@@ -25,7 +25,7 @@ Err(
 )
 
 Unparsed tokens remaining
-\\?\E:\projekty-next\isograph\crates\isograph_lang_parser\fixtures\entrypoint-with-selection-set.input.js
+crates/isograph_lang_parser/fixtures/entrypoint-with-selection-set.input.js
 entrypoint Type.Name {
                      ^^
   wat

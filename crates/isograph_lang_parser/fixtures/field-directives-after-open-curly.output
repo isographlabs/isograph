@@ -5,7 +5,7 @@ Err(
                 text_source: TextSource {
                     current_working_directory: CurrentWorkingDirectory,
                     relative_path_to_source_file: RelativePathToSourceFile(
-                        "\\\\?\\E:\\projekty-next\\isograph\\crates\\isograph_lang_parser\\fixtures\\field-directives-after-open-curly.input.js",
+                        "crates/isograph_lang_parser/fixtures/field-directives-after-open-curly.input.js",
                     ),
                     span: Some(
                         Span {
@@ -30,7 +30,7 @@ Err(
 )
 
 Expected non-variable identifier (e.g. 'x' or 'Foo'), found at symbol ('@').
-\\?\E:\projekty-next\isograph\crates\isograph_lang_parser\fixtures\field-directives-after-open-curly.input.js
+crates/isograph_lang_parser/fixtures/field-directives-after-open-curly.input.js
   field Type.Name {
     linked {
       @wat
@@ -45,7 +45,7 @@ Err(
                 text_source: TextSource {
                     current_working_directory: CurrentWorkingDirectory,
                     relative_path_to_source_file: RelativePathToSourceFile(
-                        "\\\\?\\E:\\projekty-next\\isograph\\crates\\isograph_lang_parser\\fixtures\\field-directives-after-open-curly.input.js",
+                        "crates/isograph_lang_parser/fixtures/field-directives-after-open-curly.input.js",
                     ),
                     span: Some(
                         Span {
@@ -70,7 +70,7 @@ Err(
 )
 
 Expected non-variable identifier (e.g. 'x' or 'Foo'), found at symbol ('@').
-\\?\E:\projekty-next\isograph\crates\isograph_lang_parser\fixtures\field-directives-after-open-curly.input.js
+crates/isograph_lang_parser/fixtures/field-directives-after-open-curly.input.js
 
   field Type.Name {
     @wat

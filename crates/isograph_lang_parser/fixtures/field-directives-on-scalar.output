@@ -1,7 +1,7 @@
 Ok(
     (
         RelativePathToSourceFile(
-            "\\\\?\\E:\\projekty-next\\isograph\\crates\\isograph_lang_parser\\fixtures\\field-directives-on-scalar.input.js",
+            "crates/isograph_lang_parser/fixtures/field-directives-on-scalar.input.js",
         ),
         [
             (
@@ -40,7 +40,7 @@ Ok(
                                                         text_source: TextSource {
                                                             current_working_directory: CurrentWorkingDirectory,
                                                             relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "\\\\?\\E:\\projekty-next\\isograph\\crates\\isograph_lang_parser\\fixtures\\field-directives-on-scalar.input.js",
+                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar.input.js",
                                                             ),
                                                             span: Some(
                                                                 Span {
@@ -111,7 +111,7 @@ Ok(
                             directives: [],
                             variable_definitions: [],
                             definition_path: RelativePathToSourceFile(
-                                "\\\\?\\E:\\projekty-next\\isograph\\crates\\isograph_lang_parser\\fixtures\\field-directives-on-scalar.input.js",
+                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar.input.js",
                             ),
                             field_keyword: WithSpan {
                                 item: (),
@@ -137,7 +137,7 @@ Ok(
                 TextSource {
                     current_working_directory: CurrentWorkingDirectory,
                     relative_path_to_source_file: RelativePathToSourceFile(
-                        "\\\\?\\E:\\projekty-next\\isograph\\crates\\isograph_lang_parser\\fixtures\\field-directives-on-scalar.input.js",
+                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar.input.js",
                     ),
                     span: Some(
                         Span {
