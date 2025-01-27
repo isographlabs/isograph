@@ -9,7 +9,7 @@ use graphql_lang_types::{
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
     ClientFieldDeclaration, ClientFieldDeclarationWithUnvalidatedDirectives,
-    ClientPointerDeclaration, ConstantValue, EntrypointTypeAndField, IsographFieldDirective,
+    ClientPointerDeclaration, ConstantValue, EntrypointDeclaration, IsographFieldDirective,
     LinkedFieldSelection, NonConstantValue, ScalarFieldSelection, SelectionFieldArgument,
     ServerFieldSelection, UnvalidatedSelectionWithUnvalidatedDirectives, VariableDefinition,
 };
@@ -24,7 +24,7 @@ use crate::{
 pub enum IsoLiteralExtractionResult {
     ClientPointerDeclaration(WithSpan<ClientPointerDeclaration<(), ()>>),
     ClientFieldDeclaration(WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>),
-    EntrypointDeclaration(WithSpan<EntrypointTypeAndField>),
+    EntrypointDeclaration(WithSpan<EntrypointDeclaration>),
 }
 
 pub fn parse_iso_literal(
@@ -77,7 +77,7 @@ fn parse_iso_entrypoint_declaration(
     text_source: TextSource,
     entrypoint_keyword: Span,
     iso_literal_text: IsoLiteralText,
-) -> ParseResultWithLocation<WithSpan<EntrypointTypeAndField>> {
+) -> ParseResultWithLocation<WithSpan<EntrypointDeclaration>> {
     let entrypoint_declaration = tokens
         .with_span(|tokens| {
             let parent_type = tokens
@@ -90,7 +90,7 @@ fn parse_iso_entrypoint_declaration(
                 .parse_string_key_type(IsographLangTokenKind::Identifier)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-            Ok(EntrypointTypeAndField {
+            Ok(EntrypointDeclaration {
                 parent_type,
                 client_field_name,
                 iso_literal_text,

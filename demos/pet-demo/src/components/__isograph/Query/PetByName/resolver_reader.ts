@@ -35,6 +35,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.PetByName",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;

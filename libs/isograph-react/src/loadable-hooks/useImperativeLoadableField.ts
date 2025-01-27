@@ -1,5 +1,5 @@
 import {
-  UnassignedState,
+  UNASSIGNED_STATE,
   useUpdatableDisposableState,
 } from '@isograph/react-disposable-state';
 import { FetchOptions } from '../core/check';
@@ -14,9 +14,7 @@ type UseImperativeLoadableFieldReturn<
   TResult,
   TProvidedArgs extends object,
 > = {
-  fragmentReference:
-    | FragmentReference<TReadFromStore, TResult>
-    | UnassignedState;
+  fragmentReference: FragmentReference<TReadFromStore, TResult> | null;
   loadField: (
     // TODO this should be void iff all args are provided by the query, like in
     // useClientSideDefer.
@@ -47,6 +45,6 @@ export function useImperativeLoadableField<
       const [_id, loader] = loadableField(args, fetchOptions ?? {});
       setState(loader());
     },
-    fragmentReference: state,
+    fragmentReference: state !== UNASSIGNED_STATE ? state : null,
   };
 }

@@ -36,7 +36,6 @@ Next, call `useImperativeReference`. This gives you back a fragment reference an
 
 ```jsx
 import { useImperativeReference } from '@isograph/react';
-import { UNASSIGNED_STATE } from '@isograph/react-disposable-state';
 
 export const PetTaglineCard = iso(`
   field Pet.PetTaglineCard @component {
@@ -62,7 +61,7 @@ export const PetTaglineCard = iso(`
   }
 `)(function PetTaglineCardComponent({ data: pet }) {
   // ...
-  return mutationRef === UNASSIGNED_STATE ? (
+  return mutationRef === null ? (
     <Button
       onClick={() => {
         loadMutation({

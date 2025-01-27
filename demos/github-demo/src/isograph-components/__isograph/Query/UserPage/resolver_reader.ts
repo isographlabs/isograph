@@ -34,6 +34,7 @@ const artifact: ComponentReaderArtifact<
   componentName: "Query.UserPage",
   resolver,
   readerAst,
+  hasUpdatable: false,
 };
 
 export default artifact;
