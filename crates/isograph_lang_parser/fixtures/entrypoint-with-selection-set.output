@@ -5,18 +5,18 @@ Err(
                 text_source: TextSource {
                     current_working_directory: CurrentWorkingDirectory,
                     relative_path_to_source_file: RelativePathToSourceFile(
-                        "crates/isograph_lang_parser/fixtures/entrypoint-with-selection-set.input.js",
+                        "\\\\?\\E:\\projekty-next\\isograph\\crates\\isograph_lang_parser\\fixtures\\entrypoint-with-selection-set.input.js",
                     ),
                     span: Some(
                         Span {
                             start: 5,
-                            end: 35,
+                            end: 37,
                         },
                     ),
                 },
                 span: Span {
                     start: 21,
-                    end: 30,
+                    end: 32,
                 },
             },
         ),
@@ -25,11 +25,11 @@ Err(
 )
 
 Unparsed tokens remaining
-crates/isograph_lang_parser/fixtures/entrypoint-with-selection-set.input.js
+\\?\E:\projekty-next\isograph\crates\isograph_lang_parser\fixtures\entrypoint-with-selection-set.input.js
 entrypoint Type.Name {
-                     ^
+                     ^^
   wat
-^^^^^
+^^^^^^
 }
 ^
 ---

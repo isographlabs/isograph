@@ -1,7 +1,7 @@
 Ok(
     (
         RelativePathToSourceFile(
-            "crates/isograph_lang_parser/fixtures/entrypoint-basic.input.js",
+            "\\\\?\\E:\\projekty-next\\isograph\\crates\\isograph_lang_parser\\fixtures\\entrypoint-basic.input.js",
         ),
         [
             (
@@ -40,6 +40,9 @@ Ok(
                                     end: 16,
                                 },
                             },
+                            iso_literal_text: IsoLiteralText(
+                                "entrypoint Type.Name",
+                            ),
                         },
                         span: Span {
                             start: 11,
@@ -50,7 +53,7 @@ Ok(
                 TextSource {
                     current_working_directory: CurrentWorkingDirectory,
                     relative_path_to_source_file: RelativePathToSourceFile(
-                        "crates/isograph_lang_parser/fixtures/entrypoint-basic.input.js",
+                        "\\\\?\\E:\\projekty-next\\isograph\\crates\\isograph_lang_parser\\fixtures\\entrypoint-basic.input.js",
                     ),
                     span: Some(
                         Span {
