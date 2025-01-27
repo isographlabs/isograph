@@ -61,7 +61,7 @@ pub fn derive_db(input: TokenStream) -> TokenStream {
                 } else {
                     self.current_epoch()
                 };
-                self.storage_mut().source_nodes().insert(id.key, ::pico_core::node::SourceNode {
+                self.storage_mut().source_nodes_mut().insert(id.key, ::pico_core::node::SourceNode {
                     time_updated,
                     value: Box::new(source),
                 });
@@ -71,7 +71,7 @@ pub fn derive_db(input: TokenStream) -> TokenStream {
             fn remove<T>(&mut self, id: ::pico_core::source::SourceId<T>) {
                 use ::pico_core::{storage::StorageMut, container::Container};
                 self.increment_epoch();
-                self.storage_mut().source_nodes().remove(&id.key);
+                self.storage_mut().source_nodes_mut().remove(&id.key);
             }
         }
     };
