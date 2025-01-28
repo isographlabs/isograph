@@ -35,7 +35,6 @@ import { ParentCache } from './ParentCache';
  *
  * Passing a different onCommit:
  * - Passing a different onCommit has no effect, except for during commit.
- *
  */
 export function useCachedResponsivePrecommitValue<T>(
   parentCache: ParentCache<T>,
