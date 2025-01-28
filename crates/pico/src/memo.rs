@@ -51,72 +51,61 @@ pub enum DidRecalculate {
 /// After this function is called, we guarantee that a [`DerivedNode`]
 /// (with a value identical to what we would get if we actually invoked the
 /// function) is present in the [`Storage`].
+///
+pub fn evaluate_node<Db: Database>(
+    db: &mut Db,
+    derived_node_id: DerivedNodeId,
+    inner_fn: fn(&mut Db, ParamId) -> Box<dyn DynEq>,
+) -> DerivedNode<Db> {
+    let (value, dependencies, time_updated) =
+        call_inner_fn_and_collect_dependencies(db, derived_node_id.param_id, inner_fn);
+    DerivedNode {
+        time_verified: db.current_epoch(),
+        time_updated,
+        dependencies,
+        inner_fn,
+        value,
+    }
+}
+
 pub fn memo<Db: Database>(
     db: &mut Db,
     derived_node_id: DerivedNodeId,
     inner_fn: fn(&mut Db, ParamId) -> Box<dyn DynEq>,
 ) -> DidRecalculate {
     let current_epoch = db.current_epoch();
-    let (time_updated, did_recalculate) =
-        if db.storage().derived_nodes().contains_key(&derived_node_id) {
-            if any_dependency_changed(db, derived_node_id, current_epoch) {
-                let mut state = DidRecalculate::ReusedMemoizedValue;
-                let (value, dependencies, time_updated) =
-                    call_inner_fn_and_collect_dependencies(db, derived_node_id.param_id, inner_fn);
-                if let Some(node) = db
-                    .storage_mut()
-                    .derived_nodes_mut()
-                    .get_mut(&derived_node_id)
-                {
-                    if node.value != value {
-                        node.value = value;
-                        node.time_updated = time_updated;
-                        state = DidRecalculate::Recalculated;
-                    }
-                    node.dependencies = dependencies;
-                    node.time_verified = current_epoch;
+    let (did_recalculate, derived_node) =
+        if !(db.storage().derived_nodes().contains_key(&derived_node_id))
+            || any_dependency_changed(db, derived_node_id, current_epoch)
+        {
+            let derived_node = evaluate_node(db, derived_node_id, inner_fn);
+            if let Some(node) = db
+                .storage_mut()
+                .derived_nodes_mut()
+                .get_mut(&derived_node_id)
+            {
+                if node.update(derived_node) {
+                    (DidRecalculate::Recalculated, node)
                 } else {
-                    db.storage_mut().derived_nodes_mut().insert(
-                        derived_node_id,
-                        DerivedNode {
-                            time_verified: current_epoch,
-                            time_updated,
-                            dependencies,
-                            inner_fn,
-                            value,
-                        },
-                    );
-                    state = DidRecalculate::Recalculated;
+                    (DidRecalculate::ReusedMemoizedValue, node)
                 }
-                (time_updated, state)
             } else {
-                let node = db
-                    .storage_mut()
+                db.storage_mut()
                     .derived_nodes_mut()
-                    .get_mut(&derived_node_id)
-                    .expect("node should exist. This is indicative of a bug in Pico.");
-                node.time_verified = current_epoch;
-                (node.time_updated, DidRecalculate::ReusedMemoizedValue)
+                    .insert(derived_node_id, derived_node);
+                (DidRecalculate::Recalculated, derived_node)
             }
         } else {
-            let (value, dependencies, time_updated) =
-                call_inner_fn_and_collect_dependencies(db, derived_node_id.param_id, inner_fn);
-            db.storage_mut().derived_nodes_mut().insert(
-                derived_node_id,
-                DerivedNode {
-                    time_verified: current_epoch,
-                    time_updated,
-                    dependencies,
-                    inner_fn,
-                    value,
-                },
-            );
-            (time_updated, DidRecalculate::Recalculated)
+            let derived_node = evaluate_node(db, derived_node_id, inner_fn);
+            db.storage_mut()
+                .derived_nodes_mut()
+                .insert(derived_node_id, derived_node);
+            (DidRecalculate::Recalculated, derived_node)
         };
     register_dependency_in_parent_memoized_fn(
         db,
         NodeKind::Derived(derived_node_id),
-        time_updated,
+        derived_node.time_updated,
         current_epoch,
     );
     did_recalculate

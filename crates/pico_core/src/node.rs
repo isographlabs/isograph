@@ -38,6 +38,19 @@ impl<Db: Database> fmt::Debug for DerivedNode<Db> {
     }
 }
 
+impl <Db: Database + ?Sized> for DerivedNode<Db> {
+    pub fn update(&mut self, other: DerivedNode<Db>) -> bool {
+        self.dependencies = other.dependencies;
+        self.time_verified = other.time_verified;
+        if self.value != other.value {
+            self.value = other.value;
+            self.time_updated = other.time_updated;
+            true
+        } else {
+            false
+        }
+    }
+}
 #[derive(Debug)]
 pub struct SourceNode {
     pub time_updated: Epoch,
