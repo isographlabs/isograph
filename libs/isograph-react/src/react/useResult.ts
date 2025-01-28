@@ -14,6 +14,11 @@ import { startUpdate } from '../core/startUpdate';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useReadAndSubscribe } from './useReadAndSubscribe';
 
+export function useResult(
+  fragmentReference: null | undefined,
+  partialNetworkRequestOptions?: Partial<NetworkRequestReaderOptions> | void,
+): null;
+
 export function useResult<
   TReadFromStore extends {
     parameters: object;
@@ -24,7 +29,41 @@ export function useResult<
 >(
   fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>,
   partialNetworkRequestOptions?: Partial<NetworkRequestReaderOptions> | void,
-): TClientFieldValue {
+): TClientFieldValue;
+
+export function useResult<
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
+  TClientFieldValue,
+>(
+  fragmentReference:
+    | FragmentReference<TReadFromStore, TClientFieldValue>
+    | null
+    | undefined,
+  partialNetworkRequestOptions?: Partial<NetworkRequestReaderOptions> | void,
+): TClientFieldValue | null;
+
+export function useResult<
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
+  TClientFieldValue,
+>(
+  fragmentReference:
+    | FragmentReference<TReadFromStore, TClientFieldValue>
+    | null
+    | undefined,
+  partialNetworkRequestOptions?: Partial<NetworkRequestReaderOptions> | void,
+): TClientFieldValue | null {
+  if (fragmentReference == null) {
+    return null;
+  }
+
   const environment = useIsographEnvironment();
   const networkRequestOptions = getNetworkRequestOptionsWithDefaults(
     partialNetworkRequestOptions,
@@ -34,6 +73,7 @@ export function useResult<
     fragmentReference.networkRequest,
     networkRequestOptions,
   );
+
   const readerWithRefetchQueries = readPromise(
     fragmentReference.readerWithRefetchQueries,
   );
