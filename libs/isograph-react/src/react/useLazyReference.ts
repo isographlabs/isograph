@@ -29,12 +29,14 @@ export function useLazyReference<
     TNormalizationAst
   >,
   variables: ExtractParameters<TReadFromStore>,
-  ...[fetchOptions]: NormalizationAstLoader extends TNormalizationAst
+  ...[fetchOptions]: TNormalizationAst extends NormalizationAstLoader
     ? [fetchOptions: RequiredFetchOptions<TClientFieldValue>]
     : [fetchOptions?: FetchOptions<TClientFieldValue>]
-): {
-  fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>;
-} {
+): NormalizationAst | NormalizationAstLoader extends TNormalizationAst
+  ? unknown
+  : {
+      fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>;
+    } {
   const environment = useIsographEnvironment();
 
   if (entrypoint?.kind !== 'Entrypoint') {
@@ -67,20 +69,26 @@ function tsTests() {
     NormalizationAst | NormalizationAstLoader
   >;
 
-  useLazyReference(withAst, {});
-  useLazyReference(withAst, {}, { shouldFetch: 'Yes' });
-  useLazyReference(withAst, {}, { shouldFetch: 'IfNecessary' });
+  useLazyReference(withAst, {}) satisfies {};
+  useLazyReference(withAst, {}, { shouldFetch: 'Yes' }) satisfies {};
+  useLazyReference(withAst, {}, { shouldFetch: 'IfNecessary' }) satisfies {};
 
   // @ts-expect-error if there's no ast, require `shouldFetch` to be specified
   useLazyReference(withAstLoader, {});
-  useLazyReference(withAstLoader, {}, { shouldFetch: 'Yes' });
+  useLazyReference(withAstLoader, {}, { shouldFetch: 'Yes' }) satisfies {};
   // @ts-expect-error if there's no ast, `shouldFetch` can't be `IfNecessary`
   useLazyReference(withAstLoader, {}, { shouldFetch: 'IfNecessary' });
 
   // if the type is unknown there can be no ast so we should use the same rules
-  // @ts-expect-error if the type is unknown, require `shouldFetch` to be specified
-  useLazyReference(withAstOrLoader, {});
-  useLazyReference(withAstOrLoader, {}, { shouldFetch: 'Yes' });
-  // @ts-expect-error if the type is unknown, `shouldFetch` can't be `IfNecessary`
-  useLazyReference(withAstOrLoader, {}, { shouldFetch: 'IfNecessary' });
+  // but because of TS bugs with inference we just return unknown
+  // @ts-expect-error this returns unknown which doesn't satisfy the constraint
+  useLazyReference(withAstOrLoader, {}) satisfies {};
+  // @ts-expect-error this returns unknown which doesn't satisfy the constraint
+  useLazyReference(withAstOrLoader, {}, { shouldFetch: 'Yes' }) satisfies {};
+  useLazyReference(
+    withAstOrLoader,
+    {},
+    { shouldFetch: 'IfNecessary' },
+    // @ts-expect-error this returns unknown which doesn't satisfy the constraint
+  ) satisfies {};
 }
