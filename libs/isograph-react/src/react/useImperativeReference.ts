@@ -27,9 +27,10 @@ type UseImperativeReferenceResult<
   TClientFieldValue,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 > = {
-  fragmentReference:
-    | FragmentReference<TReadFromStore, TClientFieldValue>
-    | null;
+  fragmentReference: FragmentReference<
+    TReadFromStore,
+    TClientFieldValue
+  > | null;
   loadFragmentReference: (
     variables: ExtractParameters<TReadFromStore>,
     ...[fetchOptions]: NormalizationAstLoader extends TNormalizationAst
