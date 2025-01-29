@@ -14,6 +14,13 @@ import { logMessage } from '../core/logging';
 import type { StartUpdate } from '../core/reader';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
+type IsExactlyEqual<TLeft, TRight, TIfExactlyEqual, TIfNot> =
+  TLeft extends TRight
+    ? TRight extends TLeft
+      ? TIfExactlyEqual
+      : TIfNot
+    : TIfNot;
+
 export function useLazyReference<
   TReadFromStore extends {
     parameters: object;
@@ -29,9 +36,18 @@ export function useLazyReference<
     TNormalizationAst
   >,
   variables: ExtractParameters<TReadFromStore>,
-  ...[fetchOptions]: NormalizationAstLoader extends TNormalizationAst
-    ? [fetchOptions: RequiredFetchOptions<TClientFieldValue>]
-    : [fetchOptions?: FetchOptions<TClientFieldValue>]
+
+  // What is going on here? If TNormalizationAst is exactly NormalizationAst,
+  // then (and only then) we can pass an optional FetchOptions.
+  //
+  // In all other cases, we must pass RequiredFetchOptions, and it must
+  // be present.
+  ...[fetchOptions]: IsExactlyEqual<
+    TNormalizationAst,
+    NormalizationAst,
+    [fetchOptions?: FetchOptions<TClientFieldValue>],
+    [fetchOptions: RequiredFetchOptions<TClientFieldValue>]
+  >
 ): {
   fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>;
 } {
@@ -76,6 +92,13 @@ function tsTests() {
   useLazyReference(withAstLoader, {}, { shouldFetch: 'Yes' });
   // @ts-expect-error if there's no ast, `shouldFetch` can't be `IfNecessary`
   useLazyReference(withAstLoader, {}, { shouldFetch: 'IfNecessary' });
+
+  type Blah = IsExactlyEqual<
+    NormalizationAst | NormalizationAstLoader,
+    NormalizationAst,
+    'They are equal?',
+    'Of course theyre not'
+  >;
 
   // if the type is unknown there can be no ast so we should use the same rules
   // @ts-expect-error if the type is unknown, require `shouldFetch` to be specified

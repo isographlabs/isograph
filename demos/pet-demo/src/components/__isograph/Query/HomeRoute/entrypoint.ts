@@ -1,4 +1,4 @@
-import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
+import type {IsographEntrypoint, NormalizationAst, NormalizationAstLoader, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Query__HomeRoute__param} from './param_type';
 import {Query__HomeRoute__output_type} from './output_type';
 import readerResolver from './resolver_reader';
