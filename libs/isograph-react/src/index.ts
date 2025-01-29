@@ -41,6 +41,7 @@ export {
 export {
   type NormalizationAst,
   type NormalizationAstNode,
+  type NormalizationAstLoader,
   type NormalizationLinkedField,
   type NormalizationScalarField,
   type IsographEntrypoint,
