@@ -15,7 +15,8 @@
     "coverage": "vitest run --coverage",
     "note": "WE SHOULD ALSO TEST HERE",
     "prepack": "pnpm run compile-typescript",
-    "tsc": "tsc"
+    "tsc": "tsc",
+    "tsc-force": "tsc --build --clean && tsc --build --force"
   },
   "dependencies": {
     "@isograph/disposable-types": "*"
