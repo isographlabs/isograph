@@ -33,7 +33,7 @@ export type IsographEntrypoint<
     startUpdate?: StartUpdate<object>;
   },
   TClientFieldValue,
-  TNormalizationAst = NormalizationAst,
+  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 > = {
   readonly kind: 'Entrypoint';
   readonly networkRequestInfo: NetworkRequestInfo<TNormalizationAst>;
@@ -55,7 +55,7 @@ export type IsographEntrypointLoader<
   readonly kind: 'EntrypointLoader';
   readonly typeAndField: string;
   readonly loader: () => Promise<
-    IsographEntrypoint<TReadFromStore, TClientFieldValue>
+    IsographEntrypoint<TReadFromStore, TClientFieldValue, NormalizationAst>
   >;
 };
 
@@ -67,8 +67,13 @@ export type NormalizationAstNode =
 export type NormalizationAstNodes = ReadonlyArray<NormalizationAstNode>;
 
 export type NormalizationAst = {
-  kind: 'NormalizationAst';
-  selections: NormalizationAstNodes;
+  readonly kind: 'NormalizationAst';
+  readonly selections: NormalizationAstNodes;
+};
+
+export type NormalizationAstLoader = {
+  readonly kind: 'NormalizationAstLoader';
+  readonly loader: () => Promise<NormalizationAst>;
 };
 
 export type NormalizationScalarField = {
@@ -111,19 +116,24 @@ export function assertIsEntrypoint<
     startUpdate?: StartUpdate<object>;
   },
   TClientFieldValue,
+  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 >(
   value:
-    | IsographEntrypoint<TReadFromStore, TClientFieldValue>
+    | IsographEntrypoint<TReadFromStore, TClientFieldValue, TNormalizationAst>
     | ((_: any) => any)
     // Temporarily, allow any here. Once we automatically provide
     // types to entrypoints, we probably don't need this.
     | any,
-): asserts value is IsographEntrypoint<TReadFromStore, TClientFieldValue> {
+): asserts value is IsographEntrypoint<
+  TReadFromStore,
+  TClientFieldValue,
+  TNormalizationAst
+> {
   if (typeof value === 'function') throw new Error('Not a string');
 }
 
 export type ExtractReadFromStore<Type> =
-  Type extends IsographEntrypoint<infer X, any> ? X : never;
+  Type extends IsographEntrypoint<infer X, any, any> ? X : never;
 export type ExtractResolverResult<Type> =
-  Type extends IsographEntrypoint<any, infer X> ? X : never;
+  Type extends IsographEntrypoint<any, infer X, any> ? X : never;
 export type ExtractProps<Type> = Type extends React.FC<infer X> ? X : never;
