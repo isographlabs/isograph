@@ -42,15 +42,45 @@ export function useLazyReference<
   //
   // In all other cases, we must pass RequiredFetchOptions, and it must
   // be present.
-  ...[fetchOptions]: IsExactlyEqual<
+  // ...[fetchOptions]: TNormalizationAst extends {
+  //   kind: 'NormalizationAstLoader';
+  // }
+  //   ? [fetchOptions: RequiredFetchOptions<TClientFieldValue>]
+  //   : [fetchOptions?: FetchOptions<TClientFieldValue>]
+  // ...[fetchOptions]: Equal2<
+  //   TFetchPolicy,
+  //   true,
+  //   [fetchOptions?: FetchOptions<TClientFieldValue>],
+  //   [fetchOptions: RequiredFetchOptions<TClientFieldValue>]
+  // >
+  // TFetchPolicy extends true
+  //   ? [fetchOptions?: FetchOptions<TClientFieldValue>]
+  //   : [fetchOptions: RequiredFetchOptions<TClientFieldValue>]
+  // ...[fetchOptions]: Equal2<
+  //   TNormalizationAst,
+  //   NormalizationAst,
+  //   [fetchOptions?: FetchOptions<TClientFieldValue>],
+  //   [fetchOptions: RequiredFetchOptions<TClientFieldValue>]
+  // >
+  ...[fetchOptions]: Equal2<
     TNormalizationAst,
-    NormalizationAst,
-    [fetchOptions?: FetchOptions<TClientFieldValue>],
-    [fetchOptions: RequiredFetchOptions<TClientFieldValue>]
+    NormalizationAstLoader,
+    [fetchOptions: RequiredFetchOptions<TClientFieldValue>],
+    [fetchOptions?: FetchOptions<TClientFieldValue>]
   >
-): {
-  fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>;
-} {
+): // TNormalizationAst extends NormalizationAst | NormalizationAstLoader
+//   ? unknown
+//   : {
+//       fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>;
+//     } {
+Equal2<
+  TNormalizationAst,
+  NormalizationAst | NormalizationAstLoader,
+  unknown,
+  {
+    fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>;
+  }
+> {
   const environment = useIsographEnvironment();
 
   if (entrypoint?.kind !== 'Entrypoint') {
@@ -73,6 +103,11 @@ export function useLazyReference<
   };
 }
 
+export type Equal2<X, Y, IfTrue, IfFalse> =
+  (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2
+    ? IfTrue
+    : IfFalse;
+
 // @ts-ignore
 function tsTests() {
   let withAst!: IsographEntrypoint<any, unknown, NormalizationAst>;
@@ -93,17 +128,32 @@ function tsTests() {
   // @ts-expect-error if there's no ast, `shouldFetch` can't be `IfNecessary`
   useLazyReference(withAstLoader, {}, { shouldFetch: 'IfNecessary' });
 
-  type Blah = IsExactlyEqual<
-    NormalizationAst | NormalizationAstLoader,
-    NormalizationAst,
-    'They are equal?',
-    'Of course theyre not'
-  >;
-
+  // These ts-expect-errors do not fire:
   // if the type is unknown there can be no ast so we should use the same rules
-  // @ts-expect-error if the type is unknown, require `shouldFetch` to be specified
   useLazyReference(withAstOrLoader, {});
   useLazyReference(withAstOrLoader, {}, { shouldFetch: 'Yes' });
-  // @ts-expect-error if the type is unknown, `shouldFetch` can't be `IfNecessary`
   useLazyReference(withAstOrLoader, {}, { shouldFetch: 'IfNecessary' });
 }
+
+// @ts-ignore
+type Blah = IsExactlyEqual<
+  NormalizationAst | NormalizationAstLoader,
+  NormalizationAst,
+  'They are equal?',
+  'Of course theyre not'
+>;
+// @ts-ignore
+type Blah2 = IsExactlyEqual<
+  NormalizationAst,
+  NormalizationAst | NormalizationAstLoader,
+  'They are equal?',
+  'Of course theyre not'
+>;
+
+// @ts-ignore
+type Blah3 = Equal2<
+  NormalizationAst,
+  NormalizationAst | NormalizationAstLoader,
+  'they are equal',
+  'not this time bucko'
+>;

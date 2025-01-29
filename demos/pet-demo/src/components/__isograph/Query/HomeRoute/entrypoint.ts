@@ -1,7 +1,8 @@
-import type {IsographEntrypoint, NormalizationAst, NormalizationAstLoader, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
+import type {FetchOptions, IsographEntrypoint, NormalizationAst, NormalizationAstLoader, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Query__HomeRoute__param} from './param_type';
 import {Query__HomeRoute__output_type} from './output_type';
 import readerResolver from './resolver_reader';
+import { RequiredFetchOptions } from '@isograph/react/dist/core/check';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
 const queryText = 'query HomeRoute  {\
@@ -49,7 +50,7 @@ const normalizationAst: NormalizationAst = {
 const artifact: IsographEntrypoint<
   Query__HomeRoute__param,
   Query__HomeRoute__output_type,
-  NormalizationAst
+  NormalizationAst | NormalizationAstLoader
 > = {
   kind: "Entrypoint",
   networkRequestInfo: {
