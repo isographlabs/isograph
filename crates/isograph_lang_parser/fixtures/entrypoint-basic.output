@@ -1,0 +1,65 @@
+Ok(
+    (
+        RelativePathToSourceFile(
+            "crates/isograph_lang_parser/fixtures/entrypoint-basic.input.js",
+        ),
+        [
+            (
+                EntrypointDeclaration(
+                    WithSpan {
+                        item: EntrypointDeclaration {
+                            parent_type: WithSpan {
+                                item: UnvalidatedTypeName(
+                                    "Type",
+                                ),
+                                span: Span {
+                                    start: 11,
+                                    end: 15,
+                                },
+                            },
+                            client_field_name: WithSpan {
+                                item: ScalarFieldName(
+                                    "Name",
+                                ),
+                                span: Span {
+                                    start: 16,
+                                    end: 20,
+                                },
+                            },
+                            entrypoint_keyword: WithSpan {
+                                item: (),
+                                span: Span {
+                                    start: 0,
+                                    end: 10,
+                                },
+                            },
+                            dot: WithSpan {
+                                item: (),
+                                span: Span {
+                                    start: 15,
+                                    end: 16,
+                                },
+                            },
+                        },
+                        span: Span {
+                            start: 11,
+                            end: 20,
+                        },
+                    },
+                ),
+                TextSource {
+                    current_working_directory: CurrentWorkingDirectory,
+                    relative_path_to_source_file: RelativePathToSourceFile(
+                        "crates/isograph_lang_parser/fixtures/entrypoint-basic.input.js",
+                    ),
+                    span: Some(
+                        Span {
+                            start: 5,
+                            end: 25,
+                        },
+                    ),
+                },
+            ),
+        ],
+    ),
+)

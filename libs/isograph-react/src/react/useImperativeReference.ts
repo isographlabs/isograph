@@ -1,5 +1,5 @@
 import {
-  UnassignedState,
+  UNASSIGNED_STATE,
   useUpdatableDisposableState,
 } from '@isograph/react-disposable-state';
 import { FetchOptions, type RequiredFetchOptions } from '../core/check';
@@ -18,7 +18,6 @@ import { wrapResolvedValue } from '../core/PromiseWrapper';
 import type { StartUpdate } from '../core/reader';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
-// TODO rename this to useImperativelyLoadedEntrypoint
 type UseImperativeReferenceResult<
   TReadFromStore extends {
     parameters: object;
@@ -30,7 +29,7 @@ type UseImperativeReferenceResult<
 > = {
   fragmentReference:
     | FragmentReference<TReadFromStore, TClientFieldValue>
-    | UnassignedState;
+    | null;
   loadFragmentReference: (
     variables: ExtractParameters<TReadFromStore>,
     ...[fetchOptions]: NormalizationAstLoader extends TNormalizationAst
@@ -64,7 +63,7 @@ export function useImperativeReference<
     >();
   const environment = useIsographEnvironment();
   return {
-    fragmentReference: state,
+    fragmentReference: state !== UNASSIGNED_STATE ? state : null,
     loadFragmentReference: (
       variables: ExtractParameters<TReadFromStore>,
       fetchOptions?: FetchOptions<TClientFieldValue>,

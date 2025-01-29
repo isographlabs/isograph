@@ -3,7 +3,7 @@ use common_lang_types::{
     WithLocation, WithSpan,
 };
 use isograph_lang_types::{
-    ClientFieldId, EntrypointTypeAndField, SelectableServerFieldId, ServerObjectId,
+    ClientFieldId, EntrypointDeclaration, SelectableServerFieldId, ServerObjectId,
 };
 use thiserror::Error;
 
@@ -13,7 +13,7 @@ impl UnvalidatedSchema {
     pub fn validate_entrypoint_type_and_field(
         &self,
         text_source: TextSource,
-        entrypoint_type_and_field: WithSpan<EntrypointTypeAndField>,
+        entrypoint_type_and_field: WithSpan<EntrypointDeclaration>,
     ) -> Result<ClientFieldId, WithLocation<ValidateEntrypointDeclarationError>> {
         let parent_object_id = self
             .validate_parent_object_id(entrypoint_type_and_field.item.parent_type, text_source)?;
