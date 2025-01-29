@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test-watch": "vitest watch",
     "coverage": "vitest run --coverage",
-    "tsc": "tsc"
+    "tsc": "tsc",
+    "tsc-force": "tsc --build --clean && tsc --build --force"
   },
   "dependencies": {
     "@isograph/disposable-types": "*"

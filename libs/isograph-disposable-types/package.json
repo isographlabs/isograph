@@ -14,7 +14,8 @@
     "test-watch": "echo this package has no tests",
     "coverage": "echo this package has no coverage",
     "prepack": "pnpm run compile-typescript",
-    "tsc": "tsc"
+    "tsc": "tsc",
+    "tsc-force": "tsc --build --clean && tsc --build --force"
   },
   "dependencies": {},
   "devDependencies": {
