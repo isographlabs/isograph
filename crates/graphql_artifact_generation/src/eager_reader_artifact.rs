@@ -147,7 +147,7 @@ pub(crate) fn generate_eager_reader_condition_artifact(
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
-        &inline_fragment.condition_selection_set,
+        &inline_fragment.reader_selection_set,
         0,
         refetch_paths,
         &encountered_server_field.initial_variable_context(),

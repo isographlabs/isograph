@@ -4,9 +4,9 @@ use std::{
 };
 
 use common_lang_types::{
-    DescriptionValue, GraphQLInterfaceTypeName, GraphQLScalarTypeName, IsographObjectTypeName,
-    JavascriptName, ObjectTypeAndFieldName, SelectableFieldName, UnvalidatedTypeName, WithLocation,
-    WithSpan,
+    ClientPointerFieldName, DescriptionValue, GraphQLInterfaceTypeName, GraphQLScalarTypeName,
+    IsographObjectTypeName, JavascriptName, ObjectTypeAndFieldName, SelectableFieldName,
+    UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition,
@@ -14,9 +14,9 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, SelectableServerFieldId, SelectionType, ServerFieldId,
-    ServerFieldSelection, ServerObjectId, ServerScalarId, ServerStrongIdFieldId, TypeAnnotation,
-    VariableDefinition,
+    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, SelectableServerFieldId, SelectionType,
+    ServerFieldId, ServerFieldSelection, ServerObjectId, ServerScalarId, ServerStrongIdFieldId,
+    TypeAnnotation, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -104,6 +104,11 @@ type ClientFields<
             TClientFieldSelectionLinkedFieldAssociatedData,
             TClientFieldVariableDefinitionAssociatedData,
         >,
+        ClientPointer<
+            TClientFieldSelectionScalarFieldAssociatedData,
+            TClientFieldSelectionLinkedFieldAssociatedData,
+            TClientFieldVariableDefinitionAssociatedData,
+        >,
     >,
 >;
 
@@ -149,9 +154,9 @@ pub enum FieldType<TServer, TClient> {
 }
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq, Hash)]
-pub enum ClientType<TField> {
+pub enum ClientType<TField, TPointer> {
     ClientField(TField),
-    // ClientPointer(TPointer)
+    ClientPointer(TPointer),
 }
 
 impl<TFieldAssociatedData, TClientFieldType> FieldType<TFieldAssociatedData, TClientFieldType> {
@@ -162,7 +167,7 @@ impl<TFieldAssociatedData, TClientFieldType> FieldType<TFieldAssociatedData, TCl
         }
     }
 
-    pub fn as_client_field(&self) -> Option<&TClientFieldType> {
+    pub fn as_client_type(&self) -> Option<&TClientFieldType> {
         match self {
             FieldType::ServerField(_) => None,
             FieldType::ClientField(client_field) => Some(client_field),
@@ -210,6 +215,10 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
     > {
         match &self.client_fields[client_field_id.as_usize()] {
             ClientType::ClientField(client_field) => client_field,
+            ClientType::ClientPointer(_) => panic!(
+                "encountered ClientPointer under ClientFieldId. \
+                This is indicative of a bug in Isograph."
+            ),
         }
     }
 }
@@ -361,8 +370,10 @@ pub struct SchemaObject {
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
-    pub encountered_fields:
-        BTreeMap<SelectableFieldName, FieldType<ServerFieldId, ClientType<ClientFieldId>>>,
+    pub encountered_fields: BTreeMap<
+        SelectableFieldName,
+        FieldType<ServerFieldId, ClientType<ClientFieldId, ClientPointerId>>,
+    >,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 }
@@ -458,6 +469,40 @@ impl<TData: Copy, TClientFieldVariableDefinitionAssociatedData: Ord + Debug>
             parent_type_id: value.parent_type_id,
         })
     }
+}
+
+#[derive(Debug)]
+pub struct ClientPointer<
+    TClientFieldSelectionScalarFieldAssociatedData,
+    TClientFieldSelectionLinkedFieldAssociatedData,
+    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
+> {
+    pub description: Option<DescriptionValue>,
+    pub name: ClientPointerFieldName,
+    pub id: ClientPointerId,
+    pub to: TypeAnnotation<ServerObjectId>,
+
+    pub reader_selection_set: Vec<
+        WithSpan<
+            ServerFieldSelection<
+                TClientFieldSelectionScalarFieldAssociatedData,
+                TClientFieldSelectionLinkedFieldAssociatedData,
+            >,
+        >,
+    >,
+
+    pub refetch_strategy: RefetchStrategy<
+        TClientFieldSelectionScalarFieldAssociatedData,
+        TClientFieldSelectionLinkedFieldAssociatedData,
+    >,
+
+    pub variable_definitions:
+        Vec<WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
+
+    // Why is this not calculated when needed?
+    pub type_and_field: ObjectTypeAndFieldName,
+
+    pub parent_object_id: ServerObjectId,
 }
 
 #[derive(Debug)]
