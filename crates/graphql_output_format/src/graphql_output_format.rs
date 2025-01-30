@@ -1,6 +1,8 @@
 use std::error::Error;
 
-use common_lang_types::{QueryOperationName, QueryText, RelativePathToSourceFile};
+use common_lang_types::{
+    ArtifactPathAndContent, QueryOperationName, QueryText, RelativePathToSourceFile,
+};
 use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
 use isograph_config::{AbsolutePathAndRelativePath, CompilerConfig};
 use isograph_schema::{
@@ -9,6 +11,7 @@ use isograph_schema::{
 };
 
 use crate::{
+    combined_schema::build_combined_graphql_schema,
     process_type_system_definition::{
         process_graphql_type_extension_document, process_graphql_type_system_document,
     },
@@ -79,6 +82,10 @@ impl OutputFormat for GraphQLOutputFormat {
             root_operation_name,
         )
     }
+
+    fn generate_combined_schema(schema: &ValidatedSchema<Self>) -> ArtifactPathAndContent {
+        build_combined_graphql_schema(schema)
+    }
 }
 
 #[derive(Debug)]
@@ -95,12 +102,12 @@ pub enum GraphQLSchemaOriginalDefinitionType {
 }
 
 impl GraphQLSchemaOriginalDefinitionType {
-    pub fn sdl_keyword(&self) -> &'static str {
+    pub fn colloquial_type_name(&self) -> (&'static str, &'static str) {
         match self {
-            GraphQLSchemaOriginalDefinitionType::InputObject => "input",
-            GraphQLSchemaOriginalDefinitionType::Object => "object",
-            GraphQLSchemaOriginalDefinitionType::Interface => "interface",
-            GraphQLSchemaOriginalDefinitionType::Union => "union",
+            GraphQLSchemaOriginalDefinitionType::InputObject => ("an InputObject", "input"),
+            GraphQLSchemaOriginalDefinitionType::Object => ("an Object", "type"),
+            GraphQLSchemaOriginalDefinitionType::Interface => ("an Interface", "interface"),
+            GraphQLSchemaOriginalDefinitionType::Union => ("a union", "union"),
         }
     }
 }

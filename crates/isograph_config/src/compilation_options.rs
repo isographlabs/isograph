@@ -45,6 +45,7 @@ pub struct CompilerConfigOptions {
     pub no_babel_transform: bool,
     pub include_file_extensions_in_import_statements: GenerateFileExtensionsOption,
     pub module: JavascriptModule,
+    pub generate_combined_schema: bool,
 }
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -236,6 +237,9 @@ pub struct ConfigFileOptions {
     /// into imports or requires of the generated entrypoint.ts file. Should
     /// it generate require calls or esmodule imports?
     module: ConfigFileJavascriptModule,
+    /// Whether to generate a GraphQL schema containing the original schema
+    /// plus all fields defined as client fields.
+    generate_combined_schema: bool,
 }
 
 #[derive(Deserialize, Debug, Clone, Copy, JsonSchema)]
@@ -271,6 +275,7 @@ fn create_options(options: ConfigFileOptions) -> CompilerConfigOptions {
             options.include_file_extensions_in_import_statements,
         ),
         module: create_module(options.module),
+        generate_combined_schema: options.generate_combined_schema,
     }
 }
 

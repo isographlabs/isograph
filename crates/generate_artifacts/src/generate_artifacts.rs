@@ -326,6 +326,10 @@ pub fn get_artifact_path_and_content<TOutputFormat: OutputFormat>(
         config.options.no_babel_transform,
     ));
 
+    if config.options.generate_combined_schema {
+        path_and_contents.push(TOutputFormat::generate_combined_schema(schema));
+    }
+
     path_and_contents
 }
 

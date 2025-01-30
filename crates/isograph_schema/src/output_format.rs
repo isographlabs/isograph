@@ -1,6 +1,8 @@
 use std::{error::Error, fmt::Debug, hash::Hash};
 
-use common_lang_types::{QueryOperationName, QueryText, RelativePathToSourceFile};
+use common_lang_types::{
+    ArtifactPathAndContent, QueryOperationName, QueryText, RelativePathToSourceFile,
+};
 use isograph_config::{AbsolutePathAndRelativePath, CompilerConfig, CompilerConfigOptions};
 
 use crate::{
@@ -48,6 +50,10 @@ where
         query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
         root_operation_name: &RootOperationName,
     ) -> QueryText;
+
+    // TODO consider making this optional, since this may not make sense for some
+    // output formats.
+    fn generate_combined_schema(schema: &ValidatedSchema<Self>) -> ArtifactPathAndContent;
 }
 
 pub struct ProcessTypeSystemDocumentOutcome {
