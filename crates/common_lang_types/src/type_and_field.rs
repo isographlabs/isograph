@@ -1,4 +1,4 @@
-use crate::{ArtifactFileType, IsographObjectTypeName, SelectableFieldName};
+use crate::{ArtifactFilePrefix, IsographObjectTypeName, SelectableFieldName};
 
 #[derive(Debug, PartialEq, Eq, Hash, Ord, PartialOrd, Clone, Copy)]
 pub struct ObjectTypeAndFieldName {
@@ -14,7 +14,7 @@ impl ObjectTypeAndFieldName {
     pub fn relative_path(
         &self,
         current_file_type_name: IsographObjectTypeName,
-        file_type: ArtifactFileType,
+        file_type: ArtifactFilePrefix,
     ) -> String {
         let ObjectTypeAndFieldName {
             type_name,

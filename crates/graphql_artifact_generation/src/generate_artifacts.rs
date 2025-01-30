@@ -1,5 +1,5 @@
 use common_lang_types::{
-    ArtifactFileType, ArtifactPathAndContent, DescriptionValue, Location, Span, WithLocation,
+    ArtifactFilePrefix, ArtifactPathAndContent, DescriptionValue, Location, Span, WithLocation,
     WithSpan,
 };
 use graphql_lang_types::{
@@ -43,13 +43,13 @@ use crate::{
 };
 
 lazy_static! {
-    pub static ref RESOLVER_READER: ArtifactFileType = "resolver_reader".intern().into();
-    pub static ref REFETCH_READER: ArtifactFileType = "refetch_reader".intern().into();
-    pub static ref RESOLVER_PARAM_TYPE: ArtifactFileType = "param_type".intern().into();
-    pub static ref RESOLVER_PARAMETERS_TYPE: ArtifactFileType = "parameters_type".intern().into();
-    pub static ref RESOLVER_OUTPUT_TYPE: ArtifactFileType = "output_type".intern().into();
-    pub static ref ENTRYPOINT: ArtifactFileType = "entrypoint".intern().into();
-    pub static ref ISO_TS: ArtifactFileType = "iso".intern().into();
+    pub static ref RESOLVER_READER: ArtifactFilePrefix = "resolver_reader".intern().into();
+    pub static ref REFETCH_READER: ArtifactFilePrefix = "refetch_reader".intern().into();
+    pub static ref RESOLVER_PARAM_TYPE: ArtifactFilePrefix = "param_type".intern().into();
+    pub static ref RESOLVER_PARAMETERS_TYPE: ArtifactFilePrefix = "parameters_type".intern().into();
+    pub static ref RESOLVER_OUTPUT_TYPE: ArtifactFilePrefix = "output_type".intern().into();
+    pub static ref ENTRYPOINT: ArtifactFilePrefix = "entrypoint".intern().into();
+    pub static ref ISO_TS: ArtifactFilePrefix = "iso".intern().into();
 }
 
 /// Get all artifacts according to the following scheme:
