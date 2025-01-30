@@ -18,7 +18,7 @@ use isograph_schema::{
 
 use crate::{
     generate_artifacts::{
-        NormalizationAstText, QueryText, RefetchQueryArtifactImport, ENTRYPOINT,
+        NormalizationAstText, QueryText, RefetchQueryArtifactImport, ENTRYPOINT_FILE_NAME,
         RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
     },
     imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
@@ -265,7 +265,7 @@ impl EntrypointArtifactInfo<'_> {
 
         ArtifactPathAndContent {
             file_content: self.file_contents(file_extensions),
-            file_name_prefix: *ENTRYPOINT,
+            file_name: *ENTRYPOINT_FILE_NAME,
             type_and_field: Some(ObjectTypeAndFieldName {
                 type_name,
                 field_name,

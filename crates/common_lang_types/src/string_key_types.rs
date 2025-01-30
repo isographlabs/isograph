@@ -113,6 +113,7 @@ string_key_newtype!(IsographDirectiveName);
 string_key_newtype!(FieldArgumentName);
 
 string_key_newtype!(ArtifactFilePrefix);
+string_key_newtype!(ArtifactFileName);
 
 string_key_newtype!(JavascriptVariableName);
 

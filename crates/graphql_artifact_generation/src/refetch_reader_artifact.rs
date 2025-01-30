@@ -8,8 +8,8 @@ use isograph_schema::{
 
 use crate::{
     generate_artifacts::{
-        generate_output_type, ClientFieldFunctionImportStatement, REFETCH_READER,
-        RESOLVER_OUTPUT_TYPE,
+        generate_output_type, ClientFieldFunctionImportStatement, REFETCH_READER_FILE_NAME,
+        RESOLVER_OUTPUT_TYPE_FILE_NAME,
     },
     import_statements::reader_imports_to_import_statement,
     reader_ast::generate_reader_ast,
@@ -72,7 +72,7 @@ pub(crate) fn generate_refetch_reader_artifact(
         );
 
     ArtifactPathAndContent {
-        file_name_prefix: *REFETCH_READER,
+        file_name: *REFETCH_READER_FILE_NAME,
         file_content: reader_content,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
@@ -105,7 +105,7 @@ pub(crate) fn generate_refetch_output_type_artifact(
         {output_type_text}"
     );
     ArtifactPathAndContent {
-        file_name_prefix: *RESOLVER_OUTPUT_TYPE,
+        file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
         file_content: output_type_text,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,

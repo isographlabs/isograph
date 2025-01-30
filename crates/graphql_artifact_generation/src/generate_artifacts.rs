@@ -1,6 +1,6 @@
 use common_lang_types::{
-    ArtifactFilePrefix, ArtifactPathAndContent, DescriptionValue, Location, Span, WithLocation,
-    WithSpan,
+    ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, DescriptionValue, Location, Span,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -43,13 +43,24 @@ use crate::{
 };
 
 lazy_static! {
-    pub static ref RESOLVER_READER: ArtifactFilePrefix = "resolver_reader".intern().into();
-    pub static ref REFETCH_READER: ArtifactFilePrefix = "refetch_reader".intern().into();
-    pub static ref RESOLVER_PARAM_TYPE: ArtifactFilePrefix = "param_type".intern().into();
-    pub static ref RESOLVER_PARAMETERS_TYPE: ArtifactFilePrefix = "parameters_type".intern().into();
-    pub static ref RESOLVER_OUTPUT_TYPE: ArtifactFilePrefix = "output_type".intern().into();
+    pub static ref ENTRYPOINT_FILE_NAME: ArtifactFileName = "entrypoint.ts".intern().into();
     pub static ref ENTRYPOINT: ArtifactFilePrefix = "entrypoint".intern().into();
+    pub static ref ISO_TS_FILE_NAME: ArtifactFileName = "iso.ts".intern().into();
     pub static ref ISO_TS: ArtifactFilePrefix = "iso".intern().into();
+    pub static ref REFETCH_READER_FILE_NAME: ArtifactFileName = "refetch_reader.ts".intern().into();
+    pub static ref REFETCH_READER: ArtifactFilePrefix = "refetch_reader".intern().into();
+    pub static ref RESOLVER_OUTPUT_TYPE_FILE_NAME: ArtifactFileName =
+        "output_type.ts".intern().into();
+    pub static ref RESOLVER_OUTPUT_TYPE: ArtifactFilePrefix = "output_type".intern().into();
+    pub static ref RESOLVER_PARAM_TYPE_FILE_NAME: ArtifactFileName =
+        "param_type.ts".intern().into();
+    pub static ref RESOLVER_PARAM_TYPE: ArtifactFilePrefix = "param_type".intern().into();
+    pub static ref RESOLVER_PARAMETERS_TYPE_FILE_NAME: ArtifactFileName =
+        "parameters_type.ts".intern().into();
+    pub static ref RESOLVER_PARAMETERS_TYPE: ArtifactFilePrefix = "parameters_type".intern().into();
+    pub static ref RESOLVER_READER_FILE_NAME: ArtifactFileName =
+        "resolver_reader.ts".intern().into();
+    pub static ref RESOLVER_READER: ArtifactFilePrefix = "resolver_reader".intern().into();
 }
 
 /// Get all artifacts according to the following scheme:
