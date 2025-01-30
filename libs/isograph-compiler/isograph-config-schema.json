@@ -85,6 +85,7 @@
       "type": "object",
       "properties": {
         "generate_combined_schema": {
+          "description": "Whether to generate a GraphQL schema containing the original schema plus all fields defined as client fields.",
           "default": false,
           "type": "boolean"
         },
