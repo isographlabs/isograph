@@ -67,10 +67,6 @@ type Viewer {
     Defined as `export const NewsfeedPaginationComponent` in `src/components/Newsfeed/NewsfeedPagination.tsx`
     """
     NewsfeedPaginationComponent: IsographClientField
-    """
-    A refetch field for the Viewer type.
-    """
-    __refetch: IsographImperativelyLoadedField
     id: ID!
     """
     A store Link for the Viewer type.
@@ -94,10 +90,6 @@ type Mutation {
 }
 
 type Node {
-    """
-    A refetch field for the Node type.
-    """
-    __refetch: IsographImperativelyLoadedField
     asAdItem: AdItem
     asBlogItem: BlogItem
     asImage: Image
@@ -189,7 +181,7 @@ type Pet {
     """
     PetTaglineCard: IsographClientComponentField
     """
-    # Pet.PetUpdater
+    Pet.PetUpdater
 A component to test behavior with respect to mutations.
 You can update the best friend and the tagline.
     -------
@@ -204,10 +196,6 @@ You can update the best friend and the tagline.
     Defined as `export const unreachableFromEntrypoint` in `src/components/UnreachableFromEntrypoint.tsx`
     """
     UnreachableFromEntrypoint: IsographClientField
-    """
-    A refetch field for the Pet type.
-    """
-    __refetch: IsographImperativelyLoadedField
     age: Int!
     alt_tagline: String!
     best_friend_relationship: BestFriendRelationship
@@ -258,10 +246,6 @@ type Checkin {
     Defined as `export const CheckinDisplay` in `src/components/PetCheckinsCard.tsx`
     """
     CheckinDisplay: IsographClientComponentField
-    """
-    A refetch field for the Checkin type.
-    """
-    __refetch: IsographImperativelyLoadedField
     id: ID!
     """
     A store Link for the Checkin type.
@@ -277,10 +261,6 @@ This interface exists solely allow make_checkin_super to
 return an interface
 """
 type ICheckin {
-    """
-    A refetch field for the ICheckin type.
-    """
-    __refetch: IsographImperativelyLoadedField
     asCheckin: Checkin
     id: ID!
     """
@@ -318,10 +298,6 @@ type BlogItem {
     Defined as `export const NewsfeedAdOrBlog` in `src/components/Newsfeed/NewsfeedRoute.tsx`
     """
     NewsfeedAdOrBlog: IsographClientComponentField
-    """
-    A refetch field for the BlogItem type.
-    """
-    __refetch: IsographImperativelyLoadedField
     author: String!
     content: String!
     id: ID!
@@ -343,10 +319,6 @@ type Image {
     Defined as `export const ImageDisplayWrapper` in `src/components/Newsfeed/BlogItem.tsx`
     """
     ImageDisplayWrapper: IsographClientComponentField
-    """
-    A refetch field for the Image type.
-    """
-    __refetch: IsographImperativelyLoadedField
     id: ID!
     """
     A store Link for the Image type.
@@ -368,10 +340,6 @@ type AdItem {
     Defined as `export const NewsfeedAdOrBlog` in `src/components/Newsfeed/NewsfeedRoute.tsx`
     """
     NewsfeedAdOrBlog: IsographClientComponentField
-    """
-    A refetch field for the AdItem type.
-    """
-    __refetch: IsographImperativelyLoadedField
     advertiser: String!
     id: ID!
     """
