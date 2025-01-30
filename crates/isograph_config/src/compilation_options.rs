@@ -39,7 +39,7 @@ pub struct CompilerConfig {
     pub current_working_directory: CurrentWorkingDirectory,
 }
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone)]
 pub struct ConfigOptions {
     pub on_invalid_id_type: OptionalValidationLevel,
     pub no_babel_transform: bool,
