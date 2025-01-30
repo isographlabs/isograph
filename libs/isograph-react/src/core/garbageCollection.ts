@@ -17,7 +17,7 @@ export type RetainedQuery = {
   readonly root: Link;
 };
 
-type DidUnretainSomeQuery = boolean;
+export type DidUnretainSomeQuery = boolean;
 export function unretainQuery(
   environment: IsographEnvironment,
   retainedQuery: RetainedQuery,
