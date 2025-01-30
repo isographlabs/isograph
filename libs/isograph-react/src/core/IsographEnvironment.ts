@@ -13,7 +13,7 @@ import type { ReaderAst } from './reader';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
-type ComponentCache = {
+export type ComponentCache = {
   [key: DataId]: {
     [key: ComponentOrFieldName]: { [key: StringifiedArgs]: React.FC<any> };
   };
@@ -31,24 +31,24 @@ export type FragmentSubscription<TReadFromStore extends UnknownTReadFromStore> =
     readonly readerAst: ReaderAst<TReadFromStore>;
   };
 
-type AnyChangesToRecordSubscription = {
+export type AnyChangesToRecordSubscription = {
   readonly kind: 'AnyChangesToRecord';
   readonly callback: () => void;
   readonly recordLink: Link;
 };
 
-type AnyRecordSubscription = {
+export type AnyRecordSubscription = {
   readonly kind: 'AnyRecords';
   readonly callback: () => void;
 };
 
-type Subscription =
+export type Subscription =
   | FragmentSubscription<any>
   | AnyChangesToRecordSubscription
   | AnyRecordSubscription;
-type Subscriptions = Set<Subscription>;
+export type Subscriptions = Set<Subscription>;
 // Should this be a map?
-type CacheMap<T> = { [index: string]: ParentCache<T> };
+export type CacheMap<T> = { [index: string]: ParentCache<T> };
 
 export type IsographEnvironment = {
   readonly store: IsographStore;

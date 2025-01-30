@@ -18,7 +18,7 @@ import { maybeMakeNetworkRequest } from '../core/makeNetworkRequest';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
-type UseImperativeReferenceResult<
+export type UseImperativeReferenceResult<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,

@@ -4,7 +4,7 @@ import { FragmentReference } from '../core/FragmentReference';
 import { NetworkRequestReaderOptions } from '../core/read';
 import { useResult } from './useResult';
 
-type IsExactlyIntrinsicAttributes<T> = T extends JSX.IntrinsicAttributes
+export type IsExactlyIntrinsicAttributes<T> = T extends JSX.IntrinsicAttributes
   ? JSX.IntrinsicAttributes extends T
     ? true
     : false

@@ -25,7 +25,7 @@ import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 import { maybeUnwrapNetworkRequest } from '../react/useResult';
 
-type UsePaginationReturnValue<
+export type UsePaginationReturnValue<
   TReadFromStore extends UnknownTReadFromStore,
   TItem,
 > =
@@ -66,12 +66,12 @@ function flatten<T>(arr: ReadonlyArray<ReadonlyArray<T>>): ReadonlyArray<T> {
   return outArray;
 }
 
-type PageInfo = {
+export type PageInfo = {
   readonly hasNextPage: boolean;
   readonly endCursor: string | null;
 };
 
-type Connection<T> = {
+export type Connection<T> = {
   readonly edges: ReadonlyArray<T> | null;
   readonly pageInfo: PageInfo;
 };
@@ -81,7 +81,7 @@ type NonNullConnection<T> = {
   readonly pageInfo: PageInfo;
 };
 
-type UseConnectionSpecPaginationArgs = {
+export type UseConnectionSpecPaginationArgs = {
   first: number;
   after: string | null;
 };

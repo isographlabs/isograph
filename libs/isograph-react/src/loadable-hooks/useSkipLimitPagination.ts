@@ -25,7 +25,7 @@ import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 import { maybeUnwrapNetworkRequest } from '../react/useResult';
 
-type UseSkipLimitReturnValue<
+export type UseSkipLimitReturnValue<
   TReadFromStore extends UnknownTReadFromStore,
   TItem,
 > =
@@ -73,7 +73,7 @@ function flatten<T>(arr: ReadonlyArray<ReadonlyArray<T>>): ReadonlyArray<T> {
   return outArray;
 }
 
-type UseSkipLimitPaginationArgs = {
+export type UseSkipLimitPaginationArgs = {
   skip: number;
   limit: number;
 };

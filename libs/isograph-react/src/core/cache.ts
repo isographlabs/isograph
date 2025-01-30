@@ -132,8 +132,8 @@ export function getOrCreateCacheForArtifact<
   return getOrCreateItemInSuspenseCache(environment, cacheKey, factory);
 }
 
-type NetworkResponseScalarValue = string | number | boolean;
-type NetworkResponseValue =
+export type NetworkResponseScalarValue = string | number | boolean;
+export type NetworkResponseValue =
   | NetworkResponseScalarValue
   | null
   | NetworkResponseObject
