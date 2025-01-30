@@ -13,7 +13,7 @@ pub(crate) fn build_combined_graphql_schema(schema: &ValidatedSchema) -> Artifac
     let mut schema_content = initial_schema_content();
 
     for object in schema.server_field_data.server_objects.iter() {
-        write_object(schema, &mut schema_content, &object).expect("Expected writing to work");
+        write_object(schema, &mut schema_content, object).expect("Expected writing to work");
     }
 
     for scalar in schema.server_field_data.server_scalars.iter() {
