@@ -43,7 +43,7 @@ pub struct CompilerConfig {
 pub struct ConfigOptions {
     pub on_invalid_id_type: OptionalValidationLevel,
     pub no_babel_transform: bool,
-    pub generate_file_extensions: GenerateFileExtensionsOption,
+    pub include_file_extensions_in_import_statements: GenerateFileExtensionsOption,
     pub module: JavascriptModule,
 }
 
@@ -259,7 +259,7 @@ fn create_options(options: ConfigFileOptions) -> ConfigOptions {
     ConfigOptions {
         on_invalid_id_type: create_optional_validation_level(options.on_invalid_id_type),
         no_babel_transform: options.no_babel_transform,
-        generate_file_extensions: create_generate_file_extensions(
+        include_file_extensions_in_import_statements: create_generate_file_extensions(
             options.include_file_extensions_in_import_statements,
         ),
         module: create_module(options.module),

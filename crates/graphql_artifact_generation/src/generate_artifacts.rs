@@ -7,7 +7,7 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 
-use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
+use isograph_config::CompilerConfig;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, NonConstantValue, SelectableServerFieldId, SelectionType,
     ServerFieldSelection, TypeAnnotation, UnionVariant, VariableDefinition,
@@ -76,8 +76,6 @@ lazy_static! {
 pub fn get_artifact_path_and_content(
     schema: &ValidatedSchema,
     config: &CompilerConfig,
-    file_extensions: GenerateFileExtensionsOption,
-    no_babel_transform: bool,
 ) -> Vec<ArtifactPathAndContent> {
     let mut encountered_client_field_map = BTreeMap::new();
     let mut path_and_contents = vec![];
@@ -89,7 +87,7 @@ pub fn get_artifact_path_and_content(
             schema,
             *entrypoint_id,
             &mut encountered_client_field_map,
-            file_extensions,
+            config.options.include_file_extensions_in_import_statements,
         );
         path_and_contents.extend(entrypoint_path_and_content);
 
@@ -121,7 +119,7 @@ pub fn get_artifact_path_and_content(
                                 encountered_server_field,
                                 inline_fragment,
                                 &traversal_state.refetch_paths,
-                                file_extensions,
+                                config.options.include_file_extensions_in_import_statements,
                             ));
                         }
                     },
@@ -139,7 +137,7 @@ pub fn get_artifact_path_and_content(
                             config,
                             *info,
                             &traversal_state.refetch_paths,
-                            file_extensions,
+                            config.options.include_file_extensions_in_import_statements,
                         ));
 
                         if *was_ever_selected_loadably {
@@ -149,7 +147,7 @@ pub fn get_artifact_path_and_content(
                                 None,
                                 &traversal_state.refetch_paths,
                                 true,
-                                file_extensions,
+                                config.options.include_file_extensions_in_import_statements,
                             ));
 
                             // Everything about this is quite sus
@@ -226,7 +224,7 @@ pub fn get_artifact_path_and_content(
                                     &encountered_client_field_map,
                                     variable_definitions_iter,
                                     &schema.find_query(),
-                                    file_extensions,
+                                    config.options.include_file_extensions_in_import_statements,
                                 ),
                             );
                         }
@@ -238,7 +236,7 @@ pub fn get_artifact_path_and_content(
                             variant.primary_field_info.as_ref(),
                             &traversal_state.refetch_paths,
                             false,
-                            file_extensions,
+                            config.options.include_file_extensions_in_import_statements,
                         ));
                     }
                 };
@@ -257,7 +255,7 @@ pub fn get_artifact_path_and_content(
         path_and_contents.push(generate_eager_reader_param_type_artifact(
             schema,
             user_written_client_field,
-            file_extensions,
+            config.options.include_file_extensions_in_import_statements,
         ));
 
         match encountered_client_field_map
@@ -292,7 +290,7 @@ pub fn get_artifact_path_and_content(
                     client_field,
                     config,
                     info,
-                    file_extensions,
+                    config.options.include_file_extensions_in_import_statements,
                 ))
             }
             ClientFieldVariant::ImperativelyLoadedField(_) => {
@@ -306,8 +304,8 @@ pub fn get_artifact_path_and_content(
 
     path_and_contents.push(build_iso_overload_artifact(
         schema,
-        file_extensions,
-        no_babel_transform,
+        config.options.include_file_extensions_in_import_statements,
+        config.options.no_babel_transform,
     ));
 
     path_and_contents
