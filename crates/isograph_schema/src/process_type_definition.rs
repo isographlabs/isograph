@@ -101,7 +101,7 @@ impl UnvalidatedSchema {
                         .process_object_type_definition(
                             object_type_definition,
                             true,
-                            &options,
+                            options,
                             concrete_type,
                         )?;
                     if let Some(encountered_root_kind) = outcome.encountered_root_kind {
