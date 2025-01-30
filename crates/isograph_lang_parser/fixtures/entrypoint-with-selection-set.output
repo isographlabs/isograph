@@ -10,13 +10,13 @@ Err(
                     span: Some(
                         Span {
                             start: 5,
-                            end: 37,
+                            end: 35,
                         },
                     ),
                 },
                 span: Span {
                     start: 21,
-                    end: 32,
+                    end: 30,
                 },
             },
         ),
@@ -27,9 +27,9 @@ Err(
 Unparsed tokens remaining
 crates/isograph_lang_parser/fixtures/entrypoint-with-selection-set.input.js
 entrypoint Type.Name {
-                     ^^
+                     ^
   wat
-^^^^^^
+^^^^^
 }
 ^
 ---
