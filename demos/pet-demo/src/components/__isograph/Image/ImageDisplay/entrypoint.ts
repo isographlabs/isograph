@@ -55,7 +55,8 @@ const normalizationAst: NormalizationAst = {
 };
 const artifact: IsographEntrypoint<
   Image__ImageDisplay__param,
-  Image__ImageDisplay__output_type
+  Image__ImageDisplay__output_type,
+  NormalizationAst
 > = {
   kind: "Entrypoint",
   networkRequestInfo: {

@@ -41,7 +41,8 @@ const normalizationAst: NormalizationAst = {
 };
 const artifact: IsographEntrypoint<
   Query__nodeField__param,
-  Query__nodeField__output_type
+  Query__nodeField__output_type,
+  NormalizationAst
 > = {
   kind: "Entrypoint",
   networkRequestInfo: {

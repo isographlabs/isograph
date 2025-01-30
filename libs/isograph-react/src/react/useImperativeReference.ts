@@ -2,8 +2,12 @@ import {
   UNASSIGNED_STATE,
   useUpdatableDisposableState,
 } from '@isograph/react-disposable-state';
-import { FetchOptions } from '../core/check';
-import { IsographEntrypoint } from '../core/entrypoint';
+import { FetchOptions, type RequiredFetchOptions } from '../core/check';
+import {
+  IsographEntrypoint,
+  type NormalizationAst,
+  type NormalizationAstLoader,
+} from '../core/entrypoint';
 import {
   ExtractParameters,
   FragmentReference,
@@ -14,6 +18,27 @@ import { wrapResolvedValue } from '../core/PromiseWrapper';
 import type { StartUpdate } from '../core/reader';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
+type UseImperativeReferenceResult<
+  TReadFromStore extends {
+    parameters: object;
+    data: object;
+    startUpdate?: StartUpdate<object>;
+  },
+  TClientFieldValue,
+  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
+> = {
+  fragmentReference: FragmentReference<
+    TReadFromStore,
+    TClientFieldValue
+  > | null;
+  loadFragmentReference: (
+    variables: ExtractParameters<TReadFromStore>,
+    ...[fetchOptions]: NormalizationAstLoader extends TNormalizationAst
+      ? [fetchOptions: RequiredFetchOptions<TClientFieldValue>]
+      : [fetchOptions?: FetchOptions<TClientFieldValue>]
+  ) => void;
+};
+
 export function useImperativeReference<
   TReadFromStore extends {
     parameters: object;
@@ -21,18 +46,18 @@ export function useImperativeReference<
     startUpdate?: StartUpdate<object>;
   },
   TClientFieldValue,
+  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 >(
-  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
-): {
-  fragmentReference: FragmentReference<
+  entrypoint: IsographEntrypoint<
     TReadFromStore,
-    TClientFieldValue
-  > | null;
-  loadFragmentReference: (
-    variables: ExtractParameters<TReadFromStore>,
-    fetchOptions?: FetchOptions<TClientFieldValue>,
-  ) => void;
-} {
+    TClientFieldValue,
+    TNormalizationAst
+  >,
+): UseImperativeReferenceResult<
+  TReadFromStore,
+  TClientFieldValue,
+  TNormalizationAst
+> {
   const { state, setState } =
     useUpdatableDisposableState<
       FragmentReference<TReadFromStore, TClientFieldValue>
