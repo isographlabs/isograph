@@ -8,7 +8,7 @@ use isograph_schema::{
     ValidatedSchema,
 };
 
-use crate::generate_artifacts::ISO_TS;
+use crate::generate_artifacts::ISO_TS_FILE_NAME;
 
 fn build_iso_overload_for_entrypoint(
     validated_client_field: &ValidatedClientField,
@@ -158,7 +158,7 @@ type MatchesWhitespaceAndString<
 export function iso(_isographLiteralText: string):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
-  | IsographEntrypoint<any, any>
+  | IsographEntrypoint<any, any, any>
 {\n",
             );
             content.push_str("  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
@@ -202,7 +202,7 @@ export function iso(isographLiteralText: string):
     imports.push_str(&content);
     ArtifactPathAndContent {
         file_content: imports,
-        file_name_prefix: *ISO_TS,
+        file_name: *ISO_TS_FILE_NAME,
         type_and_field: None,
     }
 }

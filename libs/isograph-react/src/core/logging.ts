@@ -50,7 +50,7 @@ export type LogMessage =
       kind: 'MakeNetworkRequest';
       artifact:
         | RefetchQueryNormalizationArtifact
-        | IsographEntrypoint<any, any>;
+        | IsographEntrypoint<any, any, any>;
       variables: Variables;
       networkRequestId: string;
     }

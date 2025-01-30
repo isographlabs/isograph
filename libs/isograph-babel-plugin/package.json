@@ -16,7 +16,8 @@
     "directory": "libs/isograph-babel-plugin"
   },
   "scripts": {
-    "tsc": "tsc"
+    "tsc": "tsc",
+    "tsc-force": "tsc --build --clean && tsc --build --force"
   },
   "dependencies": {
     "@babel/helper-module-imports": "^7.0.0",

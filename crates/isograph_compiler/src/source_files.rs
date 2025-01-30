@@ -60,10 +60,10 @@ impl SourceFiles {
         schema: &mut UnvalidatedSchema,
         config: &CompilerConfig,
     ) -> Result<(), BatchCompileError> {
-        let outcome = schema.process_graphql_type_system_document(self.schema, config.options)?;
+        let outcome = schema.process_graphql_type_system_document(self.schema, &config.options)?;
         for extension_document in self.schema_extensions.into_values() {
             let _extension_outcome = schema
-                .process_graphql_type_extension_document(extension_document, config.options)?;
+                .process_graphql_type_extension_document(extension_document, &config.options)?;
         }
         process_iso_literals(schema, self.contains_iso)?;
         process_exposed_fields(schema)?;

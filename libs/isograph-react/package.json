@@ -15,6 +15,7 @@
     "coverage": "vitest run --coverage",
     "prepack": "pnpm run test && pnpm run compile-typescript",
     "tsc": "tsc",
+    "tsc-force": "tsc --build --clean && tsc --build --force",
     "iso": "cross-env ../../target/debug/isograph_cli --config ./isograph.config.json",
     "iso-watch": "cross-env ../../target/debug/isograph_cli --config ./isograph.config.json --watch"
   },

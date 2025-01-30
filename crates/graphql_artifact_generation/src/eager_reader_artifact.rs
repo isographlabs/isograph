@@ -11,8 +11,9 @@ use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 use crate::{
     generate_artifacts::{
         generate_client_field_parameter_type, generate_output_type, generate_parameters,
-        ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAMETERS_TYPE,
-        RESOLVER_PARAM_TYPE, RESOLVER_READER,
+        ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE, RESOLVER_OUTPUT_TYPE_FILE_NAME,
+        RESOLVER_PARAMETERS_TYPE_FILE_NAME, RESOLVER_PARAM_TYPE, RESOLVER_PARAM_TYPE_FILE_NAME,
+        RESOLVER_READER_FILE_NAME,
     },
     import_statements::{
         param_type_imports_to_import_param_statement, param_type_imports_to_import_statement,
@@ -102,7 +103,7 @@ pub(crate) fn generate_eager_reader_artifacts(
     };
 
     let mut path_and_contents = vec![ArtifactPathAndContent {
-        file_name_prefix: *RESOLVER_READER,
+        file_name: *RESOLVER_READER_FILE_NAME,
         file_content: reader_content,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
@@ -118,7 +119,7 @@ pub(crate) fn generate_eager_reader_artifacts(
         let parameters_content =
             format!("export type {reader_parameters_type} = {parameters_types}\n");
         path_and_contents.push(ArtifactPathAndContent {
-            file_name_prefix: *RESOLVER_PARAMETERS_TYPE,
+            file_name: *RESOLVER_PARAMETERS_TYPE_FILE_NAME,
             file_content: parameters_content,
             type_and_field: Some(ObjectTypeAndFieldName {
                 type_name: parent_type.name,
@@ -176,7 +177,7 @@ pub(crate) fn generate_eager_reader_condition_artifact(
     );
 
     ArtifactPathAndContent {
-        file_name_prefix: *RESOLVER_READER,
+        file_name: *RESOLVER_READER_FILE_NAME,
         file_content: reader_content,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
@@ -252,7 +253,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
         }};\n",
     );
     ArtifactPathAndContent {
-        file_name_prefix: *RESOLVER_PARAM_TYPE,
+        file_name: *RESOLVER_PARAM_TYPE_FILE_NAME,
         file_content: param_type_content,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
@@ -296,7 +297,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact(
         };
 
     ArtifactPathAndContent {
-        file_name_prefix: *RESOLVER_OUTPUT_TYPE,
+        file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
         file_content: final_output_type_text,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
