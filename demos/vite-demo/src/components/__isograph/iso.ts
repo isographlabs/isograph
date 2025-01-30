@@ -66,7 +66,7 @@ export function iso<T>(
 export function iso(_isographLiteralText: string):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
-  | IsographEntrypoint<any, any>
+  | IsographEntrypoint<any, any, any>
 {
   throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
       'was not set up, or it failed to identify this call site. Make sure it ' +

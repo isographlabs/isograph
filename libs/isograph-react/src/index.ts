@@ -3,6 +3,7 @@ export {
   unretainQuery,
   type RetainedQuery,
   garbageCollectEnvironment,
+  type DidUnretainSomeQuery,
 } from './core/garbageCollection';
 export {
   type PromiseWrapper,
@@ -10,8 +11,20 @@ export {
   getPromiseState,
   wrapResolvedValue,
   wrapPromise,
+  type PromiseState,
+  type Result,
+  type AnyError,
+  type NotSet,
+  NOT_SET,
 } from './core/PromiseWrapper';
-export { subscribe, normalizeData } from './core/cache';
+export {
+  subscribe,
+  normalizeData,
+  type NetworkResponseObject,
+  type NetworkResponseValue,
+  type NetworkResponseScalarValue,
+  type EncounteredIds,
+} from './core/cache';
 export { makeNetworkRequest } from './core/makeNetworkRequest';
 export {
   ROOT_ID,
@@ -20,10 +33,21 @@ export {
   type IsographEnvironment,
   type IsographNetworkFunction,
   type IsographStore,
+  type MissingFieldHandler,
   type Link,
   type StoreRecord,
+  type CacheMap,
   createIsographEnvironment,
   createIsographStore,
+  type ComponentCache,
+  type Subscriptions,
+  type Subscription,
+  type TypeName,
+  type FragmentSubscription,
+  type AnyChangesToRecordSubscription,
+  type AnyRecordSubscription,
+  type ComponentOrFieldName,
+  type StringifiedArgs,
 } from './core/IsographEnvironment';
 export {
   type EagerReaderArtifact,
@@ -36,12 +60,18 @@ export {
   type ReaderScalarField,
   type TopLevelReaderArtifact,
   type LoadableField,
+  type StableId,
   type ResolverFirstParameter,
+  type ReaderImperativelyLoadedField,
+  type ReaderLoadableField,
+  type ReaderLinkeField,
   type StartUpdate,
 } from './core/reader';
 export {
   type NormalizationAst,
   type NormalizationAstNode,
+  type NormalizationAstNodes,
+  type NormalizationAstLoader,
   type NormalizationLinkedField,
   type NormalizationScalarField,
   type IsographEntrypoint,
@@ -52,8 +82,16 @@ export {
   type ExtractReadFromStore,
   type ExtractResolverResult,
   type NetworkRequestInfo,
+  type NormalizationInlineFragment,
+  type ReaderWithRefetchQueries,
+  type IsographEntrypointLoader,
 } from './core/entrypoint';
-export { readButDoNotEvaluate } from './core/read';
+export {
+  readButDoNotEvaluate,
+  type WithEncounteredRecords,
+  type NetworkRequestReaderOptions,
+  type ReadDataResult,
+} from './core/read';
 export {
   type ExtractSecondParam,
   type CombineWithIntrinsicAttributes,
@@ -67,23 +105,40 @@ export {
   type Variables,
   type ExtractParameters,
   type ExtractData,
+  type UnknownTReadFromStore,
   stableIdForFragmentReference,
+  type ExtractStartUpdate,
+  type VariableValue,
 } from './core/FragmentReference';
 export {
   type LogMessage,
   type LogFunction,
+  type WrappedLogFunction,
   logMessage,
   registerLogger,
 } from './core/logging';
-export { check, CheckResult, FetchOptions, ShouldFetch } from './core/check';
+export {
+  check,
+  type CheckResult,
+  type FetchOptions,
+  type RequiredFetchOptions,
+  type ShouldFetch,
+  type RequiredShouldFetch,
+} from './core/check';
 
 export {
   IsographEnvironmentProvider,
   useIsographEnvironment,
   type IsographEnvironmentProviderProps,
 } from './react/IsographEnvironmentProvider';
-export { useImperativeReference } from './react/useImperativeReference';
-export { FragmentReader } from './react/FragmentReader';
+export {
+  useImperativeReference,
+  type UseImperativeReferenceResult,
+} from './react/useImperativeReference';
+export {
+  FragmentReader,
+  type IsExactlyIntrinsicAttributes,
+} from './react/FragmentReader';
 export { useResult } from './react/useResult';
 export {
   useReadAndSubscribe,
@@ -94,7 +149,23 @@ export { useRerenderOnChange } from './react/useRerenderOnChange';
 export { RenderAfterCommit__DO_NOT_USE } from './react/RenderAfterCommit__DO_NOT_USE';
 
 export { useClientSideDefer } from './loadable-hooks/useClientSideDefer';
-export { useImperativeExposedMutationField } from './loadable-hooks/useImperativeExposedMutationField';
-export { useSkipLimitPagination } from './loadable-hooks/useSkipLimitPagination';
-export { useConnectionSpecPagination } from './loadable-hooks/useConnectionSpecPagination';
-export { useImperativeLoadableField } from './loadable-hooks/useImperativeLoadableField';
+export {
+  useImperativeExposedMutationField,
+  type UseImperativeLoadableFieldReturn as UseImperativeExposedMutationFieldReturn,
+} from './loadable-hooks/useImperativeExposedMutationField';
+export {
+  useSkipLimitPagination,
+  type UseSkipLimitPaginationArgs,
+  type UseSkipLimitReturnValue,
+} from './loadable-hooks/useSkipLimitPagination';
+export {
+  useConnectionSpecPagination,
+  type Connection,
+  type PageInfo,
+  type UseConnectionSpecPaginationArgs,
+  type UsePaginationReturnValue,
+} from './loadable-hooks/useConnectionSpecPagination';
+export {
+  useImperativeLoadableField,
+  type UseImperativeLoadableFieldReturn,
+} from './loadable-hooks/useImperativeLoadableField';

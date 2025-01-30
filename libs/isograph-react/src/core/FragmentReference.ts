@@ -8,6 +8,12 @@ export type VariableValue = string | number | boolean | null | object;
 
 export type Variables = { readonly [index: string]: VariableValue };
 
+export type UnknownTReadFromStore = {
+  parameters: object;
+  data: object;
+  startUpdate?: StartUpdate<object>;
+};
+
 export type ExtractData<T> = T extends {
   data: infer D extends object;
 }
@@ -27,11 +33,7 @@ export type ExtractStartUpdate<
 > = T['startUpdate'];
 
 export type FragmentReference<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
 > = {
   readonly kind: 'FragmentReference';

@@ -9,6 +9,8 @@ import {
   NormalizationLinkedField,
   NormalizationScalarField,
   RefetchQueryNormalizationArtifactWrapper,
+  type NormalizationAst,
+  type NormalizationAstLoader,
   type NormalizationAstNodes,
 } from '../core/entrypoint';
 import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
@@ -17,6 +19,7 @@ import {
   ExtractParameters,
   FragmentReference,
   Variables,
+  type UnknownTReadFromStore,
 } from './FragmentReference';
 import {
   DataId,
@@ -33,22 +36,13 @@ import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import { wrapResolvedValue } from './PromiseWrapper';
 import { readButDoNotEvaluate, WithEncounteredRecords } from './read';
-import {
-  ReaderLinkedField,
-  ReaderScalarField,
-  type ReaderAst,
-  type StartUpdate,
-} from './reader';
+import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
 import { Argument, ArgumentValue } from './util';
 
 export const TYPENAME_FIELD_NAME = '__typename';
 
 export function getOrCreateItemInSuspenseCache<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
 >(
   environment: IsographEnvironment,
@@ -92,15 +86,16 @@ export function stableCopy<T>(value: T): T {
 }
 
 export function getOrCreateCacheForArtifact<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
+  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 >(
   environment: IsographEnvironment,
-  entrypoint: IsographEntrypoint<TReadFromStore, TClientFieldValue>,
+  entrypoint: IsographEntrypoint<
+    TReadFromStore,
+    TClientFieldValue,
+    TNormalizationAst
+  >,
   variables: ExtractParameters<TReadFromStore>,
   fetchOptions?: FetchOptions<TClientFieldValue>,
 ): ParentCache<FragmentReference<TReadFromStore, TClientFieldValue>> {
@@ -137,8 +132,8 @@ export function getOrCreateCacheForArtifact<
   return getOrCreateItemInSuspenseCache(environment, cacheKey, factory);
 }
 
-type NetworkResponseScalarValue = string | number | boolean;
-type NetworkResponseValue =
+export type NetworkResponseScalarValue = string | number | boolean;
+export type NetworkResponseValue =
   | NetworkResponseScalarValue
   | null
   | NetworkResponseObject
@@ -221,13 +216,7 @@ export function subscribeToAnyChangesToRecord(
 }
 
 // TODO we should re-read and call callback if the value has changed
-export function subscribe<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
->(
+export function subscribe<TReadFromStore extends UnknownTReadFromStore>(
   environment: IsographEnvironment,
   encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
   fragmentReference: FragmentReference<TReadFromStore, any>,

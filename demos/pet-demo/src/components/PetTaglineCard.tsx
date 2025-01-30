@@ -1,6 +1,5 @@
 import { iso } from '@iso';
 import { FragmentReader, useImperativeReference } from '@isograph/react';
-import { UNASSIGNED_STATE } from '@isograph/react-disposable-state';
 import { Button, Card, CardContent } from '@mui/material';
 import React, { Suspense } from 'react';
 
@@ -23,7 +22,7 @@ export const PetTaglineCard = iso(`
       <CardContent>
         <h2>Tagline</h2>
         <p>&quot;{pet.tagline}&quot;</p>
-        {mutationRef === UNASSIGNED_STATE ? (
+        {mutationRef === null ? (
           <Button
             onClick={() => {
               loadMutation({

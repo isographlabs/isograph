@@ -45,8 +45,7 @@ pub(crate) fn write_artifacts_to_disk(
             }
         })?;
 
-        let absolute_file_path =
-            absolute_directory.join(format!("{}.ts", path_and_content.file_name_prefix));
+        let absolute_file_path = absolute_directory.join(path_and_content.file_name.lookup());
         let mut file = File::create(&absolute_file_path).map_err(|e| {
             GenerateArtifactsError::UnableToWriteToArtifactFile {
                 path: absolute_file_path.clone(),

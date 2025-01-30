@@ -1,7 +1,7 @@
 export type AnyError = any;
 
-const NOT_SET: Symbol = Symbol('NOT_SET');
-type NotSet = typeof NOT_SET;
+export const NOT_SET: Symbol = Symbol('NOT_SET');
+export type NotSet = typeof NOT_SET;
 
 export type Result<T, E> =
   | {

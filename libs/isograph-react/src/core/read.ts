@@ -16,6 +16,7 @@ import {
   ExtractParameters,
   FragmentReference,
   Variables,
+  type UnknownTReadFromStore,
 } from './FragmentReference';
 import {
   assertLink,
@@ -33,7 +34,7 @@ import {
   wrapPromise,
   wrapResolvedValue,
 } from './PromiseWrapper';
-import { ReaderAst, type StartUpdate } from './reader';
+import { ReaderAst } from './reader';
 import { startUpdate } from './startUpdate';
 import { Arguments } from './util';
 
@@ -43,11 +44,7 @@ export type WithEncounteredRecords<T> = {
 };
 
 export function readButDoNotEvaluate<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
 >(
   environment: IsographEnvironment,
   fragmentReference: FragmentReference<TReadFromStore, unknown>,
@@ -522,7 +519,7 @@ function readData<TReadFromStore>(
               // Fetcher
               () => {
                 const fragmentReferenceAndDisposeFromEntrypoint = (
-                  entrypoint: IsographEntrypoint<any, any>,
+                  entrypoint: IsographEntrypoint<any, any, any>,
                 ): [FragmentReference<any, any>, CleanupFn] => {
                   const [networkRequest, disposeNetworkRequest] =
                     maybeMakeNetworkRequest(

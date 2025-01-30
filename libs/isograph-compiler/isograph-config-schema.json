@@ -85,18 +85,30 @@
       "type": "object",
       "properties": {
         "include_file_extensions_in_import_statements": {
+          "description": "Should the compiler include file extensions in import statements in generated files? e.g. should it import ./param_type or ./param_type.ts?",
           "default": false,
           "type": "boolean"
         },
         "module": {
-          "$ref": "#/definitions/ConfigFileJavascriptModule"
+          "description": "The babel plugin transforms isograph literals containing entrypoints into imports or requires of the generated entrypoint.ts file. Should it generate require calls or esmodule imports?",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ConfigFileJavascriptModule"
+            }
+          ]
         },
         "no_babel_transform": {
+          "description": "Set this to true if you don't have the babel transform enabled.",
           "default": false,
           "type": "boolean"
         },
         "on_invalid_id_type": {
-          "$ref": "#/definitions/ConfigFileOptionalValidationLevel"
+          "description": "What the compiler should do if it encounters an id field whose type is not ID! or ID.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ConfigFileOptionalValidationLevel"
+            }
+          ]
         }
       },
       "additionalProperties": false

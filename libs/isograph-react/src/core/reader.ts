@@ -6,7 +6,11 @@ import {
   RefetchQueryNormalizationArtifact,
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
-import { ExtractParameters, FragmentReference } from './FragmentReference';
+import {
+  ExtractParameters,
+  FragmentReference,
+  type UnknownTReadFromStore,
+} from './FragmentReference';
 import {
   ComponentOrFieldName,
   IsographEnvironment,
@@ -15,11 +19,7 @@ import {
 import { Arguments } from './util';
 
 export type TopLevelReaderArtifact<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
   TComponentProps extends Record<PropertyKey, never>,
 > =
@@ -27,11 +27,7 @@ export type TopLevelReaderArtifact<
   | ComponentReaderArtifact<TReadFromStore, TComponentProps>;
 
 export type EagerReaderArtifact<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
 > = {
   readonly kind: 'EagerReaderArtifact';
@@ -43,11 +39,7 @@ export type EagerReaderArtifact<
 };
 
 export type ComponentReaderArtifact<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TComponentProps extends Record<string, unknown> = Record<PropertyKey, never>,
 > = {
   readonly kind: 'ComponentReaderArtifact';
@@ -61,11 +53,7 @@ export type ComponentReaderArtifact<
 };
 
 export type ResolverFirstParameter<
-  TReadFromStore extends {
-    data: object;
-    parameters: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
 > = Pick<TReadFromStore, 'data' | 'parameters' | 'startUpdate'>;
 
 export type StartUpdate<UpdatableData> = (
@@ -154,11 +142,11 @@ export type ReaderLoadableField = {
 
   // TODO we should not type these as any
   readonly entrypoint:
-    | IsographEntrypoint<any, any>
+    | IsographEntrypoint<any, any, any>
     | IsographEntrypointLoader<any, any>;
 };
 
-type StableId = string;
+export type StableId = string;
 /// Why is LoadableField the way it is? Let's work backwards.
 ///
 /// We ultimately need a stable id (for deduplication) and a way to produce a
@@ -169,11 +157,7 @@ type StableId = string;
 /// except to stringify the args or whatnot. Calling the factory can be
 /// expensive. For example, doing so will probably trigger a network request.
 export type LoadableField<
-  TReadFromStore extends {
-    data: object;
-    parameters: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TResult,
   TArgs = ExtractParameters<TReadFromStore>,
 > = (

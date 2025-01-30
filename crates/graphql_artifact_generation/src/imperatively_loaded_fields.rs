@@ -30,7 +30,7 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
             ..
         } = &self;
 
-        let file_name_prefix = format!("{}__{}", *REFETCH_FIELD_NAME, refetch_query_index.0)
+        let file_name_prefix = format!("{}__{}.ts", *REFETCH_FIELD_NAME, refetch_query_index.0)
             .intern()
             .into();
 
@@ -39,7 +39,7 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
 
         ArtifactPathAndContent {
             file_content: self.file_contents(),
-            file_name_prefix,
+            file_name: file_name_prefix,
             type_and_field: Some(ObjectTypeAndFieldName {
                 type_name,
                 field_name,
