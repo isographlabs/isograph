@@ -4,7 +4,7 @@ export type Pet__PetBestFriendCard__param = {
   readonly data: {
     readonly id: string,
     /**
-# Pet.PetUpdater
+Pet.PetUpdater
 A component to test behavior with respect to mutations.
 You can update the best friend and the tagline.
     */
