@@ -71,8 +71,8 @@ fn write_object(
     )?;
     let typename = "__typename".intern().into();
     for (field_name, field_type) in object.encountered_fields.iter() {
-        // HACK: skip typenames
-        if field_name == &typename {
+        // HACK: skip typenames and fields starting with __
+        if field_name == &typename || field_name.lookup().starts_with("__") {
             continue;
         }
         match field_type {
