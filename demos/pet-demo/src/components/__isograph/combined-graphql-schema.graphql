@@ -1,0 +1,389 @@
+"""
+A scalar representing an Isograph field defined with the 
+iso function.
+"""
+scalar IsographClientField
+
+"""
+A scalar representing an Isograph field defined with the
+iso function and annotated with @component.
+"""
+scalar IsographClientComponentField
+
+"""
+A scalar representing an Isograph imperatively loaded field.
+This type is deprecated. Use @loadable fields instead.
+"""
+scalar IsographImperativelyLoadedField
+
+"""
+A scalar representing a pointer to an Isograph object (specifically,
+a pointer to the object on which the link field was selected.)
+"""
+scalar IsographLinkField
+
+type Query {
+    """
+    Defined as `export const HomeRoute` in `src/components/HomeRoute.tsx`
+    """
+    HomeRoute: IsographClientComponentField
+    """
+    Defined as `export const Newsfeed` in `src/components/Newsfeed/NewsfeedRoute.tsx`
+    """
+    Newsfeed: IsographClientComponentField
+    """
+    Defined as `export const PetByNameRouteComponent` in `src/components/PetByName.tsx`
+    """
+    PetByName: IsographClientComponentField
+    """
+    Defined as `export const PetDetailDeferredRouteComponent` in `src/components/PetCheckinListRoute.tsx`
+    """
+    PetCheckinListRoute: IsographClientComponentField
+    """
+    Defined as `export const PetDetailDeferredRouteComponent` in `src/components/PetDetailDeferredRoute.tsx`
+    """
+    PetDetailDeferredRoute: IsographClientComponentField
+    """
+    Defined as `export const PetDetailRouteComponent` in `src/components/PetDetailRoute.tsx`
+    """
+    PetDetailRoute: IsographClientComponentField
+    """
+    Defined as `export const PetFavoritePhrase` in `src/components/FavoritePhrase.tsx`
+    """
+    PetFavoritePhrase: IsographClientComponentField
+    """
+    A store Link for the Query type.
+    """
+    link: IsographLinkField
+    node: Node
+    pet: Pet
+    petByName: Pet
+    pets: [Pet!]
+    viewer: Viewer!
+}
+
+type Viewer {
+    """
+    Defined as `export const NewsfeedPaginationComponent` in `src/components/Newsfeed/NewsfeedPagination.tsx`
+    """
+    NewsfeedPaginationComponent: IsographClientField
+    """
+    A refetch field for the Viewer type.
+    """
+    __refetch: IsographImperativelyLoadedField
+    id: ID!
+    """
+    A store Link for the Viewer type.
+    """
+    link: IsographLinkField
+    newsfeed: [NewsfeedItem!]
+}
+
+type Mutation {
+    """
+    Defined as `export const setTagline` in `src/components/PetTaglineCard.tsx`
+    """
+    SetTagline: IsographClientComponentField
+    """
+    A store Link for the Mutation type.
+    """
+    link: IsographLinkField
+    make_checkin_super: MakeCheckinSuperResponse!
+    set_pet_best_friend: SetBestFriendResponse!
+    set_pet_tagline: SetPetTaglineResponse!
+}
+
+type Node {
+    """
+    A refetch field for the Node type.
+    """
+    __refetch: IsographImperativelyLoadedField
+    asAdItem: AdItem
+    asBlogItem: BlogItem
+    asImage: Image
+    asPet: Pet
+    asViewer: Viewer
+    id: ID!
+    """
+    A store Link for the Node type.
+    """
+    link: IsographLinkField
+}
+
+type MakeCheckinSuperResponse {
+    """
+    This interface exists solely allow make_checkin_super to
+return an interface
+    """
+    checkin: ICheckin
+    """
+    A store Link for the MakeCheckinSuperResponse type.
+    """
+    link: IsographLinkField
+}
+
+type SetBestFriendResponse {
+    """
+    A store Link for the SetBestFriendResponse type.
+    """
+    link: IsographLinkField
+    pet: Pet!
+}
+
+type SetPetTaglineParams {
+    id: ID!
+    """
+    A store Link for the SetPetTaglineParams type.
+    """
+    link: IsographLinkField
+    tagline: String!
+}
+
+type SetPetTaglineResponse {
+    """
+    A store Link for the SetPetTaglineResponse type.
+    """
+    link: IsographLinkField
+    pet: Pet!
+}
+
+type Pet {
+    """
+    Defined as `export const FavoritePhraseLoader` in `src/components/FavoritePhrase.tsx`
+    """
+    FavoritePhraseLoader: IsographClientComponentField
+    """
+    Defined as `export const FirstCheckinMakeSuperButton` in `src/components/PetMakeFirstCheckinSuperButton.tsx`
+    """
+    FirstCheckinMakeSuperButton: IsographClientComponentField
+    """
+    Defined as `export const PetBestFriendCard` in `src/components/PetBestFriendCard.tsx`
+    """
+    PetBestFriendCard: IsographClientComponentField
+    """
+    Defined as `export const PetCheckinsCard` in `src/components/PetCheckinsCard.tsx`
+    """
+    PetCheckinsCard: IsographClientComponentField
+    """
+    Defined as `export const PetCheckinsCardList` in `src/components/PetCheckinsCard.tsx`
+    """
+    PetCheckinsCardList: IsographClientField
+    """
+    Defined as `export const PetDetailDeferredRouteInnerComponent` in `src/components/PetDetailDeferredRoute.tsx`
+    """
+    PetDetailDeferredRouteInnerComponent: IsographClientComponentField
+    """
+    Defined as `export const PetPhraseCard` in `src/components/PetPhraseCard.tsx`
+    """
+    PetPhraseCard: IsographClientComponentField
+    """
+    Defined as `export const PetStatsCard` in `src/components/PetStatsCard.tsx`
+    """
+    PetStatsCard: IsographClientComponentField
+    """
+    Defined as `export const PetSummaryCard` in `src/components/PetSummaryCard.tsx`
+    """
+    PetSummaryCard: IsographClientComponentField
+    """
+    Defined as `export const PetTaglineCard` in `src/components/PetTaglineCard.tsx`
+    """
+    PetTaglineCard: IsographClientComponentField
+    """
+    # Pet.PetUpdater
+A component to test behavior with respect to mutations.
+You can update the best friend and the tagline.
+    -------
+    Defined as `export const PetUpdater` in `src/components/PetUpdater.tsx`
+    """
+    PetUpdater: IsographClientComponentField
+    """
+    Defined as `export const Unreachable2` in `src/components/UnreachableFromEntrypoint.tsx`
+    """
+    Unreachable2: IsographClientField
+    """
+    Defined as `export const unreachableFromEntrypoint` in `src/components/UnreachableFromEntrypoint.tsx`
+    """
+    UnreachableFromEntrypoint: IsographClientField
+    """
+    A refetch field for the Pet type.
+    """
+    __refetch: IsographImperativelyLoadedField
+    age: Int!
+    alt_tagline: String!
+    best_friend_relationship: BestFriendRelationship
+    checkins: [Checkin!]
+    favorite_phrase: String
+    id: ID!
+    """
+    A store Link for the Pet type.
+    """
+    link: IsographLinkField
+    name: String!
+    nickname: String
+    picture: Url!
+    potential_new_best_friends: [Pet!]
+    set_best_friend: IsographImperativelyLoadedField
+    set_best_friend_do_not_use: IsographImperativelyLoadedField
+    set_best_friend_do_not_use_2: IsographImperativelyLoadedField
+    set_pet_tagline: IsographImperativelyLoadedField
+    stats: PetStats
+    tagline: String!
+}
+
+type BestFriendRelationship {
+    best_friend: Pet!
+    """
+    A store Link for the BestFriendRelationship type.
+    """
+    link: IsographLinkField
+    picture_together: Url
+}
+
+type PetStats {
+    cuteness: Int
+    energy: Int
+    hunger: Int
+    intelligence: Int
+    """
+    A store Link for the PetStats type.
+    """
+    link: IsographLinkField
+    refetch_pet_stats: IsographImperativelyLoadedField
+    sociability: Int
+    weight: Int
+}
+
+type Checkin {
+    """
+    Defined as `export const CheckinDisplay` in `src/components/PetCheckinsCard.tsx`
+    """
+    CheckinDisplay: IsographClientComponentField
+    """
+    A refetch field for the Checkin type.
+    """
+    __refetch: IsographImperativelyLoadedField
+    id: ID!
+    """
+    A store Link for the Checkin type.
+    """
+    link: IsographLinkField
+    location: String!
+    make_super: IsographImperativelyLoadedField
+    time: String!
+}
+
+"""
+This interface exists solely allow make_checkin_super to
+return an interface
+"""
+type ICheckin {
+    """
+    A refetch field for the ICheckin type.
+    """
+    __refetch: IsographImperativelyLoadedField
+    asCheckin: Checkin
+    id: ID!
+    """
+    A store Link for the ICheckin type.
+    """
+    link: IsographLinkField
+    location: String!
+    make_super: IsographImperativelyLoadedField
+    time: String!
+}
+
+type NewsfeedItem {
+    """
+    Defined as `export const NewsfeedAdOrBlog` in `src/components/Newsfeed/NewsfeedRoute.tsx`
+    """
+    NewsfeedAdOrBlog: IsographClientComponentField
+    asAdItem: AdItem
+    asBlogItem: BlogItem
+    """
+    A store Link for the NewsfeedItem type.
+    """
+    link: IsographLinkField
+}
+
+type BlogItem {
+    """
+    Defined as `export const BlogItem` in `src/components/Newsfeed/BlogItem.tsx`
+    """
+    BlogItemDisplay: IsographClientComponentField
+    """
+    Defined as `export const BlogItemMoreDetail` in `src/components/Newsfeed/BlogItemMoreDetail.tsx`
+    """
+    BlogItemMoreDetail: IsographClientComponentField
+    """
+    Defined as `export const NewsfeedAdOrBlog` in `src/components/Newsfeed/NewsfeedRoute.tsx`
+    """
+    NewsfeedAdOrBlog: IsographClientComponentField
+    """
+    A refetch field for the BlogItem type.
+    """
+    __refetch: IsographImperativelyLoadedField
+    author: String!
+    content: String!
+    id: ID!
+    image: Image
+    """
+    A store Link for the BlogItem type.
+    """
+    link: IsographLinkField
+    moreContent: String!
+    title: String!
+}
+
+type Image {
+    """
+    Defined as `export const ImageDisplay` in `src/components/Newsfeed/ImageDisplay.tsx`
+    """
+    ImageDisplay: IsographClientComponentField
+    """
+    Defined as `export const ImageDisplayWrapper` in `src/components/Newsfeed/BlogItem.tsx`
+    """
+    ImageDisplayWrapper: IsographClientComponentField
+    """
+    A refetch field for the Image type.
+    """
+    __refetch: IsographImperativelyLoadedField
+    id: ID!
+    """
+    A store Link for the Image type.
+    """
+    link: IsographLinkField
+    url: String!
+}
+
+type AdItem {
+    """
+    Defined as `export const BlogItem` in `src/components/Newsfeed/AdItem.tsx`
+    """
+    AdItemDisplay: IsographClientComponentField
+    """
+    Defined as `export const AdItemDisplayWrapper` in `src/components/Newsfeed/AdItemDisplayWrapper.tsx`
+    """
+    AdItemDisplayWrapper: IsographClientComponentField
+    """
+    Defined as `export const NewsfeedAdOrBlog` in `src/components/Newsfeed/NewsfeedRoute.tsx`
+    """
+    NewsfeedAdOrBlog: IsographClientComponentField
+    """
+    A refetch field for the AdItem type.
+    """
+    __refetch: IsographImperativelyLoadedField
+    advertiser: String!
+    id: ID!
+    """
+    A store Link for the AdItem type.
+    """
+    link: IsographLinkField
+    message: String!
+}
+
+scalar ID
+scalar String
+scalar Boolean
+scalar Float
+scalar Int
+scalar Url
