@@ -26,6 +26,7 @@ use std::{
 };
 
 use crate::{
+    build_combined_graphql_schema::build_combined_graphql_schema,
     eager_reader_artifact::{
         generate_eager_reader_artifacts, generate_eager_reader_condition_artifact,
         generate_eager_reader_output_type_artifact, generate_eager_reader_param_type_artifact,
@@ -61,6 +62,8 @@ lazy_static! {
     pub static ref RESOLVER_READER_FILE_NAME: ArtifactFileName =
         "resolver_reader.ts".intern().into();
     pub static ref RESOLVER_READER: ArtifactFilePrefix = "resolver_reader".intern().into();
+    pub static ref COMBINED_GRAPHQL_SCHEMA_FILE_NAME: ArtifactFileName =
+        "combined-graphql-schema.graphql".intern().into();
 }
 
 /// Get all artifacts according to the following scheme:
@@ -318,6 +321,10 @@ pub fn get_artifact_path_and_content(
         config.options.include_file_extensions_in_import_statements,
         config.options.no_babel_transform,
     ));
+
+    if config.options.generate_combined_schema {
+        path_and_contents.push(build_combined_graphql_schema(schema));
+    }
 
     path_and_contents
 }

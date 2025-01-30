@@ -84,6 +84,10 @@
     "ConfigFileOptions": {
       "type": "object",
       "properties": {
+        "generate_combined_schema": {
+          "default": false,
+          "type": "boolean"
+        },
         "include_file_extensions_in_import_statements": {
           "description": "Should the compiler include file extensions in import statements in generated files? e.g. should it import ./param_type or ./param_type.ts?",
           "default": false,
