@@ -6,7 +6,7 @@ import { PetId } from './routes';
 export const PetUpdater = iso(`
   field Pet.PetUpdater @component
   """
-  # Pet.PetUpdater
+  Pet.PetUpdater
   A component to test behavior with respect to mutations.
   You can update the best friend and the tagline.
   """
