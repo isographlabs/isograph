@@ -1,11 +1,15 @@
 import { ParentCache } from '@isograph/react-disposable-state';
 import { IsographEntrypoint } from './entrypoint';
-import { FragmentReference, Variables } from './FragmentReference';
+import {
+  FragmentReference,
+  Variables,
+  type UnknownTReadFromStore,
+} from './FragmentReference';
 import { RetainedQuery } from './garbageCollection';
 import { LogFunction, WrappedLogFunction } from './logging';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { WithEncounteredRecords } from './read';
-import type { ReaderAst, StartUpdate } from './reader';
+import type { ReaderAst } from './reader';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -15,22 +19,17 @@ type ComponentCache = {
   };
 };
 
-export type FragmentSubscription<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
-> = {
-  readonly kind: 'FragmentSubscription';
-  readonly callback: (
-    newEncounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
-  ) => void;
-  /** The value read out from the previous call to readButDoNotEvaluate */
-  readonly encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>;
-  readonly fragmentReference: FragmentReference<TReadFromStore, any>;
-  readonly readerAst: ReaderAst<TReadFromStore>;
-};
+export type FragmentSubscription<TReadFromStore extends UnknownTReadFromStore> =
+  {
+    readonly kind: 'FragmentSubscription';
+    readonly callback: (
+      newEncounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
+    ) => void;
+    /** The value read out from the previous call to readButDoNotEvaluate */
+    readonly encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>;
+    readonly fragmentReference: FragmentReference<TReadFromStore, any>;
+    readonly readerAst: ReaderAst<TReadFromStore>;
+  };
 
 type AnyChangesToRecordSubscription = {
   readonly kind: 'AnyChangesToRecord';

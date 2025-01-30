@@ -4,13 +4,14 @@ import {
   ExtractData,
   FragmentReference,
   stableIdForFragmentReference,
+  type UnknownTReadFromStore,
 } from '../core/FragmentReference';
 import {
   NetworkRequestReaderOptions,
   readButDoNotEvaluate,
   WithEncounteredRecords,
 } from '../core/read';
-import type { ReaderAst, StartUpdate } from '../core/reader';
+import type { ReaderAst } from '../core/reader';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import { useRerenderOnChange } from './useRerenderOnChange';
 
@@ -18,11 +19,7 @@ import { useRerenderOnChange } from './useRerenderOnChange';
  * Read the data from a fragment reference and subscribe to updates.
  */
 export function useReadAndSubscribe<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
 >(
   fragmentReference: FragmentReference<TReadFromStore, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
@@ -42,11 +39,7 @@ export function useReadAndSubscribe<
 }
 
 export function useSubscribeToMultiple<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
 >(
   items: ReadonlyArray<{
     records: WithEncounteredRecords<TReadFromStore>;

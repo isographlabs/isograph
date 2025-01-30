@@ -10,28 +10,23 @@ import {
 import { useState } from 'react';
 import { subscribeToAnyChange } from '../core/cache';
 import { FetchOptions } from '../core/check';
-import { FragmentReference } from '../core/FragmentReference';
+import {
+  FragmentReference,
+  type UnknownTReadFromStore,
+} from '../core/FragmentReference';
 import { getPromiseState, readPromise } from '../core/PromiseWrapper';
 import {
   readButDoNotEvaluate,
   type WithEncounteredRecords,
 } from '../core/read';
-import {
-  LoadableField,
-  type ReaderAst,
-  type StartUpdate,
-} from '../core/reader';
+import { LoadableField, type ReaderAst } from '../core/reader';
 import { startUpdate } from '../core/startUpdate';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 import { maybeUnwrapNetworkRequest } from '../react/useResult';
 
 type UsePaginationReturnValue<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TItem,
 > =
   | {
@@ -92,11 +87,7 @@ type UseConnectionSpecPaginationArgs = {
 };
 
 export function useConnectionSpecPagination<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TItem,
 >(
   loadableField: LoadableField<

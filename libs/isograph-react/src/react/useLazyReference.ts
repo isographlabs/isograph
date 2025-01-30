@@ -9,17 +9,13 @@ import {
 import {
   ExtractParameters,
   FragmentReference,
+  type UnknownTReadFromStore,
 } from '../core/FragmentReference';
 import { logMessage } from '../core/logging';
-import type { StartUpdate } from '../core/reader';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
 export function useLazyReference<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 >(

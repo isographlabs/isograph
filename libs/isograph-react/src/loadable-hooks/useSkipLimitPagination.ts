@@ -10,28 +10,23 @@ import {
 import { useState } from 'react';
 import { subscribeToAnyChange } from '../core/cache';
 import { FetchOptions } from '../core/check';
-import { FragmentReference } from '../core/FragmentReference';
+import {
+  FragmentReference,
+  type UnknownTReadFromStore,
+} from '../core/FragmentReference';
 import { getPromiseState, readPromise } from '../core/PromiseWrapper';
 import {
   readButDoNotEvaluate,
   type WithEncounteredRecords,
 } from '../core/read';
-import {
-  LoadableField,
-  type ReaderAst,
-  type StartUpdate,
-} from '../core/reader';
+import { LoadableField, type ReaderAst } from '../core/reader';
 import { startUpdate } from '../core/startUpdate';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 import { maybeUnwrapNetworkRequest } from '../react/useResult';
 
 type UseSkipLimitReturnValue<
-  TReadFromStore extends {
-    data: object;
-    parameters: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TItem,
 > =
   | {
@@ -52,11 +47,7 @@ type UseSkipLimitReturnValue<
     };
 
 type ArrayFragmentReference<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TItem,
 > = FragmentReference<TReadFromStore, ReadonlyArray<TItem>>;
 
@@ -89,11 +80,7 @@ type UseSkipLimitPaginationArgs = {
 
 export function useSkipLimitPagination<
   TItem,
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
 >(
   loadableField: LoadableField<
     TReadFromStore,

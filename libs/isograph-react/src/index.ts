@@ -70,6 +70,7 @@ export {
   type Variables,
   type ExtractParameters,
   type ExtractData,
+  type UnknownTReadFromStore,
   stableIdForFragmentReference,
 } from './core/FragmentReference';
 export {
