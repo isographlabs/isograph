@@ -53,7 +53,10 @@ export {
   type ExtractResolverResult,
   type NetworkRequestInfo,
 } from './core/entrypoint';
-export { readButDoNotEvaluate } from './core/read';
+export {
+  readButDoNotEvaluate,
+  type NetworkRequestReaderOptions,
+} from './core/read';
 export {
   type ExtractSecondParam,
   type CombineWithIntrinsicAttributes,
