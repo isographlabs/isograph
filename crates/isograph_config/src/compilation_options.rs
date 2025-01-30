@@ -224,9 +224,17 @@ pub fn create_config(
 #[derive(Deserialize, Default, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConfigFileOptions {
+    /// What the compiler should do if it encounters an id field whose
+    /// type is not ID! or ID.
     on_invalid_id_type: ConfigFileOptionalValidationLevel,
+    /// Set this to true if you don't have the babel transform enabled.
     no_babel_transform: bool,
+    /// Should the compiler include file extensions in import statements in
+    /// generated files? e.g. should it import ./param_type or ./param_type.ts?
     include_file_extensions_in_import_statements: bool,
+    /// The babel plugin transforms isograph literals containing entrypoints
+    /// into imports or requires of the generated entrypoint.ts file. Should
+    /// it generate require calls or esmodule imports?
     module: ConfigFileJavascriptModule,
 }
 
