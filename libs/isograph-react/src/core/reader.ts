@@ -11,6 +11,7 @@ import {
   ExtractParameters,
   FragmentReference,
   type ExtractStartUpdate,
+  type UnknownTReadFromStore,
 } from './FragmentReference';
 import {
   ComponentOrFieldName,
@@ -20,11 +21,7 @@ import {
 import { Arguments } from './util';
 
 export type TopLevelReaderArtifact<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
   TComponentProps extends Record<PropertyKey, never>,
 > =
@@ -32,11 +29,7 @@ export type TopLevelReaderArtifact<
   | ComponentReaderArtifact<TReadFromStore, TComponentProps>;
 
 export type EagerReaderArtifact<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
 > = {
   readonly kind: 'EagerReaderArtifact';
@@ -48,11 +41,7 @@ export type EagerReaderArtifact<
 };
 
 export type ComponentReaderArtifact<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TComponentProps extends Record<string, unknown> = Record<PropertyKey, never>,
 > = {
   readonly kind: 'ComponentReaderArtifact';
@@ -66,11 +55,7 @@ export type ComponentReaderArtifact<
 };
 
 export type ResolverFirstParameter<
-  TReadFromStore extends {
-    data: object;
-    parameters: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
 > = {
   data: ExtractData<TReadFromStore>;
   parameters: ExtractParameters<TReadFromStore>;
@@ -178,11 +163,7 @@ export type StableId = string;
 /// except to stringify the args or whatnot. Calling the factory can be
 /// expensive. For example, doing so will probably trigger a network request.
 export type LoadableField<
-  TReadFromStore extends {
-    data: object;
-    parameters: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TResult,
   TArgs = ExtractParameters<TReadFromStore>,
 > = (

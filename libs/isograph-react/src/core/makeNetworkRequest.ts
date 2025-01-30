@@ -8,7 +8,11 @@ import {
   type NormalizationAst,
   type NormalizationAstLoader,
 } from './entrypoint';
-import { ExtractParameters, type FragmentReference } from './FragmentReference';
+import {
+  ExtractParameters,
+  type FragmentReference,
+  type UnknownTReadFromStore,
+} from './FragmentReference';
 import {
   garbageCollectEnvironment,
   RetainedQuery,
@@ -24,17 +28,12 @@ import {
   wrapResolvedValue,
 } from './PromiseWrapper';
 import { readButDoNotEvaluate } from './read';
-import type { StartUpdate } from './reader';
 import { startUpdate } from './startUpdate';
 
 let networkRequestId = 0;
 
 export function maybeMakeNetworkRequest<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 >(
@@ -99,11 +98,7 @@ function loadNormalizationAst(
 }
 
 export function makeNetworkRequest<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 >(
@@ -241,11 +236,7 @@ type NetworkRequestStatus =
     };
 
 function readDataForOnComplete<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 >(

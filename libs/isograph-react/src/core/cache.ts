@@ -19,6 +19,7 @@ import {
   ExtractParameters,
   FragmentReference,
   Variables,
+  type UnknownTReadFromStore,
 } from './FragmentReference';
 import {
   DataId,
@@ -35,22 +36,13 @@ import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import { wrapResolvedValue } from './PromiseWrapper';
 import { readButDoNotEvaluate, WithEncounteredRecords } from './read';
-import {
-  ReaderLinkedField,
-  ReaderScalarField,
-  type ReaderAst,
-  type StartUpdate,
-} from './reader';
+import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
 import { Argument, ArgumentValue } from './util';
 
 export const TYPENAME_FIELD_NAME = '__typename';
 
 export function getOrCreateItemInSuspenseCache<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
 >(
   environment: IsographEnvironment,
@@ -94,11 +86,7 @@ export function stableCopy<T>(value: T): T {
 }
 
 export function getOrCreateCacheForArtifact<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 >(
@@ -228,13 +216,7 @@ export function subscribeToAnyChangesToRecord(
 }
 
 // TODO we should re-read and call callback if the value has changed
-export function subscribe<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
->(
+export function subscribe<TReadFromStore extends UnknownTReadFromStore>(
   environment: IsographEnvironment,
   encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
   fragmentReference: FragmentReference<TReadFromStore, any>,
