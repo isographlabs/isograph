@@ -230,8 +230,7 @@ fn get_read_out_data(field_map: &[FieldMapItem]) -> String {
                 ));
             } else {
                 s.push_str(&format!(
-                    "{spaces}variables.{path_so_far}{path_segment_item} = \
-                    variables.{path_so_far}{path_segment_item} ?? {{}};\n"
+                    "{spaces}variables.{path_so_far}{path_segment_item} ??= {{}};\n"
                 ));
                 path_so_far.push_str(&format!("{path_segment_item}."));
             }
