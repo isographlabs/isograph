@@ -167,7 +167,7 @@ export type ReaderLoadableField = {
     | IsographEntrypointLoader<any, any>;
 };
 
-type StableId = string;
+export type StableId = string;
 /// Why is LoadableField the way it is? Let's work backwards.
 ///
 /// We ultimately need a stable id (for deduplication) and a way to produce a

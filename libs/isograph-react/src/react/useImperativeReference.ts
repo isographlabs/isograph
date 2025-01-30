@@ -18,7 +18,7 @@ import { wrapResolvedValue } from '../core/PromiseWrapper';
 import type { StartUpdate } from '../core/reader';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
-type UseImperativeReferenceResult<
+export type UseImperativeReferenceResult<
   TReadFromStore extends {
     parameters: object;
     data: object;

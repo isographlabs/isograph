@@ -1,4 +1,4 @@
-type UseImperativeLoadableFieldReturn<TArgs> = {
+export type UseImperativeLoadableFieldReturn<TArgs> = {
   loadField: (args: TArgs) => void;
 };
 
