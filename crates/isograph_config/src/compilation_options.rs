@@ -34,13 +34,13 @@ pub struct CompilerConfig {
     pub schema_extensions: Vec<AbsolutePathAndRelativePath>,
 
     /// Various options that are of lesser importance
-    pub options: ConfigOptions,
+    pub options: CompilerConfigOptions,
 
     pub current_working_directory: CurrentWorkingDirectory,
 }
 
 #[derive(Default, Debug, Clone)]
-pub struct ConfigOptions {
+pub struct CompilerConfigOptions {
     pub on_invalid_id_type: OptionalValidationLevel,
     pub no_babel_transform: bool,
     pub include_file_extensions_in_import_statements: GenerateFileExtensionsOption,
@@ -255,8 +255,8 @@ pub enum ConfigFileJavascriptModule {
     EsModule,
 }
 
-fn create_options(options: ConfigFileOptions) -> ConfigOptions {
-    ConfigOptions {
+fn create_options(options: ConfigFileOptions) -> CompilerConfigOptions {
+    CompilerConfigOptions {
         on_invalid_id_type: create_optional_validation_level(options.on_invalid_id_type),
         no_babel_transform: options.no_babel_transform,
         include_file_extensions_in_import_statements: create_generate_file_extensions(

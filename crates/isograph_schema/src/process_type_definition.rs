@@ -19,7 +19,7 @@ use graphql_lang_types::{
     RootOperationKind,
 };
 use intern::{string_key::Intern, Lookup};
-use isograph_config::ConfigOptions;
+use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
     SelectableServerFieldId, ServerObjectId, ServerStrongIdFieldId, VariableDefinition,
 };
@@ -57,7 +57,7 @@ impl UnvalidatedSchema {
     pub fn process_graphql_type_system_document(
         &mut self,
         type_system_document: GraphQLTypeSystemDocument,
-        options: &ConfigOptions,
+        options: &CompilerConfigOptions,
     ) -> ProcessTypeDefinitionResult<ProcessGraphQLDocumentOutcome> {
         // In the schema, interfaces, unions and objects are the same type of object (SchemaType),
         // with e.g. interfaces "simply" being objects that can be refined to other
@@ -280,7 +280,7 @@ impl UnvalidatedSchema {
     pub fn process_graphql_type_extension_document(
         &mut self,
         extension_document: GraphQLTypeSystemExtensionDocument,
-        options: &ConfigOptions,
+        options: &CompilerConfigOptions,
     ) -> ProcessTypeDefinitionResult<ProcessGraphQLDocumentOutcome> {
         let mut definitions = Vec::with_capacity(extension_document.0.len());
         let mut extensions = Vec::with_capacity(extension_document.0.len());
@@ -362,7 +362,7 @@ impl UnvalidatedSchema {
         object_type_definition: IsographObjectTypeDefinition,
         // TODO this smells! We should probably pass Option<ServerIdFieldId>
         may_have_id_field: bool,
-        options: &ConfigOptions,
+        options: &CompilerConfigOptions,
         concrete_type: Option<IsographObjectTypeName>,
     ) -> ProcessTypeDefinitionResult<ProcessObjectTypeDefinitionOutcome> {
         let &mut Schema {
@@ -585,7 +585,7 @@ fn get_field_objects_ids_and_names(
     typename_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     // TODO this is hacky
     may_have_field_id: bool,
-    options: &ConfigOptions,
+    options: &CompilerConfigOptions,
 ) -> ProcessTypeDefinitionResult<FieldObjectIdsEtc> {
     let new_field_count = new_fields.len();
     let mut encountered_fields = BTreeMap::new();
@@ -727,7 +727,7 @@ fn set_and_validate_id_field(
     current_field_id: usize,
     field: &WithLocation<GraphQLFieldDefinition>,
     parent_type_name: IsographObjectTypeName,
-    options: &ConfigOptions,
+    options: &CompilerConfigOptions,
 ) -> ProcessTypeDefinitionResult<()> {
     // N.B. id_field is guaranteed to be None; otherwise field_names_to_type_name would
     // have contained this field name already.
