@@ -7,9 +7,7 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
 use isograph_lang_types::{
-    ClientFieldId, LinkedFieldSelection, LoadableDirectiveParameters, ScalarFieldSelection,
-    SelectableServerFieldId, SelectionFieldArgument, SelectionType, ServerFieldId,
-    ServerFieldSelection, ServerObjectId, ServerScalarId, TypeAnnotation, VariableDefinition,
+    ClientFieldId, ClientPointerId, LinkedFieldSelection, LoadableDirectiveParameters, ScalarFieldSelection, SelectableServerFieldId, SelectionFieldArgument, SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId, ServerScalarId, TypeAnnotation, VariableDefinition
 };
 use thiserror::Error;
 
@@ -65,7 +63,7 @@ pub type ValidatedSchemaIdField = SchemaIdField<ServerScalarId>;
 #[derive(Debug, Clone)]
 pub struct ValidatedLinkedFieldAssociatedData {
     pub parent_object_id: ServerObjectId,
-    pub field_id: FieldType<ServerFieldId, ()>,
+    pub field_id: FieldType<ServerFieldId, ClientPointerId>,
     // N.B. we don't actually support loadable linked fields
     pub selection_variant: ValidatedIsographSelectionVariant,
     /// Some if the object is concrete; None otherwise.

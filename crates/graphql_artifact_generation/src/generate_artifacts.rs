@@ -270,29 +270,22 @@ pub fn get_artifact_path_and_content(
             config.options.include_file_extensions_in_import_statements,
         ));
 
-        match user_written_client_type {
-            ClientType::ClientPointer(_) => {}
-            ClientType::ClientField(user_written_client_field) => {
-                match encountered_client_field_map
-                    .get(&FieldType::ClientField(user_written_client_field.id))
+        match encountered_client_field_map
+            .get(&FieldType::ClientField(user_written_client_type.id()))
+        {
+            Some(FieldTraversalResult {
+                traversal_state, ..
+            }) => {
+                // If this user-written client field is reachable from an entrypoint,
+                // we've already noted the accessible client fields
+                encountered_output_types.extend(traversal_state.accessible_client_fields.iter())
+            }
+            None => {
+                // If this field is not reachable from an entrypoint, we need to
+                // encounter all the client fields
+                for nested_client_field in user_written_client_type.accessible_client_fields(schema)
                 {
-                    Some(FieldTraversalResult {
-                        traversal_state, ..
-                    }) => {
-                        // If this user-written client field is reachable from an entrypoint,
-                        // we've already noted the accessible client fields
-                        encountered_output_types
-                            .extend(traversal_state.accessible_client_fields.iter())
-                    }
-                    None => {
-                        // If this field is not reachable from an entrypoint, we need to
-                        // encounter all the client fields
-                        for nested_client_field in
-                            user_written_client_field.accessible_client_fields(schema)
-                        {
-                            encountered_output_types.insert(nested_client_field.id);
-                        }
-                    }
+                    encountered_output_types.insert(nested_client_field.id);
                 }
             }
         }

@@ -209,6 +209,15 @@ impl<
         }
     }
 
+    pub fn id(&self) -> ClientType<ClientFieldId, ClientPointerId> {
+        match self {
+            ClientType::ClientField(client_field) => ClientType::ClientField(client_field.id),
+            ClientType::ClientPointer(client_pointer) => {
+                ClientType::ClientPointer(client_pointer.id)
+            }
+        }
+    }
+
     pub fn variable_definitions(
         &self,
     ) -> &Vec<WithSpan<VariableDefinition<TClientTypeVariableDefinitionAssociatedData>>> {
@@ -277,6 +286,24 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
             ClientType::ClientField(client_field) => client_field,
             ClientType::ClientPointer(_) => panic!(
                 "encountered ClientPointer under ClientFieldId. \
+                This is indicative of a bug in Isograph."
+            ),
+        }
+    }
+
+    /// Get a reference to a given client pointer by its id.
+    pub fn client_pointer(
+        &self,
+        client_pointer_id: ClientPointerId,
+    ) -> &ClientPointer<
+        TSchemaValidationState::ClientFieldSelectionScalarFieldAssociatedData,
+        TSchemaValidationState::ClientFieldSelectionLinkedFieldAssociatedData,
+        TSchemaValidationState::VariableDefinitionInnerType,
+    > {
+        match &self.client_fields[client_pointer_id.as_usize()] {
+            ClientType::ClientPointer(client_pointer) => client_pointer,
+            ClientType::ClientField(_) => panic!(
+                "encountered ClientField under ClientPointerId. \
                 This is indicative of a bug in Isograph."
             ),
         }
