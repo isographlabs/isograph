@@ -169,35 +169,34 @@ impl UnvalidatedSchema {
         let name = client_field_declaration.item.client_field_name.item.into();
         let variant = get_client_variant(&client_field_declaration.item);
 
-        self.client_types
-            .push(ClientType::ClientField(ClientField {
-                description: client_field_declaration.item.description.map(|x| x.item),
-                name,
-                id: next_client_field_id,
-                reader_selection_set: Some(client_field_declaration.item.selection_set),
-                variant,
-                variable_definitions: client_field_declaration.item.variable_definitions,
-                type_and_field: ObjectTypeAndFieldName {
-                    type_name: object.name,
-                    field_name: name,
-                },
+        self.client_types.push(ClientType::ClientField(ClientField {
+            description: client_field_declaration.item.description.map(|x| x.item),
+            name,
+            id: next_client_field_id,
+            reader_selection_set: Some(client_field_declaration.item.selection_set),
+            variant,
+            variable_definitions: client_field_declaration.item.variable_definitions,
+            type_and_field: ObjectTypeAndFieldName {
+                type_name: object.name,
+                field_name: name,
+            },
 
-                parent_object_id,
-                refetch_strategy: object.id_field.map(|_| {
-                    // Assume that if we have an id field, this implements Node
-                    RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
-                        vec![id_selection()],
-                        query_id,
-                        format!("refetch__{}", object.name).intern().into(),
-                        *NODE_FIELD_NAME,
-                        id_top_level_arguments(),
-                        None,
-                        RequiresRefinement::Yes(object.name),
-                        None,
-                        None,
-                    ))
-                }),
-            }));
+            parent_object_id,
+            refetch_strategy: object.id_field.map(|_| {
+                // Assume that if we have an id field, this implements Node
+                RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
+                    vec![id_selection()],
+                    query_id,
+                    format!("refetch__{}", object.name).intern().into(),
+                    *NODE_FIELD_NAME,
+                    id_top_level_arguments(),
+                    None,
+                    RequiresRefinement::Yes(object.name),
+                    None,
+                    None,
+                ))
+            }),
+        }));
         Ok(())
     }
 

@@ -22,8 +22,7 @@ pub fn add_refetch_fields_to_objects(
             continue 'objects;
         }
 
-        if let Some(value) =
-            add_refetch_field_to_object(object, &mut schema.client_types, query_id)
+        if let Some(value) = add_refetch_field_to_object(object, &mut schema.client_types, query_id)
         {
             return value;
         }

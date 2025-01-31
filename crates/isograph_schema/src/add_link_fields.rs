@@ -10,25 +10,24 @@ impl UnvalidatedSchema {
         for object in &mut self.server_field_data.server_objects {
             let field_name = (*LINK_FIELD_NAME).into();
             let next_client_field_id = self.client_types.len().into();
-            self.client_types
-                .push(ClientType::ClientField(ClientField {
-                    description: Some(
-                        format!("A store Link for the {} type.", object.name)
-                            .intern()
-                            .into(),
-                    ),
-                    id: next_client_field_id,
-                    name: field_name,
-                    parent_object_id: object.id,
-                    variable_definitions: vec![],
-                    reader_selection_set: Some(vec![]),
-                    variant: ClientFieldVariant::Link,
-                    type_and_field: ObjectTypeAndFieldName {
-                        field_name,
-                        type_name: object.name,
-                    },
-                    refetch_strategy: None,
-                }));
+            self.client_types.push(ClientType::ClientField(ClientField {
+                description: Some(
+                    format!("A store Link for the {} type.", object.name)
+                        .intern()
+                        .into(),
+                ),
+                id: next_client_field_id,
+                name: field_name,
+                parent_object_id: object.id,
+                variable_definitions: vec![],
+                reader_selection_set: Some(vec![]),
+                variant: ClientFieldVariant::Link,
+                type_and_field: ObjectTypeAndFieldName {
+                    field_name,
+                    type_name: object.name,
+                },
+                refetch_strategy: None,
+            }));
 
             if object
                 .encountered_fields
