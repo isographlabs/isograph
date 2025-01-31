@@ -16,9 +16,10 @@ use thiserror::Error;
 use crate::{
     validate_client_field::validate_and_transform_client_fields,
     validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
-    ClientPointer, FieldType, ImperativelyLoadedFieldVariant, Schema, SchemaIdField, SchemaObject,
-    SchemaServerField, SchemaValidationState, ServerFieldData, ServerFieldTypeAssociatedData,
-    UnvalidatedSchema, UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
+    ClientPointer, ClientType, FieldType, ImperativelyLoadedFieldVariant, Schema, SchemaIdField,
+    SchemaObject, SchemaServerField, SchemaValidationState, ServerFieldData,
+    ServerFieldTypeAssociatedData, UnvalidatedSchema, UseRefetchFieldRefetchStrategy,
+    ValidateEntrypointDeclarationError,
 };
 
 pub type ValidatedSchemaServerField = SchemaServerField<
@@ -428,7 +429,7 @@ pub enum ValidateSchemaError {
     },
 
     #[error(
-        "In the client field `{client_field_parent_type_name}.{client_field_name}`, \
+        "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, \
         the field `{field_parent_type_name}.{field_name}` is selected, but that \
         field does not exist on `{field_parent_type_name}`"
     )]
@@ -437,10 +438,11 @@ pub enum ValidateSchemaError {
         client_field_name: SelectableFieldName,
         field_parent_type_name: IsographObjectTypeName,
         field_name: SelectableFieldName,
+        client_type: String,
     },
 
     #[error(
-        "In the client field `{client_field_parent_type_name}.{client_field_name}`, \
+        "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, \
         the field `{field_parent_type_name}.{field_name}` is selected as a scalar, \
         but that field's type is `{target_type_name}`, which is {field_type}."
     )]
@@ -451,10 +453,11 @@ pub enum ValidateSchemaError {
         field_name: SelectableFieldName,
         field_type: &'static str,
         target_type_name: UnvalidatedTypeName,
+        client_type: String,
     },
 
     #[error(
-        "In the client field `{client_field_parent_type_name}.{client_field_name}`, \
+        "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, \
         the field `{field_parent_type_name}.{field_name}` is selected as a linked field, \
         but that field's type is `{target_type_name}`, which is {field_type}."
     )]
@@ -465,10 +468,11 @@ pub enum ValidateSchemaError {
         field_name: SelectableFieldName,
         field_type: &'static str,
         target_type_name: UnvalidatedTypeName,
+        client_type: String,
     },
 
     #[error(
-        "In the client field `{client_field_parent_type_name}.{client_field_name}`, the \
+        "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, the \
         field `{field_parent_type_name}.{field_name}` is selected as a linked field, \
         but that field is a client field, which can only be selected as a scalar."
     )]
@@ -477,6 +481,20 @@ pub enum ValidateSchemaError {
         client_field_name: SelectableFieldName,
         field_parent_type_name: IsographObjectTypeName,
         field_name: SelectableFieldName,
+        client_type: String,
+    },
+
+    #[error(
+        "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, the \
+        field `{field_parent_type_name}.{field_name}` is selected as a scalar field, \
+        but that field is a client pointer, which can only be selected as a linked."
+    )]
+    ClientTypeSelectionClientPointerSelectedAsScalar {
+        client_field_parent_type_name: IsographObjectTypeName,
+        client_field_name: SelectableFieldName,
+        field_parent_type_name: IsographObjectTypeName,
+        field_name: SelectableFieldName,
+        client_type: String,
     },
 
     #[error("`{server_field_name}` is a server field, and cannot be selected with `@loadable`")]
