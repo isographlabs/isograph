@@ -236,6 +236,20 @@ fn parse_client_pointer_declaration_inner(
             .parse_string_key_type(IsographLangTokenKind::Identifier)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
+        let target_type = match tokens.parse_source_of_kind(IsographLangTokenKind::Identifier) {
+            Ok(keyword) => {
+                if keyword.item != "to" {
+                    return Err(WithSpan::new(
+                        IsographLiteralParseError::ExpectedTo,
+                        keyword.span,
+                    ));
+                }
+
+                parse_type_annotation(tokens)?
+            }
+            Err(_) => GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(parent_type)),
+        };
+
         let variable_definitions = parse_variable_definitions(tokens, text_source)?;
 
         let directives = parse_directives(tokens, text_source)?;
@@ -258,7 +272,7 @@ fn parse_client_pointer_declaration_inner(
             directives,
             parent_type,
             client_pointer_name,
-            target_type: GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(parent_type)),
+            target_type,
             description,
             selection_set,
             definition_path: definition_file_path,
