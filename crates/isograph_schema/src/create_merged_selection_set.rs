@@ -9,17 +9,17 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, IsographSelectionVariant, NonConstantValue,
-    RefetchQueryIndex, SelectableServerFieldId, SelectionFieldArgument, SelectionType,
-    ServerFieldId, ServerFieldSelection, ServerObjectId, VariableDefinition,
+    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, IsographSelectionVariant,
+    NonConstantValue, RefetchQueryIndex, SelectableServerFieldId, SelectionFieldArgument,
+    SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
 use crate::{
     categorize_field_loadability, create_transformed_name_and_arguments,
     expose_field_directive::RequiresRefinement, transform_arguments_with_child_context,
-    transform_name_and_arguments_with_child_variable_context, ClientFieldVariant, FieldType,
-    ImperativelyLoadedFieldVariant, Loadability, NameAndArguments, PathToRefetchField,
+    transform_name_and_arguments_with_child_variable_context, ClientFieldVariant, ClientType,
+    FieldType, ImperativelyLoadedFieldVariant, Loadability, NameAndArguments, PathToRefetchField,
     RootOperationName, SchemaObject, SchemaServerFieldVariant, UnvalidatedVariableDefinition,
     ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedScalarFieldSelection,
     ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection, VariableContext,
@@ -28,8 +28,10 @@ use crate::{
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
 
 // Maybe this should be FNVHashMap? We don't really need stable iteration order
-pub type ClientFieldToCompletedMergeTraversalStateMap =
-    BTreeMap<FieldType<ServerFieldId, ClientFieldId>, FieldTraversalResult>;
+pub type FieldToCompletedMergeTraversalStateMap = BTreeMap<
+    FieldType<ServerFieldId, ClientType<ClientFieldId, ClientPointerId>>,
+    FieldTraversalResult,
+>;
 
 #[derive(Clone, Debug)]
 pub struct FieldTraversalResult {
@@ -399,14 +401,14 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map(
     schema: &ValidatedSchema,
     parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
-    encountered_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
-    root_field_id: FieldType<ServerFieldId, ClientFieldId>,
+    encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
+    root_field_id: FieldType<ServerFieldId, ClientType<ClientFieldId, ClientPointerId>>,
     variable_context: &VariableContext,
     // TODO return Cow?
 ) -> FieldTraversalResult {
     // TODO move this check outside of this function
 
-    match encountered_client_field_map.get_mut(&root_field_id) {
+    match encountered_client_type_map.get_mut(&root_field_id) {
         Some(traversal_result) => traversal_result.clone(),
         None => {
             let mut merge_traversal_state = ScalarClientFieldTraversalState::new();
@@ -415,13 +417,13 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map(
                 parent_type,
                 validated_selections,
                 &mut merge_traversal_state,
-                encountered_client_field_map,
+                encountered_client_type_map,
                 variable_context,
             );
 
             // N.B. encountered_client_field_map might actually have an item stored in root_object.id,
             // if we have some sort of recursion. That probably stack overflows right now.
-            encountered_client_field_map.insert(
+            encountered_client_type_map.insert(
                 root_field_id,
                 FieldTraversalResult {
                     traversal_state: merge_traversal_state.clone(),
@@ -635,7 +637,7 @@ fn create_selection_map_with_merge_traversal_state(
     parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    encountered_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
+    encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
 ) -> MergedSelectionMap {
     let mut merged_selection_map = BTreeMap::new();
@@ -658,7 +660,7 @@ fn merge_validated_selections_into_selection_map(
     parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    encountered_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
+    encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
 ) {
     for validated_selection in validated_selections.iter().filter(filter_id_fields) {
@@ -689,15 +691,17 @@ fn merge_validated_selections_into_selection_map(
                                     newly_encountered_scalar_client_field
                                         .selection_set_for_parent_query(),
                                     encountered_client_field_map,
-                                    FieldType::ClientField(
+                                    FieldType::ClientField(ClientType::ClientField(
                                         newly_encountered_scalar_client_field.id,
-                                    ),
+                                    )),
                                     &newly_encountered_scalar_client_field
                                         .initial_variable_context(),
                                 );
 
                                 let state = encountered_client_field_map
-                                    .get_mut(&FieldType::ClientField(*client_field_id))
+                                    .get_mut(&FieldType::ClientField(ClientType::ClientField(
+                                        *client_field_id,
+                                    )))
                                     .expect(
                                         "Expected field to exist when \
                                                 it is encountered loadably",
@@ -910,7 +914,7 @@ fn merge_validated_selections_into_selection_map(
 
 fn insert_imperative_field_into_refetch_paths(
     schema: &ValidatedSchema,
-    encountered_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
+    encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_scalar_client_field: &ValidatedClientField,
     parent_type: &SchemaObject,
@@ -947,7 +951,9 @@ fn insert_imperative_field_into_refetch_paths(
             )
             .refetch_selection_set(),
         encountered_client_field_map,
-        FieldType::ClientField(newly_encountered_scalar_client_field.id),
+        FieldType::ClientField(ClientType::ClientField(
+            newly_encountered_scalar_client_field.id,
+        )),
         &newly_encountered_scalar_client_field.initial_variable_context(),
     );
 }
@@ -974,7 +980,7 @@ fn merge_non_loadable_scalar_client_field(
     parent_map: &mut MergedSelectionMap,
     parent_merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_scalar_client_field: &ValidatedClientField,
-    encountered_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
+    encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     parent_variable_context: &VariableContext,
     selection_arguments: &[WithLocation<SelectionFieldArgument>],
 ) {
@@ -995,7 +1001,9 @@ fn merge_non_loadable_scalar_client_field(
                 This is indicative of a bug in Isograph.",
             ),
         encountered_client_field_map,
-        FieldType::ClientField(newly_encountered_scalar_client_field.id),
+        FieldType::ClientField(ClientType::ClientField(
+            newly_encountered_scalar_client_field.id,
+        )),
         &newly_encountered_scalar_client_field.initial_variable_context(),
     );
 
