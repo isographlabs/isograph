@@ -30,8 +30,8 @@ type UnvalidatedServerFieldTypeAssociatedData =
 
 impl SchemaValidationState for UnvalidatedSchemaState {
     type ServerFieldTypeAssociatedData = UnvalidatedServerFieldTypeAssociatedData;
-    type ClientFieldSelectionScalarFieldAssociatedData = IsographSelectionVariant;
-    type ClientFieldSelectionLinkedFieldAssociatedData = IsographSelectionVariant;
+    type ClientTypeSelectionScalarFieldAssociatedData = IsographSelectionVariant;
+    type ClientTypeSelectionLinkedFieldAssociatedData = IsographSelectionVariant;
     type VariableDefinitionInnerType = UnvalidatedTypeName;
     type Entrypoint = Vec<(TextSource, WithSpan<EntrypointDeclaration>)>;
 }
@@ -74,25 +74,25 @@ pub type UnvalidatedVariableDefinition = VariableDefinition<
 >;
 
 pub type UnvalidatedClientField = ClientField<
-    <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
-    <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
 >;
 
 pub type UnvalidatedClientPointer = ClientPointer<
-    <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
-    <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
 >;
 
 pub type UnvalidatedLinkedFieldSelection = LinkedFieldSelection<
-    <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
-    <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
 >;
 
 pub type UnvalidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
-    <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
-    <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
 >;
 
 impl Default for UnvalidatedSchema {

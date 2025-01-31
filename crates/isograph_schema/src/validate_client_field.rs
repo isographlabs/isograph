@@ -386,7 +386,7 @@ fn validate_field_type_exists_and_is_scalar(
                         directives: scalar_field_selection.directives,
                     }),
                     SelectionType::Object(object_id) => Err(WithLocation::new(
-                        ValidateSchemaError::ClientFieldSelectionFieldIsNotScalar {
+                        ValidateSchemaError::ClientTypeSelectionFieldIsNotScalar {
                             field_parent_type_name: scalar_field_selection_parent_object.name,
                             field_name: scalar_field_name,
                             field_type: "an object",
@@ -420,7 +420,7 @@ fn validate_field_type_exists_and_is_scalar(
             }
         },
         None => Err(WithLocation::new(
-            ValidateSchemaError::ClientFieldSelectionFieldDoesNotExist {
+            ValidateSchemaError::ClientTypeSelectionFieldDoesNotExist {
                 client_field_parent_type_name: top_level_client_field_info
                     .client_field_type_and_field_name
                     .type_name,
@@ -501,7 +501,7 @@ fn validate_field_type_exists_and_is_linked(
                     &top_level_client_field_info.server_fields[server_field_id.as_usize()];
                 match &server_field.associated_data {
                     SelectionType::Scalar(scalar_id) => Err(WithLocation::new(
-                        ValidateSchemaError::ClientFieldSelectionFieldIsScalar {
+                        ValidateSchemaError::ClientTypeSelectionFieldIsScalar {
                             field_parent_type_name: field_parent_object.name,
                             field_name: linked_field_name,
                             field_type: "a scalar",
@@ -576,7 +576,7 @@ fn validate_field_type_exists_and_is_linked(
                 }
             }
             FieldType::ClientField(_) => Err(WithLocation::new(
-                ValidateSchemaError::ClientFieldSelectionClientFieldSelectedAsLinked {
+                ValidateSchemaError::ClientTypeSelectionClientFieldSelectedAsLinked {
                     field_parent_type_name: field_parent_object.name,
                     field_name: linked_field_name,
                     client_field_parent_type_name: top_level_client_field_info
@@ -590,7 +590,7 @@ fn validate_field_type_exists_and_is_linked(
             )),
         },
         None => Err(WithLocation::new(
-            ValidateSchemaError::ClientFieldSelectionFieldDoesNotExist {
+            ValidateSchemaError::ClientTypeSelectionFieldDoesNotExist {
                 client_field_parent_type_name: top_level_client_field_info
                     .client_field_type_and_field_name
                     .type_name,
