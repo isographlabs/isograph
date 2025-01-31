@@ -146,7 +146,7 @@ impl UnvalidatedSchema {
         let client_field_name = client_field_field_name_ws.item;
         let client_field_name_span = client_field_field_name_ws.span;
 
-        let next_client_field_id = self.client_fields.len().into();
+        let next_client_field_id = self.client_types.len().into();
 
         if object
             .encountered_fields
@@ -169,7 +169,7 @@ impl UnvalidatedSchema {
         let name = client_field_declaration.item.client_field_name.item.into();
         let variant = get_client_variant(&client_field_declaration.item);
 
-        self.client_fields
+        self.client_types
             .push(ClientType::ClientField(ClientField {
                 description: client_field_declaration.item.description.map(|x| x.item),
                 name,
@@ -214,7 +214,7 @@ impl UnvalidatedSchema {
         let client_pointer_name = client_pointer_pointer_name_ws.item;
         let client_pointer_name_span = client_pointer_pointer_name_ws.span;
 
-        let next_client_pointer_id: ClientPointerId = self.client_fields.len().into();
+        let next_client_pointer_id: ClientPointerId = self.client_types.len().into();
 
         let name = client_pointer_declaration.item.client_pointer_name.item;
 
@@ -231,7 +231,7 @@ impl UnvalidatedSchema {
             }));
         }
 
-        self.client_fields
+        self.client_types
             .push(ClientType::ClientPointer(ClientPointer {
                 description: client_pointer_declaration.item.description.map(|x| x.item),
                 name,

@@ -136,7 +136,7 @@ impl ValidatedSchema {
 
         let Schema {
             server_fields: fields,
-            client_fields,
+            client_types: client_fields,
             entrypoints: _,
             server_field_data: schema_data,
             fetchable_types: root_types,
@@ -187,7 +187,7 @@ impl ValidatedSchema {
 
             Ok(Self {
                 server_fields: updated_server_fields,
-                client_fields: updated_client_fields,
+                client_types: updated_client_fields,
                 entrypoints: updated_entrypoints,
                 server_field_data: ServerFieldData {
                     server_objects,

@@ -152,7 +152,7 @@ impl UnvalidatedSchema {
 
         Self {
             server_fields: fields,
-            client_fields,
+            client_types: client_fields,
             entrypoints: Default::default(),
             server_field_data: ServerFieldData {
                 server_objects: objects,

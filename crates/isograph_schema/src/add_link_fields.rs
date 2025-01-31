@@ -9,8 +9,8 @@ impl UnvalidatedSchema {
     pub fn add_link_fields(&mut self) -> ProcessTypeDefinitionResult<()> {
         for object in &mut self.server_field_data.server_objects {
             let field_name = (*LINK_FIELD_NAME).into();
-            let next_client_field_id = self.client_fields.len().into();
-            self.client_fields
+            let next_client_field_id = self.client_types.len().into();
+            self.client_types
                 .push(ClientType::ClientField(ClientField {
                     description: Some(
                         format!("A store Link for the {} type.", object.name)

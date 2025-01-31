@@ -80,7 +80,7 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
             TSchemaValidationState::VariableDefinitionInnerType,
         >,
     >,
-    pub client_fields: ClientFields<
+    pub client_types: ClientTypes<
         TSchemaValidationState::ClientFieldSelectionScalarFieldAssociatedData,
         TSchemaValidationState::ClientFieldSelectionLinkedFieldAssociatedData,
         TSchemaValidationState::VariableDefinitionInnerType,
@@ -93,7 +93,7 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
     pub fetchable_types: BTreeMap<ServerObjectId, RootOperationName>,
 }
 
-type ClientFields<
+type ClientTypes<
     TClientFieldSelectionScalarFieldAssociatedData,
     TClientFieldSelectionLinkedFieldAssociatedData,
     TClientFieldVariableDefinitionAssociatedData,
@@ -213,7 +213,7 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
         TSchemaValidationState::ClientFieldSelectionLinkedFieldAssociatedData,
         TSchemaValidationState::VariableDefinitionInnerType,
     > {
-        match &self.client_fields[client_field_id.as_usize()] {
+        match &self.client_types[client_field_id.as_usize()] {
             ClientType::ClientField(client_field) => client_field,
             ClientType::ClientPointer(_) => panic!(
                 "encountered ClientPointer under ClientFieldId. \
