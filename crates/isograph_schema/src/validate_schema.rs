@@ -7,7 +7,10 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
 use isograph_lang_types::{
-    ClientFieldId, ClientPointerId, LinkedFieldSelection, LoadableDirectiveParameters, ScalarFieldSelection, SelectableServerFieldId, SelectionFieldArgument, SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId, ServerScalarId, TypeAnnotation, VariableDefinition
+    ClientFieldId, ClientPointerId, LinkedFieldSelection, LoadableDirectiveParameters,
+    ScalarFieldSelection, SelectableServerFieldId, SelectionFieldArgument, SelectionType,
+    ServerFieldId, ServerFieldSelection, ServerObjectId, ServerScalarId, TypeAnnotation,
+    VariableDefinition,
 };
 use thiserror::Error;
 
