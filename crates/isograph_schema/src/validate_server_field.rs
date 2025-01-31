@@ -69,7 +69,7 @@ fn validate_and_transform_server_field(
                 SelectionType::Object(_) => SchemaServerFieldVariant::InlineFragment(
                     ServerFieldTypeAssociatedDataInlineFragment {
                         concrete_type: associated_data.concrete_type,
-                        condition_selection_set: associated_data.condition_selection_set,
+                        reader_selection_set: associated_data.reader_selection_set,
                         server_field_id: associated_data.server_field_id,
                     },
                 ),

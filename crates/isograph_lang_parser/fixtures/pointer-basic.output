@@ -1,0 +1,208 @@
+Ok(
+    (
+        RelativePathToSourceFile(
+            "crates/isograph_lang_parser/fixtures/pointer-basic.input.js",
+        ),
+        [
+            (
+                ClientPointerDeclaration(
+                    WithSpan {
+                        item: ClientPointerDeclaration {
+                            directives: [],
+                            const_export_name: ConstExportName(
+                                "pointer",
+                            ),
+                            parent_type: WithSpan {
+                                item: UnvalidatedTypeName(
+                                    "User",
+                                ),
+                                span: Span {
+                                    start: 11,
+                                    end: 15,
+                                },
+                            },
+                            target_type: Named(
+                                GraphQLNamedTypeAnnotation(
+                                    WithSpan {
+                                        item: UnvalidatedTypeName(
+                                            "User",
+                                        ),
+                                        span: Span {
+                                            start: 11,
+                                            end: 15,
+                                        },
+                                    },
+                                ),
+                            ),
+                            client_pointer_name: WithSpan {
+                                item: ClientPointerFieldName(
+                                    "bestFriend",
+                                ),
+                                span: Span {
+                                    start: 16,
+                                    end: 26,
+                                },
+                            },
+                            description: None,
+                            selection_set: [
+                                WithSpan {
+                                    item: LinkedField(
+                                        LinkedFieldSelection {
+                                            name: WithLocation {
+                                                location: Embedded(
+                                                    EmbeddedLocation {
+                                                        text_source: TextSource {
+                                                            current_working_directory: CurrentWorkingDirectory,
+                                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                                "crates/isograph_lang_parser/fixtures/pointer-basic.input.js",
+                                                            ),
+                                                            span: Some(
+                                                                Span {
+                                                                    start: 28,
+                                                                    end: 106,
+                                                                },
+                                                            ),
+                                                        },
+                                                        span: Span {
+                                                            start: 33,
+                                                            end: 40,
+                                                        },
+                                                    },
+                                                ),
+                                                item: LinkedFieldName(
+                                                    "friends",
+                                                ),
+                                            },
+                                            reader_alias: None,
+                                            associated_data: (),
+                                            selection_set: [
+                                                WithSpan {
+                                                    item: ScalarField(
+                                                        ScalarFieldSelection {
+                                                            name: WithLocation {
+                                                                location: Embedded(
+                                                                    EmbeddedLocation {
+                                                                        text_source: TextSource {
+                                                                            current_working_directory: CurrentWorkingDirectory,
+                                                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                                                "crates/isograph_lang_parser/fixtures/pointer-basic.input.js",
+                                                                            ),
+                                                                            span: Some(
+                                                                                Span {
+                                                                                    start: 28,
+                                                                                    end: 106,
+                                                                                },
+                                                                            ),
+                                                                        },
+                                                                        span: Span {
+                                                                            start: 49,
+                                                                            end: 51,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                                item: ScalarFieldName(
+                                                                    "id",
+                                                                ),
+                                                            },
+                                                            reader_alias: None,
+                                                            associated_data: (),
+                                                            arguments: [],
+                                                            directives: [],
+                                                        },
+                                                    ),
+                                                    span: Span {
+                                                        start: 49,
+                                                        end: 51,
+                                                    },
+                                                },
+                                                WithSpan {
+                                                    item: ScalarField(
+                                                        ScalarFieldSelection {
+                                                            name: WithLocation {
+                                                                location: Embedded(
+                                                                    EmbeddedLocation {
+                                                                        text_source: TextSource {
+                                                                            current_working_directory: CurrentWorkingDirectory,
+                                                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                                                "crates/isograph_lang_parser/fixtures/pointer-basic.input.js",
+                                                                            ),
+                                                                            span: Some(
+                                                                                Span {
+                                                                                    start: 28,
+                                                                                    end: 106,
+                                                                                },
+                                                                            ),
+                                                                        },
+                                                                        span: Span {
+                                                                            start: 58,
+                                                                            end: 67,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                                item: ScalarFieldName(
+                                                                    "closeness",
+                                                                ),
+                                                            },
+                                                            reader_alias: None,
+                                                            associated_data: (),
+                                                            arguments: [],
+                                                            directives: [],
+                                                        },
+                                                    ),
+                                                    span: Span {
+                                                        start: 58,
+                                                        end: 67,
+                                                    },
+                                                },
+                                            ],
+                                            arguments: [],
+                                            directives: [],
+                                        },
+                                    ),
+                                    span: Span {
+                                        start: 33,
+                                        end: 73,
+                                    },
+                                },
+                            ],
+                            variable_definitions: [],
+                            definition_path: RelativePathToSourceFile(
+                                "crates/isograph_lang_parser/fixtures/pointer-basic.input.js",
+                            ),
+                            pointer_keyword: WithSpan {
+                                item: (),
+                                span: Span {
+                                    start: 3,
+                                    end: 10,
+                                },
+                            },
+                            dot: WithSpan {
+                                item: (),
+                                span: Span {
+                                    start: 15,
+                                    end: 16,
+                                },
+                            },
+                        },
+                        span: Span {
+                            start: 11,
+                            end: 77,
+                        },
+                    },
+                ),
+                TextSource {
+                    current_working_directory: CurrentWorkingDirectory,
+                    relative_path_to_source_file: RelativePathToSourceFile(
+                        "crates/isograph_lang_parser/fixtures/pointer-basic.input.js",
+                    ),
+                    span: Some(
+                        Span {
+                            start: 28,
+                            end: 106,
+                        },
+                    ),
+                },
+            ),
+        ],
+    ),
+)

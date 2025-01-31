@@ -65,10 +65,13 @@ impl UnvalidatedSchema {
                                     .encountered_fields
                                     .get(&(*LINK_FIELD_NAME).into())
                                     .expect("Expected link to exist")
-                                    .as_client_field()
+                                    .as_client_type()
                                     .expect("Expected link to be client field")
                                 {
                                     ClientType::ClientField(client_field_id) => client_field_id,
+                                    ClientType::ClientPointer(_) => {
+                                        panic!("Expected link to be client field")
+                                    }
                                 },
                             ),
                             selection_variant: ValidatedIsographSelectionVariant::Regular,
@@ -80,7 +83,7 @@ impl UnvalidatedSchema {
                     Span::todo_generated(),
                 );
 
-                let condition_selection_set = vec![typename_selection, link_selection];
+                let reader_selection_set = vec![typename_selection, link_selection];
 
                 let server_field = SchemaServerField {
                     description: Some(
@@ -98,7 +101,7 @@ impl UnvalidatedSchema {
                             ServerFieldTypeAssociatedDataInlineFragment {
                                 server_field_id: next_server_field_id,
                                 concrete_type,
-                                condition_selection_set,
+                                reader_selection_set,
                             },
                         ),
                     },

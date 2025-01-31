@@ -10,9 +10,9 @@ use common_lang_types::{
 
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    reachable_variables, ClientFieldId, IsographSelectionVariant, LinkedFieldSelection,
-    ScalarFieldSelection, SelectionFieldArgument, SelectionType, UnvalidatedScalarFieldSelection,
-    UnvalidatedSelection, VariableDefinition,
+    reachable_variables, ClientFieldId, ClientPointerId, IsographSelectionVariant,
+    LinkedFieldSelection, ScalarFieldSelection, SelectionFieldArgument, SelectionType,
+    UnvalidatedScalarFieldSelection, UnvalidatedSelection, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -20,9 +20,9 @@ use crate::{
     get_all_errors_or_all_ok, get_all_errors_or_all_ok_as_hashmap, get_all_errors_or_all_ok_iter,
     get_all_errors_or_tuple_ok, validate_argument_types::value_satisfies_type, ClientField,
     ClientType, FieldType, RefetchStrategy, SchemaObject, ServerFieldData, UnvalidatedClientField,
-    UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
+    UnvalidatedClientPointer, UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
     UnvalidatedVariableDefinition, ValidateSchemaError, ValidateSchemaResult, ValidatedClientField,
-    ValidatedIsographSelectionVariant, ValidatedLinkedFieldAssociatedData,
+    ValidatedClientPointer, ValidatedIsographSelectionVariant, ValidatedLinkedFieldAssociatedData,
     ValidatedLinkedFieldSelection, ValidatedRefetchFieldStrategy,
     ValidatedScalarFieldAssociatedData, ValidatedScalarFieldSelection, ValidatedSchemaServerField,
     ValidatedSelection, ValidatedVariableDefinition,
@@ -30,17 +30,20 @@ use crate::{
 
 type UsedVariables = BTreeSet<VariableName>;
 type ClientFieldArgsMap =
-    HashMap<ClientType<ClientFieldId>, Vec<WithSpan<ValidatedVariableDefinition>>>;
+    HashMap<ClientType<ClientFieldId, ClientPointerId>, Vec<WithSpan<ValidatedVariableDefinition>>>;
 
 lazy_static! {
     static ref ID: FieldArgumentName = "id".intern().into();
 }
 
 pub(crate) fn validate_and_transform_client_fields(
-    client_fields: Vec<ClientType<UnvalidatedClientField>>,
+    client_fields: Vec<ClientType<UnvalidatedClientField, UnvalidatedClientPointer>>,
     schema_data: &ServerFieldData,
     server_fields: &[ValidatedSchemaServerField],
-) -> Result<Vec<ClientType<ValidatedClientField>>, Vec<WithLocation<ValidateSchemaError>>> {
+) -> Result<
+    Vec<ClientType<ValidatedClientField, ValidatedClientPointer>>,
+    Vec<WithLocation<ValidateSchemaError>>,
+> {
     // TODO this smells. We probably should do this in two passes instead of doing it this
     // way. We are validating client fields, which includes validating their selections. When
     // validating a selection of a client field, we need to ensure that we pass the correct
@@ -49,8 +52,18 @@ pub(crate) fn validate_and_transform_client_fields(
     // For now, we'll make a new datastructure containing all of the client field's arguments,
     // cloned.
     let client_field_args =
-        get_all_errors_or_all_ok_as_hashmap(client_fields.iter().map(|unvalidated_client| {
-            match unvalidated_client {
+        get_all_errors_or_all_ok_as_hashmap(client_fields.iter().map(|unvalidated_client_type| {
+            match unvalidated_client_type {
+                ClientType::ClientPointer(unvalidated_client_pointer) => {
+                    let validated_variable_definitions = validate_variable_definitions(
+                        schema_data,
+                        unvalidated_client_pointer.variable_definitions.clone(),
+                    )?;
+                    Ok((
+                        ClientType::ClientPointer(unvalidated_client_pointer.id),
+                        validated_variable_definitions,
+                    ))
+                }
                 ClientType::ClientField(unvalidated_client_field) => {
                     let validated_variable_definitions = validate_variable_definitions(
                         schema_data,
@@ -66,6 +79,9 @@ pub(crate) fn validate_and_transform_client_fields(
 
     get_all_errors_or_all_ok_iter(client_fields.into_iter().map(|client_field| {
         match client_field {
+            ClientType::ClientPointer(_) => {
+                todo!("validating client pointer selection sets is not implemented yet")
+            }
             ClientType::ClientField(client_field) => validate_client_field_selection_set(
                 schema_data,
                 client_field,
@@ -389,6 +405,9 @@ fn validate_field_type_exists_and_is_scalar(
                         scalar_field_selection.name.location,
                     )),
                 }
+            }
+            FieldType::ClientField(ClientType::ClientPointer(_)) => {
+                todo!("validating client pointers is not yet implemented")
             }
             FieldType::ClientField(ClientType::ClientField(client_field_id)) => {
                 validate_client_field(

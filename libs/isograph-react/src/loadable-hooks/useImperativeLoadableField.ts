@@ -9,7 +9,7 @@ import {
 } from '../core/FragmentReference';
 import { LoadableField } from '../core/reader';
 
-type UseImperativeLoadableFieldReturn<
+export type UseImperativeLoadableFieldReturn<
   TReadFromStore extends { data: object; parameters: object },
   TResult,
   TProvidedArgs extends object,
