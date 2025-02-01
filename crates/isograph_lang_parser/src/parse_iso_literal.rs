@@ -216,6 +216,23 @@ fn parse_iso_client_pointer_declaration(
     Ok(client_pointer_declaration)
 }
 
+fn parse_client_pointer_target_type(
+    tokens: &mut PeekableLexer<'_>,
+) -> ParseResultWithSpan<GraphQLTypeAnnotation<UnvalidatedTypeName>> {
+    let keyword = tokens
+        .parse_source_of_kind(IsographLangTokenKind::Identifier)
+        .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+
+    if keyword.item != "to" {
+        return Err(WithSpan::new(
+            IsographLiteralParseError::ExpectedTo,
+            keyword.span,
+        ));
+    }
+
+    parse_type_annotation(tokens)
+}
+
 fn parse_client_pointer_declaration_inner(
     tokens: &mut PeekableLexer<'_>,
     definition_file_path: RelativePathToSourceFile,
@@ -236,19 +253,7 @@ fn parse_client_pointer_declaration_inner(
             .parse_string_key_type(IsographLangTokenKind::Identifier)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-        let target_type = match tokens.parse_source_of_kind(IsographLangTokenKind::Identifier) {
-            Ok(keyword) => {
-                if keyword.item != "to" {
-                    return Err(WithSpan::new(
-                        IsographLiteralParseError::ExpectedTo,
-                        keyword.span,
-                    ));
-                }
-
-                parse_type_annotation(tokens)?
-            }
-            Err(_) => GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(parent_type)),
-        };
+        let target_type = parse_client_pointer_target_type(tokens)?;
 
         let variable_definitions = parse_variable_definitions(tokens, text_source)?;
 
