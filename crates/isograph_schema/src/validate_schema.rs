@@ -16,10 +16,9 @@ use thiserror::Error;
 use crate::{
     validate_client_field::validate_and_transform_client_fields,
     validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
-    ClientPointer, ClientType, FieldType, ImperativelyLoadedFieldVariant, Schema, SchemaIdField,
-    SchemaObject, SchemaServerField, SchemaValidationState, ServerFieldData,
-    ServerFieldTypeAssociatedData, UnvalidatedSchema, UseRefetchFieldRefetchStrategy,
-    ValidateEntrypointDeclarationError,
+    ClientPointer, FieldType, ImperativelyLoadedFieldVariant, Schema, SchemaIdField, SchemaObject,
+    SchemaServerField, SchemaValidationState, ServerFieldData, ServerFieldTypeAssociatedData,
+    UnvalidatedSchema, UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
 };
 
 pub type ValidatedSchemaServerField = SchemaServerField<
