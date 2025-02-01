@@ -22,7 +22,7 @@ use lazy_static::lazy_static;
 
 use crate::{
     refetch_strategy::RefetchStrategy, ClientFieldVariant, NormalizationKey,
-    ServerFieldTypeAssociatedData,
+    ServerFieldTypeAssociatedData, ValidatedClientField, ValidatedClientPointer,
 };
 
 lazy_static! {
@@ -159,6 +159,75 @@ pub enum ClientType<TField, TPointer> {
     ClientPointer(TPointer),
 }
 
+pub type ValidatedClientType<'a> = ClientType<&'a ValidatedClientField, &'a ValidatedClientPointer>;
+
+impl<
+        TClientTypeSelectionScalarFieldAssociatedData,
+        TClientTypeSelectionLinkedFieldAssociatedData,
+        TClientTypeVariableDefinitionAssociatedData: Ord + Debug,
+    >
+    ClientType<
+        &ClientField<
+            TClientTypeSelectionScalarFieldAssociatedData,
+            TClientTypeSelectionLinkedFieldAssociatedData,
+            TClientTypeVariableDefinitionAssociatedData,
+        >,
+        &ClientPointer<
+            TClientTypeSelectionScalarFieldAssociatedData,
+            TClientTypeSelectionLinkedFieldAssociatedData,
+            TClientTypeVariableDefinitionAssociatedData,
+        >,
+    >
+{
+    pub fn parent_object_id(&self) -> ServerObjectId {
+        match self {
+            ClientType::ClientField(client_field) => client_field.parent_object_id,
+            ClientType::ClientPointer(client_pointer) => client_pointer.parent_object_id,
+        }
+    }
+
+    pub fn selection_set_for_parent_query(
+        &self,
+    ) -> &Vec<
+        WithSpan<
+            ServerFieldSelection<
+                TClientTypeSelectionScalarFieldAssociatedData,
+                TClientTypeSelectionLinkedFieldAssociatedData,
+            >,
+        >,
+    > {
+        match self {
+            ClientType::ClientField(client_field) => client_field.selection_set_for_parent_query(),
+            ClientType::ClientPointer(client_pointer) => &client_pointer.reader_selection_set,
+        }
+    }
+
+    pub fn name(&self) -> SelectableFieldName {
+        match self {
+            ClientType::ClientField(client_field) => client_field.name,
+            ClientType::ClientPointer(client_pointer) => client_pointer.name.into(),
+        }
+    }
+
+    pub fn id(&self) -> ClientType<ClientFieldId, ClientPointerId> {
+        match self {
+            ClientType::ClientField(client_field) => ClientType::ClientField(client_field.id),
+            ClientType::ClientPointer(client_pointer) => {
+                ClientType::ClientPointer(client_pointer.id)
+            }
+        }
+    }
+
+    pub fn variable_definitions(
+        &self,
+    ) -> &Vec<WithSpan<VariableDefinition<TClientTypeVariableDefinitionAssociatedData>>> {
+        match self {
+            ClientType::ClientPointer(client_pointer) => &client_pointer.variable_definitions,
+            ClientType::ClientField(client_field) => &client_field.variable_definitions,
+        }
+    }
+}
+
 impl<TFieldAssociatedData, TClientFieldType> FieldType<TFieldAssociatedData, TClientFieldType> {
     pub fn as_server_field(&self) -> Option<&TFieldAssociatedData> {
         match self {
@@ -217,6 +286,24 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
             ClientType::ClientField(client_field) => client_field,
             ClientType::ClientPointer(_) => panic!(
                 "encountered ClientPointer under ClientFieldId. \
+                This is indicative of a bug in Isograph."
+            ),
+        }
+    }
+
+    /// Get a reference to a given client pointer by its id.
+    pub fn client_pointer(
+        &self,
+        client_pointer_id: ClientPointerId,
+    ) -> &ClientPointer<
+        TSchemaValidationState::ClientTypeSelectionScalarFieldAssociatedData,
+        TSchemaValidationState::ClientTypeSelectionLinkedFieldAssociatedData,
+        TSchemaValidationState::VariableDefinitionInnerType,
+    > {
+        match &self.client_types[client_pointer_id.as_usize()] {
+            ClientType::ClientPointer(client_pointer) => client_pointer,
+            ClientType::ClientField(_) => panic!(
+                "encountered ClientField under ClientPointerId. \
                 This is indicative of a bug in Isograph."
             ),
         }

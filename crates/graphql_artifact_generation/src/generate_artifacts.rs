@@ -88,7 +88,7 @@ pub fn get_artifact_path_and_content(
     schema: &ValidatedSchema,
     config: &CompilerConfig,
 ) -> Vec<ArtifactPathAndContent> {
-    let mut encountered_client_field_map = BTreeMap::new();
+    let mut encountered_client_type_map = BTreeMap::new();
     let mut path_and_contents = vec![];
     let mut encountered_output_types = HashSet::<ClientFieldId>::new();
 
@@ -97,7 +97,7 @@ pub fn get_artifact_path_and_content(
         let entrypoint_path_and_content = generate_entrypoint_artifacts(
             schema,
             *entrypoint_id,
-            &mut encountered_client_field_map,
+            &mut encountered_client_type_map,
             config.options.include_file_extensions_in_import_statements,
         );
         path_and_contents.extend(entrypoint_path_and_content);
@@ -114,7 +114,7 @@ pub fn get_artifact_path_and_content(
             was_ever_selected_loadably,
             ..
         },
-    ) in &encountered_client_field_map
+    ) in &encountered_client_type_map
     {
         match encountered_field_id {
             FieldType::ServerField(encountered_server_field_id) => {
@@ -136,7 +136,11 @@ pub fn get_artifact_path_and_content(
                     },
                 };
             }
-            FieldType::ClientField(encountered_client_field_id) => {
+
+            FieldType::ClientField(ClientType::ClientPointer(_)) => {
+                todo!("generate client pointer reader artifacts is not implemented")
+            }
+            FieldType::ClientField(ClientType::ClientField(encountered_client_field_id)) => {
                 let encountered_client_field = schema.client_field(*encountered_client_field_id);
 
                 match &encountered_client_field.variant {
@@ -232,7 +236,7 @@ pub fn get_artifact_path_and_content(
                                     encountered_client_field,
                                     &wrapped_map,
                                     &traversal_state,
-                                    &encountered_client_field_map,
+                                    &encountered_client_type_map,
                                     variable_definitions_iter,
                                     &schema.find_query(),
                                     config.options.include_file_extensions_in_import_statements,
@@ -255,23 +259,23 @@ pub fn get_artifact_path_and_content(
         }
     }
 
-    for user_written_client_field in schema.client_types.iter().flat_map(|field| match field {
-        ClientType::ClientPointer(_) => todo!(),
+    for user_written_client_type in schema.client_types.iter().flat_map(|field| match field {
+        ClientType::ClientPointer(pointer) => Some(ClientType::ClientPointer(pointer)),
         ClientType::ClientField(field) => match field.variant {
             ClientFieldVariant::Link => None,
-            ClientFieldVariant::UserWritten(_) => Some(field),
+            ClientFieldVariant::UserWritten(_) => Some(ClientType::ClientField(field)),
             ClientFieldVariant::ImperativelyLoadedField(_) => None,
         },
     }) {
-        // For each user-written client field, generate a param type artifact
+        // For each user-written client types, generate a param type artifact
         path_and_contents.push(generate_eager_reader_param_type_artifact(
             schema,
-            user_written_client_field,
+            &user_written_client_type,
             config.options.include_file_extensions_in_import_statements,
         ));
 
-        match encountered_client_field_map
-            .get(&FieldType::ClientField(user_written_client_field.id))
+        match encountered_client_type_map
+            .get(&FieldType::ClientField(user_written_client_type.id()))
         {
             Some(FieldTraversalResult {
                 traversal_state, ..
@@ -283,8 +287,7 @@ pub fn get_artifact_path_and_content(
             None => {
                 // If this field is not reachable from an entrypoint, we need to
                 // encounter all the client fields
-                for nested_client_field in
-                    user_written_client_field.accessible_client_fields(schema)
+                for nested_client_field in user_written_client_type.accessible_client_fields(schema)
                 {
                     encountered_output_types.insert(nested_client_field.id);
                 }
