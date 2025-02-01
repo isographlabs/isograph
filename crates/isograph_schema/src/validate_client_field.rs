@@ -80,7 +80,7 @@ pub(crate) fn validate_and_transform_client_types(
             }
         }))?;
 
-    let client_pointer_parent_type = client_types
+    let client_pointer_target_type = client_types
         .iter()
         .filter_map(|unvalidated_client_type| match unvalidated_client_type {
             ClientType::ClientPointer(unvalidated_client_pointer) => {
@@ -103,7 +103,7 @@ pub(crate) fn validate_and_transform_client_types(
                 client_pointer,
                 server_fields,
                 &client_type_args,
-                &client_pointer_parent_type,
+                &client_pointer_target_type,
             )
             .map(ClientType::ClientPointer)
             .map_err(|err| err.into_iter()),
@@ -112,7 +112,7 @@ pub(crate) fn validate_and_transform_client_types(
                 client_field,
                 server_fields,
                 &client_type_args,
-                &client_pointer_parent_type,
+                &client_pointer_target_type,
             )
             .map(ClientType::ClientField)
             .map_err(|err| err.into_iter()),
