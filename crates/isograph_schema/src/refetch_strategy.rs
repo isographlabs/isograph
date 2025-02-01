@@ -16,25 +16,25 @@ use crate::{
 
 #[derive(Debug)]
 pub enum RefetchStrategy<
-    TClientFieldSelectionScalarFieldAssociatedData,
-    TClientFieldSelectionLinkedFieldAssociatedData,
+    TClientTypeSelectionScalarFieldAssociatedData,
+    TClientTypeSelectionLinkedFieldAssociatedData,
 > {
     UseRefetchField(
         UseRefetchFieldRefetchStrategy<
-            TClientFieldSelectionScalarFieldAssociatedData,
-            TClientFieldSelectionLinkedFieldAssociatedData,
+            TClientTypeSelectionScalarFieldAssociatedData,
+            TClientTypeSelectionLinkedFieldAssociatedData,
         >,
     ),
     // RefetchFromRoot
 }
 
 impl<
-        TClientFieldSelectionScalarFieldAssociatedData,
-        TClientFieldSelectionLinkedFieldAssociatedData,
+        TClientTypeSelectionScalarFieldAssociatedData,
+        TClientTypeSelectionLinkedFieldAssociatedData,
     >
     RefetchStrategy<
-        TClientFieldSelectionScalarFieldAssociatedData,
-        TClientFieldSelectionLinkedFieldAssociatedData,
+        TClientTypeSelectionScalarFieldAssociatedData,
+        TClientTypeSelectionLinkedFieldAssociatedData,
     >
 {
     pub fn refetch_selection_set(
@@ -42,8 +42,8 @@ impl<
     ) -> &Vec<
         WithSpan<
             ServerFieldSelection<
-                TClientFieldSelectionScalarFieldAssociatedData,
-                TClientFieldSelectionLinkedFieldAssociatedData,
+                TClientTypeSelectionScalarFieldAssociatedData,
+                TClientTypeSelectionLinkedFieldAssociatedData,
             >,
         >,
     > {
@@ -56,14 +56,14 @@ impl<
 }
 #[allow(clippy::too_many_arguments)]
 pub fn generate_refetch_field_strategy<
-    TClientFieldSelectionScalarFieldAssociatedData,
-    TClientFieldSelectionLinkedFieldAssociatedData,
+    TClientTypeSelectionScalarFieldAssociatedData,
+    TClientTypeSelectionLinkedFieldAssociatedData,
 >(
     refetch_selection_set: Vec<
         WithSpan<
             ServerFieldSelection<
-                TClientFieldSelectionScalarFieldAssociatedData,
-                TClientFieldSelectionLinkedFieldAssociatedData,
+                TClientTypeSelectionScalarFieldAssociatedData,
+                TClientTypeSelectionLinkedFieldAssociatedData,
             >,
         >,
     >,
@@ -76,8 +76,8 @@ pub fn generate_refetch_field_strategy<
     subfield: Option<LinkedFieldName>,
     subfield_concrete_type: Option<IsographObjectTypeName>,
 ) -> UseRefetchFieldRefetchStrategy<
-    TClientFieldSelectionScalarFieldAssociatedData,
-    TClientFieldSelectionLinkedFieldAssociatedData,
+    TClientTypeSelectionScalarFieldAssociatedData,
+    TClientTypeSelectionLinkedFieldAssociatedData,
 > {
     UseRefetchFieldRefetchStrategy {
         refetch_selection_set,
@@ -96,16 +96,16 @@ pub fn generate_refetch_field_strategy<
 
 #[derive(Debug)]
 pub struct UseRefetchFieldRefetchStrategy<
-    TClientFieldSelectionScalarFieldAssociatedData,
-    TClientFieldSelectionLinkedFieldAssociatedData,
+    TClientTypeSelectionScalarFieldAssociatedData,
+    TClientTypeSelectionLinkedFieldAssociatedData,
 > {
     /// If this field is fetched imperatively, what fields do we need to
     /// select in the parent query?
     pub refetch_selection_set: Vec<
         WithSpan<
             ServerFieldSelection<
-                TClientFieldSelectionScalarFieldAssociatedData,
-                TClientFieldSelectionLinkedFieldAssociatedData,
+                TClientTypeSelectionScalarFieldAssociatedData,
+                TClientTypeSelectionLinkedFieldAssociatedData,
             >,
         >,
     >,

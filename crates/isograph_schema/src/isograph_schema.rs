@@ -43,12 +43,12 @@ pub trait SchemaValidationState: Debug {
     /// - Unvalidated: ()
     /// - Validated: ValidatedFieldDefinitionLocation
     ///   i.e. DefinedField<ServerFieldId, ClientFieldId>
-    type ClientFieldSelectionScalarFieldAssociatedData: Debug;
+    type ClientTypeSelectionScalarFieldAssociatedData: Debug;
 
     /// The associated data type of linked fields in client fields' selection sets and unwraps
     /// - Unvalidated: ()
     /// - Validated: ObjectId
-    type ClientFieldSelectionLinkedFieldAssociatedData: Debug;
+    type ClientTypeSelectionLinkedFieldAssociatedData: Debug;
 
     /// The associated data type of client fields' variable definitions
     /// - Unvalidated: UnvalidatedTypeName
@@ -80,9 +80,9 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
             TSchemaValidationState::VariableDefinitionInnerType,
         >,
     >,
-    pub client_fields: ClientFields<
-        TSchemaValidationState::ClientFieldSelectionScalarFieldAssociatedData,
-        TSchemaValidationState::ClientFieldSelectionLinkedFieldAssociatedData,
+    pub client_types: ClientTypes<
+        TSchemaValidationState::ClientTypeSelectionScalarFieldAssociatedData,
+        TSchemaValidationState::ClientTypeSelectionLinkedFieldAssociatedData,
         TSchemaValidationState::VariableDefinitionInnerType,
     >,
     // TODO consider whether this belongs here. It could just be a free variable.
@@ -93,20 +93,20 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
     pub fetchable_types: BTreeMap<ServerObjectId, RootOperationName>,
 }
 
-type ClientFields<
-    TClientFieldSelectionScalarFieldAssociatedData,
-    TClientFieldSelectionLinkedFieldAssociatedData,
+type ClientTypes<
+    TClientTypeSelectionScalarFieldAssociatedData,
+    TClientTypeSelectionLinkedFieldAssociatedData,
     TClientFieldVariableDefinitionAssociatedData,
 > = Vec<
     ClientType<
         ClientField<
-            TClientFieldSelectionScalarFieldAssociatedData,
-            TClientFieldSelectionLinkedFieldAssociatedData,
+            TClientTypeSelectionScalarFieldAssociatedData,
+            TClientTypeSelectionLinkedFieldAssociatedData,
             TClientFieldVariableDefinitionAssociatedData,
         >,
         ClientPointer<
-            TClientFieldSelectionScalarFieldAssociatedData,
-            TClientFieldSelectionLinkedFieldAssociatedData,
+            TClientTypeSelectionScalarFieldAssociatedData,
+            TClientTypeSelectionLinkedFieldAssociatedData,
             TClientFieldVariableDefinitionAssociatedData,
         >,
     >,
@@ -278,11 +278,11 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
         &self,
         client_field_id: ClientFieldId,
     ) -> &ClientField<
-        TSchemaValidationState::ClientFieldSelectionScalarFieldAssociatedData,
-        TSchemaValidationState::ClientFieldSelectionLinkedFieldAssociatedData,
+        TSchemaValidationState::ClientTypeSelectionScalarFieldAssociatedData,
+        TSchemaValidationState::ClientTypeSelectionLinkedFieldAssociatedData,
         TSchemaValidationState::VariableDefinitionInnerType,
     > {
-        match &self.client_fields[client_field_id.as_usize()] {
+        match &self.client_types[client_field_id.as_usize()] {
             ClientType::ClientField(client_field) => client_field,
             ClientType::ClientPointer(_) => panic!(
                 "encountered ClientPointer under ClientFieldId. \
@@ -296,11 +296,11 @@ impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationStat
         &self,
         client_pointer_id: ClientPointerId,
     ) -> &ClientPointer<
-        TSchemaValidationState::ClientFieldSelectionScalarFieldAssociatedData,
-        TSchemaValidationState::ClientFieldSelectionLinkedFieldAssociatedData,
+        TSchemaValidationState::ClientTypeSelectionScalarFieldAssociatedData,
+        TSchemaValidationState::ClientTypeSelectionLinkedFieldAssociatedData,
         TSchemaValidationState::VariableDefinitionInnerType,
     > {
-        match &self.client_fields[client_pointer_id.as_usize()] {
+        match &self.client_types[client_pointer_id.as_usize()] {
             ClientType::ClientPointer(client_pointer) => client_pointer,
             ClientType::ClientField(_) => panic!(
                 "encountered ClientField under ClientPointerId. \
@@ -560,8 +560,8 @@ impl<TData: Copy, TClientFieldVariableDefinitionAssociatedData: Ord + Debug>
 
 #[derive(Debug)]
 pub struct ClientPointer<
-    TClientFieldSelectionScalarFieldAssociatedData,
-    TClientFieldSelectionLinkedFieldAssociatedData,
+    TClientTypeSelectionScalarFieldAssociatedData,
+    TClientTypeSelectionLinkedFieldAssociatedData,
     TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
 > {
     pub description: Option<DescriptionValue>,
@@ -572,15 +572,15 @@ pub struct ClientPointer<
     pub reader_selection_set: Vec<
         WithSpan<
             ServerFieldSelection<
-                TClientFieldSelectionScalarFieldAssociatedData,
-                TClientFieldSelectionLinkedFieldAssociatedData,
+                TClientTypeSelectionScalarFieldAssociatedData,
+                TClientTypeSelectionLinkedFieldAssociatedData,
             >,
         >,
     >,
 
     pub refetch_strategy: RefetchStrategy<
-        TClientFieldSelectionScalarFieldAssociatedData,
-        TClientFieldSelectionLinkedFieldAssociatedData,
+        TClientTypeSelectionScalarFieldAssociatedData,
+        TClientTypeSelectionLinkedFieldAssociatedData,
     >,
 
     pub variable_definitions:
@@ -594,8 +594,8 @@ pub struct ClientPointer<
 
 #[derive(Debug)]
 pub struct ClientField<
-    TClientFieldSelectionScalarFieldAssociatedData,
-    TClientFieldSelectionLinkedFieldAssociatedData,
+    TClientTypeSelectionScalarFieldAssociatedData,
+    TClientTypeSelectionLinkedFieldAssociatedData,
     TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
 > {
     pub description: Option<DescriptionValue>,
@@ -609,8 +609,8 @@ pub struct ClientField<
         Vec<
             WithSpan<
                 ServerFieldSelection<
-                    TClientFieldSelectionScalarFieldAssociatedData,
-                    TClientFieldSelectionLinkedFieldAssociatedData,
+                    TClientTypeSelectionScalarFieldAssociatedData,
+                    TClientTypeSelectionLinkedFieldAssociatedData,
                 >,
             >,
         >,
@@ -619,8 +619,8 @@ pub struct ClientField<
     // None -> not refetchable
     pub refetch_strategy: Option<
         RefetchStrategy<
-            TClientFieldSelectionScalarFieldAssociatedData,
-            TClientFieldSelectionLinkedFieldAssociatedData,
+            TClientTypeSelectionScalarFieldAssociatedData,
+            TClientTypeSelectionLinkedFieldAssociatedData,
         >,
     >,
 
@@ -637,13 +637,13 @@ pub struct ClientField<
 }
 
 impl<
-        TClientFieldSelectionScalarFieldAssociatedData,
-        TClientFieldSelectionLinkedFieldAssociatedData,
+        TClientTypeSelectionScalarFieldAssociatedData,
+        TClientTypeSelectionLinkedFieldAssociatedData,
         TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
     >
     ClientField<
-        TClientFieldSelectionScalarFieldAssociatedData,
-        TClientFieldSelectionLinkedFieldAssociatedData,
+        TClientTypeSelectionScalarFieldAssociatedData,
+        TClientTypeSelectionLinkedFieldAssociatedData,
         TClientFieldVariableDefinitionAssociatedData,
     >
 {
@@ -652,8 +652,8 @@ impl<
     ) -> &Vec<
         WithSpan<
             ServerFieldSelection<
-                TClientFieldSelectionScalarFieldAssociatedData,
-                TClientFieldSelectionLinkedFieldAssociatedData,
+                TClientTypeSelectionScalarFieldAssociatedData,
+                TClientTypeSelectionLinkedFieldAssociatedData,
             >,
         >,
     > {

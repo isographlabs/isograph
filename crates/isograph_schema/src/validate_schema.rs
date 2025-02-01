@@ -28,34 +28,34 @@ pub type ValidatedSchemaServerField = SchemaServerField<
 >;
 
 pub type ValidatedSelection = ServerFieldSelection<
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
 >;
 
 pub type ValidatedLinkedFieldSelection = LinkedFieldSelection<
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
 >;
 pub type ValidatedScalarFieldSelection = ScalarFieldSelection<
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
 >;
 
 pub type ValidatedVariableDefinition = VariableDefinition<SelectableServerFieldId>;
 pub type ValidatedClientField = ClientField<
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
 >;
 
 pub type ValidatedClientPointer = ClientPointer<
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
 >;
 
 pub type ValidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
 >;
 
 /// The validated defined field that shows up in the TScalarField generic.
@@ -102,8 +102,8 @@ pub type ValidatedServerFieldTypeAssociatedData = SelectionType<
 pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
     type ServerFieldTypeAssociatedData = ValidatedServerFieldTypeAssociatedData;
-    type ClientFieldSelectionScalarFieldAssociatedData = ValidatedScalarFieldAssociatedData;
-    type ClientFieldSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
+    type ClientTypeSelectionScalarFieldAssociatedData = ValidatedScalarFieldAssociatedData;
+    type ClientTypeSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
     type VariableDefinitionInnerType = SelectableServerFieldId;
     type Entrypoint = HashSet<ClientFieldId>;
 }
@@ -137,7 +137,7 @@ impl ValidatedSchema {
 
         let Schema {
             server_fields: fields,
-            client_fields,
+            client_types: client_fields,
             entrypoints: _,
             server_field_data: schema_data,
             fetchable_types: root_types,
@@ -188,7 +188,7 @@ impl ValidatedSchema {
 
             Ok(Self {
                 server_fields: updated_server_fields,
-                client_fields: updated_client_fields,
+                client_types: updated_client_fields,
                 entrypoints: updated_entrypoints,
                 server_field_data: ServerFieldData {
                     server_objects,
@@ -433,7 +433,7 @@ pub enum ValidateSchemaError {
         the field `{field_parent_type_name}.{field_name}` is selected, but that \
         field does not exist on `{field_parent_type_name}`"
     )]
-    ClientFieldSelectionFieldDoesNotExist {
+    ClientTypeSelectionFieldDoesNotExist {
         client_field_parent_type_name: IsographObjectTypeName,
         client_field_name: SelectableFieldName,
         field_parent_type_name: IsographObjectTypeName,
@@ -445,7 +445,7 @@ pub enum ValidateSchemaError {
         the field `{field_parent_type_name}.{field_name}` is selected as a scalar, \
         but that field's type is `{target_type_name}`, which is {field_type}."
     )]
-    ClientFieldSelectionFieldIsNotScalar {
+    ClientTypeSelectionFieldIsNotScalar {
         client_field_parent_type_name: IsographObjectTypeName,
         client_field_name: SelectableFieldName,
         field_parent_type_name: IsographObjectTypeName,
@@ -459,7 +459,7 @@ pub enum ValidateSchemaError {
         the field `{field_parent_type_name}.{field_name}` is selected as a linked field, \
         but that field's type is `{target_type_name}`, which is {field_type}."
     )]
-    ClientFieldSelectionFieldIsScalar {
+    ClientTypeSelectionFieldIsScalar {
         client_field_parent_type_name: IsographObjectTypeName,
         client_field_name: SelectableFieldName,
         field_parent_type_name: IsographObjectTypeName,
@@ -473,7 +473,7 @@ pub enum ValidateSchemaError {
         field `{field_parent_type_name}.{field_name}` is selected as a linked field, \
         but that field is a client field, which can only be selected as a scalar."
     )]
-    ClientFieldSelectionClientFieldSelectedAsLinked {
+    ClientTypeSelectionClientFieldSelectedAsLinked {
         client_field_parent_type_name: IsographObjectTypeName,
         client_field_name: SelectableFieldName,
         field_parent_type_name: IsographObjectTypeName,

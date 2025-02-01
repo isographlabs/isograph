@@ -14,13 +14,13 @@ use crate::IsographFieldDirective;
 pub type UnvalidatedSelectionWithUnvalidatedDirectives = ServerFieldSelection<(), ()>;
 
 pub type UnvalidatedSelection = ServerFieldSelection<
-    // <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
+    // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
     IsographSelectionVariant,
-    // <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
+    // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
     IsographSelectionVariant,
 >;
 pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
-    // <UnvalidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
+    // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
     IsographSelectionVariant,
 >;
 
