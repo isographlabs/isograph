@@ -89,7 +89,7 @@ export type ReaderAstNode =
   | ReaderNonLoadableResolverField
   | ReaderImperativelyLoadedField
   | ReaderLoadableField
-  | ReaderLinkeField;
+  | ReaderLinkField;
 
 // @ts-ignore
 export type ReaderAst<TReadFromStore> = ReadonlyArray<ReaderAstNode>;
@@ -101,7 +101,7 @@ export type ReaderScalarField = {
   readonly arguments: Arguments | null;
 };
 
-export type ReaderLinkeField = {
+export type ReaderLinkField = {
   readonly kind: 'Link';
   readonly alias: string;
 };
