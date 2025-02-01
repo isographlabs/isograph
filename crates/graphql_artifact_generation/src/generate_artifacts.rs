@@ -255,7 +255,7 @@ pub fn get_artifact_path_and_content(
         }
     }
 
-    for user_written_client_field in schema.client_fields.iter().flat_map(|field| match field {
+    for user_written_client_field in schema.client_types.iter().flat_map(|field| match field {
         ClientType::ClientPointer(_) => todo!(),
         ClientType::ClientField(field) => match field.variant {
             ClientFieldVariant::Link => None,
