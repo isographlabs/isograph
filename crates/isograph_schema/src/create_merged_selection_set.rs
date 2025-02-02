@@ -21,8 +21,9 @@ use crate::{
     transform_name_and_arguments_with_child_variable_context, ClientFieldVariant, ClientType,
     FieldType, ImperativelyLoadedFieldVariant, Loadability, NameAndArguments, PathToRefetchField,
     RootOperationName, SchemaObject, SchemaServerFieldVariant, UnvalidatedVariableDefinition,
-    ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedScalarFieldSelection,
-    ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection, VariableContext,
+    ValidatedClientField, ValidatedClientPointer, ValidatedIsographSelectionVariant,
+    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection,
+    VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -704,7 +705,7 @@ fn merge_validated_selections_into_selection_map(
                                     FieldType::ClientField(ClientType::ClientField(
                                         newly_encountered_scalar_client_field.id,
                                     )),
-                                    &newly_encountered_scalar_client_field
+                                    &ClientType::ClientField(newly_encountered_scalar_client_field)
                                         .initial_variable_context(),
                                 );
 
@@ -732,12 +733,14 @@ fn merge_validated_selections_into_selection_map(
                                 ClientFieldVariant::Link => {}
                                 ClientFieldVariant::ImperativelyLoadedField(_)
                                 | ClientFieldVariant::UserWritten(_) => {
-                                    merge_non_loadable_scalar_client_field(
+                                    merge_non_loadable_scalar_client_type(
                                         parent_type,
                                         schema,
                                         parent_map,
                                         merge_traversal_state,
-                                        newly_encountered_scalar_client_field,
+                                        ClientType::ClientField(
+                                            newly_encountered_scalar_client_field,
+                                        ),
                                         encountered_client_field_map,
                                         variable_context,
                                         &scalar_field_selection.arguments,
@@ -757,7 +760,21 @@ fn merge_validated_selections_into_selection_map(
                 let linked_field_parent_type = schema.server_field_data.object(type_id);
 
                 match linked_field_selection.associated_data.field_id {
-                    FieldType::ClientField(_client_pointer_id) => todo!(),
+                    FieldType::ClientField(client_pointer_id) => {
+                        let newly_encountered_client_pointer =
+                            schema.client_pointer(client_pointer_id);
+
+                        merge_non_loadable_scalar_client_type(
+                            parent_type,
+                            schema,
+                            parent_map,
+                            merge_traversal_state,
+                            ClientType::ClientPointer(newly_encountered_client_pointer),
+                            encountered_client_field_map,
+                            variable_context,
+                            &linked_field_selection.arguments,
+                        )
+                    }
                     FieldType::ServerField(server_field_id) => {
                         let server_field = schema.server_field(server_field_id);
 
@@ -964,7 +981,7 @@ fn insert_imperative_field_into_refetch_paths(
         FieldType::ClientField(ClientType::ClientField(
             newly_encountered_scalar_client_field.id,
         )),
-        &newly_encountered_scalar_client_field.initial_variable_context(),
+        &ClientType::ClientField(newly_encountered_scalar_client_field).initial_variable_context(),
     );
 }
 
@@ -984,12 +1001,12 @@ fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn merge_non_loadable_scalar_client_field(
+fn merge_non_loadable_scalar_client_type(
     parent_type: &SchemaObject,
     schema: &ValidatedSchema,
     parent_map: &mut MergedSelectionMap,
     parent_merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    newly_encountered_scalar_client_field: &ValidatedClientField,
+    newly_encountered_client_type: ClientType<&ValidatedClientField, &ValidatedClientPointer>,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     parent_variable_context: &VariableContext,
     selection_arguments: &[WithLocation<SelectionFieldArgument>],
@@ -1003,23 +1020,21 @@ fn merge_non_loadable_scalar_client_field(
     } = create_merged_selection_map_for_field_and_insert_into_global_map(
         schema,
         parent_type,
-        newly_encountered_scalar_client_field
-            .reader_selection_set
+        newly_encountered_client_type
+            .reader_selection_set()
             .as_ref()
             .expect(
                 "Expected selection set to exist. \
                 This is indicative of a bug in Isograph.",
             ),
         encountered_client_field_map,
-        FieldType::ClientField(ClientType::ClientField(
-            newly_encountered_scalar_client_field.id,
-        )),
-        &newly_encountered_scalar_client_field.initial_variable_context(),
+        FieldType::ClientField(newly_encountered_client_type.id()),
+        &newly_encountered_client_type.initial_variable_context(),
     );
 
     let transformed_child_variable_context = parent_variable_context.child_variable_context(
         selection_arguments,
-        &newly_encountered_scalar_client_field.variable_definitions,
+        newly_encountered_client_type.variable_definitions(),
         &ValidatedIsographSelectionVariant::Regular,
     );
     transform_and_merge_child_selection_map_into_parent_map(
