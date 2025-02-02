@@ -713,7 +713,6 @@ fn validate_field_type_exists_and_is_linked(
                                 ValidatedIsographSelectionVariant::Regular
                             },
                             IsographSelectionVariant::Loadable(l) => {
-                                server_field_cannot_be_selected_loadably(linked_field_name, linked_field_selection.name.location)?;
                                 ValidatedIsographSelectionVariant::Loadable((l, missing_arguments))
                             },
                         },
