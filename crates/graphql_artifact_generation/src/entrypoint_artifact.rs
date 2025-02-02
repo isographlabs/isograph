@@ -54,7 +54,7 @@ pub(crate) fn generate_entrypoint_artifacts(
         entrypoint.selection_set_for_parent_query(),
         encountered_client_type_map,
         FieldType::ClientField(ClientType::ClientField(entrypoint.id)),
-        &entrypoint.initial_variable_context(),
+        &ClientType::ClientField(entrypoint).initial_variable_context(),
     );
 
     generate_entrypoint_artifacts_with_client_field_traversal_result(
