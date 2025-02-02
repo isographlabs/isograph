@@ -7,7 +7,7 @@ use std::{
 };
 
 use calc::{ast::Program, error::Result, eval::eval, lexer::Lexer, parser::Parser};
-use pico_core::{database::Database, source::SourceId, storage::Storage};
+use pico_core::{database::Database, epoch::Epoch, source::SourceId, storage::Storage};
 use pico_macros::{memo, Db, Source};
 
 mod calc;
@@ -17,7 +17,7 @@ static EVAL_COUNTER: LazyLock<Mutex<HashMap<SourceId<Input>, usize>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[test]
-fn memoization() {
+fn drop() {
     let mut state = TestDatabase::default();
 
     let left = state.set(Input {
@@ -30,7 +30,7 @@ fn memoization() {
         value: "(2 + 2) * 2".to_string(),
     });
 
-    let result = sum(&state, left, right);
+    let result = sum(&mut state, left, right);
     assert_eq!(result, 14);
 
     // every functions has been called once on the first run
@@ -38,41 +38,61 @@ fn memoization() {
     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 1);
     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 1);
 
-    // change "left" input with the same eval result
+    // it must be safe to drop a generation, it should be recalculeted
+    let generations_count = state.storage().map.read_only_view().len();
+    state.storage_mut().map.remove(&Epoch::from(1));
+
+    // generation should be removed
+    assert_ne!(
+        generations_count,
+        state.storage().map.read_only_view().len(),
+    );
+    // but we need to create a new generation anyway
+    state.increment_epoch();
+
+    let result = sum(&mut state, left, right);
+    assert_eq!(result, 14);
+
+    // every functions has been called againd due to empty storage
+    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 2);
+    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 2);
+    assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 2);
+
+    // let's update the "left" source with the same eval result.
+    // It must create only one new derived node in the current generation.
     let left = state.set(Input {
         key: "left",
         value: "3 * 2".to_string(),
     });
 
     // changing source doesn't cause any recalculation
-    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 1);
-    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 1);
-    assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 1);
+    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 2);
+    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 2);
+    assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 2);
 
     let result = sum(&state, left, right);
     assert_eq!(result, 14);
 
     // "left" must be called again because the input value has been changed
-    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 2);
-    // "right" must not be called again
-    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 1);
-    // "left" and "right" values are the same, so no call
-    assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 1);
-
-    // change "left" input to produce a new value
-    let left = state.set(Input {
-        key: "left",
-        value: "3 * 3".to_string(),
-    });
-    let result = sum(&state, left, right);
-    assert_eq!(result, 17);
-
-    // "left" must be called again because the input value has been changed
     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 3);
     // "right" must not be called again
-    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 1);
-    // "left" value is different now, so "sum" must be called
+    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 2);
+    // "left" and "right" values are the same, so no call
     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 2);
+
+    // drop the oldest generation
+    let min_epoch = *state.storage.map.read_only_view().keys().min().unwrap();
+    state.storage_mut().map.remove(&min_epoch);
+
+    let result = sum(&mut state, left, right);
+    assert_eq!(result, 14);
+
+    // "left" exists in the latest epoch, it must not be called again
+    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 3);
+    // "right" was dropped, we don't know the previous value
+    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 3);
+    // "sum" node was dropped as well
+    assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 3);
 }
 
 #[derive(Debug, Default, Db)]
@@ -107,6 +127,5 @@ fn sum(db: &TestDatabase, left: SourceId<Input>, right: SourceId<Input>) -> i64 
     SUM_COUNTER.fetch_add(1, Ordering::SeqCst);
     let left = evaluate_input(db, left);
     let right = evaluate_input(db, right);
-
     left + right
 }

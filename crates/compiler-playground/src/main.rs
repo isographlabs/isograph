@@ -26,7 +26,7 @@ fn main() {
         value: "2 + 2 * 2".to_string(),
     };
     let id = db.set(input);
-    let mut result = evaluate_input(&mut db, id);
+    let mut result = evaluate_input(&db, id);
     info!("result: {result}");
 
     input = Input {
@@ -34,7 +34,7 @@ fn main() {
         value: "3 * 2".to_string(),
     };
     let id = db.set(input);
-    result = evaluate_input(&mut db, id);
+    result = evaluate_input(&db, id);
     info!("result: {result}");
     debug!("db: {db:#?}");
 }

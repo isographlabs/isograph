@@ -5,4 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+boxcar = { workspace = true }
+dashmap = { workspace = true }
+once_map = { workspace = true }
 thiserror = { workspace = true }

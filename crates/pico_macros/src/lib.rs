@@ -1,7 +1,6 @@
 mod db;
 mod memo;
 mod source;
-mod storage;
 
 extern crate proc_macro2;
 
@@ -20,9 +19,4 @@ pub fn source(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Db)]
 pub fn derive_db(input: TokenStream) -> TokenStream {
     db::derive_db(input)
-}
-
-#[proc_macro_derive(Storage)]
-pub fn derive_storage(input: TokenStream) -> TokenStream {
-    storage::derive_storage(input)
 }

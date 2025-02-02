@@ -14,15 +14,15 @@ pub struct Input {
 }
 
 #[memo]
-pub fn parse_ast(db: &mut State, id: SourceId<Input>) -> Result<Program> {
+pub fn parse_ast(db: &State, id: SourceId<Input>) -> Result<Program> {
     let source_text = db.get(id);
     let mut lexer = Lexer::new(source_text.value);
     let mut parser = Parser::new(&mut lexer)?;
     parser.parse_program()
 }
 
-#[memo]
-pub fn evaluate_input(db: &mut State, id: SourceId<Input>) -> i64 {
+#[memo(reference)]
+pub fn evaluate_input(db: &State, id: SourceId<Input>) -> i64 {
     let ast = parse_ast(db, id).expect("ast must be correct");
     eval::eval(ast.expression).expect("value must be evaluated")
 }

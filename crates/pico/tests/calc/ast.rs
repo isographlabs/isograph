@@ -15,7 +15,7 @@ pub enum Expression {
 }
 
 impl Expression {
-    pub fn parse<'a>(parser: &mut Parser<'a>, precedence: Precedence) -> Result<Self> {
+    pub fn parse(parser: &mut Parser<'_>, precedence: Precedence) -> Result<Self> {
         let mut left = match &parser.current_token {
             Token::Int(value) => Self::IntegerLiteral(value.parse()?),
             Token::Minus => Self::PrefixOperator(PrefixOperator::parse(parser)?),
@@ -54,7 +54,7 @@ pub struct PrefixOperator {
 }
 
 impl PrefixOperator {
-    fn parse<'a>(parser: &mut Parser<'a>) -> Result<Self> {
+    fn parse(parser: &mut Parser<'_>) -> Result<Self> {
         let operator = match parser.current_token {
             Token::Minus => PrefixOperatorKind::Negative,
             _ => {
@@ -80,7 +80,7 @@ pub struct InfixOperator {
 }
 
 impl InfixOperator {
-    fn parse<'a>(parser: &mut Parser<'a>, left: Expression) -> Result<Self> {
+    fn parse(parser: &mut Parser<'_>, left: Expression) -> Result<Self> {
         let operator = match parser.current_token {
             Token::Plus => InfixOperatorKind::Add,
             Token::Minus => InfixOperatorKind::Subtract,

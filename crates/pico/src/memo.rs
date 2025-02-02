@@ -1,12 +1,10 @@
 use pico_core::{
-    container::Container,
     database::Database,
     dyn_eq::DynEq,
     epoch::Epoch,
     key::Key,
     node::{Dependency, DerivedNode, DerivedNodeId, NodeKind},
     params::ParamId,
-    storage::{Storage, StorageMut},
 };
 
 pub enum DidRecalculate {
@@ -52,99 +50,98 @@ pub enum DidRecalculate {
 /// (with a value identical to what we would get if we actually invoked the
 /// function) is present in the [`Storage`].
 pub fn memo<Db: Database>(
-    db: &mut Db,
+    db: &Db,
     derived_node_id: DerivedNodeId,
-    inner_fn: fn(&mut Db, ParamId) -> Box<dyn DynEq>,
+    inner_fn: fn(&Db, ParamId) -> Box<dyn DynEq>,
 ) -> DidRecalculate {
-    let current_epoch = db.current_epoch();
     let (time_updated, did_recalculate) =
-        if db.storage().derived_nodes().contains_key(&derived_node_id) {
-            if any_dependency_changed(db, derived_node_id, current_epoch) {
-                let mut state = DidRecalculate::ReusedMemoizedValue;
-                let (value, dependencies, time_updated) =
-                    call_inner_fn_and_collect_dependencies(db, derived_node_id.param_id, inner_fn);
-                if let Some(node) = db
-                    .storage_mut()
-                    .derived_nodes_mut()
-                    .get_mut(&derived_node_id)
-                {
-                    if node.value != value {
-                        node.value = value;
-                        node.time_updated = time_updated;
-                        state = DidRecalculate::Recalculated;
-                    }
-                    node.dependencies = dependencies;
-                    node.time_verified = current_epoch;
-                } else {
-                    db.storage_mut().derived_nodes_mut().insert(
-                        derived_node_id,
-                        DerivedNode {
-                            time_verified: current_epoch,
-                            time_updated,
-                            dependencies,
-                            inner_fn,
-                            value,
-                        },
-                    );
-                    state = DidRecalculate::Recalculated;
-                }
-                (time_updated, state)
+        if let Some(derived_node) = db.storage().get_derived_node(derived_node_id) {
+            if any_dependency_changed(db, derived_node) {
+                update_derived_node(db, derived_node_id, derived_node.value.as_ref(), inner_fn)
             } else {
-                let node = db
-                    .storage_mut()
-                    .derived_nodes_mut()
-                    .get_mut(&derived_node_id)
-                    .expect("node should exist. This is indicative of a bug in Pico.");
-                node.time_verified = current_epoch;
-                (node.time_updated, DidRecalculate::ReusedMemoizedValue)
+                db.storage().verify_derived_node(derived_node_id);
+                (db.current_epoch(), DidRecalculate::ReusedMemoizedValue)
             }
         } else {
-            let (value, dependencies, time_updated) =
-                call_inner_fn_and_collect_dependencies(db, derived_node_id.param_id, inner_fn);
-            db.storage_mut().derived_nodes_mut().insert(
-                derived_node_id,
-                DerivedNode {
-                    time_verified: current_epoch,
-                    time_updated,
-                    dependencies,
-                    inner_fn,
-                    value,
-                },
-            );
-            (time_updated, DidRecalculate::Recalculated)
+            create_derived_node(db, derived_node_id, inner_fn)
         };
-    register_dependency_in_parent_memoized_fn(
-        db,
-        NodeKind::Derived(derived_node_id),
-        time_updated,
-        current_epoch,
-    );
+    register_dependency_in_parent_memoized_fn(db, NodeKind::Derived(derived_node_id), time_updated);
     did_recalculate
 }
 
-fn any_dependency_changed<Db: Database>(
-    db: &mut Db,
+pub fn register_dependency_in_parent_memoized_fn<Db: Database>(
+    db: &Db,
+    node: NodeKind,
+    time_updated: Epoch,
+) {
+    db.storage().dependency_stack.push_checked(|| {
+        (
+            time_updated,
+            Dependency {
+                node_to: node,
+                time_verified_or_updated: db.current_epoch(),
+            },
+        )
+    });
+}
+
+fn create_derived_node<Db: Database>(
+    db: &Db,
     derived_node_id: DerivedNodeId,
-    current_epoch: Epoch,
-) -> bool {
-    let potentially_changed_dependencies = db
-        .storage()
-        .derived_nodes()
-        .get(&derived_node_id)
-        .expect("node should exist. This is indicative of a bug in Pico.")
+    inner_fn: fn(&Db, ParamId) -> Box<dyn DynEq>,
+) -> (Epoch, DidRecalculate) {
+    let (value, dependencies, time_updated) =
+        call_inner_fn_and_collect_dependencies(db, derived_node_id.param_id, inner_fn);
+    db.storage().insert_derived_node(
+        derived_node_id,
+        DerivedNode {
+            dependencies,
+            inner_fn,
+            value,
+        },
+    );
+    db.storage()
+        .insert_derived_node_rev(derived_node_id, time_updated, db.current_epoch());
+    (time_updated, DidRecalculate::Recalculated)
+}
+
+fn update_derived_node<Db: Database>(
+    db: &Db,
+    derived_node_id: DerivedNodeId,
+    prev_value: &dyn DynEq,
+    inner_fn: fn(&Db, ParamId) -> Box<dyn DynEq>,
+) -> (Epoch, DidRecalculate) {
+    let mut did_recalculate = DidRecalculate::ReusedMemoizedValue;
+    let (value, dependencies, time_updated) =
+        call_inner_fn_and_collect_dependencies(db, derived_node_id.param_id, inner_fn);
+    if *prev_value != *value {
+        did_recalculate = DidRecalculate::Recalculated;
+        db.storage()
+            .set_derive_node_time_updated(derived_node_id, time_updated);
+    }
+    db.storage().verify_derived_node(derived_node_id);
+    db.storage().insert_derived_node(
+        derived_node_id,
+        DerivedNode {
+            dependencies,
+            inner_fn,
+            value,
+        },
+    );
+    (time_updated, did_recalculate)
+}
+
+fn any_dependency_changed<Db: Database>(db: &Db, derived_node: &DerivedNode<Db>) -> bool {
+    derived_node
         .dependencies
         .iter()
         .filter_map(|dep| {
-            if dep.time_verified_or_updated != current_epoch {
+            if dep.time_verified_or_updated != db.current_epoch() {
                 Some(*dep)
             } else {
                 None
             }
         })
-        .collect::<Vec<_>>();
-
-    potentially_changed_dependencies
-        .into_iter()
         .any(|dependency| match dependency.node_to {
             NodeKind::Source(key) => {
                 source_node_changed_since(db, key, dependency.time_verified_or_updated)
@@ -156,36 +153,40 @@ fn any_dependency_changed<Db: Database>(
 }
 
 fn source_node_changed_since<Db: Database>(db: &Db, key: Key, since: Epoch) -> bool {
-    match db.storage().source_nodes().get(&key) {
+    match db.storage().source_nodes.get(&key) {
         Some(source) => source.time_updated > since,
         None => panic!("Source node not found. This indicates a bug in Pico."),
     }
 }
 
 fn derived_node_changed_since<Db: Database>(
-    db: &mut Db,
-    node_id: DerivedNodeId,
+    db: &Db,
+    derived_node_id: DerivedNodeId,
     since: Epoch,
 ) -> bool {
-    if !db.storage().params().contains_key(&node_id.param_id) {
+    if !db.storage().contains_param(derived_node_id.param_id) {
         return true;
     }
-    let inner_fn = if let Some(node) = db.storage().derived_nodes().get(&node_id) {
-        if node.time_updated > since {
+    let inner_fn = if let Some(derived_node) = db.storage().get_derived_node(derived_node_id) {
+        if let Some(rev) = db.storage().get_derived_node_rev(derived_node_id) {
+            if rev.time_updated > since {
+                return true;
+            }
+        } else {
             return true;
         }
-        node.inner_fn
+        derived_node.inner_fn
     } else {
         return true;
     };
-    let did_recalculate = memo(db, node_id, inner_fn);
+    let did_recalculate = memo(db, derived_node_id, inner_fn);
     matches!(did_recalculate, DidRecalculate::Recalculated)
 }
 
 fn call_inner_fn_and_collect_dependencies<Db: Database>(
-    db: &mut Db,
+    db: &Db,
     param_id: ParamId,
-    inner_fn: fn(&mut Db, ParamId) -> Box<dyn DynEq>,
+    inner_fn: fn(&Db, ParamId) -> Box<dyn DynEq>,
 ) -> (
     Box<dyn DynEq>,  /* value */
     Vec<Dependency>, /* dependencies */
@@ -203,40 +204,16 @@ fn call_inner_fn_and_collect_dependencies<Db: Database>(
     (value, dependencies, time_updated)
 }
 
-pub fn register_dependency_in_parent_memoized_fn<Db: Database>(
-    db: &mut Db,
-    node: NodeKind,
-    time_updated: Epoch,
-    current_epoch: Epoch,
-) {
-    if let Some(dependencies) = db.storage_mut().dependency_stack_mut().last_mut() {
-        dependencies.push((
-            time_updated,
-            Dependency {
-                node_to: node,
-                time_verified_or_updated: current_epoch,
-            },
-        ));
-    } else {
-        // Dependency stack is empty for the outermost memoized function.
-        // We don't need to register dependencies for it.
-    }
-}
-
 fn with_dependency_tracking<Db>(
-    db: &mut Db,
+    db: &Db,
     param_id: ParamId,
-    inner_fn: fn(&mut Db, ParamId) -> Box<dyn DynEq>,
+    inner_fn: fn(&Db, ParamId) -> Box<dyn DynEq>,
 ) -> (Box<dyn DynEq>, Vec<(Epoch, Dependency)>)
 where
     Db: Database,
 {
-    db.storage_mut().dependency_stack_mut().push(vec![]);
+    db.storage().dependency_stack.enter();
     let value = inner_fn(db, param_id);
-    let registered_dependencies = db
-        .storage_mut()
-        .dependency_stack_mut()
-        .pop()
-        .expect("Dependency stack should not be empty. This indicates a bug in Pico.");
+    let registered_dependencies = db.storage().dependency_stack.leave();
     (value, registered_dependencies)
 }

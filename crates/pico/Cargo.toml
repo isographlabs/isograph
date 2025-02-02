@@ -12,4 +12,3 @@ pico_core = { path = "../pico_core" }
 serde = { workspace = true } 
 thiserror = { workspace = true }
 tracing = { workspace = true }
-lru = { workspace = true }
