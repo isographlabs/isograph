@@ -723,7 +723,7 @@ fn merge_validated_selections_into_selection_map(
                                 ClientFieldVariant::Link => {}
                                 ClientFieldVariant::ImperativelyLoadedField(_)
                                 | ClientFieldVariant::UserWritten(_) => {
-                                    merge_non_loadable_scalar_client_type(
+                                    merge_non_loadable_client_type(
                                         parent_type,
                                         schema,
                                         parent_map,
@@ -754,7 +754,7 @@ fn merge_validated_selections_into_selection_map(
                         let newly_encountered_client_pointer =
                             schema.client_pointer(client_pointer_id);
 
-                        merge_non_loadable_scalar_client_type(
+                        merge_non_loadable_client_type(
                             parent_type,
                             schema,
                             parent_map,
@@ -991,7 +991,7 @@ fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn merge_non_loadable_scalar_client_type(
+fn merge_non_loadable_client_type(
     parent_type: &SchemaObject,
     schema: &ValidatedSchema,
     parent_map: &mut MergedSelectionMap,
