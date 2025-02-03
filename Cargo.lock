@@ -1253,8 +1253,11 @@ version = "0.3.0"
 dependencies = [
  "boxcar",
  "dashmap",
+ "intern",
  "once_map",
+ "serde",
  "thiserror",
+ "u64_newtypes",
 ]
 
 [[package]]
@@ -2001,6 +2004,10 @@ dependencies = [
 
 [[package]]
 name = "u32_newtypes"
+version = "0.3.0"
+
+[[package]]
+name = "u64_newtypes"
 version = "0.3.0"
 
 [[package]]

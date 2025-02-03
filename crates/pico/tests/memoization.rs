@@ -7,8 +7,8 @@ use std::{
 };
 
 use calc::{ast::Program, error::Result, eval::eval, lexer::Lexer, parser::Parser};
-use pico_core::{database::Database, source::SourceId, storage::Storage};
-use pico_macros::{memo, Db, Source};
+use pico_core::{database::Database, source::SourceId};
+use pico_macros::{memo, Source};
 
 mod calc;
 
@@ -18,19 +18,19 @@ static EVAL_COUNTER: LazyLock<Mutex<HashMap<SourceId<Input>, usize>>> =
 
 #[test]
 fn memoization() {
-    let mut state = TestDatabase::default();
+    let mut db = Database::default();
 
-    let left = state.set(Input {
+    let left = db.set(Input {
         key: "left",
         value: "2 + 2 * 2".to_string(),
     });
 
-    let right = state.set(Input {
+    let right = db.set(Input {
         key: "right",
         value: "(2 + 2) * 2".to_string(),
     });
 
-    let result = sum(&state, left, right);
+    let result = sum(&db, left, right);
     assert_eq!(result, 14);
 
     // every functions has been called once on the first run
@@ -39,7 +39,7 @@ fn memoization() {
     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 1);
 
     // change "left" input with the same eval result
-    let left = state.set(Input {
+    let left = db.set(Input {
         key: "left",
         value: "3 * 2".to_string(),
     });
@@ -49,7 +49,7 @@ fn memoization() {
     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 1);
     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 1);
 
-    let result = sum(&state, left, right);
+    let result = sum(&db, left, right);
     assert_eq!(result, 14);
 
     // "left" must be called again because the input value has been changed
@@ -60,11 +60,11 @@ fn memoization() {
     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 1);
 
     // change "left" input to produce a new value
-    let left = state.set(Input {
+    let left = db.set(Input {
         key: "left",
         value: "3 * 3".to_string(),
     });
-    let result = sum(&state, left, right);
+    let result = sum(&db, left, right);
     assert_eq!(result, 17);
 
     // "left" must be called again because the input value has been changed
@@ -75,11 +75,6 @@ fn memoization() {
     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 2);
 }
 
-#[derive(Debug, Default, Db)]
-struct TestDatabase {
-    pub storage: Storage<Self>,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Source)]
 struct Input {
     #[key]
@@ -88,7 +83,7 @@ struct Input {
 }
 
 #[memo]
-fn parse_ast(db: &TestDatabase, id: SourceId<Input>) -> Result<Program> {
+fn parse_ast(db: &Database, id: SourceId<Input>) -> Result<Program> {
     let source_text = db.get(id);
     let mut lexer = Lexer::new(source_text.value);
     let mut parser = Parser::new(&mut lexer)?;
@@ -96,14 +91,14 @@ fn parse_ast(db: &TestDatabase, id: SourceId<Input>) -> Result<Program> {
 }
 
 #[memo]
-fn evaluate_input(db: &TestDatabase, id: SourceId<Input>) -> i64 {
+fn evaluate_input(db: &Database, id: SourceId<Input>) -> i64 {
     *EVAL_COUNTER.lock().unwrap().entry(id).or_insert(0) += 1;
     let ast = parse_ast(db, id).expect("ast must be correct");
     eval(ast.expression).expect("value must be evaluated")
 }
 
 #[memo]
-fn sum(db: &TestDatabase, left: SourceId<Input>, right: SourceId<Input>) -> i64 {
+fn sum(db: &Database, left: SourceId<Input>, right: SourceId<Input>) -> i64 {
     SUM_COUNTER.fetch_add(1, Ordering::SeqCst);
     let left = evaluate_input(db, left);
     let right = evaluate_input(db, right);

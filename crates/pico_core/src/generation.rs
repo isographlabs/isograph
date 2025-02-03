@@ -1,14 +1,14 @@
 use std::any::Any;
 
-use crate::{arena::Arena, database::Database, node::DerivedNode};
+use crate::{arena::Arena, node::DerivedNode};
 
 #[derive(Debug)]
-pub struct Generation<Db: Database + ?Sized> {
+pub struct Generation {
     pub params: Arena<Box<dyn Any>>,
-    pub derived_nodes: Arena<DerivedNode<Db>>,
+    pub derived_nodes: Arena<DerivedNode>,
 }
 
-impl<Db: Database + ?Sized> Generation<Db> {
+impl Generation {
     pub fn new() -> Self {
         Self {
             params: Arena::new(),
@@ -17,7 +17,7 @@ impl<Db: Database + ?Sized> Generation<Db> {
     }
 }
 
-impl<Db: Database + ?Sized> Default for Generation<Db> {
+impl Default for Generation {
     fn default() -> Self {
         Self::new()
     }

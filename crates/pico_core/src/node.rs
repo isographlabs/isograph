@@ -19,13 +19,13 @@ impl DerivedNodeId {
     }
 }
 
-pub struct DerivedNode<Db: Database + ?Sized> {
+pub struct DerivedNode {
     pub dependencies: Vec<Dependency>,
-    pub inner_fn: fn(&Db, ParamId) -> Box<dyn DynEq>,
+    pub inner_fn: fn(&Database, ParamId) -> Box<dyn DynEq>,
     pub value: Box<dyn DynEq>,
 }
 
-impl<Db: Database + ?Sized> fmt::Debug for DerivedNode<Db> {
+impl fmt::Debug for DerivedNode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("DerivedNode")
             .field("dependencies", &self.dependencies)

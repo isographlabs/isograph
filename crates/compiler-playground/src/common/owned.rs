@@ -1,10 +1,9 @@
 use crate::calc::{error::Result, eval, lexer::Lexer, parser::Parser};
 
 use crate::calc::ast::Program;
+use pico_core::database::Database;
 use pico_core::source::SourceId;
 use pico_macros::{memo, Source};
-
-use super::state::State;
 
 #[derive(Debug, Clone, PartialEq, Eq, Source)]
 pub struct Input {
@@ -14,7 +13,7 @@ pub struct Input {
 }
 
 #[memo]
-pub fn parse_ast(db: &State, id: SourceId<Input>) -> Result<Program> {
+pub fn parse_ast(db: &Database, id: SourceId<Input>) -> Result<Program> {
     let source_text = db.get(id);
     let mut lexer = Lexer::new(source_text.value);
     let mut parser = Parser::new(&mut lexer)?;
@@ -22,7 +21,7 @@ pub fn parse_ast(db: &State, id: SourceId<Input>) -> Result<Program> {
 }
 
 #[memo(reference)]
-pub fn evaluate_input(db: &State, id: SourceId<Input>) -> i64 {
+pub fn evaluate_input(db: &Database, id: SourceId<Input>) -> i64 {
     let ast = parse_ast(db, id).expect("ast must be correct");
     eval::eval(ast.expression).expect("value must be evaluated")
 }

@@ -9,3 +9,6 @@ boxcar = { workspace = true }
 dashmap = { workspace = true }
 once_map = { workspace = true }
 thiserror = { workspace = true }
+intern = { path = "../../relay-crates/intern" }
+serde = { workspace = true }
+u64_newtypes = { path = "../u64_newtypes" }

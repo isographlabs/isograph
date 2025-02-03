@@ -1,8 +1,8 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use calc::{ast::Program, error::Result, eval::eval, lexer::Lexer, parser::Parser};
-use pico_core::{database::Database, source::SourceId, storage::Storage};
-use pico_macros::{memo, Db, Source};
+use pico_core::{database::Database, source::SourceId};
+use pico_macros::{memo, Source};
 
 mod calc;
 
@@ -11,29 +11,24 @@ static EXPECTED: AtomicUsize = AtomicUsize::new(0);
 
 #[test]
 fn arg_reference() {
-    let mut state = TestDatabase::default();
+    let mut db = Database::default();
 
-    let input = state.set(Input {
+    let input = db.set(Input {
         key: "input",
         value: "2 + 2 * 2".to_string(),
     });
 
-    let value = evaluate_input(&state, input);
+    let value = evaluate_input(&db, input);
     // assert that the value was not cloned
     assert_eq!(VALUE.load(Ordering::SeqCst), 0);
 
     let expected = Expected(6);
-    assert_result(&state, value, expected);
+    assert_result(&db, value, expected);
     // assert that the argument of type `&Value` was cloned only once to params store
     // and internally used by reference
     assert_eq!(VALUE.load(Ordering::SeqCst), 1);
     // compare with the argument of type `Expected` which is cloned twice
     assert_eq!(EXPECTED.load(Ordering::SeqCst), 2);
-}
-
-#[derive(Debug, Default, Db)]
-struct TestDatabase {
-    pub storage: Storage<Self>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Source)]
@@ -64,7 +59,7 @@ impl Clone for Expected {
 }
 
 #[memo]
-fn parse_ast(db: &TestDatabase, id: SourceId<Input>) -> Result<Program> {
+fn parse_ast(db: &Database, id: SourceId<Input>) -> Result<Program> {
     let source_text = db.get(id);
     let mut lexer = Lexer::new(source_text.value);
     let mut parser = Parser::new(&mut lexer)?;
@@ -72,13 +67,13 @@ fn parse_ast(db: &TestDatabase, id: SourceId<Input>) -> Result<Program> {
 }
 
 #[memo(reference)]
-fn evaluate_input(db: &TestDatabase, id: SourceId<Input>) -> Value {
+fn evaluate_input(db: &Database, id: SourceId<Input>) -> Value {
     let ast = parse_ast(db, id).expect("ast must be correct");
     let result = eval(ast.expression).expect("value must be evaluated");
     Value(result)
 }
 
 #[memo]
-fn assert_result(_db: &TestDatabase, result: &Value, expected: Expected) -> bool {
+fn assert_result(_db: &Database, result: &Value, expected: Expected) -> bool {
     result.0 == expected.0
 }
