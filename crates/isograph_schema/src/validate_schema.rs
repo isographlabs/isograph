@@ -486,8 +486,8 @@ pub enum ValidateSchemaError {
 
     #[error(
         "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, the \
-        field `{field_parent_type_name}.{field_name}` is selected as a scalar field, \
-        but that field is a client pointer, which can only be selected as a linked."
+        pointer `{field_parent_type_name}.{field_name}` is selected as a scalar. \
+        However, client pointers can only be selected as linked fields."
     )]
     ClientTypeSelectionClientPointerSelectedAsScalar {
         client_field_parent_type_name: IsographObjectTypeName,
