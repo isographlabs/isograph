@@ -142,6 +142,7 @@ struct ValidateSchemaSharedInfo<'a> {
     client_type_parent_object: &'a SchemaObject,
     schema_data: &'a ServerFieldData,
     server_fields: &'a [ValidatedSchemaServerField],
+    client_type: ClientType<(), ()>,
 }
 
 fn validate_client_field_selection_set(
@@ -156,6 +157,7 @@ fn validate_client_field_selection_set(
         client_type_parent_object: schema_data.object(top_level_client_field.parent_object_id),
         schema_data,
         server_fields,
+        client_type: ClientType::ClientField(()),
     };
 
     let variable_definitions = client_type_args
@@ -462,14 +464,32 @@ fn validate_field_type_exists_and_is_scalar(
                             client_field_name: top_level_client_type_info
                                 .client_type_object_type_and_field_name
                                 .field_name,
+                            client_type: match top_level_client_field_info.client_type {
+                                ClientType::ClientField(_) => "field".to_string(),
+                                ClientType::ClientPointer(_) => "pointer".to_string(),
+                            },
                         },
                         scalar_field_selection.name.location,
                     )),
                 }
             }
-            FieldType::ClientField(ClientType::ClientPointer(_)) => {
-                todo!("validating client pointers is not yet implemented")
-            }
+            FieldType::ClientField(ClientType::ClientPointer(_)) => Err(WithLocation::new(
+                ValidateSchemaError::ClientTypeSelectionClientPointerSelectedAsScalar {
+                    client_field_parent_type_name: top_level_client_field_info
+                        .client_field_type_and_field_name
+                        .type_name,
+                    client_field_name: top_level_client_field_info
+                        .client_field_type_and_field_name
+                        .field_name,
+                    field_parent_type_name: scalar_field_selection_parent_object.name,
+                    field_name: scalar_field_name,
+                    client_type: match top_level_client_field_info.client_type {
+                        ClientType::ClientField(_) => "field".to_string(),
+                        ClientType::ClientPointer(_) => "pointer".to_string(),
+                    },
+                },
+                scalar_field_selection.name.location,
+            )),
             FieldType::ClientField(ClientType::ClientField(client_field_id)) => {
                 validate_client_field(
                     client_field_id,
@@ -490,6 +510,10 @@ fn validate_field_type_exists_and_is_scalar(
                     .field_name,
                 field_parent_type_name: scalar_field_selection_parent_object.name,
                 field_name: scalar_field_name,
+                client_type: match top_level_client_field_info.client_type {
+                    ClientType::ClientField(_) => "field".to_string(),
+                    ClientType::ClientPointer(_) => "pointer".to_string(),
+                },
             },
             scalar_field_selection.name.location,
         )),
@@ -578,6 +602,10 @@ fn validate_field_type_exists_and_is_linked(
                             client_field_name: top_level_client_type_info
                                 .client_type_object_type_and_field_name
                                 .field_name,
+                            client_type: match top_level_client_field_info.client_type {
+                                ClientType::ClientField(_) => "field".to_string(),
+                                ClientType::ClientPointer(_) => "pointer".to_string(),
+                            },
                         },
                         linked_field_selection.name.location,
                     )),
@@ -646,6 +674,10 @@ fn validate_field_type_exists_and_is_linked(
                     client_field_name: top_level_client_type_info
                         .client_type_object_type_and_field_name
                         .field_name,
+                    client_type: match top_level_client_field_info.client_type {
+                        ClientType::ClientField(_) => "field".to_string(),
+                        ClientType::ClientPointer(_) => "pointer".to_string(),
+                    },
                 },
                 linked_field_selection.name.location,
             )),
@@ -660,6 +692,10 @@ fn validate_field_type_exists_and_is_linked(
                     .field_name,
                 field_parent_type_name: field_parent_object.name,
                 field_name: linked_field_name,
+                client_type: match top_level_client_field_info.client_type {
+                    ClientType::ClientField(_) => "field".to_string(),
+                    ClientType::ClientPointer(_) => "pointer".to_string(),
+                },
             },
             linked_field_selection.name.location,
         )),
