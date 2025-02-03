@@ -15,7 +15,7 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    validate_client_field::validate_and_transform_client_fields,
+    validate_client_field::validate_and_transform_client_types,
     validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
     ClientPointer, FieldType, ImperativelyLoadedFieldVariant, Schema, SchemaIdField, SchemaObject,
     SchemaServerField, SchemaValidationState, ServerFieldData, ServerFieldTypeAssociatedData,
@@ -137,7 +137,7 @@ impl ValidatedSchema {
 
         let Schema {
             server_fields: fields,
-            client_types: client_fields,
+            client_types,
             entrypoints: _,
             server_field_data: schema_data,
             fetchable_types: root_types,
@@ -156,12 +156,12 @@ impl ValidatedSchema {
             }
         };
 
-        let updated_client_fields = match validate_and_transform_client_fields(
-            client_fields,
+        let updated_client_types = match validate_and_transform_client_types(
+            client_types,
             &schema_data,
             &updated_server_fields,
         ) {
-            Ok(client_fields) => client_fields,
+            Ok(client_types) => client_types,
             Err(new_errors) => {
                 errors.extend(new_errors);
                 vec![]
@@ -188,7 +188,7 @@ impl ValidatedSchema {
 
             Ok(Self {
                 server_fields: updated_server_fields,
-                client_types: updated_client_fields,
+                client_types: updated_client_types,
                 entrypoints: updated_entrypoints,
                 server_field_data: ServerFieldData {
                     server_objects,
