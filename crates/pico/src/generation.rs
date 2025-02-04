@@ -1,6 +1,8 @@
 use std::any::Any;
 
-use crate::{arena::Arena, node::DerivedNode};
+use crate::arena::Arena;
+
+use crate::derived_node::DerivedNode;
 
 #[derive(Debug)]
 pub struct Generation {

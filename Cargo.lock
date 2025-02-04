@@ -338,7 +338,6 @@ name = "compiler-playground"
 version = "0.3.0"
 dependencies = [
  "pico",
- "pico_core",
  "pico_macros",
  "thiserror",
  "tracing",
@@ -1238,25 +1237,14 @@ checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 name = "pico"
 version = "0.3.0"
 dependencies = [
- "intern",
- "pico_core",
- "pico_macros",
- "serde",
- "string_key_newtype",
- "thiserror",
- "tracing",
-]
-
-[[package]]
-name = "pico_core"
-version = "0.3.0"
-dependencies = [
  "boxcar",
  "dashmap",
  "intern",
  "once_map",
+ "pico_macros",
  "serde",
  "thiserror",
+ "tracing",
  "u64_newtypes",
 ]
 
@@ -1265,7 +1253,6 @@ name = "pico_macros"
 version = "0.3.0"
 dependencies = [
  "darling",
- "pico_core",
  "proc-macro2",
  "quote",
  "syn 2.0.96",

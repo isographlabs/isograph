@@ -1,10 +1,10 @@
-use pico_core::{
+use crate::dependency::{NodeKind, TrackedDependencies};
+use crate::u64_types::{Key, ParamId};
+use crate::{dyn_eq::DynEq, epoch::Epoch};
+
+use crate::{
     database::Database,
-    dyn_eq::DynEq,
-    epoch::Epoch,
-    key::Key,
-    node::{Dependency, DerivedNode, DerivedNodeId, NodeKind},
-    params::ParamId,
+    derived_node::{DerivedNode, DerivedNodeId},
 };
 
 pub enum DidRecalculate {
@@ -74,18 +74,25 @@ fn create_derived_node(
     derived_node_id: DerivedNodeId,
     inner_fn: fn(&Database, ParamId) -> Box<dyn DynEq>,
 ) -> (Epoch, DidRecalculate) {
-    let (value, dependencies, time_updated) =
-        call_inner_fn_and_collect_dependencies(db, derived_node_id.param_id, inner_fn);
+    let (value, tracked_dependencies) =
+        with_dependency_tracking(db, derived_node_id.param_id, inner_fn);
     db.insert_derived_node(
         derived_node_id,
         DerivedNode {
-            dependencies,
+            dependencies: tracked_dependencies.dependencies,
             inner_fn,
             value,
         },
     );
-    db.insert_derived_node_rev(derived_node_id, time_updated, db.current_epoch);
-    (time_updated, DidRecalculate::Recalculated)
+    db.insert_derived_node_rev(
+        derived_node_id,
+        tracked_dependencies.max_time_updated,
+        db.current_epoch,
+    );
+    (
+        tracked_dependencies.max_time_updated,
+        DidRecalculate::Recalculated,
+    )
 }
 
 fn update_derived_node(
@@ -94,10 +101,10 @@ fn update_derived_node(
     prev_value: &dyn DynEq,
     inner_fn: fn(&Database, ParamId) -> Box<dyn DynEq>,
 ) -> (Epoch, DidRecalculate) {
-    let (value, dependencies, time_updated) =
-        call_inner_fn_and_collect_dependencies(db, derived_node_id.param_id, inner_fn);
+    let (value, tracked_dependencies) =
+        with_dependency_tracking(db, derived_node_id.param_id, inner_fn);
     let did_recalculate = if *prev_value != *value {
-        db.set_derive_node_time_updated(derived_node_id, time_updated);
+        db.set_derive_node_time_updated(derived_node_id, tracked_dependencies.max_time_updated);
         DidRecalculate::Recalculated
     } else {
         DidRecalculate::ReusedMemoizedValue
@@ -105,12 +112,12 @@ fn update_derived_node(
     db.insert_derived_node(
         derived_node_id,
         DerivedNode {
-            dependencies,
+            dependencies: tracked_dependencies.dependencies,
             inner_fn,
             value,
         },
     );
-    (time_updated, did_recalculate)
+    (tracked_dependencies.max_time_updated, did_recalculate)
 }
 
 fn any_dependency_changed(db: &Database, derived_node: &DerivedNode) -> bool {
@@ -155,34 +162,13 @@ fn derived_node_changed_since(db: &Database, derived_node_id: DerivedNodeId, sin
     matches!(did_recalculate, DidRecalculate::Recalculated)
 }
 
-fn call_inner_fn_and_collect_dependencies(
-    db: &Database,
-    param_id: ParamId,
-    inner_fn: fn(&Database, ParamId) -> Box<dyn DynEq>,
-) -> (
-    Box<dyn DynEq>,  /* value */
-    Vec<Dependency>, /* dependencies */
-    Epoch,           /* time_updated */
-) {
-    let (value, registered_dependencies) = with_dependency_tracking(db, param_id, inner_fn);
-    let (dependencies, time_updated) = registered_dependencies.into_iter().fold(
-        (vec![], Epoch::new()),
-        |(mut deps, mut max_time_updated), (time_updated, dep)| {
-            deps.push(dep);
-            max_time_updated = std::cmp::max(max_time_updated, time_updated);
-            (deps, max_time_updated)
-        },
-    );
-    (value, dependencies, time_updated)
-}
-
 fn with_dependency_tracking(
     db: &Database,
     param_id: ParamId,
     inner_fn: fn(&Database, ParamId) -> Box<dyn DynEq>,
-) -> (Box<dyn DynEq>, Vec<(Epoch, Dependency)>) {
+) -> (Box<dyn DynEq>, TrackedDependencies) {
     let guard = db.dependency_stack.enter();
     let value = inner_fn(db, param_id);
-    let registered_dependencies = guard.release();
-    (value, registered_dependencies)
+    let tracked_dependencies = guard.release();
+    (value, tracked_dependencies)
 }

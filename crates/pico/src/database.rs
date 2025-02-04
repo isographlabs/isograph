@@ -1,42 +1,44 @@
 use std::any::Any;
 
+use crate::{
+    dependency::{Dependency, DependencyStack, NodeKind},
+    dyn_eq::DynEq,
+    epoch::Epoch,
+    index::Index,
+    source::{Source, SourceId, SourceNode},
+    u64_types::{Key, ParamId},
+};
 use dashmap::DashMap;
 use once_map::OnceMap;
 
 use crate::{
-    dependency_stack::DependencyStack,
-    dyn_eq::DynEq,
-    epoch::Epoch,
+    derived_node::{DerivedNode, DerivedNodeId, DerivedNodeRevision},
     generation::Generation,
-    index::Index,
-    key::Key,
-    node::{Dependency, DerivedNode, DerivedNodeId, DerivedNodeRevision, NodeKind, SourceNode},
-    params::ParamId,
-    source::{Source, SourceId},
 };
 
 #[derive(Debug)]
 pub struct Database {
-    pub current_epoch: Epoch,
-    pub dependency_stack: DependencyStack<(Epoch, Dependency)>,
-    pub param_id_to_index: DashMap<ParamId, Index>,
-    pub derived_nodes: DerivedNodesStore,
-    pub source_nodes: DashMap<Key, SourceNode>,
-    pub capacity: usize,
-    pub epoch_to_generation_map: OnceMap<Epoch, Box<Generation>>,
+    pub(crate) current_epoch: Epoch,
+    pub(crate) dependency_stack: DependencyStack,
+    pub(crate) param_id_to_index: DashMap<ParamId, Index<ParamId>>,
+    pub(crate) derived_node_id_to_index: DashMap<DerivedNodeId, Index<DerivedNodeId>>,
+    pub(crate) derived_node_id_to_revision: DashMap<DerivedNodeId, DerivedNodeRevision>,
+    pub(crate) source_nodes: DashMap<Key, SourceNode>,
+    pub(crate) epoch_to_generation_map: OnceMap<Epoch, Box<Generation>>,
 }
 
 impl Database {
-    pub fn new(capacity: usize) -> Self {
+    pub fn new() -> Self {
         let epoch_to_generation_map = OnceMap::new();
-        epoch_to_generation_map.insert(Epoch::new(), |_| Box::new(Generation::new()));
+        let current_epoch = Epoch::new();
+        epoch_to_generation_map.insert(current_epoch, |_| Box::new(Generation::new()));
         Self {
-            current_epoch: Epoch::new(),
+            current_epoch,
             dependency_stack: DependencyStack::new(),
-            param_id_to_index: DashMap::default(),
-            derived_nodes: DerivedNodesStore::default(),
-            source_nodes: DashMap::default(),
-            capacity,
+            param_id_to_index: DashMap::new(),
+            derived_node_id_to_index: DashMap::new(),
+            derived_node_id_to_revision: DashMap::new(),
+            source_nodes: DashMap::new(),
             epoch_to_generation_map,
         }
     }
@@ -45,20 +47,14 @@ impl Database {
         let current_epoch = self.current_epoch.increment();
         self.epoch_to_generation_map
             .insert(current_epoch, |_| Box::new(Generation::new()));
-        // TODO: not the best way to do it, worth to create something like OnceOrderedMap
-        if self.epoch_to_generation_map.read_only_view().len() >= self.capacity {
-            let min_epoch = *self
-                .epoch_to_generation_map
-                .read_only_view()
-                .keys()
-                .min()
-                .unwrap();
-            self.epoch_to_generation_map.remove(&min_epoch);
-        }
         current_epoch
     }
 
-    pub fn contains_param(&self, param_id: ParamId) -> bool {
+    pub fn drop_epoch(&mut self, epoch: Epoch) {
+        self.epoch_to_generation_map.remove(&epoch);
+    }
+
+    pub(crate) fn contains_param(&self, param_id: ParamId) -> bool {
         if let Some(index) = self.param_id_to_index.get(&param_id) {
             self.epoch_to_generation_map.contains_key(&index.epoch)
         } else {
@@ -66,18 +62,7 @@ impl Database {
         }
     }
 
-    pub fn insert_param<T: Clone + 'static>(&self, param_id: ParamId, param: T) {
-        let idx = self
-            .epoch_to_generation_map
-            .get(&self.current_epoch)
-            .unwrap()
-            .params
-            .push(Box::new(param));
-        self.param_id_to_index
-            .insert(param_id, Index::new(self.current_epoch, idx));
-    }
-
-    pub fn get_param(&self, param_id: ParamId) -> Option<&Box<dyn Any>> {
+    pub(crate) fn get_param(&self, param_id: ParamId) -> Option<&Box<dyn Any>> {
         let index = self.param_id_to_index.get(&param_id)?;
         Some(
             self.epoch_to_generation_map
@@ -87,8 +72,8 @@ impl Database {
         )
     }
 
-    pub fn get_derived_node(&self, derived_node_id: DerivedNodeId) -> Option<&DerivedNode> {
-        let index = self.derived_nodes.id_to_index.get(&derived_node_id)?;
+    pub(crate) fn get_derived_node(&self, derived_node_id: DerivedNodeId) -> Option<&DerivedNode> {
+        let index = self.derived_node_id_to_index.get(&derived_node_id)?;
         Some(
             self.epoch_to_generation_map
                 .get(&index.epoch)?
@@ -97,45 +82,42 @@ impl Database {
         )
     }
 
-    pub fn set_derive_node_time_updated(
+    pub(crate) fn set_derive_node_time_updated(
         &self,
         derived_node_id: DerivedNodeId,
         time_updated: Epoch,
     ) {
         let mut rev = self
-            .derived_nodes
-            .id_to_revision
+            .derived_node_id_to_revision
             .get_mut(&derived_node_id)
             .unwrap();
         rev.time_updated = time_updated;
     }
 
-    pub fn verify_derived_node(&self, derived_node_id: DerivedNodeId) {
+    pub(crate) fn verify_derived_node(&self, derived_node_id: DerivedNodeId) {
         let mut rev = self
-            .derived_nodes
-            .id_to_revision
+            .derived_node_id_to_revision
             .get_mut(&derived_node_id)
             .unwrap();
         rev.time_verified = self.current_epoch;
     }
 
-    pub fn get_derived_node_rev(
+    pub(crate) fn get_derived_node_rev(
         &self,
         derived_node_id: DerivedNodeId,
     ) -> Option<DerivedNodeRevision> {
-        self.derived_nodes
-            .id_to_revision
+        self.derived_node_id_to_revision
             .get(&derived_node_id)
             .map(|rev| *rev)
     }
 
-    pub fn insert_derived_node_rev(
+    pub(crate) fn insert_derived_node_rev(
         &self,
         derived_node_id: DerivedNodeId,
         time_updated: Epoch,
         time_verified: Epoch,
     ) {
-        self.derived_nodes.id_to_revision.insert(
+        self.derived_node_id_to_revision.insert(
             derived_node_id,
             DerivedNodeRevision {
                 time_updated,
@@ -144,15 +126,18 @@ impl Database {
         );
     }
 
-    pub fn insert_derived_node(&self, derived_node_id: DerivedNodeId, derived_node: DerivedNode) {
+    pub(crate) fn insert_derived_node(
+        &self,
+        derived_node_id: DerivedNodeId,
+        derived_node: DerivedNode,
+    ) {
         let idx = self
             .epoch_to_generation_map
             .get(&self.current_epoch)
             .unwrap()
             .derived_nodes
             .push(derived_node);
-        self.derived_nodes
-            .id_to_index
+        self.derived_node_id_to_index
             .insert(derived_node_id, Index::new(self.current_epoch, idx));
     }
 
@@ -195,27 +180,23 @@ impl Database {
         self.source_nodes.remove(&id.key);
     }
 
-    pub fn register_dependency_in_parent_memoized_fn(&self, node: NodeKind, time_updated: Epoch) {
-        self.dependency_stack.push_if_not_empty(|| {
-            (
-                time_updated,
-                Dependency {
-                    node_to: node,
-                    time_verified_or_updated: self.current_epoch,
-                },
-            )
-        });
+    pub(crate) fn register_dependency_in_parent_memoized_fn(
+        &self,
+        node: NodeKind,
+        time_updated: Epoch,
+    ) {
+        self.dependency_stack.push_if_not_empty(
+            Dependency {
+                node_to: node,
+                time_verified_or_updated: self.current_epoch,
+            },
+            time_updated,
+        );
     }
 }
 
 impl Default for Database {
     fn default() -> Self {
-        Self::new(10000)
+        Self::new()
     }
-}
-
-#[derive(Debug, Default)]
-pub struct DerivedNodesStore {
-    pub id_to_index: DashMap<DerivedNodeId, Index>,
-    pub id_to_revision: DashMap<DerivedNodeId, DerivedNodeRevision>,
 }

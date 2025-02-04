@@ -47,9 +47,9 @@ pub(crate) fn source(item: TokenStream) -> TokenStream {
     };
 
     let output = quote! {
-        impl ::pico_core::source::Source for #struct_name {
-            fn get_key(&self) -> ::pico_core::key::Key {
-                ::pico_core::key::Key::new(&self.#field_name)
+        impl ::pico::Source for #struct_name {
+            fn get_key(&self) -> ::pico::Key {
+                ::pico::hash(&self.#field_name).into()
             }
         }
     };

@@ -7,7 +7,6 @@ license.workspace = true
 [dependencies]
 pico_macros = { path = "../pico_macros"}
 pico = { path = "../pico"}
-pico_core = { path = "../pico_core" }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

@@ -1,8 +1,6 @@
-use crate::calc::{error::Result, eval, lexer::Lexer, parser::Parser};
+use crate::calc::{ast::Program, error::Result, eval, lexer::Lexer, parser::Parser};
 
-use crate::calc::ast::Program;
-use pico_core::database::Database;
-use pico_core::source::SourceId;
+use pico::{Database, SourceId};
 use pico_macros::{memo, Source};
 
 #[derive(Debug, Clone, PartialEq, Eq, Source)]

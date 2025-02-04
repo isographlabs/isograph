@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use calc::{ast::Program, error::Result, eval::eval, lexer::Lexer, parser::Parser};
-use pico_core::{database::Database, source::SourceId};
+use pico::{Database, SourceId};
 use pico_macros::{memo, Source};
 
 mod calc;

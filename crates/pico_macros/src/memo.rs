@@ -87,8 +87,7 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     let mut return_expr = quote! {
-        #db_arg
-            .get_derived_node(derived_node_id)
+        ::pico::get_derived_node(#db_arg, derived_node_id)
             .expect("derived node must exist. This is indicative of a bug in Pico.")
             .value
             .as_any()
@@ -133,11 +132,10 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
     let output = quote! {
         #(#attrs)*
         #vis #new_sig {
-            let param_id = ::pico_core::params::ParamId::new(#db_arg, (#(#other_args.clone(),)*));
-            let derived_node_id = ::pico_core::node::DerivedNodeId::new(#fn_hash.into(), param_id);
-            ::pico::memo::memo(#db_arg, derived_node_id, |#db_arg, param_id| {
-                let param_ref = #db_arg
-                    .get_param(param_id)
+            let param_id = ::pico::intern_param(#db_arg, (#(#other_args.clone(),)*));
+            let derived_node_id = ::pico::DerivedNodeId::new(#fn_hash.into(), param_id);
+            ::pico::memo(#db_arg, derived_node_id, |#db_arg, param_id| {
+                let param_ref = ::pico::get_param(#db_arg, param_id)
                     .expect("param should exist. This is indicative of a bug in Pico.");
                 let (#(#unpacked_args,)*) = {
                     let (#(#inner_args,)*) = param_ref

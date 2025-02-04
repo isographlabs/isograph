@@ -5,10 +5,12 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-string_key_newtype = { path = "../string_key_newtype" }
 intern = { path = "../../relay-crates/intern" }
 pico_macros = { path = "../pico_macros" }
-pico_core = { path = "../pico_core" }
+u64_newtypes = { path = "../u64_newtypes" }
+boxcar = { workspace = true }
+dashmap = { workspace = true }
+once_map = { workspace = true }
 serde = { workspace = true } 
 thiserror = { workspace = true }
 tracing = { workspace = true }

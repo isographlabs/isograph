@@ -1,7 +1,7 @@
 use std::io;
 
 use common::owned::{evaluate_input, Input};
-use pico_core::database::Database;
+use pico::Database;
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
 
@@ -16,6 +16,7 @@ fn main() {
         .init();
 
     let mut db = Database::default();
+
     let key = "expr1";
 
     let mut input = Input {

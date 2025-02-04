@@ -7,7 +7,7 @@ use std::{
 };
 
 use calc::{ast::Program, error::Result, eval::eval, lexer::Lexer, parser::Parser};
-use pico_core::{database::Database, epoch::Epoch, source::SourceId};
+use pico::{Database, SourceId};
 use pico_macros::{memo, Source};
 
 mod calc;
@@ -39,16 +39,8 @@ fn drop() {
     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 1);
 
     // it must be safe to drop a generation, it should be recalculeted
-    let generations_count = db.epoch_to_generation_map.read_only_view().len();
-    db.epoch_to_generation_map.remove(&Epoch::from(1));
-
-    // generation should be removed
-    assert_ne!(
-        generations_count,
-        db.epoch_to_generation_map.read_only_view().len(),
-    );
-    // but we need to create a new generation anyway
     db.increment_epoch();
+    db.drop_epoch(1.into());
 
     let result = sum(&mut db, left, right);
     assert_eq!(result, 14);
@@ -81,13 +73,7 @@ fn drop() {
     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 2);
 
     // drop the oldest generation
-    let min_epoch = *db
-        .epoch_to_generation_map
-        .read_only_view()
-        .keys()
-        .min()
-        .unwrap();
-    db.epoch_to_generation_map.remove(&min_epoch);
+    db.drop_epoch(2.into());
 
     let result = sum(&mut db, left, right);
     assert_eq!(result, 14);

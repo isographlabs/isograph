@@ -1,11 +1,12 @@
 use std::fmt;
 use std::hash::Hash;
 
-use crate::database::Database;
+use crate::dependency::Dependency;
 use crate::dyn_eq::DynEq;
 use crate::epoch::Epoch;
-use crate::key::Key;
-use crate::params::ParamId;
+
+use crate::database::Database;
+use crate::u64_types::{Key, ParamId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DerivedNodeId {
@@ -38,22 +39,4 @@ impl fmt::Debug for DerivedNode {
 pub struct DerivedNodeRevision {
     pub time_updated: Epoch,
     pub time_verified: Epoch,
-}
-
-#[derive(Debug)]
-pub struct SourceNode {
-    pub time_updated: Epoch,
-    pub value: Box<dyn DynEq>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Dependency {
-    pub node_to: NodeKind,
-    pub time_verified_or_updated: Epoch,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum NodeKind {
-    Source(Key),
-    Derived(DerivedNodeId),
 }
