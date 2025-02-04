@@ -1,0 +1,202 @@
+use std::any::Any;
+
+use crate::{
+    dependency::{Dependency, DependencyStack, NodeKind},
+    dyn_eq::DynEq,
+    epoch::Epoch,
+    index::Index,
+    source::{Source, SourceId, SourceNode},
+    u64_types::{Key, ParamId},
+};
+use dashmap::DashMap;
+use once_map::OnceMap;
+
+use crate::{
+    derived_node::{DerivedNode, DerivedNodeId, DerivedNodeRevision},
+    generation::Generation,
+};
+
+#[derive(Debug)]
+pub struct Database {
+    pub(crate) current_epoch: Epoch,
+    pub(crate) dependency_stack: DependencyStack,
+    pub(crate) param_id_to_index: DashMap<ParamId, Index<ParamId>>,
+    pub(crate) derived_node_id_to_index: DashMap<DerivedNodeId, Index<DerivedNodeId>>,
+    pub(crate) derived_node_id_to_revision: DashMap<DerivedNodeId, DerivedNodeRevision>,
+    pub(crate) source_nodes: DashMap<Key, SourceNode>,
+    pub(crate) epoch_to_generation_map: OnceMap<Epoch, Box<Generation>>,
+}
+
+impl Database {
+    pub fn new() -> Self {
+        let epoch_to_generation_map = OnceMap::new();
+        let current_epoch = Epoch::new();
+        epoch_to_generation_map.insert(current_epoch, |_| Box::new(Generation::new()));
+        Self {
+            current_epoch,
+            dependency_stack: DependencyStack::new(),
+            param_id_to_index: DashMap::new(),
+            derived_node_id_to_index: DashMap::new(),
+            derived_node_id_to_revision: DashMap::new(),
+            source_nodes: DashMap::new(),
+            epoch_to_generation_map,
+        }
+    }
+
+    pub fn increment_epoch(&mut self) -> Epoch {
+        let current_epoch = self.current_epoch.increment();
+        self.epoch_to_generation_map
+            .insert(current_epoch, |_| Box::new(Generation::new()));
+        current_epoch
+    }
+
+    pub fn drop_epoch(&mut self, epoch: Epoch) {
+        self.epoch_to_generation_map.remove(&epoch);
+    }
+
+    pub(crate) fn contains_param(&self, param_id: ParamId) -> bool {
+        if let Some(index) = self.param_id_to_index.get(&param_id) {
+            self.epoch_to_generation_map.contains_key(&index.epoch)
+        } else {
+            false
+        }
+    }
+
+    pub(crate) fn get_param(&self, param_id: ParamId) -> Option<&Box<dyn Any>> {
+        let index = self.param_id_to_index.get(&param_id)?;
+        Some(
+            self.epoch_to_generation_map
+                .get(&index.epoch)?
+                .params
+                .get(index.idx),
+        )
+    }
+
+    pub(crate) fn get_derived_node(&self, derived_node_id: DerivedNodeId) -> Option<&DerivedNode> {
+        let index = self.derived_node_id_to_index.get(&derived_node_id)?;
+        Some(
+            self.epoch_to_generation_map
+                .get(&index.epoch)?
+                .derived_nodes
+                .get(index.idx),
+        )
+    }
+
+    pub(crate) fn set_derive_node_time_updated(
+        &self,
+        derived_node_id: DerivedNodeId,
+        time_updated: Epoch,
+    ) {
+        let mut rev = self
+            .derived_node_id_to_revision
+            .get_mut(&derived_node_id)
+            .unwrap();
+        rev.time_updated = time_updated;
+    }
+
+    pub(crate) fn verify_derived_node(&self, derived_node_id: DerivedNodeId) {
+        let mut rev = self
+            .derived_node_id_to_revision
+            .get_mut(&derived_node_id)
+            .unwrap();
+        rev.time_verified = self.current_epoch;
+    }
+
+    pub(crate) fn get_derived_node_rev(
+        &self,
+        derived_node_id: DerivedNodeId,
+    ) -> Option<DerivedNodeRevision> {
+        self.derived_node_id_to_revision
+            .get(&derived_node_id)
+            .map(|rev| *rev)
+    }
+
+    pub(crate) fn insert_derived_node_rev(
+        &self,
+        derived_node_id: DerivedNodeId,
+        time_updated: Epoch,
+        time_verified: Epoch,
+    ) {
+        self.derived_node_id_to_revision.insert(
+            derived_node_id,
+            DerivedNodeRevision {
+                time_updated,
+                time_verified,
+            },
+        );
+    }
+
+    pub(crate) fn insert_derived_node(
+        &self,
+        derived_node_id: DerivedNodeId,
+        derived_node: DerivedNode,
+    ) {
+        let idx = self
+            .epoch_to_generation_map
+            .get(&self.current_epoch)
+            .unwrap()
+            .derived_nodes
+            .push(derived_node);
+        self.derived_node_id_to_index
+            .insert(derived_node_id, Index::new(self.current_epoch, idx));
+    }
+
+    pub fn get<T: Clone + 'static>(&self, id: SourceId<T>) -> T {
+        let time_updated = self
+            .source_nodes
+            .get(&id.key)
+            .expect("node should exist. This is indicative of a bug in Pico.")
+            .time_updated;
+        self.register_dependency_in_parent_memoized_fn(NodeKind::Source(id.key), time_updated);
+        self.source_nodes
+            .get(&id.key)
+            .expect("value should exist. This is indicative of a bug in Pico.")
+            .value
+            .as_any()
+            .downcast_ref::<T>()
+            .expect("unexpected struct type. This is indicative of a bug in Pico.")
+            .clone()
+    }
+
+    pub fn set<T: Source + DynEq>(&mut self, source: T) -> SourceId<T> {
+        let id = SourceId::new(&source);
+        let time_updated = if self.source_nodes.contains_key(&id.key) {
+            self.increment_epoch()
+        } else {
+            self.current_epoch
+        };
+        self.source_nodes.insert(
+            id.key,
+            SourceNode {
+                time_updated,
+                value: Box::new(source),
+            },
+        );
+        id
+    }
+
+    pub fn remove<T>(&mut self, id: SourceId<T>) {
+        self.increment_epoch();
+        self.source_nodes.remove(&id.key);
+    }
+
+    pub(crate) fn register_dependency_in_parent_memoized_fn(
+        &self,
+        node: NodeKind,
+        time_updated: Epoch,
+    ) {
+        self.dependency_stack.push_if_not_empty(
+            Dependency {
+                node_to: node,
+                time_verified_or_updated: self.current_epoch,
+            },
+            time_updated,
+        );
+    }
+}
+
+impl Default for Database {
+    fn default() -> Self {
+        Self::new()
+    }
+}

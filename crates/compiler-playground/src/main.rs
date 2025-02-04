@@ -1,10 +1,7 @@
 use std::io;
 
-use common::{
-    owned::{evaluate_input, Input},
-    state::State,
-};
-use pico_core::database::Database;
+use common::owned::{evaluate_input, Input};
+use pico::Database;
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
 
@@ -18,7 +15,8 @@ fn main() {
         .with_writer(io::stderr)
         .init();
 
-    let mut db = State::new();
+    let mut db = Database::default();
+
     let key = "expr1";
 
     let mut input = Input {
@@ -26,7 +24,7 @@ fn main() {
         value: "2 + 2 * 2".to_string(),
     };
     let id = db.set(input);
-    let mut result = evaluate_input(&mut db, id);
+    let mut result = evaluate_input(&db, id);
     info!("result: {result}");
 
     input = Input {
@@ -34,7 +32,7 @@ fn main() {
         value: "3 * 2".to_string(),
     };
     let id = db.set(input);
-    result = evaluate_input(&mut db, id);
+    result = evaluate_input(&db, id);
     info!("result: {result}");
     debug!("db: {db:#?}");
 }

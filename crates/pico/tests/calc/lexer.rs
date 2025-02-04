@@ -36,7 +36,7 @@ impl Lexer {
         };
 
         self.read_char();
-        return Ok(tok);
+        Ok(tok)
     }
 
     fn read_char(&mut self) {
@@ -62,6 +62,6 @@ impl Lexer {
             self.read_char();
         }
 
-        return String::from_utf8_lossy(&self.input[pos..self.position]).to_string();
+        String::from_utf8_lossy(&self.input[pos..self.position]).to_string()
     }
 }

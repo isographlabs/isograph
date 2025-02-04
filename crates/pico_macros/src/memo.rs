@@ -51,6 +51,26 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
         _ => unreachable!(),
     });
 
+    let unpacked_args = sig.inputs.iter().skip(1).map(|arg| match arg {
+        FnArg::Typed(PatType { pat, .. }) => pat.clone(),
+        _ => unreachable!(),
+    });
+
+    let get_ref_types = argument_types.clone().map(|ty| match **ty {
+        syn::Type::Reference(ref ref_type) => ref_type.elem.clone(),
+        _ => ty.clone(),
+    });
+
+    let reconstructed_args = argument_types
+        .clone()
+        .zip(unpacked_args.clone())
+        .map(|(ty, arg)| {
+            match **ty {
+                syn::Type::Reference(_) => quote!(#arg),
+                _ => quote!(#arg.clone()), // Clone
+            }
+        });
+
     let attr_args = match NestedMeta::parse_meta_list(args.into()) {
         Ok(v) => v,
         Err(e) => return Error::new_spanned(&sig, e).to_compile_error().into(),
@@ -67,10 +87,8 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     let mut return_expr = quote! {
-        #db_arg.storage()
-            .derived_nodes()
-            .get(&derived_node_id)
-            .expect("value should exist. This is indicative of a bug in Pico.")
+        ::pico::get_derived_node(#db_arg, derived_node_id)
+            .expect("derived node must exist. This is indicative of a bug in Pico.")
             .value
             .as_any()
             .downcast_ref::<#return_type>()
@@ -110,15 +128,23 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     let unpacked_args = other_args.clone();
+    let inner_args = other_args.clone();
     let output = quote! {
         #(#attrs)*
         #vis #new_sig {
-            use ::pico_core::{storage::Storage, container::Container, database::Database};
-            let param_id = ::pico_core::params::ParamId::intern(#db_arg, (#(#other_args.clone(),)*));
-            let derived_node_id = ::pico_core::node::DerivedNodeId::new(#fn_hash.into(), param_id);
-            ::pico::memo::memo(#db_arg, derived_node_id, |#db_arg, param_id| {
-                let (#(#unpacked_args,)*) = param_id.get::<(#(#argument_types,)*), _>(#db_arg)
-                    .expect("parameter should exist. This is indicative of a bug in Pico.");
+            let param_id = ::pico::intern_param(#db_arg, (#(#other_args.clone(),)*));
+            let derived_node_id = ::pico::DerivedNodeId::new(#fn_hash.into(), param_id);
+            ::pico::memo(#db_arg, derived_node_id, |#db_arg, param_id| {
+                let param_ref = ::pico::get_param(#db_arg, param_id)
+                    .expect("param should exist. This is indicative of a bug in Pico.");
+                let (#(#unpacked_args,)*) = {
+                    let (#(#inner_args,)*) = param_ref
+                        .downcast_ref::<(#(#get_ref_types,)*)>()
+                        .expect("param type must to be correct. This is indicative of a bug in Pico.");
+                    (
+                        #(#reconstructed_args,)*
+                    )
+                };
                 let value: #return_type = (|| #block)();
                 Box::new(value)
             });

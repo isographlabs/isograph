@@ -17,7 +17,7 @@ static EVAL_COUNTER: LazyLock<Mutex<HashMap<SourceId<Input>, usize>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[test]
-fn memoization() {
+fn drop() {
     let mut db = Database::default();
 
     let left = db.set(Input {
@@ -30,7 +30,7 @@ fn memoization() {
         value: "(2 + 2) * 2".to_string(),
     });
 
-    let result = sum(&db, left, right);
+    let result = sum(&mut db, left, right);
     assert_eq!(result, 14);
 
     // every functions has been called once on the first run
@@ -38,41 +38,52 @@ fn memoization() {
     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 1);
     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 1);
 
-    // change "left" input with the same eval result
+    // it must be safe to drop a generation, it should be recalculeted
+    db.increment_epoch();
+    db.drop_epoch(1.into());
+
+    let result = sum(&mut db, left, right);
+    assert_eq!(result, 14);
+
+    // every functions has been called againd due to empty storage
+    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 2);
+    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 2);
+    assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 2);
+
+    // let's update the "left" source with the same eval result.
+    // It must create only one new derived node in the current generation.
     let left = db.set(Input {
         key: "left",
         value: "3 * 2".to_string(),
     });
 
     // changing source doesn't cause any recalculation
-    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 1);
-    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 1);
-    assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 1);
+    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 2);
+    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 2);
+    assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 2);
 
     let result = sum(&db, left, right);
     assert_eq!(result, 14);
 
     // "left" must be called again because the input value has been changed
-    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 2);
-    // "right" must not be called again
-    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 1);
-    // "left" and "right" values are the same, so no call
-    assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 1);
-
-    // change "left" input to produce a new value
-    let left = db.set(Input {
-        key: "left",
-        value: "3 * 3".to_string(),
-    });
-    let result = sum(&db, left, right);
-    assert_eq!(result, 17);
-
-    // "left" must be called again because the input value has been changed
     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 3);
     // "right" must not be called again
-    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 1);
-    // "left" value is different now, so "sum" must be called
+    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 2);
+    // "left" and "right" values are the same, so no call
     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 2);
+
+    // drop the oldest generation
+    db.drop_epoch(2.into());
+
+    let result = sum(&mut db, left, right);
+    assert_eq!(result, 14);
+
+    // "left" exists in the latest epoch, it must not be called again
+    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 3);
+    // "right" was dropped, we don't know the previous value
+    assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 3);
+    // "sum" node was dropped as well
+    assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 3);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Source)]
@@ -102,6 +113,5 @@ fn sum(db: &Database, left: SourceId<Input>, right: SourceId<Input>) -> i64 {
     SUM_COUNTER.fetch_add(1, Ordering::SeqCst);
     let left = evaluate_input(db, left);
     let right = evaluate_input(db, right);
-
     left + right
 }

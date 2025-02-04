@@ -8,10 +8,13 @@ edition = "2021"
 license = "MIT"
 
 [workspace.dependencies]
+boxcar = "0.2.8"
 clap = { version = "4.5.18", features = ["derive"] }
 colored = "2.0.4"
 colorize = "0.1.0"
 crossbeam = "0.8"
+darling = "0.20.10"
+dashmap = "6.0.1"
 lazy_static = "1.4"
 log = { version = "0.4.17", features = ["kv_unstable", "kv_unstable_std"] }
 logos = "0.12"
@@ -19,19 +22,19 @@ lsp-server = "0.7.2"
 lsp-types = "0.94.1"
 notify = "7.0.0"
 notify-debouncer-full = "0.4.0"
+once_map = "0.4.20"
 pathdiff = "0.2.1"
 pretty-duration = "0.1.1"
 regex = "1.6.0"
 schemars = { version="0.8.11", features=["indexmap1"] }
 serde = "1.0.197"
+serde_derive = "1.0.197"
 serde_json = "1.0.108"
 strum = { version = "0.25.0", features = ["derive"] }
+syn = "2.0.96"
 thiserror = "1.0.40"
 tokio = { version = "1.35.0", features = ["full"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-lru = "0.12.5"
 proc-macro2 = "1.0.92"
-syn = "2.0.96"
 quote = "1.0.38"
-darling = "0.20.10"

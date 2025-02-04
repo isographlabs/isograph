@@ -1,7 +1,9 @@
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
-use crate::key::Key;
+use crate::dyn_eq::DynEq;
+use crate::epoch::Epoch;
+use crate::u64_types::Key;
 
 pub trait Source {
     fn get_key(&self) -> Key;
@@ -34,4 +36,10 @@ impl<T> SourceId<T> {
             phantom: PhantomData,
         }
     }
+}
+
+#[derive(Debug)]
+pub struct SourceNode {
+    pub time_updated: Epoch,
+    pub value: Box<dyn DynEq>,
 }
