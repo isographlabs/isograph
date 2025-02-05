@@ -51,6 +51,7 @@ impl Database {
     }
 
     pub fn drop_epoch(&mut self, epoch: Epoch) {
+        debug_assert!(epoch < self.current_epoch, "Cannot drop the current epoch.");
         self.epoch_to_generation_map.remove(&epoch);
     }
 
