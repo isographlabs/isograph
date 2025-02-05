@@ -5,7 +5,7 @@ use crate::{
     dyn_eq::DynEq,
     epoch::Epoch,
     u64_types::{Key, ParamId},
-    InnerFn,
+    Database,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -17,6 +17,14 @@ pub struct DerivedNodeId {
 impl DerivedNodeId {
     pub fn new(key: Key, param_id: ParamId) -> Self {
         Self { key, param_id }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct InnerFn(pub fn(&Database, ParamId) -> Box<dyn DynEq>);
+impl InnerFn {
+    pub fn new(inner_fn: fn(&Database, ParamId) -> Box<dyn DynEq>) -> Self {
+        InnerFn(inner_fn)
     }
 }
 
