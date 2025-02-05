@@ -1,5 +1,6 @@
 use crate::dependency::{NodeKind, TrackedDependencies};
 use crate::u64_types::{Key, ParamId};
+use crate::InnerFn;
 use crate::{dyn_eq::DynEq, epoch::Epoch};
 
 use crate::{
@@ -49,11 +50,7 @@ pub enum DidRecalculate {
 /// After this function is called, we guarantee that a [`DerivedNode`]
 /// (with a value identical to what we would get if we actually invoked the
 /// function) is present in the [`Database`].
-pub fn memo(
-    db: &Database,
-    derived_node_id: DerivedNodeId,
-    inner_fn: fn(&Database, ParamId) -> Box<dyn DynEq>,
-) -> DidRecalculate {
+pub fn memo(db: &Database, derived_node_id: DerivedNodeId, inner_fn: InnerFn) -> DidRecalculate {
     let (time_updated, did_recalculate) =
         if let Some(derived_node) = db.get_derived_node(derived_node_id) {
             db.verify_derived_node(derived_node_id);
@@ -72,7 +69,7 @@ pub fn memo(
 fn create_derived_node(
     db: &Database,
     derived_node_id: DerivedNodeId,
-    inner_fn: fn(&Database, ParamId) -> Box<dyn DynEq>,
+    inner_fn: InnerFn,
 ) -> (Epoch, DidRecalculate) {
     let (value, tracked_dependencies) =
         with_dependency_tracking(db, derived_node_id.param_id, inner_fn);
@@ -99,7 +96,7 @@ fn update_derived_node(
     db: &Database,
     derived_node_id: DerivedNodeId,
     prev_value: &dyn DynEq,
-    inner_fn: fn(&Database, ParamId) -> Box<dyn DynEq>,
+    inner_fn: InnerFn,
 ) -> (Epoch, DidRecalculate) {
     let (value, tracked_dependencies) =
         with_dependency_tracking(db, derived_node_id.param_id, inner_fn);
@@ -165,10 +162,10 @@ fn derived_node_changed_since(db: &Database, derived_node_id: DerivedNodeId, sin
 fn with_dependency_tracking(
     db: &Database,
     param_id: ParamId,
-    inner_fn: fn(&Database, ParamId) -> Box<dyn DynEq>,
+    inner_fn: InnerFn,
 ) -> (Box<dyn DynEq>, TrackedDependencies) {
     let guard = db.dependency_stack.enter();
-    let value = inner_fn(db, param_id);
+    let value = inner_fn.0(db, param_id);
     let tracked_dependencies = guard.release();
     (value, tracked_dependencies)
 }

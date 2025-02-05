@@ -12,6 +12,7 @@ mod source;
 mod u64_types;
 
 pub use database::*;
+pub use dependency::InnerFn;
 pub use derived_node::*;
 pub use memo::*;
 pub use source::*;

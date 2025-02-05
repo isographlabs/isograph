@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 
-use crate::{derived_node::DerivedNodeId, epoch::Epoch, u64_types::Key};
+use crate::{
+    derived_node::DerivedNodeId, dyn_eq::DynEq, epoch::Epoch, u64_types::Key, Database, ParamId,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Dependency {
@@ -94,5 +96,13 @@ impl Drop for DependencyStackGuard<'_> {
         if !self.released {
             self.stack.leave();
         }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct InnerFn(pub fn(&Database, ParamId) -> Box<dyn DynEq>);
+impl InnerFn {
+    pub fn new(inner_fn: fn(&Database, ParamId) -> Box<dyn DynEq>) -> Self {
+        InnerFn(inner_fn)
     }
 }

@@ -134,7 +134,7 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
         #vis #new_sig {
             let param_id = ::pico::macro_fns::intern_param(#db_arg, (#(#other_args.clone(),)*));
             let derived_node_id = ::pico::DerivedNodeId::new(#fn_hash.into(), param_id);
-            ::pico::memo(#db_arg, derived_node_id, |#db_arg, param_id| {
+            ::pico::memo(#db_arg, derived_node_id, ::pico::InnerFn::new(|#db_arg, param_id| {
                 let param_ref = ::pico::macro_fns::get_param(#db_arg, param_id)
                     .expect("param should exist. This is indicative of a bug in Pico.");
                 let (#(#unpacked_args,)*) = {
@@ -147,7 +147,7 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
                 };
                 let value: #return_type = (|| #block)();
                 Box::new(value)
-            });
+            }));
             #return_expr
         }
     };

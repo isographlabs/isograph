@@ -5,8 +5,8 @@ use crate::dependency::Dependency;
 use crate::dyn_eq::DynEq;
 use crate::epoch::Epoch;
 
-use crate::database::Database;
 use crate::u64_types::{Key, ParamId};
+use crate::InnerFn;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DerivedNodeId {
@@ -22,7 +22,7 @@ impl DerivedNodeId {
 
 pub struct DerivedNode {
     pub dependencies: Vec<Dependency>,
-    pub inner_fn: fn(&Database, ParamId) -> Box<dyn DynEq>,
+    pub inner_fn: InnerFn,
     pub value: Box<dyn DynEq>,
 }
 
