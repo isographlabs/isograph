@@ -24,8 +24,8 @@ fn arg_reference() {
 
     let expected = Expected(6);
     assert_result(&db, value, expected);
-    // assert that the argument of type `&Value` was cloned only once to params store
-    // and internally used by reference
+    // assert that the argument of type `&Value` was cloned only once, when it was
+    // inserted into the params store, and then internally used by reference
     assert_eq!(VALUE.load(Ordering::SeqCst), 1);
     // compare with the argument of type `Expected` which is cloned twice
     assert_eq!(EXPECTED.load(Ordering::SeqCst), 2);
