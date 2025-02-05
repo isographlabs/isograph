@@ -1,12 +1,12 @@
-use std::fmt;
-use std::hash::Hash;
+use std::{fmt, hash::Hash};
 
-use crate::dependency::Dependency;
-use crate::dyn_eq::DynEq;
-use crate::epoch::Epoch;
-
-use crate::u64_types::{Key, ParamId};
-use crate::InnerFn;
+use crate::{
+    dependency::Dependency,
+    dyn_eq::DynEq,
+    epoch::Epoch,
+    u64_types::{Key, ParamId},
+    InnerFn,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DerivedNodeId {

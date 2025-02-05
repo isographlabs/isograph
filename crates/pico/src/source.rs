@@ -1,9 +1,9 @@
-use std::hash::{Hash, Hasher};
-use std::marker::PhantomData;
+use std::{
+    hash::{Hash, Hasher},
+    marker::PhantomData,
+};
 
-use crate::dyn_eq::DynEq;
-use crate::epoch::Epoch;
-use crate::u64_types::Key;
+use crate::{dyn_eq::DynEq, epoch::Epoch, u64_types::Key};
 
 pub trait Source {
     fn get_key(&self) -> Key;

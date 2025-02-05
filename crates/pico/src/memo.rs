@@ -1,11 +1,11 @@
-use crate::dependency::{NodeKind, TrackedDependencies};
-use crate::u64_types::{Key, ParamId};
-use crate::InnerFn;
-use crate::{dyn_eq::DynEq, epoch::Epoch};
-
 use crate::{
     database::Database,
+    dependency::{NodeKind, TrackedDependencies},
     derived_node::{DerivedNode, DerivedNodeId},
+    dyn_eq::DynEq,
+    epoch::Epoch,
+    u64_types::{Key, ParamId},
+    InnerFn,
 };
 
 pub enum DidRecalculate {
