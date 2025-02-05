@@ -67,8 +67,7 @@ impl Database {
         Some(
             self.epoch_to_generation_map
                 .get(&index.epoch)?
-                .params
-                .get(index.idx),
+                .get_param(*index),
         )
     }
 
@@ -77,8 +76,7 @@ impl Database {
         Some(
             self.epoch_to_generation_map
                 .get(&index.epoch)?
-                .derived_nodes
-                .get(index.idx),
+                .get_derived_node(*index),
         )
     }
 
@@ -135,8 +133,7 @@ impl Database {
             .epoch_to_generation_map
             .get(&self.current_epoch)
             .unwrap()
-            .derived_nodes
-            .push(derived_node);
+            .insert_derived_node(derived_node);
         self.derived_node_id_to_index
             .insert(derived_node_id, Index::new(self.current_epoch, idx));
     }

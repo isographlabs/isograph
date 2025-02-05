@@ -30,8 +30,7 @@ pub fn intern_param<T: Hash + Clone + 'static>(db: &Database, param: T) -> Param
             .epoch_to_generation_map
             .get(&db.current_epoch)
             .unwrap()
-            .params
-            .push(Box::new(param));
+            .insert_param(Box::new(param));
         db.param_id_to_index
             .insert(param_id, Index::new(db.current_epoch, idx));
     }
