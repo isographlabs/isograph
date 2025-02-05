@@ -49,7 +49,7 @@ pub(crate) fn source(item: TokenStream) -> TokenStream {
     let output = quote! {
         impl ::pico::Source for #struct_name {
             fn get_key(&self) -> ::pico::Key {
-                ::pico::hash(&self.#field_name).into()
+                ::pico::macro_fns::hash(&self.#field_name).into()
             }
         }
     };
