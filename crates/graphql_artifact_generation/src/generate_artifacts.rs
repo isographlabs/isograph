@@ -454,11 +454,14 @@ pub(crate) fn generate_client_field_parameter_type(
     // TODO use unwraps
     let mut client_field_parameter_type = "{\n".to_string();
     let mut client_field_updatable_data_type = "{\n".to_string();
+    let mut query_type_declaration = DualStringProxy::new(
+        &mut client_field_parameter_type,
+        &mut client_field_updatable_data_type,
+    );
     for selection in selection_map.iter() {
         write_param_type_from_selection(
             schema,
-            &mut client_field_parameter_type,
-            &mut client_field_updatable_data_type,
+            &mut query_type_declaration,
             selection,
             parent_type,
             nested_client_field_imports,
@@ -495,6 +498,15 @@ impl<'a> DualStringProxy<'a> {
         self.left.push_str(s);
         self.right.push_str(s);
     }
+
+    pub fn push_readonly(&mut self, s: &str) {
+        self.left.push_str(s);
+    }
+
+    pub fn push_updatable(&mut self, s: &str) {
+        self.right.push_str(s);
+    }
+
     pub fn push(&mut self, ch: char) {
         self.left.push(ch);
         self.right.push(ch);
@@ -504,8 +516,7 @@ impl<'a> DualStringProxy<'a> {
 #[allow(clippy::too_many_arguments)]
 fn write_param_type_from_selection(
     schema: &ValidatedSchema,
-    readonly_data_type: &mut String,
-    updatable_data_type: &mut String,
+    query_type_declaration: &mut DualStringProxy,
     selection: &WithSpan<ValidatedSelection>,
     parent_type: &SchemaObject,
     nested_client_field_imports: &mut ParamTypeImports,
@@ -514,8 +525,6 @@ fn write_param_type_from_selection(
     link_fields: &mut LinkImports,
     updatable_fields: &mut UpdatableImports,
 ) {
-    let mut query_type_declaration = DualStringProxy::new(readonly_data_type, updatable_data_type);
-
     match &selection.item {
         ServerFieldSelection::ScalarField(scalar_field_selection) => {
             match scalar_field_selection.associated_data.location {
@@ -530,7 +539,7 @@ fn write_param_type_from_selection(
 
                     write_optional_description(
                         field.description,
-                        &mut query_type_declaration,
+                        query_type_declaration,
                         indentation_level,
                     );
 
@@ -552,15 +561,11 @@ fn write_param_type_from_selection(
                     match scalar_field_selection.associated_data.selection_variant {
                         ValidatedIsographSelectionVariant::Updatable => {
                             *updatable_fields = true;
-                            updatable_data_type.push_str(&format!(
-                                "{}{}: {},\n",
-                                "  ".repeat(indentation_level as usize),
-                                name_or_alias,
-                                print_javascript_type_declaration(&output_type)
-                            ));
-                            readonly_data_type.push_str(&format!(
-                                "{}readonly {}: {},\n",
-                                "  ".repeat(indentation_level as usize),
+                            query_type_declaration
+                                .push_str(&"  ".repeat(indentation_level as usize).to_string());
+                            query_type_declaration.push_readonly("readonly ");
+                            query_type_declaration.push_str(&format!(
+                                "{}: {},\n",
                                 name_or_alias,
                                 print_javascript_type_declaration(&output_type)
                             ));
@@ -582,7 +587,7 @@ fn write_param_type_from_selection(
                     let client_field = schema.client_field(client_field_id);
                     write_optional_description(
                         client_field.description,
-                        &mut query_type_declaration,
+                        query_type_declaration,
                         indentation_level,
                     );
                     query_type_declaration
@@ -667,13 +672,13 @@ fn write_param_type_from_selection(
             let field = schema.server_field(*parent_field);
             write_optional_description(
                 field.description,
-                &mut query_type_declaration,
+                query_type_declaration,
                 indentation_level,
             );
             query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
             let name_or_alias = linked_field.name_or_alias().item;
 
-            let (type_annotation, updatable_data_type_annotation) = match &field.associated_data {
+            match &field.associated_data {
                 SelectionType::Scalar(_) => panic!(
                     "output_type_id should be an object. \
                             This is indicative of a bug in Isograph.",
@@ -682,7 +687,7 @@ fn write_param_type_from_selection(
                     let output_type_id = associated_data.type_name.inner();
                     let object_id = output_type_id;
                     let object = schema.server_field_data.object(object_id);
-                    let (parameter_type, updatable_data_type) =
+                    let (parameter_type, updatable_parameter_type) =
                         generate_client_field_parameter_type(
                             schema,
                             &linked_field.selection_set,
@@ -693,30 +698,22 @@ fn write_param_type_from_selection(
                             link_fields,
                             updatable_fields,
                         );
-
-                    (
-                        associated_data
+                    query_type_declaration.push_str(&format!("readonly {}: ", name_or_alias,));
+                    query_type_declaration.push_readonly(&print_javascript_type_declaration(
+                        &associated_data
                             .type_name
                             .clone()
-                            .map(&mut |_| parameter_type.0.clone()),
-                        associated_data
+                            .map(&mut |_| &parameter_type),
+                    ));
+                    query_type_declaration.push_updatable(&print_javascript_type_declaration(
+                        &associated_data
                             .type_name
                             .clone()
-                            .map(&mut |_| updatable_data_type.0.clone()),
-                    )
+                            .map(&mut |_| &updatable_parameter_type),
+                    ));
+                    query_type_declaration.push_str(",\n");
                 }
             };
-
-            readonly_data_type.push_str(&format!(
-                "readonly {}: {},\n",
-                name_or_alias,
-                print_javascript_type_declaration(&type_annotation),
-            ));
-            updatable_data_type.push_str(&format!(
-                "readonly {}: {},\n",
-                name_or_alias,
-                print_javascript_type_declaration(&updatable_data_type_annotation),
-            ));
         }
     }
 }
