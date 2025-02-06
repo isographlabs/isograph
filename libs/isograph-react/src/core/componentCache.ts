@@ -5,7 +5,7 @@ import { IsographEnvironment } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { readPromise } from './PromiseWrapper';
 import { NetworkRequestReaderOptions } from './read';
-import { startUpdate } from './startUpdate';
+import { getOrCreateCachedStartUpdate } from './startUpdate';
 
 export function getOrCreateCachedComponent(
   environment: IsographEnvironment,
@@ -50,7 +50,11 @@ export function getOrCreateCachedComponent(
           data,
           parameters: fragmentReference.variables,
           startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
-            ? startUpdate(environment, data)
+            ? getOrCreateCachedStartUpdate(
+                environment,
+                fragmentReference,
+                readerWithRefetchQueries,
+              )
             : undefined,
         },
         additionalRuntimeProps,

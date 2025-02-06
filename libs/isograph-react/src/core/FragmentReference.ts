@@ -45,9 +45,11 @@ export type FragmentReference<
   readonly networkRequest: PromiseWrapper<void, any>;
 };
 
+export type StableIdForFragmentReference = string;
+
 export function stableIdForFragmentReference(
   fragmentReference: FragmentReference<any, any>,
-): string {
+): StableIdForFragmentReference {
   return `${fragmentReference.root.__typename}/${fragmentReference.root.__link}/TODO_FRAGMENT_NAME/${serializeVariables(fragmentReference.variables ?? {})}`;
 }
 

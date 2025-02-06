@@ -48,6 +48,8 @@ export {
   type AnyRecordSubscription,
   type ComponentOrFieldName,
   type StringifiedArgs,
+  type Resolver,
+  type StartUpdateCache,
 } from './core/IsographEnvironment';
 export {
   type EagerReaderArtifact,
@@ -109,6 +111,7 @@ export {
   stableIdForFragmentReference,
   type ExtractStartUpdate,
   type VariableValue,
+  type StableIdForFragmentReference,
 } from './core/FragmentReference';
 export {
   type LogMessage,

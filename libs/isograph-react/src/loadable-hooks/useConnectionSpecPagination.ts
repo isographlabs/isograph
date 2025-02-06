@@ -20,7 +20,7 @@ import {
   type WithEncounteredRecords,
 } from '../core/read';
 import { LoadableField, type ReaderAst } from '../core/reader';
-import { startUpdate } from '../core/startUpdate';
+import { getOrCreateCachedStartUpdate } from '../core/startUpdate';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 import { maybeUnwrapNetworkRequest } from '../react/useResult';
@@ -130,7 +130,11 @@ export function useConnectionSpecPagination<
         data,
         parameters: fragmentReference.variables,
         startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
-          ? startUpdate(environment, data)
+          ? getOrCreateCachedStartUpdate(
+              environment,
+              fragmentReference,
+              readerWithRefetchQueries,
+            )
           : undefined,
       };
 

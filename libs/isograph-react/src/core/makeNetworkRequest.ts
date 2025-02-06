@@ -28,7 +28,7 @@ import {
   wrapResolvedValue,
 } from './PromiseWrapper';
 import { readButDoNotEvaluate } from './read';
-import { startUpdate } from './startUpdate';
+import { getOrCreateCachedStartUpdate } from './startUpdate';
 
 let networkRequestId = 0;
 
@@ -307,7 +307,11 @@ function readDataForOnComplete<
           data: fragmentResult,
           parameters: variables,
           startUpdate: readerArtifact.hasUpdatable
-            ? startUpdate(environment, fragmentResult)
+            ? getOrCreateCachedStartUpdate(
+                environment,
+                fragment,
+                artifact.readerWithRefetchQueries,
+              )
             : undefined,
         });
       }

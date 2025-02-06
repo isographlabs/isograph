@@ -12,7 +12,7 @@ import {
   getNetworkRequestOptionsWithDefaults,
   NetworkRequestReaderOptions,
 } from '../core/read';
-import { startUpdate } from '../core/startUpdate';
+import { getOrCreateCachedStartUpdate } from '../core/startUpdate';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useReadAndSubscribe } from './useReadAndSubscribe';
 
@@ -56,7 +56,11 @@ export function useResult<
         data: data,
         parameters: fragmentReference.variables,
         startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
-          ? startUpdate(environment, data)
+          ? getOrCreateCachedStartUpdate(
+              environment,
+              fragmentReference,
+              readerWithRefetchQueries,
+            )
           : undefined,
       };
       return readerWithRefetchQueries.readerArtifact.resolver(param);
